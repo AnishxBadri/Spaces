@@ -566,6 +566,54 @@ export const listPeople = createServerFn().handler(async () => {
   }))
 })
 
+/** Table rows for people: values + identity emails + company via contact_at. */
+export const listPeopleTable = createServerFn().handler(async () => {
+  await requireUser()
+  const rows = await db
+    .select({
+      id: entity.id,
+      name: entity.canonicalName,
+      values: entity.values,
+      createdAt: entity.createdAt,
+    })
+    .from(entity)
+    .innerJoin(person, eq(person.entityId, entity.id))
+    .where(isNull(entity.mergedIntoId))
+    .orderBy(desc(entity.createdAt))
+
+  const emails = await db
+    .select({ entityId: entityAlias.entityId, email: entityAlias.valueNorm })
+    .from(entityAlias)
+    .where(and(eq(entityAlias.kind, 'email'), eq(entityAlias.isIdentity, true)))
+  const emailsBy = new Map<string, Array<string>>()
+  for (const e of emails) {
+    emailsBy.set(e.entityId, [...(emailsBy.get(e.entityId) ?? []), e.email])
+  }
+
+  const companies = await db
+    .select({
+      personId: link.fromEntityId,
+      companyId: entity.id,
+      companyName: entity.canonicalName,
+    })
+    .from(link)
+    .innerJoin(entity, eq(entity.id, link.toEntityId))
+    .where(and(eq(link.relation, 'contact_at'), isNull(entity.mergedIntoId)))
+  const companyBy = new Map<string, { id: string; name: string }>()
+  for (const c of companies) {
+    companyBy.set(c.personId, { id: c.companyId, name: c.companyName })
+  }
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    values: (r.values ?? {}) as Record<string, Json>,
+    emails: emailsBy.get(r.id) ?? [],
+    company: companyBy.get(r.id) ?? null,
+    createdAt: r.createdAt.toISOString(),
+  }))
+})
+
 const createPersonInput = z.object({
   name: z.string().trim().min(1).max(160),
   email: z.string().trim().max(255).optional(),

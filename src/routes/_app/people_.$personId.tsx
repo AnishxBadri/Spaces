@@ -18,11 +18,17 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
+import { ValueEditor } from '#/components/attributes/value-editor'
+import type { RegistryEntry } from '#/components/attributes/value-editor'
+import { RecordTimeline } from '#/components/record-timeline'
 import {
   addPersonContact,
   createNote,
   getPerson,
+  getRecordTimeline,
   listCompanies,
+  listRegistry,
   setPersonCompany,
   updateRecord,
 } from '#/lib/server-fns'
@@ -30,9 +36,11 @@ import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/people_/$personId')({
   loader: async ({ params }) => {
-    const [personData, companies] = await Promise.all([
+    const [personData, companies, registry, timeline] = await Promise.all([
       getPerson({ data: { id: params.personId } }),
       listCompanies(),
+      listRegistry({ data: { kind: 'person' } }),
+      getRecordTimeline({ data: { entityId: params.personId } }),
     ])
     if (personData.mergedIntoId) {
       throw redirect({
@@ -40,27 +48,13 @@ export const Route = createFileRoute('/_app/people_/$personId')({
         params: { personId: personData.mergedIntoId },
       })
     }
-    return { person: personData, allCompanies: companies }
+    return { person: personData, allCompanies: companies, registry, timeline }
   },
   component: PersonRecordPage,
 })
 
-const dateTimeFmt = new Intl.DateTimeFormat('en', {
-  day: '2-digit',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-})
-
-const VERB_LABELS: Record<string, string> = {
-  'person.created': 'Person created',
-  'person.updated': 'Details updated',
-  'note.created': 'Note created',
-  'entity.merged': 'Merged duplicate record',
-}
-
 function PersonRecordPage() {
-  const { person, allCompanies } = Route.useLoaderData()
+  const { person, allCompanies, registry, timeline } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'activity' | 'notes'>('activity')
@@ -117,22 +111,19 @@ function PersonRecordPage() {
       <div className="mt-8 grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
         {/* Left: details */}
         <aside className="space-y-5">
-          <AttrField
-            label="Job title"
-            value={String(person.values.job_title ?? '')}
-            placeholder="CTO @ Pixxel"
-            onSave={(v) =>
-              save({ id: person.id, patch: { job_title: v || null } })
-            }
-          />
-          <AttrField
-            label="Location"
-            value={String(person.values.location ?? '')}
-            placeholder="Bengaluru"
-            onSave={(v) =>
-              save({ id: person.id, patch: { location: v || null } })
-            }
-          />
+          {registry.map((def) => (
+            <div key={def.slug} className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                {def.name}
+              </span>
+              <ValueEditor
+                def={def as RegistryEntry}
+                value={person.values[def.slug] ?? null}
+                variant="field"
+                onSave={(v) => save({ id: person.id, patch: { [def.slug]: v } })}
+              />
+            </div>
+          ))}
 
           <ContactField
             personId={person.id}
@@ -149,6 +140,17 @@ function PersonRecordPage() {
             icon={Linkedin}
             values={person.linkedins.map((l) => l.valueNorm)}
             placeholder="linkedin.com/in/…"
+          />
+
+          <AttributeCreateDialog
+            objectKind="person"
+            onCreated={() => router.invalidate()}
+            trigger={
+              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+                <Plus className="size-3" strokeWidth={2} />
+                Add attribute
+              </button>
+            }
           />
         </aside>
 
@@ -181,20 +183,10 @@ function PersonRecordPage() {
           </div>
 
           {tab === 'activity' ? (
-            <ul className="mt-4 space-y-2.5">
-              {person.timeline.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">Nothing yet.</p>
-              ) : (
-                person.timeline.map((t) => (
-                  <li key={t.id} className="flex items-baseline gap-3 text-[13px]">
-                    <span className="tabular w-28 shrink-0 text-xs text-muted-foreground/80">
-                      {dateTimeFmt.format(new Date(t.at))}
-                    </span>
-                    <span>{VERB_LABELS[t.verb] ?? t.verb}</span>
-                  </li>
-                ))
-              )}
-            </ul>
+            <RecordTimeline
+              items={timeline}
+              registry={registry as Array<RegistryEntry>}
+            />
           ) : (
             <ul className="mt-4 space-y-1">
               {noteMentions.length === 0 ? (
@@ -325,38 +317,6 @@ function PersonRecordPage() {
   )
 }
 
-function AttrField({
-  label,
-  value,
-  placeholder,
-  onSave,
-}: {
-  label: string
-  value: string
-  placeholder: string
-  onSave: (value: string) => void
-}) {
-  const [draft, setDraft] = useState(value)
-  const id = `attr-${label.toLowerCase()}`
-  return (
-    <div className="space-y-1">
-      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
-        {label}
-      </label>
-      <Input
-        id={id}
-        value={draft}
-        placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => draft !== value && onSave(draft)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-        }}
-        className="h-8 text-[13px]"
-      />
-    </div>
-  )
-}
 
 function ContactField({
   personId,
