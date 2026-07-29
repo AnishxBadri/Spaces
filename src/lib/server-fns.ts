@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
-import { and, asc, count, desc, eq, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { auth } from './auth'
 import { db } from '#/db'
@@ -734,6 +734,284 @@ export const setPersonCompany = createServerFn({ method: 'POST' })
     return { ok: true }
   })
 
+// ---------- deals ----------
+
+const createDealInput = z.object({
+  companyId: z.string().uuid(),
+  name: z.string().trim().min(1).max(200),
+  stage: z.string().max(60).optional(),
+  value: z.number().finite().optional(),
+  source: z.string().max(60).optional(),
+})
+
+export const createDeal = createServerFn({ method: 'POST' })
+  .validator(createDealInput)
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const [ent] = await db
+      .insert(entity)
+      .values({ kind: 'deal', canonicalName: data.name, createdBy: u.id })
+      .returning({ id: entity.id })
+
+    const { setValues } = await import('./attributes/values')
+    await setValues({
+      entityId: ent.id,
+      patch: {
+        company: data.companyId,
+        stage: data.stage ?? 'pre_lead',
+        owner: u.id,
+        ...(data.value !== undefined ? { value: data.value } : {}),
+        ...(data.source ? { source: data.source } : {}),
+      },
+      actorId: u.id,
+    })
+    await db.insert(activity).values({
+      actorId: u.id,
+      verb: 'deal.created',
+      subjectEntityId: data.companyId,
+      objectEntityId: ent.id,
+    })
+    return { id: ent.id }
+  })
+
+/**
+ * Deal rows with referenced records resolved for display: values hold
+ * uuids; the table wants names. One pass over reference links.
+ */
+export const listDealsTable = createServerFn().handler(async () => {
+  await requireUser()
+  const rows = await db
+    .select({
+      id: entity.id,
+      name: entity.canonicalName,
+      values: entity.values,
+      createdAt: entity.createdAt,
+    })
+    .from(entity)
+    .where(and(eq(entity.kind, 'deal'), isNull(entity.mergedIntoId)))
+    .orderBy(desc(entity.createdAt))
+
+  if (rows.length === 0)
+    return {
+      rows: [] as Array<{
+        id: string
+        name: string
+        values: Record<string, Json>
+        createdAt: string
+      }>,
+      refNames: {} as Record<string, { id: string; name: string; kind: string }>,
+      userNames: {} as Record<string, string>,
+    }
+  const dealIds = rows.map((r) => r.id)
+  const refs = await db
+    .select({
+      fromId: link.fromEntityId,
+      toId: link.toEntityId,
+      attrSlug: link.attrSlug,
+      name: entity.canonicalName,
+      kind: entity.kind,
+    })
+    .from(link)
+    .innerJoin(entity, eq(entity.id, link.toEntityId))
+    .where(
+      and(eq(link.relation, 'references'), inArray(link.fromEntityId, dealIds)),
+    )
+  const refNames = new Map<string, { id: string; name: string; kind: string }>()
+  for (const r of refs) refNames.set(r.toId, { id: r.toId, name: r.name, kind: r.kind })
+
+  const users = await db.select({ id: user.id, name: user.name }).from(user)
+
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      values: (r.values ?? {}) as Record<string, Json>,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    refNames: Object.fromEntries(refNames) as Record<
+      string,
+      { id: string; name: string; kind: string }
+    >,
+    userNames: Object.fromEntries(users.map((u) => [u.id, u.name])) as Record<
+      string,
+      string
+    >,
+  }
+})
+
+/** Deals referencing a company — the company record's Deals section. */
+export const listCompanyDeals = createServerFn()
+  .validator(z.object({ companyId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const rows = await db
+      .select({
+        id: entity.id,
+        name: entity.canonicalName,
+        values: entity.values,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.fromEntityId))
+      .where(
+        and(
+          eq(link.toEntityId, data.companyId),
+          eq(link.relation, 'references'),
+          eq(link.attrSlug, 'company'),
+          eq(entity.kind, 'deal'),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+      .orderBy(desc(entity.createdAt))
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      stage: ((r.values ?? {}) as Record<string, unknown>).stage as
+        | string
+        | undefined,
+    }))
+  })
+
+export const getDeal = createServerFn()
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const [head] = await db
+      .select({
+        id: entity.id,
+        name: entity.canonicalName,
+        kind: entity.kind,
+        mergedIntoId: entity.mergedIntoId,
+        values: entity.values,
+        createdAt: entity.createdAt,
+      })
+      .from(entity)
+      .where(and(eq(entity.id, data.id), eq(entity.kind, 'deal')))
+    if (!head) throw new Error('Deal not found')
+
+    // Resolve referenced entities + users for display.
+    const refs = await db
+      .select({
+        toId: link.toEntityId,
+        name: entity.canonicalName,
+        kind: entity.kind,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.toEntityId))
+      .where(
+        and(eq(link.fromEntityId, data.id), eq(link.relation, 'references')),
+      )
+    const users = await db.select({ id: user.id, name: user.name }).from(user)
+
+    const mentionedIn = await db
+      .select({
+        fromId: link.fromEntityId,
+        name: entity.canonicalName,
+        kind: entity.kind,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.fromEntityId))
+      .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
+
+    return {
+      id: head.id,
+      name: head.name,
+      mergedIntoId: head.mergedIntoId,
+      values: (head.values ?? {}) as Record<string, Json>,
+      createdAt: head.createdAt.toISOString(),
+      refNames: Object.fromEntries(
+        refs.map((r) => [r.toId, { name: r.name, kind: r.kind }]),
+      ) as Record<string, { name: string; kind: string }>,
+      userNames: Object.fromEntries(users.map((u) => [u.id, u.name])) as Record<
+        string,
+        string
+      >,
+      mentionedIn,
+    }
+  })
+
+// ---------- record timeline (condensed) ----------
+
+/**
+ * Merged timeline: macro activity + attribute_event bursts. Bursts group
+ * consecutive attribute changes by the same actor within 10 minutes —
+ * read-time condensing, per CONTEXT.md.
+ */
+export const getRecordTimeline = createServerFn()
+  .validator(z.object({ entityId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { attributeEvent } = await import('#/db/schema')
+
+    const users = await db.select({ id: user.id, name: user.name }).from(user)
+    const userNames = new Map(users.map((u) => [u.id, u.name]))
+
+    const macros = await db
+      .select({
+        id: activity.id,
+        verb: activity.verb,
+        actorId: activity.actorId,
+        at: activity.at,
+      })
+      .from(activity)
+      .where(eq(activity.subjectEntityId, data.entityId))
+      .orderBy(desc(activity.at))
+      .limit(80)
+
+    const events = await db
+      .select()
+      .from(attributeEvent)
+      .where(eq(attributeEvent.entityId, data.entityId))
+      .orderBy(desc(attributeEvent.at))
+      .limit(200)
+
+    const GAP_MS = 10 * 60 * 1000
+    type Burst = {
+      type: 'attrs'
+      actor: string | null
+      at: string
+      changes: Array<{ slug: string; to: Json }>
+    }
+    const bursts: Array<Burst> = []
+    for (const ev of events) {
+      const last = bursts[bursts.length - 1]
+      if (
+        last &&
+        last.actor === (ev.actorId ?? null) &&
+        new Date(last.at).getTime() - ev.at.getTime() < GAP_MS
+      ) {
+        last.changes.push({ slug: ev.attrSlug, to: ev.to as Json })
+      } else {
+        bursts.push({
+          type: 'attrs',
+          actor: ev.actorId ?? null,
+          at: ev.at.toISOString(),
+          changes: [{ slug: ev.attrSlug, to: ev.to as Json }],
+        })
+      }
+    }
+
+    const items = [
+      ...macros
+        .filter((m) => !['company.updated', 'person.updated'].includes(m.verb))
+        .map((m) => ({
+          type: 'macro' as const,
+          id: m.id,
+          verb: m.verb,
+          actorName: m.actorId ? (userNames.get(m.actorId) ?? null) : null,
+          at: m.at.toISOString(),
+        })),
+      ...bursts.map((b, i) => ({
+        type: 'attrs' as const,
+        id: `burst-${i}`,
+        actorName: b.actor ? (userNames.get(b.actor) ?? null) : null,
+        at: b.at,
+        changes: b.changes,
+      })),
+    ].sort((a, b) => (a.at < b.at ? 1 : -1))
+
+    return items.slice(0, 60)
+  })
+
 // ---------- dedupe inbox ----------
 
 async function entityContext(id: string) {
@@ -1050,9 +1328,26 @@ export const saveNote = createServerFn({ method: 'POST' })
     return { savedAt: new Date().toISOString() }
   })
 
-/** Mention autocomplete — every linkable kind except documents. */
+/** Autocomplete over entities — mentions and reference pickers share it. */
 export const searchEntities = createServerFn()
-  .validator(z.object({ q: z.string().max(120) }))
+  .validator(
+    z.object({
+      q: z.string().max(120),
+      kinds: z
+        .array(
+          z.enum([
+            'company',
+            'person',
+            'organization',
+            'deal',
+            'space',
+            'thesis',
+            'note',
+          ]),
+        )
+        .optional(),
+    }),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const q = data.q.trim()
@@ -1069,12 +1364,19 @@ export const searchEntities = createServerFn()
       .where(
         and(
           isNull(entity.mergedIntoId),
-          ne(entity.kind, 'document'),
+          data.kinds
+            ? inArray(entity.kind, data.kinds)
+            : ne(entity.kind, 'document'),
           sql`(${entity.canonicalName} ilike ${pattern} or (${entityAlias.kind} = 'name' and ${entityAlias.valueNorm} ilike ${pattern}))`,
         ),
       )
       .limit(8)
   })
+
+export const listUsers = createServerFn().handler(async () => {
+  await requireUser()
+  return db.select({ id: user.id, name: user.name }).from(user)
+})
 
 // ---------- spaces (first real write path through the entity core) ----------
 

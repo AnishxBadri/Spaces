@@ -19,12 +19,16 @@ import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
-import { ValueEditor } from '#/components/attributes/value-editor'
+import { ValueEditor, optionLabel } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
+import { RecordTimeline } from '#/components/record-timeline'
+import { CreateDealDialog } from '#/routes/_app/deals'
 import {
   addCompanyDomain,
   createNote,
   getCompany,
+  getRecordTimeline,
+  listCompanyDeals,
   listRegistry,
   listSpaces,
   tagIntoSpace,
@@ -35,11 +39,15 @@ import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/companies_/$companyId')({
   loader: async ({ params }) => {
-    const [companyData, spaces, registry] = await Promise.all([
-      getCompany({ data: { id: params.companyId } }),
-      listSpaces(),
-      listRegistry({ data: { kind: 'company' } }),
-    ])
+    const [companyData, spaces, registry, dealRegistry, deals, timeline] =
+      await Promise.all([
+        getCompany({ data: { id: params.companyId } }),
+        listSpaces(),
+        listRegistry({ data: { kind: 'company' } }),
+        listRegistry({ data: { kind: 'deal' } }),
+        listCompanyDeals({ data: { companyId: params.companyId } }),
+        getRecordTimeline({ data: { entityId: params.companyId } }),
+      ])
     // Merged-away records redirect to their survivor — stale URLs keep working.
     if (companyData.mergedIntoId) {
       throw redirect({
@@ -47,28 +55,22 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
         params: { companyId: companyData.mergedIntoId },
       })
     }
-    return { company: companyData, allSpaces: spaces, registry }
+    return {
+      company: companyData,
+      allSpaces: spaces,
+      registry,
+      dealRegistry,
+      deals,
+      timeline,
+    }
   },
   component: CompanyRecordPage,
 })
 
-const dateTimeFmt = new Intl.DateTimeFormat('en', {
-  day: '2-digit',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-})
-
-const VERB_LABELS: Record<string, string> = {
-  'company.created': 'Company created',
-  'company.updated': 'Attributes updated',
-  'space.tagged': 'Tagged into space',
-  'space.untagged': 'Removed from space',
-  'note.created': 'Note created',
-}
-
 function CompanyRecordPage() {
-  const { company, allSpaces, registry } = Route.useLoaderData()
+  const { company, allSpaces, registry, dealRegistry, deals, timeline } =
+    Route.useLoaderData()
+  const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'activity' | 'notes'>('activity')
@@ -179,22 +181,10 @@ function CompanyRecordPage() {
           </div>
 
           {tab === 'activity' ? (
-            <ul className="mt-4 space-y-2.5">
-              {company.timeline.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">
-                  Nothing yet.
-                </p>
-              ) : (
-                company.timeline.map((t) => (
-                  <li key={t.id} className="flex items-baseline gap-3 text-[13px]">
-                    <span className="tabular w-28 shrink-0 text-xs text-muted-foreground/80">
-                      {dateTimeFmt.format(new Date(t.at))}
-                    </span>
-                    <span>{VERB_LABELS[t.verb] ?? t.verb}</span>
-                  </li>
-                ))
-              )}
-            </ul>
+            <RecordTimeline
+              items={timeline}
+              registry={registry as Array<RegistryEntry>}
+            />
           ) : (
             <ul className="mt-4 space-y-1">
               {noteMentions.length === 0 ? (
@@ -225,6 +215,43 @@ function CompanyRecordPage() {
 
         {/* Right: related */}
         <aside className="space-y-6">
+          <div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-medium text-muted-foreground">
+                Deals
+              </h2>
+              <CreateDealDialog
+                registry={dealRegistry as Array<RegistryEntry>}
+                presetCompany={{ id: company.id, name: company.name }}
+                triggerLabel="New"
+              />
+            </div>
+            {deals.length === 0 ? (
+              <p className="mt-2 text-xs text-muted-foreground/80">
+                No deals yet — watching only.
+              </p>
+            ) : (
+              <ul className="mt-2 space-y-1">
+                {deals.map((d) => (
+                  <li key={d.id}>
+                    <Link
+                      to="/deals/$dealId"
+                      params={{ dealId: d.id }}
+                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                    >
+                      <span className="min-w-0 flex-1 truncate">{d.name}</span>
+                      {d.stage && stageDef ? (
+                        <span className="rounded-full bg-selected px-2 py-0.5 text-xs font-medium">
+                          {optionLabel(stageDef as RegistryEntry, d.stage)}
+                        </span>
+                      ) : null}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div>
             <h2 className="text-xs font-medium text-muted-foreground">
               Spaces

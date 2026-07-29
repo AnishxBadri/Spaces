@@ -14,15 +14,16 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AppCompaniesRouteImport } from './routes/_app/companies'
+import { Route as AppDealsRouteImport } from './routes/_app/deals'
 import { Route as AppDedupeRouteImport } from './routes/_app/dedupe'
 import { Route as AppNotesRouteImport } from './routes/_app/notes'
 import { Route as AppPeopleRouteImport } from './routes/_app/people'
-import { Route as AppPipelineRouteImport } from './routes/_app/pipeline'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSpacesRouteImport } from './routes/_app/spaces'
 import { Route as AppThesesRouteImport } from './routes/_app/theses'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/companies_.$companyId'
+import { Route as AppDealsDealIdRouteImport } from './routes/_app/deals_.$dealId'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId'
 import { Route as AppPeoplePersonIdRouteImport } from './routes/_app/people_.$personId'
 import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
@@ -53,6 +54,11 @@ const AppCompaniesRoute = AppCompaniesRouteImport.update({
   path: '/companies',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDealsRoute = AppDealsRouteImport.update({
+  id: '/deals',
+  path: '/deals',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDedupeRoute = AppDedupeRouteImport.update({
   id: '/dedupe',
   path: '/dedupe',
@@ -66,11 +72,6 @@ const AppNotesRoute = AppNotesRouteImport.update({
 const AppPeopleRoute = AppPeopleRouteImport.update({
   id: '/people',
   path: '/people',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPipelineRoute = AppPipelineRouteImport.update({
-  id: '/pipeline',
-  path: '/pipeline',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -96,6 +97,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
 const AppCompaniesCompanyIdRoute = AppCompaniesCompanyIdRouteImport.update({
   id: '/companies_/$companyId',
   path: '/companies/$companyId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDealsDealIdRoute = AppDealsDealIdRouteImport.update({
+  id: '/deals_/$dealId',
+  path: '/deals/$dealId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppNotesNoteIdRoute = AppNotesNoteIdRouteImport.update({
@@ -129,15 +135,16 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/companies': typeof AppCompaniesRoute
+  '/deals': typeof AppDealsRoute
   '/dedupe': typeof AppDedupeRoute
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
-  '/pipeline': typeof AppPipelineRoute
   '/settings': typeof AppSettingsRoute
   '/spaces': typeof AppSpacesRoute
   '/theses': typeof AppThesesRoute
   '/api/health': typeof ApiHealthRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
+  '/deals/$dealId': typeof AppDealsDealIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
@@ -149,15 +156,16 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/companies': typeof AppCompaniesRoute
+  '/deals': typeof AppDealsRoute
   '/dedupe': typeof AppDedupeRoute
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
-  '/pipeline': typeof AppPipelineRoute
   '/settings': typeof AppSettingsRoute
   '/spaces': typeof AppSpacesRoute
   '/theses': typeof AppThesesRoute
   '/api/health': typeof ApiHealthRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
+  '/deals/$dealId': typeof AppDealsDealIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
@@ -171,15 +179,16 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/_app/companies': typeof AppCompaniesRoute
+  '/_app/deals': typeof AppDealsRoute
   '/_app/dedupe': typeof AppDedupeRoute
   '/_app/notes': typeof AppNotesRoute
   '/_app/people': typeof AppPeopleRoute
-  '/_app/pipeline': typeof AppPipelineRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/spaces': typeof AppSpacesRoute
   '/_app/theses': typeof AppThesesRoute
   '/api/health': typeof ApiHealthRoute
   '/_app/companies_/$companyId': typeof AppCompaniesCompanyIdRoute
+  '/_app/deals_/$dealId': typeof AppDealsDealIdRoute
   '/_app/notes_/$noteId': typeof AppNotesNoteIdRoute
   '/_app/people_/$personId': typeof AppPeoplePersonIdRoute
   '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
@@ -193,15 +202,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/companies'
+    | '/deals'
     | '/dedupe'
     | '/notes'
     | '/people'
-    | '/pipeline'
     | '/settings'
     | '/spaces'
     | '/theses'
     | '/api/health'
     | '/companies/$companyId'
+    | '/deals/$dealId'
     | '/notes/$noteId'
     | '/people/$personId'
     | '/spaces/$spaceId'
@@ -213,15 +223,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/companies'
+    | '/deals'
     | '/dedupe'
     | '/notes'
     | '/people'
-    | '/pipeline'
     | '/settings'
     | '/spaces'
     | '/theses'
     | '/api/health'
     | '/companies/$companyId'
+    | '/deals/$dealId'
     | '/notes/$noteId'
     | '/people/$personId'
     | '/spaces/$spaceId'
@@ -234,15 +245,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/_app/companies'
+    | '/_app/deals'
     | '/_app/dedupe'
     | '/_app/notes'
     | '/_app/people'
-    | '/_app/pipeline'
     | '/_app/settings'
     | '/_app/spaces'
     | '/_app/theses'
     | '/api/health'
     | '/_app/companies_/$companyId'
+    | '/_app/deals_/$dealId'
     | '/_app/notes_/$noteId'
     | '/_app/people_/$personId'
     | '/_app/spaces_/$spaceId'
@@ -297,6 +309,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCompaniesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/deals': {
+      id: '/_app/deals'
+      path: '/deals'
+      fullPath: '/deals'
+      preLoaderRoute: typeof AppDealsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dedupe': {
       id: '/_app/dedupe'
       path: '/dedupe'
@@ -316,13 +335,6 @@ declare module '@tanstack/react-router' {
       path: '/people'
       fullPath: '/people'
       preLoaderRoute: typeof AppPeopleRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/pipeline': {
-      id: '/_app/pipeline'
-      path: '/pipeline'
-      fullPath: '/pipeline'
-      preLoaderRoute: typeof AppPipelineRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/settings': {
@@ -358,6 +370,13 @@ declare module '@tanstack/react-router' {
       path: '/companies/$companyId'
       fullPath: '/companies/$companyId'
       preLoaderRoute: typeof AppCompaniesCompanyIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/deals_/$dealId': {
+      id: '/_app/deals_/$dealId'
+      path: '/deals/$dealId'
+      fullPath: '/deals/$dealId'
+      preLoaderRoute: typeof AppDealsDealIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/notes_/$noteId': {
@@ -400,14 +419,15 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppCompaniesRoute: typeof AppCompaniesRoute
+  AppDealsRoute: typeof AppDealsRoute
   AppDedupeRoute: typeof AppDedupeRoute
   AppNotesRoute: typeof AppNotesRoute
   AppPeopleRoute: typeof AppPeopleRoute
-  AppPipelineRoute: typeof AppPipelineRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSpacesRoute: typeof AppSpacesRoute
   AppThesesRoute: typeof AppThesesRoute
   AppCompaniesCompanyIdRoute: typeof AppCompaniesCompanyIdRoute
+  AppDealsDealIdRoute: typeof AppDealsDealIdRoute
   AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
   AppPeoplePersonIdRoute: typeof AppPeoplePersonIdRoute
   AppSpacesSpaceIdRoute: typeof AppSpacesSpaceIdRoute
@@ -415,14 +435,15 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppCompaniesRoute: AppCompaniesRoute,
+  AppDealsRoute: AppDealsRoute,
   AppDedupeRoute: AppDedupeRoute,
   AppNotesRoute: AppNotesRoute,
   AppPeopleRoute: AppPeopleRoute,
-  AppPipelineRoute: AppPipelineRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSpacesRoute: AppSpacesRoute,
   AppThesesRoute: AppThesesRoute,
   AppCompaniesCompanyIdRoute: AppCompaniesCompanyIdRoute,
+  AppDealsDealIdRoute: AppDealsDealIdRoute,
   AppNotesNoteIdRoute: AppNotesNoteIdRoute,
   AppPeoplePersonIdRoute: AppPeoplePersonIdRoute,
   AppSpacesSpaceIdRoute: AppSpacesSpaceIdRoute,

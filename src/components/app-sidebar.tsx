@@ -27,7 +27,7 @@ export const NAV_ITEMS = [
   { to: '/spaces', label: 'Spaces', icon: Layers },
   { to: '/companies', label: 'Companies', icon: Building2 },
   { to: '/people', label: 'People', icon: Users },
-  { to: '/pipeline', label: 'Pipeline', icon: Kanban },
+  { to: '/deals', label: 'Deals', icon: Kanban },
   { to: '/theses', label: 'Theses', icon: Target },
   { to: '/notes', label: 'Notes', icon: FileText },
 ] as const

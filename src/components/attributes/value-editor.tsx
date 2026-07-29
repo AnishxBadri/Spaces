@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Star } from 'lucide-react'
+import { Building2, Check, ChevronDown, Star, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   DropdownMenu,
@@ -7,6 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
+import { Input } from '#/components/ui/input'
+import { listUsers, searchEntities } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
@@ -23,8 +25,20 @@ export type RegistryEntry = {
     options?: Array<{ id: string; label: string; group?: string; color?: string }>
     max?: number
     code?: string
+    targetKind?: string
+    multi?: boolean
+    required?: boolean
   } | null
   isSystem: boolean
+}
+
+/** id → display name for reference/actor values, supplied by the caller. */
+export type RefNames = Record<string, { name: string } | string>
+
+export function refName(refNames: RefNames | undefined, id: string): string {
+  const hit = refNames?.[id]
+  if (!hit) return '…'
+  return typeof hit === 'string' ? hit : hit.name
 }
 
 type Props = {
@@ -33,6 +47,8 @@ type Props = {
   onSave: (value: unknown) => void
   variant: 'cell' | 'field'
   autoFocus?: boolean
+  /** display names for record/actor reference ids */
+  refNames?: RefNames
 }
 
 const STATUS_GROUP_COLORS: Record<string, string> = {
@@ -46,8 +62,35 @@ export function optionLabel(def: RegistryEntry, id: unknown): string {
   return opt?.label ?? String(id ?? '')
 }
 
-export function ValueEditor({ def, value, onSave, variant, autoFocus }: Props) {
+export function ValueEditor({
+  def,
+  value,
+  onSave,
+  variant,
+  autoFocus,
+  refNames,
+}: Props) {
   switch (def.type) {
+    case 'record_reference':
+      return (
+        <RecordRefPicker
+          def={def}
+          value={value}
+          onSave={onSave}
+          variant={variant}
+          refNames={refNames}
+        />
+      )
+    case 'actor_reference':
+      return (
+        <ActorPicker
+          def={def}
+          value={value}
+          onSave={onSave}
+          variant={variant}
+          refNames={refNames}
+        />
+      )
     case 'select':
     case 'status':
       return (
@@ -180,6 +223,167 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
           : 'h-full rounded px-1 focus-visible:ring-2 focus-visible:ring-ring/60',
       )}
     />
+  )
+}
+
+function RecordRefPicker({
+  def,
+  value,
+  onSave,
+  variant,
+  refNames,
+}: Props) {
+  const multi = Boolean(def.options?.multi)
+  const targetKind = def.options?.targetKind ?? 'company'
+  const selected: Array<string> = multi
+    ? Array.isArray(value)
+      ? (value as Array<string>)
+      : []
+    : value == null
+      ? []
+      : [String(value)]
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<
+    Array<{ id: string; name: string; kind: string }>
+  >([])
+
+  useEffect(() => {
+    if (!query.trim()) return setResults([])
+    let alive = true
+    const t = setTimeout(async () => {
+      const r = await searchEntities({
+        data: { q: query, kinds: [targetKind as 'company'] },
+      })
+      if (alive) setResults(r)
+    }, 200)
+    return () => {
+      alive = false
+      clearTimeout(t)
+    }
+  }, [query, targetKind])
+
+  const Icon = targetKind === 'person' ? User : Building2
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={def.name}
+        className={cn(
+          'flex min-w-0 items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+          variant === 'field'
+            ? 'border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
+            : 'h-full w-full rounded px-1',
+        )}
+      >
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+          {selected.length === 0 ? (
+            <span className="text-[13px] text-muted-foreground/60">—</span>
+          ) : (
+            selected.map((id) => (
+              <span
+                key={id}
+                className="flex items-center gap-1 truncate rounded-full bg-muted px-2 py-0.5 text-xs font-medium"
+              >
+                <Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
+                {refName(refNames, id)}
+              </span>
+            ))
+          )}
+        </span>
+        <ChevronDown className="size-3 shrink-0 text-muted-foreground/60" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <div className="p-1.5">
+          <Input
+            value={query}
+            autoFocus
+            placeholder={`Search ${targetKind}…`}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-7 text-xs"
+          />
+        </div>
+        {results.map((r) => (
+          <DropdownMenuItem
+            key={r.id}
+            onSelect={() => {
+              if (multi) {
+                if (!selected.includes(r.id)) onSave([...selected, r.id])
+              } else {
+                onSave(r.id)
+              }
+              setQuery('')
+            }}
+          >
+            <Icon className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
+            {r.name}
+          </DropdownMenuItem>
+        ))}
+        {selected.length > 0 ? (
+          <DropdownMenuItem
+            onSelect={() => onSave(null)}
+            className={cn(
+              'text-muted-foreground',
+              def.options?.required && !multi && 'hidden',
+            )}
+          >
+            Clear
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
+  const [users, setUsers] = useState<Array<{ id: string; name: string }>>([])
+  const selected = value == null ? null : String(value)
+
+  return (
+    <DropdownMenu
+      onOpenChange={async (open) => {
+        if (open && users.length === 0) setUsers(await listUsers())
+      }}
+    >
+      <DropdownMenuTrigger
+        aria-label={def.name}
+        className={cn(
+          'flex min-w-0 items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+          variant === 'field'
+            ? 'border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
+            : 'h-full w-full rounded px-1',
+        )}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-[13px]">
+          {selected ? (
+            <>
+              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-foreground/80 text-[9px] font-semibold text-background">
+                {refName(refNames, selected).charAt(0).toUpperCase()}
+              </span>
+              <span className="truncate">{refName(refNames, selected)}</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground/60">—</span>
+          )}
+        </span>
+        <ChevronDown className="size-3 shrink-0 text-muted-foreground/60" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {users.map((u) => (
+          <DropdownMenuItem key={u.id} onSelect={() => onSave(u.id)}>
+            {u.name}
+          </DropdownMenuItem>
+        ))}
+        {selected ? (
+          <DropdownMenuItem
+            onSelect={() => onSave(null)}
+            className="text-muted-foreground"
+          >
+            Clear
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
