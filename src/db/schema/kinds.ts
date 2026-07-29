@@ -2,6 +2,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -142,16 +143,18 @@ export const noteKind = pgEnum('note_kind', ['note', 'memo', 'scratch'])
 export const visibility = pgEnum('visibility', ['shared', 'private'])
 
 /**
- * Markdown is the source of truth ([[Label|entity:uuid]] mention convention,
- * uuid authoritative). Attachment to other entities goes through `link`.
- * Default visibility is shared — private-by-default is the trap that keeps
- * partner #2 writing in Apple Notes.
+ * body_json (BlockNote document) is authoritative — BlockNote's markdown
+ * export is lossy, so md can't round-trip. body_md is derived on save and
+ * feeds search/embeddings/export ([[Label|entity:uuid]] for mentions).
+ * Attachment to other entities goes through `link`. Default visibility is
+ * shared — private-by-default keeps partner #2 in Apple Notes.
  */
 export const note = pgTable('note', {
   entityId: uuid('entity_id')
     .primaryKey()
     .references(() => entity.id),
   title: text('title').notNull().default(''),
+  bodyJson: jsonb('body_json'),
   bodyMd: text('body_md').notNull().default(''),
   kind: noteKind('kind').notNull().default('note'),
   authorId: text('author_id')

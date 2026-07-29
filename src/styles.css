@@ -1,5 +1,7 @@
-/* Inter Variable, self-hosted — no font CDN calls from a privacy product. */
+/* Self-hosted fonts — no font CDN calls from a privacy product.
+   Inter carries UI (ledger register); Source Serif carries prose (page register). */
 @import '@fontsource-variable/inter';
+@import '@fontsource-variable/source-serif-4';
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
@@ -70,6 +72,7 @@
 
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Source Serif 4 Variable', Georgia, serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -150,4 +153,47 @@
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/**
+ * Prose register — The Two Registers Rule. Note bodies read like a page:
+ * serif, 17px, generous leading. Everything around them stays ledger.
+ */
+.prose-note .bn-editor {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem; /* 17px */
+  line-height: 1.65;
+  padding-inline: 0;
+  background: transparent;
+  color: var(--foreground);
+}
+
+.prose-note .bn-editor h1,
+.prose-note .bn-editor h2,
+.prose-note .bn-editor h3 {
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+}
+
+.prose-note .bn-editor .bn-inline-content[data-content-type='paragraph'] {
+  font-family: inherit;
+}
+
+/* Mention chip — quiet ink, not a colored pill; gold is for actions. */
+.mention-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  padding: 0.05em 0.35em;
+  border-radius: 4px;
+  background: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.85em;
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mention-chip:hover {
+  background: var(--selected);
 }

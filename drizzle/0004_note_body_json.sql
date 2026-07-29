@@ -1,0 +1,1 @@
+ALTER TABLE "note" ADD COLUMN "body_json" jsonb;

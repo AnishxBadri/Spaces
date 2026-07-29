@@ -52,7 +52,7 @@ One language, TypeScript, one codebase. Two processes (web, worker), two contain
 | Data layer | TanStack Query + Start server functions — one model everywhere |
 | Jobs | pg-boss, Postgres-backed, separate Node process |
 | Auth | Better Auth (`tanstackStartCookies` plugin, Postgres adapter) |
-| Editor | TipTap (ProseMirror), markdown as source of truth |
+| Editor | **BlockNote** (ProseMirror/TipTap-based), Notion-grade block UX; JSON authoritative, markdown derived |
 | Grid | TanStack Table + TanStack Virtual, DOM-based |
 | UI | shadcn/ui + Tailwind + Radix, `cmdk` for Cmd-K |
 | LLM | Vercel AI SDK, BYOK |
@@ -106,19 +106,29 @@ cheap after the grid and editor exist.
 - **AG Grid** — the useful features are enterprise-licensed. Poison for AGPL.
 - **Glide Data Grid** — canvas is faster at 100k rows, but you have ~2k companies, and canvas
   makes cell editors and accessibility painful.
-- **Lexical / BlockNote** — Lexical's markdown story is rough; BlockNote fights customization
-  the moment you want glossary auto-linking.
+- **Lexical** — markdown story is rough, thinner ecosystem.
+- **TipTap directly** — was the original pick (markdown-as-source-of-truth doctrine). Reversed
+  2026-07: owner wants Notion-grade block UX (drag handles, slash menu, block chrome) day one,
+  and BlockNote ships it on the same ProseMirror engine. Costs accepted knowingly: note JSON
+  becomes authoritative (`note.body_json`) with markdown derived via lossy export (search,
+  embeddings, plain-text portability); glossary auto-link and custom mention serialization go
+  through BlockNote's inline-content API instead of raw ProseMirror. If BlockNote fights the
+  glossary feature hard, the escape hatch is dropping to its TipTap layer.
 - **Separate vector DB, Elasticsearch, Redis, Trigger.dev, Turborepo** — Postgres and one app
   cover all of it at this scale.
 - **MinIO in default compose** — see storage below.
 
 ### Notes on specific picks
 
-- **Markdown, not ProseMirror JSON.** Portable, greppable, diffable, chunks cleanly for
-  embeddings, survives the project dying. Cost: mentions need a serialization convention —
-  `[[Label|entity:uuid]]`, uuid authoritative, label a cached display string re-resolved on
-  render. JSON is lossless and easier, but notes you can't read without the app is a worse
-  product for a self-host tool.
+- **Note storage (amended 2026-07 with the BlockNote switch).** `note.body_json` (BlockNote
+  document) is authoritative — BlockNote's markdown export is lossy, so round-tripping through
+  markdown would corrupt notes progressively. `note.body_md` is *derived* on every save and
+  feeds search, embeddings, and plain-text export; mentions land in it as `[[Label|entity:uuid]]`.
+  The original notes-outlive-the-app doctrine survives in weakened form: the derived markdown
+  is always exportable and readable, but is not the editing source of truth.
+- **Mentions** are BlockNote inline-content nodes carrying `{entityId, label}`; uuid
+  authoritative, label a cached display string. Link rows sync from the JSON (walk inline
+  content), not from markdown regex.
 - **`pg_trgm` is not an extra dependency** — entity resolution owes you fuzzy name matching
   anyway. `ltree` for `space.path` ancestor queries. Both ship with the standard Postgres image.
 - **Search is hybrid, fused in Postgres:** `tsvector` rank + pgvector cosine, combined via
