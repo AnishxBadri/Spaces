@@ -46,15 +46,24 @@ export const Mention = createReactInlineContentSpec(
     render: (props) => {
       const { entityId, label, kind } = props.inlineContent.props
       const Icon = KIND_ICONS[kind] ?? Building2
+      // Plain anchor, not router Link — renders inside BlockNote's tree.
+      const href =
+        kind === 'company'
+          ? `/companies/${entityId}`
+          : kind === 'note'
+            ? `/notes/${entityId}`
+            : KIND_ROUTES[kind]
       return (
-        <span
+        <a
+          href={href}
           data-entity-id={entityId}
           data-entity-kind={kind}
           className="mention-chip"
+          contentEditable={false}
         >
           <Icon size={12} strokeWidth={1.75} aria-hidden />
           {label}
-        </span>
+        </a>
       )
     },
   },

@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { Building2, Globe, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -58,7 +58,10 @@ function CompaniesPage() {
         <ul className="mt-6 -mx-2">
           {companies.map((c) => (
             <li key={c.id}>
-              <div className="group flex h-10 items-center gap-3 rounded-md px-2 text-[13px] hover:bg-accent">
+              <Link
+                to="/companies/$companyId"
+                params={{ companyId: c.id }}
+                className="group flex h-10 items-center gap-3 rounded-md px-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
                 <span className="flex size-6 shrink-0 items-center justify-center rounded bg-muted">
                   <Building2
                     className="size-3.5 text-muted-foreground"
@@ -77,7 +80,7 @@ function CompaniesPage() {
                 <span className="tabular w-24 text-right text-xs text-muted-foreground/80">
                   {dateFmt.format(new Date(c.createdAt))}
                 </span>
-              </div>
+              </Link>
             </li>
           ))}
         </ul>

@@ -5,9 +5,17 @@ import { z } from 'zod'
 import { auth } from './auth'
 import { db } from '#/db'
 import { user } from '#/db/schema/auth'
-import { entity, entityAlias, link, note, space } from '#/db/schema'
+import {
+  company,
+  entity,
+  entityAlias,
+  entitySpace,
+  link,
+  note,
+  space,
+} from '#/db/schema'
 import { activity } from '#/db/schema/activity'
-import { resolveEntity } from './entities/resolve'
+import { addIdentityAlias, resolveEntity } from './entities/resolve'
 import { storeCredential } from './vault'
 
 /**
@@ -141,26 +149,265 @@ export const createCompany = createServerFn({ method: 'POST' })
     return { ...result, name: row.name }
   })
 
+// ---------- company record ----------
+
+export const getCompany = createServerFn()
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+
+    const [head] = await db
+      .select({
+        id: entity.id,
+        name: entity.canonicalName,
+        source: entity.source,
+        mergedIntoId: entity.mergedIntoId,
+        createdAt: entity.createdAt,
+        foundedYear: company.foundedYear,
+        sectors: company.sectors,
+        stage: company.stage,
+        geo: company.geo,
+      })
+      .from(entity)
+      .innerJoin(company, eq(company.entityId, entity.id))
+      .where(eq(entity.id, data.id))
+    if (!head) throw new Error('Company not found')
+
+    const aliases = await db
+      .select({
+        id: entityAlias.id,
+        kind: entityAlias.kind,
+        value: entityAlias.value,
+        valueNorm: entityAlias.valueNorm,
+        isIdentity: entityAlias.isIdentity,
+        source: entityAlias.source,
+      })
+      .from(entityAlias)
+      .where(eq(entityAlias.entityId, data.id))
+
+    const spaces = await db
+      .select({
+        id: space.entityId,
+        name: entity.canonicalName,
+        source: entitySpace.source,
+      })
+      .from(entitySpace)
+      .innerJoin(space, eq(space.entityId, entitySpace.spaceId))
+      .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(eq(entitySpace.entityId, data.id))
+
+    // Notes (and anything else) that mention this company.
+    const mentionedIn = await db
+      .select({
+        fromId: link.fromEntityId,
+        name: entity.canonicalName,
+        kind: entity.kind,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.fromEntityId))
+      .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
+
+    const timeline = await db
+      .select({
+        id: activity.id,
+        verb: activity.verb,
+        actorId: activity.actorId,
+        at: activity.at,
+      })
+      .from(activity)
+      .where(eq(activity.subjectEntityId, data.id))
+      .orderBy(desc(activity.at))
+      .limit(50)
+
+    return {
+      id: head.id,
+      name: head.name,
+      source: head.source,
+      mergedIntoId: head.mergedIntoId,
+      createdAt: head.createdAt.toISOString(),
+      attrs: {
+        foundedYear: head.foundedYear,
+        sectors: head.sectors ?? [],
+        stage: head.stage,
+        geo: head.geo,
+      },
+      aliases,
+      spaces,
+      mentionedIn,
+      timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
+    }
+  })
+
+const updateCompanyInput = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(160).optional(),
+  stage: z.string().trim().max(60).nullish(),
+  geo: z.string().trim().max(120).nullish(),
+  foundedYear: z.number().int().min(1800).max(2100).nullish(),
+  sectors: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+})
+
+export const updateCompany = createServerFn({ method: 'POST' })
+  .validator(updateCompanyInput)
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    await db.transaction(async (tx) => {
+      if (data.name) {
+        await tx
+          .update(entity)
+          .set({ canonicalName: data.name })
+          .where(eq(entity.id, data.id))
+      }
+      await tx
+        .update(company)
+        .set({
+          ...(data.stage !== undefined ? { stage: data.stage } : {}),
+          ...(data.geo !== undefined ? { geo: data.geo } : {}),
+          ...(data.foundedYear !== undefined
+            ? { foundedYear: data.foundedYear }
+            : {}),
+          ...(data.sectors !== undefined ? { sectors: data.sectors } : {}),
+        })
+        .where(eq(company.entityId, data.id))
+      await tx.insert(activity).values({
+        actorId: u.id,
+        verb: 'company.updated',
+        subjectEntityId: data.id,
+      })
+    })
+    return { ok: true }
+  })
+
+/** Surfaces the dedupe tripwire in the UI. */
+export const addCompanyDomain = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid(), domain: z.string().max(255) }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const result = await addIdentityAlias(
+      data.id,
+      'domain',
+      data.domain,
+      'manual',
+    )
+    return result
+  })
+
+export const tagIntoSpace = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({ entityId: z.string().uuid(), spaceId: z.string().uuid() }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    await db
+      .insert(entitySpace)
+      .values({
+        entityId: data.entityId,
+        spaceId: data.spaceId,
+        source: 'manual',
+        createdBy: u.id,
+      })
+      .onConflictDoNothing()
+    await db.insert(activity).values({
+      actorId: u.id,
+      verb: 'space.tagged',
+      subjectEntityId: data.entityId,
+      objectEntityId: data.spaceId,
+    })
+    return { ok: true }
+  })
+
+export const untagFromSpace = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({ entityId: z.string().uuid(), spaceId: z.string().uuid() }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    await db
+      .delete(entitySpace)
+      .where(
+        and(
+          eq(entitySpace.entityId, data.entityId),
+          eq(entitySpace.spaceId, data.spaceId),
+        ),
+      )
+    await db.insert(activity).values({
+      actorId: u.id,
+      verb: 'space.untagged',
+      subjectEntityId: data.entityId,
+      objectEntityId: data.spaceId,
+    })
+    return { ok: true }
+  })
+
 // ---------- notes ----------
 
-export const createNote = createServerFn({ method: 'POST' }).handler(
-  async () => {
+export const createNote = createServerFn({ method: 'POST' })
+  .validator(
+    z
+      .object({
+        /** Pre-link the note to an entity: starter block with its mention. */
+        about: z
+          .object({
+            entityId: z.string().uuid(),
+            label: z.string().max(200),
+            kind: z.string().max(30),
+          })
+          .optional(),
+      })
+      .optional(),
+  )
+  .handler(async ({ data }) => {
     const u = await requireUser()
+    const about = data?.about
     return db.transaction(async (tx) => {
       const [ent] = await tx
         .insert(entity)
         .values({ kind: 'note', canonicalName: 'Untitled', createdBy: u.id })
         .returning({ id: entity.id })
-      await tx.insert(note).values({ entityId: ent.id, authorId: u.id })
+
+      const bodyJson = about
+        ? [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'mention',
+                  props: {
+                    entityId: about.entityId,
+                    label: about.label,
+                    kind: about.kind,
+                  },
+                },
+                { type: 'text', text: ' — ', styles: {} },
+              ],
+            },
+          ]
+        : null
+
+      await tx.insert(note).values({
+        entityId: ent.id,
+        authorId: u.id,
+        bodyJson,
+        bodyMd: about ? `Mentions: [[${about.label}|entity:${about.entityId}]]\n` : '',
+      })
+      if (about) {
+        await tx.insert(link).values({
+          fromEntityId: ent.id,
+          toEntityId: about.entityId,
+          relation: 'mentions',
+          source: 'extracted',
+          createdBy: u.id,
+        })
+      }
       await tx.insert(activity).values({
         actorId: u.id,
         verb: 'note.created',
-        subjectEntityId: ent.id,
+        subjectEntityId: about ? about.entityId : ent.id,
+        objectEntityId: about ? ent.id : undefined,
       })
       return { id: ent.id }
     })
-  },
-)
+  })
 
 export const listNotes = createServerFn().handler(async () => {
   await requireUser()

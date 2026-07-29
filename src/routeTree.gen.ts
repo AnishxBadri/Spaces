@@ -21,6 +21,7 @@ import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSpacesRouteImport } from './routes/_app/spaces'
 import { Route as AppThesesRouteImport } from './routes/_app/theses'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/companies_.$companyId'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
@@ -84,6 +85,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppCompaniesCompanyIdRoute = AppCompaniesCompanyIdRouteImport.update({
+  id: '/companies_/$companyId',
+  path: '/companies/$companyId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppNotesNoteIdRoute = AppNotesNoteIdRouteImport.update({
   id: '/notes_/$noteId',
   path: '/notes/$noteId',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/spaces': typeof AppSpacesRoute
   '/theses': typeof AppThesesRoute
   '/api/health': typeof ApiHealthRoute
+  '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/spaces': typeof AppSpacesRoute
   '/theses': typeof AppThesesRoute
   '/api/health': typeof ApiHealthRoute
+  '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/_app/spaces': typeof AppSpacesRoute
   '/_app/theses': typeof AppThesesRoute
   '/api/health': typeof ApiHealthRoute
+  '/_app/companies_/$companyId': typeof AppCompaniesCompanyIdRoute
   '/_app/notes_/$noteId': typeof AppNotesNoteIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
@@ -164,6 +173,7 @@ export interface FileRouteTypes {
     | '/spaces'
     | '/theses'
     | '/api/health'
+    | '/companies/$companyId'
     | '/notes/$noteId'
     | '/api/auth/$'
     | '/api/blob/$key'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/spaces'
     | '/theses'
     | '/api/health'
+    | '/companies/$companyId'
     | '/notes/$noteId'
     | '/api/auth/$'
     | '/api/blob/$key'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/_app/spaces'
     | '/_app/theses'
     | '/api/health'
+    | '/_app/companies_/$companyId'
     | '/_app/notes_/$noteId'
     | '/api/auth/$'
     | '/api/blob/$key'
@@ -298,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/companies_/$companyId': {
+      id: '/_app/companies_/$companyId'
+      path: '/companies/$companyId'
+      fullPath: '/companies/$companyId'
+      preLoaderRoute: typeof AppCompaniesCompanyIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/notes_/$noteId': {
       id: '/_app/notes_/$noteId'
       path: '/notes/$noteId'
@@ -330,6 +349,7 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppSpacesRoute: typeof AppSpacesRoute
   AppThesesRoute: typeof AppThesesRoute
+  AppCompaniesCompanyIdRoute: typeof AppCompaniesCompanyIdRoute
   AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
 }
 
@@ -341,6 +361,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppSpacesRoute: AppSpacesRoute,
   AppThesesRoute: AppThesesRoute,
+  AppCompaniesCompanyIdRoute: AppCompaniesCompanyIdRoute,
   AppNotesNoteIdRoute: AppNotesNoteIdRoute,
 }
 
