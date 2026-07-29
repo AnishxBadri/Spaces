@@ -18,10 +18,14 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
+import { ValueEditor } from '#/components/attributes/value-editor'
+import type { RegistryEntry } from '#/components/attributes/value-editor'
 import {
   addCompanyDomain,
   createNote,
   getCompany,
+  listRegistry,
   listSpaces,
   tagIntoSpace,
   untagFromSpace,
@@ -31,9 +35,10 @@ import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/companies_/$companyId')({
   loader: async ({ params }) => {
-    const [companyData, spaces] = await Promise.all([
+    const [companyData, spaces, registry] = await Promise.all([
       getCompany({ data: { id: params.companyId } }),
       listSpaces(),
+      listRegistry({ data: { kind: 'company' } }),
     ])
     // Merged-away records redirect to their survivor — stale URLs keep working.
     if (companyData.mergedIntoId) {
@@ -42,7 +47,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
         params: { companyId: companyData.mergedIntoId },
       })
     }
-    return { company: companyData, allSpaces: spaces }
+    return { company: companyData, allSpaces: spaces, registry }
   },
   component: CompanyRecordPage,
 })
@@ -63,7 +68,7 @@ const VERB_LABELS: Record<string, string> = {
 }
 
 function CompanyRecordPage() {
-  const { company, allSpaces } = Route.useLoaderData()
+  const { company, allSpaces, registry } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'activity' | 'notes'>('activity')
@@ -113,49 +118,36 @@ function CompanyRecordPage() {
       </header>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
-        {/* Left: attributes (registry-generated rail lands in Phase 2;
-            until then the seeded slugs are read/written directly). */}
-        <aside className="space-y-5">
-          <AttrField
-            label="Description"
-            value={String(company.values.description ?? '')}
-            placeholder="What they do"
-            onSave={(v) =>
-              save({ id: company.id, patch: { description: v || null } }, router)
-            }
-          />
-          <AttrField
-            label="Funding stage"
-            value={String(company.values.funding_stage ?? '')}
-            placeholder="seed"
-            onSave={(v) =>
-              save(
-                { id: company.id, patch: { funding_stage: v || null } },
-                router,
-              )
-            }
-          />
-          <AttrField
-            label="Location"
-            value={String(company.values.location ?? '')}
-            placeholder="Bengaluru"
-            onSave={(v) =>
-              save({ id: company.id, patch: { location: v || null } }, router)
-            }
-          />
-          <AttrField
-            label="Founded"
-            value={company.values.founded_year?.toString() ?? ''}
-            placeholder="2021"
-            onSave={(v) =>
-              save(
-                { id: company.id, patch: { founded_year: v ? Number(v) : null } },
-                router,
-              )
-            }
-          />
+        {/* Left: registry-generated attribute rail */}
+        <aside className="space-y-4">
+          {registry.map((def) => (
+            <div key={def.slug} className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                {def.name}
+              </span>
+              <ValueEditor
+                def={def as RegistryEntry}
+                value={company.values[def.slug] ?? null}
+                variant="field"
+                onSave={(v) =>
+                  save({ id: company.id, patch: { [def.slug]: v } }, router)
+                }
+              />
+            </div>
+          ))}
 
           <DomainsField companyId={company.id} domains={domains} />
+
+          <AttributeCreateDialog
+            objectKind="company"
+            onCreated={() => router.invalidate()}
+            trigger={
+              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+                <Plus className="size-3" strokeWidth={2} />
+                Add attribute
+              </button>
+            }
+          />
         </aside>
 
         {/* Center: tabs */}
@@ -363,38 +355,6 @@ async function save(
   }
 }
 
-function AttrField({
-  label,
-  value,
-  placeholder,
-  onSave,
-}: {
-  label: string
-  value: string
-  placeholder: string
-  onSave: (value: string) => void
-}) {
-  const [draft, setDraft] = useState(value)
-  const id = `attr-${label.toLowerCase()}`
-  return (
-    <div className="space-y-1">
-      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
-        {label}
-      </label>
-      <Input
-        id={id}
-        value={draft}
-        placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => draft !== value && onSave(draft)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-        }}
-        className="h-8 text-[13px]"
-      />
-    </div>
-  )
-}
 
 function DomainsField({
   companyId,

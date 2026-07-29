@@ -152,6 +152,167 @@ export const createCompany = createServerFn({ method: 'POST' })
     return { ...result, name: row.name }
   })
 
+// ---------- attribute registry ----------
+
+export const listRegistry = createServerFn()
+  .validator(z.object({ kind: z.enum(['company', 'person', 'deal']) }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { getRegistry } = await import('./attributes/values')
+    const defs = await getRegistry(data.kind)
+    return defs.map((d) => ({
+      id: d.id,
+      slug: d.slug,
+      name: d.name,
+      type: d.type,
+      options: d.options as Json,
+      isSystem: d.isSystem,
+      sortOrder: d.sortOrder,
+    }))
+  })
+
+const createAttributeInput = z.object({
+  objectKind: z.enum(['company', 'person', 'deal']),
+  name: z.string().trim().min(1).max(80),
+  type: z.enum([
+    'text',
+    'number',
+    'currency',
+    'date',
+    'checkbox',
+    'select',
+    'multi_select',
+    'rating',
+    'url',
+    'email',
+    'phone',
+  ]),
+  /** select/multi_select: option labels; ids derived */
+  optionLabels: z.array(z.string().trim().min(1).max(60)).max(50).optional(),
+})
+
+export const createAttribute = createServerFn({ method: 'POST' })
+  .validator(createAttributeInput)
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { attribute } = await import('#/db/schema')
+
+    const baseSlug =
+      data.name
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 48) || 'attribute'
+
+    // Suffix on slug collision within the object kind.
+    let slug = baseSlug
+    for (let i = 2; ; i++) {
+      const existing = await db
+        .select({ id: attribute.id })
+        .from(attribute)
+        .where(
+          and(
+            eq(attribute.objectKind, data.objectKind),
+            eq(attribute.slug, slug),
+          ),
+        )
+      if (existing.length === 0) break
+      slug = `${baseSlug}_${i}`
+    }
+
+    const needsOptions = data.type === 'select' || data.type === 'multi_select'
+    if (needsOptions && (!data.optionLabels || data.optionLabels.length === 0)) {
+      throw new Error('Select attributes need at least one option')
+    }
+    const options = needsOptions
+      ? {
+          options: data.optionLabels!.map((label) => ({
+            id:
+              label
+                .toLowerCase()
+                .normalize('NFKD')
+                .replace(/[^a-z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '')
+                .slice(0, 48) || 'option',
+            label,
+          })),
+        }
+      : data.type === 'rating'
+        ? { max: 5 }
+        : {}
+
+    const [{ maxOrder }] = await db
+      .select({ maxOrder: sql<number>`coalesce(max(${attribute.sortOrder}), 0)` })
+      .from(attribute)
+      .where(eq(attribute.objectKind, data.objectKind))
+
+    const [row] = await db
+      .insert(attribute)
+      .values({
+        objectKind: data.objectKind,
+        slug,
+        name: data.name,
+        type: data.type,
+        options,
+        isSystem: false,
+        sortOrder: maxOrder + 10,
+        createdBy: u.id,
+      })
+      .returning({ id: attribute.id, slug: attribute.slug })
+    return row
+  })
+
+/** Table rows: entity core + values + domains + spaces, one query batch. */
+export const listCompaniesTable = createServerFn().handler(async () => {
+  await requireUser()
+  const rows = await db
+    .select({
+      id: entity.id,
+      name: entity.canonicalName,
+      values: entity.values,
+      createdAt: entity.createdAt,
+    })
+    .from(entity)
+    .innerJoin(company, eq(company.entityId, entity.id))
+    .where(and(eq(entity.kind, 'company'), isNull(entity.mergedIntoId)))
+    .orderBy(desc(entity.createdAt))
+
+  const domains = await db
+    .select({ entityId: entityAlias.entityId, domain: entityAlias.valueNorm })
+    .from(entityAlias)
+    .where(and(eq(entityAlias.kind, 'domain'), eq(entityAlias.isIdentity, true)))
+  const domainsBy = new Map<string, Array<string>>()
+  for (const d of domains) {
+    domainsBy.set(d.entityId, [...(domainsBy.get(d.entityId) ?? []), d.domain])
+  }
+
+  const tags = await db
+    .select({
+      entityId: entitySpace.entityId,
+      spaceId: entitySpace.spaceId,
+      spaceName: entity.canonicalName,
+    })
+    .from(entitySpace)
+    .innerJoin(entity, eq(entity.id, entitySpace.spaceId))
+  const spacesBy = new Map<string, Array<{ id: string; name: string }>>()
+  for (const t of tags) {
+    spacesBy.set(t.entityId, [
+      ...(spacesBy.get(t.entityId) ?? []),
+      { id: t.spaceId, name: t.spaceName },
+    ])
+  }
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    values: (r.values ?? {}) as Record<string, Json>,
+    domains: domainsBy.get(r.id) ?? [],
+    spaces: spacesBy.get(r.id) ?? [],
+    createdAt: r.createdAt.toISOString(),
+  }))
+})
+
 // ---------- company record ----------
 
 export const getCompany = createServerFn()
