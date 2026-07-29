@@ -1,5 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
+import { cleanupTestEntities } from './test-helpers'
+
+afterAll(async () => {
+  if (!process.env.DATABASE_URL) return
+  await cleanupTestEntities([
+    '^(Quantum Forge Robotics|Claimant|Holder|OtherCo|FreeMailCo) [0-9a-f]{4,8}( .*)?$',
+    '^Orbital [0-9a-f]{6,8}( Inc| Systems)?$',
+  ])
+})
 
 /**
  * Integration tests — run against the dev database (.env.local). Each run

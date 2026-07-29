@@ -210,6 +210,8 @@ export async function addIdentityAlias(
   rawValue: string,
   source: ResolveInput['source'],
 ): Promise<{ outcome: 'added' | 'already_own' | 'suggested_duplicate' }> {
+  // Callers may hold a stale (merged-away) id — follow the redirect.
+  entityId = await canonicalId(entityId)
   const norm = {
     domain: normalizeDomain,
     email: normalizeEmail,

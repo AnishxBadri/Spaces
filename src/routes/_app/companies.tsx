@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { Building2, Globe, Plus } from 'lucide-react'
+import { Building2, Copy, Globe, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { EmptyState } from '#/components/empty-state'
@@ -15,10 +15,20 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import { createCompany, listCompanies } from '#/lib/server-fns'
+import {
+  countOpenDuplicates,
+  createCompany,
+  listCompanies,
+} from '#/lib/server-fns'
 
 export const Route = createFileRoute('/_app/companies')({
-  loader: () => listCompanies(),
+  loader: async () => {
+    const [companies, dupes] = await Promise.all([
+      listCompanies(),
+      countOpenDuplicates(),
+    ])
+    return { companies, openDuplicates: dupes.open }
+  },
   component: CompaniesPage,
 })
 
@@ -29,7 +39,7 @@ const dateFmt = new Intl.DateTimeFormat('en', {
 })
 
 function CompaniesPage() {
-  const companies = Route.useLoaderData()
+  const { companies, openDuplicates } = Route.useLoaderData()
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8 md:px-10">
@@ -45,6 +55,18 @@ function CompaniesPage() {
         </div>
         {companies.length > 0 ? <CreateCompanyDialog /> : null}
       </header>
+
+      {openDuplicates > 0 ? (
+        <Link
+          to="/dedupe"
+          className="mt-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        >
+          <Copy className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
+          <span className="font-medium tabular">{openDuplicates}</span>
+          possible duplicate{openDuplicates === 1 ? '' : 's'} to review
+          <span className="ml-auto text-xs text-muted-foreground">Review →</span>
+        </Link>
+      ) : null}
 
       {companies.length === 0 ? (
         <EmptyState

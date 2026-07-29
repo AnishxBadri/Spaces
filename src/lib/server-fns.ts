@@ -7,6 +7,7 @@ import { db } from '#/db'
 import { user } from '#/db/schema/auth'
 import {
   company,
+  duplicateCandidate,
   entity,
   entityAlias,
   entitySpace,
@@ -16,6 +17,7 @@ import {
 } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from './entities/resolve'
+import { mergeEntities } from './entities/merge'
 import { storeCredential } from './vault'
 
 /**
@@ -336,6 +338,109 @@ export const untagFromSpace = createServerFn({ method: 'POST' })
       subjectEntityId: data.entityId,
       objectEntityId: data.spaceId,
     })
+    return { ok: true }
+  })
+
+// ---------- dedupe inbox ----------
+
+async function entityContext(id: string) {
+  const [head] = await db
+    .select({
+      id: entity.id,
+      name: entity.canonicalName,
+      kind: entity.kind,
+      source: entity.source,
+      createdAt: entity.createdAt,
+    })
+    .from(entity)
+    .where(eq(entity.id, id))
+  const aliases = await db
+    .select({ kind: entityAlias.kind, valueNorm: entityAlias.valueNorm })
+    .from(entityAlias)
+    .where(eq(entityAlias.entityId, id))
+  const [{ value: mentionCount }] = await db
+    .select({ value: count() })
+    .from(link)
+    .where(and(eq(link.toEntityId, id), eq(link.relation, 'mentions')))
+  const spaceRows = await db
+    .select({ name: entity.canonicalName })
+    .from(entitySpace)
+    .innerJoin(entity, eq(entity.id, entitySpace.spaceId))
+    .where(eq(entitySpace.entityId, id))
+  return {
+    ...head,
+    createdAt: head.createdAt.toISOString(),
+    domains: aliases.filter((a) => a.kind === 'domain').map((a) => a.valueNorm),
+    otherNames: aliases
+      .filter((a) => a.kind === 'name' && a.valueNorm !== head.name.toLowerCase())
+      .map((a) => a.valueNorm),
+    mentionCount,
+    spaces: spaceRows.map((s) => s.name),
+  }
+}
+
+export const listDuplicates = createServerFn().handler(async () => {
+  await requireUser()
+  const rows = await db
+    .select()
+    .from(duplicateCandidate)
+    .where(eq(duplicateCandidate.status, 'open'))
+    .orderBy(desc(duplicateCandidate.score), desc(duplicateCandidate.createdAt))
+  return Promise.all(
+    rows.map(async (r) => ({
+      id: r.id,
+      score: r.score,
+      reason: r.reason as Record<string, string>,
+      a: await entityContext(r.entityA),
+      b: await entityContext(r.entityB),
+    })),
+  )
+})
+
+export const countOpenDuplicates = createServerFn().handler(async () => {
+  await requireUser()
+  const [{ value }] = await db
+    .select({ value: count() })
+    .from(duplicateCandidate)
+    .where(eq(duplicateCandidate.status, 'open'))
+  return { open: value }
+})
+
+export const mergeDuplicate = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      candidateId: z.string().uuid(),
+      winnerId: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const [cand] = await db
+      .select()
+      .from(duplicateCandidate)
+      .where(eq(duplicateCandidate.id, data.candidateId))
+    if (!cand || cand.status !== 'open') throw new Error('Candidate not open')
+    if (data.winnerId !== cand.entityA && data.winnerId !== cand.entityB)
+      throw new Error('Winner must be one of the pair')
+    const loserId =
+      data.winnerId === cand.entityA ? cand.entityB : cand.entityA
+    await mergeEntities({
+      winnerId: data.winnerId,
+      loserId,
+      mergedBy: u.id,
+      candidateId: data.candidateId,
+    })
+    return { ok: true }
+  })
+
+export const dismissDuplicate = createServerFn({ method: 'POST' })
+  .validator(z.object({ candidateId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    await db
+      .update(duplicateCandidate)
+      .set({ status: 'dismissed', resolvedBy: u.id, resolvedAt: new Date() })
+      .where(eq(duplicateCandidate.id, data.candidateId))
     return { ok: true }
   })
 

@@ -14,6 +14,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AppCompaniesRouteImport } from './routes/_app/companies'
+import { Route as AppDedupeRouteImport } from './routes/_app/dedupe'
 import { Route as AppNotesRouteImport } from './routes/_app/notes'
 import { Route as AppPeopleRouteImport } from './routes/_app/people'
 import { Route as AppPipelineRouteImport } from './routes/_app/pipeline'
@@ -48,6 +49,11 @@ const SetupRoute = SetupRouteImport.update({
 const AppCompaniesRoute = AppCompaniesRouteImport.update({
   id: '/companies',
   path: '/companies',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDedupeRoute = AppDedupeRouteImport.update({
+  id: '/dedupe',
+  path: '/dedupe',
   getParentRoute: () => AppRoute,
 } as any)
 const AppNotesRoute = AppNotesRouteImport.update({
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/companies': typeof AppCompaniesRoute
+  '/dedupe': typeof AppDedupeRoute
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
   '/pipeline': typeof AppPipelineRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/companies': typeof AppCompaniesRoute
+  '/dedupe': typeof AppDedupeRoute
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
   '/pipeline': typeof AppPipelineRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/_app/companies': typeof AppCompaniesRoute
+  '/_app/dedupe': typeof AppDedupeRoute
   '/_app/notes': typeof AppNotesRoute
   '/_app/people': typeof AppPeopleRoute
   '/_app/pipeline': typeof AppPipelineRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/companies'
+    | '/dedupe'
     | '/notes'
     | '/people'
     | '/pipeline'
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/companies'
+    | '/dedupe'
     | '/notes'
     | '/people'
     | '/pipeline'
@@ -201,6 +212,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/_app/companies'
+    | '/_app/dedupe'
     | '/_app/notes'
     | '/_app/people'
     | '/_app/pipeline'
@@ -259,6 +271,13 @@ declare module '@tanstack/react-router' {
       path: '/companies'
       fullPath: '/companies'
       preLoaderRoute: typeof AppCompaniesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dedupe': {
+      id: '/_app/dedupe'
+      path: '/dedupe'
+      fullPath: '/dedupe'
+      preLoaderRoute: typeof AppDedupeRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/notes': {
@@ -343,6 +362,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppCompaniesRoute: typeof AppCompaniesRoute
+  AppDedupeRoute: typeof AppDedupeRoute
   AppNotesRoute: typeof AppNotesRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppPipelineRoute: typeof AppPipelineRoute
@@ -355,6 +375,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppCompaniesRoute: AppCompaniesRoute,
+  AppDedupeRoute: AppDedupeRoute,
   AppNotesRoute: AppNotesRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppPipelineRoute: AppPipelineRoute,

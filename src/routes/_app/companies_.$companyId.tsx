@@ -1,6 +1,7 @@
 import {
   createFileRoute,
   Link,
+  redirect,
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
@@ -34,6 +35,13 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       getCompany({ data: { id: params.companyId } }),
       listSpaces(),
     ])
+    // Merged-away records redirect to their survivor — stale URLs keep working.
+    if (companyData.mergedIntoId) {
+      throw redirect({
+        to: '/companies/$companyId',
+        params: { companyId: companyData.mergedIntoId },
+      })
+    }
     return { company: companyData, allSpaces: spaces }
   },
   component: CompanyRecordPage,
