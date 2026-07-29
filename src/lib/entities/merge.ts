@@ -1,7 +1,7 @@
 import { and, eq, or } from 'drizzle-orm'
 import { db } from '#/db'
 import {
-  company,
+  attributeEvent,
   duplicateCandidate,
   entity,
   entityAlias,
@@ -12,7 +12,6 @@ import {
   listEntry,
   listEntryEvent,
   mergeEvent,
-  person,
   signal,
 } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
@@ -98,13 +97,18 @@ export async function mergeEntities(opts: {
       }
     }
 
-    // --- links: repoint both directions; unique(from,to,relation) --------
+    // --- links: repoint both directions; unique(from,to,relation,attr) ----
     const loserLinks = await tx
       .select()
       .from(link)
       .where(
         or(eq(link.fromEntityId, loserId), eq(link.toEntityId, loserId)),
       )
+    // Record-reference attributes pointing AT the loser: after repointing
+    // the links, the referrers' values jsonb must be rewritten too.
+    const inboundRefs = loserLinks.filter(
+      (l) => l.relation === 'references' && l.toEntityId === loserId,
+    )
     for (const l of loserLinks) {
       const newFrom = l.fromEntityId === loserId ? winnerId : l.fromEntityId
       const newTo = l.toEntityId === loserId ? winnerId : l.toEntityId
@@ -287,70 +291,95 @@ export async function mergeEntities(opts: {
       }
     }
 
-    // --- side-table fields: winner keeps, loser fills nulls ---------------
-    if (winner.kind === 'company') {
+    // --- attribute values: winner keeps, loser fills the gaps -------------
+    {
       const [w] = await tx
-        .select()
-        .from(company)
-        .where(eq(company.entityId, winnerId))
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, winnerId))
       const [l] = await tx
-        .select()
-        .from(company)
-        .where(eq(company.entityId, loserId))
-      if (w && l) {
-        const fill: Partial<typeof w> = {}
-        for (const key of ['foundedYear', 'sectors', 'stage', 'geo'] as const) {
-          const wv = w[key]
-          const lv = l[key]
-          if (lv == null) continue
-          if (wv == null || (Array.isArray(wv) && wv.length === 0)) {
-            ;(fill as Record<string, unknown>)[key] = lv
-            snapshot.push({
-              table: 'company',
-              action: 'field_filled',
-              pk: { entityId: winnerId },
-              old: { field: key, winnerHad: wv, filledWith: lv },
-            })
-          } else if (JSON.stringify(wv) !== JSON.stringify(lv)) {
-            snapshot.push({
-              table: 'company',
-              action: 'field_conflict',
-              pk: { entityId: winnerId },
-              old: { field: key, winnerKept: wv, loserHad: lv },
-            })
-          }
-        }
-        if (Object.keys(fill).length > 0) {
-          await tx.update(company).set(fill).where(eq(company.entityId, winnerId))
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, loserId))
+      const wv = (w?.values ?? {}) as Record<string, unknown>
+      const lv = (l?.values ?? {}) as Record<string, unknown>
+      const fill: Record<string, unknown> = {}
+      for (const [key, loserVal] of Object.entries(lv)) {
+        if (loserVal == null) continue
+        const winnerVal = wv[key]
+        if (
+          winnerVal == null ||
+          (Array.isArray(winnerVal) && winnerVal.length === 0)
+        ) {
+          fill[key] = loserVal
+          snapshot.push({
+            table: 'entity.values',
+            action: 'field_filled',
+            pk: { entityId: winnerId },
+            old: { field: key, winnerHad: winnerVal ?? null, filledWith: loserVal },
+          })
+        } else if (JSON.stringify(winnerVal) !== JSON.stringify(loserVal)) {
+          snapshot.push({
+            table: 'entity.values',
+            action: 'field_conflict',
+            pk: { entityId: winnerId },
+            old: { field: key, winnerKept: winnerVal, loserHad: loserVal },
+          })
         }
       }
-    } else if (winner.kind === 'person') {
-      const [w] = await tx
-        .select()
-        .from(person)
-        .where(eq(person.entityId, winnerId))
-      const [l] = await tx
-        .select()
-        .from(person)
-        .where(eq(person.entityId, loserId))
-      if (w && l) {
-        const fill: Partial<typeof w> = {}
-        for (const key of ['headline', 'geo'] as const) {
-          if (l[key] != null && w[key] == null) {
-            ;(fill as Record<string, unknown>)[key] = l[key]
-            snapshot.push({
-              table: 'person',
-              action: 'field_filled',
-              pk: { entityId: winnerId },
-              old: { field: key, winnerHad: null, filledWith: l[key] },
-            })
-          }
-        }
-        if (Object.keys(fill).length > 0) {
-          await tx.update(person).set(fill).where(eq(person.entityId, winnerId))
-        }
+      if (Object.keys(fill).length > 0) {
+        await tx
+          .update(entity)
+          .set({ values: { ...wv, ...fill } })
+          .where(eq(entity.id, winnerId))
       }
     }
+
+    // --- referrers' record-reference values: loser id → winner id ---------
+    for (const ref of inboundRefs) {
+      const [referrer] = await tx
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, ref.fromEntityId))
+      if (!referrer) continue
+      const vals = { ...(referrer.values ?? {}) } as Record<string, unknown>
+      const cur = vals[ref.attrSlug]
+      let nextVal: unknown = cur
+      if (cur === loserId) nextVal = winnerId
+      else if (Array.isArray(cur)) {
+        nextVal = [...new Set(cur.map((v) => (v === loserId ? winnerId : v)))]
+      }
+      if (JSON.stringify(nextVal) !== JSON.stringify(cur)) {
+        snapshot.push({
+          table: 'entity.values',
+          action: 'repointed',
+          pk: { entityId: ref.fromEntityId },
+          old: { field: ref.attrSlug, was: cur },
+        })
+        vals[ref.attrSlug] = nextVal
+        await tx
+          .update(entity)
+          .set({ values: vals })
+          .where(eq(entity.id, ref.fromEntityId))
+      }
+    }
+
+    // --- attribute history follows the record ------------------------------
+    for (const ev of await tx
+      .select({ id: attributeEvent.id })
+      .from(attributeEvent)
+      .where(eq(attributeEvent.entityId, loserId))) {
+      snapshot.push({
+        table: 'attribute_event',
+        action: 'repointed',
+        pk: { id: ev.id },
+        old: { entityId: loserId },
+      })
+    }
+    await tx
+      .update(attributeEvent)
+      .set({ entityId: winnerId })
+      .where(eq(attributeEvent.entityId, loserId))
 
     // --- other open candidates touching the loser repoint to winner -------
     const loserCandidates = await tx

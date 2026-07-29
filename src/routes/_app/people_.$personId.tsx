@@ -24,7 +24,7 @@ import {
   getPerson,
   listCompanies,
   setPersonCompany,
-  updatePerson,
+  updateRecord,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
@@ -79,12 +79,12 @@ function PersonRecordPage() {
     navigate({ to: '/notes/$noteId', params: { noteId: id } })
   }
 
-  async function save(data: Parameters<typeof updatePerson>[0]['data']) {
+  async function save(data: Parameters<typeof updateRecord>[0]['data']) {
     try {
-      await updatePerson({ data })
+      await updateRecord({ data })
       router.invalidate()
-    } catch {
-      toast.error('Could not save')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not save')
     }
   }
 
@@ -106,9 +106,9 @@ function PersonRecordPage() {
           <h1 className="truncate text-[22px] font-semibold tracking-tight">
             {person.name}
           </h1>
-          {person.headline ? (
+          {person.values.job_title ? (
             <p className="truncate text-[13px] text-muted-foreground">
-              {person.headline}
+              {String(person.values.job_title)}
             </p>
           ) : null}
         </div>
@@ -118,16 +118,20 @@ function PersonRecordPage() {
         {/* Left: details */}
         <aside className="space-y-5">
           <AttrField
-            label="Headline"
-            value={person.headline ?? ''}
+            label="Job title"
+            value={String(person.values.job_title ?? '')}
             placeholder="CTO @ Pixxel"
-            onSave={(v) => save({ id: person.id, headline: v || null })}
+            onSave={(v) =>
+              save({ id: person.id, patch: { job_title: v || null } })
+            }
           />
           <AttrField
-            label="Geography"
-            value={person.geo ?? ''}
+            label="Location"
+            value={String(person.values.location ?? '')}
             placeholder="Bengaluru"
-            onSave={(v) => save({ id: person.id, geo: v || null })}
+            onSave={(v) =>
+              save({ id: person.id, patch: { location: v || null } })
+            }
           />
 
           <ContactField

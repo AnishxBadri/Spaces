@@ -166,10 +166,7 @@ export const getCompany = createServerFn()
         source: entity.source,
         mergedIntoId: entity.mergedIntoId,
         createdAt: entity.createdAt,
-        foundedYear: company.foundedYear,
-        sectors: company.sectors,
-        stage: company.stage,
-        geo: company.geo,
+        values: entity.values,
       })
       .from(entity)
       .innerJoin(company, eq(company.entityId, entity.id))
@@ -200,11 +197,11 @@ export const getCompany = createServerFn()
       .where(eq(entitySpace.entityId, data.id))
 
     // Contacts: people linked contact_at → this company.
-    const people = await db
+    const peopleRows = await db
       .select({
         id: entity.id,
         name: entity.canonicalName,
-        headline: person.headline,
+        values: entity.values,
       })
       .from(link)
       .innerJoin(entity, eq(entity.id, link.fromEntityId))
@@ -216,6 +213,13 @@ export const getCompany = createServerFn()
           isNull(entity.mergedIntoId),
         ),
       )
+    const people = peopleRows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      headline:
+        (((p.values ?? {}) as Record<string, unknown>).job_title as string) ??
+        null,
+    }))
 
     // Notes (and anything else) that mention this company.
     const mentionedIn = await db
@@ -246,12 +250,7 @@ export const getCompany = createServerFn()
       source: head.source,
       mergedIntoId: head.mergedIntoId,
       createdAt: head.createdAt.toISOString(),
-      attrs: {
-        foundedYear: head.foundedYear,
-        sectors: head.sectors ?? [],
-        stage: head.stage,
-        geo: head.geo,
-      },
+      values: (head.values ?? {}) as Record<string, Json>,
       aliases,
       spaces,
       people,
@@ -260,43 +259,35 @@ export const getCompany = createServerFn()
     }
   })
 
-const updateCompanyInput = z.object({
-  id: z.string().uuid(),
-  name: z.string().trim().min(1).max(160).optional(),
-  stage: z.string().trim().max(60).nullish(),
-  geo: z.string().trim().max(120).nullish(),
-  foundedYear: z.number().int().min(1800).max(2100).nullish(),
-  sectors: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
-})
-
-export const updateCompany = createServerFn({ method: 'POST' })
-  .validator(updateCompanyInput)
+/**
+ * Generic record update for object-model entities: rename and/or an
+ * attribute-values patch through the one validated write path.
+ */
+export const updateRecord = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      name: z.string().trim().min(1).max(200).optional(),
+      patch: z.record(z.string(), z.unknown()).optional(),
+    }),
+  )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    await db.transaction(async (tx) => {
-      if (data.name) {
-        await tx
-          .update(entity)
-          .set({ canonicalName: data.name })
-          .where(eq(entity.id, data.id))
-      }
-      await tx
-        .update(company)
-        .set({
-          ...(data.stage !== undefined ? { stage: data.stage } : {}),
-          ...(data.geo !== undefined ? { geo: data.geo } : {}),
-          ...(data.foundedYear !== undefined
-            ? { foundedYear: data.foundedYear }
-            : {}),
-          ...(data.sectors !== undefined ? { sectors: data.sectors } : {}),
-        })
-        .where(eq(company.entityId, data.id))
-      await tx.insert(activity).values({
+    if (data.name) {
+      await db
+        .update(entity)
+        .set({ canonicalName: data.name })
+        .where(eq(entity.id, data.id))
+      await db.insert(activity).values({
         actorId: u.id,
-        verb: 'company.updated',
+        verb: 'renamed',
         subjectEntityId: data.id,
       })
-    })
+    }
+    if (data.patch && Object.keys(data.patch).length > 0) {
+      const { setValues } = await import('./attributes/values')
+      await setValues({ entityId: data.id, patch: data.patch, actorId: u.id })
+    }
     return { ok: true }
   })
 
@@ -369,7 +360,7 @@ export const listPeople = createServerFn().handler(async () => {
     .select({
       id: entity.id,
       name: entity.canonicalName,
-      headline: person.headline,
+      values: entity.values,
       createdAt: entity.createdAt,
     })
     .from(entity)
@@ -406,7 +397,8 @@ export const listPeople = createServerFn().handler(async () => {
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
-    headline: r.headline,
+    headline:
+      ((r.values as Record<string, unknown>)?.job_title as string) ?? null,
     email: emailBy.get(r.id) ?? null,
     company: companyBy.get(r.id) ?? null,
     createdAt: r.createdAt.toISOString(),
@@ -466,8 +458,7 @@ export const getPerson = createServerFn()
         name: entity.canonicalName,
         mergedIntoId: entity.mergedIntoId,
         createdAt: entity.createdAt,
-        headline: person.headline,
-        geo: person.geo,
+        values: entity.values,
       })
       .from(entity)
       .innerJoin(person, eq(person.entityId, entity.id))
@@ -524,48 +515,13 @@ export const getPerson = createServerFn()
       id: head.id,
       name: head.name,
       mergedIntoId: head.mergedIntoId,
-      headline: head.headline,
-      geo: head.geo,
+      values: (head.values ?? {}) as Record<string, Json>,
       emails: aliases.filter((a) => a.kind === 'email'),
       linkedins: aliases.filter((a) => a.kind === 'linkedin'),
       companies,
       mentionedIn,
       timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
     }
-  })
-
-export const updatePerson = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({
-      id: z.string().uuid(),
-      name: z.string().trim().min(1).max(160).optional(),
-      headline: z.string().trim().max(200).nullish(),
-      geo: z.string().trim().max(120).nullish(),
-    }),
-  )
-  .handler(async ({ data }) => {
-    const u = await requireUser()
-    await db.transaction(async (tx) => {
-      if (data.name) {
-        await tx
-          .update(entity)
-          .set({ canonicalName: data.name })
-          .where(eq(entity.id, data.id))
-      }
-      await tx
-        .update(person)
-        .set({
-          ...(data.headline !== undefined ? { headline: data.headline } : {}),
-          ...(data.geo !== undefined ? { geo: data.geo } : {}),
-        })
-        .where(eq(person.entityId, data.id))
-      await tx.insert(activity).values({
-        actorId: u.id,
-        verb: 'person.updated',
-        subjectEntityId: data.id,
-      })
-    })
-    return { ok: true }
   })
 
 /** Email/LinkedIn add with the same tripwire semantics as company domains. */
@@ -1032,12 +988,11 @@ export const getSpace = createServerFn()
       .where(eq(space.parentId, data.id))
       .orderBy(asc(entity.canonicalName))
 
-    const companies = await db
+    const companyRows = await db
       .select({
         id: entity.id,
         name: entity.canonicalName,
-        stage: company.stage,
-        geo: company.geo,
+        values: entity.values,
         taggedVia: entitySpace.source,
       })
       .from(entitySpace)
@@ -1047,6 +1002,16 @@ export const getSpace = createServerFn()
         and(eq(entitySpace.spaceId, data.id), isNull(entity.mergedIntoId)),
       )
       .orderBy(asc(entity.canonicalName))
+    const companies = companyRows.map((c) => {
+      const v = (c.values ?? {}) as Record<string, unknown>
+      return {
+        id: c.id,
+        name: c.name,
+        stage: (v.funding_stage as string) ?? null,
+        geo: (v.location as string) ?? null,
+        taggedVia: c.taggedVia,
+      }
+    })
 
     // The memo: a note of kind memo linked tagged_in to this space.
     const [memo] = await db

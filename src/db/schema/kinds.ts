@@ -24,23 +24,20 @@ import { user } from './auth'
  */
 
 // ---------- company / person ----------
+// Attribute values live in entity.values (unified storage, CONTEXT.md).
+// Side tables persist as kind markers and future homes for non-attribute
+// structure; they carry no attribute columns.
 
 export const company = pgTable('company', {
   entityId: uuid('entity_id')
     .primaryKey()
     .references(() => entity.id),
-  foundedYear: integer('founded_year'),
-  sectors: text('sectors').array(),
-  stage: text('stage'),
-  geo: text('geo'),
 })
 
 export const person = pgTable('person', {
   entityId: uuid('entity_id')
     .primaryKey()
     .references(() => entity.id),
-  headline: text('headline'),
-  geo: text('geo'),
 })
 
 // ---------- space (taxonomy — stable, hierarchical, never dies) ----------

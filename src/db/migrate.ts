@@ -11,6 +11,10 @@ async function main() {
   await migrate(db, { migrationsFolder: './drizzle' })
   console.log('[migrate] up to date')
   await db.$client.end()
+  // System attributes: insert-if-absent on every boot; user edits survive.
+  const { seedSystemAttributes } = await import('#/lib/attributes/seed')
+  await seedSystemAttributes()
+  process.exit(0)
 }
 
 main().catch((err) => {

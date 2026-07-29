@@ -1,5 +1,6 @@
 export * from './auth'
 export * from './entities'
+export * from './attributes'
 export * from './kinds'
 export * from './lists'
 export * from './interactions'

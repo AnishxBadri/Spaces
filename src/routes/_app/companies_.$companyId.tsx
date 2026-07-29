@@ -25,7 +25,7 @@ import {
   listSpaces,
   tagIntoSpace,
   untagFromSpace,
-  updateCompany,
+  updateRecord,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
@@ -113,46 +113,43 @@ function CompanyRecordPage() {
       </header>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
-        {/* Left: attributes */}
+        {/* Left: attributes (registry-generated rail lands in Phase 2;
+            until then the seeded slugs are read/written directly). */}
         <aside className="space-y-5">
           <AttrField
-            label="Stage"
-            value={company.attrs.stage ?? ''}
-            placeholder="Seed"
+            label="Description"
+            value={String(company.values.description ?? '')}
+            placeholder="What they do"
             onSave={(v) =>
-              save({ id: company.id, stage: v || null }, router)
+              save({ id: company.id, patch: { description: v || null } }, router)
             }
           />
           <AttrField
-            label="Geography"
-            value={company.attrs.geo ?? ''}
-            placeholder="Bengaluru"
-            onSave={(v) => save({ id: company.id, geo: v || null }, router)}
-          />
-          <AttrField
-            label="Founded"
-            value={company.attrs.foundedYear?.toString() ?? ''}
-            placeholder="2021"
+            label="Funding stage"
+            value={String(company.values.funding_stage ?? '')}
+            placeholder="seed"
             onSave={(v) =>
               save(
-                { id: company.id, foundedYear: v ? Number(v) : null },
+                { id: company.id, patch: { funding_stage: v || null } },
                 router,
               )
             }
           />
           <AttrField
-            label="Sectors"
-            value={company.attrs.sectors.join(', ')}
-            placeholder="robotics, defence"
+            label="Location"
+            value={String(company.values.location ?? '')}
+            placeholder="Bengaluru"
+            onSave={(v) =>
+              save({ id: company.id, patch: { location: v || null } }, router)
+            }
+          />
+          <AttrField
+            label="Founded"
+            value={company.values.founded_year?.toString() ?? ''}
+            placeholder="2021"
             onSave={(v) =>
               save(
-                {
-                  id: company.id,
-                  sectors: v
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                },
+                { id: company.id, patch: { founded_year: v ? Number(v) : null } },
                 router,
               )
             }
@@ -353,16 +350,16 @@ function CompanyRecordPage() {
 }
 
 async function save(
-  data: Parameters<typeof updateCompany>[0] extends { data: infer D }
+  data: Parameters<typeof updateRecord>[0] extends { data: infer D }
     ? D
     : never,
   router: ReturnType<typeof useRouter>,
 ) {
   try {
-    await updateCompany({ data })
+    await updateRecord({ data })
     router.invalidate()
-  } catch {
-    toast.error('Could not save')
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Could not save')
   }
 }
 

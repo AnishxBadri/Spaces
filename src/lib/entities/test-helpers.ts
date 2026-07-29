@@ -19,8 +19,10 @@ export async function cleanupTestEntities(patterns: Array<string>) {
   if (ids.length === 0) return
 
   const { entity, entityAlias, duplicateCandidate, mergeEvent, link } = schema
-  const { entitySpace, company, person, space, note } = schema
+  const { entitySpace, company, person, space, note, attributeEvent } = schema
   const { activity } = await import('#/db/schema/activity')
+
+  await db.delete(attributeEvent).where(inArray(attributeEvent.entityId, ids))
 
   await db
     .delete(mergeEvent)

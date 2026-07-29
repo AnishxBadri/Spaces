@@ -33,19 +33,8 @@ export const list = pgTable('list', {
     .defaultNow(),
 })
 
-export const attributeType = pgEnum('attribute_type', [
-  'text',
-  'select',
-  'status',
-  'number',
-  'currency',
-  'date',
-  'checkbox',
-  'domain',
-  'email',
-  'record_reference',
-  'actor_reference',
-])
+// Shares the engine's type enum — one type menu everywhere.
+import { attributeType } from './attributes'
 
 export const listAttribute = pgTable(
   'list_attribute',

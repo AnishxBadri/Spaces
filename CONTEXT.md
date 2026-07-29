@@ -226,6 +226,30 @@ space and no pipeline at all: *tracking, not evaluating.* That is a first-class 
 AI-suggested tags land as `source: ai` in a review queue, never silently written. Same
 provenance rule as enrichment.
 
+### Spaces vs attributes — the classification boundary (decided 2026-07)
+
+Two dimensions that must never share a field:
+
+- **Markets — *where* a company operates** (Aerospace → In-space Manufacturing). Hierarchical,
+  researchable. **Spaces own this exclusively** — industry/sector never becomes an attribute.
+  The companies table shows a graph-backed Spaces column, not a sectors field.
+- **Characterizations — *what kind of business* it is** (B2B/B2C, hardware, capital
+  intensity, GTM motion). Orthogonal facets that cut across every market. **These are
+  attributes** — flat, filterable, no research attached.
+
+**The litmus test:** "Could I write a memo about it and track companies in it?" → space.
+"Is it a property of the business itself, true in any market?" → attribute.
+
+Seeded facet: one system multi-select on Company — `Business model`
+(B2B · B2C · B2B2C · Marketplace · Hardware · Deep tech · Services), options editable.
+No "sectors"/"categories" attribute ships, ever — that's the drift vector Attio's
+Categories demonstrates.
+
+**Extensibility doctrine: structure fixed, content free, defaults curated.** Object kinds,
+the attribute type menu, identity rules, and the engine's shape are code. The space tree,
+custom attributes, and every seeded attribute's options are the user's vocabulary. The
+litmus test lives in docs and seed data as guidance — never enforced by validation.
+
 ### Seed taxonomy
 
 Ship ~150–250 curated nodes, versioned. NAICS/SIC rejected — useless for deeptech and tech.
@@ -238,27 +262,103 @@ Scoped to a space — "stage" means different things in aerospace and bio. Terms
 note body (Aho-Corasick over the term set at render time), hover shows the definition. Cheap to
 build, disproportionate payoff for someone learning a new space.
 
-### Pipeline — Attio-inspired list/entry primitive
+### Deal — a first-class object (decided 2026-07, reversing lists-first)
 
-Key idea borrowed from Attio: **pipeline data lives on list membership, not on the company.**
-Same company sits in "Q3 Pipeline" (stage: diligence) and "Portfolio" (ownership: 4.2%) at
-once, with different fields in each.
+**One Deal = one investment opportunity (round or instrument) in one company.** Many deals
+per company over time — the 2024 pre-lead you passed on and the 2026 Series A are two
+records, each keeping its own arrival context, stage history, and pass reasoning. That
+history is the institutional memory an angel pays for.
+
+**Three-state model** (validated against a real fund's funnel data — 331 pre-leads,
+1,164 rejected, 2 term sheets):
+
+1. **Watching — no Deal exists.** Company tagged into spaces. "Tracking, not evaluating."
+   Never a pipeline stage — cramming watching into the funnel is the workaround tools
+   without a research layer are forced into.
+2. **Pre-lead — Deal exists, judgment hasn't happened.** Born when something arrives
+   (deck, intro, founder email). High-volume triage bucket; most deals die here.
+3. **Funnel proper** through to a terminal state.
+
+**Default stage set** (status attribute; options editable, each option carries a group):
+- Funnel (`active`): Pre-lead → Screening → Meeting → Diligence → Term sheet
+- Parked (`parked`): Early — revisit  *(nurture pool: "come back at seed"; not terminal,
+  not active — without it people abuse Rejected and lose warm relationships)*
+- Terminal (`closed`): Invested · Passed (our no) · Lost (their no / missed allocation —
+  a different post-mortem lesson than Passed)
+
+Terminal deals close, never delete — same death-is-information principle as theses.
+
+Deal system attributes: stage (status), value (currency), company (record-reference),
+people (record-reference), owner (actor-reference), close date. Custom attributes via the
+attribute engine like every object.
+
+### Attribute engine (decided 2026-07)
+
+The object model: **Companies, People, Deals** are objects with an attribute registry —
+system attributes we ship, custom attributes users add. Notes, spaces, theses, terms are
+deliberately *not* object-modeled; they're the research layer that links in.
 
 ```
-list(id, name, kind: pipeline|portfolio|watchlist)
-list_attribute(list_id, slug, type, options jsonb)
-list_entry(list_id, entity_id, values jsonb, owner_id, created_at)
-list_entry_event(entry_id, attr, from, to, at)      -- typed stage history, feeds analytics
+attribute(id, object_kind: company|person|deal, slug, name, type,
+          options jsonb, is_system, archived, sort_order)
 ```
 
-Note `list.kind` no longer includes `thesis` — thesis is its own object now.
+- **Unified storage:** all attribute values — system and custom — live in `entity.values`
+  jsonb, keyed by slug. One write path, one validator (zod per type at write time), one
+  renderer, one indexing story. No column-vs-jsonb branching anywhere.
+- **Hard exclusions, never attributes:** `kind`, `canonical_name`, `merged_into_id`, and
+  all identity (domains/emails/linkedin/cin live in `entity_alias` under resolution rules).
+  The opinionated core stays code-owned; attributes are display/filter/sort data.
+- **Type menu is fixed** (users define attributes, never types): text, number, currency,
+  date, checkbox, select, multi-select, status (options carry a group:
+  active/parked/closed), domain, email, url, phone, rating, **record-reference**,
+  **actor-reference**.
+- System attributes are `is_system`, non-deletable, archivable-not-removable; a custom
+  attribute that proves universal gets promoted to system in a release, not by users.
+- Indexing: expression indexes minted per attribute when tables need them; GIN + measured
+  seq scans until then. Fine at 1–15 users.
+- The registry generates the UI: table columns, create-modal fields, record-page detail
+  rails all read the registry. Attio's structure, self-hosted.
+- **Record-references materialize into the graph:** the uuid in `values` is source of
+  truth; every reference write syncs a `link` row (`relation: references`, `attr_slug`)
+  in the same transaction — the note-mentions pattern. Backlinks, "related" rails, and
+  the merge executor's referrer lookup all stay on the one graph; merge rewrites both.
+- `deal.company` is **required and single** — a deal without a company doesn't exist in
+  this domain. `deal.people` is optional and multi.
 
-Attribute types to support: select, status, number, currency, date, checkbox, domain, email,
-**record-reference**, **actor-reference**. Record-reference is what makes the co-investor graph work.
+### Seeded system attributes (decided 2026-07)
 
-`values jsonb` buys flexibility but loses typed indexes. Kanban group-by and sort on a select
-attribute over a few thousand entries needs expression indexes generated at attribute-create
-time, or GIN plus accepting seq scans. Decide before the table component is built.
+- **Company:** description (text) · business_model (multi-select) · funding_stage (select:
+  Pre-seed → Public/Bootstrapped) · location (text) · founded_year (number) · linkedin (url).
+  Website is the domain alias rendered, never an attribute.
+- **Person:** job_title (text) · description · location · linkedin (url) · twitter (url) ·
+  phone (phone). Emails are identity aliases, not attributes.
+- **Deal:** stage (status) · value (currency) · company (ref, required single) · people
+  (ref, multi) · owner (actor) · close_date (date) · source (select: Inbound · Referral ·
+  Outbound · Event).
+- Enrichment-fed fields (employee range, ARR, funding raised) deliberately absent — empty
+  boxes without a provider; they arrive with the enrichment integration as
+  provenance-tracked attributes.
+
+### Attribute change history (decided 2026-07)
+
+```
+attribute_event(id, entity_id, attr_slug, from jsonb, to jsonb, actor_id, at)
+```
+
+One row per attribute change, same transaction as the value write. Restores what
+`list_entry_event` provided: deal stage history is `attr_slug = 'stage'`; time-in-stage
+analytics fall out free. `activity` carries macro verbs only (created, merged, tagged,
+note-created) — no "updated" noise rows. **Condensing is read-time display:** group
+events by actor + record within a ~10-minute burst → "changed 8 attributes", expandable
+to the attr/value table. No write-side session tracking.
+
+### Lists — deferred
+
+The Attio list/entry primitive (`list`, `list_attribute`, `list_entry`, `list_entry_event`)
+stays in the schema but is **not the deal mechanism** and is deferred from MVP. If
+watchlists/portfolio views later need membership-with-context, lists are there; deals no
+longer wait on a list engine, and kanban falls out of the Deal stage attribute.
 
 ### Interactions and enrichment
 
@@ -559,8 +659,19 @@ Attio is the reference for shape and craft.
 - **Spreadsheet-grade table:** inline cell edit, virtualized rows, resizable/reorderable columns,
   multi-select + bulk edit, keyboard nav. Investors live in Excel. If the table is worse than a
   spreadsheet they leave. Hardest UI work in the project — budget for it.
+  **v1 scope line (2026-07):** registry-generated columns (show/hide/reorder/resize),
+  "+ Add column" creates an attribute inline, typed cell renderers + inline edit, single
+  sort, simple filters, Spaces pseudo-column, row → record. Deferred by name: saved/shared
+  views, bulk edit, calculations row, CSV, virtualization + keyboard-grid (land when row
+  counts demand), kanban debuts on Deals only.
 - **Record page:** left = attribute sidebar, center = tabs (Activity / Notes / Emails / Files / Tasks),
   right = related records. Activity timeline auto-filled from mail.
+  **v1 scope line (2026-07):** left rail registry-generated (same typed editors as table
+  cells, "+ Add attribute"), identity/domains block from aliases; center tabs Activity
+  (condensed bursts) + Notes; right rail Spaces · People↔Companies · Deals (on company) ·
+  Mentioned-in; full-page nav. Deferred by name: Overview/Highlight cards (needs
+  interaction+enrichment data), Emails/Calls/Tasks/Files tabs (arrive with their
+  features), drawer-over-table.
 - **Cmd-K everywhere:** search, create, navigate, jump to record.
 - Optimistic updates, no page reloads.
 - **Never show an empty table.** Onboarding aha = connect Gmail, companies and people are already
@@ -664,7 +775,7 @@ Both halves ship, or the seam — the whole point — doesn't exist.
 3. Spaces: seed taxonomy, custom nodes, space page (notes + sources + companies + contacts)
 4. Notes: markdown, `[[mentions]]`, backlinks, attach to anything
 5. Documents: upload + URL clip, text extraction, attach to any entity
-6. Pipeline: list/entry model, table + kanban, stage history, activity feed
+6. Deals: object with stage/value/company attributes, table + kanban by stage, activity feed
 7. Theses: claim, conviction, status, evidence for/against
 8. Glossary with in-note auto-linking
 9. Entity resolution: `resolveEntity()` choke point, aliases, dedupe inbox, merge + snapshot
@@ -684,14 +795,23 @@ that skews Google Workspace.
 
 ---
 
-# Next step
+# Next step — the object-model build (planned 2026-07)
 
-Entity resolution spec'd — schema is unblocked.
+Scaffold, auth, entity core, resolution/dedupe, notes/mentions, spaces, people/company
+records: **done.** Current phase order:
 
-Scaffold: TanStack Start + Postgres, Drizzle schema with the entity/link core plus the
-list/entry model, Better Auth + invites, credential vault, storage abstraction, docker-compose
-(app + db, web and worker processes), first-run wizard. Gmail sync and Apollo stubbed behind
-their adapter interfaces.
+1. **Attribute engine** — `attribute` registry + `entity.values` + `attribute_event`,
+   seeded system attributes, typed validators; migrate company/person attr columns into
+   values. No UI.
+2. **Companies, Attio-style** — registry-driven table (v1 scope line above), create modal
+   from registry, record page converted to registry rail.
+3. **Deals** — the object: seeded attributes, table + kanban by stage group, deals on
+   company records, dedupe-safe via resolveEntity company ref.
+4. **People** — same table/record treatment.
+5. **Object settings** — attribute management UI (rename, options, archive, reorder).
+
+Then: interactions (manual meetings), documents/upload + extraction worker, glossary terms,
+theses — followed by the integrations phase (Calendar first, Gmail, Apollo).
 
 ## Open questions
 

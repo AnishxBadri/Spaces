@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
+// (values column) — attribute registry lives in ./attributes
 import { sql } from 'drizzle-orm'
 import { user } from './auth'
 
@@ -23,6 +24,7 @@ export const entityKind = pgEnum('entity_kind', [
   'company',
   'person',
   'organization',
+  'deal',
   'space',
   'thesis',
   'note',
@@ -48,6 +50,9 @@ export const entity = pgTable(
     // Soft merge: loser rows survive and redirect. Chains are flattened at
     // write time — merging B into C repoints every merged_into_id at B.
     mergedIntoId: uuid('merged_into_id'),
+    // Attribute values (system + custom), keyed by attribute slug. The
+    // registry (attribute table) defines shape; validation happens at write.
+    values: jsonb('values').notNull().default({}),
     source: entitySource('source').notNull().default('manual'),
     createdBy: text('created_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -181,6 +186,8 @@ export const linkRelation = pgEnum('link_relation', [
   'contact_at',
   'derived_from',
   'supersedes',
+  // Materialized record-reference attribute (attr_slug says which one).
+  'references',
 ])
 
 export const linkSource = pgEnum('link_source', ['manual', 'ai', 'extracted'])
@@ -201,6 +208,11 @@ export const link = pgTable(
       .notNull()
       .references(() => entity.id),
     relation: linkRelation('relation').notNull(),
+    // For relation='references': the record-reference attribute this edge
+    // materializes. Values jsonb is source of truth; this row is the graph.
+    // Empty string (not null) for other relations so the unique edge index
+    // can include it without NULL-distinctness loopholes.
+    attrSlug: text('attr_slug').notNull().default(''),
     source: linkSource('source').notNull().default('manual'),
     createdBy: text('created_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -208,7 +220,12 @@ export const link = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex('link_edge_unique').on(t.fromEntityId, t.toEntityId, t.relation),
+    uniqueIndex('link_edge_unique').on(
+      t.fromEntityId,
+      t.toEntityId,
+      t.relation,
+      t.attrSlug,
+    ),
     index('link_to_idx').on(t.toEntityId),
     index('link_from_idx').on(t.fromEntityId),
   ],

@@ -22,7 +22,6 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
     const { mergeEntities } = await import('./merge')
     const { db } = await import('#/db')
     const {
-      company,
       duplicateCandidate,
       entity,
       entityAlias,
@@ -93,9 +92,9 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
       source: 'extracted',
     })
     await db
-      .update(company)
-      .set({ stage: 'Seed' })
-      .where(eq(company.entityId, loser.entityId))
+      .update(entity)
+      .set({ values: { funding_stage: 'seed' } })
+      .where(eq(entity.id, loser.entityId))
 
     // Merge.
     const { mergeEventId } = await mergeEntities({
@@ -150,12 +149,12 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
       )
     expect(movedTag).toBeTruthy()
 
-    // Null field filled from loser.
-    const [wCompany] = await db
-      .select({ stage: company.stage })
-      .from(company)
-      .where(eq(company.entityId, winner.entityId))
-    expect(wCompany.stage).toBe('Seed')
+    // Null value filled from loser.
+    const [wEnt] = await db
+      .select({ values: entity.values })
+      .from(entity)
+      .where(eq(entity.id, winner.entityId))
+    expect((wEnt.values as Record<string, unknown>).funding_stage).toBe('seed')
 
     // Candidate closed; no open candidates left on the pair.
     const openLeft = await db
