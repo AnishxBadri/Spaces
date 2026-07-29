@@ -24,7 +24,7 @@ function NotesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8 md:px-10">
+    <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight">Notes</h1>

@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { ChevronRight, Layers, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { EmptyState } from '#/components/empty-state'
@@ -28,7 +28,7 @@ function SpacesPage() {
   const spaces = Route.useLoaderData()
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8 md:px-10">
+    <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight">Spaces</h1>
@@ -51,9 +51,11 @@ function SpacesPage() {
         <ul className="mt-6 -mx-2">
           {spaces.map((s) => (
             <li key={s.id}>
-              <div
+              <Link
+                to="/spaces/$spaceId"
+                params={{ spaceId: s.id }}
                 className={cn(
-                  'group flex h-9 items-center gap-2 rounded-md px-2 text-[13px] hover:bg-accent',
+                  'group flex h-9 items-center gap-2 rounded-md px-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
                 )}
                 style={{ paddingLeft: `${8 + s.depth * 20}px` }}
               >
@@ -67,7 +69,7 @@ function SpacesPage() {
                 <span className="text-xs text-muted-foreground/70">
                   {s.slug}
                 </span>
-              </div>
+              </Link>
             </li>
           ))}
         </ul>
