@@ -1,0 +1,22 @@
+name: dealos-dev
+# Dev-only: runs Postgres locally while the app runs via `pnpm dev`.
+# Production compose (app + db) is docker-compose.yml.
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: dealos
+      POSTGRES_PASSWORD: dealos
+      POSTGRES_DB: dealos
+    ports:
+      - '5432:5432'
+    volumes:
+      - dealos_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dealos -d dealos']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  dealos_dev_pgdata:

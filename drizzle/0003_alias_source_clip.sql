@@ -1,0 +1,1 @@
+ALTER TYPE "public"."alias_source" ADD VALUE 'clip' BEFORE 'merge';

@@ -1,0 +1,29 @@
+{
+  "projectName": "dealos",
+  "mode": "file-router",
+  "typescript": true,
+  "tailwind": true,
+  "packageManager": "pnpm",
+  "git": true,
+  "install": true,
+  "intent": false,
+  "addOnOptions": {
+    "drizzle": {
+      "database": "postgresql"
+    }
+  },
+  "projectPreset": "default",
+  "includeExamples": false,
+  "routerOnly": false,
+  "version": 1,
+  "framework": "react",
+  "chosenAddOns": [
+    "drizzle",
+    "better-auth",
+    "shadcn",
+    "tanstack-query",
+    "t3env",
+    "eslint",
+    "nitro"
+  ]
+}

@@ -1,0 +1,13 @@
+node_modules
+.output
+.nitro
+.tanstack
+data
+.git
+.env
+.env.*
+*.md
+!README.md
+drizzle/**/*.snapshot.json
+.vscode
+.impeccable
