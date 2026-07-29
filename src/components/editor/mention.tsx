@@ -52,7 +52,11 @@ export const Mention = createReactInlineContentSpec(
           ? `/companies/${entityId}`
           : kind === 'note'
             ? `/notes/${entityId}`
-            : KIND_ROUTES[kind]
+            : kind === 'space'
+              ? `/spaces/${entityId}`
+              : kind === 'person'
+                ? `/people/${entityId}`
+                : KIND_ROUTES[kind]
       return (
         <a
           href={href}

@@ -104,6 +104,27 @@ describe.skipIf(!hasDb)('resolveEntity', () => {
     expect(rows[0].status).toBe('open')
   })
 
+  it('role emails never become person identity', async () => {
+    const { resolveEntity } = await import('./resolve')
+    const tag = randomUUID().slice(0, 8)
+    const a = await resolveEntity({
+      kind: 'person',
+      name: `Holder ${tag}`,
+      keys: { email: `info@role-${tag}.com` },
+      source: 'manual',
+    })
+    const b = await resolveEntity({
+      kind: 'person',
+      name: `Claimant ${tag}`,
+      keys: { email: `info@role-${tag}.com` },
+      source: 'manual',
+    })
+    // Both created — the shared role email was discarded as identity.
+    expect(a.action).toBe('created')
+    expect(b.action).toBe('created')
+    expect(a.entityId).not.toBe(b.entityId)
+  })
+
   it('similar names suggest, never attach', async () => {
     const { resolveEntity } = await import('./resolve')
     const { db } = await import('#/db')

@@ -24,6 +24,8 @@ import { Route as AppThesesRouteImport } from './routes/_app/theses'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/companies_.$companyId'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId'
+import { Route as AppPeoplePersonIdRouteImport } from './routes/_app/people_.$personId'
+import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
 
@@ -101,6 +103,16 @@ const AppNotesNoteIdRoute = AppNotesNoteIdRouteImport.update({
   path: '/notes/$noteId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPeoplePersonIdRoute = AppPeoplePersonIdRouteImport.update({
+  id: '/people_/$personId',
+  path: '/people/$personId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSpacesSpaceIdRoute = AppSpacesSpaceIdRouteImport.update({
+  id: '/spaces_/$spaceId',
+  path: '/spaces/$spaceId',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -127,6 +139,8 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
+  '/people/$personId': typeof AppPeoplePersonIdRoute
+  '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
 }
@@ -145,6 +159,8 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
+  '/people/$personId': typeof AppPeoplePersonIdRoute
+  '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
 }
@@ -165,6 +181,8 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/_app/companies_/$companyId': typeof AppCompaniesCompanyIdRoute
   '/_app/notes_/$noteId': typeof AppNotesNoteIdRoute
+  '/_app/people_/$personId': typeof AppPeoplePersonIdRoute
+  '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
 }
@@ -185,6 +203,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/companies/$companyId'
     | '/notes/$noteId'
+    | '/people/$personId'
+    | '/spaces/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
   fileRoutesByTo: FileRoutesByTo
@@ -203,6 +223,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/companies/$companyId'
     | '/notes/$noteId'
+    | '/people/$personId'
+    | '/spaces/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
   id:
@@ -222,6 +244,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/_app/companies_/$companyId'
     | '/_app/notes_/$noteId'
+    | '/_app/people_/$personId'
+    | '/_app/spaces_/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
   fileRoutesById: FileRoutesById
@@ -343,6 +367,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNotesNoteIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/people_/$personId': {
+      id: '/_app/people_/$personId'
+      path: '/people/$personId'
+      fullPath: '/people/$personId'
+      preLoaderRoute: typeof AppPeoplePersonIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/spaces_/$spaceId': {
+      id: '/_app/spaces_/$spaceId'
+      path: '/spaces/$spaceId'
+      fullPath: '/spaces/$spaceId'
+      preLoaderRoute: typeof AppSpacesSpaceIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -371,6 +409,8 @@ interface AppRouteChildren {
   AppThesesRoute: typeof AppThesesRoute
   AppCompaniesCompanyIdRoute: typeof AppCompaniesCompanyIdRoute
   AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
+  AppPeoplePersonIdRoute: typeof AppPeoplePersonIdRoute
+  AppSpacesSpaceIdRoute: typeof AppSpacesSpaceIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -384,6 +424,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppThesesRoute: AppThesesRoute,
   AppCompaniesCompanyIdRoute: AppCompaniesCompanyIdRoute,
   AppNotesNoteIdRoute: AppNotesNoteIdRoute,
+  AppPeoplePersonIdRoute: AppPeoplePersonIdRoute,
+  AppSpacesSpaceIdRoute: AppSpacesSpaceIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

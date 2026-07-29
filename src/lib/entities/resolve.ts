@@ -8,6 +8,7 @@ import {
   person,
 } from '#/db/schema'
 import {
+  isRoleEmail,
   normalizeCin,
   normalizeDomain,
   normalizeEmail,
@@ -63,7 +64,11 @@ function normalizeKeys(input: ResolveInput): Array<NormalizedKey> {
   }
   if (k.email) {
     const norm = normalizeEmail(k.email)
-    if (norm) out.push({ kind: 'email', value: k.email.trim(), valueNorm: norm })
+    // Role emails (info@, careers@…) never identify a person — anyone can
+    // send from them, so matching on one would weld strangers together.
+    if (norm && !(input.kind === 'person' && isRoleEmail(norm))) {
+      out.push({ kind: 'email', value: k.email.trim(), valueNorm: norm })
+    }
   }
   if (k.linkedin) {
     const norm = normalizeLinkedin(k.linkedin)

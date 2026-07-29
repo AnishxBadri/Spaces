@@ -13,6 +13,7 @@ import {
   entitySpace,
   link,
   note,
+  person,
   space,
 } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
@@ -198,6 +199,24 @@ export const getCompany = createServerFn()
       .innerJoin(entity, eq(entity.id, space.entityId))
       .where(eq(entitySpace.entityId, data.id))
 
+    // Contacts: people linked contact_at → this company.
+    const people = await db
+      .select({
+        id: entity.id,
+        name: entity.canonicalName,
+        headline: person.headline,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.fromEntityId))
+      .innerJoin(person, eq(person.entityId, entity.id))
+      .where(
+        and(
+          eq(link.toEntityId, data.id),
+          eq(link.relation, 'contact_at'),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+
     // Notes (and anything else) that mention this company.
     const mentionedIn = await db
       .select({
@@ -235,6 +254,7 @@ export const getCompany = createServerFn()
       },
       aliases,
       spaces,
+      people,
       mentionedIn,
       timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
     }
@@ -338,6 +358,262 @@ export const untagFromSpace = createServerFn({ method: 'POST' })
       subjectEntityId: data.entityId,
       objectEntityId: data.spaceId,
     })
+    return { ok: true }
+  })
+
+// ---------- people ----------
+
+export const listPeople = createServerFn().handler(async () => {
+  await requireUser()
+  const rows = await db
+    .select({
+      id: entity.id,
+      name: entity.canonicalName,
+      headline: person.headline,
+      createdAt: entity.createdAt,
+    })
+    .from(entity)
+    .innerJoin(person, eq(person.entityId, entity.id))
+    .where(isNull(entity.mergedIntoId))
+    .orderBy(desc(entity.createdAt))
+  if (rows.length === 0) return []
+
+  // Primary email + company per person, batched.
+  const emails = await db
+    .select({ entityId: entityAlias.entityId, email: entityAlias.valueNorm })
+    .from(entityAlias)
+    .where(
+      and(eq(entityAlias.kind, 'email'), eq(entityAlias.isIdentity, true)),
+    )
+  const emailBy = new Map(emails.map((e) => [e.entityId, e.email]))
+
+  const companies = await db
+    .select({
+      personId: link.fromEntityId,
+      companyId: entity.id,
+      companyName: entity.canonicalName,
+    })
+    .from(link)
+    .innerJoin(entity, eq(entity.id, link.toEntityId))
+    .where(eq(link.relation, 'contact_at'))
+  const companyBy = new Map(
+    companies.map((c) => [
+      c.personId,
+      { id: c.companyId, name: c.companyName },
+    ]),
+  )
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    headline: r.headline,
+    email: emailBy.get(r.id) ?? null,
+    company: companyBy.get(r.id) ?? null,
+    createdAt: r.createdAt.toISOString(),
+  }))
+})
+
+const createPersonInput = z.object({
+  name: z.string().trim().min(1).max(160),
+  email: z.string().trim().max(255).optional(),
+  companyId: z.string().uuid().optional(),
+})
+
+export const createPerson = createServerFn({ method: 'POST' })
+  .validator(createPersonInput)
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const result = await resolveEntity({
+      kind: 'person',
+      name: data.name,
+      keys: data.email ? { email: data.email } : undefined,
+      source: 'manual',
+      createdBy: u.id,
+    })
+    if (data.companyId) {
+      await db
+        .insert(link)
+        .values({
+          fromEntityId: result.entityId,
+          toEntityId: data.companyId,
+          relation: 'contact_at',
+          source: 'manual',
+          createdBy: u.id,
+        })
+        .onConflictDoNothing()
+    }
+    if (result.action === 'created') {
+      await db.insert(activity).values({
+        actorId: u.id,
+        verb: 'person.created',
+        subjectEntityId: result.entityId,
+      })
+    }
+    const [row] = await db
+      .select({ name: entity.canonicalName })
+      .from(entity)
+      .where(eq(entity.id, result.entityId))
+    return { ...result, name: row.name }
+  })
+
+export const getPerson = createServerFn()
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const [head] = await db
+      .select({
+        id: entity.id,
+        name: entity.canonicalName,
+        mergedIntoId: entity.mergedIntoId,
+        createdAt: entity.createdAt,
+        headline: person.headline,
+        geo: person.geo,
+      })
+      .from(entity)
+      .innerJoin(person, eq(person.entityId, entity.id))
+      .where(eq(entity.id, data.id))
+    if (!head) throw new Error('Person not found')
+
+    const aliases = await db
+      .select({
+        id: entityAlias.id,
+        kind: entityAlias.kind,
+        value: entityAlias.value,
+        valueNorm: entityAlias.valueNorm,
+      })
+      .from(entityAlias)
+      .where(eq(entityAlias.entityId, data.id))
+
+    const companies = await db
+      .select({
+        id: entity.id,
+        name: entity.canonicalName,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.toEntityId))
+      .where(
+        and(
+          eq(link.fromEntityId, data.id),
+          eq(link.relation, 'contact_at'),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+
+    const mentionedIn = await db
+      .select({
+        fromId: link.fromEntityId,
+        name: entity.canonicalName,
+        kind: entity.kind,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.fromEntityId))
+      .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
+
+    const timeline = await db
+      .select({
+        id: activity.id,
+        verb: activity.verb,
+        at: activity.at,
+      })
+      .from(activity)
+      .where(eq(activity.subjectEntityId, data.id))
+      .orderBy(desc(activity.at))
+      .limit(50)
+
+    return {
+      id: head.id,
+      name: head.name,
+      mergedIntoId: head.mergedIntoId,
+      headline: head.headline,
+      geo: head.geo,
+      emails: aliases.filter((a) => a.kind === 'email'),
+      linkedins: aliases.filter((a) => a.kind === 'linkedin'),
+      companies,
+      mentionedIn,
+      timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
+    }
+  })
+
+export const updatePerson = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      name: z.string().trim().min(1).max(160).optional(),
+      headline: z.string().trim().max(200).nullish(),
+      geo: z.string().trim().max(120).nullish(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    await db.transaction(async (tx) => {
+      if (data.name) {
+        await tx
+          .update(entity)
+          .set({ canonicalName: data.name })
+          .where(eq(entity.id, data.id))
+      }
+      await tx
+        .update(person)
+        .set({
+          ...(data.headline !== undefined ? { headline: data.headline } : {}),
+          ...(data.geo !== undefined ? { geo: data.geo } : {}),
+        })
+        .where(eq(person.entityId, data.id))
+      await tx.insert(activity).values({
+        actorId: u.id,
+        verb: 'person.updated',
+        subjectEntityId: data.id,
+      })
+    })
+    return { ok: true }
+  })
+
+/** Email/LinkedIn add with the same tripwire semantics as company domains. */
+export const addPersonContact = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      kind: z.enum(['email', 'linkedin']),
+      value: z.string().trim().max(255),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    return addIdentityAlias(data.id, data.kind, data.value, 'manual')
+  })
+
+export const setPersonCompany = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      personId: z.string().uuid(),
+      companyId: z.string().uuid(),
+      action: z.enum(['link', 'unlink']),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    if (data.action === 'link') {
+      await db
+        .insert(link)
+        .values({
+          fromEntityId: data.personId,
+          toEntityId: data.companyId,
+          relation: 'contact_at',
+          source: 'manual',
+          createdBy: u.id,
+        })
+        .onConflictDoNothing()
+    } else {
+      await db
+        .delete(link)
+        .where(
+          and(
+            eq(link.fromEntityId, data.personId),
+            eq(link.toEntityId, data.companyId),
+            eq(link.relation, 'contact_at'),
+          ),
+        )
+    }
     return { ok: true }
   })
 
@@ -458,12 +734,15 @@ export const createNote = createServerFn({ method: 'POST' })
             kind: z.string().max(30),
           })
           .optional(),
+        /** memo: the note IS the memo of `about` (tagged_in, not mentions). */
+        noteKind: z.enum(['note', 'memo']).optional(),
       })
       .optional(),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
     const about = data?.about
+    const noteKind = data?.noteKind ?? 'note'
     return db.transaction(async (tx) => {
       const [ent] = await tx
         .insert(entity)
@@ -492,15 +771,20 @@ export const createNote = createServerFn({ method: 'POST' })
       await tx.insert(note).values({
         entityId: ent.id,
         authorId: u.id,
-        bodyJson,
-        bodyMd: about ? `Mentions: [[${about.label}|entity:${about.entityId}]]\n` : '',
+        kind: noteKind,
+        bodyJson: noteKind === 'memo' ? null : bodyJson,
+        bodyMd:
+          about && noteKind !== 'memo'
+            ? `Mentions: [[${about.label}|entity:${about.entityId}]]\n`
+            : '',
       })
       if (about) {
         await tx.insert(link).values({
           fromEntityId: ent.id,
           toEntityId: about.entityId,
-          relation: 'mentions',
-          source: 'extracted',
+          // A memo belongs to its space; a note merely mentions things.
+          relation: noteKind === 'memo' ? 'tagged_in' : 'mentions',
+          source: noteKind === 'memo' ? 'manual' : 'extracted',
           createdBy: u.id,
         })
       }
@@ -705,6 +989,124 @@ export const listSpaces = createServerFn().handler(async () => {
     .orderBy(asc(space.path))
   return rows.map((r) => ({ ...r, depth: r.path.split('.').length - 1 }))
 })
+
+export const getSpace = createServerFn()
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+
+    const [head] = await db
+      .select({
+        id: space.entityId,
+        name: entity.canonicalName,
+        slug: space.slug,
+        path: space.path,
+        parentId: space.parentId,
+        isSeeded: space.isSeeded,
+      })
+      .from(space)
+      .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(eq(space.entityId, data.id))
+    if (!head) throw new Error('Space not found')
+
+    // Breadcrumb chain: every ancestor, resolved by path prefix.
+    const labels = head.path.split('.')
+    const ancestors =
+      labels.length > 1
+        ? await db
+            .select({
+              id: space.entityId,
+              name: entity.canonicalName,
+              path: space.path,
+            })
+            .from(space)
+            .innerJoin(entity, eq(entity.id, space.entityId))
+            .where(sql`${space.path} @> ${head.path} and ${space.path} != ${head.path}`)
+            .orderBy(asc(space.path))
+        : []
+
+    const children = await db
+      .select({ id: space.entityId, name: entity.canonicalName })
+      .from(space)
+      .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(eq(space.parentId, data.id))
+      .orderBy(asc(entity.canonicalName))
+
+    const companies = await db
+      .select({
+        id: entity.id,
+        name: entity.canonicalName,
+        stage: company.stage,
+        geo: company.geo,
+        taggedVia: entitySpace.source,
+      })
+      .from(entitySpace)
+      .innerJoin(entity, eq(entity.id, entitySpace.entityId))
+      .innerJoin(company, eq(company.entityId, entity.id))
+      .where(
+        and(eq(entitySpace.spaceId, data.id), isNull(entity.mergedIntoId)),
+      )
+      .orderBy(asc(entity.canonicalName))
+
+    // The memo: a note of kind memo linked tagged_in to this space.
+    const [memo] = await db
+      .select({
+        id: note.entityId,
+        title: note.title,
+        bodyMd: note.bodyMd,
+        updatedAt: note.updatedAt,
+      })
+      .from(link)
+      .innerJoin(note, eq(note.entityId, link.fromEntityId))
+      .where(
+        and(
+          eq(link.toEntityId, data.id),
+          eq(link.relation, 'tagged_in'),
+          eq(note.kind, 'memo'),
+        ),
+      )
+      .orderBy(desc(note.updatedAt))
+      .limit(1)
+
+    // Research: notes that mention this space.
+    const notes = await db
+      .select({
+        id: note.entityId,
+        title: note.title,
+        updatedAt: note.updatedAt,
+      })
+      .from(link)
+      .innerJoin(note, eq(note.entityId, link.fromEntityId))
+      .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
+      .orderBy(desc(note.updatedAt))
+
+    return {
+      id: head.id,
+      name: head.name,
+      slug: head.slug,
+      isSeeded: head.isSeeded,
+      ancestors: ancestors.map((a) => ({ id: a.id, name: a.name })),
+      children,
+      companies,
+      memo: memo
+        ? {
+            id: memo.id,
+            title: memo.title,
+            snippet: memo.bodyMd
+              .replace(/Mentions:.*$/s, '')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 280),
+            updatedAt: memo.updatedAt.toISOString(),
+          }
+        : null,
+      notes: notes.map((n) => ({
+        id: n.id,
+        title: n.title || 'Untitled',
+        updatedAt: n.updatedAt.toISOString(),
+      })),
+    }
+  })
 
 const createSpaceInput = z.object({
   name: z.string().trim().min(1).max(120),

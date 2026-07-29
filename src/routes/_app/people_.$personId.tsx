@@ -7,10 +7,10 @@ import {
 } from '@tanstack/react-router'
 import {
   ArrowLeft,
+  AtSign,
   Building2,
   FileText,
-  Globe,
-  Layers,
+  Linkedin,
   Plus,
   X,
 } from 'lucide-react'
@@ -19,32 +19,30 @@ import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import {
-  addCompanyDomain,
+  addPersonContact,
   createNote,
-  getCompany,
-  listSpaces,
-  tagIntoSpace,
-  untagFromSpace,
-  updateCompany,
+  getPerson,
+  listCompanies,
+  setPersonCompany,
+  updatePerson,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
-export const Route = createFileRoute('/_app/companies_/$companyId')({
+export const Route = createFileRoute('/_app/people_/$personId')({
   loader: async ({ params }) => {
-    const [companyData, spaces] = await Promise.all([
-      getCompany({ data: { id: params.companyId } }),
-      listSpaces(),
+    const [personData, companies] = await Promise.all([
+      getPerson({ data: { id: params.personId } }),
+      listCompanies(),
     ])
-    // Merged-away records redirect to their survivor — stale URLs keep working.
-    if (companyData.mergedIntoId) {
+    if (personData.mergedIntoId) {
       throw redirect({
-        to: '/companies/$companyId',
-        params: { companyId: companyData.mergedIntoId },
+        to: '/people/$personId',
+        params: { personId: personData.mergedIntoId },
       })
     }
-    return { company: companyData, allSpaces: spaces }
+    return { person: personData, allCompanies: companies }
   },
-  component: CompanyRecordPage,
+  component: PersonRecordPage,
 })
 
 const dateTimeFmt = new Intl.DateTimeFormat('en', {
@@ -55,110 +53,99 @@ const dateTimeFmt = new Intl.DateTimeFormat('en', {
 })
 
 const VERB_LABELS: Record<string, string> = {
-  'company.created': 'Company created',
-  'company.updated': 'Attributes updated',
-  'space.tagged': 'Tagged into space',
-  'space.untagged': 'Removed from space',
+  'person.created': 'Person created',
+  'person.updated': 'Details updated',
   'note.created': 'Note created',
+  'entity.merged': 'Merged duplicate record',
 }
 
-function CompanyRecordPage() {
-  const { company, allSpaces } = Route.useLoaderData()
+function PersonRecordPage() {
+  const { person, allCompanies } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'activity' | 'notes'>('activity')
 
-  const noteMentions = company.mentionedIn.filter((m) => m.kind === 'note')
-  const domains = company.aliases.filter((a) => a.kind === 'domain')
-  const nameAliases = company.aliases.filter(
-    (a) => a.kind === 'name' && a.value !== company.name,
-  )
-  const untaggedSpaces = allSpaces.filter(
-    (s) => !company.spaces.some((cs) => cs.id === s.id),
+  const noteMentions = person.mentionedIn.filter((m) => m.kind === 'note')
+  const unlinkedCompanies = allCompanies.filter(
+    (c) => !person.companies.some((pc) => pc.id === c.id),
   )
 
   async function newNoteAboutThis() {
     const { id } = await createNote({
       data: {
-        about: { entityId: company.id, label: company.name, kind: 'company' },
+        about: { entityId: person.id, label: person.name, kind: 'person' },
       },
     })
     navigate({ to: '/notes/$noteId', params: { noteId: id } })
   }
 
+  async function save(data: Parameters<typeof updatePerson>[0]['data']) {
+    try {
+      await updatePerson({ data })
+      router.invalidate()
+    } catch {
+      toast.error('Could not save')
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-8 md:px-10">
       <Link
-        to="/companies"
+        to="/people"
         className="flex w-fit items-center gap-1.5 rounded-md text-[13px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
       >
         <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-        Companies
+        People
       </Link>
 
       <header className="mt-5 flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-          <Building2 className="size-4.5 text-muted-foreground" strokeWidth={1.75} />
+        <span className="flex size-9 items-center justify-center rounded-full bg-muted text-[15px] font-semibold text-muted-foreground">
+          {person.name.charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0">
           <h1 className="truncate text-[22px] font-semibold tracking-tight">
-            {company.name}
+            {person.name}
           </h1>
-          {nameAliases.length > 0 ? (
-            <p className="truncate text-xs text-muted-foreground">
-              also seen as {nameAliases.map((a) => a.value).join(', ')}
+          {person.headline ? (
+            <p className="truncate text-[13px] text-muted-foreground">
+              {person.headline}
             </p>
           ) : null}
         </div>
       </header>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
-        {/* Left: attributes */}
+        {/* Left: details */}
         <aside className="space-y-5">
           <AttrField
-            label="Stage"
-            value={company.attrs.stage ?? ''}
-            placeholder="Seed"
-            onSave={(v) =>
-              save({ id: company.id, stage: v || null }, router)
-            }
+            label="Headline"
+            value={person.headline ?? ''}
+            placeholder="CTO @ Pixxel"
+            onSave={(v) => save({ id: person.id, headline: v || null })}
           />
           <AttrField
             label="Geography"
-            value={company.attrs.geo ?? ''}
+            value={person.geo ?? ''}
             placeholder="Bengaluru"
-            onSave={(v) => save({ id: company.id, geo: v || null }, router)}
-          />
-          <AttrField
-            label="Founded"
-            value={company.attrs.foundedYear?.toString() ?? ''}
-            placeholder="2021"
-            onSave={(v) =>
-              save(
-                { id: company.id, foundedYear: v ? Number(v) : null },
-                router,
-              )
-            }
-          />
-          <AttrField
-            label="Sectors"
-            value={company.attrs.sectors.join(', ')}
-            placeholder="robotics, defence"
-            onSave={(v) =>
-              save(
-                {
-                  id: company.id,
-                  sectors: v
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                },
-                router,
-              )
-            }
+            onSave={(v) => save({ id: person.id, geo: v || null })}
           />
 
-          <DomainsField companyId={company.id} domains={domains} />
+          <ContactField
+            personId={person.id}
+            label="Emails"
+            kind="email"
+            icon={AtSign}
+            values={person.emails.map((e) => e.valueNorm)}
+            placeholder="name@company.com"
+          />
+          <ContactField
+            personId={person.id}
+            label="LinkedIn"
+            kind="linkedin"
+            icon={Linkedin}
+            values={person.linkedins.map((l) => l.valueNorm)}
+            placeholder="linkedin.com/in/…"
+          />
         </aside>
 
         {/* Center: tabs */}
@@ -191,12 +178,10 @@ function CompanyRecordPage() {
 
           {tab === 'activity' ? (
             <ul className="mt-4 space-y-2.5">
-              {company.timeline.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">
-                  Nothing yet.
-                </p>
+              {person.timeline.length === 0 ? (
+                <p className="text-[13px] text-muted-foreground">Nothing yet.</p>
               ) : (
-                company.timeline.map((t) => (
+                person.timeline.map((t) => (
                   <li key={t.id} className="flex items-baseline gap-3 text-[13px]">
                     <span className="tabular w-28 shrink-0 text-xs text-muted-foreground/80">
                       {dateTimeFmt.format(new Date(t.at))}
@@ -210,8 +195,7 @@ function CompanyRecordPage() {
             <ul className="mt-4 space-y-1">
               {noteMentions.length === 0 ? (
                 <p className="text-[13px] text-muted-foreground">
-                  No notes mention {company.name} yet. Write one — it links
-                  itself here.
+                  No notes mention {person.name} yet.
                 </p>
               ) : (
                 noteMentions.map((m) => (
@@ -234,28 +218,38 @@ function CompanyRecordPage() {
           )}
         </section>
 
-        {/* Right: related */}
+        {/* Right: companies */}
         <aside className="space-y-6">
           <div>
             <h2 className="text-xs font-medium text-muted-foreground">
-              Spaces
+              Companies
             </h2>
             <ul className="mt-2 space-y-1">
-              {company.spaces.map((s) => (
+              {person.companies.map((c) => (
                 <li
-                  key={s.id}
+                  key={c.id}
                   className="group flex h-7 items-center gap-2 rounded-md px-1.5 text-[13px] hover:bg-accent"
                 >
-                  <Layers
+                  <Building2
                     className="size-3.5 shrink-0 text-muted-foreground"
                     strokeWidth={1.75}
                   />
-                  <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                  <Link
+                    to="/companies/$companyId"
+                    params={{ companyId: c.id }}
+                    className="min-w-0 flex-1 truncate hover:underline"
+                  >
+                    {c.name}
+                  </Link>
                   <button
-                    aria-label={`Remove from ${s.name}`}
+                    aria-label={`Unlink from ${c.name}`}
                     onClick={async () => {
-                      await untagFromSpace({
-                        data: { entityId: company.id, spaceId: s.id },
+                      await setPersonCompany({
+                        data: {
+                          personId: person.id,
+                          companyId: c.id,
+                          action: 'unlink',
+                        },
                       })
                       router.invalidate()
                     }}
@@ -266,24 +260,27 @@ function CompanyRecordPage() {
                 </li>
               ))}
             </ul>
-            {untaggedSpaces.length > 0 ? (
+            {unlinkedCompanies.length > 0 ? (
               <select
-                aria-label="Tag into space"
+                aria-label="Link to company"
                 value=""
                 onChange={async (e) => {
                   if (!e.target.value) return
-                  await tagIntoSpace({
-                    data: { entityId: company.id, spaceId: e.target.value },
+                  await setPersonCompany({
+                    data: {
+                      personId: person.id,
+                      companyId: e.target.value,
+                      action: 'link',
+                    },
                   })
                   router.invalidate()
                 }}
                 className="border-input mt-2 h-7 w-full rounded-md border bg-transparent px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <option value="">+ Tag into space…</option>
-                {untaggedSpaces.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {' '.repeat(s.depth * 2)}
-                    {s.name}
+                <option value="">+ Link to company…</option>
+                {unlinkedCompanies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -292,43 +289,15 @@ function CompanyRecordPage() {
 
           <div>
             <h2 className="text-xs font-medium text-muted-foreground">
-              People
-            </h2>
-            {company.people.length === 0 ? (
-              <p className="mt-2 text-xs text-muted-foreground/80">
-                No contacts yet — link people from their records.
-              </p>
-            ) : (
-              <ul className="mt-2 space-y-1">
-                {company.people.map((p) => (
-                  <li key={p.id}>
-                    <Link
-                      to="/people/$personId"
-                      params={{ personId: p.id }}
-                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                    >
-                      <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-semibold text-muted-foreground">
-                        {p.name.charAt(0).toUpperCase()}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div>
-            <h2 className="text-xs font-medium text-muted-foreground">
               Mentioned in
             </h2>
-            {company.mentionedIn.length === 0 ? (
+            {person.mentionedIn.length === 0 ? (
               <p className="mt-2 text-xs text-muted-foreground/80">
                 Nowhere yet.
               </p>
             ) : (
               <ul className="mt-2 space-y-1">
-                {company.mentionedIn.map((m) => (
+                {person.mentionedIn.map((m) => (
                   <li key={m.fromId} className="truncate text-[13px]">
                     {m.kind === 'note' ? (
                       <Link
@@ -350,20 +319,6 @@ function CompanyRecordPage() {
       </div>
     </div>
   )
-}
-
-async function save(
-  data: Parameters<typeof updateCompany>[0] extends { data: infer D }
-    ? D
-    : never,
-  router: ReturnType<typeof useRouter>,
-) {
-  try {
-    await updateCompany({ data })
-    router.invalidate()
-  } catch {
-    toast.error('Could not save')
-  }
 }
 
 function AttrField({
@@ -399,51 +354,54 @@ function AttrField({
   )
 }
 
-function DomainsField({
-  companyId,
-  domains,
+function ContactField({
+  personId,
+  label,
+  kind,
+  icon: Icon,
+  values,
+  placeholder,
 }: {
-  companyId: string
-  domains: Array<{ id: string; valueNorm: string }>
+  personId: string
+  label: string
+  kind: 'email' | 'linkedin'
+  icon: typeof AtSign
+  values: Array<string>
+  placeholder: string
 }) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
 
   async function add() {
-    const domain = draft.trim()
-    if (!domain) return setAdding(false)
+    const value = draft.trim()
+    if (!value) return setAdding(false)
     try {
-      const result = await addCompanyDomain({
-        data: { id: companyId, domain },
+      const result = await addPersonContact({
+        data: { id: personId, kind, value },
       })
       if (result.outcome === 'suggested_duplicate') {
-        toast(`Another company already owns ${domain}`, {
+        toast(`Another person already owns that ${kind}`, {
           description:
             'Flagged as a possible duplicate — review it in the dedupe inbox.',
         })
-      } else if (result.outcome === 'already_own') {
-        toast(`${domain} is already on this company`)
       }
       setDraft('')
       setAdding(false)
       router.invalidate()
     } catch {
-      toast.error('Not a valid domain')
+      toast.error(`Not a valid ${kind}`)
     }
   }
 
   return (
     <div className="space-y-1">
-      <span className="text-xs font-medium text-muted-foreground">Domains</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <ul className="space-y-1">
-        {domains.map((d) => (
-          <li
-            key={d.id}
-            className="flex h-7 items-center gap-2 text-[13px]"
-          >
-            <Globe className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
-            {d.valueNorm}
+        {values.map((v) => (
+          <li key={v} className="flex h-7 items-center gap-2 text-[13px]">
+            <Icon className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+            <span className="truncate">{v}</span>
           </li>
         ))}
       </ul>
@@ -451,7 +409,7 @@ function DomainsField({
         <Input
           autoFocus
           value={draft}
-          placeholder="acme.com"
+          placeholder={placeholder}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={add}
           onKeyDown={(e) => e.key === 'Enter' && add()}
@@ -463,7 +421,7 @@ function DomainsField({
           className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
         >
           <Plus className="size-3" strokeWidth={2} />
-          Add domain
+          Add
         </button>
       )}
     </div>
