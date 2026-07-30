@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { Building2, ChevronDown, ChevronRight, Kanban, Phone, Users } from 'lucide-react'
 import { useState } from 'react'
 import { optionLabel } from './attributes/value-editor'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
@@ -56,12 +56,51 @@ export function RecordTimeline({
                 {VERB_LABELS[item.verb] ?? item.verb}
               </span>
             </div>
+          ) : item.type === 'interaction' ? (
+            <InteractionItem item={item} />
           ) : (
             <AttrBurst item={item} registry={registry} refNames={refNames} />
           )}
         </li>
       ))}
     </ul>
+  )
+}
+
+const ATTENDEE_ICONS: Record<string, typeof Users> = {
+  person: Users,
+  company: Building2,
+  deal: Kanban,
+}
+
+function InteractionItem({
+  item,
+}: {
+  item: Extract<Items[number], { type: 'interaction' }>
+}) {
+  return (
+    <div className="flex items-baseline gap-3 rounded-md bg-muted/40 px-1 py-1.5 text-[13px]">
+      <span className="tabular w-28 shrink-0 text-xs text-muted-foreground/80">
+        {dateTimeFmt.format(new Date(item.at))}
+      </span>
+      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <Phone className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+        <span className="font-medium capitalize">{item.kind}</span>
+        <span className="truncate">— {item.subject}</span>
+        {item.attendees.map((a) => {
+          const Icon = ATTENDEE_ICONS[a.kind] ?? Users
+          return (
+            <span
+              key={a.id}
+              className="flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium"
+            >
+              <Icon className="size-2.5" strokeWidth={1.75} />
+              {a.name}
+            </span>
+          )
+        })}
+      </span>
+    </div>
   )
 }
 

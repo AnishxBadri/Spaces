@@ -21,6 +21,7 @@ import { Input } from '#/components/ui/input'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { ValueEditor } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
+import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordTimeline } from '#/components/record-timeline'
 import {
   addPersonContact,
@@ -174,12 +175,15 @@ function PersonRecordPage() {
                 </button>
               ))}
             </div>
-            {tab === 'notes' ? (
+            <div className="flex items-center gap-1.5">
+              <LogInteractionDialog
+                seed={{ id: person.id, name: person.name, kind: 'person' }}
+              />
               <Button size="xs" variant="outline" onClick={newNoteAboutThis}>
                 <Plus className="size-3" strokeWidth={2} />
                 Note about this
               </Button>
-            ) : null}
+            </div>
           </div>
 
           {tab === 'activity' ? (

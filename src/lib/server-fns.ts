@@ -11,6 +11,8 @@ import {
   entity,
   entityAlias,
   entitySpace,
+  interaction,
+  interactionEntity,
   link,
   note,
   person,
@@ -155,20 +157,148 @@ export const createCompany = createServerFn({ method: 'POST' })
 // ---------- attribute registry ----------
 
 export const listRegistry = createServerFn()
-  .validator(z.object({ kind: z.enum(['company', 'person', 'deal']) }))
+  .validator(
+    z.object({
+      kind: z.enum(['company', 'person', 'deal']),
+      includeArchived: z.boolean().optional(),
+    }),
+  )
   .handler(async ({ data }) => {
     await requireUser()
-    const { getRegistry } = await import('./attributes/values')
-    const defs = await getRegistry(data.kind)
-    return defs.map((d) => ({
+    const { attribute } = await import('#/db/schema')
+    const rows = await db
+      .select()
+      .from(attribute)
+      .where(
+        data.includeArchived
+          ? eq(attribute.objectKind, data.kind)
+          : and(
+              eq(attribute.objectKind, data.kind),
+              eq(attribute.archived, false),
+            ),
+      )
+      .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
+    return rows.map((d) => ({
       id: d.id,
       slug: d.slug,
       name: d.name,
       type: d.type,
       options: d.options as Json,
       isSystem: d.isSystem,
+      archived: d.archived,
       sortOrder: d.sortOrder,
     }))
+  })
+
+const optionEdit = z.object({
+  /** absent id = new option (id derived from label) */
+  id: z.string().max(60).optional(),
+  label: z.string().trim().min(1).max(60),
+  group: z.enum(['active', 'parked', 'closed']).optional(),
+})
+
+/**
+ * Attribute maintenance. Structure fixed, content free: names and options
+ * are editable (system included); types never change; options can be added
+ * and renamed but not removed — stored values may reference them.
+ */
+export const updateAttribute = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      name: z.string().trim().min(1).max(80).optional(),
+      archived: z.boolean().optional(),
+      move: z.enum(['up', 'down']).optional(),
+      options: z.array(optionEdit).max(50).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { attribute } = await import('#/db/schema')
+    const [attr] = await db
+      .select()
+      .from(attribute)
+      .where(eq(attribute.id, data.id))
+    if (!attr) throw new Error('Attribute not found')
+
+    if (data.options) {
+      const isOptionType = ['select', 'multi_select', 'status'].includes(
+        attr.type,
+      )
+      if (!isOptionType) throw new Error('This attribute type has no options')
+      const existing =
+        ((attr.options as Record<string, unknown>).options as Array<{
+          id: string
+        }>) ?? []
+      const existingIds = new Set(existing.map((o) => o.id))
+      const keptIds = new Set(
+        data.options.filter((o) => o.id).map((o) => o.id!),
+      )
+      for (const id of existingIds) {
+        if (!keptIds.has(id))
+          throw new Error(
+            'Options cannot be removed — records may hold that value. Rename it instead.',
+          )
+      }
+      const seen = new Set<string>()
+      const nextOptions = data.options.map((o) => {
+        let id = o.id
+        if (!id) {
+          id =
+            o.label
+              .toLowerCase()
+              .normalize('NFKD')
+              .replace(/[^a-z0-9]+/g, '_')
+              .replace(/^_+|_+$/g, '')
+              .slice(0, 48) || 'option'
+          while (seen.has(id) || existingIds.has(id)) id = `${id}_2`
+        }
+        seen.add(id)
+        return { id, label: o.label, ...(o.group ? { group: o.group } : {}) }
+      })
+      await db
+        .update(attribute)
+        .set({
+          options: {
+            ...(attr.options as Record<string, unknown>),
+            options: nextOptions,
+          },
+        })
+        .where(eq(attribute.id, data.id))
+    }
+
+    if (data.name) {
+      await db
+        .update(attribute)
+        .set({ name: data.name })
+        .where(eq(attribute.id, data.id))
+    }
+    if (data.archived !== undefined) {
+      await db
+        .update(attribute)
+        .set({ archived: data.archived })
+        .where(eq(attribute.id, data.id))
+    }
+    if (data.move) {
+      const siblings = await db
+        .select({ id: attribute.id, sortOrder: attribute.sortOrder })
+        .from(attribute)
+        .where(eq(attribute.objectKind, attr.objectKind))
+        .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
+      const idx = siblings.findIndex((s) => s.id === data.id)
+      const swapWith = data.move === 'up' ? siblings[idx - 1] : siblings[idx + 1]
+      if (swapWith) {
+        await db
+          .update(attribute)
+          .set({ sortOrder: swapWith.sortOrder })
+          .where(eq(attribute.id, data.id))
+        await db
+          .update(attribute)
+          .set({ sortOrder: attr.sortOrder })
+          .where(eq(attribute.id, swapWith.id))
+      }
+    }
+    return { ok: true }
   })
 
 const createAttributeInput = z.object({
@@ -303,12 +433,15 @@ export const listCompaniesTable = createServerFn().handler(async () => {
     ])
   }
 
+  const touched = await lastTouchedMap()
+
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
     values: (r.values ?? {}) as Record<string, Json>,
     domains: domainsBy.get(r.id) ?? [],
     spaces: spacesBy.get(r.id) ?? [],
+    lastTouched: touched[r.id] ?? null,
     createdAt: r.createdAt.toISOString(),
   }))
 })
@@ -604,12 +737,15 @@ export const listPeopleTable = createServerFn().handler(async () => {
     companyBy.set(c.personId, { id: c.companyId, name: c.companyName })
   }
 
+  const touched = await lastTouchedMap()
+
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
     values: (r.values ?? {}) as Record<string, Json>,
     emails: emailsBy.get(r.id) ?? [],
     company: companyBy.get(r.id) ?? null,
+    lastTouched: touched[r.id] ?? null,
     createdAt: r.createdAt.toISOString(),
   }))
 })
@@ -977,6 +1113,60 @@ export const getDeal = createServerFn()
     }
   })
 
+// ---------- interactions ----------
+
+const logInteractionInput = z.object({
+  kind: z.enum(['meeting', 'call']),
+  subject: z.string().trim().min(1).max(300),
+  occurredAt: z.string().datetime({ local: true }).or(z.string().datetime()),
+  /** every entity in the room: people, companies, deals */
+  attendeeIds: z.array(z.string().uuid()).min(1).max(50),
+})
+
+export const logInteraction = createServerFn({ method: 'POST' })
+  .validator(logInteractionInput)
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    return db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(interaction)
+        .values({
+          kind: data.kind,
+          subject: data.subject,
+          occurredAt: new Date(data.occurredAt),
+        })
+        .returning({ id: interaction.id })
+      for (const entityId of new Set(data.attendeeIds)) {
+        await tx
+          .insert(interactionEntity)
+          .values({ interactionId: row.id, entityId })
+          .onConflictDoNothing()
+      }
+      await tx.insert(activity).values({
+        actorId: u.id,
+        verb: `interaction.${data.kind}`,
+        subjectEntityId: data.attendeeIds[0],
+        meta: { interactionId: row.id },
+      })
+      return { id: row.id }
+    })
+  })
+
+/** Latest interaction per entity — the "last touched" signal for tables. */
+async function lastTouchedMap(): Promise<Record<string, string>> {
+  const rows = await db
+    .select({
+      entityId: interactionEntity.entityId,
+      last: sql<string>`max(${interaction.occurredAt})`,
+    })
+    .from(interactionEntity)
+    .innerJoin(interaction, eq(interaction.id, interactionEntity.interactionId))
+    .groupBy(interactionEntity.entityId)
+  return Object.fromEntries(
+    rows.map((r) => [r.entityId, new Date(r.last).toISOString()]),
+  )
+}
+
 // ---------- record timeline (condensed) ----------
 
 /**
@@ -1038,9 +1228,52 @@ export const getRecordTimeline = createServerFn()
       }
     }
 
+    // Interactions this entity participated in, with co-attendees.
+    const myInteractions = await db
+      .select({
+        id: interaction.id,
+        kind: interaction.kind,
+        subject: interaction.subject,
+        occurredAt: interaction.occurredAt,
+      })
+      .from(interactionEntity)
+      .innerJoin(
+        interaction,
+        eq(interaction.id, interactionEntity.interactionId),
+      )
+      .where(eq(interactionEntity.entityId, data.entityId))
+      .orderBy(desc(interaction.occurredAt))
+      .limit(50)
+    const interactionIds = myInteractions.map((i) => i.id)
+    const attendees =
+      interactionIds.length > 0
+        ? await db
+            .select({
+              interactionId: interactionEntity.interactionId,
+              entityId: entity.id,
+              name: entity.canonicalName,
+              kind: entity.kind,
+            })
+            .from(interactionEntity)
+            .innerJoin(entity, eq(entity.id, interactionEntity.entityId))
+            .where(inArray(interactionEntity.interactionId, interactionIds))
+        : []
+    const attendeesBy = new Map<string, Array<{ id: string; name: string; kind: string }>>()
+    for (const a of attendees) {
+      if (a.entityId === data.entityId) continue
+      attendeesBy.set(a.interactionId, [
+        ...(attendeesBy.get(a.interactionId) ?? []),
+        { id: a.entityId, name: a.name, kind: a.kind },
+      ])
+    }
+
     const items = [
       ...macros
-        .filter((m) => !['company.updated', 'person.updated'].includes(m.verb))
+        .filter(
+          (m) =>
+            !['company.updated', 'person.updated'].includes(m.verb) &&
+            !m.verb.startsWith('interaction.'),
+        )
         .map((m) => ({
           type: 'macro' as const,
           id: m.id,
@@ -1054,6 +1287,14 @@ export const getRecordTimeline = createServerFn()
         actorName: b.actor ? (userNames.get(b.actor) ?? null) : null,
         at: b.at,
         changes: b.changes,
+      })),
+      ...myInteractions.map((i) => ({
+        type: 'interaction' as const,
+        id: i.id,
+        kind: i.kind,
+        subject: i.subject ?? '',
+        at: i.occurredAt.toISOString(),
+        attendees: attendeesBy.get(i.id) ?? [],
       })),
     ].sort((a, b) => (a.at < b.at ? 1 : -1))
 

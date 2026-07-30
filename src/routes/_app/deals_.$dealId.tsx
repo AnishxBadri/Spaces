@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { ValueEditor } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
+import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordTimeline } from '#/components/record-timeline'
 import { Button } from '#/components/ui/button'
 import {
@@ -152,12 +153,15 @@ function DealRecordPage() {
                 </button>
               ))}
             </div>
-            {tab === 'notes' ? (
+            <div className="flex items-center gap-1.5">
+              <LogInteractionDialog
+                seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
+              />
               <Button size="xs" variant="outline" onClick={newNoteAboutThis}>
                 <Plus className="size-3" strokeWidth={2} />
                 Note about this
               </Button>
-            ) : null}
+            </div>
           </div>
 
           {tab === 'activity' ? (

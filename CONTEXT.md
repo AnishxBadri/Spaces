@@ -795,23 +795,17 @@ that skews Google Workspace.
 
 ---
 
-# Next step — the object-model build (planned 2026-07)
+# Next step
 
-Scaffold, auth, entity core, resolution/dedupe, notes/mentions, spaces, people/company
-records: **done.** Current phase order:
+**Object-model build (phases 1–5): done, 2026-07.** Attribute engine, Attio-style tables
+for Companies/People/Deals with inline typed editing and add-column, registry rails,
+reference editors, condensed attribute timelines, object settings (rename/options/
+archive/reorder — option ids preserved on rename so stored values survive). Kanban was
+dropped in favor of stage-group filters on the deals table.
 
-1. **Attribute engine** — `attribute` registry + `entity.values` + `attribute_event`,
-   seeded system attributes, typed validators; migrate company/person attr columns into
-   values. No UI.
-2. **Companies, Attio-style** — registry-driven table (v1 scope line above), create modal
-   from registry, record page converted to registry rail.
-3. **Deals** — the object: seeded attributes, table + kanban by stage group, deals on
-   company records, dedupe-safe via resolveEntity company ref.
-4. **People** — same table/record treatment.
-5. **Object settings** — attribute management UI (rename, options, archive, reorder).
-
-Then: interactions (manual meetings), documents/upload + extraction worker, glossary terms,
-theses — followed by the integrations phase (Calendar first, Gmail, Apollo).
+Next, in rough order: interactions (manual meetings — the calendar primitive), documents/
+upload + extraction worker, theses, glossary terms — followed by the integrations phase
+(Calendar first, Gmail, Apollo).
 
 ## Open questions
 

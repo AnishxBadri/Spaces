@@ -190,6 +190,18 @@ function CompaniesPage() {
           </span>
         ),
       }) as ColumnDef<Row, unknown>,
+      col.accessor((r) => r.lastTouched ?? '', {
+        id: 'lastTouched',
+        header: 'Last touched',
+        size: 120,
+        sortUndefined: 'last',
+        cell: (info) =>
+          info.row.original.lastTouched ? (
+            <span className="tabular block px-1 text-right text-xs text-muted-foreground/80">
+              {dateFmt.format(new Date(info.row.original.lastTouched))}
+            </span>
+          ) : null,
+      }) as ColumnDef<Row, unknown>,
       col.accessor('createdAt', {
         id: 'createdAt',
         header: 'Added',
