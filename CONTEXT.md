@@ -803,9 +803,22 @@ reference editors, condensed attribute timelines, object settings (rename/option
 archive/reorder — option ids preserved on rename so stored values survive). Kanban was
 dropped in favor of stage-group filters on the deals table.
 
-Next, in rough order: interactions (manual meetings — the calendar primitive), documents/
-upload + extraction worker, theses, glossary terms — followed by the integrations phase
-(Calendar first, Gmail, Apollo).
+**Interactions: done, 2026-07** — manual meeting/call logging, attendee edges, timeline
+integration, last-touched columns. Calendar sync later automates rows into this shape.
+
+Remaining phases, in order:
+6. **Documents** — upload on records, storage layer wired to UI, extraction worker job
+7. **Theses** — claim/conviction/status, evidence for & against, thesis section on spaces
+8. **Search** — real Cmd-K over all entities + notes (tsvector), jump-to-record
+9. **Glossary + seeds** — terms w/ in-note auto-linking, starter taxonomy, demo seed
+10. **Auth completion** — invites, member management, /setup one-time token, optional TOTP
+11. **Ship polish** — backup script, install docs, GHCR multi-arch images, upgrade CI
+
+Then integrations (each independent): Google Calendar first, Gmail (forward-only),
+Apollo enrichment, BYOK AI features.
+
+Standing debt: dark theme, placeholder contrast (DESIGN.md floor), test-db harness,
+note deletion.
 
 ## Open questions
 
