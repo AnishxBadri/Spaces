@@ -1715,14 +1715,28 @@ export const createNote = createServerFn({ method: 'POST' })
             : '',
       })
       if (about) {
-        await tx.insert(link).values({
-          fromEntityId: ent.id,
-          toEntityId: about.entityId,
-          // A memo belongs to its space; a note merely mentions things.
-          relation: noteKind === 'memo' ? 'tagged_in' : 'mentions',
-          source: noteKind === 'memo' ? 'manual' : 'extracted',
-          createdBy: u.id,
-        })
+        if (about.kind === 'space') {
+          // Written while standing in the space, so it is filed there, not
+          // merely referenced — and it files through entity_space like every
+          // other kind, inheriting its provenance/confidence story.
+          await tx
+            .insert(entitySpace)
+            .values({
+              entityId: ent.id,
+              spaceId: about.entityId,
+              source: 'manual',
+              createdBy: u.id,
+            })
+            .onConflictDoNothing()
+        } else {
+          await tx.insert(link).values({
+            fromEntityId: ent.id,
+            toEntityId: about.entityId,
+            relation: 'mentions',
+            source: 'extracted',
+            createdBy: u.id,
+          })
+        }
       }
       await tx.insert(activity).values({
         actorId: u.id,
@@ -1785,12 +1799,22 @@ export const getNote = createServerFn()
       .where(
         and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')),
       )
+    // Spaces this note is filed in — the picker's current state.
+    const spaces = await db
+      .select({ id: space.entityId, name: entity.canonicalName })
+      .from(entitySpace)
+      .innerJoin(space, eq(space.entityId, entitySpace.spaceId))
+      .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(eq(entitySpace.entityId, data.id))
+      .orderBy(asc(entity.canonicalName))
+
     return {
       id: row.id,
       title: row.title,
       bodyJson,
       updatedAt: row.updatedAt.toISOString(),
       backlinks,
+      spaces,
     }
   })
 
@@ -2017,27 +2041,28 @@ export const getSpace = createServerFn()
       }
     })
 
-    // The memo: a note of kind memo linked tagged_in to this space.
-    const [memo] = await db
+    // Filed: notes the user deliberately put in this space. No singleton —
+    // a space holds as many as its owner wants, and the "memo" is just the
+    // first one filed.
+    const filedRows = await db
       .select({
         id: note.entityId,
         title: note.title,
         bodyMd: note.bodyMd,
+        kind: note.kind,
         updatedAt: note.updatedAt,
       })
-      .from(link)
-      .innerJoin(note, eq(note.entityId, link.fromEntityId))
+      .from(entitySpace)
+      .innerJoin(note, eq(note.entityId, entitySpace.entityId))
+      .innerJoin(entity, eq(entity.id, note.entityId))
       .where(
-        and(
-          eq(link.toEntityId, data.id),
-          eq(link.relation, 'tagged_in'),
-          eq(note.kind, 'memo'),
-        ),
+        and(eq(entitySpace.spaceId, data.id), isNull(entity.mergedIntoId)),
       )
       .orderBy(desc(note.updatedAt))
-      .limit(1)
+    const filedIds = new Set(filedRows.map((f) => f.id))
 
-    // Research: notes that mention this space.
+    // Referenced: notes whose body happens to mention this space. A note
+    // that is filed here too shows once, at the top — not in both lists.
     const notes = await db
       .select({
         id: note.entityId,
@@ -2057,23 +2082,24 @@ export const getSpace = createServerFn()
       ancestors: ancestors.map((a) => ({ id: a.id, name: a.name })),
       children,
       companies,
-      memo: memo
-        ? {
-            id: memo.id,
-            title: memo.title,
-            snippet: memo.bodyMd
-              .replace(/Mentions:.*$/s, '')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 280),
-            updatedAt: memo.updatedAt.toISOString(),
-          }
-        : null,
-      notes: notes.map((n) => ({
-        id: n.id,
-        title: n.title || 'Untitled',
-        updatedAt: n.updatedAt.toISOString(),
+      filed: filedRows.map((f) => ({
+        id: f.id,
+        title: f.title,
+        kind: f.kind,
+        snippet: f.bodyMd
+          .replace(/Mentions:.*$/s, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 400),
+        updatedAt: f.updatedAt.toISOString(),
       })),
+      notes: notes
+        .filter((n) => !filedIds.has(n.id))
+        .map((n) => ({
+          id: n.id,
+          title: n.title || 'Untitled',
+          updatedAt: n.updatedAt.toISOString(),
+        })),
     }
   })
 
@@ -2099,13 +2125,17 @@ export const createSpace = createServerFn({ method: 'POST' })
       }
 
       const base = toLabel(data.name)
-      // Slugs are globally unique; suffix on collision.
+      // Slugs are unique per parent — two branches may both hold a "Cooling".
+      // Only a genuine same-parent collision gets the suffix.
+      const siblingOf = data.parentId
+        ? eq(space.parentId, data.parentId)
+        : isNull(space.parentId)
       let slug = base
       for (let i = 2; ; i++) {
         const existing = await tx
           .select({ id: space.entityId })
           .from(space)
-          .where(eq(space.slug, slug))
+          .where(and(siblingOf, eq(space.slug, slug)))
         if (existing.length === 0) break
         slug = `${base}_${i}`
       }

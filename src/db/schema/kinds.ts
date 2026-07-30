@@ -13,6 +13,7 @@ import {
   uuid,
   vector,
 } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 import { ltree, tsvector } from './helpers'
 import { entity } from './entities'
 import { user } from './auth'
@@ -55,7 +56,20 @@ export const space = pgTable(
     path: ltree('path').notNull(),
     isSeeded: boolean('is_seeded').notNull().default(false),
   },
-  (t) => [uniqueIndex('space_slug_unique').on(t.slug)],
+  // Slugs are unique per parent, not globally: at 3–4 levels the same label
+  // recurs legitimately across branches (Cooling under Data centers and under
+  // Energy storage), and a global constraint renamed the second one to
+  // `cooling_2` — in a tree the investor reads. `path` stays globally unique
+  // by construction, so nothing is lost. Roots are disambiguated by a partial
+  // index, since NULL parent_id defeats a plain unique constraint.
+  (t) => [
+    uniqueIndex('space_slug_per_parent_unique')
+      .on(t.parentId, t.slug)
+      .where(sql`${t.parentId} is not null`),
+    uniqueIndex('space_slug_root_unique')
+      .on(t.slug)
+      .where(sql`${t.parentId} is null`),
+  ],
 )
 
 // ---------- thesis (a claim you hold — dies often, death is information) ----------

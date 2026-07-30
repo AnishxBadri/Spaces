@@ -109,51 +109,53 @@ function SpacePage() {
         <NewSubspace parentId={spc.id} />
       </div>
 
-      {/* Memo */}
-      <section className="mt-8">
-        {spc.memo ? (
+      {/* What I think here: notes filed into this space. No singleton — a
+          space holds as many as its owner wants. Theses join this block. */}
+      <section className="mt-8 space-y-3">
+        {spc.filed.map((f) => (
           <Link
+            key={f.id}
             to="/notes/$noteId"
-            params={{ noteId: spc.memo.id }}
+            params={{ noteId: f.id }}
             className="block rounded-lg border border-border p-4 hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
-            <div className="flex items-center justify-between">
-              <h2 className="text-[15px] font-semibold">
-                {spc.memo.title || `${spc.name} memo`}
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="min-w-0 truncate text-[15px] font-semibold">
+                {f.title || `${spc.name} ${f.kind}`}
               </h2>
-              <span className="text-xs text-muted-foreground">
-                updated {dateFmt.format(new Date(spc.memo.updatedAt))}
+              <span className="shrink-0 text-xs text-muted-foreground">
+                updated {dateFmt.format(new Date(f.updatedAt))}
               </span>
             </div>
-            {spc.memo.snippet ? (
+            {f.snippet ? (
               <p className="mt-2 font-serif text-[15px] leading-relaxed text-muted-foreground">
-                {spc.memo.snippet}
-                {spc.memo.snippet.length >= 280 ? '…' : ''}
+                {f.snippet}
+                {f.snippet.length >= 400 ? '…' : ''}
               </p>
             ) : (
               <p className="mt-2 text-[13px] text-muted-foreground">
-                The memo is empty — open it and set down the thesis of this
-                map.
+                Empty so far — open it and set down what you know.
               </p>
             )}
           </Link>
-        ) : (
-          <button
-            onClick={writeMemo}
-            className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border p-4 text-left hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-          >
-            <PenLine className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
-            <span>
-              <span className="block text-[13px] font-medium">
-                Write the memo
-              </span>
-              <span className="block text-xs text-muted-foreground">
-                What this space is, why it matters, what would make it
-                investible.
-              </span>
+        ))}
+
+        <button
+          onClick={writeMemo}
+          className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border p-4 text-left hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        >
+          <PenLine className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+          <span>
+            <span className="block text-[13px] font-medium">
+              {spc.filed.length === 0 ? 'Write the memo' : 'File another'}
             </span>
-          </button>
-        )}
+            <span className="block text-xs text-muted-foreground">
+              {spc.filed.length === 0
+                ? 'What this space is, why it matters, what would make it investible.'
+                : 'A second memo, a market map, a teardown — as many as you want.'}
+            </span>
+          </span>
+        </button>
       </section>
 
       {/* Tracked companies */}
@@ -199,14 +201,16 @@ function SpacePage() {
         )}
       </section>
 
-      {/* Research */}
+      {/* Referenced: notes whose body mentions this space, but which live
+          somewhere else. Filed notes are above and never repeat here. */}
       <section className="mt-10">
         <h2 className="text-xs font-medium text-muted-foreground">
-          Notes · {spc.notes.length}
+          Referenced · {spc.notes.length}
         </h2>
         {spc.notes.length === 0 ? (
           <p className="mt-2 text-[13px] text-muted-foreground">
-            No research yet. Notes that @mention {spc.name} collect here.
+            Nothing yet. Notes that @mention {spc.name} without being filed
+            here collect in this list.
           </p>
         ) : (
           <ul className="mt-2 -mx-2">

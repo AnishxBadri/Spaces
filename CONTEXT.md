@@ -176,6 +176,30 @@ Rejected: nullable-FK-per-type (N columns and N joins per attach point), and unt
 **Note the reinterpretation:** `document.entity_id` is now the document's *own* identity, not
 the company it belongs to. Attachment goes through `link`. Same for `note`.
 
+### Filed vs referenced (decided 2026-07)
+
+Two ways a thing ends up "in" something else, and they must not be conflated — one is an act,
+the other is a side effect of writing.
+
+| | meaning | mechanism |
+|---|---|---|
+| **Filed in a space** | you deliberately put it there | `entity_space` |
+| **Filed against a record** | a document belongs to this company/person/deal | `link(tagged_in)` |
+| **Referenced** | the body happens to mention it | `link(mentions)`, diff-synced on save |
+
+**Space membership goes through `entity_space` for every kind, not just companies** — notes,
+documents, and people file the same way a company is tagged. `link` cannot express what that
+table already carries: `source: manual|ai|inherited` and `confidence`, which is what lets AI
+suggestions land in a review queue instead of being silently written. Routing notes through
+`link(tagged_in)` instead would forfeit that and make "what is in this space" a two-table
+question forever.
+
+**There is no singular memo.** A space holds as many filed notes as the user wants; the memo
+is simply the first one filed, and `note.kind = 'memo'` is presentation (serif, wide measure,
+PDF export later), never structure. Spaces are how a user imposes hierarchy on their own
+research — constraining that to one document per space is the tool telling the investor how
+to think.
+
 ### Per-kind side tables
 
 ```
@@ -228,17 +252,28 @@ provenance rule as enrichment.
 
 ### Spaces vs attributes — the classification boundary (decided 2026-07)
 
-Two dimensions that must never share a field:
+Two dimensions that must never share a field. **The litmus test is the rule, not a hint:**
 
-- **Markets — *where* a company operates** (Aerospace → In-space Manufacturing). Hierarchical,
-  researchable. **Spaces own this exclusively** — industry/sector never becomes an attribute.
-  The companies table shows a graph-backed Spaces column, not a sectors field.
-- **Characterizations — *what kind of business* it is** (B2B/B2C, hardware, capital
-  intensity, GTM motion). Orthogonal facets that cut across every market. **These are
-  attributes** — flat, filterable, no research attached.
+- **Space — could I write a memo about it and track companies in it?** *Where* a company
+  competes **and *how* it competes.** Hierarchical, researchable. **Spaces own this
+  exclusively** — industry/sector never becomes an attribute. The companies table shows a
+  graph-backed Spaces column, not a sectors field.
+- **Attribute — is it a property of the business itself, true in any market?** B2B/B2C,
+  hardware, capital intensity, GTM motion. Orthogonal facets. Flat, filterable, no research
+  attached.
 
-**The litmus test:** "Could I write a memo about it and track companies in it?" → space.
-"Is it a property of the business itself, true in any market?" → attribute.
+**Amended 2026-07:** the rule used to read *"markets are **where** a company operates"*,
+which put competing approaches (Data centers → Cooling → Immersion) on the wrong side. You
+would absolutely write a memo on immersion cooling and track companies in it, so it is a
+space. The *where* framing also failed its own test — approaches cut across markets, since
+immersion cooling is EV packs and mining rigs too.
+
+**That cross-cutting is handled by tagging, not by the tree.** The hierarchy decides where a
+memo *files*; it does not decide what a company *is*. `entity_space` is many-to-many, so a
+company doing immersion for data centers and for EV packs is tagged into both nodes — no
+duplication, no forced choice, no polyhierarchy. PitchBook needs a second classification
+system (flat "verticals" over hierarchical "industries") to express this; one object plus
+many-to-many membership covers it here.
 
 Seeded facet: one system multi-select on Company — `Business model`
 (B2B · B2C · B2B2C · Marketplace · Hardware · Deep tech · Services), options editable.
@@ -250,11 +285,28 @@ the attribute type menu, identity rules, and the engine's shape are code. The sp
 custom attributes, and every seeded attribute's options are the user's vocabulary. The
 litmus test lives in docs and seed data as guidance — never enforced by validation.
 
-### Seed taxonomy
+### Seed taxonomy — deliberately tiny (reversed 2026-07)
 
-Ship ~150–250 curated nodes, versioned. NAICS/SIC rejected — useless for deeptech and tech.
-`is_seeded` flag so upgrades can add nodes without stomping user edits. Users fork and extend
-freely; custom nodes sit alongside seeded ones with no second-class treatment.
+**Ship a handful of example nodes, not a curated ontology.** The earlier plan was ~150–250
+versioned nodes; that was wrong, for the reason the whole feature exists: the tree is the
+investor's own vocabulary, and a shipped ontology quietly pre-empts it. NAICS/SIC stay
+rejected — useless for deeptech and tech.
+
+What the small seed buys, beyond flexibility:
+- **No reconciliation machinery.** `is_seeded` was reserved so upgrades could add nodes
+  without stomping user edits — which needs a stable per-node seed key, because slugs and
+  names change under the user's hands. With a handful of nodes there is nothing to
+  reconcile. The flag stays as provenance; the machinery never gets built.
+- **Depth is earned.** Nobody creates *Immersion cooling* until they have companies and a
+  memo to put in it. A node that exists before its research is a filing decision made by
+  the wrong person, and it makes every space picker worse — the tag-into-space control
+  lists every space in the tree.
+
+First boot is answered by the **demo seed**, not the taxonomy: opt-in at setup, populated,
+and explicitly sample data. An empty spaces page teaches; a fake ontology misleads.
+
+Users fork and extend freely; custom nodes sit alongside seeded ones with no second-class
+treatment.
 
 ### Glossary
 
@@ -840,11 +892,13 @@ bytes with no row).
 
 ## Open questions
 
-- **Space page shape.** A space accumulates notes, sources, companies, contacts, child spaces,
-  and theses. Is it one long page, or tabs like the record page? Leaning: one scrollable page
-  with a memo at top — a space is something you *read*, not something you administer.
+- ~~**Space page shape.**~~ **Answered, and shipped:** one scrollable page, memo at top — a
+  space is something you *read*, not something you administer. Still unresolved is what
+  happens as it goes from three sections (memo · companies · notes) to six — sources,
+  contacts, and theses have no section yet, and phase 7 adds two of them.
 - **Does a thesis need its own attributes**, or is claim + conviction + status enough?
   Resist list-ifying it; a thesis is prose with structure, not a row.
-- **Note vs memo vs document.** A memo is a long note that ends up as a PDF. Is that one object
-  with an export, or two? Leaning one.
+- ~~**Note vs memo vs document.**~~ **Answered 2026-07: one object.** A memo is a note with
+  `kind = 'memo'` — same table, same editor, same links. The kind drives presentation and a
+  later PDF export, nothing structural. See *Filed vs referenced*.
 - **`values jsonb` indexing strategy** for kanban group-by, per the data model section.

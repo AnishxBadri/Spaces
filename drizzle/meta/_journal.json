@@ -50,6 +50,20 @@
       "when": 1785390003608,
       "tag": "0006_document_extraction",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785413069547,
+      "tag": "0007_space_slug_per_parent",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785414755763,
+      "tag": "0008_notes_filed_via_entity_space",
+      "breakpoints": true
     }
   ]
 }
