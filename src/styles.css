@@ -197,3 +197,14 @@
 .mention-chip:hover {
   background: var(--selected);
 }
+
+/* Glossary auto-link — a hint, not a link. A dotted underline says "there is
+   a definition here" without competing with mentions, which are navigable. */
+.glossary-term {
+  border-bottom: 1px dotted var(--muted-foreground);
+  cursor: help;
+}
+.glossary-term:hover {
+  border-bottom-color: var(--foreground);
+  background: var(--muted);
+}

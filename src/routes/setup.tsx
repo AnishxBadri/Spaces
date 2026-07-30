@@ -6,7 +6,7 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { authClient } from '#/lib/auth-client'
-import { getSession, getSetupState, saveAiKey } from '#/lib/server-fns'
+import { getSession, getSetupState, saveAiKey, seedDemo } from '#/lib/server-fns'
 
 /**
  * First-run wizard. Two steps, both real:
@@ -40,19 +40,21 @@ const PROVIDERS = [
 type ProviderId = (typeof PROVIDERS)[number]['id']
 
 function SetupWizard() {
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
 
   return (
     <main className="flex min-h-dvh flex-col items-center bg-background px-6">
       <div className="w-full max-w-[400px] pt-[18vh] pb-16">
         <Wordmark />
         <p className="mt-3 text-xs font-medium text-muted-foreground tabular">
-          Step {step} of 2
+          Step {step} of 3
         </p>
         {step === 1 ? (
           <AdminStep onDone={() => setStep(2)} />
+        ) : step === 2 ? (
+          <AiKeyStep onDone={() => setStep(3)} />
         ) : (
-          <AiKeyStep />
+          <DemoStep />
         )}
       </div>
     </main>
@@ -141,8 +143,7 @@ function AdminStep({ onDone }: { onDone: () => void }) {
   )
 }
 
-function AiKeyStep() {
-  const navigate = useNavigate()
+function AiKeyStep({ onDone }: { onDone: () => void }) {
   const [provider, setProvider] = useState<ProviderId>('anthropic')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -190,11 +191,8 @@ function AiKeyStep() {
           <code className="rounded bg-muted px-1 py-0.5 text-xs">{saved}</code>
           . It never leaves this server and is only decrypted at call time.
         </p>
-        <Button
-          className="mt-6 w-full"
-          onClick={() => navigate({ to: '/spaces' })}
-        >
-          Open DealOS
+        <Button className="mt-6 w-full" onClick={onDone}>
+          Continue
         </Button>
       </>
     )
@@ -261,15 +259,68 @@ function AiKeyStep() {
           <Button type="submit" className="flex-1" disabled={pending}>
             {pending ? 'Saving…' : 'Save key'}
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => navigate({ to: '/spaces' })}
-          >
+          <Button type="button" variant="ghost" onClick={onDone}>
             Skip for now
           </Button>
         </div>
       </form>
+    </>
+  )
+}
+
+/**
+ * Demo data, offered rather than assumed. The starter taxonomy is
+ * deliberately tiny (CONTEXT.md), so this is what keeps a fresh install from
+ * being an empty page — but shipping it silently would put fictional
+ * companies in someone's CRM, so it is a choice with a visible cost.
+ */
+function DemoStep() {
+  const navigate = useNavigate()
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function withDemo() {
+    setPending(true)
+    setError(null)
+    try {
+      await seedDemo()
+      navigate({ to: '/spaces' })
+    } catch {
+      setError('Could not load the demo data. You can start empty instead.')
+      setPending(false)
+    }
+  }
+
+  return (
+    <>
+      <h1 className="mt-6 text-[22px] font-semibold tracking-tight">
+        Start with demo data?
+      </h1>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+        A worked example in data-center cooling — a small space tree, three
+        companies, a memo, a glossary, and a thesis with evidence on both
+        sides. Obviously fictional, and safe to delete once you have seen how
+        the pieces connect.
+      </p>
+
+      {error ? (
+        <p role="alert" className="mt-4 text-[13px] text-destructive">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="mt-6 flex gap-2">
+        <Button className="flex-1" disabled={pending} onClick={withDemo}>
+          {pending ? 'Loading…' : 'Load demo data'}
+        </Button>
+        <Button
+          variant="ghost"
+          disabled={pending}
+          onClick={() => navigate({ to: '/spaces' })}
+        >
+          Start empty
+        </Button>
+      </div>
     </>
   )
 }

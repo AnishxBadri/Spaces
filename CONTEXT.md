@@ -911,8 +911,29 @@ document text, fused in Postgres. Decisions:
   extracted deck text is not something to hand to a parser.
 - **Document hits route to the record they are filed against**, since documents have no page.
 
+**Glossary + seeds (phase 9): done, 2026-07.** Aho-Corasick auto-linking in the editor,
+per-space glossary, starter taxonomy, opt-in demo data. Decisions:
+- **Auto-linking is a ProseMirror decoration, not document content.** This is the TipTap
+  escape hatch this doc reserved, reached through BlockNote's `_tiptapOptions.extensions`.
+  Writing highlights into `body_json` would put derived data in the source of truth and
+  force a rewrite of every stored note whenever a definition changes. Decorations are
+  presentation only and vanish when a term does. `@tiptap/core` and `@tiptap/pm` are now
+  direct deps, pinned to BlockNote's exact version — two ProseMirror copies break plugin keys.
+- **Matching is whole-word and longest-wins, deliberately without stemming.** "stage" does
+  not match inside "backstage" — nor inside "stages". A highlight you cannot predict is
+  worse than one that misses a plural.
+- **Terms inherit down the tree, never up.** PUE defined at Data centers is true in
+  Cooling; a term defined in Cooling says nothing about Aerospace. That asymmetry is the
+  whole reason terms are scoped — `ltree` ancestor containment gives it for free.
+- **The term set is captured when the editor mounts.** Defining a term while a note is open
+  highlights it on next load; recreating the editor would discard cursor and undo history.
+- **Starter taxonomy seeds on first boot only**, so nodes the operator deletes stay deleted.
+  No seed keys, no reconciliation — the tiny-seed decision bought that away.
+- **Demo data is opt-in at setup, guarded on "no companies exist"**, and goes through
+  `resolveEntity()` like every other creator. Shipping it silently would put fictional
+  companies in someone's CRM.
+
 Remaining phases, in order:
-9. **Glossary + seeds** — terms w/ in-note auto-linking, starter taxonomy, demo seed
 10. **Auth completion** — invites, member management, /setup one-time token, optional TOTP
 11. **Ship polish** — backup script, install docs, GHCR multi-arch images, upgrade CI
 

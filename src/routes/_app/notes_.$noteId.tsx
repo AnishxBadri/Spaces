@@ -16,6 +16,7 @@ import { KIND_ICONS, KIND_ROUTES } from '#/components/editor/mention'
 import {
   getNote,
   listSpaces,
+  listTermsForNote,
   saveNote,
   tagIntoSpace,
   untagFromSpace,
@@ -27,11 +28,12 @@ import {
  */
 export const Route = createFileRoute('/_app/notes_/$noteId')({
   loader: async ({ params }) => {
-    const [note, spaces] = await Promise.all([
+    const [note, spaces, terms] = await Promise.all([
       getNote({ data: { id: params.noteId } }),
       listSpaces(),
+      listTermsForNote({ data: { noteId: params.noteId } }),
     ])
-    return { note, allSpaces: spaces }
+    return { note, allSpaces: spaces, terms }
   },
   component: NotePage,
 })
@@ -39,7 +41,7 @@ export const Route = createFileRoute('/_app/notes_/$noteId')({
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved'
 
 function NotePage() {
-  const { note: initial, allSpaces } = Route.useLoaderData()
+  const { note: initial, allSpaces, terms } = Route.useLoaderData()
   const [title, setTitle] = useState(initial.title)
   const [saveState, setSaveState] = useState<SaveState>('idle')
 
@@ -133,6 +135,7 @@ function NotePage() {
         <ClientOnly fallback={<div className="min-h-40" />}>
           <NoteEditor
             initialContent={initial.bodyJson}
+            terms={terms}
             onChange={(editor) => {
               latest.current = editor
               scheduleSave()

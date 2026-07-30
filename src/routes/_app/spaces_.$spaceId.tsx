@@ -19,7 +19,14 @@ import { useState } from 'react'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { CreateThesisDialog } from '#/routes/_app/theses'
-import { createNote, createSpace, getSpace, listSpaces } from '#/lib/server-fns'
+import { SpaceGlossary } from '#/components/space-glossary'
+import {
+  createNote,
+  createSpace,
+  getSpace,
+  listSpaces,
+  listTerms,
+} from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
@@ -28,11 +35,12 @@ import { cn } from '#/lib/utils'
  */
 export const Route = createFileRoute('/_app/spaces_/$spaceId')({
   loader: async ({ params }) => {
-    const [spc, spaces] = await Promise.all([
+    const [spc, spaces, terms] = await Promise.all([
       getSpace({ data: { id: params.spaceId } }),
       listSpaces(),
+      listTerms({ data: { spaceId: params.spaceId } }),
     ])
-    return { spc, allSpaces: spaces }
+    return { spc, allSpaces: spaces, terms }
   },
   component: SpacePage,
 })
@@ -40,7 +48,7 @@ export const Route = createFileRoute('/_app/spaces_/$spaceId')({
 const dateFmt = new Intl.DateTimeFormat('en', { day: '2-digit', month: 'short' })
 
 function SpacePage() {
-  const { spc, allSpaces } = Route.useLoaderData()
+  const { spc, allSpaces, terms } = Route.useLoaderData()
   const navigate = useNavigate()
 
   async function writeMemo() {
@@ -261,6 +269,8 @@ function SpacePage() {
           </ul>
         )}
       </section>
+
+      <SpaceGlossary spaceId={spc.id} spaceName={spc.name} terms={terms} />
 
       {/* Referenced: notes whose body mentions this space, but which live
           somewhere else. Filed notes are above and never repeat here. */}

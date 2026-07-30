@@ -12,6 +12,8 @@ import {
 } from '@blocknote/react'
 import { useMemo } from 'react'
 import { Mention } from './mention'
+import { createGlossaryExtension } from './glossary-decoration'
+import type { GlossaryTerm } from './glossary-decoration'
 import { searchEntities } from '#/lib/server-fns'
 
 const schema = BlockNoteSchema.create({
@@ -78,9 +80,18 @@ export function deriveMarkdown(
 
 export function NoteEditor({
   initialContent,
+  terms = [],
   onChange,
 }: {
   initialContent: unknown
+  /**
+   * Glossary terms in scope, from the spaces this note is filed in. Captured
+   * when the editor is created — defining a new term while a note is open
+   * highlights it on the next load, not live. Recreating the editor to pick
+   * up a term set would throw away cursor and undo history, which is a worse
+   * trade than a stale highlight.
+   */
+  terms?: Array<GlossaryTerm>
   onChange: (editor: {
     document: unknown
     blocksToMarkdownLossy: () => Promise<string>
@@ -93,6 +104,9 @@ export function NoteEditor({
         Array.isArray(initialContent) && initialContent.length > 0
           ? (initialContent as never)
           : undefined,
+      _tiptapOptions: {
+        extensions: [createGlossaryExtension(terms)],
+      },
     },
     [],
   )

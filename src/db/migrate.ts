@@ -14,6 +14,9 @@ async function main() {
   // System attributes: insert-if-absent on every boot; user edits survive.
   const { seedSystemAttributes } = await import('#/lib/attributes/seed')
   await seedSystemAttributes()
+  // Starter taxonomy: first boot only, so deleted nodes stay deleted.
+  const { seedStarterTaxonomy } = await import('#/lib/seeds/taxonomy')
+  await seedStarterTaxonomy()
   process.exit(0)
 }
 
