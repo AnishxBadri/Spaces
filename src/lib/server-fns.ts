@@ -30,6 +30,8 @@ import {
   note,
   person,
   space,
+  thesis,
+  thesisSpace,
 } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from './entities/resolve'
@@ -1943,6 +1945,388 @@ export const listUsers = createServerFn().handler(async () => {
   return db.select({ id: user.id, name: user.name }).from(user)
 })
 
+// ---------- theses ----------
+
+/**
+ * A thesis is a claim you hold, not a row. It deliberately has no attribute
+ * registry — claim, conviction, status, and evidence on both sides is the
+ * whole shape, and list-ifying it is the failure mode CONTEXT.md warns about.
+ *
+ * Evidence is open to any entity kind, not just companies. Disconfirmation is
+ * usually an article or a teardown note rather than a company, and
+ * evidence-against is the thing no generic CRM records.
+ */
+
+const CONVICTIONS = ['low', 'medium', 'high'] as const
+const THESIS_STATUSES = ['forming', 'active', 'parked', 'killed'] as const
+
+/** Terminal, and terminal means the reasoning gets captured. */
+function isTerminal(status: (typeof THESIS_STATUSES)[number]) {
+  return status === 'killed'
+}
+
+export const listTheses = createServerFn().handler(async () => {
+  await requireUser()
+  const rows = await db
+    .select({
+      id: thesis.entityId,
+      name: entity.canonicalName,
+      claim: thesis.claim,
+      conviction: thesis.conviction,
+      status: thesis.status,
+      openedAt: thesis.openedAt,
+      closedAt: thesis.closedAt,
+      closedReason: thesis.closedReason,
+      ownerId: thesis.ownerId,
+    })
+    .from(thesis)
+    .innerJoin(entity, eq(entity.id, thesis.entityId))
+    .where(isNull(entity.mergedIntoId))
+    .orderBy(desc(thesis.openedAt))
+  if (rows.length === 0) return []
+
+  const ids = rows.map((r) => r.id)
+
+  // Spaces per thesis, one query.
+  const spaceRows = await db
+    .select({
+      thesisId: thesisSpace.thesisEntityId,
+      id: space.entityId,
+      name: entity.canonicalName,
+    })
+    .from(thesisSpace)
+    .innerJoin(space, eq(space.entityId, thesisSpace.spaceEntityId))
+    .innerJoin(entity, eq(entity.id, space.entityId))
+    .where(inArray(thesisSpace.thesisEntityId, ids))
+
+  // Evidence tallies — the for/against split is the headline number.
+  const evidence = await db
+    .select({
+      thesisId: link.toEntityId,
+      relation: link.relation,
+      n: count(),
+    })
+    .from(link)
+    .where(
+      and(
+        inArray(link.toEntityId, ids),
+        inArray(link.relation, ['evidence_for', 'evidence_against']),
+      ),
+    )
+    .groupBy(link.toEntityId, link.relation)
+
+  const spacesBy = new Map<string, Array<{ id: string; name: string }>>()
+  for (const s of spaceRows) {
+    spacesBy.set(s.thesisId, [
+      ...(spacesBy.get(s.thesisId) ?? []),
+      { id: s.id, name: s.name },
+    ])
+  }
+  const tally = (id: string, relation: string) =>
+    evidence.find((e) => e.thesisId === id && e.relation === relation)?.n ?? 0
+
+  const users = await db.select({ id: user.id, name: user.name }).from(user)
+  const names = new Map(users.map((u) => [u.id, u.name]))
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    claim: r.claim,
+    conviction: r.conviction,
+    status: r.status,
+    openedAt: r.openedAt.toISOString(),
+    closedAt: r.closedAt?.toISOString() ?? null,
+    closedReason: r.closedReason,
+    ownerName: r.ownerId ? (names.get(r.ownerId) ?? null) : null,
+    spaces: spacesBy.get(r.id) ?? [],
+    forCount: tally(r.id, 'evidence_for'),
+    againstCount: tally(r.id, 'evidence_against'),
+  }))
+})
+
+export const createThesis = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      claim: z.string().trim().min(1).max(2000),
+      conviction: z.enum(CONVICTIONS).default('low'),
+      spaceIds: z.array(z.string().uuid()).max(20).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    return db.transaction(async (tx) => {
+      // canonical_name is the claim, truncated — it's what search, mentions,
+      // and the command palette show. The full claim lives on the side table.
+      const [ent] = await tx
+        .insert(entity)
+        .values({
+          kind: 'thesis',
+          canonicalName: data.claim.slice(0, 200),
+          createdBy: u.id,
+        })
+        .returning({ id: entity.id })
+
+      await tx.insert(thesis).values({
+        entityId: ent.id,
+        claim: data.claim,
+        conviction: data.conviction,
+        status: 'forming',
+        // Someone holds the claim; everyone can see it.
+        ownerId: u.id,
+      })
+
+      for (const spaceId of new Set(data.spaceIds ?? [])) {
+        await tx
+          .insert(thesisSpace)
+          .values({ thesisEntityId: ent.id, spaceEntityId: spaceId })
+          .onConflictDoNothing()
+      }
+
+      await tx.insert(activity).values({
+        actorId: u.id,
+        verb: 'thesis.created',
+        subjectEntityId: ent.id,
+      })
+      return { id: ent.id }
+    })
+  })
+
+export const getThesis = createServerFn()
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const [head] = await db
+      .select({
+        id: thesis.entityId,
+        claim: thesis.claim,
+        conviction: thesis.conviction,
+        status: thesis.status,
+        ownerId: thesis.ownerId,
+        openedAt: thesis.openedAt,
+        closedAt: thesis.closedAt,
+        closedReason: thesis.closedReason,
+        mergedIntoId: entity.mergedIntoId,
+      })
+      .from(thesis)
+      .innerJoin(entity, eq(entity.id, thesis.entityId))
+      .where(eq(thesis.entityId, data.id))
+    if (!head) throw new Error('Thesis not found')
+
+    const spaces = await db
+      .select({ id: space.entityId, name: entity.canonicalName })
+      .from(thesisSpace)
+      .innerJoin(space, eq(space.entityId, thesisSpace.spaceEntityId))
+      .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(eq(thesisSpace.thesisEntityId, data.id))
+      .orderBy(asc(entity.canonicalName))
+
+    // Both sides in one query — they are the same shape and differ only in
+    // which column of the page they land in.
+    const evidenceRows = await db
+      .select({
+        linkId: link.id,
+        relation: link.relation,
+        id: entity.id,
+        name: entity.canonicalName,
+        kind: entity.kind,
+        createdAt: link.createdAt,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.fromEntityId))
+      .where(
+        and(
+          eq(link.toEntityId, data.id),
+          inArray(link.relation, ['evidence_for', 'evidence_against']),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+      .orderBy(desc(link.createdAt))
+
+    const users = await db.select({ id: user.id, name: user.name }).from(user)
+    const names = new Map(users.map((u) => [u.id, u.name]))
+
+    const shape = (r: (typeof evidenceRows)[number]) => ({
+      linkId: r.linkId,
+      id: r.id,
+      name: r.name,
+      kind: r.kind,
+    })
+    return {
+      id: head.id,
+      claim: head.claim,
+      conviction: head.conviction,
+      status: head.status,
+      ownerName: head.ownerId ? (names.get(head.ownerId) ?? null) : null,
+      openedAt: head.openedAt.toISOString(),
+      closedAt: head.closedAt?.toISOString() ?? null,
+      closedReason: head.closedReason,
+      mergedIntoId: head.mergedIntoId,
+      spaces,
+      evidenceFor: evidenceRows
+        .filter((r) => r.relation === 'evidence_for')
+        .map(shape),
+      evidenceAgainst: evidenceRows
+        .filter((r) => r.relation === 'evidence_against')
+        .map(shape),
+    }
+  })
+
+/**
+ * Status changes carry the reasoning. Killing a thesis without recording why
+ * throws away the only thing a dead thesis is worth — reviving one is a
+ * status change back, and the reason stays on the record either way.
+ */
+export const updateThesis = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      claim: z.string().trim().min(1).max(2000).optional(),
+      conviction: z.enum(CONVICTIONS).optional(),
+      status: z.enum(THESIS_STATUSES).optional(),
+      closedReason: z.string().trim().max(2000).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const [current] = await db
+      .select({ status: thesis.status })
+      .from(thesis)
+      .where(eq(thesis.entityId, data.id))
+    if (!current) throw new Error('Thesis not found')
+
+    const nextStatus = data.status ?? current.status
+    const nowTerminal = isTerminal(nextStatus)
+    if (nowTerminal && !isTerminal(current.status) && !data.closedReason) {
+      throw new Error('Killing a thesis needs a reason — that is the record')
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(thesis)
+        .set({
+          ...(data.claim ? { claim: data.claim } : {}),
+          ...(data.conviction ? { conviction: data.conviction } : {}),
+          ...(data.status ? { status: data.status } : {}),
+          ...(nowTerminal
+            ? {
+                closedAt: isTerminal(current.status)
+                  ? undefined
+                  : new Date(),
+                ...(data.closedReason
+                  ? { closedReason: data.closedReason }
+                  : {}),
+              }
+            : // Reopening clears the closure but never the claim's history —
+              // activity keeps the trail.
+              { closedAt: null, closedReason: null }),
+        })
+        .where(eq(thesis.entityId, data.id))
+
+      if (data.claim) {
+        await tx
+          .update(entity)
+          .set({ canonicalName: data.claim.slice(0, 200) })
+          .where(eq(entity.id, data.id))
+      }
+
+      if (data.status && data.status !== current.status) {
+        await tx.insert(activity).values({
+          actorId: u.id,
+          verb: `thesis.${data.status}`,
+          subjectEntityId: data.id,
+          meta: data.closedReason ? { reason: data.closedReason } : {},
+        })
+      }
+    })
+    return { ok: true }
+  })
+
+export const setThesisEvidence = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      thesisId: z.string().uuid(),
+      entityId: z.string().uuid(),
+      side: z.enum(['evidence_for', 'evidence_against']),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    if (data.thesisId === data.entityId) {
+      throw new Error('A thesis cannot be its own evidence')
+    }
+    await db.transaction(async (tx) => {
+      // One entity, one side. Moving a company from for to against is the
+      // most informative edit there is — it must not leave both rows behind.
+      const other =
+        data.side === 'evidence_for' ? 'evidence_against' : 'evidence_for'
+      await tx
+        .delete(link)
+        .where(
+          and(
+            eq(link.fromEntityId, data.entityId),
+            eq(link.toEntityId, data.thesisId),
+            eq(link.relation, other),
+          ),
+        )
+      await tx
+        .insert(link)
+        .values({
+          fromEntityId: data.entityId,
+          toEntityId: data.thesisId,
+          relation: data.side,
+          source: 'manual',
+          createdBy: u.id,
+        })
+        .onConflictDoNothing()
+      await tx.insert(activity).values({
+        actorId: u.id,
+        verb: `thesis.${data.side}`,
+        subjectEntityId: data.thesisId,
+        objectEntityId: data.entityId,
+      })
+    })
+    return { ok: true }
+  })
+
+export const removeThesisEvidence = createServerFn({ method: 'POST' })
+  .validator(z.object({ linkId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    await db.delete(link).where(eq(link.id, data.linkId))
+    return { ok: true }
+  })
+
+export const setThesisSpace = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      thesisId: z.string().uuid(),
+      spaceId: z.string().uuid(),
+      attached: z.boolean(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    if (data.attached) {
+      await db
+        .insert(thesisSpace)
+        .values({
+          thesisEntityId: data.thesisId,
+          spaceEntityId: data.spaceId,
+        })
+        .onConflictDoNothing()
+    } else {
+      await db
+        .delete(thesisSpace)
+        .where(
+          and(
+            eq(thesisSpace.thesisEntityId, data.thesisId),
+            eq(thesisSpace.spaceEntityId, data.spaceId),
+          ),
+        )
+    }
+    return { ok: true }
+  })
+
 // ---------- spaces (first real write path through the entity core) ----------
 
 /** ltree labels: [a-z0-9_] only. */
@@ -2061,6 +2445,46 @@ export const getSpace = createServerFn()
       .orderBy(desc(note.updatedAt))
     const filedIds = new Set(filedRows.map((f) => f.id))
 
+    // Claims held about this space. They share the top block with filed
+    // prose — what you think here is one idea, not two sections.
+    const thesesRows = await db
+      .select({
+        id: thesis.entityId,
+        claim: thesis.claim,
+        conviction: thesis.conviction,
+        status: thesis.status,
+        closedReason: thesis.closedReason,
+      })
+      .from(thesisSpace)
+      .innerJoin(thesis, eq(thesis.entityId, thesisSpace.thesisEntityId))
+      .innerJoin(entity, eq(entity.id, thesis.entityId))
+      .where(
+        and(
+          eq(thesisSpace.spaceEntityId, data.id),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+      .orderBy(desc(thesis.openedAt))
+
+    const thesisIds = thesesRows.map((t) => t.id)
+    const evidence =
+      thesisIds.length > 0
+        ? await db
+            .select({
+              thesisId: link.toEntityId,
+              relation: link.relation,
+              n: count(),
+            })
+            .from(link)
+            .where(
+              and(
+                inArray(link.toEntityId, thesisIds),
+                inArray(link.relation, ['evidence_for', 'evidence_against']),
+              ),
+            )
+            .groupBy(link.toEntityId, link.relation)
+        : []
+
     // Referenced: notes whose body happens to mention this space. A note
     // that is filed here too shows once, at the top — not in both lists.
     const notes = await db
@@ -2082,6 +2506,17 @@ export const getSpace = createServerFn()
       ancestors: ancestors.map((a) => ({ id: a.id, name: a.name })),
       children,
       companies,
+      theses: thesesRows.map((t) => ({
+        ...t,
+        forCount:
+          evidence.find(
+            (e) => e.thesisId === t.id && e.relation === 'evidence_for',
+          )?.n ?? 0,
+        againstCount:
+          evidence.find(
+            (e) => e.thesisId === t.id && e.relation === 'evidence_against',
+          )?.n ?? 0,
+      })),
       filed: filedRows.map((f) => ({
         id: f.id,
         title: f.title,

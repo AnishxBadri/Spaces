@@ -27,6 +27,7 @@ import { Route as AppDealsDealIdRouteImport } from './routes/_app/deals_.$dealId
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId'
 import { Route as AppPeoplePersonIdRouteImport } from './routes/_app/people_.$personId'
 import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
+import { Route as AppThesesThesisIdRouteImport } from './routes/_app/theses_.$thesisId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
 
@@ -119,6 +120,11 @@ const AppSpacesSpaceIdRoute = AppSpacesSpaceIdRouteImport.update({
   path: '/spaces/$spaceId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppThesesThesisIdRoute = AppThesesThesisIdRouteImport.update({
+  id: '/theses_/$thesisId',
+  path: '/theses/$thesisId',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
+  '/theses/$thesisId': typeof AppThesesThesisIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
 }
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
+  '/theses/$thesisId': typeof AppThesesThesisIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
 }
@@ -192,6 +200,7 @@ export interface FileRoutesById {
   '/_app/notes_/$noteId': typeof AppNotesNoteIdRoute
   '/_app/people_/$personId': typeof AppPeoplePersonIdRoute
   '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
+  '/_app/theses_/$thesisId': typeof AppThesesThesisIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
 }
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/notes/$noteId'
     | '/people/$personId'
     | '/spaces/$spaceId'
+    | '/theses/$thesisId'
     | '/api/auth/$'
     | '/api/blob/$key'
   fileRoutesByTo: FileRoutesByTo
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/notes/$noteId'
     | '/people/$personId'
     | '/spaces/$spaceId'
+    | '/theses/$thesisId'
     | '/api/auth/$'
     | '/api/blob/$key'
   id:
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/_app/notes_/$noteId'
     | '/_app/people_/$personId'
     | '/_app/spaces_/$spaceId'
+    | '/_app/theses_/$thesisId'
     | '/api/auth/$'
     | '/api/blob/$key'
   fileRoutesById: FileRoutesById
@@ -400,6 +412,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSpacesSpaceIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/theses_/$thesisId': {
+      id: '/_app/theses_/$thesisId'
+      path: '/theses/$thesisId'
+      fullPath: '/theses/$thesisId'
+      preLoaderRoute: typeof AppThesesThesisIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -431,6 +450,7 @@ interface AppRouteChildren {
   AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
   AppPeoplePersonIdRoute: typeof AppPeoplePersonIdRoute
   AppSpacesSpaceIdRoute: typeof AppSpacesSpaceIdRoute
+  AppThesesThesisIdRoute: typeof AppThesesThesisIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -447,6 +467,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppNotesNoteIdRoute: AppNotesNoteIdRoute,
   AppPeoplePersonIdRoute: AppPeoplePersonIdRoute,
   AppSpacesSpaceIdRoute: AppSpacesSpaceIdRoute,
+  AppThesesThesisIdRoute: AppThesesThesisIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

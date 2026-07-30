@@ -876,8 +876,23 @@ Decisions worth keeping:
   phase 7 where space pages actually want *sources*; chunking + embeddings wait on BYOK; the
   S3 driver still throws.
 
+**Theses (phase 7): done, 2026-07.** Claim/conviction/status, evidence on both sides,
+claims on the space page. No migration needed — `thesis`, `thesis_space`, and the
+`evidence_for`/`evidence_against` relations were already in the schema. Decisions:
+- **Evidence is open to any entity kind, not just companies.** Disconfirmation is usually
+  an article or a teardown note, so companies-only would have gutted the against column.
+- **One entity, one side.** Attaching a company to the side it isn't already on moves it;
+  the opposite row is deleted in the same transaction. Moving a company from *for* to
+  *against* is the most informative edit there is and must not leave both rows behind.
+- **Killing requires a reason, enforced server-side.** The status change is refused without
+  one, and the reasoning gets the loudest block on the page. Reopening clears the closure;
+  `activity` keeps the trail either way.
+- **No attribute registry on theses.** Claim, conviction, status and evidence is the whole
+  shape — list-ifying it is the failure mode.
+- Claim is truncated into `entity.canonical_name` so search, mentions, and Cmd-K work; the
+  full claim lives on the side table.
+
 Remaining phases, in order:
-7. **Theses** — claim/conviction/status, evidence for & against, thesis section on spaces
 8. **Search** — real Cmd-K over all entities + notes (tsvector), jump-to-record
 9. **Glossary + seeds** — terms w/ in-note auto-linking, starter taxonomy, demo seed
 10. **Auth completion** — invites, member management, /setup one-time token, optional TOTP
