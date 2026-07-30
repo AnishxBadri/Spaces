@@ -10,7 +10,16 @@ import type { Readable } from 'node:stream'
  */
 export interface Storage {
   put(key: string, data: Readable | Buffer, meta: { mime?: string }): Promise<void>
-  getDownloadUrl(key: string, ttlSeconds: number): Promise<string>
+  /**
+   * `filename` is the name the download lands under — the key is a digest
+   * and carries none. S3 expresses this as response-content-disposition on
+   * the presigned URL; the local driver has its own equivalent.
+   */
+  getDownloadUrl(
+    key: string,
+    ttlSeconds: number,
+    opts?: { filename?: string },
+  ): Promise<string>
   getUploadUrl(key: string, ttlSeconds: number): Promise<string>
   delete(key: string): Promise<void>
   exists(key: string): Promise<boolean>

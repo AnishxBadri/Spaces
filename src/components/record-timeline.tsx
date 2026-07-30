@@ -24,6 +24,7 @@ const VERB_LABELS: Record<string, string> = {
   'person.created': 'created this person',
   'deal.created': 'created a deal',
   'note.created': 'wrote a note',
+  'document.filed': 'filed a document',
   'space.tagged': 'tagged into a space',
   'space.untagged': 'removed from a space',
   'entity.merged': 'merged a duplicate record',

@@ -12,12 +12,14 @@ import { ValueEditor } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { Button } from '#/components/ui/button'
 import {
   createNote,
   getDeal,
   getRecordTimeline,
+  listRecordDocuments,
   listRegistry,
   updateRecord,
 } from '#/lib/server-fns'
@@ -25,10 +27,11 @@ import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/deals_/$dealId')({
   loader: async ({ params }) => {
-    const [deal, registry, timeline] = await Promise.all([
+    const [deal, registry, timeline, documents] = await Promise.all([
       getDeal({ data: { id: params.dealId } }),
       listRegistry({ data: { kind: 'deal' } }),
       getRecordTimeline({ data: { entityId: params.dealId } }),
+      listRecordDocuments({ data: { entityId: params.dealId } }),
     ])
     if (deal.mergedIntoId) {
       throw redirect({
@@ -36,16 +39,16 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
         params: { dealId: deal.mergedIntoId },
       })
     }
-    return { deal, registry, timeline }
+    return { deal, registry, timeline, documents }
   },
   component: DealRecordPage,
 })
 
 function DealRecordPage() {
-  const { deal, registry, timeline } = Route.useLoaderData()
+  const { deal, registry, timeline, documents } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'activity' | 'notes'>('activity')
+  const [tab, setTab] = useState<'activity' | 'notes' | 'files'>('activity')
 
   const refNames = {
     ...deal.refNames,
@@ -137,7 +140,7 @@ function DealRecordPage() {
         <section className="min-w-0">
           <div className="flex items-center justify-between border-b border-border">
             <div role="tablist" className="flex gap-1">
-              {(['activity', 'notes'] as const).map((t) => (
+              {(['activity', 'notes', 'files'] as const).map((t) => (
                 <button
                   key={t}
                   role="tab"
@@ -170,6 +173,8 @@ function DealRecordPage() {
               registry={registry as Array<RegistryEntry>}
               refNames={refNames}
             />
+          ) : tab === 'files' ? (
+            <RecordFiles entityId={deal.id} documents={documents} />
           ) : (
             <ul className="mt-4 space-y-1">
               {noteMentions.length === 0 ? (

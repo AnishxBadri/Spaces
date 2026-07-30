@@ -182,6 +182,19 @@ export const documentOrigin = pgEnum('document_origin', [
   'clip',
 ])
 
+/**
+ * Extraction is a worker job, so the row exists before its text does. The
+ * UI needs to tell "still working" from "this format has no text we can
+ * reach" (scanned PDFs, images — a BYOK vision model is the upgrade path)
+ * from "we tried and it broke".
+ */
+export const extractionStatus = pgEnum('extraction_status', [
+  'pending',
+  'done',
+  'unsupported',
+  'failed',
+])
+
 export const document = pgTable(
   'document',
   {
@@ -200,6 +213,14 @@ export const document = pgTable(
     extractedText: text('extracted_text'),
     // Populated by the extraction worker alongside extracted_text.
     tsv: tsvector('tsv'),
+    extractionStatus: extractionStatus('extraction_status')
+      .notNull()
+      .default('pending'),
+    // Operator-facing reason when status is failed/unsupported. Surfaced in
+    // the UI — swallowing it turns "why is my deck not searchable" into a
+    // support thread.
+    extractionError: text('extraction_error'),
+    extractedAt: timestamp('extracted_at', { withTimezone: true }),
     uploadedBy: text('uploaded_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

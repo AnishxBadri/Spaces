@@ -22,6 +22,7 @@ import { AttributeCreateDialog } from '#/components/attributes/attribute-create-
 import { ValueEditor, optionLabel } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import {
@@ -30,6 +31,7 @@ import {
   getCompany,
   getRecordTimeline,
   listCompanyDeals,
+  listRecordDocuments,
   listRegistry,
   listSpaces,
   tagIntoSpace,
@@ -40,15 +42,23 @@ import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/companies_/$companyId')({
   loader: async ({ params }) => {
-    const [companyData, spaces, registry, dealRegistry, deals, timeline] =
-      await Promise.all([
-        getCompany({ data: { id: params.companyId } }),
-        listSpaces(),
-        listRegistry({ data: { kind: 'company' } }),
-        listRegistry({ data: { kind: 'deal' } }),
-        listCompanyDeals({ data: { companyId: params.companyId } }),
-        getRecordTimeline({ data: { entityId: params.companyId } }),
-      ])
+    const [
+      companyData,
+      spaces,
+      registry,
+      dealRegistry,
+      deals,
+      timeline,
+      documents,
+    ] = await Promise.all([
+      getCompany({ data: { id: params.companyId } }),
+      listSpaces(),
+      listRegistry({ data: { kind: 'company' } }),
+      listRegistry({ data: { kind: 'deal' } }),
+      listCompanyDeals({ data: { companyId: params.companyId } }),
+      getRecordTimeline({ data: { entityId: params.companyId } }),
+      listRecordDocuments({ data: { entityId: params.companyId } }),
+    ])
     // Merged-away records redirect to their survivor — stale URLs keep working.
     if (companyData.mergedIntoId) {
       throw redirect({
@@ -63,18 +73,26 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       dealRegistry,
       deals,
       timeline,
+      documents,
     }
   },
   component: CompanyRecordPage,
 })
 
 function CompanyRecordPage() {
-  const { company, allSpaces, registry, dealRegistry, deals, timeline } =
-    Route.useLoaderData()
+  const {
+    company,
+    allSpaces,
+    registry,
+    dealRegistry,
+    deals,
+    timeline,
+    documents,
+  } = Route.useLoaderData()
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'activity' | 'notes'>('activity')
+  const [tab, setTab] = useState<'activity' | 'notes' | 'files'>('activity')
 
   const noteMentions = company.mentionedIn.filter((m) => m.kind === 'note')
   const domains = company.aliases.filter((a) => a.kind === 'domain')
@@ -157,7 +175,7 @@ function CompanyRecordPage() {
         <section className="min-w-0">
           <div className="flex items-center justify-between border-b border-border">
             <div role="tablist" className="flex gap-1">
-              {(['activity', 'notes'] as const).map((t) => (
+              {(['activity', 'notes', 'files'] as const).map((t) => (
                 <button
                   key={t}
                   role="tab"
@@ -189,6 +207,8 @@ function CompanyRecordPage() {
               items={timeline}
               registry={registry as Array<RegistryEntry>}
             />
+          ) : tab === 'files' ? (
+            <RecordFiles entityId={company.id} documents={documents} />
           ) : (
             <ul className="mt-4 space-y-1">
               {noteMentions.length === 0 ? (

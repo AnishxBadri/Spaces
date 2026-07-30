@@ -806,8 +806,25 @@ dropped in favor of stage-group filters on the deals table.
 **Interactions: done, 2026-07** — manual meeting/call logging, attendee edges, timeline
 integration, last-touched columns. Calendar sync later automates rows into this shape.
 
+**Documents (phase 6): done, 2026-07.** Files tab on company/person/deal records; upload is
+browser-hashed → presigned PUT → file the row, so bytes never stream through a server
+function. The local driver verifies the digest as it writes, which is what makes "same sha ⇒
+same bytes" true enough for the dedupe, the immutable cache header, and the worker to rely
+on. Extraction runs on the worker (`unpdf`, `mammoth`, `fflate` + OOXML for PPTX/XLSX) and
+writes `extracted_text` + `tsv` together — phase 8 search inherits a populated index.
+Decisions worth keeping:
+- **`extraction_status` is three-way, not a boolean.** `unsupported` (scanned deck, image —
+  a BYOK vision model is its upgrade path) is a normal permanent state, not a failure.
+- **Downloads are always `attachment` + `application/octet-stream`.** Echoing an upload's own
+  content-type would make an uploaded `.html` stored XSS against the app's own origin. Revisit
+  only alongside a preview surface that has thought about it.
+- **Delete is real, and GCs the blob when no other row shares its digest.** A misfiled upload
+  the operator can't remove is worse than the audit trail it costs.
+- Deferred by name: URL clip (`origin: 'url'`, `@mozilla/readability` + `linkedom`) moves to
+  phase 7 where space pages actually want *sources*; chunking + embeddings wait on BYOK; the
+  S3 driver still throws.
+
 Remaining phases, in order:
-6. **Documents** — upload on records, storage layer wired to UI, extraction worker job
 7. **Theses** — claim/conviction/status, evidence for & against, thesis section on spaces
 8. **Search** — real Cmd-K over all entities + notes (tsvector), jump-to-record
 9. **Glossary + seeds** — terms w/ in-note auto-linking, starter taxonomy, demo seed
@@ -818,7 +835,8 @@ Then integrations (each independent): Google Calendar first, Gmail (forward-only
 Apollo enrichment, BYOK AI features.
 
 Standing debt: dark theme, placeholder contrast (DESIGN.md floor), test-db harness,
-note deletion.
+note deletion, S3 storage driver, orphan-blob sweep (a finalize that never arrives leaves
+bytes with no row).
 
 ## Open questions
 

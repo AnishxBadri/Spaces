@@ -43,6 +43,13 @@
       "when": 1785351610349,
       "tag": "0005_attribute_engine",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785390003608,
+      "tag": "0006_document_extraction",
+      "breakpoints": true
     }
   ]
 }

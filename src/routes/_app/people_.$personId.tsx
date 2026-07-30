@@ -22,6 +22,7 @@ import { AttributeCreateDialog } from '#/components/attributes/attribute-create-
 import { ValueEditor } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import {
   addPersonContact,
@@ -29,6 +30,7 @@ import {
   getPerson,
   getRecordTimeline,
   listCompanies,
+  listRecordDocuments,
   listRegistry,
   setPersonCompany,
   updateRecord,
@@ -37,28 +39,37 @@ import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/people_/$personId')({
   loader: async ({ params }) => {
-    const [personData, companies, registry, timeline] = await Promise.all([
-      getPerson({ data: { id: params.personId } }),
-      listCompanies(),
-      listRegistry({ data: { kind: 'person' } }),
-      getRecordTimeline({ data: { entityId: params.personId } }),
-    ])
+    const [personData, companies, registry, timeline, documents] =
+      await Promise.all([
+        getPerson({ data: { id: params.personId } }),
+        listCompanies(),
+        listRegistry({ data: { kind: 'person' } }),
+        getRecordTimeline({ data: { entityId: params.personId } }),
+        listRecordDocuments({ data: { entityId: params.personId } }),
+      ])
     if (personData.mergedIntoId) {
       throw redirect({
         to: '/people/$personId',
         params: { personId: personData.mergedIntoId },
       })
     }
-    return { person: personData, allCompanies: companies, registry, timeline }
+    return {
+      person: personData,
+      allCompanies: companies,
+      registry,
+      timeline,
+      documents,
+    }
   },
   component: PersonRecordPage,
 })
 
 function PersonRecordPage() {
-  const { person, allCompanies, registry, timeline } = Route.useLoaderData()
+  const { person, allCompanies, registry, timeline, documents } =
+    Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'activity' | 'notes'>('activity')
+  const [tab, setTab] = useState<'activity' | 'notes' | 'files'>('activity')
 
   const noteMentions = person.mentionedIn.filter((m) => m.kind === 'note')
   const unlinkedCompanies = allCompanies.filter(
@@ -159,7 +170,7 @@ function PersonRecordPage() {
         <section className="min-w-0">
           <div className="flex items-center justify-between border-b border-border">
             <div role="tablist" className="flex gap-1">
-              {(['activity', 'notes'] as const).map((t) => (
+              {(['activity', 'notes', 'files'] as const).map((t) => (
                 <button
                   key={t}
                   role="tab"
@@ -191,6 +202,8 @@ function PersonRecordPage() {
               items={timeline}
               registry={registry as Array<RegistryEntry>}
             />
+          ) : tab === 'files' ? (
+            <RecordFiles entityId={person.id} documents={documents} />
           ) : (
             <ul className="mt-4 space-y-1">
               {noteMentions.length === 0 ? (

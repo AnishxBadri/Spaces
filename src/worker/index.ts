@@ -1,6 +1,7 @@
 import { PgBoss } from 'pg-boss'
 import type { Job } from 'pg-boss'
 import { QUEUES } from './queues'
+import { extractDocument } from './jobs/extract-document'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -29,7 +30,15 @@ async function main() {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots
   }
 
-  await boss.work(QUEUES.extractDocument, stub('document.extract'))
+  // Extraction is the CPU-bound one: a whole batch on one tick would block
+  // this process the way inline extraction would block the web one.
+  await boss.work(
+    QUEUES.extractDocument,
+    { batchSize: 1 },
+    async (jobs: Array<Job>) => {
+      for (const job of jobs) await extractDocument(job.data)
+    },
+  )
   await boss.work(QUEUES.embedDocument, stub('document.embed'))
   await boss.work(QUEUES.dedupeSweep, stub('entity.dedupe-sweep'))
   await boss.work(QUEUES.enrichEntity, stub('entity.enrich'))
