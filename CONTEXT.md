@@ -940,9 +940,51 @@ Remaining phases, in order:
 Then integrations (each independent): Google Calendar first, Gmail (forward-only),
 Apollo enrichment, BYOK AI features.
 
-Standing debt: dark theme, placeholder contrast (DESIGN.md floor), test-db harness,
-note deletion, S3 storage driver, orphan-blob sweep (a finalize that never arrives leaves
-bytes with no row).
+Standing debt: test-db harness, note deletion, S3 storage driver, orphan-blob sweep (a
+finalize that never arrives leaves bytes with no row).
+
+## UI craft debt (catalogued 2026-07, before the design pass)
+
+The next UI work is a **craft pass, not a redesign** — CONTEXT.md's v1 scope lines hold, and
+nothing below reopens a deferred feature. What follows is drift between what DESIGN.md
+*states* and what phases 1–9 actually shipped. Recorded now because it was found by writing
+the code; rediscovering it means re-reading every route.
+
+**Rules DESIGN.md states that the code does not follow:**
+- **Type scale.** DESIGN.md specifies a tight scale (ratio ~1.125–1.2, fixed rem). The code
+  has `text-[26px]`, `text-[22px]`, `text-[15px]`, `text-[13px]`, `text-xs`, `text-sm` —
+  a pile, not a scale. Collapse to named steps.
+- **Contrast floor.** `text-muted-foreground/80`, `/70`, `/50` appear throughout every
+  surface built in phases 6–9. This is the failure mode DESIGN.md names outright ("muted
+  gray *for elegance* is the first failure mode of this aesthetic lane"). Resolve the muted
+  ramp to values that pass ≥4.5:1 and delete the sub-100% opacities.
+- **Focus states.** Two competing treatments in the codebase: `ring-2 ring-ring/60` (written
+  by hand) and `ring-[3px] ring-ring/50` (inherited from shadcn inputs). Pick one.
+- **The Tabular Rule.** `.tabular` is on some counts and dates, missing on others (file
+  sizes, several metadata rows).
+- **Motion.** "150–250ms, ease-out, `prefers-reduced-motion` honored everywhere" — there is
+  exactly one `motion-reduce:` in the app.
+
+**Gaps in DESIGN.md itself:**
+- **No spacing section.** §3 Typography jumps straight to §4 Elevation. Row heights and
+  vertical rhythm are consequently ad hoc (`h-7`/`h-8`/`h-9`, `py-2.5`/`py-3`).
+- **Dark theme is absent from the document**, though `next-themes` is already a dependency.
+- **§5 Components is still the placeholder**, awaiting the scan run its own comment asks for.
+- **Fonts are listed "to be chosen at implementation"** — they were chosen (Inter, Source
+  Serif 4, both in `package.json`) and never written down.
+
+**The shape of the fix.** The durable output is a token-and-primitive layer, not a list of
+per-screen corrections: named type steps, one focus treatment, a numeric primitive so
+tabular figures are automatic rather than remembered, and row/section primitives so density
+rhythm is structural. Otherwise the next feature re-drifts, because the next person writing
+a settings screen retypes `text-xs text-muted-foreground/80` from muscle memory.
+
+**Ordering note.** Run `/impeccable document` *after* the token/primitive pass, not before —
+scanning now would document components that pass is about to replace.
+
+**Also carry into any design run:** the deferral list, or an Attio-shaped brief will
+propose most of it back. Deferred by name: saved/shared views, bulk edit, calculations row,
+CSV, virtualization + keyboard-grid, kanban, drawer-over-table, Overview/Highlight cards.
 
 ## Open questions
 
