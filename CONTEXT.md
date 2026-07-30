@@ -892,8 +892,26 @@ claims on the space page. No migration needed — `thesis`, `thesis_space`, and 
 - Claim is truncated into `entity.canonical_name` so search, mentions, and Cmd-K work; the
   full claim lives on the side table.
 
+**Search (phase 8): done, 2026-07.** One Cmd-K box over names, note bodies, and extracted
+document text, fused in Postgres. Decisions:
+- **Everything searchable is an entity, so RRF is honest.** Trigram similarity and `ts_rank`
+  produce incomparable scores, but ranks fuse cleanly — reciprocal rank fusion (k=60) over
+  three CTEs ranking the same id space. The pgvector half joins as a fourth CTE when
+  embeddings land; nothing else changes.
+- **`word_similarity` (`<%`), not `similarity` (`%`), for names.** The plain operator
+  compares whole strings, so a short query against a long name always falls under the
+  threshold — "orbitl" would never reach "Orbital Composites". Needs the trigram GIN index
+  on `entity.canonical_name` added in 0009.
+- **`note.tsv` is a STORED generated column**, not a trigger or an app-side write. `body_md`
+  is already derived on save, so the vector derives from it and cannot drift. Title carries
+  weight A over body B. (`document.tsv` stays worker-written — its text arrives async.)
+- **cmdk's client-side filtering is off.** It would re-filter server-ranked results and
+  silently drop the fuzzy matches the trigram index exists to find.
+- **Snippets come from `ts_headline` with `«»` markers, rendered as text.** Never HTML —
+  extracted deck text is not something to hand to a parser.
+- **Document hits route to the record they are filed against**, since documents have no page.
+
 Remaining phases, in order:
-8. **Search** — real Cmd-K over all entities + notes (tsvector), jump-to-record
 9. **Glossary + seeds** — terms w/ in-note auto-linking, starter taxonomy, demo seed
 10. **Auth completion** — invites, member management, /setup one-time token, optional TOTP
 11. **Ship polish** — backup script, install docs, GHCR multi-arch images, upgrade CI

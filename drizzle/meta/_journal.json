@@ -64,6 +64,13 @@
       "when": 1785414755763,
       "tag": "0008_notes_filed_via_entity_space",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785419543663,
+      "tag": "0009_search_notes_and_names",
+      "breakpoints": true
     }
   ]
 }

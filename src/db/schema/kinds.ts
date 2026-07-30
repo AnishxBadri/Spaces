@@ -168,6 +168,9 @@ export const note = pgTable('note', {
   bodyJson: jsonb('body_json'),
   bodyMd: text('body_md').notNull().default(''),
   kind: noteKind('kind').notNull().default('note'),
+  // Generated column (migration 0009) — derived from title + body_md by
+  // Postgres, never written by the app. Title is weighted above body.
+  tsv: tsvector('tsv'),
   authorId: text('author_id')
     .notNull()
     .references(() => user.id),
