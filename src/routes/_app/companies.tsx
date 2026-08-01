@@ -1,34 +1,33 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import {
   createColumnHelper,
-  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type {
-  ColumnDef,
-  ColumnSizingState,
-  SortingState,
-  VisibilityState,
-} from '@tanstack/react-table'
-import {
-  ArrowDown,
-  ArrowUp,
-  Building2,
-  Columns3,
-  Copy,
-  Globe,
-  Layers,
-  Plus,
-} from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import { Building2, Copy, Globe, Layers, Plus } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { ValueEditor } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
+import {
+  ChipLink,
+  DateCell,
+  IconBadge,
+  MetaCell,
+  RecordLinkCell,
+} from '#/components/table/cells'
+import {
+  AddColumnButton,
+  PageHeader,
+  RecordTable,
+  TableToolbar,
+} from '#/components/table/record-table'
+import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -39,13 +38,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '#/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import {
@@ -73,41 +65,12 @@ type Row = Awaited<ReturnType<typeof listCompaniesTable>>[number]
 const col = createColumnHelper<Row>()
 const PREFS_KEY = 'dealos.companies-table.v1'
 
-const dateFmt = new Intl.DateTimeFormat('en', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-})
-
-function loadPrefs(): {
-  columnVisibility?: VisibilityState
-  columnSizing?: ColumnSizingState
-} {
-  try {
-    return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}')
-  } catch {
-    return {}
-  }
-}
-
 function CompaniesPage() {
   const { rows, registry, openDuplicates } = Route.useLoaderData()
   const router = useRouter()
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-    () => loadPrefs().columnVisibility ?? {},
-  )
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(
-    () => loadPrefs().columnSizing ?? {},
-  )
-
-  useEffect(() => {
-    localStorage.setItem(
-      PREFS_KEY,
-      JSON.stringify({ columnVisibility, columnSizing }),
-    )
-  }, [columnVisibility, columnSizing])
+  const prefs = useTablePrefs(PREFS_KEY)
 
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
@@ -127,16 +90,12 @@ function CompaniesPage() {
         size: 220,
         enableHiding: false,
         cell: (info) => (
-          <Link
+          <RecordLinkCell
             to="/companies/$companyId"
             params={{ companyId: info.row.original.id }}
-            className="flex h-full min-w-0 items-center gap-2 px-1 font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded"
-          >
-            <span className="flex size-5 shrink-0 items-center justify-center rounded bg-muted">
-              <Building2 className="size-3 text-muted-foreground" strokeWidth={1.75} />
-            </span>
-            <span className="truncate">{info.getValue()}</span>
-          </Link>
+            name={String(info.getValue())}
+            badge={<IconBadge icon={Building2} />}
+          />
         ),
       }) as ColumnDef<Row, unknown>,
       col.accessor((r) => r.domains.join(', '), {
@@ -145,12 +104,9 @@ function CompaniesPage() {
         size: 170,
         cell: (info) =>
           info.row.original.domains.length > 0 ? (
-            <span className="flex items-center gap-1.5 truncate px-1 text-muted-foreground">
-              <Globe className="size-3 shrink-0" strokeWidth={1.75} />
-              <span className="truncate">
-                {info.row.original.domains.join(', ')}
-              </span>
-            </span>
+            <MetaCell icon={Globe}>
+              {info.row.original.domains.join(', ')}
+            </MetaCell>
           ) : null,
       }) as ColumnDef<Row, unknown>,
       ...registry.map(
@@ -177,15 +133,13 @@ function CompaniesPage() {
         cell: (info) => (
           <span className="flex flex-wrap items-center gap-1 px-1">
             {info.row.original.spaces.map((s) => (
-              <Link
+              <ChipLink
                 key={s.id}
                 to="/spaces/$spaceId"
                 params={{ spaceId: s.id }}
-                className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium hover:bg-selected focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-              >
-                <Layers className="size-2.5" strokeWidth={1.75} />
-                {s.name}
-              </Link>
+                icon={Layers}
+                label={s.name}
+              />
             ))}
           </span>
         ),
@@ -195,22 +149,13 @@ function CompaniesPage() {
         header: 'Last touched',
         size: 120,
         sortUndefined: 'last',
-        cell: (info) =>
-          info.row.original.lastTouched ? (
-            <span className="tabular block px-1 text-right text-xs text-muted-foreground/80">
-              {dateFmt.format(new Date(info.row.original.lastTouched))}
-            </span>
-          ) : null,
+        cell: (info) => <DateCell value={info.row.original.lastTouched} />,
       }) as ColumnDef<Row, unknown>,
       col.accessor('createdAt', {
         id: 'createdAt',
         header: 'Added',
         size: 110,
-        cell: (info) => (
-          <span className="tabular block px-1 text-right text-xs text-muted-foreground/80">
-            {dateFmt.format(new Date(info.getValue()))}
-          </span>
-        ),
+        cell: (info) => <DateCell value={info.getValue()} />,
       }) as ColumnDef<Row, unknown>,
     ]
     return defs
@@ -220,10 +165,15 @@ function CompaniesPage() {
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting, columnVisibility, columnSizing, globalFilter },
+    state: {
+      sorting,
+      columnVisibility: prefs.columnVisibility,
+      columnSizing: prefs.columnSizing,
+      globalFilter,
+    },
     onSortingChange: setSorting,
-    onColumnVisibilityChange: setColumnVisibility,
-    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: prefs.setColumnVisibility,
+    onColumnSizingChange: prefs.setColumnSizing,
     onGlobalFilterChange: setGlobalFilter,
     globalFilterFn: (row, _colId, filter) => {
       const q = String(filter).toLowerCase()
@@ -241,27 +191,23 @@ function CompaniesPage() {
 
   return (
     <div className="flex h-full flex-col px-6 py-6 md:px-8">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight">
-            Companies
-          </h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            Every company you track — deduped by domain, tagged into spaces.
-          </p>
-        </div>
-        <CreateCompanyDialog registry={registry as Array<RegistryEntry>} />
-      </header>
+      <PageHeader
+        title="Companies"
+        description="Every company you track — deduped by domain, tagged into spaces."
+        action={
+          <CreateCompanyDialog registry={registry as Array<RegistryEntry>} />
+        }
+      />
 
       {openDuplicates > 0 ? (
         <Link
           to="/dedupe"
-          className="mt-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="focus-ring mt-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-ui transition-colors duration-150 ease-out-quart hover:bg-accent"
         >
           <Copy className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
           <span className="tabular font-medium">{openDuplicates}</span>
           possible duplicate{openDuplicates === 1 ? '' : 's'} to review
-          <span className="ml-auto text-xs text-muted-foreground">Review →</span>
+          <span className="ml-auto text-muted-foreground">Review →</span>
         </Link>
       ) : null}
 
@@ -270,137 +216,34 @@ function CompaniesPage() {
           icon={Building2}
           title="No companies yet"
           body="Add one by name or domain. The domain is identity — the same company arriving twice becomes one record, not two."
-          action={<CreateCompanyDialog registry={registry as Array<RegistryEntry>} />}
+          action={
+            <CreateCompanyDialog registry={registry as Array<RegistryEntry>} />
+          }
         />
       ) : (
         <>
-          <div className="mt-4 flex items-center gap-2">
-            <Input
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              placeholder="Filter by name, domain, space…"
-              aria-label="Filter companies"
-              className="h-8 max-w-xs text-[13px]"
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="xs">
-                  <Columns3 className="size-3.5" strokeWidth={1.75} />
-                  Columns
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                  Show columns
-                </DropdownMenuLabel>
-                {table
-                  .getAllLeafColumns()
-                  .filter((c) => c.getCanHide())
-                  .map((c) => (
-                    <DropdownMenuCheckboxItem
-                      key={c.id}
-                      checked={c.getIsVisible()}
-                      onCheckedChange={(v) => c.toggleVisibility(Boolean(v))}
-                    >
-                      {typeof c.columnDef.header === 'string'
-                        ? c.columnDef.header
-                        : c.id}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <span className="tabular ml-auto text-xs text-muted-foreground">
-              {table.getRowModel().rows.length} of {rows.length}
-            </span>
-          </div>
-
-          <div className="mt-3 min-h-0 flex-1 overflow-auto rounded-lg border border-border">
-            <table
-              className="w-full border-collapse text-[13px]"
-              style={{ width: table.getTotalSize() }}
-            >
-              <thead className="sticky top-0 z-10 bg-background">
-                {table.getHeaderGroups().map((hg) => (
-                  <tr key={hg.id} className="border-b border-border">
-                    {hg.headers.map((header) => (
-                      <th
-                        key={header.id}
-                        style={{ width: header.getSize() }}
-                        className={
-                          'relative h-9 border-r border-border/60 px-2 text-left align-middle font-medium text-muted-foreground last:border-r-0' +
-                          (header.column.id === 'name'
-                            ? ' sticky left-0 z-20 bg-background'
-                            : '')
-                        }
-                      >
-                        <button
-                          type="button"
-                          onClick={header.column.getToggleSortingHandler()}
-                          className="flex w-full items-center gap-1 truncate rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                        >
-                          <span className="truncate">
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                          </span>
-                          {header.column.getIsSorted() === 'asc' ? (
-                            <ArrowUp className="size-3 shrink-0 text-primary" />
-                          ) : header.column.getIsSorted() === 'desc' ? (
-                            <ArrowDown className="size-3 shrink-0 text-primary" />
-                          ) : null}
-                        </button>
-                        <span
-                          onMouseDown={header.getResizeHandler()}
-                          onTouchStart={header.getResizeHandler()}
-                          className="absolute top-0 right-0 h-full w-1 cursor-col-resize select-none hover:bg-primary/40"
-                          aria-hidden
-                        />
-                      </th>
-                    ))}
-                    <th className="w-10 px-1">
-                      <AttributeCreateDialog
-                        objectKind="company"
-                        onCreated={() => router.invalidate()}
-                        trigger={
-                          <button
-                            aria-label="Add column"
-                            className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                          >
-                            <Plus className="size-3.5" strokeWidth={2} />
-                          </button>
-                        }
-                      />
-                    </th>
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="group h-9 border-b border-border/60 last:border-b-0 hover:bg-accent/50"
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        style={{ width: cell.column.getSize() }}
-                        className={
-                          'border-r border-border/40 px-1 align-middle last:border-r-0' +
-                          (cell.column.id === 'name'
-                            ? ' sticky left-0 z-10 bg-background group-hover:bg-accent'
-                            : '')
-                        }
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                    <td className="w-10" />
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TableToolbar
+            table={table}
+            filter={globalFilter}
+            onFilterChange={setGlobalFilter}
+            filterPlaceholder="Filter by name, domain, space…"
+            filterLabel="Filter companies"
+            noun={{ one: 'company', many: 'companies' }}
+            total={rows.length}
+            shown={table.getRowModel().rows.length}
+          />
+          <RecordTable
+            table={table}
+            label="Companies"
+            stickyColumnId="name"
+            addColumn={
+              <AttributeCreateDialog
+                objectKind="company"
+                onCreated={() => router.invalidate()}
+                trigger={<AddColumnButton />}
+              />
+            }
+          />
         </>
       )}
     </div>
@@ -450,7 +293,9 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
       }
       router.invalidate()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not add the company.')
+      setError(
+        err instanceof Error ? err.message : 'Could not add the company.',
+      )
     } finally {
       setPending(false)
     }
@@ -505,7 +350,7 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
           ))}
 
           {error ? (
-            <p role="alert" className="text-[13px] text-destructive">
+            <p role="alert" className="text-ui text-destructive">
               {error}
             </p>
           ) : null}

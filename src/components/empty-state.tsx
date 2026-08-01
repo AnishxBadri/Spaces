@@ -25,13 +25,13 @@ export function EmptyState({
         <div className="mb-5 flex size-11 items-center justify-center rounded-lg bg-muted">
           <Icon className="size-5 text-muted-foreground" strokeWidth={1.75} />
         </div>
-        <h2 className="text-[15px] font-semibold">{title}</h2>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+        <h2 className="text-title font-semibold">{title}</h2>
+        <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
           {body}
         </p>
         {action ? <div className="mt-5">{action}</div> : null}
         {hint ? (
-          <p className="mt-4 text-xs text-muted-foreground/80">{hint}</p>
+          <p className="mt-4 text-label text-muted-foreground">{hint}</p>
         ) : null}
       </div>
     </div>

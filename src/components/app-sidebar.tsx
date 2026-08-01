@@ -128,8 +128,10 @@ export function AppSidebar({
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
             )}
           >
-            {/* Neutral, not gold — gold means action/selection/focus only. */}
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground/80 text-[11px] font-semibold text-background">
+            {/* Neutral, never the primary — that means action/selection/focus
+                only. Opaque ink, not `/80`: the initial is white, and at 80%
+                over the sidebar the disc composited to 1.07:1. */}
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-micro font-semibold text-background">
               {user.name.charAt(0).toUpperCase()}
             </span>
             <span className="min-w-0 flex-1">

@@ -73,7 +73,9 @@ export function AttributeCreateDialog({
       toast(`${name} added`)
       onCreated()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create attribute')
+      setError(
+        err instanceof Error ? err.message : 'Could not create attribute',
+      )
     } finally {
       setPending(false)
     }
@@ -107,7 +109,7 @@ export function AttributeCreateDialog({
               id="attr-type"
               value={type}
               onChange={(e) => setType(e.target.value as TypeId)}
-              className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="focus-ring border-input h-9 w-full rounded-md border bg-transparent px-3 text-body shadow-xs"
             >
               {TYPE_CHOICES.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -125,14 +127,17 @@ export function AttributeCreateDialog({
                 placeholder="Low, Medium, High"
                 aria-describedby="attr-options-hint"
               />
-              <p id="attr-options-hint" className="text-xs text-muted-foreground">
+              <p
+                id="attr-options-hint"
+                className="text-label text-muted-foreground"
+              >
                 Comma-separated.
               </p>
             </div>
           ) : null}
 
           {error ? (
-            <p role="alert" className="text-[13px] text-destructive">
+            <p role="alert" className="text-ui text-destructive">
               {error}
             </p>
           ) : null}

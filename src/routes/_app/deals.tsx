@@ -1,11 +1,27 @@
-import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { Kanban, Plus } from 'lucide-react'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table'
+import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import { Handshake, Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { ValueEditor, optionLabel } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { EmptyState } from '#/components/empty-state'
+import { IconBadge, RecordLinkCell } from '#/components/table/cells'
+import {
+  AddColumnButton,
+  PageHeader,
+  RecordTable,
+  TableToolbar,
+} from '#/components/table/record-table'
+import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -43,17 +59,71 @@ const GROUP_LABELS: Record<string, string> = {
   closed: 'Closed',
 }
 
+type DealRow = {
+  id: string
+  name: string
+  values: Record<string, unknown>
+  createdAt: string
+}
+
+const col = createColumnHelper<DealRow>()
+const PREFS_KEY = 'dealos.deals-table.v1'
+
+/**
+ * What a column sorts and filters *on*. Sorting a status column by its stored
+ * option id would order deals by an opaque slug, and sorting a reference by
+ * uuid is worse — both read as "sorting is broken". Every attribute type
+ * resolves to the string the user can actually see in the cell.
+ */
+function lookupName(
+  refNames: Record<string, { name: string } | string | undefined>,
+  id: string,
+): string {
+  const hit = refNames[id]
+  if (!hit) return ''
+  return typeof hit === 'string' ? hit : hit.name
+}
+
+function sortValue(
+  def: RegistryEntry,
+  raw: unknown,
+  refNames: Record<string, { name: string } | string | undefined>,
+): string | number {
+  if (raw == null) return ''
+  switch (def.type) {
+    case 'select':
+    case 'status':
+      return optionLabel(def, raw)
+    case 'multi_select':
+      return Array.isArray(raw)
+        ? raw.map((id) => optionLabel(def, id)).join(', ')
+        : optionLabel(def, raw)
+    case 'record_reference':
+    case 'actor_reference': {
+      const ids = Array.isArray(raw) ? raw : [raw]
+      return ids.map((id) => lookupName(refNames, String(id))).join(', ')
+    }
+    case 'number':
+    case 'currency':
+    case 'rating':
+      return typeof raw === 'number' ? raw : Number(raw)
+    default:
+      return String(raw)
+  }
+}
+
 function DealsPage() {
   const { deals, registry } = Route.useLoaderData()
   const router = useRouter()
-  const [query, setQuery] = useState('')
+  const [globalFilter, setGlobalFilter] = useState('')
+  const [sorting, setSorting] = useState<SortingState>([])
+  const prefs = useTablePrefs(PREFS_KEY)
   // Stage filter: group chips (Active/Parked/Closed) + per-stage narrowing.
   const [groupFilter, setGroupFilter] = useState<string | null>('active')
   const [stageFilter, setStageFilter] = useState<string | null>(null)
 
   const stageDef = registry.find((d) => d.slug === 'stage') as
-    | RegistryEntry
-    | undefined
+    RegistryEntry | undefined
   const stageOptions = stageDef?.options?.options ?? []
 
   const refNames = useMemo(
@@ -66,31 +136,25 @@ function DealsPage() {
     [deals],
   )
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
+  // Stage narrowing runs before the table so the chips stay an independent
+  // control; free-text filtering is the table's own, as on every other surface.
+  const staged = useMemo(() => {
     return deals.rows.filter((d) => {
       const stage = String(d.values.stage ?? '')
       const opt = stageOptions.find((o) => o.id === stage)
-      if (stageFilter && stage !== stageFilter) return false
-      if (!stageFilter && groupFilter && (opt?.group ?? 'active') !== groupFilter)
-        return false
-      if (!q) return true
-      const companyId = d.values.company as string | undefined
-      const companyName = companyId
-        ? (deals.refNames[companyId]?.name ?? '')
-        : ''
-      return (
-        d.name.toLowerCase().includes(q) ||
-        companyName.toLowerCase().includes(q)
-      )
+      if (stageFilter) return stage === stageFilter
+      if (groupFilter) return (opt?.group ?? 'active') === groupFilter
+      return true
     })
-  }, [deals, query, groupFilter, stageFilter, stageOptions])
+  }, [deals, groupFilter, stageFilter, stageOptions])
 
   // Counts per group for the filter chips.
   const groupCounts = useMemo(() => {
     const counts: Record<string, number> = { active: 0, parked: 0, closed: 0 }
     for (const d of deals.rows) {
-      const opt = stageOptions.find((o) => o.id === String(d.values.stage ?? ''))
+      const opt = stageOptions.find(
+        (o) => o.id === String(d.values.stage ?? ''),
+      )
       counts[opt?.group ?? 'active'] += 1
     }
     return counts
@@ -114,69 +178,148 @@ function DealsPage() {
     }
   }
 
+  const columns = useMemo(() => {
+    const defs: Array<ColumnDef<DealRow, unknown>> = [
+      col.accessor('name', {
+        id: 'name',
+        header: 'Deal',
+        size: 240,
+        enableHiding: false,
+        cell: (info) => (
+          <RecordLinkCell
+            to="/deals/$dealId"
+            params={{ dealId: info.row.original.id }}
+            name={String(info.getValue())}
+            badge={<IconBadge icon={Handshake} />}
+          />
+        ),
+      }),
+      ...registry.map(
+        (def) =>
+          col.accessor(
+            (r) =>
+              sortValue(def as RegistryEntry, r.values[def.slug], refNames),
+            {
+              id: `attr:${def.slug}`,
+              header: def.name,
+              size: def.type === 'text' ? 200 : 140,
+              sortUndefined: 'last',
+              cell: (info) => (
+                <ValueEditor
+                  def={def as RegistryEntry}
+                  value={info.row.original.values[def.slug] ?? null}
+                  variant="cell"
+                  refNames={refNames}
+                  onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
+                />
+              ),
+            },
+          ) as ColumnDef<DealRow, unknown>,
+      ),
+    ]
+    return defs
+  }, [registry, refNames])
+
+  const table = useReactTable({
+    data: staged,
+    columns,
+    state: {
+      sorting,
+      columnVisibility: prefs.columnVisibility,
+      columnSizing: prefs.columnSizing,
+      globalFilter,
+    },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: prefs.setColumnVisibility,
+    onColumnSizingChange: prefs.setColumnSizing,
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: (row, _colId, filter) => {
+      const q = String(filter).toLowerCase()
+      const companyId = row.original.values.company as string | undefined
+      const companyName = companyId ? lookupName(deals.refNames, companyId) : ''
+      return (
+        row.original.name.toLowerCase().includes(q) ||
+        companyName.toLowerCase().includes(q)
+      )
+    },
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    columnResizeMode: 'onChange',
+  })
+
   return (
     <div className="flex h-full flex-col px-6 py-6 md:px-8">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight">Deals</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            One record per opportunity — born at Pre-lead, closed as Invested,
-            Passed, or Lost. History is the point.
-          </p>
-        </div>
-        <CreateDealDialog registry={registry as Array<RegistryEntry>} />
-      </header>
+      <PageHeader
+        title="Deals"
+        description="One record per opportunity — born at Pre-lead, closed as Invested, Passed, or Lost. History is the point."
+        action={
+          <CreateDealDialog registry={registry as Array<RegistryEntry>} />
+        }
+      />
 
       {deals.rows.length === 0 ? (
         <EmptyState
-          icon={Kanban}
+          icon={Handshake}
           title="No deals yet"
           body="A deal starts when something arrives — a deck, an intro, a founder email. Create one against a company and triage it from Pre-lead."
-          action={<CreateDealDialog registry={registry as Array<RegistryEntry>} />}
+          action={
+            <CreateDealDialog registry={registry as Array<RegistryEntry>} />
+          }
         />
       ) : (
         <>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filter by deal or company…"
-              aria-label="Filter deals"
-              className="h-8 max-w-56 text-[13px]"
-            />
-            <div className="flex items-center gap-1" role="group" aria-label="Stage group">
+          <TableToolbar
+            table={table}
+            filter={globalFilter}
+            onFilterChange={setGlobalFilter}
+            filterPlaceholder="Filter by deal or company…"
+            filterLabel="Filter deals"
+            noun={{ one: 'deal', many: 'deals' }}
+            total={deals.rows.length}
+            shown={table.getRowModel().rows.length}
+          >
+            <div
+              className="flex items-center gap-1"
+              role="group"
+              aria-label="Stage group"
+            >
               {(['active', 'parked', 'closed'] as const).map((g) => (
                 <button
                   key={g}
+                  type="button"
                   aria-pressed={groupFilter === g}
                   onClick={() => setGroupFilter(groupFilter === g ? null : g)}
                   className={cn(
-                    'flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+                    'focus-ring flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-label font-medium whitespace-nowrap transition-colors duration-150 ease-out-quart',
                     groupFilter === g
                       ? 'border-primary/40 bg-selected text-foreground'
                       : 'border-border text-muted-foreground hover:border-input hover:text-foreground',
                   )}
                 >
                   {GROUP_LABELS[g]}
-                  <span className="tabular text-muted-foreground">
-                    {groupCounts[g]}
-                  </span>
+                  <span className="tabular">{groupCounts[g]}</span>
                 </button>
               ))}
             </div>
             {groupFilter ? (
-              <div className="flex items-center gap-1">
+              <div
+                className="flex items-center gap-1"
+                role="group"
+                aria-label={`${GROUP_LABELS[groupFilter]} stages`}
+              >
                 {stageOptions
                   .filter((o) => (o.group ?? 'active') === groupFilter)
                   .map((o) => (
                     <button
                       key={o.id}
+                      type="button"
                       aria-pressed={stageFilter === o.id}
                       onClick={() =>
                         setStageFilter(stageFilter === o.id ? null : o.id)
                       }
                       className={cn(
-                        'h-7 rounded-full border px-2.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+                        'focus-ring h-7 shrink-0 rounded-full border px-2.5 text-label whitespace-nowrap transition-colors duration-150 ease-out-quart',
                         stageFilter === o.id
                           ? 'border-primary/40 bg-selected font-medium text-foreground'
                           : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -187,77 +330,19 @@ function DealsPage() {
                   ))}
               </div>
             ) : null}
-            <span className="tabular ml-auto text-xs text-muted-foreground">
-              {filtered.length} of {deals.rows.length}
-            </span>
-          </div>
-
-          <div className="mt-3 min-h-0 flex-1 overflow-auto rounded-lg border border-border">
-            <table className="w-full border-collapse text-[13px]">
-              <thead className="sticky top-0 z-10 bg-background">
-                <tr className="border-b border-border">
-                  <th className="h-9 w-64 border-r border-border/60 px-2 text-left font-medium text-muted-foreground">
-                    Deal
-                  </th>
-                  {registry.map((def) => (
-                    <th
-                      key={def.slug}
-                      className="h-9 min-w-32 border-r border-border/60 px-2 text-left font-medium text-muted-foreground"
-                    >
-                      {def.name}
-                    </th>
-                  ))}
-                  <th className="w-10 px-1">
-                    <AttributeCreateDialog
-                      objectKind="deal"
-                      onCreated={() => router.invalidate()}
-                      trigger={
-                        <button
-                          aria-label="Add column"
-                          className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                        >
-                          <Plus className="size-3.5" strokeWidth={2} />
-                        </button>
-                      }
-                    />
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((d) => (
-                  <tr
-                    key={d.id}
-                    className="h-9 border-b border-border/60 last:border-b-0 hover:bg-accent/50"
-                  >
-                    <td className="border-r border-border/40 px-1">
-                      <Link
-                        to="/deals/$dealId"
-                        params={{ dealId: d.id }}
-                        className="block truncate px-1 font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded"
-                      >
-                        {d.name}
-                      </Link>
-                    </td>
-                    {registry.map((def) => (
-                      <td
-                        key={def.slug}
-                        className="border-r border-border/40 px-1"
-                      >
-                        <ValueEditor
-                          def={def as RegistryEntry}
-                          value={d.values[def.slug] ?? null}
-                          variant="cell"
-                          refNames={refNames}
-                          onSave={(v) => saveCell(d.id, def.slug, v)}
-                        />
-                      </td>
-                    ))}
-                    <td className="w-10" />
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          </TableToolbar>
+          <RecordTable
+            table={table}
+            label="Deals"
+            stickyColumnId="name"
+            addColumn={
+              <AttributeCreateDialog
+                objectKind="deal"
+                onCreated={() => router.invalidate()}
+                trigger={<AddColumnButton />}
+              />
+            }
+          />
         </>
       )}
     </div>
@@ -333,7 +418,9 @@ export function CreateDealDialog({
                 def={companyDef}
                 value={companyId}
                 variant="field"
-                refNames={companyId ? { [companyId]: { name: companyName } } : {}}
+                refNames={
+                  companyId ? { [companyId]: { name: companyName } } : {}
+                }
                 onSave={(v) => setCompanyId(v as string | null)}
               />
               <CompanyNameCapture
@@ -369,7 +456,7 @@ export function CreateDealDialog({
           ) : null}
 
           {error ? (
-            <p role="alert" className="text-[13px] text-destructive">
+            <p role="alert" className="text-ui text-destructive">
               {error}
             </p>
           ) : null}
