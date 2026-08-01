@@ -1070,16 +1070,17 @@ once, immediately before strangers can install):
     land on a settled mechanism.
 13. **Design-debt pass** — focus-ring sweep (~60), then `/impeccable document` writes
     DESIGN.md §5. Short and mechanical; new surfaces in 11–12 are built clean on tokens.
-14. **Ship polish → announce** — in order: rename mechanics (Angle — domain/npm
-    diligence first), test-db harness (unblocks everything below), GitHub Actions
-    (lint / tsc / vitest / multi-arch GHCR images), ESLint-79 cleanup (CI gates on lint
-    from here), install docs (Caddy/TLS, `APP_URL` trap, `chown 1000:1000 ./data`,
-    back-up-before-upgrade).
+14. **Ship polish — deferred, scope TBD (2026-08).** No release after phase 13: more dev
+    work and manual testing come first. CI, images, upgrade CI, install docs get decided
+    when a release is actually in sight. Still banked from the earlier grill, to reuse
+    then: rename mechanics first (Angle — domain/npm diligence before images bake the
+    name in), test-db harness before any CI, upgrade CI only once there is a release to
+    upgrade *from*.
 
-**Release 2, not release 1:** upgrade CI (needs a first release to upgrade *from*),
-Playwright preview smoke test, dark theme. Then integrations (each independent):
-Google Calendar first, Gmail (forward-only), Apollo enrichment (Exa alongside as a
-second `Enricher`), BYOK AI features — each adds its own wizard step when it lands.
+Post-v1 backlog unchanged: dark theme, Playwright preview smoke test, then integrations
+(each independent): Google Calendar first, Gmail (forward-only), Apollo enrichment (Exa
+alongside as a second `Enricher`), BYOK AI features — each adds its own wizard step when
+it lands.
 
 Standing debt:
 - **Test-db harness.** The suite shares the *dev* database and mutates it; without a live
