@@ -11,68 +11,165 @@
 
 /**
  * DealOS tokens — DESIGN.md ("The Analyst's Desk") made concrete.
- * Pure white ground; warmth lives in Ochre Gold and type, never the surface.
- * Gold appears only as: primary action, current selection, focus. (The Ten
- * Percent Rule.) All neutrals carry a whisper of the gold hue (~91°) at
- * near-zero chroma so grays feel of-the-brand without reading warm.
+ * Pure white ground; warmth lives in Vermilion and type, never the surface.
+ * The primary appears only as: primary action, current selection, focus.
+ * All neutrals carry a whisper of the primary hue (~35°) at near-zero chroma
+ * so grays feel of-the-brand without reading warm.
+ *
+ * TWO-TIER COLOUR (2026-07, amends the Ten Percent Rule). Badges may take any
+ * of twelve hues, so rarity can no longer be what marks the primary out.
+ * Instead: the primary is the only fully saturated FILL on a surface; option
+ * badges are always a pale tint with same-hue ink. Action and data therefore
+ * never compete, however many badge colours are in play.
  */
 :root {
   /* ground + ink */
   --background: oklch(1 0 0); /* literal white, no hidden warmth */
-  --foreground: oklch(0.24 0.012 91); /* ink — ~13:1 on white */
-  --muted-foreground: oklch(0.49 0.016 91); /* secondary text — ≥4.5:1 */
+  --foreground: oklch(0.24 0.012 35); /* ink — ~13:1 on white */
+  --muted-foreground: oklch(0.49 0.016 35); /* secondary text — ≥4.5:1 */
 
   --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
   --popover: oklch(1 0 0);
   --popover-foreground: var(--foreground);
 
-  /* Ochre Gold — the one voice */
-  --primary: oklch(0.58 0.13 88);
+  /**
+   * Vermilion — the one voice, replacing Ochre Gold (2026-07).
+   * Gold was reversed for a measurable reason, not taste: white text needs
+   * 4.5:1, and at the lightness that forces, a yellow hue has nowhere to go
+   * but muddy olive. Hues away from yellow keep their chroma when darkened,
+   * so vermilion stays vivid at the same contrast gold could only reach by
+   * going drab. Warmth still comes from the accent, as DESIGN.md intended.
+   * Lightness is pinned by contrast: 0.588 measures 4.55:1 with white.
+   */
+  --primary: oklch(0.588 0.2 35);
   --primary-foreground: oklch(1 0 0);
-  --primary-hover: oklch(0.53 0.125 88);
+  --primary-hover: oklch(0.54 0.19 35);
   /* selection wash — active nav, selected rows */
-  --selected: oklch(0.958 0.022 91);
+  --selected: oklch(0.962 0.022 35);
 
-  --secondary: oklch(0.965 0.004 91);
+  --secondary: oklch(0.965 0.004 35);
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.965 0.004 91);
-  --accent: oklch(0.955 0.006 91); /* hover tint on menu items etc. */
+  --muted: oklch(0.965 0.004 35);
+  --accent: oklch(0.955 0.006 35); /* hover tint on menu items etc. */
   --accent-foreground: var(--foreground);
+  /* Row hover — opaque on purpose. A translucent tint on a sticky column lets
+     the columns scrolling underneath bleed through it; this is `accent/50`
+     resolved against the white ground so the sticky cell and the rest of the
+     row land on exactly the same value with no seam. */
+  --row-hover: oklch(0.977 0.003 35);
 
-  --destructive: oklch(0.55 0.19 25);
+  /* Deep crimson, moved off the old 25 (2026-07). Vermilion primary sits at
+     hue 35; a destructive red at 25 read as the same colour at a glance,
+     which is the one confusion a delete button must never cause. */
+  --destructive: oklch(0.48 0.17 12);
   --destructive-foreground: oklch(1 0 0);
   --success: oklch(0.55 0.12 150);
   --warning: oklch(0.7 0.13 75);
   --info: oklch(0.55 0.1 240);
 
-  --border: oklch(0.92 0.005 91);
-  --input: oklch(0.885 0.006 91);
-  --ring: oklch(0.62 0.13 88); /* focus is gold */
+  --border: oklch(0.92 0.005 35);
+  --input: oklch(0.885 0.006 35);
+  --ring: oklch(0.6 0.2 35); /* focus is the primary — 4.33:1 on white */
 
   /* second neutral layer — sidebar, toolbars, rails */
-  --sidebar: oklch(0.976 0.003 91);
+  --sidebar: oklch(0.976 0.003 35);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.945 0.005 91);
+  --sidebar-accent: oklch(0.945 0.005 35);
   --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: oklch(0.925 0.005 91);
+  --sidebar-border: oklch(0.925 0.005 35);
   --sidebar-ring: var(--ring);
 
-  --chart-1: oklch(0.58 0.13 88);
+  --chart-1: oklch(0.588 0.2 35);
   --chart-2: oklch(0.55 0.1 240);
   --chart-3: oklch(0.55 0.12 150);
   --chart-4: oklch(0.7 0.13 75);
-  --chart-5: oklch(0.55 0.19 25);
+  --chart-5: oklch(0.48 0.17 12);
+
+  /**
+   * Badge palette — the colour vocabulary for select/status options.
+   *
+   * Every hue is built the same way: a pale tint at L 0.955 and same-hue ink
+   * at L 0.45, with chroma fitted to the largest the sRGB gamut allows at that
+   * lightness. Fixing lightness across all twelve is what makes them read as
+   * one system rather than a bag of colours, and it means no hue can quietly
+   * fall below the floor — the worst pair measures 6.26:1, the best 7.02:1.
+   *
+   * These are data colours, never decoration: a badge is tinted because the
+   * option it names has an identity, per DESIGN.md's Meaning Rule.
+   */
+  --badge-slate: oklch(0.955 0.005 255);
+  --badge-slate-ink: oklch(0.45 0.014 255); /* 6.52:1 */
+  --badge-blue: oklch(0.955 0.022 250);
+  --badge-blue-ink: oklch(0.45 0.129 250); /* 6.55:1 */
+  --badge-indigo: oklch(0.955 0.022 275);
+  --badge-indigo-ink: oklch(0.45 0.15 275); /* 6.81:1 */
+  --badge-violet: oklch(0.955 0.025 300);
+  --badge-violet-ink: oklch(0.45 0.15 300); /* 6.96:1 */
+  --badge-fuchsia: oklch(0.955 0.033 335);
+  --badge-fuchsia-ink: oklch(0.45 0.15 335); /* 7.02:1 */
+  --badge-rose: oklch(0.955 0.023 15);
+  --badge-rose-ink: oklch(0.45 0.15 15); /* 7.02:1 */
+  --badge-orange: oklch(0.955 0.025 50);
+  --badge-orange-ink: oklch(0.45 0.121 50); /* 6.81:1 */
+  --badge-amber: oklch(0.955 0.037 75);
+  --badge-amber-ink: oklch(0.45 0.096 75); /* 6.62:1 */
+  --badge-lime: oklch(0.955 0.04 125);
+  --badge-lime-ink: oklch(0.45 0.115 125); /* 6.38:1 */
+  --badge-emerald: oklch(0.955 0.04 155);
+  --badge-emerald-ink: oklch(0.45 0.113 155); /* 6.26:1 */
+  --badge-teal: oklch(0.955 0.04 190);
+  --badge-teal-ink: oklch(0.45 0.079 190); /* 6.36:1 */
+  --badge-cyan: oklch(0.955 0.029 225);
+  --badge-cyan-ink: oklch(0.45 0.086 225); /* 6.41:1 */
 
   /* crisper than shadcn's default 10px — this is a tool, not a toy */
   --radius: 0.375rem;
+
+  /* Row rhythm — the ledger's baseline. Header and body rows share a height so
+     a sticky header sits flush against the first row. */
+  --row-h: 2.25rem;
 }
 
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-serif: 'Source Serif 4 Variable', Georgia, serif;
+
+  /**
+   * Type scale — named steps, fixed rem, never fluid. DESIGN.md §3 asks for a
+   * tight ratio (~1.125–1.2) and modest sizes: this is product UI, nothing
+   * shouts. Each step maps to one role in the hierarchy; if a size isn't on
+   * this list it does not go in the app.
+   *
+   *   micro   11px  Label — timestamps, chip counts, avatar initials
+   *   label   12px  Label — field labels, metadata
+   *   ui      13px  Body/UI — the table + form workhorse
+   *   body    14px  Body/UI — default running text in UI
+   *   title   15px  Title — section headers, panel titles
+   *   page    22px  Headline — page titles
+   *   display 26px  Headline — record names
+   */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1rem;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1rem;
+  --text-ui: 0.8125rem;
+  --text-ui--line-height: 1.25rem;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-title: 0.9375rem;
+  --text-title--line-height: 1.375rem;
+  --text-page: 1.375rem;
+  --text-page--line-height: 1.75rem;
+  --text-display: 1.625rem;
+  --text-display--line-height: 2rem;
+
+  /* Motion — DESIGN.md: 150–250ms, ease-out, state-conveying only. */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+
+  --spacing-row: var(--row-h);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -90,6 +187,7 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-row-hover: var(--row-hover);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
@@ -118,9 +216,49 @@
   --radius-xl: calc(var(--radius) + 6px);
 }
 
+/**
+ * ONE focus treatment, everywhere. The codebase had two competing rings —
+ * hand-written `ring-2 ring-ring/60` and shadcn's `ring-[3px] ring-ring/50` —
+ * and both were translucent, which put the indicator under 3:1 against white
+ * and missed the 3:1 floor WCAG 2.2 sets for non-text contrast (SC 1.4.11,
+ * level AA; the stricter focus-specific SC 2.4.13 is AAA and wants the same
+ * 3:1 between focused and unfocused pixels). This draws at full `--ring` (3.6:1)
+ * and uses `outline` rather than a box-shadow ring so it costs no layout and
+ * never needs an offset color plumbed through.
+ */
+@utility focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+
+  &:focus-visible {
+    outline-color: var(--ring);
+  }
+}
+
+/* Same ring drawn tight to the edge — for cells and rows, where an offset ring
+   would be clipped by the scroll container or overlap the neighbouring cell. */
+@utility focus-ring-inset {
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+
+  &:focus-visible {
+    outline-color: var(--ring);
+  }
+}
+
+/**
+ * The Tabular Rule (DESIGN.md §3) made structural rather than remembered.
+ * `.numeric` is the primitive: comparable figures are tabular AND right-aligned
+ * in one class, so the two halves of the rule cannot drift apart.
+ */
+@utility numeric {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
 
   html {
@@ -135,7 +273,9 @@
     line-height: 1.5;
   }
 
-  /* Every comparable number aligns — The Tabular Rule. */
+  /* Tabular figures without the right-alignment — for numbers that sit inline
+     inside a sentence or a chip ("12 of 40"), where `.numeric` would be wrong.
+     Anything in a column uses `.numeric`. */
   .tabular {
     font-variant-numeric: tabular-nums;
   }
