@@ -888,6 +888,33 @@ STORAGE_DRIVER=local # or s3, then S3_* vars
 Upgrade: `docker compose pull && docker compose up -d`. Never ship a breaking migration;
 CI must test the upgrade path from every prior release.
 
+## Hostability decisions (locked 2026-08, implementation slots later)
+
+Six contracts, decided before any release work so nothing gets built against weaker ones:
+
+1. **`./data` ownership is fixed structurally, not by docs.** Entrypoint starts as root,
+   repairs `/data` ownership if wrong, drops to UID 1000 via `su-exec` before running
+   anything. The Linux bind-mount trap stops existing. (Named volume rejected — plain
+   files under `./data` that the operator can `tar` anywhere *is* the you-own-your-data
+   story.)
+2. **Either process dies → the container exits.** `ROLE=all` currently waits on the web
+   PID only; a crashed worker leaves a "healthy" container with extraction silently
+   stopped. Supervision contract: worker death kills the container; `restart:
+   unless-stopped` heals it.
+3. **The app never terminates TLS.** Reverse proxy always in front; `APP_URL` is the
+   single source of truth for scheme, cookies, OAuth redirects; `X-Forwarded-Proto`
+   trusted only from the proxy. Ship a worked Caddy overlay
+   (`docker-compose.tls.yml` + Caddyfile) so HTTPS is copy-paste.
+4. **`/api/health` checks the DB**, not just the process — otherwise the compose
+   healthcheck gates nothing. Later: worker heartbeat row so `ROLE=worker` containers
+   get a real check too.
+5. **Backup is both-or-neither, and rollback is restore.** `pg_dump` + `tar ./data`
+   together — content-addressed blobs are worthless without the DB and vice versa.
+   Upgrade = backup → pull → up. Never run an older image against a newer schema.
+6. **The required-env set is frozen at `{DATABASE_URL, APP_URL}` — permanently.** Every
+   future feature ships with a working default or is optional. This rule is what keeps
+   "compose up works first try" true five features from now.
+
 Backup — three artifacts, one cron line, ship as `scripts/backup.sh`:
 ```bash
 docker compose exec db pg_dump -U dealos dealos > dump.sql
