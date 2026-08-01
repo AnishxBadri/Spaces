@@ -37,6 +37,7 @@ import {
 import { activity } from '#/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from './entities/resolve'
 import { mergeEntities } from './entities/merge'
+import { BADGE_COLORS, nextBadgeColor } from './attributes/colors'
 import { storeCredential } from './vault'
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from './documents'
 import { enqueue } from './queue'
@@ -49,7 +50,8 @@ import { QUEUES } from '#/worker/queues'
  */
 
 /** Closed JSON type — Start's serializer rejects `unknown`. */
-type Json = string | number | boolean | null | Array<Json> | { [k: string]: Json }
+type Json =
+  string | number | boolean | null | Array<Json> | { [k: string]: Json }
 
 export const getSession = createServerFn().handler(async () => {
   const session = await auth.api.getSession({
@@ -215,6 +217,10 @@ const optionEdit = z.object({
   id: z.string().max(60).optional(),
   label: z.string().trim().min(1).max(60),
   group: z.enum(['active', 'parked', 'closed']).optional(),
+  /** Constrained to the shipped palette, never a free colour string — a free
+   *  field is how someone stores 2:1 grey-on-white and the badge stops being
+   *  readable. Structure fixed, content free. */
+  color: z.enum(BADGE_COLORS).optional(),
 })
 
 /**
@@ -261,7 +267,7 @@ export const updateAttribute = createServerFn({ method: 'POST' })
           )
       }
       const seen = new Set<string>()
-      const nextOptions = data.options.map((o) => {
+      const nextOptions = data.options.map((o, i) => {
         let id = o.id
         if (!id) {
           id =
@@ -274,7 +280,15 @@ export const updateAttribute = createServerFn({ method: 'POST' })
           while (seen.has(id) || existingIds.has(id)) id = `${id}_2`
         }
         seen.add(id)
-        return { id, label: o.label, ...(o.group ? { group: o.group } : {}) }
+        return {
+          id,
+          label: o.label,
+          ...(o.group ? { group: o.group } : {}),
+          // An option without an explicit colour is stored with the one it was
+          // already rendering, so saving the editor never silently reshuffles
+          // the colours the user has been looking at.
+          color: o.color ?? nextBadgeColor(i, o.group),
+        }
       })
       await db
         .update(attribute)
@@ -306,7 +320,8 @@ export const updateAttribute = createServerFn({ method: 'POST' })
         .where(eq(attribute.objectKind, attr.objectKind))
         .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
       const idx = siblings.findIndex((s) => s.id === data.id)
-      const swapWith = data.move === 'up' ? siblings[idx - 1] : siblings[idx + 1]
+      const swapWith =
+        data.move === 'up' ? siblings[idx - 1] : siblings[idx + 1]
       if (swapWith) {
         await db
           .update(attribute)
@@ -372,12 +387,15 @@ export const createAttribute = createServerFn({ method: 'POST' })
     }
 
     const needsOptions = data.type === 'select' || data.type === 'multi_select'
-    if (needsOptions && (!data.optionLabels || data.optionLabels.length === 0)) {
+    if (
+      needsOptions &&
+      (!data.optionLabels || data.optionLabels.length === 0)
+    ) {
       throw new Error('Select attributes need at least one option')
     }
     const options = needsOptions
       ? {
-          options: data.optionLabels!.map((label) => ({
+          options: data.optionLabels!.map((label, i) => ({
             id:
               label
                 .toLowerCase()
@@ -386,6 +404,9 @@ export const createAttribute = createServerFn({ method: 'POST' })
                 .replace(/^_+|_+$/g, '')
                 .slice(0, 48) || 'option',
             label,
+            // Coloured on creation, so a new select is legible immediately
+            // rather than a column of identical grey chips.
+            color: nextBadgeColor(i),
           })),
         }
       : data.type === 'rating'
@@ -393,7 +414,9 @@ export const createAttribute = createServerFn({ method: 'POST' })
         : {}
 
     const [{ maxOrder }] = await db
-      .select({ maxOrder: sql<number>`coalesce(max(${attribute.sortOrder}), 0)` })
+      .select({
+        maxOrder: sql<number>`coalesce(max(${attribute.sortOrder}), 0)`,
+      })
       .from(attribute)
       .where(eq(attribute.objectKind, data.objectKind))
 
@@ -431,7 +454,9 @@ export const listCompaniesTable = createServerFn().handler(async () => {
   const domains = await db
     .select({ entityId: entityAlias.entityId, domain: entityAlias.valueNorm })
     .from(entityAlias)
-    .where(and(eq(entityAlias.kind, 'domain'), eq(entityAlias.isIdentity, true)))
+    .where(
+      and(eq(entityAlias.kind, 'domain'), eq(entityAlias.isIdentity, true)),
+    )
   const domainsBy = new Map<string, Array<string>>()
   for (const d of domains) {
     domainsBy.set(d.entityId, [...(domainsBy.get(d.entityId) ?? []), d.domain])
@@ -687,9 +712,7 @@ export const listPeople = createServerFn().handler(async () => {
   const emails = await db
     .select({ entityId: entityAlias.entityId, email: entityAlias.valueNorm })
     .from(entityAlias)
-    .where(
-      and(eq(entityAlias.kind, 'email'), eq(entityAlias.isIdentity, true)),
-    )
+    .where(and(eq(entityAlias.kind, 'email'), eq(entityAlias.isIdentity, true)))
   const emailBy = new Map(emails.map((e) => [e.entityId, e.email]))
 
   const companies = await db
@@ -1003,7 +1026,10 @@ export const listDealsTable = createServerFn().handler(async () => {
         values: Record<string, Json>
         createdAt: string
       }>,
-      refNames: {} as Record<string, { id: string; name: string; kind: string }>,
+      refNames: {} as Record<
+        string,
+        { id: string; name: string; kind: string }
+      >,
       userNames: {} as Record<string, string>,
     }
   const dealIds = rows.map((r) => r.id)
@@ -1021,7 +1047,8 @@ export const listDealsTable = createServerFn().handler(async () => {
       and(eq(link.relation, 'references'), inArray(link.fromEntityId, dealIds)),
     )
   const refNames = new Map<string, { id: string; name: string; kind: string }>()
-  for (const r of refs) refNames.set(r.toId, { id: r.toId, name: r.name, kind: r.kind })
+  for (const r of refs)
+    refNames.set(r.toId, { id: r.toId, name: r.name, kind: r.kind })
 
   const users = await db.select({ id: user.id, name: user.name }).from(user)
 
@@ -1070,8 +1097,7 @@ export const listCompanyDeals = createServerFn()
       id: r.id,
       name: r.name,
       stage: ((r.values ?? {}) as Record<string, unknown>).stage as
-        | string
-        | undefined,
+        string | undefined,
     }))
   })
 
@@ -1359,6 +1385,26 @@ export const listRecordDocuments = createServerFn()
     }))
   })
 
+/**
+ * Full extracted text for one document, fetched only when a preview opens.
+ * The list deliberately carries a 200-char snippet instead — this column runs
+ * to 2MB and nothing wants it in every Files-tab render.
+ */
+export const getDocumentText = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    // `.at(0)` rather than destructuring: the row genuinely may not exist, and
+    // a destructured element types as always-present here.
+    const row = (
+      await db
+        .select({ text: document.extractedText })
+        .from(document)
+        .where(eq(document.entityId, data.id))
+    ).at(0)
+    return { text: row?.text ?? null }
+  })
+
 export const getDocumentDownloadUrl = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
@@ -1397,9 +1443,7 @@ export const deleteDocument = createServerFn({ method: 'POST' })
         .where(eq(documentChunk.documentId, data.id))
       await tx
         .delete(link)
-        .where(
-          or(eq(link.fromEntityId, data.id), eq(link.toEntityId, data.id)),
-        )
+        .where(or(eq(link.fromEntityId, data.id), eq(link.toEntityId, data.id)))
       await tx
         .delete(activity)
         .where(
@@ -1513,7 +1557,10 @@ export const getRecordTimeline = createServerFn()
             .innerJoin(entity, eq(entity.id, interactionEntity.entityId))
             .where(inArray(interactionEntity.interactionId, interactionIds))
         : []
-    const attendeesBy = new Map<string, Array<{ id: string; name: string; kind: string }>>()
+    const attendeesBy = new Map<
+      string,
+      Array<{ id: string; name: string; kind: string }>
+    >()
     for (const a of attendees) {
       if (a.entityId === data.entityId) continue
       attendeesBy.set(a.interactionId, [
@@ -1587,7 +1634,9 @@ async function entityContext(id: string) {
     createdAt: head.createdAt.toISOString(),
     domains: aliases.filter((a) => a.kind === 'domain').map((a) => a.valueNorm),
     otherNames: aliases
-      .filter((a) => a.kind === 'name' && a.valueNorm !== head.name.toLowerCase())
+      .filter(
+        (a) => a.kind === 'name' && a.valueNorm !== head.name.toLowerCase(),
+      )
       .map((a) => a.valueNorm),
     mentionCount,
     spaces: spaceRows.map((s) => s.name),
@@ -1637,8 +1686,7 @@ export const mergeDuplicate = createServerFn({ method: 'POST' })
     if (!cand || cand.status !== 'open') throw new Error('Candidate not open')
     if (data.winnerId !== cand.entityA && data.winnerId !== cand.entityB)
       throw new Error('Winner must be one of the pair')
-    const loserId =
-      data.winnerId === cand.entityA ? cand.entityB : cand.entityA
+    const loserId = data.winnerId === cand.entityA ? cand.entityB : cand.entityA
     await mergeEntities({
       winnerId: data.winnerId,
       loserId,
@@ -1799,9 +1847,7 @@ export const getNote = createServerFn()
       })
       .from(link)
       .innerJoin(entity, eq(entity.id, link.fromEntityId))
-      .where(
-        and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')),
-      )
+      .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
     // Spaces this note is filed in — the picker's current state.
     const spaces = await db
       .select({ id: space.entityId, name: entity.canonicalName })
@@ -1869,9 +1915,7 @@ export const saveNote = createServerFn({ method: 'POST' })
             eq(link.source, 'extracted'),
           ),
         )
-      const wanted = new Set(
-        data.body.mentionIds.filter((m) => m !== data.id),
-      )
+      const wanted = new Set(data.body.mentionIds.filter((m) => m !== data.id))
       const current = new Set(existing.map((e) => e.toEntityId))
       for (const row of existing) {
         if (!wanted.has(row.toEntityId)) {
@@ -2055,7 +2099,9 @@ export const searchAll = createServerFn()
 
     // Documents have no page of their own — they are filed against a record,
     // so a result has to send you to that record or it is a dead end.
-    const documentIds = hits.filter((h) => h.kind === 'document').map((h) => h.id)
+    const documentIds = hits
+      .filter((h) => h.kind === 'document')
+      .map((h) => h.id)
     const parents =
       documentIds.length > 0
         ? await db
@@ -2271,9 +2317,7 @@ export const deleteTerm = createServerFn({ method: 'POST' })
     await db.transaction(async (tx) => {
       await tx
         .delete(link)
-        .where(
-          or(eq(link.fromEntityId, data.id), eq(link.toEntityId, data.id)),
-        )
+        .where(or(eq(link.fromEntityId, data.id), eq(link.toEntityId, data.id)))
       await tx
         .delete(activity)
         .where(
@@ -2552,9 +2596,7 @@ export const updateThesis = createServerFn({ method: 'POST' })
           ...(data.status ? { status: data.status } : {}),
           ...(nowTerminal
             ? {
-                closedAt: isTerminal(current.status)
-                  ? undefined
-                  : new Date(),
+                closedAt: isTerminal(current.status) ? undefined : new Date(),
                 ...(data.closedReason
                   ? { closedReason: data.closedReason }
                   : {}),
@@ -2732,7 +2774,9 @@ export const getSpace = createServerFn()
             })
             .from(space)
             .innerJoin(entity, eq(entity.id, space.entityId))
-            .where(sql`${space.path} @> ${head.path} and ${space.path} != ${head.path}`)
+            .where(
+              sql`${space.path} @> ${head.path} and ${space.path} != ${head.path}`,
+            )
             .orderBy(asc(space.path))
         : []
 
@@ -2753,9 +2797,7 @@ export const getSpace = createServerFn()
       .from(entitySpace)
       .innerJoin(entity, eq(entity.id, entitySpace.entityId))
       .innerJoin(company, eq(company.entityId, entity.id))
-      .where(
-        and(eq(entitySpace.spaceId, data.id), isNull(entity.mergedIntoId)),
-      )
+      .where(and(eq(entitySpace.spaceId, data.id), isNull(entity.mergedIntoId)))
       .orderBy(asc(entity.canonicalName))
     const companies = companyRows.map((c) => {
       const v = (c.values ?? {}) as Record<string, unknown>
@@ -2782,9 +2824,7 @@ export const getSpace = createServerFn()
       .from(entitySpace)
       .innerJoin(note, eq(note.entityId, entitySpace.entityId))
       .innerJoin(entity, eq(entity.id, note.entityId))
-      .where(
-        and(eq(entitySpace.spaceId, data.id), isNull(entity.mergedIntoId)),
-      )
+      .where(and(eq(entitySpace.spaceId, data.id), isNull(entity.mergedIntoId)))
       .orderBy(desc(note.updatedAt))
     const filedIds = new Set(filedRows.map((f) => f.id))
 

@@ -8,6 +8,8 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
+import { badgeStyle, optionColor } from '#/lib/attributes/colors'
+import { formatDate } from '#/lib/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
@@ -22,7 +24,12 @@ export type RegistryEntry = {
   name: string
   type: string
   options: {
-    options?: Array<{ id: string; label: string; group?: string; color?: string }>
+    options?: Array<{
+      id: string
+      label: string
+      group?: string
+      color?: string
+    }>
     max?: number
     code?: string
     targetKind?: string
@@ -49,12 +56,6 @@ type Props = {
   autoFocus?: boolean
   /** display names for record/actor reference ids */
   refNames?: RefNames
-}
-
-const STATUS_GROUP_COLORS: Record<string, string> = {
-  active: 'bg-selected text-foreground',
-  parked: 'bg-info/10 text-info',
-  closed: 'bg-muted text-muted-foreground',
 }
 
 export function optionLabel(def: RegistryEntry, id: unknown): string {
@@ -121,7 +122,7 @@ export function ValueEditor({
           aria-label={def.name}
           onClick={() => onSave(!value)}
           className={cn(
-            'flex size-4 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+            'flex size-4 items-center justify-center rounded border transition-colors duration-150 ease-out-quart focus-ring',
             value
               ? 'border-primary bg-primary text-primary-foreground'
               : 'border-input hover:border-ring',
@@ -134,7 +135,11 @@ export function ValueEditor({
       const max = def.options?.max ?? 5
       const current = typeof value === 'number' ? value : 0
       return (
-        <div className="flex items-center gap-0.5" role="radiogroup" aria-label={def.name}>
+        <div
+          className="flex items-center gap-0.5"
+          role="radiogroup"
+          aria-label={def.name}
+        >
           {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
             <button
               key={n}
@@ -143,7 +148,7 @@ export function ValueEditor({
               aria-checked={current === n}
               aria-label={`${n} of ${max}`}
               onClick={() => onSave(current === n ? null : n)}
-              className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              className="rounded focus-ring"
             >
               <Star
                 className={cn(
@@ -159,6 +164,23 @@ export function ValueEditor({
         </div>
       )
     }
+    case 'date':
+      return variant === 'cell' ? (
+        <DateCellEditor
+          def={def}
+          value={value}
+          onSave={onSave}
+          variant={variant}
+        />
+      ) : (
+        <TextLikeEditor
+          def={def}
+          value={value}
+          onSave={onSave}
+          variant={variant}
+          autoFocus={autoFocus}
+        />
+      )
     default:
       return (
         <TextLikeEditor
@@ -170,6 +192,52 @@ export function ValueEditor({
         />
       )
   }
+}
+
+/**
+ * A date cell reads as a date until you edit it. `<input type="date">` renders
+ * its own `mm/dd/yyyy` skeleton and picker glyph in every empty row, which puts
+ * a US-format placeholder and a stray icon in a column where every other empty
+ * cell is an em dash — two conventions broken at once. In a form field the
+ * native control is exactly right, so this only applies to cells.
+ */
+function DateCellEditor({ def, value, onSave }: Props) {
+  const [editing, setEditing] = useState(false)
+  const stored = value == null ? '' : String(value)
+
+  if (editing) {
+    return (
+      <input
+        type="date"
+        defaultValue={stored}
+        autoFocus
+        aria-label={def.name}
+        onBlur={(e) => {
+          setEditing(false)
+          if (e.target.value !== stored) onSave(e.target.value || null)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          if (e.key === 'Escape') setEditing(false)
+        }}
+        className="focus-ring-inset h-full w-full min-w-0 rounded bg-transparent px-1 text-ui"
+      />
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={def.name}
+      onClick={() => setEditing(true)}
+      className={cn(
+        'focus-ring-inset h-full w-full rounded px-1 text-ui',
+        stored ? 'numeric' : 'text-left text-muted-foreground',
+      )}
+    >
+      {stored ? formatDate(stored) : '—'}
+    </button>
+  )
 }
 
 function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
@@ -205,7 +273,7 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
       value={draft}
       autoFocus={autoFocus}
       aria-label={def.name}
-      placeholder={variant === 'field' ? '—' : ''}
+      placeholder="—"
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -216,23 +284,19 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
         }
       }}
       className={cn(
-        'w-full min-w-0 bg-transparent text-[13px] outline-none',
-        (def.type === 'number' || def.type === 'currency') && 'tabular text-right',
+        'w-full min-w-0 bg-transparent text-ui',
+        (def.type === 'number' || def.type === 'currency') && 'numeric',
         variant === 'field'
-          ? 'border-input h-8 rounded-md border px-2.5 shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'
-          : 'h-full rounded px-1 focus-visible:ring-2 focus-visible:ring-ring/60',
+          ? 'focus-ring border-input h-8 rounded-md border px-2.5 shadow-xs'
+          : // Inset inside a cell: an offset ring would be clipped by the
+            // table's scroll container and overlap the neighbouring column.
+            'focus-ring-inset h-full rounded px-1',
       )}
     />
   )
 }
 
-function RecordRefPicker({
-  def,
-  value,
-  onSave,
-  variant,
-  refNames,
-}: Props) {
+function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
   const multi = Boolean(def.options?.multi)
   const targetKind = def.options?.targetKind ?? 'company'
   const selected: Array<string> = multi
@@ -269,20 +333,20 @@ function RecordRefPicker({
       <DropdownMenuTrigger
         aria-label={def.name}
         className={cn(
-          'flex min-w-0 items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+          'flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
-            : 'h-full w-full rounded px-1',
+            ? 'focus-ring border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
+            : 'focus-ring-inset h-full w-full rounded px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
           {selected.length === 0 ? (
-            <span className="text-[13px] text-muted-foreground/60">—</span>
+            <span className="text-ui text-muted-foreground">—</span>
           ) : (
             selected.map((id) => (
               <span
                 key={id}
-                className="flex items-center gap-1 truncate rounded-full bg-muted px-2 py-0.5 text-xs font-medium"
+                className="flex items-center gap-1 truncate rounded-full bg-muted px-2 py-0.5 text-label font-medium"
               >
                 <Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
                 {refName(refNames, id)}
@@ -290,7 +354,7 @@ function RecordRefPicker({
             ))
           )}
         </span>
-        <ChevronDown className="size-3 shrink-0 text-muted-foreground/60" />
+        <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         <div className="p-1.5">
@@ -300,7 +364,7 @@ function RecordRefPicker({
             placeholder={`Search ${targetKind}…`}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.stopPropagation()}
-            className="h-7 text-xs"
+            className="h-7 text-label"
           />
         </div>
         {results.map((r) => (
@@ -315,7 +379,10 @@ function RecordRefPicker({
               setQuery('')
             }}
           >
-            <Icon className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
+            <Icon
+              className="size-3.5 text-muted-foreground"
+              strokeWidth={1.75}
+            />
             {r.name}
           </DropdownMenuItem>
         ))}
@@ -348,25 +415,25 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
       <DropdownMenuTrigger
         aria-label={def.name}
         className={cn(
-          'flex min-w-0 items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+          'flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
-            : 'h-full w-full rounded px-1',
+            ? 'focus-ring border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
+            : 'focus-ring-inset h-full w-full rounded px-1',
         )}
       >
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-[13px]">
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-ui">
           {selected ? (
             <>
-              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-foreground/80 text-[9px] font-semibold text-background">
+              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-foreground text-micro font-semibold text-background">
                 {refName(refNames, selected).charAt(0).toUpperCase()}
               </span>
               <span className="truncate">{refName(refNames, selected)}</span>
             </>
           ) : (
-            <span className="text-muted-foreground/60">—</span>
+            <span className="text-muted-foreground">—</span>
           )}
         </span>
-        <ChevronDown className="size-3 shrink-0 text-muted-foreground/60" />
+        <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {users.map((u) => (
@@ -408,30 +475,24 @@ function OptionPicker({
       <DropdownMenuTrigger
         aria-label={def.name}
         className={cn(
-          'flex min-w-0 items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+          'flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
-            : 'h-full w-full rounded px-1',
+            ? 'focus-ring border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
+            : 'focus-ring-inset h-full w-full rounded px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
           {selected.length === 0 ? (
-            <span className="text-[13px] text-muted-foreground/60">—</span>
+            <span className="text-ui text-muted-foreground">—</span>
           ) : (
             selected.map((id) => {
-              const opt = opts.find((o) => o.id === id)
-              const groupClass = opt?.group
-                ? STATUS_GROUP_COLORS[opt.group]
-                : 'bg-muted text-foreground'
+              const idx = opts.findIndex((o) => o.id === id)
+              const opt = idx >= 0 ? opts[idx] : undefined
               return (
                 <span
                   key={id}
-                  className={cn(
-                    'truncate rounded-full px-2 py-0.5 text-xs font-medium',
-                    def.type === 'status' || multi || def.type === 'select'
-                      ? groupClass
-                      : '',
-                  )}
+                  style={badgeStyle(optionColor(opt, Math.max(idx, 0)))}
+                  className="truncate rounded-full px-2 py-0.5 text-label font-medium"
                 >
                   {opt?.label ?? String(id)}
                 </span>
@@ -439,11 +500,11 @@ function OptionPicker({
             })
           )}
         </span>
-        <ChevronDown className="size-3 shrink-0 text-muted-foreground/60" />
+        <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
         {multi
-          ? opts.map((o) => (
+          ? opts.map((o, i) => (
               <DropdownMenuCheckboxItem
                 key={o.id}
                 checked={selected.includes(o.id)}
@@ -454,19 +515,20 @@ function OptionPicker({
                   onSave(next.length === 0 ? null : next)
                 }}
               >
-                {o.label}
+                <span
+                  style={badgeStyle(optionColor(o, i))}
+                  className="rounded-full px-2 py-0.5 text-label font-medium"
+                >
+                  {o.label}
+                </span>
               </DropdownMenuCheckboxItem>
             ))
           : [
-              ...opts.map((o) => (
+              ...opts.map((o, i) => (
                 <DropdownMenuItem key={o.id} onSelect={() => onSave(o.id)}>
                   <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-xs font-medium',
-                      o.group
-                        ? STATUS_GROUP_COLORS[o.group]
-                        : 'bg-muted',
-                    )}
+                    style={badgeStyle(optionColor(o, i))}
+                    className="rounded-full px-2 py-0.5 text-label font-medium"
                   >
                     {o.label}
                   </span>

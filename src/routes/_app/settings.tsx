@@ -15,8 +15,21 @@ import {
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import {
+  BADGE_COLORS,
+  badgeStyle,
+  nextBadgeColor,
+  optionColor,
+} from '#/lib/attributes/colors'
+import type { BadgeColor } from '#/lib/attributes/colors'
 import { listRegistry, updateAttribute } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
@@ -76,8 +89,8 @@ function SettingsPage() {
       <header>
         <h1 className="text-[22px] font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-[13px] text-muted-foreground">
-          Objects and their attributes. Rename anything, edit options,
-          archive what you don't use — types are fixed.
+          Objects and their attributes. Rename anything, edit options, archive
+          what you don't use — types are fixed.
         </p>
       </header>
 
@@ -161,6 +174,7 @@ function AttributeRow({
       id: string
       label: string
       group?: string
+      color?: string
     }>) ?? []
   const hasOptions = ['select', 'multi_select', 'status'].includes(attr.type)
 
@@ -173,10 +187,7 @@ function AttributeRow({
     >
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <InlineName
-            name={attr.name}
-            onSave={(name) => act({ name })}
-          />
+          <InlineName name={attr.name} onSave={(name) => act({ name })} />
           <span className="text-xs text-muted-foreground">
             {TYPE_LABELS[attr.type] ?? attr.type}
             {attr.type === 'record_reference'
@@ -224,7 +235,9 @@ function AttributeRow({
             onClick={() =>
               act(
                 { archived: !attr.archived },
-                attr.archived ? `${attr.name} restored` : `${attr.name} archived`,
+                attr.archived
+                  ? `${attr.name} restored`
+                  : `${attr.name} archived`,
               )
             }
           >
@@ -239,19 +252,11 @@ function AttributeRow({
 
       {hasOptions && !editing && options.length > 0 ? (
         <div className="flex flex-wrap gap-1">
-          {options.map((o) => (
+          {options.map((o, i) => (
             <span
               key={o.id}
-              className={cn(
-                'rounded-full px-2 py-0.5 text-xs font-medium',
-                o.group === 'parked'
-                  ? 'bg-info/10 text-info'
-                  : o.group === 'closed'
-                    ? 'bg-muted text-muted-foreground'
-                    : o.group === 'active'
-                      ? 'bg-selected text-foreground'
-                      : 'bg-muted text-foreground',
-              )}
+              style={badgeStyle(optionColor(o, i))}
+              className="rounded-full px-2 py-0.5 text-label font-medium"
             >
               {o.label}
             </span>
@@ -305,16 +310,30 @@ function OptionsEditor({
   onDone,
 }: {
   attr: Attr
-  options: Array<{ id: string; label: string; group?: string }>
+  options: Array<{
+    id: string
+    label: string
+    group?: string
+    color?: string
+  }>
   onDone: (
-    next: Array<{ id?: string; label: string; group?: 'active' | 'parked' | 'closed' }> | null,
-  ) => void
-}) {
-  const [drafts, setDrafts] = useState(
-    options.map((o) => ({ ...o })) as Array<{
+    next: Array<{
       id?: string
       label: string
       group?: 'active' | 'parked' | 'closed'
+      color?: BadgeColor
+    }> | null,
+  ) => void
+}) {
+  const [drafts, setDrafts] = useState(
+    options.map((o, i) => ({
+      ...o,
+      color: optionColor(o, i),
+    })) as Array<{
+      id?: string
+      label: string
+      group?: 'active' | 'parked' | 'closed'
+      color: BadgeColor
     }>,
   )
   const isStatus = attr.type === 'status'
@@ -329,7 +348,9 @@ function OptionsEditor({
               aria-label={`Option ${i + 1}`}
               onChange={(e) =>
                 setDrafts((ds) =>
-                  ds.map((d, j) => (j === i ? { ...d, label: e.target.value } : d)),
+                  ds.map((d, j) =>
+                    j === i ? { ...d, label: e.target.value } : d,
+                  ),
                 )
               }
               className="h-7 max-w-56 text-xs"
@@ -341,9 +362,7 @@ function OptionsEditor({
                 onChange={(e) =>
                   setDrafts((ds) =>
                     ds.map((d, j) =>
-                      j === i
-                        ? { ...d, group: e.target.value as 'active' }
-                        : d,
+                      j === i ? { ...d, group: e.target.value as 'active' } : d,
                     ),
                   )
                 }
@@ -354,6 +373,15 @@ function OptionsEditor({
                 <option value="closed">Closed</option>
               </select>
             ) : null}
+            <ColorPicker
+              value={o.color}
+              label={o.label || `Option ${i + 1}`}
+              onPick={(color) =>
+                setDrafts((ds) =>
+                  ds.map((d, j) => (j === i ? { ...d, color } : d)),
+                )
+              }
+            />
             {!o.id ? (
               <IconBtn
                 label="Remove new option"
@@ -372,7 +400,14 @@ function OptionsEditor({
           onClick={() =>
             setDrafts((ds) => [
               ...ds,
-              { label: '', ...(isStatus ? { group: 'active' as const } : {}) },
+              {
+                label: '',
+                color: nextBadgeColor(
+                  ds.length,
+                  isStatus ? 'active' : undefined,
+                ),
+                ...(isStatus ? { group: 'active' as const } : {}),
+              },
             ])
           }
         >
@@ -420,5 +455,61 @@ function IconBtn({
     >
       {children}
     </button>
+  )
+}
+
+/**
+ * Swatch picker for one option's badge colour. A fixed grid of the shipped
+ * palette rather than a colour input: every swatch is already known to clear
+ * AA against its own ink, which an arbitrary hex cannot promise.
+ */
+function ColorPicker({
+  value,
+  label,
+  onPick,
+}: {
+  value: BadgeColor
+  label: string
+  onPick: (color: BadgeColor) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={`Colour for ${label}`}
+        title={`Colour: ${value}`}
+        className="focus-ring size-6 shrink-0 rounded-full border border-border transition-colors duration-150 ease-out-quart hover:border-input"
+        style={{ backgroundColor: `var(--badge-${value})` }}
+      >
+        <span
+          className="mx-auto block size-2.5 rounded-full"
+          style={{ backgroundColor: `var(--badge-${value}-ink)` }}
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-auto p-2">
+        {/* Menu items rather than plain buttons: a raw <button> inside Radix
+            content leaves the popover open after a pick, so choosing a colour
+            silently traps the next click. Items also get roving arrow-key
+            focus, which a grid of buttons would not. */}
+        <div className="grid grid-cols-6 gap-1.5">
+          {BADGE_COLORS.map((c) => (
+            <DropdownMenuItem
+              key={c}
+              aria-label={c}
+              title={c}
+              onSelect={() => onPick(c)}
+              style={badgeStyle(c)}
+              className={cn(
+                'focus-ring flex size-7 items-center justify-center rounded-full border p-0 transition-colors duration-150 ease-out-quart',
+                c === value ? 'border-foreground' : 'border-transparent',
+              )}
+            >
+              {c === value ? (
+                <Check className="size-3" strokeWidth={3} />
+              ) : null}
+            </DropdownMenuItem>
+          ))}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

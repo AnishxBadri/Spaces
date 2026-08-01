@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { BadgeColor } from './colors'
 
 /**
  * The attribute type menu — fixed in code; users define attributes, never
@@ -30,7 +31,8 @@ export type SelectOption = {
   label: string
   /** status only: funnel semantics for kanban/filters */
   group?: 'active' | 'parked' | 'closed'
-  color?: string
+  /** one of BADGE_COLORS; absent falls back to the option's position */
+  color?: BadgeColor
 }
 
 export type AttributeOptions = {
@@ -121,10 +123,16 @@ type SeedDef = {
   options?: AttributeOptions
 }
 
-const opt = (id: string, label: string, group?: SelectOption['group']) => ({
+const opt = (
+  id: string,
+  label: string,
+  group?: SelectOption['group'],
+  color?: BadgeColor,
+) => ({
   id,
   label,
   ...(group ? { group } : {}),
+  ...(color ? { color } : {}),
 })
 
 export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
@@ -152,12 +160,12 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       type: 'select',
       options: {
         options: [
-          opt('pre_seed', 'Pre-seed'),
-          opt('seed', 'Seed'),
-          opt('series_a', 'Series A'),
-          opt('series_b_plus', 'Series B+'),
-          opt('public', 'Public'),
-          opt('bootstrapped', 'Bootstrapped'),
+          opt('pre_seed', 'Pre-seed', undefined, 'slate'),
+          opt('seed', 'Seed', undefined, 'cyan'),
+          opt('series_a', 'Series A', undefined, 'blue'),
+          opt('series_b_plus', 'Series B+', undefined, 'indigo'),
+          opt('public', 'Public', undefined, 'emerald'),
+          opt('bootstrapped', 'Bootstrapped', undefined, 'lime'),
         ],
       },
     },
@@ -180,19 +188,24 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       type: 'status',
       options: {
         options: [
-          opt('pre_lead', 'Pre-lead', 'active'),
-          opt('screening', 'Screening', 'active'),
-          opt('meeting', 'Meeting', 'active'),
-          opt('diligence', 'Diligence', 'active'),
-          opt('term_sheet', 'Term sheet', 'active'),
-          opt('early_revisit', 'Early — revisit', 'parked'),
-          opt('invested', 'Invested', 'closed'),
-          opt('passed', 'Passed', 'closed'),
-          opt('lost', 'Lost', 'closed'),
+          opt('pre_lead', 'Pre-lead', 'active', 'slate'),
+          opt('screening', 'Screening', 'active', 'cyan'),
+          opt('meeting', 'Meeting', 'active', 'blue'),
+          opt('diligence', 'Diligence', 'active', 'indigo'),
+          opt('term_sheet', 'Term sheet', 'active', 'violet'),
+          opt('early_revisit', 'Early — revisit', 'parked', 'amber'),
+          opt('invested', 'Invested', 'closed', 'emerald'),
+          opt('passed', 'Passed', 'closed', 'rose'),
+          opt('lost', 'Lost', 'closed', 'fuchsia'),
         ],
       },
     },
-    { slug: 'value', name: 'Value', type: 'currency', options: { code: 'USD' } },
+    {
+      slug: 'value',
+      name: 'Value',
+      type: 'currency',
+      options: { code: 'USD' },
+    },
     {
       slug: 'company',
       name: 'Company',
@@ -213,10 +226,10 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       type: 'select',
       options: {
         options: [
-          opt('inbound', 'Inbound'),
-          opt('referral', 'Referral'),
-          opt('outbound', 'Outbound'),
-          opt('event', 'Event'),
+          opt('inbound', 'Inbound', undefined, 'blue'),
+          opt('referral', 'Referral', undefined, 'emerald'),
+          opt('outbound', 'Outbound', undefined, 'orange'),
+          opt('event', 'Event', undefined, 'violet'),
         ],
       },
     },
