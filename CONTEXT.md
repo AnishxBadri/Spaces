@@ -640,6 +640,37 @@ FS means plain files the operator can open in Finder and `tar` anywhere, MinIO m
 dir needing a compatible MinIO to restore. Plus MinIO gutted its community console in 2025;
 don't inherit that. If bundling an object store, prefer **Garage** (single Rust binary, ~100MB RAM).
 
+**Re-argued and confirmed 2026-08 — do not relitigate.** The conclusions:
+
+- **A bundled object store does not solve the problem that motivates it.** Single-node
+  Garage/MinIO writes to the same local disk. An operator with an ephemeral disk needs
+  *remote* storage, which bundling does not provide.
+- **Backup regresses.** Today: `tar czf blobs.tgz ./data` — plain files, restorable
+  anywhere. Bundled store: an opaque data dir needing a compatible daemon. The product
+  thesis is *you own your data*; this cuts against it.
+- **Prior art agrees** (verified against primary sources): Paperless-ngx — closest
+  analogue, PDFs + OCR + metadata in Postgres — is **filesystem only, no native S3**.
+  Immich (terabytes of media): filesystem only; a maintainer's stated position is that
+  swappable backends are the storage layer's job, not the app's — push it below to
+  rclone/s3fs. Twenty and Docmost: local default, S3 opt-in via env — Docmost
+  independently landed on the same `STORAGE_DRIVER=local|s3` name and path-style flag
+  this doc specifies. Plane bundles MinIO and its default compose defines **13 services**;
+  nobody both bundles an object store and is considered easy to self-host.
+- **The single trigger that changes the answer:** deploying where the host disk is
+  ephemeral (Fly / Railway / Render / Cloud Run). Then S3 is a correctness requirement,
+  not an upgrade. Nothing else moves it.
+- **Decided in advance for whenever the S3 driver is built:** (1) Garage arrives as the
+  `docker-compose.s3.yml` overlay, never as service #3 in the default file. (2) The local
+  driver re-hashes on write and rejects a mismatch; a presigned S3 PUT cannot — bytes go
+  browser→bucket and the server never sees them. Dedupe, the immutable cache header, and
+  "same sha ⇒ same bytes" all lean on that check. Mitigation: require
+  `x-amz-checksum-sha256` on the presigned PUT. **Unresearched:** whether R2, B2, and
+  Garage all enforce it — research the day the driver is written, not before.
+- **Workaround noted, with its caveat:** an operator can get S3 today by mounting it at
+  `./data` with rclone/s3fs, since the local driver just writes to `dataDir()`. But
+  `rename()` is not atomic on S3 and the local driver streams-then-renames, so that write
+  pattern is not guaranteed safe. Fine for evaluation, not for a fund.
+
 ```ts
 interface Storage {
   put(key, stream, meta): Promise<void>
@@ -665,8 +696,11 @@ docker compose -f docker-compose.yml -f docker-compose.s3.yml up
 two `document` rows. Dedupe free, immutable, cache-forever.
 
 **Text extraction, in-process, no extra containers:**
-- PDF -> `unpdf`/pdfjs · DOCX -> `mammoth` · PPTX -> unzip + slide XML (do this one properly,
-  decks matter most) · XLSX -> `sheetjs` (cap tables, MIS)
+- PDF -> `unpdf`/pdfjs · DOCX -> `mammoth` · PPTX/XLSX -> `fflate` + OOXML XML directly
+  (SheetJS was dropped — the shared unzip covers both, decks matter most). Macro/template
+  variants (`.xlsm`/`.xltx`/`.docm`/`.pptm`) route to the same extractors.
+- **Legacy Office (`.doc`/`.xls`) is unsupported** — binary OLE, no extractor. Common in
+  Indian deal flow; known gap, lands `extraction_status: unsupported`.
 - Scanned/image PDF -> **BYOK vision model**. No Tesseract container. Key absent -> "text not extractable".
 
 Documents hang off entities, not folders. Folders are the thing being replaced.
@@ -742,7 +776,9 @@ services:
 ```
 
 Two processes in one image, selected by entrypoint. Web must never run CPU-bound extraction or
-embedding inline — those block the event loop and are the worker's job.
+embedding inline — those block the event loop and are the worker's job. Dev mirrors the
+split: `pnpm dev` is web only; run `pnpm worker` alongside, or extraction never runs and
+Office previews sit on "Extracting text…" forever.
 
 Rules that decide adoption:
 - Migrations auto-run on boot. No `docker exec` step.
@@ -868,8 +904,18 @@ Decisions worth keeping:
 - **`extraction_status` is three-way, not a boolean.** `unsupported` (scanned deck, image —
   a BYOK vision model is its upgrade path) is a normal permanent state, not a failure.
 - **Downloads are always `attachment` + `application/octet-stream`.** Echoing an upload's own
-  content-type would make an uploaded `.html` stored XSS against the app's own origin. Revisit
-  only alongside a preview surface that has thought about it.
+  content-type would make an uploaded `.html` stored XSS against the app's own origin.
+  **The preview surface arrived (2026-08) and kept this intact:** the blob route is
+  unchanged; `document-preview.tsx` fetches the same opaque bytes and renders them itself —
+  PDF via pdf.js to a canvas (the browser never navigates to the file), images via an
+  object URL whose type *we* choose, Office via the worker's already-extracted text (a
+  tab-separated sheet renders back into a grid). SVG stays download-only — it is a script
+  vector and `<img>` is the only safe element for it. Preview is a modal, argued for: an
+  inspection, not a destination — a route would make the back button undo reading position.
+  Known limits: whole file loads into memory (no `Range` support in blob route or preview —
+  fine for 5–30MB decks, slow for a 200MB scan); Office preview depends on the worker
+  running, PDF and images do not; no automated test — a Playwright upload→preview→assert
+  test is the natural first CI case.
 - **Delete is real, and GCs the blob when no other row shares its digest.** A misfiled upload
   the operator can't remove is worse than the audit trail it costs.
 - Deferred by name: URL clip (`origin: 'url'`, `@mozilla/readability` + `linkedom`) moves to
@@ -933,6 +979,15 @@ per-space glossary, starter taxonomy, opt-in demo data. Decisions:
   `resolveEntity()` like every other creator. Shipping it silently would put fictional
   companies in someone's CRM.
 
+**Design craft pass (partial): 2026-08.** Not a redesign — the v1 scope lines held.
+Shipped: the token/primitive layer (see *UI craft debt* below), **one shared record table
+behind Companies/People/Deals** (three copies collapsed; the table is the hardest UI in
+the project and now has one implementation to be good at), per-option badge colours
+(auto-assigned, overridable in settings), and in-browser document preview (see the phase 6
+notes — the download hardening survives it). Verified by driving the real app, which is
+what caught a colour picker that didn't close on selection, a sticky-column hover seam,
+and mouse-only column resizing. Remaining craft work is itemised in *UI craft debt*.
+
 Remaining phases, in order:
 10. **Auth completion** — invites, member management, /setup one-time token, optional TOTP
 11. **Ship polish** — backup script, install docs, GHCR multi-arch images, upgrade CI
@@ -940,47 +995,45 @@ Remaining phases, in order:
 Then integrations (each independent): Google Calendar first, Gmail (forward-only),
 Apollo enrichment, BYOK AI features.
 
-Standing debt: test-db harness, note deletion, S3 storage driver, orphan-blob sweep (a
-finalize that never arrives leaves bytes with no row).
+Standing debt:
+- **Test-db harness.** The suite shares the *dev* database and mutates it; without a live
+  Postgres on :5432, 8 of 52 tests fail with `ECONNREFUSED`. This is why CI cannot simply
+  run `vitest` yet, and it blocks the upgrade-path CI phase 11 wants.
+- **`./data` ownership landmine.** The Dockerfile `chown`s `/data` at build, but the
+  compose bind mount overlays it with host ownership at runtime. Wrong UID on a Linux
+  host → cannot write blobs or generate `secret.key`, and it **fails at first upload, not
+  at boot**. macOS hides it. Docs need `chown -R 1000:1000 ./data`.
+- **Rollback is unsafe and undocumented.** Migrations are forward-only and auto-apply, so
+  pulling an older tag runs old code against a new schema. The upgrade doc must say *back
+  up first*.
+- **No published images yet.** Compose still says `build: .` — installing means building
+  on the target box (583MB of node_modules for a 9.3MB `.output`; tight on 2GB RAM, fails
+  on 1GB). Phase 11's GHCR multi-arch pipeline is the fix and the biggest adoption win.
+- Note deletion, S3 storage driver, orphan-blob sweep (a finalize that never arrives
+  leaves bytes with no row).
 
-## UI craft debt (catalogued 2026-07, before the design pass)
+## UI craft debt (catalogued 2026-07 · token pass shipped 2026-08)
 
-The next UI work is a **craft pass, not a redesign** — CONTEXT.md's v1 scope lines hold, and
-nothing below reopens a deferred feature. What follows is drift between what DESIGN.md
-*states* and what phases 1–9 actually shipped. Recorded now because it was found by writing
-the code; rediscovering it means re-reading every route.
+**The token-and-primitive layer landed** (`9bb23a8` and after): named type steps
+(`text-micro` → `text-display` — if a size isn't on the list it doesn't go in the app),
+one focus treatment (`focus-ring` / `focus-ring-inset` at full `--ring`; the two old
+translucent rings both missed WCAG 2.2's 3:1 non-text floor), the muted ramp resolved to
+≥4.5:1 with sub-100% opacities deleted, `.numeric` making the Tabular Rule structural
+(tabular + right-aligned in one class), `--row-h` row rhythm, a global
+`prefers-reduced-motion` kill switch, and the two-tier colour rule (vermilion primary +
+twelve-hue badge tint palette). DESIGN.md §2–§3 now match the code; the reasoning also
+lives in `src/styles.css` comments — read those before changing any colour.
 
-**Rules DESIGN.md states that the code does not follow:**
-- **Type scale.** DESIGN.md specifies a tight scale (ratio ~1.125–1.2, fixed rem). The code
-  has `text-[26px]`, `text-[22px]`, `text-[15px]`, `text-[13px]`, `text-xs`, `text-sm` —
-  a pile, not a scale. Collapse to named steps.
-- **Contrast floor.** `text-muted-foreground/80`, `/70`, `/50` appear throughout every
-  surface built in phases 6–9. This is the failure mode DESIGN.md names outright ("muted
-  gray *for elegance* is the first failure mode of this aesthetic lane"). Resolve the muted
-  ramp to values that pass ≥4.5:1 and delete the sub-100% opacities.
-- **Focus states.** Two competing treatments in the codebase: `ring-2 ring-ring/60` (written
-  by hand) and `ring-[3px] ring-ring/50` (inherited from shadcn inputs). Pick one.
-- **The Tabular Rule.** `.tabular` is on some counts and dates, missing on others (file
-  sizes, several metadata rows).
-- **Motion.** "150–250ms, ease-out, `prefers-reduced-motion` honored everywhere" — there is
-  exactly one `motion-reduce:` in the app.
-
-**Gaps in DESIGN.md itself:**
-- **No spacing section.** §3 Typography jumps straight to §4 Elevation. Row heights and
-  vertical rhythm are consequently ad hoc (`h-7`/`h-8`/`h-9`, `py-2.5`/`py-3`).
-- **Dark theme is absent from the document**, though `next-themes` is already a dependency.
-- **§5 Components is still the placeholder**, awaiting the scan run its own comment asks for.
-- **Fonts are listed "to be chosen at implementation"** — they were chosen (Inter, Source
-  Serif 4, both in `package.json`) and never written down.
-
-**The shape of the fix.** The durable output is a token-and-primitive layer, not a list of
-per-screen corrections: named type steps, one focus treatment, a numeric primitive so
-tabular figures are automatic rather than remembered, and row/section primitives so density
-rhythm is structural. Otherwise the next feature re-drifts, because the next person writing
-a settings screen retypes `text-xs text-muted-foreground/80` from muscle memory.
-
-**Ordering note.** Run `/impeccable document` *after* the token/primitive pass, not before —
-scanning now would document components that pass is about to replace.
+**Still open, in order:**
+- **~69 old focus rings** remain outside the table surfaces (record pages, spaces, theses,
+  notes, settings) — **5 of them in the shell** (`app-sidebar.tsx`, `_app.tsx`), so they
+  are on screen even on the polished routes. Mostly mechanical — swap to `focus-ring` and
+  delete the adjacent `outline-none`, which would otherwise cancel it — but controls
+  inside a scroll container need `focus-ring-inset`, so not a blind find-and-replace.
+- **`/impeccable polish`** for the surfaces above (arbitrary type sizes ride along).
+- **`/impeccable document`** to write DESIGN.md §5 — *after* the sweep, not before.
+- **Dark theme** remains a feature, not started: the `dark` custom-variant exists but no
+  dark token values do.
 
 **Also carry into any design run:** the deferral list, or an Attio-shaped brief will
 propose most of it back. Deferred by name: saved/shared views, bulk edit, calculations row,

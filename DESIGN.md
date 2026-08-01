@@ -1,4 +1,4 @@
-<!-- SEED: re-run /impeccable document once there's code to capture the actual tokens and components. -->
+<!-- SEED: §5 Components is still pending — run /impeccable document after the focus-ring sweep (see CONTEXT.md's ordering note), not before. -->
 
 ---
 name: DealOS
@@ -14,8 +14,8 @@ description: Self-hosted deal-management OS for angel and private-capital invest
 A serious instrument for someone who reads for a living: a clean desk, good light, a ledger
 on one side and a well-set book on the other. The interface is precise, calm, and fast —
 density done the Attio way, speed felt the Linear way, and warmth carried entirely by one
-gold accent and the typography, never by the surface. The tool disappears; the research
-remains.
+vermilion accent and the typography, never by the surface. The tool disappears; the
+research remains.
 
 This system explicitly rejects enterprise CRM chrome (Salesforce/HubSpot dashboards-first
 sprawl), the generic SaaS template look (shadcn defaults, gradient heroes, purple accents,
@@ -31,55 +31,92 @@ Familiarity is earned through craft — typography, spacing, alignment — not t
 
 ## 2. Colors
 
-Restrained strategy: pure neutrals carry the entire surface; one warm gold speaks rarely
-and therefore clearly.
+Restrained strategy: pure neutrals carry the entire surface; one warm vermilion speaks
+rarely and therefore clearly. Every value below is live in `src/styles.css` — this section
+describes; the CSS decides.
 
 ### Primary
-- **Ochre Gold** (anchor: oklch hue ~91°, seeded from oklch(0.842 0.165 91.3); working tone
-  deepened toward oklch(0.60–0.68 0.13–0.15 91) — exact ramp to be resolved during
-  implementation): primary actions, current selection, focus rings, active pipeline stage.
-  Distinctive in the category — no CRM owns gold — and reads capital-adjacent without the
-  navy-and-gold cliché. White text on any filled gold element.
+- **Vermilion** (oklch(0.588 0.2 35)): primary actions, current selection, focus rings.
+  Replaced Ochre Gold (2026-07) for a measurable reason, not taste: white text on a fill
+  needs 4.5:1, and at the lightness that forces, a yellow hue has nowhere to go but muddy
+  olive. Hues away from yellow keep their chroma when darkened, so vermilion stays vivid
+  at the same contrast gold could only reach by going drab. Lightness is pinned by
+  contrast: 0.588 measures 4.55:1 with white. Warmth still comes from the accent, as this
+  document always intended. Hover deepens to oklch(0.54 0.19 35); the selection wash
+  (active nav, selected rows) is a pale same-hue tint, oklch(0.962 0.022 35).
 
 ### Neutral
-- **Pure White** (oklch(1.0 0 0)): the body background. Literal white, no hidden warmth —
-  the mood lives in the gold and the type, never in a tinted surface.
-- **Panel Neutral** (to be resolved): second neutral layer for sidebar, toolbars, and rails —
-  white pulled slightly toward ink, chroma ≈ 0.
-- **Ink** (to be resolved): body text, ≥7:1 against white.
-- **Muted Ink** (to be resolved): secondary text, ≥4.5:1 against white — the Linear-gray
-  temptation is bounded by contrast, not taste.
-- **Semantic set** (to be resolved): success / warning / error / info, standardized once,
-  used identically everywhere. Stage and status colors are data, not decoration.
+- **Pure White** (oklch(1 0 0)): the body background. Literal white, no hidden warmth —
+  the mood lives in the vermilion and the type, never in a tinted surface.
+- **Ink** (oklch(0.24 0.012 35)): body text, ~13:1 against white.
+- **Muted Ink** (oklch(0.49 0.016 35)): secondary text, ≥4.5:1 — the Linear-gray
+  temptation is bounded by contrast, not taste. No sub-100% opacity variants of it, ever;
+  that is how the floor gets quietly broken.
+- **Panel Neutral** (oklch(0.976 0.003 35)): second neutral layer for sidebar, toolbars,
+  and rails. Borders at oklch(0.92 0.005 35), inputs slightly darker.
+- All neutrals carry a whisper of the primary hue (~35°) at near-zero chroma, so grays
+  feel of-the-brand without reading warm.
+
+### Semantic
+- **Destructive** is deep crimson (oklch(0.48 0.17 12)), deliberately moved off hue 25:
+  vermilion sits at 35, and a red at 25 read as the same colour at a glance — the one
+  confusion a delete button must never cause.
+- Success oklch(0.55 0.12 150) · warning oklch(0.7 0.13 75) · info oklch(0.55 0.1 240).
+  Standardized once, used identically everywhere. Stage and status colors are data, not
+  decoration.
+
+### Badge palette
+Twelve hues (slate → cyan around the wheel) for select/status options, every one built
+the same way: a pale tint at L 0.955 and same-hue ink at L 0.45, chroma fitted to the
+largest the sRGB gamut allows at that lightness. Fixing lightness across all twelve is
+what makes them read as one system rather than a bag of colours, and it means no hue can
+quietly fall below the contrast floor — the worst pair measures 6.26:1, the best 7.02:1.
+Options get a hue auto-assigned; users can override per option in settings.
 
 ### Named Rules
-**The Ten Percent Rule.** Ochre Gold touches at most 10% of any screen. Its rarity is the
-signal — a gold element is either the primary action, the selection, or the focus. Nothing else.
+**The Two-Tier Rule** (2026-07 — supersedes the Ten Percent Rule). Badges may take any of
+twelve hues, so rarity can no longer be what marks the primary out. Instead: **the primary
+is the only fully saturated fill on a surface; option badges are always a pale tint with
+same-hue ink.** Action and data therefore never compete, however many badge colours are
+in play.
 
 **The Meaning Rule.** Color only ever encodes information: action, selection, state, stage,
 status. If a color choice can't name what it encodes, it is forbidden.
 
+**The Focus Rule.** One treatment everywhere: the `focus-ring` utility — a 2px outline at
+full `--ring` (3.6:1 on white), 1px offset, drawn only on `:focus-visible`;
+`focus-ring-inset` for cells and rows inside scroll containers, where an offset ring would
+be clipped. Translucent rings are banned — both of the old competing treatments sat under
+the 3:1 non-text floor (WCAG 2.2 SC 1.4.11). Outline, not box-shadow: costs no layout,
+needs no offset colour plumbed through.
+
 ## 3. Typography
 
-**UI/Data Font:** [tuned sans, to be chosen at implementation — technical-humanist, strong
-tabular numerals required]
-**Prose Font:** [text serif, to be chosen at implementation — real italics, comfortable at
-16–18px body]
+**UI/Data Font:** **Inter Variable** (`cv11` + `ss01` enabled; tabular numerals on demand).
+**Prose Font:** **Source Serif 4 Variable.**
+Both self-hosted via Fontsource — no font CDN calls from a privacy product.
 
 **Character:** Two registers, one system. A single sans carries every interface surface —
-tables, labels, buttons, attributes, navigation — in a tight scale (ratio ~1.125–1.2, fixed
-rem, never fluid). A text serif appears only where the user reads: note bodies, thesis
-claims, memos. Data reads like a ledger; prose reads like a page.
+tables, labels, buttons, attributes, navigation — in a tight scale (fixed rem, never
+fluid). A text serif appears only where the user reads: note bodies, thesis claims, memos.
+Data reads like a ledger; prose reads like a page.
 
-### Hierarchy
-- **Display/Headline** (sans, semibold, modest sizes — this is product UI, nothing shouts):
-  page titles, record names.
-- **Title** (sans, medium): section headers, panel titles, table headers.
-- **Body — UI** (sans, regular, 13–14px): the workhorse for tables, forms, attributes.
-  Tabular numerals in every numeric column.
-- **Body — Prose** (serif, regular, 16–18px, line-height ≥1.6, measure capped 65–75ch):
-  notes, theses, memos. Reading-grade, closer to a book than a dashboard.
-- **Label** (sans, medium, 11–12px): field labels, metadata, timestamps.
+### The named scale
+Seven steps, each mapping to one role. **If a size isn't on this list it does not go in
+the app** — no `text-[15px]` arbitraries.
+
+| step | size | role |
+|---|---|---|
+| `text-micro` | 11px | timestamps, chip counts, avatar initials |
+| `text-label` | 12px | field labels, metadata |
+| `text-ui` | 13px | the table + form workhorse |
+| `text-body` | 14px | default running text in UI (the body baseline) |
+| `text-title` | 15px | section headers, panel titles |
+| `text-page` | 22px | page titles |
+| `text-display` | 26px | record names |
+
+The prose register opts out of the scale: note bodies render serif at 17px, line-height
+1.65 (`.prose-note`), headings inside prose stay sans.
 
 ### Named Rules
 **The Two Registers Rule.** Serif appears only in prose bodies the user reads and writes.
@@ -87,21 +124,37 @@ Never in buttons, labels, tables, navigation, or data. Sans everywhere else. No 
 
 **The Tabular Rule.** Every number that can be compared to a number above or below it is set
 in tabular figures, right-aligned. Currency, ownership %, valuations, dates in tables.
+Made structural, not remembered: the `.numeric` utility is tabular + right-aligned in one
+class, so the two halves cannot drift apart; `.tabular` alone is for figures inline in a
+sentence or chip ("12 of 40"), where right-alignment would be wrong.
+
+### Rhythm
+- **Row height:** one token, `--row-h: 2.25rem`, shared by table headers and body rows so
+  a sticky header sits flush against the first row. Exposed as `spacing-row`.
+- **Radius:** `--radius: 0.375rem` — crisper than shadcn's 10px default; this is a tool,
+  not a toy.
+- Row hover is an *opaque* neutral (`--row-hover`), never a translucent tint: a
+  translucent hover on a sticky column lets the columns scrolling underneath bleed
+  through it.
 
 ## 4. Elevation
 
 Flat at rest. Depth is conveyed by borders and the panel-neutral layer, not shadows. Shadows
 exist only as a response to state — an open dropdown, a dragged kanban card, a command
-palette — and vanish at rest. One small, one medium shadow token; nothing else. Exact values
-to be resolved during implementation.
+palette — and vanish at rest. In practice the code uses Tailwind's stock shadows and only
+on lifted surfaces (`shadow-xs` on triggers, `shadow-md`/`shadow-lg` on popovers and
+dialogs); no custom shadow tokens have been needed, and none should be minted until a
+surface demands one.
 
 **The Flat-at-Rest Rule.** A resting surface never casts a shadow. If an element is
 elevated, the user did something to lift it.
 
 ## 5. Components
 
-*Omitted — no components exist yet. This section is written by the first scan-mode run of
-`/impeccable document` after scaffolding.*
+*Still omitted — components exist (phases 1–9), but this section is written by a scan-mode
+run of `/impeccable document`, deliberately ordered **after** the focus-ring sweep
+(~69 pre-token rings remain outside the table surfaces). Scanning now would document
+components that sweep is about to touch.*
 
 Component philosophy to build toward: refined and restrained; every interactive element ships
 with default, hover, focus-visible, active, disabled, loading, and error states; skeletons
@@ -112,7 +165,7 @@ honored everywhere.
 ## 6. Do's and Don'ts
 
 ### Do:
-- **Do** keep the ground pure white (oklch(1.0 0 0)) and let gold + typography carry all warmth.
+- **Do** keep the ground pure white (oklch(1 0 0)) and let vermilion + typography carry all warmth.
 - **Do** hold body text at ≥4.5:1 contrast — muted gray "for elegance" is the first failure mode of this aesthetic lane.
 - **Do** set every comparable number in tabular figures, right-aligned.
 - **Do** give every interactive element a visible focus state — keyboard is the primary input.
