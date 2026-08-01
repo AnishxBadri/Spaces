@@ -30,6 +30,10 @@ const BY_EXTENSION = new Map<string, Format>([
   ['docx', 'docx'],
   ['pptx', 'pptx'],
   ['xlsx', 'xlsx'],
+  ['xlsm', 'xlsx'],
+  ['xltx', 'xlsx'],
+  ['pptm', 'pptx'],
+  ['docm', 'docx'],
   ['txt', 'text'],
   ['md', 'text'],
   ['markdown', 'text'],
@@ -49,6 +53,9 @@ const BY_MIME = new Map<string, Format>([
     'pptx',
   ],
   ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx'],
+  ['application/vnd.ms-excel.sheet.macroenabled.12', 'xlsx'],
+  ['application/vnd.ms-powerpoint.presentation.macroenabled.12', 'pptx'],
+  ['application/vnd.ms-word.document.macroenabled.12', 'docx'],
   ['text/plain', 'text'],
   ['text/markdown', 'text'],
   ['text/csv', 'text'],
@@ -306,10 +313,7 @@ function numbered(zip: Zip, pattern: RegExp): Array<ZipEntry> {
 
 /** Text of every <tag>…</tag> run, entity-decoded. */
 function ooxmlRuns(xml: string, tag: string): Array<string> {
-  const pattern = new RegExp(
-    `<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`,
-    'g',
-  )
+  const pattern = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, 'g')
   return [...xml.matchAll(pattern)]
     .map((m) => decodeXml(m[1]))
     .filter((t) => t.trim() !== '')

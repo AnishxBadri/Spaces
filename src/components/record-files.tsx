@@ -1,6 +1,7 @@
 import { useRouter } from '@tanstack/react-router'
 import {
   Download,
+  Eye,
   File as FileIcon,
   FileSpreadsheet,
   FileText,
@@ -12,6 +13,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
+import { DocumentPreview } from './document-preview'
 import {
   DOCUMENT_KIND_LABELS,
   MAX_UPLOAD_BYTES,
@@ -80,6 +82,7 @@ export function RecordFiles({
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [pending, setPending] = useState<Array<Pending>>([])
+  const [previewing, setPreviewing] = useState<Documents[number] | null>(null)
 
   useExtractionPolling(documents, router)
 
@@ -128,7 +131,11 @@ export function RecordFiles({
             ? 'Decks, memos, cap tables — drop them here.'
             : `${documents.length} file${documents.length === 1 ? '' : 's'}`}
         </p>
-        <Button size="xs" variant="outline" onClick={() => inputRef.current?.click()}>
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => inputRef.current?.click()}
+        >
           <Upload className="size-3" strokeWidth={2} />
           Upload
         </Button>
@@ -161,7 +168,10 @@ export function RecordFiles({
               className="flex items-center gap-3 px-1 py-2.5 text-[13px]"
             >
               {p.error ? (
-                <FileIcon className="size-4 text-destructive" strokeWidth={1.75} />
+                <FileIcon
+                  className="size-4 text-destructive"
+                  strokeWidth={1.75}
+                />
               ) : (
                 <Loader2
                   className="size-4 animate-spin text-muted-foreground motion-reduce:animate-none"
@@ -180,15 +190,30 @@ export function RecordFiles({
             </li>
           ))}
           {documents.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} />
+            <DocumentRow
+              key={doc.id}
+              doc={doc}
+              onPreview={() => setPreviewing(doc)}
+            />
           ))}
         </ul>
       )}
+
+      <DocumentPreview
+        doc={previewing}
+        onOpenChange={(open) => !open && setPreviewing(null)}
+      />
     </div>
   )
 }
 
-function DocumentRow({ doc }: { doc: Documents[number] }) {
+function DocumentRow({
+  doc,
+  onPreview,
+}: {
+  doc: Documents[number]
+  onPreview: () => void
+}) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const Icon = KIND_ICONS[doc.kind] ?? FileIcon
@@ -203,7 +228,8 @@ function DocumentRow({ doc }: { doc: Documents[number] }) {
   }
 
   async function remove() {
-    if (!window.confirm(`Delete ${doc.filename}? This cannot be undone.`)) return
+    if (!window.confirm(`Delete ${doc.filename}? This cannot be undone.`))
+      return
     setBusy(true)
     try {
       await deleteDocument({ data: { id: doc.id } })
@@ -222,7 +248,14 @@ function DocumentRow({ doc }: { doc: Documents[number] }) {
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="min-w-0 truncate font-medium">{doc.filename}</span>
+          <button
+            type="button"
+            onClick={onPreview}
+            title={`Preview ${doc.filename}`}
+            className="focus-ring min-w-0 truncate rounded text-left font-medium hover:underline"
+          >
+            {doc.filename}
+          </button>
           <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
             {DOCUMENT_KIND_LABELS[doc.kind]}
           </span>
@@ -239,6 +272,14 @@ function DocumentRow({ doc }: { doc: Documents[number] }) {
         <ExtractionNote doc={doc} />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          aria-label={`Preview ${doc.filename}`}
+          onClick={onPreview}
+        >
+          <Eye />
+        </Button>
         <Button
           size="icon-xs"
           variant="ghost"
