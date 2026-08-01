@@ -1111,7 +1111,7 @@ once, immediately before strangers can install):
     (worker re-downloads and verifies async; blob unverified until). Local FS stays the
     default; nothing gets bundled.
 14. **Design-debt pass** — focus-ring sweep (~60), then `/impeccable document` writes
-    DESIGN.md §5. Short and mechanical; new surfaces in 11–12 are built clean on tokens.
+    DESIGN.md §6 (Components). Short and mechanical; new surfaces in 11–12 are built clean on tokens.
 15. **Ship polish — deferred, scope TBD (2026-08).** No release after phase 13: more dev
     work and manual testing come first. CI, images, upgrade CI, install docs get decided
     when a release is actually in sight. Still banked from the earlier grill, to reuse
@@ -1161,7 +1161,7 @@ lives in `src/styles.css` comments — read those before changing any colour.
   delete the adjacent `outline-none`, which would otherwise cancel it — but controls
   inside a scroll container need `focus-ring-inset`, so not a blind find-and-replace.
 - **`/impeccable polish`** for the surfaces above (arbitrary type sizes ride along).
-- **`/impeccable document`** to write DESIGN.md §5 — *after* the sweep, not before.
+- **`/impeccable document`** to write DESIGN.md §6 (Components) — *after* the sweep, not before.
 - **Dark theme** remains a feature, not started: the `dark` custom-variant exists but no
   dark token values do.
 

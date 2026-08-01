@@ -1,4 +1,4 @@
-<!-- SEED: §5 Components is still pending — run /impeccable document after the focus-ring sweep (see CONTEXT.md's ordering note), not before. -->
+<!-- SEED: §6 Components is still pending — run /impeccable document after the focus-ring sweep (see CONTEXT.md's ordering note), not before. -->
 
 ---
 name: DealOS
@@ -149,7 +149,40 @@ surface demands one.
 **The Flat-at-Rest Rule.** A resting surface never casts a shadow. If an element is
 elevated, the user did something to lift it.
 
-## 5. Components
+## 5. Motion
+
+**Pure CSS, used extensively, never decoratively** (decided 2026-08). No JS animation
+runtime — Radix `data-state` attributes + `tw-animate-css` keyframes + Tailwind
+transitions carry everything, which is exactly what lets the one global
+`prefers-reduced-motion` query in `styles.css` silence the entire app.
+
+Principles, after Rauno Freiberg's interface guidelines:
+
+- **Compositor-only.** Animate `transform` and `opacity` exclusively — never width,
+  height, top, or margin. Layout-property animation janks; transform/opacity stay on
+  the GPU at 60fps.
+- **Every transient surface enters and exits.** Dialogs, popovers, dropdowns, tooltips,
+  toasts, inline panels: fade + slight scale (≈0.95 → 1) on enter. Nothing transient
+  pops into existence unstyled.
+- **Origin-aware.** Overlays scale from their trigger, not from screen center —
+  `transform-origin` from Radix's placement variables, so a dropdown grows out of the
+  button that opened it.
+- **Exit faster than enter.** Enter ~150–200ms ease-out; exit ~100–150ms (or instant).
+  Dismissed UI must never make the user wait — leaving is not a moment.
+- **Motion frequency is inverse to action frequency.** High-frequency interactions
+  (cell edit commit, row hover, keyboard nav) get ≤100ms or nothing; rare moments
+  (a dialog, a command palette) afford the full 200ms.
+- **Interruptible, never blocking.** Animation never gates input; a user can act
+  mid-transition.
+- **No load choreography.** Pages appear settled — nothing animates on initial paint.
+- **Pressed states are physical.** Buttons and chips compress subtly on press
+  (`active:scale-[0.97]`-class treatment). Tactility without bounce — springs and
+  overshoot are for toys; this is a tool.
+
+**The Compositor Rule.** If a motion can't be expressed in transform + opacity, it
+doesn't ship.
+
+## 6. Components
 
 *Still omitted — components exist (phases 1–9), but this section is written by a scan-mode
 run of `/impeccable document`, deliberately ordered **after** the focus-ring sweep
@@ -162,7 +195,7 @@ over spinners; empty states that teach (and per PRODUCT.md, a table should almos
 empty at all); motion 150–250ms, ease-out, state-conveying only, `prefers-reduced-motion`
 honored everywhere.
 
-## 6. Do's and Don'ts
+## 7. Do's and Don'ts
 
 ### Do:
 - **Do** keep the ground pure white (oklch(1 0 0)) and let vermilion + typography carry all warmth.
