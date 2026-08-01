@@ -1115,11 +1115,24 @@ guard), and the authz choke points. Decisions worth keeping:
   `FOR UPDATE` on the `setValues` read-modify-write so concurrent partners can't lose
   each other's attribute edits.
 
+**Mandate page (phase 11): done, 2026-08.** `mandate` table (one active enforced by a
+partial unique index; archived rows are vintages), prose as a real memo note, facts rail
+(stage chips off the live `funding_stage` vocabulary, geo tags, check range), Mandate
+first in nav with login still landing on `/spaces`, teaching empty state, and the
+outside-mandate hint on the deal record. Decisions worth keeping:
+- **Member-writable, not admin.** The mandate is judgment, not settings — same
+  no-ceremony rule as merge. Note prose follows normal note rules.
+- **`mandate.stages` stores option ids**, so the operator renaming "Seed" in settings
+  never breaks the mandate — ids are stable under rename by the registry's own rule.
+- **The hint computes server-side in `getDeal`** and is tri-state: null (no mandate, no
+  stages, or company has no stage) renders nothing — only a real mismatch shows, as a
+  quiet amber tint linking to the mandate, never red, never blocking.
+- Verified live: empty state SSR, facts rail renders vocabulary, series_a company under
+  a pre-seed/seed mandate shows the hint, flipping the company to seed removes it.
+
 Remaining phases (**sequence grilled and decided 2026-08** — features first, ship polish
 once, immediately before strangers can install):
 
-11. **Mandate page** — spec in the data model. Nav-first, land on `/spaces`, hint on
-    deal record only, teaching empty state prompts the first mandate.
 12. **Templates** — build order **notes → record → space**: note templates prove the
     mechanism (storage, picker, `suggest_on`, save-in-place) on the highest-value kind;
     record templates reuse the picker in the create modal; by-example space scaffolds
