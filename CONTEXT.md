@@ -1075,9 +1075,17 @@ once, immediately before strangers can install):
     mechanism (storage, picker, `suggest_on`, save-in-place) on the highest-value kind;
     record templates reuse the picker in the create modal; by-example space scaffolds
     land on a settled mechanism.
-13. **Design-debt pass** — focus-ring sweep (~60), then `/impeccable document` writes
+13. **S3 storage driver** (decided 2026-08 — driver was always the design, timing now
+    fixed). Scope: `@aws-sdk/client-s3` driver behind the existing `Storage` interface,
+    MinIO (or Garage) service in `docker-compose.dev.yml` for dev/testing, and the
+    `x-amz-checksum-sha256` support matrix across AWS/R2/B2/Garage — the presigned-PUT
+    integrity question gets retired here, before integrations lean harder on
+    "same sha ⇒ same bytes". If the matrix disappoints, design the fallback then
+    (worker re-downloads and verifies async; blob unverified until). Local FS stays the
+    default; nothing gets bundled.
+14. **Design-debt pass** — focus-ring sweep (~60), then `/impeccable document` writes
     DESIGN.md §5. Short and mechanical; new surfaces in 11–12 are built clean on tokens.
-14. **Ship polish — deferred, scope TBD (2026-08).** No release after phase 13: more dev
+15. **Ship polish — deferred, scope TBD (2026-08).** No release after phase 13: more dev
     work and manual testing come first. CI, images, upgrade CI, install docs get decided
     when a release is actually in sight. Still banked from the earlier grill, to reuse
     then: rename mechanics first (Angle — domain/npm diligence before images bake the
@@ -1092,7 +1100,7 @@ it lands.
 Standing debt:
 - **Test-db harness.** The suite shares the *dev* database and mutates it; without a live
   Postgres on :5432, 8 of 52 tests fail with `ECONNREFUSED`. This is why CI cannot simply
-  run `vitest` yet — fixing it is the first technical task inside ship polish (phase 14).
+  run `vitest` yet — fixing it is the first technical task inside ship polish (phase 15).
 - **`./data` ownership landmine.** The Dockerfile `chown`s `/data` at build, but the
   compose bind mount overlays it with host ownership at runtime. Wrong UID on a Linux
   host → cannot write blobs or generate `secret.key`, and it **fails at first upload, not
@@ -1121,7 +1129,7 @@ lives in `src/styles.css` comments — read those before changing any colour.
 **Still open, in order:**
 - **Old focus rings** (~60 after the thesis routes went) remain outside the table
   surfaces (record pages, spaces, notes, settings) — **5 of them in the shell**
-  (`app-sidebar.tsx`, `_app.tsx`). Slotted as phase 13, after templates. They
+  (`app-sidebar.tsx`, `_app.tsx`). Slotted as phase 14, after the S3 driver. They
   are on screen even on the polished routes. Mostly mechanical — swap to `focus-ring` and
   delete the adjacent `outline-none`, which would otherwise cancel it — but controls
   inside a scroll container need `focus-ring-inset`, so not a blind find-and-replace.
