@@ -1088,14 +1088,36 @@ notes — the download hardening survives it). Verified by driving the real app,
 what caught a colour picker that didn't close on selection, a sticky-column hover seam,
 and mouse-only column resizing. Remaining craft work is itemised in *UI craft debt*.
 
+**Auth + onboarding (phase 10): done, 2026-08.** Workspace singleton (CHECK-enforced one
+row; sidebar shows its name), /setup one-time token (file under DATA_DIR, printed to
+logs, deleted when the first admin exists), minimal two-step wizard (token + admin +
+workspace name → optional demo data; the AI-key step was removed until a feature
+consumes keys), invites (hash-only storage, single-use, 7-day, role baked in, copyable
+/join link — no SMTP needed), member management in settings (roles, suspend, last-admin
+guard), and the authz choke points. Decisions worth keeping:
+- **Token and invite enforcement live in the Better Auth database hook**, not routes —
+  the public signup endpoint would bypass anything checked route-side. Wizard and /join
+  merely carry the token as a header. Verified by driving the endpoint directly: no
+  token rejected, wrong token rejected, valid path creates the admin, invite single-use
+  enforced, `used_by` attributed.
+- **`canRead` enforced in SQL, not per-row in Node** — private-note filters live in the
+  queries (list, get, search CTEs, space page, autocomplete), because a title surfacing
+  in Cmd-K is as much a leak as a body. Private note reads return "not found", never
+  403 — a 403 confirms existence.
+- **Visibility is the author's alone** — not even an admin flips someone's private note
+  shared; the default-shared trust model depends on that. Shared notes stay
+  team-editable.
+- **updateAttribute is admin; createAttribute stays member.** Renames/options/archive
+  reshape shared vocabulary (settings, admin-owned); adding a column is additive and a
+  two-person fund needs no ceremony for it.
+- Ops fixes landed alongside: `scripts/backup.sh` (both-or-neither, partial deleted on
+  failure), entrypoint supervision (either process dies → container exits), and a
+  `FOR UPDATE` on the `setValues` read-modify-write so concurrent partners can't lose
+  each other's attribute edits.
+
 Remaining phases (**sequence grilled and decided 2026-08** — features first, ship polish
 once, immediately before strangers can install):
 
-10. **Auth + onboarding** — workspace singleton row, `canWrite()` choke point, invites,
-    member management, /setup one-time token, minimal first-run wizard (see Hosting).
-    TOTP deferred post-v1 — additive via Better Auth's plugin whenever.
-    `scripts/backup.sh` is pulled into this phase: ten lines, and the rollback doc
-    depends on it existing.
 11. **Mandate page** — spec in the data model. Nav-first, land on `/spaces`, hint on
     deal record only, teaching empty state prompts the first mandate.
 12. **Templates** — build order **notes → record → space**: note templates prove the
@@ -1112,7 +1134,7 @@ once, immediately before strangers can install):
     default; nothing gets bundled.
 14. **Design-debt pass** — focus-ring sweep (~60), then `/impeccable document` writes
     DESIGN.md §6 (Components). Short and mechanical; new surfaces in 11–12 are built clean on tokens.
-15. **Ship polish — deferred, scope TBD (2026-08).** No release after phase 13: more dev
+15. **Ship polish — deferred, scope TBD (2026-08).** No release after phase 14: more dev
     work and manual testing come first. CI, images, upgrade CI, install docs get decided
     when a release is actually in sight. Still banked from the earlier grill, to reuse
     then: rename mechanics first (Angle — domain/npm diligence before images bake the
