@@ -237,6 +237,36 @@ thesis_space(thesis_entity_id, space_entity_id)     -- many-to-many
 Companies attach to a thesis via `link(relation: evidence_for | evidence_against)`.
 Evidence-against is the differentiator — no generic CRM records disconfirmation.
 
+### Mandate — the fund's strategy, not another thesis (decided 2026-08)
+
+A third thing shares the word "thesis" and must not merge with the other two. A thesis is
+a falsifiable market claim that dies often. The **mandate** is the fund's *prescriptive*
+strategy — deep-tech, pre-seed to seed, India, check size, portfolio construction — what
+an LP reads in the deck. It evolves per vintage rather than being disproven. The mandate
+cites theses; theses justify conviction; cramming one into the other list-ifies both.
+
+```
+mandate(id, status: active|archived, note_entity_id → note,
+        stages text[], geos text[], check_min, check_max, currency)
+```
+
+- **The prose body is a real note** (`kind: memo`) — search, `[[mentions]]` of theses and
+  spaces, and future AI-screening input all come free. No new entity kind.
+- **Structured columns, deliberately few.** `stages` shares the company `funding_stage`
+  option vocabulary; `geos` are free tags; check range. Typed columns, *not* the
+  attribute engine — one row, a registry buys nothing.
+- **Portfolio construction stays prose.** Nothing consumes "25 checks, 20% follow-on
+  reserve" as data; promote only when a feature (reserve tracking, pacing) demands it.
+- v1 structured fields mostly display. One real consumer: a soft **"outside mandate"
+  hint** where `company.funding_stage ∉ mandate.stages` — a hint, never a block; edge
+  cases are the job. Geo cannot power this while `location` is free text.
+- One active mandate per workspace; `archived` covers vintages. No versioning machinery.
+- **Nav: the Mandate page is the roof.** Structured facts + prose strategy up top, active
+  theses beneath (claim, conviction, status), killed theses collapsed but present —
+  death is information. The separate Theses tab goes away. Thesis object, thesis page,
+  `thesis_space`, evidence model: all unchanged. Separation lives in the schema;
+  coupling lives in the UI.
+
 ### Space membership is orthogonal to pipeline membership
 
 ```
@@ -412,6 +442,39 @@ stays in the schema but is **not the deal mechanism** and is deferred from MVP. 
 watchlists/portfolio views later need membership-with-context, lists are there; deals no
 longer wait on a list engine, and kanban falls out of the Deal stage attribute.
 
+### Templates (decided 2026-08)
+
+One mechanism, three kinds — standardized *capture*, never automation.
+
+```
+template(id, kind: note|space|record, object_kind,   -- object_kind only when kind=record
+         name, body jsonb, suggest_on entity_kind[],
+         created_by, archived, sort_order)
+```
+
+- **note** — a stored BlockNote document; instantiate = copy into a new note. Meeting
+  note, call debrief, diligence checklist, IC memo skeleton.
+- **space** — a scaffold manifest `{memo_body?, glossary_terms[], subspace_names[]}`,
+  applied once at space creation. The investor builds their market-breakdown pattern
+  once and stamps it per space.
+- **record** — `{values}` keyed by `attr_slug` for one object kind. **Pre-fills the
+  create modal, visibly and editably — never silently writes.** Unknown/archived slugs
+  are skipped at instantiation; option renames already preserve ids, so templates
+  survive vocabulary edits.
+
+Doctrine:
+- **User-created, workspace-shared; we ship none.** A shipped template pre-empts the
+  user's vocabulary — the same reasoning that killed the big seed taxonomy. The demo
+  seed may carry examples, opt-in like the rest of it.
+- **Instantiation is copy, not reference.** Editing a template never rewrites existing
+  notes or spaces; divergence after stamping is the point.
+- **Templates are config, not entities.** No mentions, no search hits, no graph rows.
+  Managed in settings, plus "save this note as a template" in place.
+- **Application is manual plus a context hint.** The picker is scoped by `suggest_on` —
+  a deal page surfaces deal-tagged templates first. Ordering, not automation; nothing
+  auto-creates. Contextual *defaults* (new deal auto-creates a checklist) were
+  considered and rejected as the first step toward workflow-config sprawl.
+
 ### Interactions and enrichment
 
 ```
@@ -532,6 +595,15 @@ The UI is single-user. The schema is not. Every row that could ever be personal 
   bodies only. Notes private-by-default is the trap that keeps partner #2 writing in Apple Notes.
 - No permission engine yet. One server-side choke point — `canRead(entity, user)` — returning
   true for everything except private-and-not-yours. Every read path goes through it from day one.
+- **`canWrite(entity, user)` from day one too (decided 2026-08).** v1 ships admin/member
+  only, but every mutation routes through the choke point, so a read-only viewer role
+  (LP, intern, advisor) later is a one-line change instead of a write-path audit.
+  Retrofitting a role *column* is trivial; retrofitting *enforcement* is not.
+- **Explicit workspace singleton (decided 2026-08).** One enforced row — name, logo,
+  settings — anchoring the mandate, `credential(scope: workspace)`, and sidebar identity,
+  which otherwise reference a ghost. Hard rule: **no other table ever grows a
+  `workspace_id` FK.** The moment one appears, the no-multi-tenancy decision is being
+  relitigated by accident.
 - **Spaces, theses, terms, taxonomy are global.** Never per-user. Shared vocabulary is the point;
   a per-user taxonomy is two people building two ontologies of the same market.
 - Thesis has an `owner_id` but is visible to all. Someone holds the claim; everyone can see it.
@@ -615,7 +687,7 @@ interface Enricher {
 }
 ```
 
-Ship Apollo first; the interface makes PDL/Crunchbase/Harmonic community PRs.
+Ship Apollo first; the interface makes PDL/Crunchbase/Harmonic/Exa community PRs.
 
 Apollo notes: `POST /api/v1/organizations/enrich` (by domain), `POST /api/v1/people/match`.
 Use bulk variants — cheaper per record. Auth header `X-Api-Key`. Rate limits are per-minute/hour/day
@@ -788,7 +860,7 @@ Rules that decide adoption:
   as Next's `NEXT_PUBLIC_*`; a prebuilt image cannot be reconfigured at `docker run` otherwise.
 - Prebuilt multi-arch image (arm64 matters) on GHCR + Docker Hub.
   Non-root UID 1000. Docs tell people to pin tags, not `latest`.
-- First-run web wizard: admin -> optional AI key -> optional Gmail -> optional demo data.
+- First-run web wizard: admin + workspace name -> optional AI key -> optional Gmail -> optional demo data.
 - Healthcheck endpoint, sane logs.
 - Publish Coolify / Railway / Render / Unraid templates. Cheap, huge reach — that's where
   self-hosters live.
@@ -989,11 +1061,14 @@ what caught a colour picker that didn't close on selection, a sticky-column hove
 and mouse-only column resizing. Remaining craft work is itemised in *UI craft debt*.
 
 Remaining phases, in order:
-10. **Auth completion** — invites, member management, /setup one-time token, optional TOTP
+10. **Auth completion** — workspace singleton row, invites, member management,
+    `canWrite()` choke point, /setup one-time token, optional TOTP
 11. **Ship polish** — backup script, install docs, GHCR multi-arch images, upgrade CI
 
-Then integrations (each independent): Google Calendar first, Gmail (forward-only),
-Apollo enrichment, BYOK AI features.
+Then the 2026-08 product decisions — **mandate page** (the roof over theses) and
+**templates** — specs in the data model; then integrations (each independent):
+Google Calendar first, Gmail (forward-only), Apollo enrichment (Exa alongside as a
+second `Enricher`), BYOK AI features.
 
 Standing debt:
 - **Test-db harness.** The suite shares the *dev* database and mutates it; without a live
