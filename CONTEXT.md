@@ -61,9 +61,16 @@ One language, TypeScript, one codebase. Two processes (web, worker), two contain
 | UI | shadcn/ui + Tailwind + Radix, `cmdk` for Cmd-K |
 | LLM | Vercel AI SDK, BYOK |
 | Blobs | local filesystem default, S3 opt-in |
-| Validation | Zod + drizzle-zod |
+| Validation | Zod, hand-written at write-path choke points (drizzle-zod considered and skipped — schema-derived validators can't carry the per-type business rules) |
 | Tests | Vitest + Playwright |
 | Tooling | pnpm, single app, no monorepo |
+
+Server functions live in `src/lib/server/`, one file per domain, re-exported through the
+`#/lib/server-fns` barrel (split 2026-08 at ~2,900 lines, before auth/mandate/templates
+each added a domain). Pin discipline (2026-08): no `latest` version specifiers — TanStack
+deps pinned to resolved versions; upgrades are deliberate events. The prod worker runs
+TypeScript via tsx (one build pipeline, accepted 2026-08); bundle it with esbuild when an
+image actually ships.
 
 ### Why TanStack Start over Next.js
 
