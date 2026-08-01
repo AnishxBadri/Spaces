@@ -61,7 +61,11 @@ describe.skipIf(!hasDb)('setValues', () => {
     // Plain values + validation failure
     await setValues({
       entityId: co.entityId,
-      patch: { funding_stage: 'seed', location: 'Bengaluru', founded_year: 2021 },
+      patch: {
+        funding_stage: 'seed',
+        location: 'Bengaluru',
+        founded_year: 2021,
+      },
       actorId: actor.id,
     })
     await expect(

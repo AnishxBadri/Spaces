@@ -124,7 +124,10 @@ function CompanyRecordPage() {
 
       <header className="mt-5 flex items-center gap-3">
         <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-          <Building2 className="size-4.5 text-muted-foreground" strokeWidth={1.75} />
+          <Building2
+            className="size-4.5 text-muted-foreground"
+            strokeWidth={1.75}
+          />
         </span>
         <div className="min-w-0">
           <h1 className="truncate text-[22px] font-semibold tracking-tight">
@@ -406,7 +409,6 @@ async function save(
   }
 }
 
-
 function DomainsField({
   companyId,
   domains,
@@ -446,11 +448,11 @@ function DomainsField({
       <span className="text-xs font-medium text-muted-foreground">Domains</span>
       <ul className="space-y-1">
         {domains.map((d) => (
-          <li
-            key={d.id}
-            className="flex h-7 items-center gap-2 text-[13px]"
-          >
-            <Globe className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
+          <li key={d.id} className="flex h-7 items-center gap-2 text-[13px]">
+            <Globe
+              className="size-3.5 text-muted-foreground"
+              strokeWidth={1.75}
+            />
             {d.valueNorm}
           </li>
         ))}

@@ -50,9 +50,7 @@ export const Route = createFileRoute('/api/blob/$key')({
         const info = await stat(path).catch(() => null)
         if (!info) return new Response('Not found', { status: 404 })
 
-        const name = safeFilename(
-          new URL(request.url).searchParams.get('name'),
-        )
+        const name = safeFilename(new URL(request.url).searchParams.get('name'))
 
         return new Response(
           Readable.toWeb(createReadStream(path)) as ReadableStream,

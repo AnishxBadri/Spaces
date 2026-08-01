@@ -1,11 +1,5 @@
 import { createReactInlineContentSpec } from '@blocknote/react'
-import {
-  Building2,
-  FileText,
-  Layers,
-  Target,
-  User,
-} from 'lucide-react'
+import { Building2, FileText, Layers, Target, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 /**

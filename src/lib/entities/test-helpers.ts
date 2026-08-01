@@ -26,7 +26,9 @@ export async function cleanupTestEntities(patterns: Array<string>) {
 
   await db
     .delete(mergeEvent)
-    .where(or(inArray(mergeEvent.winnerId, ids), inArray(mergeEvent.loserId, ids)))
+    .where(
+      or(inArray(mergeEvent.winnerId, ids), inArray(mergeEvent.loserId, ids)),
+    )
   await db
     .delete(duplicateCandidate)
     .where(

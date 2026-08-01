@@ -38,7 +38,9 @@ export function loadMasterKey(): Buffer {
   if (existsSync(keyPath)) {
     const key = Buffer.from(readFileSync(keyPath, 'utf8').trim(), 'base64')
     if (key.length !== KEY_BYTES) {
-      throw new Error(`Corrupt master key at ${keyPath}: not ${KEY_BYTES} bytes`)
+      throw new Error(
+        `Corrupt master key at ${keyPath}: not ${KEY_BYTES} bytes`,
+      )
     }
     cached = key
     return key

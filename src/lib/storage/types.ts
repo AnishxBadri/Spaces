@@ -9,7 +9,11 @@ import type { Readable } from 'node:stream'
  * local driver fakes it with a short-lived HMAC token on /api/blob/:key.
  */
 export interface Storage {
-  put(key: string, data: Readable | Buffer, meta: { mime?: string }): Promise<void>
+  put(
+    key: string,
+    data: Readable | Buffer,
+    meta: { mime?: string },
+  ): Promise<void>
   /**
    * `filename` is the name the download lands under — the key is a digest
    * and carries none. S3 expresses this as response-content-disposition on

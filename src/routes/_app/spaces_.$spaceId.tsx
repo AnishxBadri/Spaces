@@ -45,7 +45,10 @@ export const Route = createFileRoute('/_app/spaces_/$spaceId')({
   component: SpacePage,
 })
 
-const dateFmt = new Intl.DateTimeFormat('en', { day: '2-digit', month: 'short' })
+const dateFmt = new Intl.DateTimeFormat('en', {
+  day: '2-digit',
+  month: 'short',
+})
 
 function SpacePage() {
   const { spc, allSpaces, terms } = Route.useLoaderData()
@@ -84,7 +87,10 @@ function SpacePage() {
         </Link>
         {spc.ancestors.map((a) => (
           <span key={a.id} className="flex items-center gap-1">
-            <ChevronRight className="size-3 text-muted-foreground/50" strokeWidth={2} />
+            <ChevronRight
+              className="size-3 text-muted-foreground/50"
+              strokeWidth={2}
+            />
             <Link
               to="/spaces/$spaceId"
               params={{ spaceId: a.id }}
@@ -99,7 +105,10 @@ function SpacePage() {
       <header className="mt-5 flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-            <Layers className="size-4.5 text-muted-foreground" strokeWidth={1.75} />
+            <Layers
+              className="size-4.5 text-muted-foreground"
+              strokeWidth={1.75}
+            />
           </span>
           <h1 className="text-[22px] font-semibold tracking-tight">
             {spc.name}
@@ -200,7 +209,10 @@ function SpacePage() {
           onClick={writeMemo}
           className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border p-4 text-left hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
         >
-          <PenLine className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+          <PenLine
+            className="size-4 shrink-0 text-muted-foreground"
+            strokeWidth={1.75}
+          />
           <span>
             <span className="block text-[13px] font-medium">
               {spc.filed.length === 0 ? 'Write the memo' : 'File another'}
@@ -234,8 +246,8 @@ function SpacePage() {
         </h2>
         {spc.companies.length === 0 ? (
           <p className="mt-2 text-[13px] text-muted-foreground">
-            Nothing tracked here yet — tag companies into this space from
-            their record page.
+            Nothing tracked here yet — tag companies into this space from their
+            record page.
           </p>
         ) : (
           <ul className="mt-2 -mx-2">
@@ -280,8 +292,8 @@ function SpacePage() {
         </h2>
         {spc.notes.length === 0 ? (
           <p className="mt-2 text-[13px] text-muted-foreground">
-            Nothing yet. Notes that @mention {spc.name} without being filed
-            here collect in this list.
+            Nothing yet. Notes that @mention {spc.name} without being filed here
+            collect in this list.
           </p>
         ) : (
           <ul className="mt-2 -mx-2">

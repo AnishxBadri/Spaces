@@ -6,7 +6,12 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { authClient } from '#/lib/auth-client'
-import { getSession, getSetupState, saveAiKey, seedDemo } from '#/lib/server-fns'
+import {
+  getSession,
+  getSetupState,
+  saveAiKey,
+  seedDemo,
+} from '#/lib/server-fns'
 
 /**
  * First-run wizard. Two steps, both real:
@@ -94,8 +99,8 @@ function AdminStep({ onDone }: { onDone: () => void }) {
         Create the admin account
       </h1>
       <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-        This deployment is yours. Signup closes permanently after this
-        account exists — everyone else joins by invitation.
+        This deployment is yours. Signup closes permanently after this account
+        exists — everyone else joins by invitation.
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
@@ -188,8 +193,8 @@ function AiKeyStep({ onDone }: { onDone: () => void }) {
         </h1>
         <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
           Stored encrypted as{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">{saved}</code>
-          . It never leaves this server and is only decrypted at call time.
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">{saved}</code>.
+          It never leaves this server and is only decrypted at call time.
         </p>
         <Button className="mt-6 w-full" onClick={onDone}>
           Continue
@@ -204,9 +209,9 @@ function AiKeyStep({ onDone }: { onDone: () => void }) {
         Connect an AI provider
       </h1>
       <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-        Bring your own key — summaries, memo drafts, and tagging run through
-        it. Optional: without one, AI features stay hidden and everything
-        else works.
+        Bring your own key — summaries, memo drafts, and tagging run through it.
+        Optional: without one, AI features stay hidden and everything else
+        works.
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
@@ -298,9 +303,9 @@ function DemoStep() {
       </h1>
       <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
         A worked example in data-center cooling — a small space tree, three
-        companies, a memo, a glossary, and a thesis with evidence on both
-        sides. Obviously fictional, and safe to delete once you have seen how
-        the pieces connect.
+        companies, a memo, a glossary, and a thesis with evidence on both sides.
+        Obviously fictional, and safe to delete once you have seen how the
+        pieces connect.
       </p>
 
       {error ? (

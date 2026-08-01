@@ -20,7 +20,10 @@ function aadFor(scope: string, provider: string): string {
 }
 
 export async function storeCredential(input: CredentialInput) {
-  const secretEnc = encryptSecret(input.secret, aadFor(input.scope, input.provider))
+  const secretEnc = encryptSecret(
+    input.secret,
+    aadFor(input.scope, input.provider),
+  )
   const [row] = await db
     .insert(credential)
     .values({

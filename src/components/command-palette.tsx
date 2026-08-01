@@ -178,7 +178,9 @@ export function CommandPalette({
           <>
             {hits.length === 0 ? (
               <CommandEmpty>
-                {searching ? 'Searching…' : `Nothing matches “${query.trim()}”.`}
+                {searching
+                  ? 'Searching…'
+                  : `Nothing matches “${query.trim()}”.`}
               </CommandEmpty>
             ) : (
               <CommandGroup heading="Results">

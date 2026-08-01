@@ -41,7 +41,11 @@ function patternsOf(terms: Array<GlossaryTerm>): Array<Pattern> {
  * a term never spans a node boundary, and inline marks split text nodes at
  * unpredictable points.
  */
-function decorate(doc: any, automaton: Automaton, byId: Map<string, GlossaryTerm>) {
+function decorate(
+  doc: any,
+  automaton: Automaton,
+  byId: Map<string, GlossaryTerm>,
+) {
   if (automaton.empty) return DecorationSet.empty
   const decorations: Array<Decoration> = []
 

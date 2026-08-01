@@ -177,7 +177,11 @@ function ThesisPage() {
         <KillDialog
           onCancel={() => setKilling(false)}
           onConfirm={async (reason) => {
-            await save({ id: thesis.id, status: 'killed', closedReason: reason })
+            await save({
+              id: thesis.id,
+              status: 'killed',
+              closedReason: reason,
+            })
             setKilling(false)
           }}
         />
@@ -188,7 +192,8 @@ function ThesisPage() {
       {killed ? (
         <div className="mt-5 rounded-lg border border-border bg-muted/40 p-4">
           <h2 className="text-xs font-medium text-muted-foreground">
-            Killed {thesis.closedAt ? dateFmt.format(new Date(thesis.closedAt)) : ''}
+            Killed{' '}
+            {thesis.closedAt ? dateFmt.format(new Date(thesis.closedAt)) : ''}
           </h2>
           <p className="mt-1.5 font-serif text-[15px] leading-relaxed">
             {thesis.closedReason}

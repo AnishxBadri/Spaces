@@ -41,15 +41,24 @@ export async function mergeEntities(opts: {
   candidateId?: string
 }): Promise<{ mergeEventId: string }> {
   const { winnerId, loserId, mergedBy } = opts
-  if (winnerId === loserId) throw new Error('Cannot merge an entity into itself')
+  if (winnerId === loserId)
+    throw new Error('Cannot merge an entity into itself')
 
   return db.transaction(async (tx) => {
     const [winner] = await tx
-      .select({ id: entity.id, kind: entity.kind, mergedIntoId: entity.mergedIntoId })
+      .select({
+        id: entity.id,
+        kind: entity.kind,
+        mergedIntoId: entity.mergedIntoId,
+      })
       .from(entity)
       .where(eq(entity.id, winnerId))
     const [loser] = await tx
-      .select({ id: entity.id, kind: entity.kind, mergedIntoId: entity.mergedIntoId })
+      .select({
+        id: entity.id,
+        kind: entity.kind,
+        mergedIntoId: entity.mergedIntoId,
+      })
       .from(entity)
       .where(eq(entity.id, loserId))
     if (!winner || !loser) throw new Error('Entity not found')
@@ -101,9 +110,7 @@ export async function mergeEntities(opts: {
     const loserLinks = await tx
       .select()
       .from(link)
-      .where(
-        or(eq(link.fromEntityId, loserId), eq(link.toEntityId, loserId)),
-      )
+      .where(or(eq(link.fromEntityId, loserId), eq(link.toEntityId, loserId)))
     // Record-reference attributes pointing AT the loser: after repointing
     // the links, the referrers' values jsonb must be rewritten too.
     const inboundRefs = loserLinks.filter(
@@ -316,7 +323,11 @@ export async function mergeEntities(opts: {
             table: 'entity.values',
             action: 'field_filled',
             pk: { entityId: winnerId },
-            old: { field: key, winnerHad: winnerVal ?? null, filledWith: loserVal },
+            old: {
+              field: key,
+              winnerHad: winnerVal ?? null,
+              filledWith: loserVal,
+            },
           })
         } else if (JSON.stringify(winnerVal) !== JSON.stringify(loserVal)) {
           snapshot.push({

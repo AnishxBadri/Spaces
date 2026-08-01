@@ -161,7 +161,9 @@ function NotePage() {
                     params={b.kind === 'note' ? { noteId: b.fromId } : {}}
                     className="flex items-center gap-2 rounded-md px-1 py-0.5 text-[13px] text-muted-foreground hover:text-foreground"
                   >
-                    {Icon ? <Icon className="size-3.5" strokeWidth={1.75} /> : null}
+                    {Icon ? (
+                      <Icon className="size-3.5" strokeWidth={1.75} />
+                    ) : null}
                     {b.name}
                   </Link>
                 </li>

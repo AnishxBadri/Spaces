@@ -10,7 +10,9 @@ import type { AttributeDef, ObjectKind } from './registry'
  * record-reference link rows — all in one transaction.
  */
 
-export async function getRegistry(kind: ObjectKind): Promise<Array<AttributeDef>> {
+export async function getRegistry(
+  kind: ObjectKind,
+): Promise<Array<AttributeDef>> {
   const rows = await db
     .select()
     .from(attribute)
@@ -85,11 +87,18 @@ export async function setValues(opts: {
         const ids = Array.isArray(value) ? value : [value as string]
         if (ids.length > 0) {
           const targets = await tx
-            .select({ id: entity.id, kind: entity.kind, merged: entity.mergedIntoId })
+            .select({
+              id: entity.id,
+              kind: entity.kind,
+              merged: entity.mergedIntoId,
+            })
             .from(entity)
             .where(inArray(entity.id, ids))
           if (targets.length !== ids.length)
-            throw new AttributeValidationError(slug, 'Referenced record not found')
+            throw new AttributeValidationError(
+              slug,
+              'Referenced record not found',
+            )
           for (const t of targets) {
             if (t.kind !== def.options.targetKind)
               throw new AttributeValidationError(
@@ -97,7 +106,10 @@ export async function setValues(opts: {
                 `Must reference a ${def.options.targetKind}`,
               )
             if (t.merged)
-              throw new AttributeValidationError(slug, 'Referenced record was merged')
+              throw new AttributeValidationError(
+                slug,
+                'Referenced record was merged',
+              )
           }
         }
       }
@@ -125,7 +137,8 @@ export async function setValues(opts: {
               eq(link.attrSlug, slug),
             ),
           )
-        const ids = value === null ? [] : Array.isArray(value) ? value : [value as string]
+        const ids =
+          value === null ? [] : Array.isArray(value) ? value : [value as string]
         for (const target of ids) {
           await tx
             .insert(link)
@@ -143,7 +156,10 @@ export async function setValues(opts: {
     }
 
     if (changed.length > 0) {
-      await tx.update(entity).set({ values: next }).where(eq(entity.id, entityId))
+      await tx
+        .update(entity)
+        .set({ values: next })
+        .where(eq(entity.id, entityId))
     }
     return { changed }
   })

@@ -18,7 +18,9 @@ export function storage(): Storage {
       instance = new LocalStorage()
       return instance
     case 's3':
-      throw new Error('S3 storage driver not implemented yet — use STORAGE_DRIVER=local')
+      throw new Error(
+        'S3 storage driver not implemented yet — use STORAGE_DRIVER=local',
+      )
     default:
       throw new Error(`Unknown STORAGE_DRIVER: ${driver}`)
   }

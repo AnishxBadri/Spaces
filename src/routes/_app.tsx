@@ -1,8 +1,4 @@
-import {
-  Outlet,
-  createFileRoute,
-  redirect,
-} from '@tanstack/react-router'
+import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
 import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { AppSidebar } from '#/components/app-sidebar'

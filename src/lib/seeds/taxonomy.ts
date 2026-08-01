@@ -32,7 +32,9 @@ const STARTER: Array<SeedNode> = [
   {
     slug: 'aerospace',
     name: 'Aerospace',
-    children: [{ slug: 'in_space_manufacturing', name: 'In-space manufacturing' }],
+    children: [
+      { slug: 'in_space_manufacturing', name: 'In-space manufacturing' },
+    ],
   },
   { slug: 'fintech', name: 'Fintech' },
 ]
@@ -78,7 +80,10 @@ async function insertNode(
  * moment they touch it.
  */
 export async function seedStarterTaxonomy(): Promise<void> {
-  const [any] = await db.select({ entityId: space.entityId }).from(space).limit(1)
+  const [any] = await db
+    .select({ entityId: space.entityId })
+    .from(space)
+    .limit(1)
   if (any) return
 
   for (const node of STARTER) await insertNode(node, null)

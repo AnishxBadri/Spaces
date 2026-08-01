@@ -10,7 +10,10 @@ export const Route = createFileRoute('/api/health')({
           await db.execute(sql`select 1`)
           return Response.json({ status: 'ok', db: 'ok' })
         } catch {
-          return Response.json({ status: 'degraded', db: 'unreachable' }, { status: 503 })
+          return Response.json(
+            { status: 'degraded', db: 'unreachable' },
+            { status: 503 },
+          )
         }
       },
     },

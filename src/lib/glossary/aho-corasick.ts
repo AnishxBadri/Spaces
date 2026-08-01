@@ -76,7 +76,8 @@ export function buildAutomaton(patterns: Array<Pattern>): Automaton {
       let f = nodes[cur].fail
       while (f !== 0 && !nodes[f].next.has(ch)) f = nodes[f].fail
       const candidate = nodes[f].next.get(ch)
-      nodes[child].fail = candidate !== undefined && candidate !== child ? candidate : 0
+      nodes[child].fail =
+        candidate !== undefined && candidate !== child ? candidate : 0
       // Inherit outputs so a match ending here also reports shorter patterns
       // that end here — resolved later by longest-wins.
       nodes[child].out.push(...nodes[nodes[child].fail].out)

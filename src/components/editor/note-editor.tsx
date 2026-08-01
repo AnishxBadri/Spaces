@@ -6,10 +6,7 @@ import {
   filterSuggestionItems,
 } from '@blocknote/core'
 import { BlockNoteView } from '@blocknote/shadcn'
-import {
-  SuggestionMenuController,
-  useCreateBlockNote,
-} from '@blocknote/react'
+import { SuggestionMenuController, useCreateBlockNote } from '@blocknote/react'
 import { useMemo } from 'react'
 import { Mention } from './mention'
 import { createGlossaryExtension } from './glossary-decoration'
@@ -50,10 +47,7 @@ export function extractMentionIds(doc: unknown): Array<string> {
  * trailer of [[Label|entity:id]] references — searchable and greppable
  * even if not positionally faithful.
  */
-export function deriveMarkdown(
-  lossyMd: string,
-  doc: unknown,
-): string {
+export function deriveMarkdown(lossyMd: string, doc: unknown): string {
   const mentions: Array<{ id: string; label: string }> = []
   const seen = new Set<string>()
   const walk = (node: unknown) => {
@@ -72,9 +66,7 @@ export function deriveMarkdown(
   }
   walk(doc)
   if (mentions.length === 0) return lossyMd
-  const trailer = mentions
-    .map((m) => `[[${m.label}|entity:${m.id}]]`)
-    .join(' ')
+  const trailer = mentions.map((m) => `[[${m.label}|entity:${m.id}]]`).join(' ')
   return `${lossyMd.trimEnd()}\n\nMentions: ${trailer}\n`
 }
 
@@ -112,26 +104,25 @@ export function NoteEditor({
   )
 
   const getMentionItems = useMemo(
-    () =>
-      async (query: string) => {
-        const results = await searchEntities({ data: { q: query } })
-        return filterSuggestionItems(
-          results.map((r) => ({
-            title: r.name,
-            badge: r.kind,
-            onItemClick: () => {
-              editor.insertInlineContent([
-                {
-                  type: 'mention',
-                  props: { entityId: r.id, label: r.name, kind: r.kind },
-                },
-                ' ',
-              ])
-            },
-          })),
-          query,
-        )
-      },
+    () => async (query: string) => {
+      const results = await searchEntities({ data: { q: query } })
+      return filterSuggestionItems(
+        results.map((r) => ({
+          title: r.name,
+          badge: r.kind,
+          onItemClick: () => {
+            editor.insertInlineContent([
+              {
+                type: 'mention',
+                props: { entityId: r.id, label: r.name, kind: r.kind },
+              },
+              ' ',
+            ])
+          },
+        })),
+        query,
+      )
+    },
     [editor],
   )
 

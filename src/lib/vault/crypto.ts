@@ -21,7 +21,12 @@ export function encryptSecret(plaintext: string, aad: string): Buffer {
     cipher.update(plaintext, 'utf8'),
     cipher.final(),
   ])
-  return Buffer.concat([Buffer.from([VERSION]), iv, cipher.getAuthTag(), ciphertext])
+  return Buffer.concat([
+    Buffer.from([VERSION]),
+    iv,
+    cipher.getAuthTag(),
+    ciphertext,
+  ])
 }
 
 export function decryptSecret(blob: Buffer, aad: string): string {
@@ -35,9 +40,10 @@ export function decryptSecret(blob: Buffer, aad: string): string {
   const decipher = createDecipheriv('aes-256-gcm', loadMasterKey(), iv)
   decipher.setAAD(Buffer.from(aad, 'utf8'))
   decipher.setAuthTag(tag)
-  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString(
-    'utf8',
-  )
+  return Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString('utf8')
 }
 
 /** UI display form — never return the secret itself to the client. */

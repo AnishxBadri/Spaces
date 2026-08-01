@@ -98,7 +98,10 @@ describe.skipIf(!hasDb)('resolveEntity', () => {
       .select()
       .from(duplicateCandidate)
       .where(
-        and(eq(duplicateCandidate.entityA, a), eq(duplicateCandidate.entityB, b)),
+        and(
+          eq(duplicateCandidate.entityA, a),
+          eq(duplicateCandidate.entityB, b),
+        ),
       )
     expect(rows.length).toBe(1)
     expect(rows[0].status).toBe('open')
@@ -146,11 +149,18 @@ describe.skipIf(!hasDb)('resolveEntity', () => {
     expect(b.entityId).not.toBe(a.entityId)
 
     const [x, y] =
-      a.entityId < b.entityId ? [a.entityId, b.entityId] : [b.entityId, a.entityId]
+      a.entityId < b.entityId
+        ? [a.entityId, b.entityId]
+        : [b.entityId, a.entityId]
     const rows = await db
       .select()
       .from(duplicateCandidate)
-      .where(and(eq(duplicateCandidate.entityA, x), eq(duplicateCandidate.entityB, y)))
+      .where(
+        and(
+          eq(duplicateCandidate.entityA, x),
+          eq(duplicateCandidate.entityB, y),
+        ),
+      )
     expect(rows.length).toBe(1)
     expect(Number(rows[0].score)).toBeGreaterThanOrEqual(0.5)
   })

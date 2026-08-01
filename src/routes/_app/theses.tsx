@@ -136,7 +136,10 @@ function ThesisRow({ row }: { row: ThesisRowData }) {
           </span>
           {/* The for/against split is the headline number, so it is never
               collapsed into one "evidence" count. */}
-          <span className="flex items-center gap-1" title="Evidence for · against">
+          <span
+            className="flex items-center gap-1"
+            title="Evidence for · against"
+          >
             <Plus className="size-3" strokeWidth={2.5} />
             <span className="tabular">{row.forCount}</span>
             <Minus className="ml-1.5 size-3" strokeWidth={2.5} />
@@ -254,7 +257,9 @@ export function CreateThesisDialog({
                 }}
                 className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <option value="">+ Add a space… (a claim can span several)</option>
+                <option value="">
+                  + Add a space… (a claim can span several)
+                </option>
                 {spaces
                   .filter((s) => !spaceIds.includes(s.id))
                   .map((s) => (

@@ -48,9 +48,7 @@ export const auth = betterAuth({
           if (existing > 0) {
             // Permanently closed after the first admin exists. Invites will
             // create users through a separate, token-gated path.
-            throw new Error(
-              'Signup is closed. Ask an admin for an invitation.',
-            )
+            throw new Error('Signup is closed. Ask an admin for an invitation.')
           }
           // First user is the admin.
           return { data: { ...newUser, role: 'admin' } }

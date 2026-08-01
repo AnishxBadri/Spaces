@@ -60,7 +60,8 @@ function normalizeKeys(input: ResolveInput): Array<NormalizedKey> {
   const k = input.keys ?? {}
   if (k.domain) {
     const norm = normalizeDomain(k.domain)
-    if (norm) out.push({ kind: 'domain', value: k.domain.trim(), valueNorm: norm })
+    if (norm)
+      out.push({ kind: 'domain', value: k.domain.trim(), valueNorm: norm })
   }
   if (k.email) {
     const norm = normalizeEmail(k.email)

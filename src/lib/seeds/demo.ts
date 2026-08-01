@@ -98,7 +98,9 @@ export async function canSeedDemo(): Promise<boolean> {
   return value === 0
 }
 
-export async function seedDemoData(userId: string): Promise<{ seeded: boolean }> {
+export async function seedDemoData(
+  userId: string,
+): Promise<{ seeded: boolean }> {
   if (!(await canSeedDemo())) return { seeded: false }
 
   // --- spaces -------------------------------------------------------------
@@ -152,12 +154,20 @@ export async function seedDemoData(userId: string): Promise<{ seeded: boolean }>
       .update(entity)
       .set({ values: c.values })
       .where(eq(entity.id, result.entityId))
-    await db.insert(company).values({ entityId: result.entityId }).onConflictDoNothing()
+    await db
+      .insert(company)
+      .values({ entityId: result.entityId })
+      .onConflictDoNothing()
     const spaceId = spaceIds.get(c.space)
     if (spaceId) {
       await db
         .insert(entitySpace)
-        .values({ entityId: result.entityId, spaceId, source: 'manual', createdBy: userId })
+        .values({
+          entityId: result.entityId,
+          spaceId,
+          source: 'manual',
+          createdBy: userId,
+        })
         .onConflictDoNothing()
     }
     await db.insert(activity).values({
@@ -175,7 +185,10 @@ export async function seedDemoData(userId: string): Promise<{ seeded: boolean }>
     source: 'import',
     createdBy: userId,
   })
-  await db.insert(person).values({ entityId: personResult.entityId }).onConflictDoNothing()
+  await db
+    .insert(person)
+    .values({ entityId: personResult.entityId })
+    .onConflictDoNothing()
   await db
     .update(entity)
     .set({ values: { job_title: 'Co-founder & CTO' } })
@@ -198,7 +211,12 @@ export async function seedDemoData(userId: string): Promise<{ seeded: boolean }>
   for (const t of TERMS) {
     const [ent] = await db
       .insert(entity)
-      .values({ kind: 'term', canonicalName: t.name, source: 'seed', createdBy: userId })
+      .values({
+        kind: 'term',
+        canonicalName: t.name,
+        source: 'seed',
+        createdBy: userId,
+      })
       .returning({ id: entity.id })
     await db.insert(term).values({
       entityId: ent.id,
@@ -244,7 +262,12 @@ export async function seedDemoData(userId: string): Promise<{ seeded: boolean }>
   if (coolingId) {
     await db
       .insert(entitySpace)
-      .values({ entityId: memoEnt.id, spaceId: coolingId, source: 'manual', createdBy: userId })
+      .values({
+        entityId: memoEnt.id,
+        spaceId: coolingId,
+        source: 'manual',
+        createdBy: userId,
+      })
       .onConflictDoNothing()
   }
 
@@ -274,7 +297,9 @@ export async function seedDemoData(userId: string): Promise<{ seeded: boolean }>
       .values({ thesisEntityId: thesisEnt.id, spaceEntityId: immersionId })
       .onConflictDoNothing()
   }
-  const evidence: Array<[string | undefined, 'evidence_for' | 'evidence_against']> = [
+  const evidence: Array<
+    [string | undefined, 'evidence_for' | 'evidence_against']
+  > = [
     [companyIds.get('Submer'), 'evidence_for'],
     [memoEnt.id, 'evidence_for'],
     // The differentiator: a company that argues the other way.

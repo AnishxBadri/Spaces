@@ -12,7 +12,9 @@ import type { ObjectKind } from './registry'
  */
 export async function seedSystemAttributes() {
   let inserted = 0
-  for (const objectKind of Object.keys(SYSTEM_ATTRIBUTES) as Array<ObjectKind>) {
+  for (const objectKind of Object.keys(
+    SYSTEM_ATTRIBUTES,
+  ) as Array<ObjectKind>) {
     const defs = SYSTEM_ATTRIBUTES[objectKind]
     for (let i = 0; i < defs.length; i++) {
       const def = defs[i]
@@ -39,5 +41,6 @@ export async function seedSystemAttributes() {
       inserted++
     }
   }
-  if (inserted > 0) console.log(`[attributes] seeded ${inserted} system attributes`)
+  if (inserted > 0)
+    console.log(`[attributes] seeded ${inserted} system attributes`)
 }

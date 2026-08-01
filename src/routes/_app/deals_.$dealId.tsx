@@ -88,7 +88,10 @@ function DealRecordPage() {
 
       <header className="mt-5 flex items-center gap-3">
         <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-          <Kanban className="size-4.5 text-muted-foreground" strokeWidth={1.75} />
+          <Kanban
+            className="size-4.5 text-muted-foreground"
+            strokeWidth={1.75}
+          />
         </span>
         <div className="min-w-0">
           <h1 className="truncate text-[22px] font-semibold tracking-tight">

@@ -185,7 +185,10 @@ function TermForm({
   }
 
   return (
-    <form onSubmit={submit} className="mt-2 space-y-2 rounded-md border border-border p-3">
+    <form
+      onSubmit={submit}
+      className="mt-2 space-y-2 rounded-md border border-border p-3"
+    >
       <div className="flex gap-2">
         <Input
           autoFocus

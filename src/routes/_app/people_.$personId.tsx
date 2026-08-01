@@ -132,7 +132,9 @@ function PersonRecordPage() {
                 def={def as RegistryEntry}
                 value={person.values[def.slug] ?? null}
                 variant="field"
-                onSave={(v) => save({ id: person.id, patch: { [def.slug]: v } })}
+                onSave={(v) =>
+                  save({ id: person.id, patch: { [def.slug]: v } })
+                }
               />
             </div>
           ))}
@@ -334,7 +336,6 @@ function PersonRecordPage() {
   )
 }
 
-
 function ContactField({
   personId,
   label,
@@ -381,7 +382,10 @@ function ContactField({
       <ul className="space-y-1">
         {values.map((v) => (
           <li key={v} className="flex h-7 items-center gap-2 text-[13px]">
-            <Icon className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+            <Icon
+              className="size-3.5 shrink-0 text-muted-foreground"
+              strokeWidth={1.75}
+            />
             <span className="truncate">{v}</span>
           </li>
         ))}

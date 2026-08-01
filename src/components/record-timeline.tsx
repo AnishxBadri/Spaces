@@ -1,4 +1,11 @@
-import { Building2, ChevronDown, ChevronRight, Kanban, Phone, Users } from 'lucide-react'
+import {
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  Kanban,
+  Phone,
+  Users,
+} from 'lucide-react'
 import { useState } from 'react'
 import { optionLabel } from './attributes/value-editor'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
@@ -41,7 +48,9 @@ export function RecordTimeline({
   refNames?: RefNames
 }) {
   if (items.length === 0) {
-    return <p className="mt-4 text-[13px] text-muted-foreground">Nothing yet.</p>
+    return (
+      <p className="mt-4 text-[13px] text-muted-foreground">Nothing yet.</p>
+    )
   }
   return (
     <ul className="mt-4 space-y-1">
@@ -53,7 +62,9 @@ export function RecordTimeline({
                 {dateTimeFmt.format(new Date(item.at))}
               </span>
               <span>
-                <span className="font-medium">{item.actorName ?? 'System'}</span>{' '}
+                <span className="font-medium">
+                  {item.actorName ?? 'System'}
+                </span>{' '}
                 {VERB_LABELS[item.verb] ?? item.verb}
               </span>
             </div>
@@ -85,7 +96,10 @@ function InteractionItem({
         {dateTimeFmt.format(new Date(item.at))}
       </span>
       <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <Phone className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+        <Phone
+          className="size-3.5 shrink-0 text-muted-foreground"
+          strokeWidth={1.75}
+        />
         <span className="font-medium capitalize">{item.kind}</span>
         <span className="truncate">— {item.subject}</span>
         {item.attendees.map((a) => {
@@ -146,7 +160,8 @@ function AttrBurst({
           <span className="font-medium">{item.actorName ?? 'System'}</span>{' '}
           changed{' '}
           <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
-            {item.changes.length} attribute{item.changes.length === 1 ? '' : 's'}
+            {item.changes.length} attribute
+            {item.changes.length === 1 ? '' : 's'}
           </span>
           {open ? (
             <ChevronDown className="size-3 text-muted-foreground" />

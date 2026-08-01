@@ -234,7 +234,10 @@ function AttendeePicker({
                   }}
                   className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                 >
-                  <Icon className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
+                  <Icon
+                    className="size-3.5 text-muted-foreground"
+                    strokeWidth={1.75}
+                  />
                   {r.name}
                   <span className="ml-auto text-xs text-muted-foreground">
                     {r.kind}

@@ -132,7 +132,10 @@ function SidePanel({ side }: { side: Side }) {
   return (
     <div className="text-[13px]">
       <div className="flex items-center gap-2">
-        <Icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+        <Icon
+          className="size-4 shrink-0 text-muted-foreground"
+          strokeWidth={1.75}
+        />
         {side.kind === 'company' ? (
           <Link
             to="/companies/$companyId"
@@ -162,7 +165,11 @@ function SidePanel({ side }: { side: Side }) {
         ) : null}
         <div>
           {side.mentionCount} mention{side.mentionCount === 1 ? '' : 's'} ·
-          added {new Date(side.createdAt).toLocaleDateString('en', { day: '2-digit', month: 'short' })}{' '}
+          added{' '}
+          {new Date(side.createdAt).toLocaleDateString('en', {
+            day: '2-digit',
+            month: 'short',
+          })}{' '}
           via {side.source}
         </div>
       </dl>
