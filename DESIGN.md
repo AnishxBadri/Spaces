@@ -98,7 +98,7 @@ Both self-hosted via Fontsource — no font CDN calls from a privacy product.
 
 **Character:** Two registers, one system. A single sans carries every interface surface —
 tables, labels, buttons, attributes, navigation — in a tight scale (fixed rem, never
-fluid). A text serif appears only where the user reads: note bodies, thesis claims, memos.
+fluid). A text serif appears only where the user reads: note bodies, memos, the mandate.
 Data reads like a ledger; prose reads like a page.
 
 ### The named scale

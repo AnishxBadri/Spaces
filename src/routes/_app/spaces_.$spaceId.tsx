@@ -10,24 +10,14 @@ import {
   ChevronRight,
   FileText,
   Layers,
-  Minus,
   PenLine,
   Plus,
-  Target,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
-import { CreateThesisDialog } from '#/routes/_app/theses'
 import { SpaceGlossary } from '#/components/space-glossary'
-import {
-  createNote,
-  createSpace,
-  getSpace,
-  listSpaces,
-  listTerms,
-} from '#/lib/server-fns'
-import { cn } from '#/lib/utils'
+import { createNote, createSpace, getSpace, listTerms } from '#/lib/server-fns'
 
 /**
  * A space is something you read, not something you administer: one
@@ -35,12 +25,11 @@ import { cn } from '#/lib/utils'
  */
 export const Route = createFileRoute('/_app/spaces_/$spaceId')({
   loader: async ({ params }) => {
-    const [spc, spaces, terms] = await Promise.all([
+    const [spc, terms] = await Promise.all([
       getSpace({ data: { id: params.spaceId } }),
-      listSpaces(),
       listTerms({ data: { spaceId: params.spaceId } }),
     ])
-    return { spc, allSpaces: spaces, terms }
+    return { spc, terms }
   },
   component: SpacePage,
 })
@@ -51,7 +40,7 @@ const dateFmt = new Intl.DateTimeFormat('en', {
 })
 
 function SpacePage() {
-  const { spc, allSpaces, terms } = Route.useLoaderData()
+  const { spc, terms } = Route.useLoaderData()
   const navigate = useNavigate()
 
   async function writeMemo() {
@@ -136,47 +125,8 @@ function SpacePage() {
         <NewSubspace parentId={spc.id} />
       </div>
 
-      {/* What I think here — one idea, two registers: falsifiable claims and
-          the prose filed alongside them. Theses are not a sixth section. */}
+      {/* What I think here — the prose filed against this space. */}
       <section className="mt-8 space-y-3">
-        {spc.theses.map((t) => (
-          <Link
-            key={t.id}
-            to="/theses/$thesisId"
-            params={{ thesisId: t.id }}
-            className="block rounded-lg border border-border p-4 hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-          >
-            <div className="flex items-start gap-3">
-              <Target
-                className="mt-1 size-3.5 shrink-0 text-muted-foreground"
-                strokeWidth={1.75}
-              />
-              <p
-                className={cn(
-                  'min-w-0 flex-1 font-serif text-[15px] leading-relaxed',
-                  t.status === 'killed' && 'text-muted-foreground',
-                )}
-              >
-                {t.claim}
-              </p>
-              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">
-                {t.status === 'killed' ? 'killed' : t.conviction}
-              </span>
-            </div>
-            <div className="mt-1.5 flex items-center gap-3 pl-6 text-xs text-muted-foreground/80">
-              <span className="flex items-center gap-1">
-                <Plus className="size-3" strokeWidth={2.5} />
-                <span className="tabular">{t.forCount}</span>
-                <Minus className="ml-1.5 size-3" strokeWidth={2.5} />
-                <span className="tabular">{t.againstCount}</span>
-              </span>
-              {t.status === 'killed' && t.closedReason ? (
-                <span className="min-w-0 truncate">{t.closedReason}</span>
-              ) : null}
-            </div>
-          </Link>
-        ))}
-
         {spc.filed.map((f) => (
           <Link
             key={f.id}
@@ -224,19 +174,6 @@ function SpacePage() {
             </span>
           </span>
         </button>
-
-        {/* Both registers get an entry point, side by side — a claim is not
-            a lesser act than a memo. */}
-        <div className="flex items-center gap-2 pt-1">
-          <CreateThesisDialog
-            spaces={allSpaces}
-            presetSpaceId={spc.id}
-            triggerLabel="New thesis"
-          />
-          <span className="text-xs text-muted-foreground/80">
-            State something about {spc.name} that could turn out wrong.
-          </span>
-        </div>
       </section>
 
       {/* Tracked companies */}

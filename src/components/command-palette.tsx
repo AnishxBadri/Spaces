@@ -7,7 +7,6 @@ import {
   LogOut,
   Paperclip,
   Settings,
-  Target,
   Users,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -40,7 +39,6 @@ const KIND_ICONS: Record<string, LucideIcon> = {
   organization: Building2,
   deal: Kanban,
   space: Layers,
-  thesis: Target,
   note: FileText,
   document: Paperclip,
 }
@@ -64,8 +62,6 @@ function hrefFor(hit: Hit): string | null {
       return `/deals/${target.id}`
     case 'space':
       return `/spaces/${target.id}`
-    case 'thesis':
-      return `/theses/${target.id}`
     case 'note':
       return `/notes/${target.id}`
     default:

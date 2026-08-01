@@ -20,14 +20,12 @@ import { Route as AppNotesRouteImport } from './routes/_app/notes'
 import { Route as AppPeopleRouteImport } from './routes/_app/people'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSpacesRouteImport } from './routes/_app/spaces'
-import { Route as AppThesesRouteImport } from './routes/_app/theses'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/companies_.$companyId'
 import { Route as AppDealsDealIdRouteImport } from './routes/_app/deals_.$dealId'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId'
 import { Route as AppPeoplePersonIdRouteImport } from './routes/_app/people_.$personId'
 import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
-import { Route as AppThesesThesisIdRouteImport } from './routes/_app/theses_.$thesisId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
 
@@ -85,11 +83,6 @@ const AppSpacesRoute = AppSpacesRouteImport.update({
   path: '/spaces',
   getParentRoute: () => AppRoute,
 } as any)
-const AppThesesRoute = AppThesesRouteImport.update({
-  id: '/theses',
-  path: '/theses',
-  getParentRoute: () => AppRoute,
-} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -120,11 +113,6 @@ const AppSpacesSpaceIdRoute = AppSpacesSpaceIdRouteImport.update({
   path: '/spaces/$spaceId',
   getParentRoute: () => AppRoute,
 } as any)
-const AppThesesThesisIdRoute = AppThesesThesisIdRouteImport.update({
-  id: '/theses_/$thesisId',
-  path: '/theses/$thesisId',
-  getParentRoute: () => AppRoute,
-} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -147,14 +135,12 @@ export interface FileRoutesByFullPath {
   '/people': typeof AppPeopleRoute
   '/settings': typeof AppSettingsRoute
   '/spaces': typeof AppSpacesRoute
-  '/theses': typeof AppThesesRoute
   '/api/health': typeof ApiHealthRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
-  '/theses/$thesisId': typeof AppThesesThesisIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
 }
@@ -169,14 +155,12 @@ export interface FileRoutesByTo {
   '/people': typeof AppPeopleRoute
   '/settings': typeof AppSettingsRoute
   '/spaces': typeof AppSpacesRoute
-  '/theses': typeof AppThesesRoute
   '/api/health': typeof ApiHealthRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
-  '/theses/$thesisId': typeof AppThesesThesisIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
 }
@@ -193,14 +177,12 @@ export interface FileRoutesById {
   '/_app/people': typeof AppPeopleRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/spaces': typeof AppSpacesRoute
-  '/_app/theses': typeof AppThesesRoute
   '/api/health': typeof ApiHealthRoute
   '/_app/companies_/$companyId': typeof AppCompaniesCompanyIdRoute
   '/_app/deals_/$dealId': typeof AppDealsDealIdRoute
   '/_app/notes_/$noteId': typeof AppNotesNoteIdRoute
   '/_app/people_/$personId': typeof AppPeoplePersonIdRoute
   '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
-  '/_app/theses_/$thesisId': typeof AppThesesThesisIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
 }
@@ -217,14 +199,12 @@ export interface FileRouteTypes {
     | '/people'
     | '/settings'
     | '/spaces'
-    | '/theses'
     | '/api/health'
     | '/companies/$companyId'
     | '/deals/$dealId'
     | '/notes/$noteId'
     | '/people/$personId'
     | '/spaces/$spaceId'
-    | '/theses/$thesisId'
     | '/api/auth/$'
     | '/api/blob/$key'
   fileRoutesByTo: FileRoutesByTo
@@ -239,14 +219,12 @@ export interface FileRouteTypes {
     | '/people'
     | '/settings'
     | '/spaces'
-    | '/theses'
     | '/api/health'
     | '/companies/$companyId'
     | '/deals/$dealId'
     | '/notes/$noteId'
     | '/people/$personId'
     | '/spaces/$spaceId'
-    | '/theses/$thesisId'
     | '/api/auth/$'
     | '/api/blob/$key'
   id:
@@ -262,14 +240,12 @@ export interface FileRouteTypes {
     | '/_app/people'
     | '/_app/settings'
     | '/_app/spaces'
-    | '/_app/theses'
     | '/api/health'
     | '/_app/companies_/$companyId'
     | '/_app/deals_/$dealId'
     | '/_app/notes_/$noteId'
     | '/_app/people_/$personId'
     | '/_app/spaces_/$spaceId'
-    | '/_app/theses_/$thesisId'
     | '/api/auth/$'
     | '/api/blob/$key'
   fileRoutesById: FileRoutesById
@@ -363,13 +339,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSpacesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/theses': {
-      id: '/_app/theses'
-      path: '/theses'
-      fullPath: '/theses'
-      preLoaderRoute: typeof AppThesesRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -412,13 +381,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSpacesSpaceIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/theses_/$thesisId': {
-      id: '/_app/theses_/$thesisId'
-      path: '/theses/$thesisId'
-      fullPath: '/theses/$thesisId'
-      preLoaderRoute: typeof AppThesesThesisIdRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -444,13 +406,11 @@ interface AppRouteChildren {
   AppPeopleRoute: typeof AppPeopleRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSpacesRoute: typeof AppSpacesRoute
-  AppThesesRoute: typeof AppThesesRoute
   AppCompaniesCompanyIdRoute: typeof AppCompaniesCompanyIdRoute
   AppDealsDealIdRoute: typeof AppDealsDealIdRoute
   AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
   AppPeoplePersonIdRoute: typeof AppPeoplePersonIdRoute
   AppSpacesSpaceIdRoute: typeof AppSpacesSpaceIdRoute
-  AppThesesThesisIdRoute: typeof AppThesesThesisIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -461,13 +421,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppPeopleRoute: AppPeopleRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSpacesRoute: AppSpacesRoute,
-  AppThesesRoute: AppThesesRoute,
   AppCompaniesCompanyIdRoute: AppCompaniesCompanyIdRoute,
   AppDealsDealIdRoute: AppDealsDealIdRoute,
   AppNotesNoteIdRoute: AppNotesNoteIdRoute,
   AppPeoplePersonIdRoute: AppPeoplePersonIdRoute,
   AppSpacesSpaceIdRoute: AppSpacesSpaceIdRoute,
-  AppThesesThesisIdRoute: AppThesesThesisIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

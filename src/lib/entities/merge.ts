@@ -21,8 +21,8 @@ import { activity } from '#/db/schema/activity'
  * read time. Loser survives as a redirect (merged_into_id); every moved or
  * dropped row lands in merge_event.snapshot so unmerge stays possible.
  *
- * Restricted to company|person|organization and same-kind pairs — spaces,
- * notes, and theses have structural children and different semantics.
+ * Restricted to company|person|organization and same-kind pairs — spaces
+ * and notes have structural children and different semantics.
  */
 
 type SnapshotEntry = {

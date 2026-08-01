@@ -29,7 +29,7 @@ function NotesPage() {
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight">Notes</h1>
           <p className="mt-1 text-[13px] text-muted-foreground">
-            Research lives here — @mention companies, spaces, and theses to
+            Research lives here — @mention companies, people, and spaces to
             weave the graph.
           </p>
         </div>

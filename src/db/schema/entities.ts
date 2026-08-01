@@ -26,7 +26,6 @@ export const entityKind = pgEnum('entity_kind', [
   'organization',
   'deal',
   'space',
-  'thesis',
   'note',
   'document',
   'term',
@@ -181,8 +180,6 @@ export const mergeEvent = pgTable('merge_event', {
 export const linkRelation = pgEnum('link_relation', [
   'mentions',
   'tagged_in',
-  'evidence_for',
-  'evidence_against',
   'contact_at',
   'derived_from',
   'supersedes',
@@ -195,7 +192,6 @@ export const linkSource = pgEnum('link_source', ['manual', 'ai', 'extracted'])
 /**
  * The one edge table. [[mention]] in a note body materializes a link row —
  * backlinks are `select * from link where to_entity_id = X`.
- * evidence_for / evidence_against is the thesis differentiator.
  */
 export const link = pgTable(
   'link',

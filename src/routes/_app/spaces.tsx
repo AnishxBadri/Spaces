@@ -43,7 +43,7 @@ function SpacesPage() {
         <EmptyState
           icon={Layers}
           title="No spaces yet"
-          body="Spaces are the market map — Aerospace, then In-space Manufacturing inside it. Notes, sources, companies, and theses all hang off them."
+          body="Spaces are the market map — Aerospace, then In-space Manufacturing inside it. Notes, sources, and companies all hang off them."
           action={<CreateSpaceDialog spaces={spaces} />}
           hint="The tree is yours — a few starter spaces ship, the rest you build as the research earns them."
         />

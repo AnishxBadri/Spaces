@@ -1,5 +1,5 @@
 import { createReactInlineContentSpec } from '@blocknote/react'
-import { Building2, FileText, Layers, Target, User } from 'lucide-react'
+import { Building2, FileText, Layers, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 /**
@@ -13,7 +13,6 @@ export const KIND_ICONS: Record<string, LucideIcon> = {
   person: User,
   organization: Building2,
   space: Layers,
-  thesis: Target,
   note: FileText,
 }
 
@@ -22,7 +21,6 @@ export const KIND_ROUTES: Record<string, string> = {
   person: '/people',
   organization: '/companies',
   space: '/spaces',
-  thesis: '/theses',
   note: '/notes',
 }
 

@@ -143,7 +143,7 @@ cheap after the grid and editor exist.
 
 **Two halves, one graph.**
 
-- **Research half (PKM-shaped):** spaces, theses, notes, sources, glossary. Slow, exploratory,
+- **Research half (PKM-shaped):** spaces, notes, sources, glossary. Slow, exploratory,
   no pipeline, no stages.
 - **Deal half (CRM-shaped):** companies, pipeline lists, entries, activity. Fast, structured.
 
@@ -157,12 +157,11 @@ Everything linkable is an entity. One mention system, one backlink query, one se
 one attach mechanism.
 
 ```
-entity(id, kind: company|person|organization|space|thesis|note|document)
+entity(id, kind: company|person|organization|space|note|document)
 
 link(from_entity_id, to_entity_id, relation, source: manual|ai|extracted,
      created_by, created_at)
-  relation: mentions | tagged_in | evidence_for | evidence_against
-          | contact_at | derived_from | supersedes
+  relation: mentions | tagged_in | contact_at | derived_from | supersedes
 ```
 
 Real FKs on both sides. Typing `[[Orbital Composites]]` in a note materializes a `link` row —
@@ -206,8 +205,6 @@ to think.
 company(entity_id, domain, cin, founded, sector[], stage, geo)
 person(entity_id, emails[], linkedin)
 space(entity_id, parent_id, slug, name, path, is_seeded)
-thesis(entity_id, claim, conviction, status: forming|active|parked|killed,
-       opened_at, closed_at, closed_reason, owner_id)
 note(entity_id, title, body_md, kind: note|memo|scratch, author_id, visibility)
 document(entity_id, blob_sha, filename, mime, url,
          kind: deck|memo|dd|cap_table|legal|article,
@@ -217,41 +214,36 @@ document_chunk(document_id, idx, text, embedding vector)
 term(entity_id, name, aliases[], definition_md, space_id)
 ```
 
-### Space vs thesis — do not merge these
+### Thesis — removed (2026-08)
 
-**Space is taxonomy.** Aerospace → In-space manufacturing. Hierarchical, shared vocabulary,
-stable for years, effectively never deleted.
+The thesis object (phase 7: falsifiable claim, conviction, status, evidence for/against)
+was **removed by owner decision**: a separate tab and separate storage were judged
+inconsequential — the mandate is the strategy surface, and what a thesis captured is
+prose, which a note filed in a space already carries. Removed, not deferred: the
+`thesis`/`thesis_space` tables, the `thesis` entity kind, and the
+`evidence_for`/`evidence_against` link relations are dropped (migration 0010), the
+routes and space-page claims section deleted. Costs accepted knowingly: structured
+evidence tallies and the kill-requires-a-reason machinery are gone; disconfirmation now
+lives in prose, not in a queryable edge.
 
-**Thesis is a claim you hold.** "In-space manufacturing is investible once launch drops below
-$1000/kg." Has conviction, status, an open date, and evidence on both sides. Theses die often,
-and a dead thesis with its reasoning intact is worth more than a deleted one.
+**Space remains taxonomy** — Aerospace → In-space manufacturing, hierarchical, shared
+vocabulary, effectively never deleted. Market *claims* now live as notes filed in the
+space they are about.
 
-Kept separate because: theses die and taxonomy doesn't; one thesis spans several spaces
-(defence × autonomy); and recording "wrong, killed Mar 2026" on a taxonomy node corrupts
-the tree for everyone.
+### Mandate — the fund's strategy (decided 2026-08)
 
-```
-thesis_space(thesis_entity_id, space_entity_id)     -- many-to-many
-```
-
-Companies attach to a thesis via `link(relation: evidence_for | evidence_against)`.
-Evidence-against is the differentiator — no generic CRM records disconfirmation.
-
-### Mandate — the fund's strategy, not another thesis (decided 2026-08)
-
-A third thing shares the word "thesis" and must not merge with the other two. A thesis is
-a falsifiable market claim that dies often. The **mandate** is the fund's *prescriptive*
-strategy — deep-tech, pre-seed to seed, India, check size, portfolio construction — what
-an LP reads in the deck. It evolves per vintage rather than being disproven. The mandate
-cites theses; theses justify conviction; cramming one into the other list-ifies both.
+The **mandate** is the fund's *prescriptive* strategy — deep-tech, pre-seed to seed,
+India, check size, portfolio construction — what an LP reads in the deck. It evolves per
+vintage rather than being disproven, and it is a filter over deal flow, not a claim
+about a market.
 
 ```
 mandate(id, status: active|archived, note_entity_id → note,
         stages text[], geos text[], check_min, check_max, currency)
 ```
 
-- **The prose body is a real note** (`kind: memo`) — search, `[[mentions]]` of theses and
-  spaces, and future AI-screening input all come free. No new entity kind.
+- **The prose body is a real note** (`kind: memo`) — search, `[[mentions]]` of spaces
+  and companies, and future AI-screening input all come free. No new entity kind.
 - **Structured columns, deliberately few.** `stages` shares the company `funding_stage`
   option vocabulary; `geos` are free tags; check range. Typed columns, *not* the
   attribute engine — one row, a registry buys nothing.
@@ -261,11 +253,8 @@ mandate(id, status: active|archived, note_entity_id → note,
   hint** where `company.funding_stage ∉ mandate.stages` — a hint, never a block; edge
   cases are the job. Geo cannot power this while `location` is free text.
 - One active mandate per workspace; `archived` covers vintages. No versioning machinery.
-- **Nav: the Mandate page is the roof.** Structured facts + prose strategy up top, active
-  theses beneath (claim, conviction, status), killed theses collapsed but present —
-  death is information. The separate Theses tab goes away. Thesis object, thesis page,
-  `thesis_space`, evidence model: all unchanged. Separation lives in the schema;
-  coupling lives in the UI.
+- **Nav: one Mandate page** — structured facts rail + prose strategy. With the thesis
+  object removed it is the single "why we invest" destination.
 
 ### Space membership is orthogonal to pipeline membership
 
@@ -368,7 +357,7 @@ history is the institutional memory an angel pays for.
 - Terminal (`closed`): Invested · Passed (our no) · Lost (their no / missed allocation —
   a different post-mortem lesson than Passed)
 
-Terminal deals close, never delete — same death-is-information principle as theses.
+Terminal deals close, never delete — death is information.
 
 Deal system attributes: stage (status), value (currency), company (record-reference),
 people (record-reference), owner (actor-reference), close date. Custom attributes via the
@@ -377,7 +366,7 @@ attribute engine like every object.
 ### Attribute engine (decided 2026-07)
 
 The object model: **Companies, People, Deals** are objects with an attribute registry —
-system attributes we ship, custom attributes users add. Notes, spaces, theses, terms are
+system attributes we ship, custom attributes users add. Notes, spaces, terms are
 deliberately *not* object-modeled; they're the research layer that links in.
 
 ```
@@ -580,7 +569,7 @@ search indexes, and you will ship one and forget the other.
 ### Investor-specific surfaces Attio does not have
 
 - Space page: notes + sources + tracked companies + contacts + child spaces
-- Thesis page: claim + conviction + evidence for/against + linked spaces
+- Mandate page: strategy prose + stage/geo/check-size facts
 - Round history, valuation, check size, ownership %, dilution
 - Cap table + portfolio marks
 - Co-investor graph
@@ -604,9 +593,8 @@ The UI is single-user. The schema is not. Every row that could ever be personal 
   which otherwise reference a ghost. Hard rule: **no other table ever grows a
   `workspace_id` FK.** The moment one appears, the no-multi-tenancy decision is being
   relitigated by accident.
-- **Spaces, theses, terms, taxonomy are global.** Never per-user. Shared vocabulary is the point;
-  a per-user taxonomy is two people building two ontologies of the same market.
-- Thesis has an `owner_id` but is visible to all. Someone holds the claim; everyone can see it.
+- **Spaces, terms, taxonomy, the mandate are global.** Never per-user. Shared vocabulary is
+  the point; a per-user taxonomy is two people building two ontologies of the same market.
 
 Retrofitting these columns after real data exists is a migration touching every table. Adding
 them now costs nothing.
@@ -936,7 +924,8 @@ Both halves ship, or the seam — the whole point — doesn't exist.
 4. Notes: markdown, `[[mentions]]`, backlinks, attach to anything
 5. Documents: upload + URL clip, text extraction, attach to any entity
 6. Deals: object with stage/value/company attributes, table + kanban by stage, activity feed
-7. Theses: claim, conviction, status, evidence for/against
+7. ~~Theses~~ — shipped 2026-07, **removed 2026-08** (see *Thesis — removed*); the
+   mandate page takes the "why we invest" slot
 8. Glossary with in-note auto-linking
 9. Entity resolution: `resolveEntity()` choke point, aliases, dedupe inbox, merge + snapshot
 10. BYOK AI: deal summary from attached material, memo draft, space tag suggestions
@@ -994,21 +983,11 @@ Decisions worth keeping:
   phase 7 where space pages actually want *sources*; chunking + embeddings wait on BYOK; the
   S3 driver still throws.
 
-**Theses (phase 7): done, 2026-07.** Claim/conviction/status, evidence on both sides,
-claims on the space page. No migration needed — `thesis`, `thesis_space`, and the
-`evidence_for`/`evidence_against` relations were already in the schema. Decisions:
-- **Evidence is open to any entity kind, not just companies.** Disconfirmation is usually
-  an article or a teardown note, so companies-only would have gutted the against column.
-- **One entity, one side.** Attaching a company to the side it isn't already on moves it;
-  the opposite row is deleted in the same transaction. Moving a company from *for* to
-  *against* is the most informative edit there is and must not leave both rows behind.
-- **Killing requires a reason, enforced server-side.** The status change is refused without
-  one, and the reasoning gets the loudest block on the page. Reopening clears the closure;
-  `activity` keeps the trail either way.
-- **No attribute registry on theses.** Claim, conviction, status and evidence is the whole
-  shape — list-ifying it is the failure mode.
-- Claim is truncated into `entity.canonical_name` so search, mentions, and Cmd-K work; the
-  full claim lives on the side table.
+**Theses (phase 7): done 2026-07 — removed 2026-08.** Shipped as claim/conviction/status
+with evidence on both sides, then removed by owner decision; the reasoning and the
+removal's scope live in *Thesis — removed* in the data model. Migration 0010 dropped the
+tables, the entity kind, and the evidence relations; routes, space-page claims, and the
+demo-seed thesis went with them.
 
 **Search (phase 8): done, 2026-07.** One Cmd-K box over names, note bodies, and extracted
 document text, fused in Postgres. Decisions:
@@ -1065,8 +1044,8 @@ Remaining phases, in order:
     `canWrite()` choke point, /setup one-time token, optional TOTP
 11. **Ship polish** — backup script, install docs, GHCR multi-arch images, upgrade CI
 
-Then the 2026-08 product decisions — **mandate page** (the roof over theses) and
-**templates** — specs in the data model; then integrations (each independent):
+Then the 2026-08 product decisions — **mandate page** and **templates** — specs in the
+data model; then integrations (each independent):
 Google Calendar first, Gmail (forward-only), Apollo enrichment (Exa alongside as a
 second `Enricher`), BYOK AI features.
 
@@ -1100,8 +1079,9 @@ twelve-hue badge tint palette). DESIGN.md §2–§3 now match the code; the reas
 lives in `src/styles.css` comments — read those before changing any colour.
 
 **Still open, in order:**
-- **~69 old focus rings** remain outside the table surfaces (record pages, spaces, theses,
-  notes, settings) — **5 of them in the shell** (`app-sidebar.tsx`, `_app.tsx`), so they
+- **Old focus rings** (~60 after the thesis routes went) remain outside the table
+  surfaces (record pages, spaces, notes, settings) — **5 of them in the shell**
+  (`app-sidebar.tsx`, `_app.tsx`), so they
   are on screen even on the polished routes. Mostly mechanical — swap to `focus-ring` and
   delete the adjacent `outline-none`, which would otherwise cancel it — but controls
   inside a scroll container need `focus-ring-inset`, so not a blind find-and-replace.
@@ -1118,10 +1098,8 @@ CSV, virtualization + keyboard-grid, kanban, drawer-over-table, Overview/Highlig
 
 - ~~**Space page shape.**~~ **Answered, and shipped:** one scrollable page, memo at top — a
   space is something you *read*, not something you administer. Still unresolved is what
-  happens as it goes from three sections (memo · companies · notes) to six — sources,
-  contacts, and theses have no section yet, and phase 7 adds two of them.
-- **Does a thesis need its own attributes**, or is claim + conviction + status enough?
-  Resist list-ifying it; a thesis is prose with structure, not a row.
+  happens when sources and contacts get sections alongside memo · companies · notes.
+- ~~**Does a thesis need its own attributes?**~~ Moot — thesis removed 2026-08.
 - ~~**Note vs memo vs document.**~~ **Answered 2026-07: one object.** A memo is a note with
   `kind = 'memo'` — same table, same editor, same links. The kind drives presentation and a
   later PDF export, nothing structural. See *Filed vs referenced*.

@@ -303,9 +303,8 @@ function DemoStep() {
       </h1>
       <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
         A worked example in data-center cooling — a small space tree, three
-        companies, a memo, a glossary, and a thesis with evidence on both sides.
-        Obviously fictional, and safe to delete once you have seen how the
-        pieces connect.
+        companies, a memo, and a glossary. Obviously fictional, and safe to
+        delete once you have seen how the pieces connect.
       </p>
 
       {error ? (

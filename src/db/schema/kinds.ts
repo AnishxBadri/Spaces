@@ -72,51 +72,6 @@ export const space = pgTable(
   ],
 )
 
-// ---------- thesis (a claim you hold — dies often, death is information) ----------
-
-export const thesisStatus = pgEnum('thesis_status', [
-  'forming',
-  'active',
-  'parked',
-  'killed',
-])
-
-export const thesisConviction = pgEnum('thesis_conviction', [
-  'low',
-  'medium',
-  'high',
-])
-
-export const thesis = pgTable('thesis', {
-  entityId: uuid('entity_id')
-    .primaryKey()
-    .references(() => entity.id),
-  claim: text('claim').notNull(),
-  conviction: thesisConviction('conviction').notNull().default('low'),
-  status: thesisStatus('status').notNull().default('forming'),
-  // Owned but visible to all: someone holds the claim, everyone can see it.
-  ownerId: text('owner_id').references(() => user.id),
-  openedAt: timestamp('opened_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  closedAt: timestamp('closed_at', { withTimezone: true }),
-  closedReason: text('closed_reason'),
-})
-
-/** A thesis spans ≥1 space (defence × autonomy). */
-export const thesisSpace = pgTable(
-  'thesis_space',
-  {
-    thesisEntityId: uuid('thesis_entity_id')
-      .notNull()
-      .references(() => thesis.entityId),
-    spaceEntityId: uuid('space_entity_id')
-      .notNull()
-      .references(() => space.entityId),
-  },
-  (t) => [primaryKey({ columns: [t.thesisEntityId, t.spaceEntityId] })],
-)
-
 // ---------- entity ↔ space tagging (orthogonal to pipelines) ----------
 
 export const tagSource = pgEnum('tag_source', ['manual', 'ai', 'inherited'])

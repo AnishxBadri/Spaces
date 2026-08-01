@@ -9,8 +9,6 @@ import {
   person,
   space,
   term,
-  thesis,
-  thesisSpace,
 } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
 import { resolveEntity } from '#/lib/entities/resolve'
@@ -24,8 +22,8 @@ import { resolveEntity } from '#/lib/entities/resolve'
  * example the operator chooses, and can delete.
  *
  * It exercises the seam the product is built around — a company that lands
- * in a pipeline already carrying the space it was researched in, the notes
- * written there, and the thesis it is evidence for.
+ * in a pipeline already carrying the space it was researched in and the
+ * notes written there.
  */
 
 const SPACE_TREE = [
@@ -270,59 +268,6 @@ export async function seedDemoData(
       })
       .onConflictDoNothing()
   }
-
-  // --- a thesis, with evidence on both sides ------------------------------
-  const [thesisEnt] = await db
-    .insert(entity)
-    .values({
-      kind: 'thesis',
-      canonicalName:
-        'Single-phase immersion wins the retrofit market before two-phase clears regulation.',
-      source: 'import',
-      createdBy: userId,
-    })
-    .returning({ id: entity.id })
-  await db.insert(thesis).values({
-    entityId: thesisEnt.id,
-    claim:
-      'Single-phase immersion wins the retrofit market before two-phase clears regulation.',
-    conviction: 'medium',
-    status: 'active',
-    ownerId: userId,
-  })
-  const immersionId = spaceIds.get('immersion')
-  if (immersionId) {
-    await db
-      .insert(thesisSpace)
-      .values({ thesisEntityId: thesisEnt.id, spaceEntityId: immersionId })
-      .onConflictDoNothing()
-  }
-  const evidence: Array<
-    [string | undefined, 'evidence_for' | 'evidence_against']
-  > = [
-    [companyIds.get('Submer'), 'evidence_for'],
-    [memoEnt.id, 'evidence_for'],
-    // The differentiator: a company that argues the other way.
-    [companyIds.get('LiquidStack'), 'evidence_against'],
-  ]
-  for (const [id, relation] of evidence) {
-    if (!id) continue
-    await db
-      .insert(link)
-      .values({
-        fromEntityId: id,
-        toEntityId: thesisEnt.id,
-        relation,
-        source: 'manual',
-        createdBy: userId,
-      })
-      .onConflictDoNothing()
-  }
-  await db.insert(activity).values({
-    actorId: userId,
-    verb: 'thesis.created',
-    subjectEntityId: thesisEnt.id,
-  })
 
   console.log('[demo] seeded demo data')
   return { seeded: true }

@@ -20,7 +20,7 @@ spreadsheet loses them.
 ## Product Purpose
 
 An open-source, self-hosted deal-management OS for angel and private-capital investing.
-Two halves on one graph: a research half (spaces, theses, notes, sources, glossary) and a
+Two halves on one graph: a research half (spaces, notes, sources, glossary) and a
 deal half (pipeline, companies, contacts, activity). The seam is the product — a company
 landing in pre-lead already carries months of notes on its subspace, saved sources, and
 contacts. Success looks like zero manual data entry (Gmail sync populates the graph) and the
@@ -35,8 +35,8 @@ BYOK, so the fund owns the data and the schema fits investing instead of sales.
 
 Precise, calm, fast. Quiet confidence — the tool disappears and the work remains. Speed is
 a feeling, not a spec: instant response, keyboard-first, no page reloads. One deliberate
-nuance: this is a thinking tool, not just a tracking tool. Prose surfaces — notes, theses,
-memos — get reading-grade typography, closer to a well-set book than a dashboard. Data
+nuance: this is a thinking tool, not just a tracking tool. Prose surfaces — notes, memos,
+the mandate — get reading-grade typography, closer to a well-set book than a dashboard. Data
 surfaces read like a ledger; prose surfaces read like a page.
 
 ## Anti-references
@@ -55,7 +55,7 @@ surfaces read like a ledger; prose surfaces read like a page.
 2. **Keyboard is the primary input.** Cmd-K everywhere, shortcuts for every frequent action,
    mouse optional. Latency is a design defect.
 3. **Two registers, one system.** Ledger register for data (tables, pipeline, attributes),
-   page register for prose (notes, theses, memos). Same tokens, different type treatment.
+   page register for prose (notes, memos, the mandate). Same tokens, different type treatment.
 4. **Never show an empty table.** Every surface earns its place with real or seeded content;
    onboarding lands in a populated graph, not a blank slate.
 5. **Craft over decoration.** Quality comes from typography, spacing, and alignment — not

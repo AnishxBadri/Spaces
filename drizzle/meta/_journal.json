@@ -71,6 +71,13 @@
       "when": 1785419543663,
       "tag": "0009_search_notes_and_names",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785590366565,
+      "tag": "0010_drop_thesis",
+      "breakpoints": true
     }
   ]
 }

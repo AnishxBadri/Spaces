@@ -8,7 +8,6 @@ import {
   LogOut,
   Search,
   Settings,
-  Target,
   Users,
 } from 'lucide-react'
 import { Wordmark } from './wordmark'
@@ -28,7 +27,6 @@ export const NAV_ITEMS = [
   { to: '/companies', label: 'Companies', icon: Building2 },
   { to: '/people', label: 'People', icon: Users },
   { to: '/deals', label: 'Deals', icon: Kanban },
-  { to: '/theses', label: 'Theses', icon: Target },
   { to: '/notes', label: 'Notes', icon: FileText },
 ] as const
 
