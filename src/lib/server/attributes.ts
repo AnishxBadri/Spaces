@@ -3,7 +3,7 @@ import { and, asc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '#/db'
 import { BADGE_COLORS, nextBadgeColor } from '../attributes/colors'
-import { requireUser } from './shared'
+import { requireAdmin, requireUser } from './shared'
 import type { Json } from './shared'
 
 export const listRegistry = createServerFn()
@@ -67,7 +67,11 @@ export const updateAttribute = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ data }) => {
-    await requireUser()
+    // canWrite's admin edge: renames, option edits, and archiving reshape
+    // shared vocabulary for everyone, so they are settings — admin-owned.
+    // Creating an attribute stays member (the "+ Add column" flow): additive,
+    // and a two-person fund should not need ceremony to add a field.
+    await requireAdmin()
     const { attribute } = await import('#/db/schema')
     const [attr] = await db
       .select()

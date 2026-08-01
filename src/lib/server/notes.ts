@@ -1,10 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, desc, eq, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '#/db'
 import { entity, entitySpace, link, note, space } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
-import { requireUser } from './shared'
+import { canRead, requireUser } from './shared'
 import type { Json } from './shared'
 
 export const createNote = createServerFn({ method: 'POST' })
@@ -98,7 +98,7 @@ export const createNote = createServerFn({ method: 'POST' })
   })
 
 export const listNotes = createServerFn().handler(async () => {
-  await requireUser()
+  const u = await requireUser()
   const rows = await db
     .select({
       id: note.entityId,
@@ -106,33 +106,44 @@ export const listNotes = createServerFn().handler(async () => {
       bodyMd: note.bodyMd,
       updatedAt: note.updatedAt,
       authorId: note.authorId,
+      visibility: note.visibility,
     })
     .from(note)
     .innerJoin(entity, eq(entity.id, note.entityId))
-    .where(isNull(entity.mergedIntoId))
+    .where(
+      and(
+        isNull(entity.mergedIntoId),
+        // canRead in SQL: shared, or private-and-mine.
+        or(eq(note.visibility, 'shared'), eq(note.authorId, u.id)),
+      ),
+    )
     .orderBy(desc(note.updatedAt))
   return rows.map((r) => ({
     id: r.id,
     title: r.title || 'Untitled',
     snippet: r.bodyMd.replace(/\s+/g, ' ').slice(0, 140),
     updatedAt: r.updatedAt.toISOString(),
+    isPrivate: r.visibility === 'private',
   }))
 })
 
 export const getNote = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
-    await requireUser()
+    const u = await requireUser()
     const [row] = await db
       .select({
         id: note.entityId,
         title: note.title,
         bodyJson: note.bodyJson,
         updatedAt: note.updatedAt,
+        authorId: note.authorId,
+        visibility: note.visibility,
       })
       .from(note)
       .where(eq(note.entityId, data.id))
-    if (!row) throw new Error('Note not found')
+    // "Not found" on purpose — a 403 would confirm a private note exists.
+    if (!row || !canRead(u, row)) throw new Error('Note not found')
     // jsonb comes back as unknown; it's a BlockNote document array.
     const bodyJson = row.bodyJson as Array<Json> | null
 
@@ -162,7 +173,38 @@ export const getNote = createServerFn()
       updatedAt: row.updatedAt.toISOString(),
       backlinks,
       spaces,
+      isPrivate: row.visibility === 'private',
+      isMine: row.authorId === u.id,
     }
+  })
+
+/**
+ * Visibility is the author's choice alone — an admin flipping someone's
+ * private note shared would break the trust the default-shared model
+ * depends on.
+ */
+export const setNoteVisibility = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      visibility: z.enum(['shared', 'private']),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const [row] = await db
+      .select({ authorId: note.authorId })
+      .from(note)
+      .where(eq(note.entityId, data.id))
+    if (!row) throw new Error('Note not found')
+    if (row.authorId !== u.id) {
+      throw new Error('Only the author can change a note’s visibility.')
+    }
+    await db
+      .update(note)
+      .set({ visibility: data.visibility, updatedAt: new Date() })
+      .where(eq(note.entityId, data.id))
+    return { ok: true }
   })
 
 const saveNoteInput = z.object({
@@ -183,6 +225,13 @@ export const saveNote = createServerFn({ method: 'POST' })
   .validator(saveNoteInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
+
+    // Shared notes are team-editable; private ones are the author's alone.
+    const [existing] = await db
+      .select({ authorId: note.authorId, visibility: note.visibility })
+      .from(note)
+      .where(eq(note.entityId, data.id))
+    if (!existing || !canRead(u, existing)) throw new Error('Note not found')
 
     await db.transaction(async (tx) => {
       await tx

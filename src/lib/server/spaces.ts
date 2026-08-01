@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '#/db'
 import { company, entity, entitySpace, link, note, space } from '#/db/schema'
@@ -40,7 +40,7 @@ export const listSpaces = createServerFn().handler(async () => {
 export const getSpace = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
-    await requireUser()
+    const u = await requireUser()
 
     const [head] = await db
       .select({
@@ -118,7 +118,15 @@ export const getSpace = createServerFn()
       .from(entitySpace)
       .innerJoin(note, eq(note.entityId, entitySpace.entityId))
       .innerJoin(entity, eq(entity.id, note.entityId))
-      .where(and(eq(entitySpace.spaceId, data.id), isNull(entity.mergedIntoId)))
+      .where(
+        and(
+          eq(entitySpace.spaceId, data.id),
+          isNull(entity.mergedIntoId),
+          // canRead in SQL: private notes file into spaces like any other,
+          // but only their author sees them there.
+          or(eq(note.visibility, 'shared'), eq(note.authorId, u.id)),
+        ),
+      )
       .orderBy(desc(note.updatedAt))
     const filedIds = new Set(filedRows.map((f) => f.id))
 
@@ -132,7 +140,13 @@ export const getSpace = createServerFn()
       })
       .from(link)
       .innerJoin(note, eq(note.entityId, link.fromEntityId))
-      .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
+      .where(
+        and(
+          eq(link.toEntityId, data.id),
+          eq(link.relation, 'mentions'),
+          or(eq(note.visibility, 'shared'), eq(note.authorId, u.id)),
+        ),
+      )
       .orderBy(desc(note.updatedAt))
 
     return {

@@ -23,10 +23,19 @@ export const getSession = createServerFn().handler(async () => {
   }
 })
 
-/** True until the first admin exists — drives the /setup redirect. */
+/**
+ * True until the first admin exists — drives the /setup redirect. Asking
+ * while setup is needed (re)prints the one-time token to the server logs,
+ * so the operator who just opened /setup finds it waiting in the terminal.
+ */
 export const getSetupState = createServerFn().handler(async () => {
   const [{ value }] = await db.select({ value: count() }).from(user)
-  return { needsSetup: value === 0 }
+  const needsSetup = value === 0
+  if (needsSetup) {
+    const { printSetupToken } = await import('../setup-token')
+    printSetupToken()
+  }
+  return { needsSetup }
 })
 
 const aiKeyInput = z.object({

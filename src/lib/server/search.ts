@@ -25,7 +25,7 @@ export const searchEntities = createServerFn()
     }),
   )
   .handler(async ({ data }) => {
-    await requireUser()
+    const u = await requireUser()
     const q = data.q.trim()
     if (!q) return []
     const pattern = `%${q}%`
@@ -43,6 +43,9 @@ export const searchEntities = createServerFn()
           data.kinds
             ? inArray(entity.kind, data.kinds)
             : ne(entity.kind, 'document'),
+          // canRead at the SQL layer: a private note's title must not
+          // surface in anyone else's autocomplete.
+          sql`not exists (select 1 from note pn where pn.entity_id = ${entity.id} and pn.visibility = 'private' and pn.author_id <> ${u.id})`,
           sql`(${entity.canonicalName} ilike ${pattern} or (${entityAlias.kind} = 'name' and ${entityAlias.valueNorm} ilike ${pattern}))`,
         ),
       )
@@ -65,7 +68,7 @@ export const searchEntities = createServerFn()
 export const searchAll = createServerFn()
   .validator(z.object({ q: z.string().max(200) }))
   .handler(async ({ data }) => {
-    await requireUser()
+    const u = await requireUser()
     const q = data.q.trim()
     if (q.length < 2) return []
 
@@ -98,6 +101,13 @@ export const searchAll = createServerFn()
         left join entity_alias a
           on a.entity_id = e.id and a.kind = 'name'
         where e.merged_into_id is null
+          -- canRead in SQL: private note titles are entities too.
+          and not exists (
+            select 1 from note pn
+            where pn.entity_id = e.id
+              and pn.visibility = 'private'
+              and pn.author_id <> ${u.id}
+          )
           and (
             e.canonical_name ilike '%' || (select raw from q) || '%'
             -- word_similarity, not similarity: the percent operator compares
@@ -122,6 +132,7 @@ export const searchAll = createServerFn()
         from note n
         join entity e on e.id = n.entity_id and e.merged_into_id is null
         where n.tsv @@ (select tsq from q)
+          and (n.visibility = 'shared' or n.author_id = ${u.id})
         limit 40
       ),
 

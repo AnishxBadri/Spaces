@@ -73,6 +73,29 @@ export const account = pgTable('account', {
     .defaultNow(),
 })
 
+/**
+ * Invites — the token-gated path around the permanently-closed signup.
+ * Only the hash is stored (a leaked DB row is not a working invite);
+ * single-use, 7-day expiry, role baked in at creation. Works without SMTP:
+ * the UI shows a copyable /join link when mail isn't configured.
+ */
+export const invite = pgTable('invite', {
+  id: text('id').primaryKey(),
+  tokenHash: text('token_hash').notNull().unique(),
+  // Optional lock to one address; null = whoever holds the link.
+  email: text('email'),
+  role: text('role').notNull().default('member'),
+  invitedBy: text('invited_by')
+    .notNull()
+    .references(() => user.id),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  usedBy: text('used_by').references(() => user.id),
+})
+
 export const verification = pgTable('verification', {
   id: text('id').primaryKey(),
   identifier: text('identifier').notNull(),

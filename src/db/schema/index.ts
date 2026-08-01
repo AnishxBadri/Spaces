@@ -1,4 +1,5 @@
 export * from './auth'
+export * from './workspace'
 export * from './entities'
 export * from './attributes'
 export * from './kinds'

@@ -4,7 +4,7 @@ import {
   Link,
   useRouter,
 } from '@tanstack/react-router'
-import { ArrowLeft, Layers, X } from 'lucide-react'
+import { ArrowLeft, Globe, Layers, Lock, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -18,6 +18,7 @@ import {
   listSpaces,
   listTermsForNote,
   saveNote,
+  setNoteVisibility,
   tagIntoSpace,
   untagFromSpace,
 } from '#/lib/server-fns'
@@ -98,18 +99,26 @@ function NotePage() {
           <ArrowLeft className="size-3.5" strokeWidth={1.75} />
           Notes
         </Link>
-        <span
-          className="text-xs text-muted-foreground/80"
-          role="status"
-          aria-live="polite"
-        >
-          {saveState === 'saving'
-            ? 'Saving…'
-            : saveState === 'saved'
-              ? 'Saved'
-              : saveState === 'dirty'
-                ? 'Unsaved changes'
-                : ''}
+        <span className="flex items-center gap-3">
+          <span
+            className="text-xs text-muted-foreground/80"
+            role="status"
+            aria-live="polite"
+          >
+            {saveState === 'saving'
+              ? 'Saving…'
+              : saveState === 'saved'
+                ? 'Saved'
+                : saveState === 'dirty'
+                  ? 'Unsaved changes'
+                  : ''}
+          </span>
+          {initial.isMine ? (
+            <VisibilityToggle
+              noteId={initial.id}
+              isPrivate={initial.isPrivate}
+            />
+          ) : null}
         </span>
       </div>
 
@@ -181,6 +190,61 @@ function NotePage() {
  * filing says the note *lives* here, and puts it in the space's top block.
  * Same `entity_space` write a company tag makes — one mechanism per kind.
  */
+/**
+ * Author-only. Default is shared — private is the exception you opt into
+ * (CONTEXT.md: notes private-by-default is the trap that keeps partner #2
+ * writing in Apple Notes).
+ */
+function VisibilityToggle({
+  noteId,
+  isPrivate: initialPrivate,
+}: {
+  noteId: string
+  isPrivate: boolean
+}) {
+  const [isPrivate, setIsPrivate] = useState(initialPrivate)
+  const [pending, setPending] = useState(false)
+
+  async function toggle() {
+    const next = !isPrivate
+    setPending(true)
+    try {
+      await setNoteVisibility({
+        data: { id: noteId, visibility: next ? 'private' : 'shared' },
+      })
+      setIsPrivate(next)
+      toast.success(
+        next ? 'Only you can see this note now' : 'Visible to the workspace',
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not change that')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={pending}
+      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+      title={
+        isPrivate
+          ? 'Private — only you. Click to share with the workspace.'
+          : 'Shared with the workspace. Click to make private.'
+      }
+    >
+      {isPrivate ? (
+        <Lock className="size-3" strokeWidth={1.75} />
+      ) : (
+        <Globe className="size-3" strokeWidth={1.75} />
+      )}
+      {isPrivate ? 'Private' : 'Shared'}
+    </button>
+  )
+}
+
 function SpaceFiling({
   noteId,
   filed,

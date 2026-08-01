@@ -9,18 +9,19 @@ import { authClient } from '#/lib/auth-client'
 import {
   getSession,
   getSetupState,
-  saveAiKey,
+  saveWorkspace,
   seedDemo,
 } from '#/lib/server-fns'
 
 /**
- * First-run wizard. Two steps, both real:
- *  1. Create the admin account (signup closes permanently after).
- *  2. Optional BYOK AI key into the vault. Skippable — no key means AI
- *     features stay hidden, everything else works.
+ * First-run wizard — deliberately minimal (CONTEXT.md, 2026-08): setup
+ * token → admin + workspace name → optional demo data. Under a minute.
+ * AI-key and Gmail steps join only when their features ship; the mandate is
+ * written from its own page, not here.
  *
- * TODO(setup-token): CONTEXT.md trap #2 — one-time token printed to
- * container logs, required here. Env-gated, lands before first release.
+ * The token is enforced in the Better Auth database hook, not this route —
+ * the public signup endpoint would bypass anything checked here. This form
+ * merely carries it along as a header.
  */
 export const Route = createFileRoute('/setup')({
   beforeLoad: async () => {
@@ -34,33 +35,17 @@ export const Route = createFileRoute('/setup')({
   component: SetupWizard,
 })
 
-const PROVIDERS = [
-  { id: 'anthropic', label: 'Anthropic', placeholder: 'sk-ant-…' },
-  { id: 'openai', label: 'OpenAI', placeholder: 'sk-…' },
-  { id: 'google', label: 'Google', placeholder: 'AIza…' },
-  { id: 'openrouter', label: 'OpenRouter', placeholder: 'sk-or-…' },
-  { id: 'ollama', label: 'Ollama', placeholder: 'unused — local' },
-] as const
-
-type ProviderId = (typeof PROVIDERS)[number]['id']
-
 function SetupWizard() {
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState<1 | 2>(1)
 
   return (
     <main className="flex min-h-dvh flex-col items-center bg-background px-6">
       <div className="w-full max-w-[400px] pt-[18vh] pb-16">
         <Wordmark />
         <p className="mt-3 text-xs font-medium text-muted-foreground tabular">
-          Step {step} of 3
+          Step {step} of 2
         </p>
-        {step === 1 ? (
-          <AdminStep onDone={() => setStep(2)} />
-        ) : step === 2 ? (
-          <AiKeyStep onDone={() => setStep(3)} />
-        ) : (
-          <DemoStep />
-        )}
+        {step === 1 ? <AdminStep onDone={() => setStep(2)} /> : <DemoStep />}
       </div>
     </main>
   )
@@ -79,17 +64,32 @@ function AdminStep({ onDone }: { onDone: () => void }) {
       setError('Password needs at least 12 characters.')
       return
     }
+    const workspaceName = String(form.get('workspace')).trim()
+    if (!workspaceName) {
+      setError('Give the workspace a name — usually the fund’s.')
+      return
+    }
     setPending(true)
     const { error: err } = await authClient.signUp.email({
       name: String(form.get('name')),
       email: String(form.get('email')),
       password,
+      fetchOptions: {
+        headers: { 'x-setup-token': String(form.get('token')).trim() },
+      },
     })
-    setPending(false)
     if (err) {
+      setPending(false)
       setError(err.message ?? 'Could not create the account.')
       return
     }
+    try {
+      await saveWorkspace({ data: { name: workspaceName } })
+    } catch {
+      // Account exists and session is live — the name can be set again in
+      // settings. Do not strand the operator on a half-failed step.
+    }
+    setPending(false)
     onDone()
   }
 
@@ -105,8 +105,33 @@ function AdminStep({ onDone }: { onDone: () => void }) {
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
         <div className="space-y-1.5">
-          <Label htmlFor="name">Name</Label>
-          <Input id="name" name="name" autoComplete="name" required autoFocus />
+          <Label htmlFor="token">Setup token</Label>
+          <Input
+            id="token"
+            name="token"
+            autoComplete="off"
+            required
+            autoFocus
+            placeholder="Printed in the server logs"
+            aria-describedby="token-hint"
+          />
+          <p id="token-hint" className="text-xs text-muted-foreground">
+            One-time code from the terminal or container logs — proof you run
+            this server.
+          </p>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="workspace">Workspace name</Label>
+          <Input
+            id="workspace"
+            name="workspace"
+            required
+            placeholder="Meridian Ventures"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="name">Your name</Label>
+          <Input id="name" name="name" autoComplete="name" required />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
@@ -143,131 +168,6 @@ function AdminStep({ onDone }: { onDone: () => void }) {
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? 'Creating…' : 'Create account'}
         </Button>
-      </form>
-    </>
-  )
-}
-
-function AiKeyStep({ onDone }: { onDone: () => void }) {
-  const [provider, setProvider] = useState<ProviderId>('anthropic')
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
-  const [saved, setSaved] = useState<string | null>(null)
-
-  const selected = PROVIDERS.find((p) => p.id === provider)!
-
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
-    const form = new FormData(e.currentTarget)
-    const key = String(form.get('key')).trim()
-    if (!key) {
-      setError('Paste a key, or skip this step.')
-      return
-    }
-    setPending(true)
-    try {
-      const { display } = await saveAiKey({
-        data: {
-          provider,
-          key,
-          baseUrl:
-            provider === 'ollama'
-              ? String(form.get('baseUrl') || 'http://localhost:11434')
-              : undefined,
-        },
-      })
-      setSaved(display)
-    } catch {
-      setError('Could not save the key. It stays on this server either way.')
-    } finally {
-      setPending(false)
-    }
-  }
-
-  if (saved) {
-    return (
-      <>
-        <h1 className="mt-6 text-[22px] font-semibold tracking-tight">
-          Key saved
-        </h1>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-          Stored encrypted as{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">{saved}</code>.
-          It never leaves this server and is only decrypted at call time.
-        </p>
-        <Button className="mt-6 w-full" onClick={onDone}>
-          Continue
-        </Button>
-      </>
-    )
-  }
-
-  return (
-    <>
-      <h1 className="mt-6 text-[22px] font-semibold tracking-tight">
-        Connect an AI provider
-      </h1>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-        Bring your own key — summaries, memo drafts, and tagging run through it.
-        Optional: without one, AI features stay hidden and everything else
-        works.
-      </p>
-
-      <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
-        <div className="space-y-1.5">
-          <Label htmlFor="provider">Provider</Label>
-          <select
-            id="provider"
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as ProviderId)}
-            className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            {PROVIDERS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {provider === 'ollama' ? (
-          <div className="space-y-1.5">
-            <Label htmlFor="baseUrl">Ollama URL</Label>
-            <Input
-              id="baseUrl"
-              name="baseUrl"
-              type="url"
-              defaultValue="http://localhost:11434"
-            />
-          </div>
-        ) : null}
-
-        <div className="space-y-1.5">
-          <Label htmlFor="key">API key</Label>
-          <Input
-            id="key"
-            name="key"
-            type="password"
-            autoComplete="off"
-            placeholder={selected.placeholder}
-          />
-        </div>
-
-        {error ? (
-          <p role="alert" className="text-[13px] text-destructive">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="flex gap-2">
-          <Button type="submit" className="flex-1" disabled={pending}>
-            {pending ? 'Saving…' : 'Save key'}
-          </Button>
-          <Button type="button" variant="ghost" onClick={onDone}>
-            Skip for now
-          </Button>
-        </div>
       </form>
     </>
   )

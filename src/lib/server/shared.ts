@@ -16,6 +16,31 @@ export async function requireUser() {
   return session.user
 }
 
+/**
+ * canWrite's admin gate. Admin owns: settings, integrations, keys, user
+ * management (CONTEXT.md). Everything else any member writes — a two-person
+ * fund has no ceremony.
+ */
+export async function requireAdmin() {
+  const u = await requireUser()
+  if (u.role !== 'admin') throw new Error('Admins only')
+  return u
+}
+
+/**
+ * canRead, as a predicate. Policy is deliberately trivial (2026-08): shared
+ * unless private-and-not-yours. Private applies to note bodies (and later
+ * interaction bodies) only. The point of the choke point is that it exists
+ * — every read path routes through it before any richer policy needs it.
+ */
+export function canRead(
+  user: { id: string },
+  row: { visibility?: string | null; authorId?: string | null },
+): boolean {
+  if (row.visibility !== 'private') return true
+  return row.authorId === user.id
+}
+
 /** Latest interaction per entity — the "last touched" signal for tables. */
 export async function lastTouchedMap(): Promise<Record<string, string>> {
   const rows = await db

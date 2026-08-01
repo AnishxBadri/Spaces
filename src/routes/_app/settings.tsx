@@ -6,6 +6,7 @@ import {
   ArrowUp,
   Building2,
   Check,
+  Copy,
   Kanban,
   Pencil,
   Plus,
@@ -23,6 +24,7 @@ import {
 } from '#/components/ui/dropdown-menu'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { Label } from '#/components/ui/label'
 import {
   BADGE_COLORS,
   badgeStyle,
@@ -30,22 +32,49 @@ import {
   optionColor,
 } from '#/lib/attributes/colors'
 import type { BadgeColor } from '#/lib/attributes/colors'
-import { listRegistry, updateAttribute } from '#/lib/server-fns'
+import {
+  createInvite,
+  getSession,
+  getWorkspace,
+  listInvites,
+  listMembers,
+  listRegistry,
+  revokeInvite,
+  saveWorkspace,
+  setMemberBanned,
+  setMemberRole,
+  updateAttribute,
+} from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
- * Object settings — the attribute registries behind Companies, People,
- * Deals. Structure fixed, content free: rename anything, edit options,
- * archive; types and system-ness are immutable.
+ * Settings: the workspace singleton, members + invites, and the attribute
+ * registries behind Companies, People, Deals. Structure fixed, content
+ * free; admin owns the destructive edges.
  */
 export const Route = createFileRoute('/_app/settings')({
   loader: async () => {
-    const [company, person, deal] = await Promise.all([
-      listRegistry({ data: { kind: 'company', includeArchived: true } }),
-      listRegistry({ data: { kind: 'person', includeArchived: true } }),
-      listRegistry({ data: { kind: 'deal', includeArchived: true } }),
-    ])
-    return { company, person, deal }
+    const [session, workspace, members, company, person, deal] =
+      await Promise.all([
+        getSession(),
+        getWorkspace(),
+        listMembers(),
+        listRegistry({ data: { kind: 'company', includeArchived: true } }),
+        listRegistry({ data: { kind: 'person', includeArchived: true } }),
+        listRegistry({ data: { kind: 'deal', includeArchived: true } }),
+      ])
+    const isAdmin = session?.user.role === 'admin'
+    const invites = isAdmin ? await listInvites() : []
+    return {
+      me: session!.user,
+      isAdmin,
+      workspace,
+      members,
+      invites,
+      company,
+      person,
+      deal,
+    }
   },
   component: SettingsPage,
 })
@@ -79,7 +108,12 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 function SettingsPage() {
-  const registries = Route.useLoaderData()
+  const data = Route.useLoaderData()
+  const registries = {
+    company: data.company,
+    person: data.person,
+    deal: data.deal,
+  }
   const router = useRouter()
   const [kind, setKind] = useState<Kind>('company')
   const registry = registries[kind]
@@ -89,12 +123,29 @@ function SettingsPage() {
       <header>
         <h1 className="text-[22px] font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-[13px] text-muted-foreground">
-          Objects and their attributes. Rename anything, edit options, archive
-          what you don't use — types are fixed.
+          Workspace, members, and objects. Structural edits are admin-only.
         </p>
       </header>
 
-      <div className="mt-6 flex items-center justify-between border-b border-border">
+      <WorkspaceSection
+        name={data.workspace?.name ?? ''}
+        isAdmin={data.isAdmin}
+      />
+
+      <MembersSection
+        me={data.me}
+        isAdmin={data.isAdmin}
+        members={data.members}
+        invites={data.invites}
+      />
+
+      <h2 className="mt-10 text-title font-semibold tracking-tight">Objects</h2>
+      <p className="mt-1 text-[13px] text-muted-foreground">
+        Attributes behind Companies, People, Deals. Rename anything, edit
+        options, archive what you don't use — types are fixed.
+      </p>
+
+      <div className="mt-4 flex items-center justify-between border-b border-border">
         <div role="tablist" className="flex gap-1">
           {OBJECTS.map((o) => (
             <button
@@ -139,6 +190,271 @@ function SettingsPage() {
         ))}
       </ul>
     </div>
+  )
+}
+
+function WorkspaceSection({
+  name,
+  isAdmin,
+}: {
+  name: string
+  isAdmin: boolean
+}) {
+  const router = useRouter()
+  const [value, setValue] = useState(name)
+  const [pending, setPending] = useState(false)
+  const dirty = value.trim() !== name && value.trim().length > 0
+
+  async function save() {
+    setPending(true)
+    try {
+      await saveWorkspace({ data: { name: value.trim() } })
+      toast.success('Workspace renamed')
+      router.invalidate()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not rename')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <section className="mt-8">
+      <h2 className="text-title font-semibold tracking-tight">Workspace</h2>
+      <div className="mt-3 flex max-w-sm items-end gap-2">
+        <div className="flex-1 space-y-1.5">
+          <Label htmlFor="ws-name">Name</Label>
+          <Input
+            id="ws-name"
+            value={value}
+            disabled={!isAdmin}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Your fund's name"
+          />
+        </div>
+        {isAdmin ? (
+          <Button size="sm" disabled={!dirty || pending} onClick={save}>
+            {pending ? 'Saving…' : 'Save'}
+          </Button>
+        ) : null}
+      </div>
+      {!isAdmin ? (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Only admins can rename the workspace.
+        </p>
+      ) : null}
+    </section>
+  )
+}
+
+type Member = Awaited<ReturnType<typeof listMembers>>[number]
+type Invite = Awaited<ReturnType<typeof listInvites>>[number]
+
+function MembersSection({
+  me,
+  isAdmin,
+  members,
+  invites,
+}: {
+  me: { id: string }
+  isAdmin: boolean
+  members: Array<Member>
+  invites: Array<Invite>
+}) {
+  const router = useRouter()
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [pending, setPending] = useState(false)
+
+  async function invite() {
+    setPending(true)
+    try {
+      const { url } = await createInvite({
+        data: {
+          role: inviteRole,
+          email: inviteEmail.trim() || undefined,
+        },
+      })
+      setInviteUrl(url)
+      setInviteEmail('')
+      router.invalidate()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not create invite')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  async function act(fn: () => Promise<unknown>, ok: string) {
+    try {
+      await fn()
+      toast.success(ok)
+      router.invalidate()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'That did not work')
+    }
+  }
+
+  return (
+    <section className="mt-10">
+      <h2 className="text-title font-semibold tracking-tight">Members</h2>
+
+      <ul className="mt-3 divide-y divide-border/60 rounded-lg border border-border">
+        {members.map((m) => (
+          <li key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground text-micro font-semibold text-background">
+              {m.name.charAt(0).toUpperCase()}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-baseline gap-2">
+                <span className="truncate text-[13px] font-medium">
+                  {m.name}
+                  {m.id === me.id ? (
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                      you
+                    </span>
+                  ) : null}
+                </span>
+                {m.banned ? (
+                  <span className="rounded-full bg-destructive/10 px-2 text-xs font-medium text-destructive">
+                    suspended
+                  </span>
+                ) : null}
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {m.email}
+              </span>
+            </span>
+            {isAdmin && m.id !== me.id ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="rounded-md px-2 py-1 text-xs font-medium capitalize text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+                  {m.role}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      act(
+                        () =>
+                          setMemberRole({
+                            data: {
+                              userId: m.id,
+                              role: m.role === 'admin' ? 'member' : 'admin',
+                            },
+                          }),
+                        'Role updated',
+                      )
+                    }
+                  >
+                    Make {m.role === 'admin' ? 'member' : 'admin'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant={m.banned ? undefined : 'destructive'}
+                    onSelect={() =>
+                      act(
+                        () =>
+                          setMemberBanned({
+                            data: { userId: m.id, banned: !m.banned },
+                          }),
+                        m.banned ? 'Access restored' : 'Access suspended',
+                      )
+                    }
+                  >
+                    {m.banned ? 'Restore access' : 'Suspend access'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <span className="px-2 text-xs font-medium capitalize text-muted-foreground">
+                {m.role}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {isAdmin ? (
+        <div className="mt-4">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="w-56 space-y-1.5">
+              <Label htmlFor="invite-email">Invite by email (optional)</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="partner@fund.com"
+              />
+            </div>
+            <select
+              aria-label="Invite role"
+              value={inviteRole}
+              onChange={(e) =>
+                setInviteRole(e.target.value as 'member' | 'admin')
+              }
+              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs focus-ring"
+            >
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
+            <Button size="sm" disabled={pending} onClick={invite}>
+              <Plus className="size-3.5" strokeWidth={2} />
+              Create invite
+            </Button>
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Single-use link, valid 7 days. Leave email empty for a link anyone
+            can use once.
+          </p>
+
+          {inviteUrl ? (
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+              <code className="min-w-0 flex-1 truncate text-xs">
+                {inviteUrl}
+              </code>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(inviteUrl)
+                  toast.success('Link copied — send it however you like')
+                }}
+              >
+                <Copy className="size-3" strokeWidth={2} />
+                Copy
+              </Button>
+            </div>
+          ) : null}
+
+          {invites.length > 0 ? (
+            <ul className="mt-3 space-y-1">
+              {invites.map((inv) => (
+                <li
+                  key={inv.id}
+                  className="flex items-center gap-2 text-xs text-muted-foreground"
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {inv.email ?? 'Open link'} · {inv.role} · expires{' '}
+                    {new Date(inv.expiresAt).toLocaleDateString()}
+                  </span>
+                  <button
+                    className="rounded px-1.5 py-0.5 hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                    onClick={() =>
+                      act(
+                        () => revokeInvite({ data: { id: inv.id } }),
+                        'Invite revoked',
+                      )
+                    }
+                  >
+                    Revoke
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
   )
 }
 

@@ -42,10 +42,16 @@ export async function setValues(opts: {
   const { entityId, patch, actorId } = opts
 
   return db.transaction(async (tx) => {
+    // FOR UPDATE: this is a read-modify-write of the whole values blob. At
+    // READ COMMITTED, two partners editing different attributes of the same
+    // record concurrently would both read the same starting blob and the
+    // second commit would silently erase the first one's key. The row lock
+    // serializes the merges instead.
     const [ent] = await tx
       .select({ id: entity.id, kind: entity.kind, values: entity.values })
       .from(entity)
       .where(eq(entity.id, entityId))
+      .for('update')
     if (!ent) throw new Error('Entity not found')
     const kind = ent.kind as ObjectKind
     const registry = await getRegistry(kind)

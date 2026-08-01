@@ -5,7 +5,7 @@ import { AppSidebar } from '#/components/app-sidebar'
 import { CommandPalette } from '#/components/command-palette'
 import { Wordmark } from '#/components/wordmark'
 import { Toaster } from '#/components/ui/sonner'
-import { getSession } from '#/lib/server-fns'
+import { getSession, getWorkspace } from '#/lib/server-fns'
 
 /** Authenticated shell: fixed sidebar, fluid content, Cmd-K everywhere. */
 export const Route = createFileRoute('/_app')({
@@ -14,11 +14,13 @@ export const Route = createFileRoute('/_app')({
     if (!session) throw redirect({ to: '/login' })
     return { session }
   },
+  loader: async () => ({ workspace: await getWorkspace() }),
   component: AppShell,
 })
 
 function AppShell() {
   const { session } = Route.useRouteContext()
+  const { workspace } = Route.useLoaderData()
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
@@ -28,6 +30,7 @@ function AppShell() {
       <aside className="fixed inset-y-0 left-0 hidden w-60 border-r border-sidebar-border md:block">
         <AppSidebar
           user={session.user}
+          workspaceName={workspace?.name ?? null}
           onOpenCommand={() => setCommandOpen(true)}
         />
       </aside>
@@ -62,6 +65,7 @@ function AppShell() {
             <AppSidebar
               hideWordmark
               user={session.user}
+              workspaceName={workspace?.name ?? null}
               onOpenCommand={() => {
                 setMobileNavOpen(false)
                 setCommandOpen(true)

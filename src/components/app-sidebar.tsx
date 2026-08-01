@@ -35,11 +35,14 @@ const isMac =
 
 export function AppSidebar({
   user,
+  workspaceName,
   onOpenCommand,
   onNavigate,
   hideWordmark = false,
 }: {
   user: { name: string; email: string }
+  /** The workspace singleton's name — the deployment's identity. */
+  workspaceName?: string | null
   onOpenCommand: () => void
   onNavigate?: () => void
   /** Drawer usage — the mobile top bar already shows the wordmark. */
@@ -59,7 +62,13 @@ export function AppSidebar({
       ) : (
         <div className="flex h-14 items-center px-4">
           <Link to="/spaces" onClick={onNavigate} aria-label="DealOS home">
-            <Wordmark />
+            {workspaceName ? (
+              <span className="block truncate text-title font-semibold tracking-tight">
+                {workspaceName}
+              </span>
+            ) : (
+              <Wordmark />
+            )}
           </Link>
         </div>
       )}
