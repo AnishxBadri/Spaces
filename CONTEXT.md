@@ -1,6 +1,10 @@
 # DealOS — context
 
-Placeholder name. Rename before first public commit. Candidates: Angle, Tessera, Thesis, Dealbase.
+**Name decided 2026-08: Angle** (angel/angle — your angle on the market). Collision check
+killed the other candidates: Thesis* is an a16z-backed crypto venture studio, dealbase.app
+is VC deal-management software, Tessera is three funded companies. The mechanical rename
+(repo, wordmark, package, image names) lands at ship-polish start, after domain/npm
+diligence — before GHCR images bake the old name in. "DealOS" persists in code until then.
 
 ## What this is
 
@@ -253,8 +257,12 @@ mandate(id, status: active|archived, note_entity_id → note,
   hint** where `company.funding_stage ∉ mandate.stages` — a hint, never a block; edge
   cases are the job. Geo cannot power this while `location` is free text.
 - One active mandate per workspace; `archived` covers vintages. No versioning machinery.
-- **Nav: one Mandate page** — structured facts rail + prose strategy. With the thesis
-  object removed it is the single "why we invest" destination.
+- **Nav: one Mandate page, first in the sidebar** (decided 2026-08) — the fund's identity
+  tops the nav, but login still lands on `/spaces`, where daily work happens. Structured
+  facts rail + prose strategy; the single "why we invest" destination.
+- **The outside-mandate hint renders on the deal record only** (decided 2026-08): one
+  quiet badge near the company reference, where the invest/pass judgment happens. Not in
+  tables — a hint sprinkled across rows becomes noise people learn to ignore.
 
 ### Space membership is orthogonal to pipeline membership
 
@@ -443,9 +451,11 @@ template(id, kind: note|space|record, object_kind,   -- object_kind only when ki
 
 - **note** — a stored BlockNote document; instantiate = copy into a new note. Meeting
   note, call debrief, diligence checklist, IC memo skeleton.
-- **space** — a scaffold manifest `{memo_body?, glossary_terms[], subspace_names[]}`,
-  applied once at space creation. The investor builds their market-breakdown pattern
-  once and stamps it per space.
+- **space** — a scaffold manifest `{memo_body?, glossary_terms[], subspaces[]}` (nested,
+  names + skeletons only, never content), applied once at space creation. **Created by
+  example, not by form** (decided 2026-08): "save this space as a template" captures the
+  existing subtree — the investor builds their market breakdown once by hand, saves it,
+  stamps it onto the next market. No scaffold-builder UI ever gets written.
 - **record** — `{values}` keyed by `attr_slug` for one object kind. **Pre-fills the
   create modal, visibly and editably — never silently writes.** Unknown/archived slugs
   are skipped at instantiation; option renames already preserve ids, so templates
@@ -611,7 +621,8 @@ them now costs nothing.
 - **Optional OIDC** via env (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_ALLOWED_DOMAIN`).
   Present -> SSO button appears. Native invites + password stay the default; OIDC-only multi-user
   (what Wealthfolio does) is hostile to a two-person fund that won't run Keycloak.
-- Optional TOTP 2FA. This DB holds deal terms and cap tables.
+- Optional TOTP 2FA (deferred post-v1, 2026-08 — additive via Better Auth's plugin).
+  This DB holds deal terms and cap tables, so it stays on the roadmap.
 
 Two token stores, never conflated:
 - `session` — who you are in the app
@@ -848,7 +859,11 @@ Rules that decide adoption:
   as Next's `NEXT_PUBLIC_*`; a prebuilt image cannot be reconfigured at `docker run` otherwise.
 - Prebuilt multi-arch image (arm64 matters) on GHCR + Docker Hub.
   Non-root UID 1000. Docs tell people to pin tags, not `latest`.
-- First-run web wizard: admin + workspace name -> optional AI key -> optional Gmail -> optional demo data.
+- First-run web wizard (**minimal, decided 2026-08**): setup token -> admin + workspace
+  name -> optional demo data. Under a minute. AI-key and Gmail steps join the wizard only
+  when their features ship — a wizard step collecting a key nothing consumes is a broken
+  promise on first boot. The mandate is written from its page's teaching empty state, not
+  a wizard step.
 - Healthcheck endpoint, sane logs.
 - Publish Coolify / Railway / Render / Unraid templates. Cheap, huge reach — that's where
   self-hosters live.
@@ -1039,20 +1054,37 @@ notes — the download hardening survives it). Verified by driving the real app,
 what caught a colour picker that didn't close on selection, a sticky-column hover seam,
 and mouse-only column resizing. Remaining craft work is itemised in *UI craft debt*.
 
-Remaining phases, in order:
-10. **Auth completion** — workspace singleton row, invites, member management,
-    `canWrite()` choke point, /setup one-time token, optional TOTP
-11. **Ship polish** — backup script, install docs, GHCR multi-arch images, upgrade CI
+Remaining phases (**sequence grilled and decided 2026-08** — features first, ship polish
+once, immediately before strangers can install):
 
-Then the 2026-08 product decisions — **mandate page** and **templates** — specs in the
-data model; then integrations (each independent):
+10. **Auth + onboarding** — workspace singleton row, `canWrite()` choke point, invites,
+    member management, /setup one-time token, minimal first-run wizard (see Hosting).
+    TOTP deferred post-v1 — additive via Better Auth's plugin whenever.
+    `scripts/backup.sh` is pulled into this phase: ten lines, and the rollback doc
+    depends on it existing.
+11. **Mandate page** — spec in the data model. Nav-first, land on `/spaces`, hint on
+    deal record only, teaching empty state prompts the first mandate.
+12. **Templates** — build order **notes → record → space**: note templates prove the
+    mechanism (storage, picker, `suggest_on`, save-in-place) on the highest-value kind;
+    record templates reuse the picker in the create modal; by-example space scaffolds
+    land on a settled mechanism.
+13. **Design-debt pass** — focus-ring sweep (~60), then `/impeccable document` writes
+    DESIGN.md §5. Short and mechanical; new surfaces in 11–12 are built clean on tokens.
+14. **Ship polish → announce** — in order: rename mechanics (Angle — domain/npm
+    diligence first), test-db harness (unblocks everything below), GitHub Actions
+    (lint / tsc / vitest / multi-arch GHCR images), ESLint-79 cleanup (CI gates on lint
+    from here), install docs (Caddy/TLS, `APP_URL` trap, `chown 1000:1000 ./data`,
+    back-up-before-upgrade).
+
+**Release 2, not release 1:** upgrade CI (needs a first release to upgrade *from*),
+Playwright preview smoke test, dark theme. Then integrations (each independent):
 Google Calendar first, Gmail (forward-only), Apollo enrichment (Exa alongside as a
-second `Enricher`), BYOK AI features.
+second `Enricher`), BYOK AI features — each adds its own wizard step when it lands.
 
 Standing debt:
 - **Test-db harness.** The suite shares the *dev* database and mutates it; without a live
   Postgres on :5432, 8 of 52 tests fail with `ECONNREFUSED`. This is why CI cannot simply
-  run `vitest` yet, and it blocks the upgrade-path CI phase 11 wants.
+  run `vitest` yet — fixing it is the first technical task inside ship polish (phase 14).
 - **`./data` ownership landmine.** The Dockerfile `chown`s `/data` at build, but the
   compose bind mount overlays it with host ownership at runtime. Wrong UID on a Linux
   host → cannot write blobs or generate `secret.key`, and it **fails at first upload, not
@@ -1081,7 +1113,7 @@ lives in `src/styles.css` comments — read those before changing any colour.
 **Still open, in order:**
 - **Old focus rings** (~60 after the thesis routes went) remain outside the table
   surfaces (record pages, spaces, notes, settings) — **5 of them in the shell**
-  (`app-sidebar.tsx`, `_app.tsx`), so they
+  (`app-sidebar.tsx`, `_app.tsx`). Slotted as phase 13, after templates. They
   are on screen even on the polished routes. Mostly mechanical — swap to `focus-ring` and
   delete the adjacent `outline-none`, which would otherwise cancel it — but controls
   inside a scroll container need `focus-ring-inset`, so not a blind find-and-replace.
