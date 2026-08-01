@@ -10,6 +10,7 @@
 
 export * from './server/settings'
 export * from './server/members'
+export * from './server/mandate'
 export * from './server/companies'
 export * from './server/attributes'
 export * from './server/people'

@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { db } from '#/db'
 import { user } from '#/db/schema/auth'
 import { entity, link } from '#/db/schema'
+import { mandate } from '#/db/schema/workspace'
 import { activity } from '#/db/schema/activity'
 import { requireUser } from './shared'
 import type { Json } from './shared'
@@ -187,12 +188,35 @@ export const getDeal = createServerFn()
       .innerJoin(entity, eq(entity.id, link.fromEntityId))
       .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
 
+    // Outside-mandate hint (CONTEXT.md, 2026-08): rendered on the deal
+    // record only — where the invest/pass judgment happens. A hint, never a
+    // block; null when there is no mandate, no stages, or no company stage.
+    let outsideMandate: boolean | null = null
+    const values = (head.values ?? {}) as Record<string, Json>
+    const companyId = values.company as string | undefined
+    if (companyId) {
+      const [m] = await db
+        .select({ stages: mandate.stages })
+        .from(mandate)
+        .where(eq(mandate.status, 'active'))
+      if (m && m.stages.length > 0) {
+        const [comp] = await db
+          .select({ values: entity.values })
+          .from(entity)
+          .where(eq(entity.id, companyId))
+        const stage = (comp?.values as Record<string, unknown> | null)
+          ?.funding_stage as string | undefined
+        if (stage) outsideMandate = !m.stages.includes(stage)
+      }
+    }
+
     return {
       id: head.id,
       name: head.name,
       mergedIntoId: head.mergedIntoId,
-      values: (head.values ?? {}) as Record<string, Json>,
+      values,
       createdAt: head.createdAt.toISOString(),
+      outsideMandate,
       refNames: Object.fromEntries(
         refs.map((r) => [r.toId, { name: r.name, kind: r.kind }]),
       ) as Record<string, { name: string; kind: string }>,

@@ -5,7 +5,14 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { ArrowLeft, Building2, FileText, Kanban, Plus } from 'lucide-react'
+import {
+  ArrowLeft,
+  Building2,
+  Compass,
+  FileText,
+  Kanban,
+  Plus,
+} from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { ValueEditor } from '#/components/attributes/value-editor'
@@ -98,14 +105,28 @@ function DealRecordPage() {
             {deal.name}
           </h1>
           {companyId ? (
-            <Link
-              to="/companies/$companyId"
-              params={{ companyId }}
-              className="flex w-fit items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground"
-            >
-              <Building2 className="size-3" strokeWidth={1.75} />
-              {deal.refNames[companyId]?.name ?? 'Company'}
-            </Link>
+            <span className="flex items-center gap-2">
+              <Link
+                to="/companies/$companyId"
+                params={{ companyId }}
+                className="flex w-fit items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground"
+              >
+                <Building2 className="size-3" strokeWidth={1.75} />
+                {deal.refNames[companyId]?.name ?? 'Company'}
+              </Link>
+              {deal.outsideMandate ? (
+                // A hint, never a block — edge cases are the job. Deliberately
+                // quiet: same-hue tint, no red.
+                <Link
+                  to="/mandate"
+                  className="flex items-center gap-1 rounded-full bg-[var(--badge-amber)] px-2 py-0.5 text-xs font-medium text-[var(--badge-amber-ink)] hover:opacity-80"
+                  title="This company's stage is outside the mandate's stages. Click to review the mandate."
+                >
+                  <Compass className="size-3" strokeWidth={2} />
+                  Outside mandate
+                </Link>
+              ) : null}
+            </span>
           ) : null}
         </div>
       </header>

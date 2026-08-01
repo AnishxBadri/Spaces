@@ -2,6 +2,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import {
   Building2,
   ChevronsUpDown,
+  Compass,
   FileText,
   Kanban,
   Layers,
@@ -23,6 +24,9 @@ import { authClient } from '#/lib/auth-client'
 import { cn } from '#/lib/utils'
 
 export const NAV_ITEMS = [
+  // Mandate first — the fund's identity tops the nav; login still lands on
+  // /spaces, where daily work happens (CONTEXT.md, 2026-08).
+  { to: '/mandate', label: 'Mandate', icon: Compass },
   { to: '/spaces', label: 'Spaces', icon: Layers },
   { to: '/companies', label: 'Companies', icon: Building2 },
   { to: '/people', label: 'People', icon: Users },
