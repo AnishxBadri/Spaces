@@ -13,9 +13,9 @@ description: Self-hosted deal-management OS for angel and private-capital invest
 
 A serious instrument for someone who reads for a living: a clean desk, good light, a ledger
 on one side and a well-set book on the other. The interface is precise, calm, and fast —
-density done the Attio way, speed felt the Linear way, and warmth carried entirely by one
-vermilion accent and the typography, never by the surface. The tool disappears; the
-research remains.
+density done the Attio way, speed felt the Linear way, and character carried entirely by
+one deep pine-green accent and the typography, never by the surface. The tool
+disappears; the research remains.
 
 This system explicitly rejects enterprise CRM chrome (Salesforce/HubSpot dashboards-first
 sprawl), the generic SaaS template look (shadcn defaults, gradient heroes, purple accents,
@@ -31,37 +31,42 @@ Familiarity is earned through craft — typography, spacing, alignment — not t
 
 ## 2. Colors
 
-Restrained strategy: pure neutrals carry the entire surface; one warm vermilion speaks
+Restrained strategy: pure neutrals carry the entire surface; one deep pine green speaks
 rarely and therefore clearly. Every value below is live in `src/styles.css` — this section
 describes; the CSS decides.
 
 ### Primary
-- **Vermilion** (oklch(0.588 0.2 35)): primary actions, current selection, focus rings.
-  Replaced Ochre Gold (2026-07) for a measurable reason, not taste: white text on a fill
-  needs 4.5:1, and at the lightness that forces, a yellow hue has nowhere to go but muddy
-  olive. Hues away from yellow keep their chroma when darkened, so vermilion stays vivid
-  at the same contrast gold could only reach by going drab. Lightness is pinned by
-  contrast: 0.588 measures 4.55:1 with white. Warmth still comes from the accent, as this
-  document always intended. Hover deepens to oklch(0.54 0.19 35); the selection wash
-  (active nav, selected rows) is a pale same-hue tint, oklch(0.962 0.022 35).
+- **Pine** (oklch(0.55 0.14 155) ≈ #00884b): primary actions, current selection, focus
+  rings. Third primary, by owner decision (2026-08): Ochre Gold fell to contrast physics
+  (2026-07), Vermilion to preference for a quieter, capital-coded voice. Costs accepted
+  knowingly: green is fintech's most-owned hue, and the success semantic had to move off
+  green so an action and a state never share a hue. What green gives back: at
+  contrast-passing lightness it holds less chroma than vermilion, so the one loud voice
+  in the system is naturally more restrained — a sturdier, instrument-like read.
+  Lightness is pinned by contrast: 0.55 measures 4.52:1 with white text (measured via
+  proper OKLCH→sRGB conversion, never eyeballed). Hover deepens to oklch(0.5 0.14 155),
+  5.51:1; the selection wash is a pale same-hue tint, oklch(0.962 0.022 155), 14.8:1
+  under ink.
 
 ### Neutral
-- **Pure White** (oklch(1 0 0)): the body background. Literal white, no hidden warmth —
-  the mood lives in the vermilion and the type, never in a tinted surface.
-- **Ink** (oklch(0.24 0.012 35)): body text, ~13:1 against white.
-- **Muted Ink** (oklch(0.49 0.016 35)): secondary text, ≥4.5:1 — the Linear-gray
+- **Pure White** (oklch(1 0 0)): the body background. Literal white, no hidden tint —
+  the mood lives in the pine and the type, never in a tinted surface.
+- **Ink** (oklch(0.24 0.012 155)): body text, ~13:1 against white.
+- **Muted Ink** (oklch(0.49 0.016 155)): secondary text, ≥4.5:1 — the Linear-gray
   temptation is bounded by contrast, not taste. No sub-100% opacity variants of it, ever;
   that is how the floor gets quietly broken.
-- **Panel Neutral** (oklch(0.976 0.003 35)): second neutral layer for sidebar, toolbars,
-  and rails. Borders at oklch(0.92 0.005 35), inputs slightly darker.
-- All neutrals carry a whisper of the primary hue (~35°) at near-zero chroma, so grays
-  feel of-the-brand without reading warm.
+- **Panel Neutral** (oklch(0.976 0.003 155)): second neutral layer for sidebar, toolbars,
+  and rails. Borders at oklch(0.92 0.005 155), inputs slightly darker.
+- All neutrals carry a whisper of the primary hue (~155°) at near-zero chroma, so grays
+  feel of-the-brand without reading tinted.
 
 ### Semantic
-- **Destructive** is deep crimson (oklch(0.48 0.17 12)), deliberately moved off hue 25:
-  vermilion sits at 35, and a red at 25 read as the same colour at a glance — the one
-  confusion a delete button must never cause.
-- Success oklch(0.55 0.12 150) · warning oklch(0.7 0.13 75) · info oklch(0.55 0.1 240).
+- **Destructive** is deep crimson (oklch(0.48 0.17 12)) — chosen under the vermilion
+  primary to keep delete unmistakable from act, kept under pine because it still reads
+  unambiguously destructive against everything else.
+- **Success moved to teal** (oklch(0.55 0.09 190), 2026-08): pine owns green now, and a
+  success *state* sharing the action hue would blur two meanings — the Meaning Rule
+  applied to the system itself. Warning oklch(0.7 0.13 75) · info oklch(0.55 0.1 240).
   Standardized once, used identically everywhere. Stage and status colors are data, not
   decoration.
 
@@ -84,7 +89,7 @@ in play.
 status. If a color choice can't name what it encodes, it is forbidden.
 
 **The Focus Rule.** One treatment everywhere: the `focus-ring` utility — a 2px outline at
-full `--ring` (3.6:1 on white), 1px offset, drawn only on `:focus-visible`;
+full `--ring` (the primary, 4.52:1 on white), 1px offset, drawn only on `:focus-visible`;
 `focus-ring-inset` for cells and rows inside scroll containers, where an offset ring would
 be clipped. Translucent rings are banned — both of the old competing treatments sat under
 the 3:1 non-text floor (WCAG 2.2 SC 1.4.11). Outline, not box-shadow: costs no layout,
@@ -198,7 +203,7 @@ honored everywhere.
 ## 7. Do's and Don'ts
 
 ### Do:
-- **Do** keep the ground pure white (oklch(1 0 0)) and let vermilion + typography carry all warmth.
+- **Do** keep the ground pure white (oklch(1 0 0)) and let pine + typography carry all character.
 - **Do** hold body text at ≥4.5:1 contrast — muted gray "for elegance" is the first failure mode of this aesthetic lane.
 - **Do** set every comparable number in tabular figures, right-aligned.
 - **Do** give every interactive element a visible focus state — keyboard is the primary input.

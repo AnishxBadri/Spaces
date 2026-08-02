@@ -1219,8 +1219,10 @@ one focus treatment (`focus-ring` / `focus-ring-inset` at full `--ring`; the two
 translucent rings both missed WCAG 2.2's 3:1 non-text floor), the muted ramp resolved to
 ≥4.5:1 with sub-100% opacities deleted, `.numeric` making the Tabular Rule structural
 (tabular + right-aligned in one class), `--row-h` row rhythm, a global
-`prefers-reduced-motion` kill switch, and the two-tier colour rule (vermilion primary +
-twelve-hue badge tint palette). DESIGN.md §2–§3 now match the code; the reasoning also
+`prefers-reduced-motion` kill switch, and the two-tier colour rule (twelve-hue badge tint
+palette under one saturated primary — vermilion then, **Pine green
+oklch(0.55 0.14 155) since 2026-08** by owner decision; success re-hued teal to keep
+action and state apart). DESIGN.md §2–§3 now match the code; the reasoning also
 lives in `src/styles.css` comments — read those before changing any colour.
 
 **Still open, in order:**
