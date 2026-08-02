@@ -1284,7 +1284,11 @@ snippets.
     when a release is actually in sight. Still banked from the earlier grill, to reuse
     then: rename mechanics first (Angle — domain/npm diligence before images bake the
     name in), test-db harness before any CI, upgrade CI only once there is a release to
-    upgrade *from*.
+    upgrade *from*. Also banked for launch: a **comparison page** (vs Twenty/Attio/
+    vertical tools) assembled from the recorded surveys — honest-claims rule: never
+    claim a storage advantage (Twenty has the same local-default/S3-opt-in answer);
+    claim the research half, two-container ops, BYOK-to-Ollama, the investor schema,
+    and the financial engine.
 
 Post-v1 backlog unchanged: dark theme, Playwright preview smoke test, an **MCP server**
 over the deal graph (approved 2026-08, explicitly last — a self-hosted graph your own
