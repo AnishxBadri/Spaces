@@ -1212,8 +1212,19 @@ Decisions worth keeping:
 Remaining phases (**sequence grilled and decided 2026-08** — features first, ship polish
 once, immediately before strangers can install):
 
-14. **Design-debt pass** — focus-ring sweep (~60), then `/impeccable document` writes
-    DESIGN.md §5 (Components). Short and mechanical; new surfaces in 11–12 are built clean on tokens.
+**Design-debt pass (phase 14): done, 2026-08.** The sweep: every hand-written translucent
+focus ring (51, across 16 app files) replaced by the `focus-ring` utility; all bracketed
+type sizes collapsed to the named scale (92 instances — the one surviving `text-[17px]`
+is the prose register's, by design); every sub-100% `text-muted-foreground` opacity
+removed (10 files — the contrast-floor doctrine now holds everywhere); motion timing made
+explicit per the Freiberg doctrine (dialogs 180/120ms, menus 150/100, tooltips 120/80,
+all on ease-out-quart, exits always faster) and buttons gained the physical pressed
+compression (scale 0.97). Then `/impeccable document` ran: DESIGN.md now carries full
+machine-readable frontmatter tokens (OKLCH, per doctrine), a real §5 Components section
+scanned from the shipped code (record table and typed value editors documented as the
+signature components; motion doctrine folded in per the six-section spec), and an
+`.impeccable/design.json` sidecar with ramps, motion tokens, and renderable component
+snippets.
 15. **Portfolio layer** (decided 2026-08, surveyed against TagHash-class products —
     this is the tier where an investing CRM stops being a pipeline tracker; it is also
     where we currently lose any feature comparison). Pure graph + registry + computed
