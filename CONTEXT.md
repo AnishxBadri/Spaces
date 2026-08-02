@@ -405,6 +405,17 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
   seq scans until then. Fine at 1–15 users.
 - The registry generates the UI: table columns, create-modal fields, record-page detail
   rails all read the registry. Attio's structure, self-hosted.
+- **Expansion path (decided 2026-08): the attribute engine grows, objects don't.** The
+  type menu widens by release — attribute *descriptions* first (human docs now, prompt
+  context for AI later), then timestamp, then structured location (needs a migration
+  story off free-text), formula deliberately deferred (an expression engine; most
+  domain formulas are better as system-computed columns). The headline is the
+  **AI-autofill attribute family** (classify / summarize / prompt-completion), landing
+  with the BYOK AI phase — fed by the research graph (notes, extracted decks, the
+  mandate), which is context Attio's version cannot see, and governed by the existing
+  provenance doctrine: AI-written values are suggestions, never silent overwrites.
+  Custom objects stay a non-goal; a fourth object that proves universal ships as a
+  system release, not a builder.
 - **Record-references materialize into the graph:** the uuid in `values` is source of
   truth; every reference write syncs a `link` row (`relation: references`, `attr_slug`)
   in the same transaction — the note-mentions pattern. Backlinks, "related" rails, and
@@ -1189,7 +1200,9 @@ once, immediately before strangers can install):
     name in), test-db harness before any CI, upgrade CI only once there is a release to
     upgrade *from*.
 
-Post-v1 backlog unchanged: dark theme, Playwright preview smoke test, then integrations
+Post-v1 backlog unchanged: dark theme, Playwright preview smoke test, an **MCP server**
+over the deal graph (approved 2026-08, explicitly last — a self-hosted graph your own
+AI tools can query is stronger under BYOK than under a cloud CRM), then integrations
 (each independent): Google Calendar first, Gmail (forward-only), Apollo enrichment (Exa
 alongside as a second `Enricher`), BYOK AI features — each adds its own wizard step when
 it lands.
