@@ -955,9 +955,14 @@ Docmost/Outline as a two-tool stack. None are investor-opinionated. That's the g
 **Investor-specific products surveyed (2026-08):** Affinity (auto email/calendar capture →
 relationship graph + warm-path scoring — validates Gmail-sync-as-endgame and our
 `interaction_entity` scoring primitive; also ships meeting-prep agents and an MCP server,
-so MCP is trending table-stakes), Edda (their Portfolio "automatically receives invested
-companies from Dealflow" — independent convergence on our Invested-births-a-holding
-seam), 4Degrees (warm-intro paths as the differentiator), TagHash (fund-admin tier —
+so MCP is trending table-stakes), Edda (mechanics verified: "once Dealflow companies move to
+the 'Invested' stage, their data is automatically transferred to your Portfolio" —
+independent convergence on our Invested-births-a-holding seam; their metric kit
+IRR/MOIC/NAV/DPI/TVPI matches phase 15's; two features banked from them —
+**deal scorecards** with weighted per-partner votes, a post-portfolio candidate for
+multi-member workspaces that maps onto rating attributes, and a **funding-status/runway
+lens** over the portfolio as the first consumer if MIS ever lands; their deal
+tasks/reminders reinforce that known gap), 4Degrees (warm-intro paths as the differentiator), TagHash (fund-admin tier —
 fenced out of phase 15), Visible.vc (portfolio MIS = structured founder requests with a
 standard-six metric default — Revenue, Net Income, Cash, Runway, Burn, Headcount — via
 login-free tokenized links; the shape to copy if MIS ever lands). Three ideas banked for
