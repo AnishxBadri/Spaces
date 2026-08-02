@@ -13,11 +13,13 @@ import {
   NoteEditor,
 } from '#/components/editor/note-editor'
 import { KIND_ICONS, KIND_ROUTES } from '#/components/editor/mention'
+import { SaveAsTemplateAction } from '#/components/templates'
 import {
   getNote,
   listSpaces,
   listTermsForNote,
   saveNote,
+  saveNoteAsTemplate,
   setNoteVisibility,
   tagIntoSpace,
   untagFromSpace,
@@ -113,6 +115,15 @@ function NotePage() {
                   ? 'Unsaved changes'
                   : ''}
           </span>
+          <SaveAsTemplateAction
+            entityLabel="note"
+            defaultName={initial.title}
+            onSave={async (name) => {
+              await saveNoteAsTemplate({
+                data: { noteId: initial.id, name },
+              })
+            }}
+          />
           {initial.isMine ? (
             <VisibilityToggle
               noteId={initial.id}

@@ -4,21 +4,9 @@ import { z } from 'zod'
 import { db } from '#/db'
 import { company, entity, entitySpace, link, note, space } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
-import { requireUser } from './shared'
+import { createSpaceRow, requireUser } from './shared'
 
 // Spaces — first real write path through the entity core.
-
-/** ltree labels: [a-z0-9_] only. */
-function toLabel(name: string): string {
-  const label = name
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 48)
-  return label || 'space'
-}
 
 export const listSpaces = createServerFn().handler(async () => {
   await requireUser()
@@ -187,57 +175,11 @@ export const createSpace = createServerFn({ method: 'POST' })
   .validator(createSpaceInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
-
-    return db.transaction(async (tx) => {
-      let parentPath: string | null = null
-      if (data.parentId) {
-        const [parent] = await tx
-          .select({ path: space.path })
-          .from(space)
-          .where(eq(space.entityId, data.parentId))
-        if (!parent) throw new Error('Parent space not found')
-        parentPath = parent.path
-      }
-
-      const base = toLabel(data.name)
-      // Slugs are unique per parent — two branches may both hold a "Cooling".
-      // Only a genuine same-parent collision gets the suffix.
-      const siblingOf = data.parentId
-        ? eq(space.parentId, data.parentId)
-        : isNull(space.parentId)
-      let slug = base
-      for (let i = 2; ; i++) {
-        const existing = await tx
-          .select({ id: space.entityId })
-          .from(space)
-          .where(and(siblingOf, eq(space.slug, slug)))
-        if (existing.length === 0) break
-        slug = `${base}_${i}`
-      }
-
-      const [ent] = await tx
-        .insert(entity)
-        .values({
-          kind: 'space',
-          canonicalName: data.name,
-          source: 'manual',
-          createdBy: u.id,
-        })
-        .returning({ id: entity.id })
-
-      await tx.insert(space).values({
-        entityId: ent.id,
-        parentId: data.parentId ?? null,
-        slug,
-        path: parentPath ? `${parentPath}.${slug}` : slug,
-      })
-
-      await tx.insert(activity).values({
-        actorId: u.id,
-        verb: 'space.created',
-        subjectEntityId: ent.id,
-      })
-
-      return { id: ent.id }
+    const id = await createSpaceRow(data.name, data.parentId ?? null, u.id)
+    await db.insert(activity).values({
+      actorId: u.id,
+      verb: 'space.created',
+      subjectEntityId: id,
     })
+    return { id }
   })

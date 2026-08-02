@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { FileText, Plus } from 'lucide-react'
 import { EmptyState } from '#/components/empty-state'
+import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
-import { createNote, listNotes } from '#/lib/server-fns'
+import { createNote, createNoteFromTemplate, listNotes } from '#/lib/server-fns'
 
 export const Route = createFileRoute('/_app/notes')({
   loader: () => listNotes(),
@@ -34,10 +35,21 @@ function NotesPage() {
           </p>
         </div>
         {notes.length > 0 ? (
-          <Button size="sm" onClick={newNote}>
-            <Plus className="size-4" strokeWidth={2} />
-            New note
-          </Button>
+          <div className="flex items-center gap-2">
+            <TemplatePicker
+              kind="note"
+              onPick={async (t) => {
+                const { id } = await createNoteFromTemplate({
+                  data: { templateId: t.id },
+                })
+                navigate({ to: '/notes/$noteId', params: { noteId: id } })
+              }}
+            />
+            <Button size="sm" onClick={newNote}>
+              <Plus className="size-4" strokeWidth={2} />
+              New note
+            </Button>
+          </div>
         ) : null}
       </header>
 

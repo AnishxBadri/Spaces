@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { SaveAsTemplateAction } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
@@ -37,6 +38,7 @@ import {
   tagIntoSpace,
   untagFromSpace,
   updateRecord,
+  saveRecordAsTemplate,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
@@ -139,6 +141,16 @@ function CompanyRecordPage() {
             </p>
           ) : null}
         </div>
+        <span className="ml-auto">
+          <SaveAsTemplateAction
+            entityLabel="company"
+            onSave={async (name) => {
+              await saveRecordAsTemplate({
+                data: { recordId: company.id, name },
+              })
+            }}
+          />
+        </span>
       </header>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)_220px]">

@@ -39,11 +39,13 @@ import {
   listInvites,
   listMembers,
   listRegistry,
+  listTemplates,
   revokeInvite,
   saveWorkspace,
   setMemberBanned,
   setMemberRole,
   updateAttribute,
+  updateTemplate,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
@@ -54,11 +56,12 @@ import { cn } from '#/lib/utils'
  */
 export const Route = createFileRoute('/_app/settings')({
   loader: async () => {
-    const [session, workspace, members, company, person, deal] =
+    const [session, workspace, members, templates, company, person, deal] =
       await Promise.all([
         getSession(),
         getWorkspace(),
         listMembers(),
+        listTemplates({ data: { includeArchived: true } }),
         listRegistry({ data: { kind: 'company', includeArchived: true } }),
         listRegistry({ data: { kind: 'person', includeArchived: true } }),
         listRegistry({ data: { kind: 'deal', includeArchived: true } }),
@@ -70,6 +73,7 @@ export const Route = createFileRoute('/_app/settings')({
       isAdmin,
       workspace,
       members,
+      templates,
       invites,
       company,
       person,
@@ -138,6 +142,8 @@ function SettingsPage() {
         members={data.members}
         invites={data.invites}
       />
+
+      <TemplatesSection templates={data.templates} />
 
       <h2 className="mt-10 text-title font-semibold tracking-tight">Objects</h2>
       <p className="mt-1 text-[13px] text-muted-foreground">
@@ -454,6 +460,115 @@ function MembersSection({
           ) : null}
         </div>
       ) : null}
+    </section>
+  )
+}
+
+type TemplateRow = Awaited<ReturnType<typeof listTemplates>>[number]
+
+const SUGGEST_KINDS = ['company', 'person', 'deal', 'space'] as const
+
+/**
+ * Templates are config, not entities — this is their whole management
+ * surface. Creation happens by example ("Save as template" on a note,
+ * record, or space), never here.
+ */
+function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
+  const router = useRouter()
+
+  async function patch(
+    id: string,
+    data: { name?: string; archived?: boolean; suggestOn?: Array<string> },
+    ok: string,
+  ) {
+    try {
+      await updateTemplate({ data: { id, ...data } })
+      toast.success(ok)
+      router.invalidate()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'That did not work')
+    }
+  }
+
+  return (
+    <section className="mt-10">
+      <h2 className="text-title font-semibold tracking-tight">Templates</h2>
+      <p className="mt-1 text-[13px] text-muted-foreground">
+        Saved patterns for notes, records, and space breakdowns. Create one from
+        any existing note, record, or space — “Save as template”.
+      </p>
+      {templates.length === 0 ? (
+        <p className="mt-3 text-[13px] text-muted-foreground">
+          None yet. Open a note, record, or space you like the shape of and save
+          it as the pattern.
+        </p>
+      ) : (
+        <ul className="mt-3 divide-y divide-border/60 rounded-lg border border-border">
+          {templates.map((t) => (
+            <li
+              key={t.id}
+              className={cn(
+                'flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5',
+                t.archived && 'opacity-50',
+              )}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium">
+                  {t.name}
+                </span>
+                <span className="block text-xs capitalize text-muted-foreground">
+                  {t.kind === 'record' ? (t.objectKind ?? 'record') : t.kind}
+                </span>
+              </span>
+              <span className="flex items-center gap-1">
+                {SUGGEST_KINDS.map((k) => {
+                  const on = t.suggestOn.includes(k)
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      aria-pressed={on}
+                      title={`Suggest first on ${k} surfaces`}
+                      onClick={() =>
+                        patch(
+                          t.id,
+                          {
+                            suggestOn: on
+                              ? t.suggestOn.filter((x) => x !== k)
+                              : [...t.suggestOn, k],
+                          },
+                          'Suggestion contexts updated',
+                        )
+                      }
+                      className={cn(
+                        'focus-ring rounded-full px-2 py-0.5 text-xs capitalize',
+                        on
+                          ? 'bg-selected font-medium text-foreground'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                      )}
+                    >
+                      {k}
+                    </button>
+                  )
+                })}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  patch(
+                    t.id,
+                    { archived: !t.archived },
+                    t.archived ? 'Template restored' : 'Template archived',
+                  )
+                }
+                className="focus-ring rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {t.archived ? 'Restore' : 'Archive'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

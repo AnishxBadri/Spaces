@@ -17,7 +17,14 @@ import { useState } from 'react'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { SpaceGlossary } from '#/components/space-glossary'
-import { createNote, createSpace, getSpace, listTerms } from '#/lib/server-fns'
+import { SaveAsTemplateAction } from '#/components/templates'
+import {
+  createNote,
+  createSpace,
+  getSpace,
+  listTerms,
+  saveSpaceAsTemplate,
+} from '#/lib/server-fns'
 
 /**
  * A space is something you read, not something you administer: one
@@ -103,10 +110,19 @@ function SpacePage() {
             {spc.name}
           </h1>
         </div>
-        <Button size="xs" variant="outline" onClick={newNoteHere}>
-          <Plus className="size-3" strokeWidth={2} />
-          Note here
-        </Button>
+        <span className="flex items-center gap-2">
+          <SaveAsTemplateAction
+            entityLabel="space"
+            defaultName={`${spc.name} breakdown`}
+            onSave={async (name) => {
+              await saveSpaceAsTemplate({ data: { spaceId: spc.id, name } })
+            }}
+          />
+          <Button size="xs" variant="outline" onClick={newNoteHere}>
+            <Plus className="size-3" strokeWidth={2} />
+            Note here
+          </Button>
+        </span>
       </header>
 
       {/* Subspaces */}

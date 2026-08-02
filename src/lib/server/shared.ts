@@ -1,8 +1,8 @@
 import { getRequest } from '@tanstack/react-start/server'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { auth } from '../auth'
 import { db } from '#/db'
-import { interaction, interactionEntity } from '#/db/schema'
+import { entity, interaction, interactionEntity, space } from '#/db/schema'
 
 /** Closed JSON type — Start's serializer rejects `unknown`. */
 export type Json =
@@ -39,6 +39,70 @@ export function canRead(
 ): boolean {
   if (row.visibility !== 'private') return true
   return row.authorId === user.id
+}
+
+/** ltree labels: [a-z0-9_] only. */
+export function toLabel(name: string): string {
+  const label = name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 48)
+  return label || 'space'
+}
+
+/**
+ * Space creation, shared by the createSpace server fn and the scaffold
+ * stamper. Slugs are unique per parent (two branches may both hold a
+ * "Cooling"); only a genuine same-parent collision gets a suffix.
+ */
+export async function createSpaceRow(
+  name: string,
+  parentId: string | null,
+  userId: string,
+): Promise<string> {
+  return db.transaction(async (tx) => {
+    let parentPath: string | null = null
+    if (parentId) {
+      const [parent] = await tx
+        .select({ path: space.path })
+        .from(space)
+        .where(eq(space.entityId, parentId))
+      if (!parent) throw new Error('Parent space not found')
+      parentPath = parent.path
+    }
+    const base = toLabel(name)
+    const siblingOf = parentId
+      ? eq(space.parentId, parentId)
+      : isNull(space.parentId)
+    let slug = base
+    for (let i = 2; ; i++) {
+      const existing = await tx
+        .select({ id: space.entityId })
+        .from(space)
+        .where(and(siblingOf, eq(space.slug, slug)))
+      if (existing.length === 0) break
+      slug = `${base}_${i}`
+    }
+    const [ent] = await tx
+      .insert(entity)
+      .values({
+        kind: 'space',
+        canonicalName: name,
+        source: 'manual',
+        createdBy: userId,
+      })
+      .returning({ id: entity.id })
+    await tx.insert(space).values({
+      entityId: ent.id,
+      parentId,
+      slug,
+      path: parentPath ? `${parentPath}.${slug}` : slug,
+    })
+    return ent.id
+  })
 }
 
 /** Latest interaction per entity — the "last touched" signal for tables. */

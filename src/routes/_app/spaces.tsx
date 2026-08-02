@@ -2,6 +2,7 @@ import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { ChevronRight, Layers, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { EmptyState } from '#/components/empty-state'
+import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -14,7 +15,7 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import { createSpace, listSpaces } from '#/lib/server-fns'
+import { applySpaceTemplate, createSpace, listSpaces } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/spaces')({
@@ -83,6 +84,9 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [scaffold, setScaffold] = useState<{ id: string; name: string } | null>(
+    null,
+  )
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -96,10 +100,23 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
     }
     setPending(true)
     try {
-      await createSpace({
-        data: { name, parentId: parentId || undefined },
-      })
+      if (scaffold) {
+        // Stamp the pattern: subtree + glossary, skip-existing. The tree it
+        // creates is fully editable afterwards — copy, not reference.
+        await applySpaceTemplate({
+          data: {
+            templateId: scaffold.id,
+            name,
+            parentId: parentId || undefined,
+          },
+        })
+      } else {
+        await createSpace({
+          data: { name, parentId: parentId || undefined },
+        })
+      }
       setOpen(false)
+      setScaffold(null)
       router.invalidate()
     } catch {
       setError('Could not create the space.')
@@ -123,6 +140,33 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
             A market or theme to research. Nest it to build the map.
           </DialogDescription>
         </DialogHeader>
+        <div className="flex items-center justify-between gap-2">
+          {scaffold ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              Scaffold:{' '}
+              <span className="font-medium text-foreground">
+                {scaffold.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => setScaffold(null)}
+                className="focus-ring rounded text-muted-foreground hover:text-foreground"
+                aria-label="Clear scaffold"
+              >
+                ×
+              </button>
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              Optionally stamp a saved market-breakdown pattern.
+            </span>
+          )}
+          <TemplatePicker
+            kind="space"
+            context="space"
+            onPick={(t) => setScaffold({ id: t.id, name: t.name })}
+          />
+        </div>
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="space-y-1.5">
             <Label htmlFor="space-name">Name</Label>

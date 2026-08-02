@@ -14,6 +14,7 @@ import { AttributeCreateDialog } from '#/components/attributes/attribute-create-
 import { ValueEditor } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
+import { TemplatePicker } from '#/components/templates'
 import {
   ChipLink,
   DateCell,
@@ -316,6 +317,18 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
             Domain is the strongest identity — add it when you know it.
           </DialogDescription>
         </DialogHeader>
+        {/* Pre-fills the fields below, visibly and editably — never writes. */}
+        <div className="flex justify-end">
+          <TemplatePicker
+            kind="record"
+            objectKind="company"
+            context="company"
+            onPick={(t) => {
+              const tv = (t.body as { values?: Record<string, unknown> }).values
+              if (tv) setValues((s) => ({ ...tv, ...s }))
+            }}
+          />
+        </div>
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="space-y-1.5">
             <Label htmlFor="company-name">Name</Label>
