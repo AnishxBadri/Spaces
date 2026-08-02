@@ -1,10 +1,10 @@
+import { createHash } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '#/db'
 import { document } from '#/db/schema'
-import { blobPath } from '#/lib/storage/local'
+import { storage } from '#/lib/storage'
 import { extractDocumentText } from '#/lib/documents/extract'
-import { readFile } from 'node:fs/promises'
 
 /**
  * document.extract — the reason the worker process exists. Parsing a 200-page
@@ -42,7 +42,7 @@ export async function extractDocument(data: unknown): Promise<void> {
 
   let bytes: Uint8Array
   try {
-    bytes = new Uint8Array(await readFile(blobPath(row.blobSha)))
+    bytes = await storage().getBytes(row.blobSha)
   } catch (err) {
     await fail(
       documentId,
@@ -50,6 +50,21 @@ export async function extractDocument(data: unknown): Promise<void> {
       `Blob ${row.blobSha.slice(0, 12)} unreadable: ${
         err instanceof Error ? err.message : String(err)
       }`,
+    )
+    return
+  }
+
+  // Universal integrity backstop (2026-08): the local driver verifies on
+  // write and enforcing S3 endpoints verify on PUT, but partially-compatible
+  // targets (Garage) may not. We're holding the whole blob anyway, so
+  // re-verify "same sha ⇒ same bytes" here — the invariant dedupe and the
+  // immutable cache header lean on.
+  const digest = createHash('sha256').update(bytes).digest('hex')
+  if (digest !== row.blobSha) {
+    await fail(
+      documentId,
+      'failed',
+      `Blob integrity check failed: stored bytes hash ${digest.slice(0, 12)}, expected ${row.blobSha.slice(0, 12)}. The storage backend accepted a corrupt upload.`,
     )
     return
   }

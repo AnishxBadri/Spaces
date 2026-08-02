@@ -5,7 +5,7 @@ import {
   timingSafeEqual,
 } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
-import { mkdir, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -123,7 +123,15 @@ export class LocalStorage implements Storage {
   async getUploadUrl(key: string, ttlSeconds: number) {
     const exp = Date.now() + ttlSeconds * 1000
     const sig = signBlobToken(key, 'put', exp)
-    return `${appUrl()}/api/blob/${key}?exp=${exp}&sig=${sig}`
+    // No headers: the app is the store here and re-hashes the stream itself.
+    return {
+      url: `${appUrl()}/api/blob/${key}?exp=${exp}&sig=${sig}`,
+      headers: {},
+    }
+  }
+
+  async getBytes(key: string) {
+    return new Uint8Array(await readFile(blobPath(key)))
   }
 
   async delete(key: string) {

@@ -35,12 +35,14 @@ export const prepareDocumentUpload = createServerFn({ method: 'POST' })
     // Content-addressed: the same deck sent to both partners is one blob.
     // Already stored ⇒ skip the transfer entirely.
     if (await store.exists(data.sha)) {
-      return { uploadUrl: null as string | null, alreadyStored: true }
+      return {
+        uploadUrl: null as string | null,
+        uploadHeaders: {} as Record<string, string>,
+        alreadyStored: true,
+      }
     }
-    return {
-      uploadUrl: await store.getUploadUrl(data.sha, 600),
-      alreadyStored: false,
-    }
+    const { url, headers } = await store.getUploadUrl(data.sha, 600)
+    return { uploadUrl: url, uploadHeaders: headers, alreadyStored: false }
   })
 
 export const finalizeDocumentUpload = createServerFn({ method: 'POST' })

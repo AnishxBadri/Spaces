@@ -380,13 +380,19 @@ async function uploadOne(
   setPhase('hashing')
   const sha = await sha256Hex(file)
 
-  const { uploadUrl } = await prepareDocumentUpload({
+  const { uploadUrl, uploadHeaders } = await prepareDocumentUpload({
     data: { sha, sizeBytes: file.size },
   })
 
   if (uploadUrl) {
     setPhase('uploading')
-    const response = await fetch(uploadUrl, { method: 'PUT', body: file })
+    // uploadHeaders carry the S3 checksum condition when that driver is
+    // live — the signature breaks without them. Empty for local.
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: uploadHeaders,
+    })
     if (!response.ok) {
       throw new Error((await response.text()) || 'Storage rejected the upload')
     }
