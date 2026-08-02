@@ -1320,7 +1320,10 @@ snippets.
     claim the research half, two-container ops, BYOK-to-Ollama, the investor schema,
     and the financial engine.
 
-Post-v1 backlog unchanged: dark theme, Playwright preview smoke test, an **MCP server**
+Post-v1 backlog unchanged: dark theme, Playwright preview smoke test, a **capture
+extension** (folkX-style, surveyed 2026-08: add a founder/company from LinkedIn without
+leaving the page — just another `resolveEntity()` caller pointed at the operator's own
+instance; BYOK-shaped by nature), an **MCP server**
 over the deal graph (approved 2026-08, explicitly last — a self-hosted graph your own
 AI tools can query is stronger under BYOK than under a cloud CRM), then integrations
 (each independent): Google Calendar first, Gmail (forward-only), Apollo enrichment (Exa
