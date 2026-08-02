@@ -1225,7 +1225,10 @@ scanned from the shipped code (record table and typed value editors documented a
 signature components; motion doctrine folded in per the six-section spec), and an
 `.impeccable/design.json` sidecar with ramps, motion tokens, and renderable component
 snippets.
-15. **Portfolio layer** (decided 2026-08, surveyed against TagHash-class products —
+15. **Portfolio layer** (decided 2026-08; the full domain vocabulary behind this layer —
+    terms, fund mechanics, ideologies, and what each surveyed vendor covers — lives in
+    `docs/private-capital-glossary.md`, annotated with [P15]/[banked]/[fenced] tags;
+    surveyed against TagHash-class products —
     this is the tier where an investing CRM stops being a pipeline tracker; it is also
     where we currently lose any feature comparison). Pure graph + registry + computed
     values: no external dependency, no OAuth, fully in-wheelhouse. Build order is the
