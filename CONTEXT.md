@@ -799,6 +799,17 @@ two `document` rows. Dedupe free, immutable, cache-forever.
 
 Documents hang off entities, not folders. Folders are the thing being replaced.
 
+## Integration readiness (noted 2026-08)
+
+The integration surface (email/calendar, enrichment, call recorders, messaging, AI
+assistants, public API/MCP) rides on extension points that already exist: the
+credential vault, per-user `account_connection`, `resolveEntity()` as the single entry
+gate, `interaction`/`signal` tables, the document pipeline for transcripts/attachments,
+and the worker. Two small baselines to add when the first push-style integration lands
+(neither changes the schema's shape): a **generic webhook ingress**
+(`/api/webhooks/:provider`, signature-verified) and the dedupe-inbox pattern
+generalized into a reusable **review inbox** for assistant/AI suggestions.
+
 ## Email / calendar ingestion
 
 **Deferred — post-MVP.** Decided 2026-07: ship the graph and both halves first; feed it
