@@ -1238,6 +1238,19 @@ once, immediately before strangers can install):
        MOIC / IRR / last mark) on the existing record-table engine + holding detail.
     8. Multi-currency minimally but from the first migration: per-cash-flow currency,
        base-currency roll-up, manual rates first.
+    Spec refinements (2026-08, stress-tested against a TagHash analytics dashboard):
+    - **Append-only dated events; aggregates always derived, never stored.** This is
+      what makes "as on <date>" point-in-time views free — filter events ≤ date and
+      recompute. Stated as a rule so nobody adds a mutable current_value column.
+    - **Share-level columns from day one**: price_per_share + shares_outstanding on
+      `round`, optional shares on `investment` and `distribution` — ownership %,
+      dilution deltas, and divestment math all need them; retrofitting means
+      re-entering history. Ownership stays ours-position-only (our shares ÷
+      outstanding ⇒ our % and fully-diluted %); a full all-shareholder cap table is
+      Carta-tier and stays out.
+    - **Nullable `vehicle` label on money events** — data, not tenancy (the
+      no-workspace_id rule is untouched): one optional column so an All-funds/Fund-I
+      grouping is possible later without a migration.
     **Deliberately not in this phase (TagHash-scale fund admin):** capital ledger
     (commitments/drawdowns/notices), fund-level NAV statements, multi-vehicle/SPV
     structures, LP reporting (standing non-goal), FoF look-through (wrong customer),
