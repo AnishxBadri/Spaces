@@ -1273,7 +1273,17 @@ snippets.
       Carta-tier and stays out.
     - **Nullable `vehicle` label on money events** — data, not tenancy (the
       no-workspace_id rule is untouched): one optional column so an All-funds/Fund-I
-      grouping is possible later without a migration.
+      grouping is possible later without a migration. Doctrine (2026-08): **workspace =
+      firm, never fund** — research, relationships, and pipeline are firm-level; which
+      vehicle wrote the check is a late accounting detail, and cross-vehicle follow-ons
+      must land on one holding. Known limit, accepted: one-active-mandate assumes
+      serial vintages; parallel distinct-strategy vehicles would need
+      mandate-per-vehicle (a loosening, not a redesign).
+    - **The follow-on decision is a new deal** — "one deal = one opportunity" means a
+      pro-rata decision enters the pipeline with its own judgment trail and can be
+      Passed without touching the original holding. Banked alongside: structured
+      **deal-rights capture** (pro-rata, information rights, board/observer, MFN) —
+      prose until the follow-on flow needs them as data.
     **Deliberately not in this phase (TagHash-scale fund admin):** capital ledger
     (commitments/drawdowns/notices), fund-level NAV statements, multi-vehicle/SPV
     structures, LP reporting (standing non-goal), FoF look-through (wrong customer),
