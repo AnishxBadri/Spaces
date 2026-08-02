@@ -1,8 +1,97 @@
-<!-- SEED: §6 Components is still pending — run /impeccable document after the focus-ring sweep (see CONTEXT.md's ordering note), not before. -->
-
 ---
 name: DealOS
 description: Self-hosted deal-management OS for angel and private-capital investing
+colors:
+  pine: "oklch(0.55 0.14 155)"
+  pine-hover: "oklch(0.5 0.14 155)"
+  selected-wash: "oklch(0.962 0.022 155)"
+  ground: "oklch(1 0 0)"
+  ink: "oklch(0.24 0.012 155)"
+  muted-ink: "oklch(0.49 0.016 155)"
+  panel: "oklch(0.976 0.003 155)"
+  border: "oklch(0.92 0.005 155)"
+  input-border: "oklch(0.885 0.006 155)"
+  row-hover: "oklch(0.977 0.003 155)"
+  destructive-crimson: "oklch(0.48 0.17 12)"
+  success-teal: "oklch(0.55 0.09 190)"
+  warning-amber: "oklch(0.7 0.13 75)"
+  info-blue: "oklch(0.55 0.1 240)"
+typography:
+  display:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "1.625rem"
+    fontWeight: 600
+    lineHeight: "2rem"
+    letterSpacing: "-0.025em"
+  headline:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "1.375rem"
+    fontWeight: 600
+    lineHeight: "1.75rem"
+    letterSpacing: "-0.025em"
+  title:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.9375rem"
+    fontWeight: 600
+    lineHeight: "1.375rem"
+  body:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.875rem"
+    fontWeight: 400
+    lineHeight: "1.25rem"
+  ui:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.8125rem"
+    fontWeight: 400
+    lineHeight: "1.25rem"
+  label:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.75rem"
+    fontWeight: 500
+    lineHeight: "1rem"
+  micro:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.6875rem"
+    fontWeight: 500
+    lineHeight: "1rem"
+  prose:
+    fontFamily: "Source Serif 4 Variable, Georgia, serif"
+    fontSize: "1.0625rem"
+    fontWeight: 400
+    lineHeight: 1.65
+rounded:
+  sm: "4px"
+  md: "6px"
+  lg: "8px"
+  xl: "12px"
+spacing:
+  row: "2.25rem"
+components:
+  button-primary:
+    backgroundColor: "{colors.pine}"
+    textColor: "#ffffff"
+    rounded: "{rounded.md}"
+    padding: "8px 16px"
+    height: "36px"
+  button-primary-hover:
+    backgroundColor: "{colors.pine-hover}"
+  button-outline:
+    backgroundColor: "{colors.ground}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.md}"
+    padding: "6px 12px"
+    height: "32px"
+  button-ghost:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.md}"
+    height: "32px"
+  input:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.md}"
+    padding: "4px 12px"
+    height: "36px"
 ---
 
 # Design System: DealOS
@@ -154,53 +243,102 @@ surface demands one.
 **The Flat-at-Rest Rule.** A resting surface never casts a shadow. If an element is
 elevated, the user did something to lift it.
 
-## 5. Motion
+## 5. Components
 
-**Pure CSS, used extensively, never decoratively** (decided 2026-08). No JS animation
-runtime — Radix `data-state` attributes + `tw-animate-css` keyframes + Tailwind
-transitions carry everything, which is exactly what lets the one global
-`prefers-reduced-motion` query in `styles.css` silence the entire app.
+Refined and restrained: every interactive element ships with default, hover,
+focus-visible, active, and disabled states; empty states teach; skeletons over spinners.
+Documented from the shipped code (2026-08, post-sweep) — one focus treatment, named type
+steps, and the motion doctrine below apply to every component without exception.
 
-Principles, after Rauno Freiberg's interface guidelines:
+### Motion
+**Pure CSS, used extensively, never decoratively.** No JS animation runtime — Radix
+`data-state` attributes + `tw-animate-css` keyframes + Tailwind transitions carry
+everything, which is what lets the one global `prefers-reduced-motion` query silence the
+entire app. Principles, after Rauno Freiberg's interface guidelines:
 
 - **Compositor-only.** Animate `transform` and `opacity` exclusively — never width,
-  height, top, or margin. Layout-property animation janks; transform/opacity stay on
-  the GPU at 60fps.
-- **Every transient surface enters and exits.** Dialogs, popovers, dropdowns, tooltips,
-  toasts, inline panels: fade + slight scale (≈0.95 → 1) on enter. Nothing transient
+  height, top, or margin.
+- **Every transient surface enters and exits** — fade + slight scale (0.95 → 1); nothing
   pops into existence unstyled.
-- **Origin-aware.** Overlays scale from their trigger, not from screen center —
-  `transform-origin` from Radix's placement variables, so a dropdown grows out of the
-  button that opened it.
-- **Exit faster than enter.** Enter ~150–200ms ease-out; exit ~100–150ms (or instant).
-  Dismissed UI must never make the user wait — leaving is not a moment.
-- **Motion frequency is inverse to action frequency.** High-frequency interactions
-  (cell edit commit, row hover, keyboard nav) get ≤100ms or nothing; rare moments
-  (a dialog, a command palette) afford the full 200ms.
-- **Interruptible, never blocking.** Animation never gates input; a user can act
-  mid-transition.
-- **No load choreography.** Pages appear settled — nothing animates on initial paint.
-- **Pressed states are physical.** Buttons and chips compress subtly on press
-  (`active:scale-[0.97]`-class treatment). Tactility without bounce — springs and
-  overshoot are for toys; this is a tool.
+- **Origin-aware.** Overlays scale from their trigger (`transform-origin` from Radix's
+  placement variables), never from screen center.
+- **Exit faster than enter, frequency scales the numbers.** Dialogs/palette: 180ms in,
+  120ms out. Menus: 150/100. Tooltips: 120/80. Cell edits and hovers: ≤100ms or nothing.
+  All on `--ease-out-quart`.
+- **Interruptible, never blocking. No load choreography** — pages appear settled.
+- **Pressed states are physical.** Buttons compress to `scale(0.97)` on press. No bounce,
+  no springs — tool, not toy.
 
 **The Compositor Rule.** If a motion can't be expressed in transform + opacity, it
 doesn't ship.
 
-## 6. Components
+### Buttons
+- **Shape:** crisp corners (6px radius), heights 24 / 32 / 36 / 40px (`xs / sm / default / lg`).
+- **Primary:** the only saturated fill on any surface — Pine on white text
+  (oklch(0.55 0.14 155), 4.52:1), hover deepens to pine-hover, press compresses to 0.97.
+- **Outline:** white ground, 1px border, `shadow-xs`, hover tints to the accent neutral.
+- **Ghost:** transparent until hover; used for in-context quiet actions.
+- **Destructive:** crimson fill, white text — never adjacent to a primary without space.
+- **Focus:** the app-wide `focus-ring` outline; the shadcn translucent ring was
+  deliberately replaced and must not return with re-vendored primitives.
 
-*Still omitted — components exist (phases 1–9), but this section is written by a scan-mode
-run of `/impeccable document`, deliberately ordered **after** the focus-ring sweep
-(~69 pre-token rings remain outside the table surfaces). Scanning now would document
-components that sweep is about to touch.*
+### Inputs / Fields
+- **Style:** transparent background, 1px `input-border` stroke, 6px radius, 36px height,
+  `shadow-xs`; selection highlight uses the primary.
+- **Focus:** `focus-ring` outline plus the border shifting to the ring color.
+- **Placeholders:** full-strength Muted Ink — never a sub-100% opacity.
+- **Invalid:** border and ring shift to destructive.
+- **Date fields:** native control in forms; in table cells a date renders as formatted
+  text until clicked (the native `mm/dd/yyyy` skeleton breaks the em-dash empty-cell
+  convention).
 
-Component philosophy to build toward: refined and restrained; every interactive element ships
-with default, hover, focus-visible, active, disabled, loading, and error states; skeletons
-over spinners; empty states that teach (and per PRODUCT.md, a table should almost never be
-empty at all); motion 150–250ms, ease-out, state-conveying only, `prefers-reduced-motion`
-honored everywhere.
+### The Record Table (signature)
+The hardest-working surface; spreadsheet-grade or the audience leaves.
+- **Rows:** one `--row-h` (36px) shared by header and body — the sticky header sits
+  flush; borders at 60% border color between rows, none after the last.
+- **Header:** sticky, white, `text-ui` medium; resizable and hideable columns.
+- **Hover:** the *opaque* `row-hover` neutral (translucency bleeds under sticky columns).
+- **Cells:** `text-ui` (13px); editors are borderless until hover ('cell' variant);
+  comparable numbers set `.numeric`; empty cells render an em dash.
+- **Focus inside the scroll container:** `focus-ring-inset`, never the offset ring.
 
-## 7. Do's and Don'ts
+### Typed Value Editors (signature)
+One implementation shared by table cells, record rails, and create dialogs — `variant`
+only changes chrome ('cell' is borderless-until-hover; 'field' looks like a form input).
+Selects/statuses/multi-selects render option badges; ratings render primary-filled stars;
+checkboxes are 16px squares that fill with the primary when checked. Create-dialog layout
+is type-driven: half-width fields in a two-column grid, long-form (`description`)
+spanning both — the registry generates the form, so the span rule survives any custom
+attribute.
+
+### Option Badges
+Pills carrying select/status/stage values: pale tint background + same-hue ink from the
+twelve-hue palette, `text-label` (12px) medium, full radius. Data colors, never
+decoration; the Two-Tier Rule guarantees they never compete with the primary.
+
+### Navigation
+Fixed 240px sidebar on the panel neutral; items are 32px rows, `text-ui` medium, Muted
+Ink at rest → ink on hover with the accent tint → the selection wash + ink when active
+(`aria-current="page"`). The workspace name (or wordmark) heads it; Cmd-K search sits
+directly beneath. Collapses to a drawer under a 48px top bar on mobile.
+
+### Overlays (Dialogs · Menus · Tooltips)
+- **Dialogs:** centered, max-height 85vh with internal scroll, 8px radius, `shadow-lg`,
+  1px border; enter 180ms fade+zoom-in-95, exit 120ms. Wide (672px) when a form has >4
+  fields, narrow (384–448px) otherwise. A modal must be argued for — previews and
+  create-forms qualify; navigation does not.
+- **Menus/dropdowns:** popover white, 1px border, `shadow-md`, origin-aware 150/100ms,
+  items 32px with the accent hover tint.
+- **Tooltips:** inverted (ink background, background text), `text-label`, 120/80ms.
+- **Toasts:** sonner, bottom-right, self-contained motion.
+
+### Empty States (teaching)
+Centered, max 24rem: an icon in a 44px muted rounded square, `text-title` semibold
+headline, two sentences of Muted Ink body that explain what the surface will do, then the
+create action — and, where relevant, a quiet hint line about what automation will fill
+this later. A table should almost never be empty at all (demo seed exists for that).
+
+## 6. Do's and Don'ts
 
 ### Do:
 - **Do** keep the ground pure white (oklch(1 0 0)) and let pine + typography carry all character.
