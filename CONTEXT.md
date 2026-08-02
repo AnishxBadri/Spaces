@@ -990,8 +990,8 @@ Both halves ship, or the seam — the whole point — doesn't exist.
 9. Entity resolution: `resolveEntity()` choke point, aliases, dedupe inbox, merge + snapshot
 10. BYOK AI: deal summary from attached material, memo draft, space tag suggestions
 
-Then: **Gmail sync (forward-only)**, Apollo enrichment, signals, co-investor graph,
-portfolio marks, Outlook.
+Then: **Gmail sync (forward-only)**, Apollo enrichment, signals, co-investor graph
+(seeded by round co-investor links from the portfolio layer, phase 15), Outlook.
 
 **Ordering rationale.** Nothing in 1–10 needs an external dependency, OAuth consent screen,
 or provider doc. Gmail is the single longest step in the project and gates nothing above it.
@@ -1194,7 +1194,36 @@ once, immediately before strangers can install):
 
 14. **Design-debt pass** — focus-ring sweep (~60), then `/impeccable document` writes
     DESIGN.md §6 (Components). Short and mechanical; new surfaces in 11–12 are built clean on tokens.
-15. **Ship polish — deferred, scope TBD (2026-08).** No release after phase 14: more dev
+15. **Portfolio layer** (decided 2026-08, surveyed against TagHash-class products —
+    this is the tier where an investing CRM stops being a pipeline tracker; it is also
+    where we currently lose any feature comparison). Pure graph + registry + computed
+    values: no external dependency, no OAuth, fully in-wheelhouse. Build order is the
+    dependency order:
+    1. `round` — financing event per company: date, kind, raised, pre/post-money,
+       co-investors (link rows → the co-investor graph falls out later).
+    2. `investment` — *our* checks: amount, **currency**, instrument
+       (SAFE / CCD / priced — CCDs matter for India), date, round ref, shares or
+       ownership %. **A deal reaching Invested births one** — the pipeline→portfolio
+       seam, same philosophy as research→pipeline.
+    3. Ownership & dilution ledger — % at entry, recomputed per subsequent round.
+       An ownership *history*, deliberately not cap-table management (Carta's job).
+    4. `mark` — fair value per holding over time, each carrying basis
+       (round price / manual / 409A) and date, never overwritten: death-is-information
+       applied to valuations.
+    5. `distribution` — realized proceeds: exits, secondaries, dividends, write-offs.
+    6. Computed performance, live at our scale (dozens of holdings, no metrics
+       warehouse): MOIC, TVPI, RVPI, DPI, XIRR, realized/unrealized — per holding and
+       portfolio roll-up.
+    7. Portfolio surface — holdings table (invested / current value / ownership /
+       MOIC / IRR / last mark) on the existing record-table engine + holding detail.
+    8. Multi-currency minimally but from the first migration: per-cash-flow currency,
+       base-currency roll-up, manual rates first.
+    **Deliberately not in this phase (TagHash-scale fund admin):** capital ledger
+    (commitments/drawdowns/notices), fund-level NAV statements, multi-vehicle/SPV
+    structures, LP reporting (standing non-goal), FoF look-through (wrong customer),
+    MIS collection. A lightweight single-vehicle capital ledger may earn a later slot
+    if fund-I customers ask; nothing else on that list should.
+16. **Ship polish — deferred, scope TBD (2026-08).** No release before this: more dev
     work and manual testing come first. CI, images, upgrade CI, install docs get decided
     when a release is actually in sight. Still banked from the earlier grill, to reuse
     then: rename mechanics first (Angle — domain/npm diligence before images bake the
