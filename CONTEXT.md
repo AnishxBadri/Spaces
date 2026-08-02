@@ -1151,17 +1151,35 @@ Decisions worth keeping:
   "EV batteries" root; company template visibly pre-filled Business model / Funding
   stage / Location in the create modal; settings lists all three with context chips.
 
+**S3 storage driver (phase 13): done, 2026-08.** `S3Storage` behind the frozen `Storage`
+interface (`@aws-sdk/client-s3` + presigner), selected by `STORAGE_DRIVER=s3`; env is
+`S3_BUCKET/S3_ENDPOINT/S3_REGION/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY/S3_FORCE_PATH_STYLE`
+(path-style defaults **on** — right for R2/B2/MinIO/Garage). MinIO + one-shot bucket-init
+live in the *dev* compose only. Local FS stays the default; production compose unchanged.
+Decisions worth keeping:
+- **The checksum matrix, answered.** `x-amz-checksum-sha256` is baked into the presigned
+  PUT's signature and returned as a required header for the browser to send. Empirical:
+  MinIO rejects mismatched bytes (`XAmzContentChecksumMismatch`, 400) and refuses PUTs
+  omitting the signed header. Documented: AWS verifies server-side (BadDigest); R2 and
+  B2 added sha256 checksum support (2024 / July 2025); **Garage remains doubtful**.
+- **Universal integrity backstop, nearly free:** the extraction worker already holds
+  every blob it processes, so it re-verifies the digest there regardless of driver —
+  partially-compatible endpoints can't quietly break "same sha ⇒ same bytes". Mismatch
+  → extraction fails loudly, document flagged.
+- **Download hardening survives S3:** attachment + octet-stream are baked into the
+  *signed* response params of every presigned GET — an uploaded `.html` can't be served
+  inline from the bucket either.
+- **Interface changes the second driver forced** (the predicted leak-finding):
+  `getUploadUrl` now returns `{url, headers}` (local returns empty headers), and the
+  worker reads via `storage().getBytes()` instead of a direct file path.
+- Verified: 12-check driver suite against MinIO (lifecycle + both integrity rejections),
+  then the full app driven by browser with `STORAGE_DRIVER=s3` — upload via presigned
+  PUT, extraction from the bucket, pdf.js preview via presigned GET; blob present in
+  MinIO under its sha, local blobs dir never created.
+
 Remaining phases (**sequence grilled and decided 2026-08** — features first, ship polish
 once, immediately before strangers can install):
 
-13. **S3 storage driver** (decided 2026-08 — driver was always the design, timing now
-    fixed). Scope: `@aws-sdk/client-s3` driver behind the existing `Storage` interface,
-    MinIO (or Garage) service in `docker-compose.dev.yml` for dev/testing, and the
-    `x-amz-checksum-sha256` support matrix across AWS/R2/B2/Garage — the presigned-PUT
-    integrity question gets retired here, before integrations lean harder on
-    "same sha ⇒ same bytes". If the matrix disappoints, design the fallback then
-    (worker re-downloads and verifies async; blob unverified until). Local FS stays the
-    default; nothing gets bundled.
 14. **Design-debt pass** — focus-ring sweep (~60), then `/impeccable document` writes
     DESIGN.md §6 (Components). Short and mechanical; new surfaces in 11–12 are built clean on tokens.
 15. **Ship polish — deferred, scope TBD (2026-08).** No release after phase 14: more dev
