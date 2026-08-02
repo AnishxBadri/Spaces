@@ -44,6 +44,11 @@ AGPL-3.0. Can relicense permissively later; reverse is impossible once contribut
 
 # Architecture decisions
 
+> Synthesis view for newcomers: `docs/ARCHITECTURE.md` — every model (workspace,
+> entity graph, objects, research, mandate, deals, templates, financial engine),
+> the stack, and the TagHash-parity map, in one read. This file remains the deep
+> decision record.
+
 ## Stack
 
 One language, TypeScript, one codebase. Two processes (web, worker), two containers (app, db).
