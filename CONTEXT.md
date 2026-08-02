@@ -1257,6 +1257,15 @@ snippets.
        MOIC / IRR / last mark) on the existing record-table engine + holding detail.
     8. Multi-currency minimally but from the first migration: per-cash-flow currency,
        base-currency roll-up, manual rates first.
+    9. **Portfolio bootstrap import** (decided 2026-08) — inside this phase, not
+       deferred with general CSV import: an empty financial engine is dead on arrival
+       for anyone with existing checks. One wizard — upload (CSV/XLSX) → map columns
+       onto the registry/event fields → resolve-preview (`resolveEntity` does the
+       matching; `source: 'import'` provenance already exists) → dry-run report →
+       idempotent commit. Target shape is the universal tracking spreadsheet: company /
+       date / amount / instrument / round info / current mark, decomposed into dated
+       `round` + `investment` + `mark` events so IRR and as-of views work on day one
+       for pre-existing positions. Per-row errors, never all-or-nothing.
     Spec refinements (2026-08, stress-tested against a TagHash analytics dashboard):
     - **Append-only dated events; aggregates always derived, never stored.** This is
       what makes "as on <date>" point-in-time views free — filter events ≤ date and
