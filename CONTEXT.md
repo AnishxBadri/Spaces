@@ -952,6 +952,21 @@ simple as them. Target is "as simple as Plane/Cal.com".
 Huly, EspoCRM/SuiteCRM/Odoo (sales-shaped, not investing-shaped), NocoDB/Baserow/Teable +
 Docmost/Outline as a two-tool stack. None are investor-opinionated. That's the gap.
 
+**Investor-specific products surveyed (2026-08):** Affinity (auto email/calendar capture →
+relationship graph + warm-path scoring — validates Gmail-sync-as-endgame and our
+`interaction_entity` scoring primitive; also ships meeting-prep agents and an MCP server,
+so MCP is trending table-stakes), Edda (their Portfolio "automatically receives invested
+companies from Dealflow" — independent convergence on our Invested-births-a-holding
+seam), 4Degrees (warm-intro paths as the differentiator), TagHash (fund-admin tier —
+fenced out of phase 15), Visible.vc (portfolio MIS = structured founder requests with a
+standard-six metric default — Revenue, Net Income, Cash, Runway, Burn, Headcount — via
+login-free tokenized links; the shape to copy if MIS ever lands). Three ideas banked for
+the BYOK AI phase: **meeting-prep brief** (one-pager from record + filed notes + recent
+interactions ahead of a calendar event — our research half makes this richer than
+Affinity's), **pass-letter drafting** from the recorded pass reason (Edda's Decision
+Writer), and deck-reader autofill (already implied by extraction + AI-autofill
+attributes).
+
 ---
 
 # Hard parts, in order
