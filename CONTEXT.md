@@ -1130,13 +1130,30 @@ outside-mandate hint on the deal record. Decisions worth keeping:
 - Verified live: empty state SSR, facts rail renders vocabulary, series_a company under
   a pre-seed/seed mandate shows the hint, flipping the company to seed removes it.
 
+**Templates (phase 12): done, 2026-08.** One `template` table, three kinds, all creation
+by-example ("Save as template" on a note, record, or space — no builder UI anywhere), one
+shared picker component with `suggest_on` context ordering, management in settings.
+Decisions worth keeping:
+- **Mentions are stripped to plain text at note-template capture** — a template holding a
+  real entity reference would materialize ghost backlinks on every instantiation.
+- **Record templates exclude reference/actor slugs at capture** and pre-fill the create
+  modal visibly; nothing writes silently. v1 limit, on purpose: the picker only sits on
+  the **company** dialog — the person and deal dialogs are deliberately minimal and don't
+  render registry fields, and silently applying template values would break the
+  pre-fill-visibly rule. The picker joins them when they grow fields.
+- **Scaffold stamping is skip-existing** (same-named child reused, never duplicated) and
+  captures names + glossary terms only, never memo content — a scaffold that copied
+  memos would smuggle one market's research into another.
+- `createSpaceRow` moved to `server/shared.ts` (not barrel-exported) so the scaffold
+  stamper and `createSpace` share slug/path logic without leaking db code client-side.
+- Verified by driving the real app end-to-end: note → template → new note carries the
+  body; Data-centers subtree + PUE term captured and stamped intact onto a new
+  "EV batteries" root; company template visibly pre-filled Business model / Funding
+  stage / Location in the create modal; settings lists all three with context chips.
+
 Remaining phases (**sequence grilled and decided 2026-08** — features first, ship polish
 once, immediately before strangers can install):
 
-12. **Templates** — build order **notes → record → space**: note templates prove the
-    mechanism (storage, picker, `suggest_on`, save-in-place) on the highest-value kind;
-    record templates reuse the picker in the create modal; by-example space scaffolds
-    land on a settled mechanism.
 13. **S3 storage driver** (decided 2026-08 — driver was always the design, timing now
     fixed). Scope: `@aws-sdk/client-s3` driver behind the existing `Storage` interface,
     MinIO (or Garage) service in `docker-compose.dev.yml` for dev/testing, and the
