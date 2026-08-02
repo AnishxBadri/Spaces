@@ -48,9 +48,7 @@ function LoginPage() {
     <main className="flex min-h-dvh flex-col items-center bg-background px-6">
       <div className="w-full max-w-[360px] pt-[22vh]">
         <Wordmark />
-        <h1 className="mt-8 text-[22px] font-semibold tracking-tight">
-          Sign in
-        </h1>
+        <h1 className="mt-8 text-page font-semibold tracking-tight">Sign in</h1>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
           <div className="space-y-1.5">
@@ -76,7 +74,7 @@ function LoginPage() {
           </div>
 
           {error ? (
-            <p role="alert" className="text-[13px] text-destructive">
+            <p role="alert" className="text-ui text-destructive">
               {error}
             </p>
           ) : null}
@@ -86,7 +84,7 @@ function LoginPage() {
           </Button>
         </form>
 
-        <p className="mt-6 text-[13px] text-muted-foreground">
+        <p className="mt-6 text-ui text-muted-foreground">
           No account? Ask your admin for an invitation.
         </p>
       </div>

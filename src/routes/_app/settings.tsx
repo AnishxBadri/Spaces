@@ -125,8 +125,8 @@ function SettingsPage() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-8 md:px-10">
       <header>
-        <h1 className="text-[22px] font-semibold tracking-tight">Settings</h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <h1 className="text-page font-semibold tracking-tight">Settings</h1>
+        <p className="mt-1 text-ui text-muted-foreground">
           Workspace, members, and objects. Structural edits are admin-only.
         </p>
       </header>
@@ -146,7 +146,7 @@ function SettingsPage() {
       <TemplatesSection templates={data.templates} />
 
       <h2 className="mt-10 text-title font-semibold tracking-tight">Objects</h2>
-      <p className="mt-1 text-[13px] text-muted-foreground">
+      <p className="mt-1 text-ui text-muted-foreground">
         Attributes behind Companies, People, Deals. Rename anything, edit
         options, archive what you don't use — types are fixed.
       </p>
@@ -160,7 +160,7 @@ function SettingsPage() {
               aria-selected={kind === o.kind}
               onClick={() => setKind(o.kind)}
               className={cn(
-                'relative flex items-center gap-1.5 px-3 pb-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded-t-md',
+                'relative flex items-center gap-1.5 px-3 pb-2.5 text-ui font-medium text-muted-foreground transition-colors hover:text-foreground focus-ring rounded-t-md',
                 kind === o.kind &&
                   'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
               )}
@@ -314,7 +314,7 @@ function MembersSection({
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline gap-2">
-                <span className="truncate text-[13px] font-medium">
+                <span className="truncate text-ui font-medium">
                   {m.name}
                   {m.id === me.id ? (
                     <span className="ml-1.5 text-xs font-normal text-muted-foreground">
@@ -334,7 +334,7 @@ function MembersSection({
             </span>
             {isAdmin && m.id !== me.id ? (
               <DropdownMenu>
-                <DropdownMenuTrigger className="rounded-md px-2 py-1 text-xs font-medium capitalize text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+                <DropdownMenuTrigger className="rounded-md px-2 py-1 text-xs font-medium capitalize text-muted-foreground hover:bg-accent hover:text-foreground focus-ring">
                   {m.role}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
@@ -444,7 +444,7 @@ function MembersSection({
                     {new Date(inv.expiresAt).toLocaleDateString()}
                   </span>
                   <button
-                    className="rounded px-1.5 py-0.5 hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                    className="rounded px-1.5 py-0.5 hover:bg-accent hover:text-foreground focus-ring"
                     onClick={() =>
                       act(
                         () => revokeInvite({ data: { id: inv.id } }),
@@ -493,12 +493,12 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
   return (
     <section className="mt-10">
       <h2 className="text-title font-semibold tracking-tight">Templates</h2>
-      <p className="mt-1 text-[13px] text-muted-foreground">
+      <p className="mt-1 text-ui text-muted-foreground">
         Saved patterns for notes, records, and space breakdowns. Create one from
         any existing note, record, or space — “Save as template”.
       </p>
       {templates.length === 0 ? (
-        <p className="mt-3 text-[13px] text-muted-foreground">
+        <p className="mt-3 text-ui text-muted-foreground">
           None yet. Open a note, record, or space you like the shape of and save
           it as the pattern.
         </p>
@@ -513,7 +513,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
               )}
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-medium">
+                <span className="block truncate text-ui font-medium">
                   {t.name}
                 </span>
                 <span className="block text-xs capitalize text-muted-foreground">
@@ -730,7 +730,7 @@ function InlineName({
           ;(e.target as HTMLInputElement).blur()
         }
       }}
-      className="block w-full truncate bg-transparent text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded"
+      className="focus-ring block w-full truncate rounded bg-transparent text-ui font-medium"
     />
   )
 }
@@ -882,7 +882,7 @@ function IconBtn({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="flex size-6.5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+      className="flex size-6.5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40 focus-ring"
     >
       {children}
     </button>

@@ -81,11 +81,11 @@ export function AppSidebar({
         <button
           type="button"
           onClick={onOpenCommand}
-          className="flex h-8 w-full items-center gap-2 rounded-md border border-sidebar-border bg-background px-2.5 text-[13px] text-muted-foreground transition-colors hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="flex h-8 w-full items-center gap-2 rounded-md border border-sidebar-border bg-background px-2.5 text-ui text-muted-foreground transition-colors hover:border-input focus-ring"
         >
           <Search className="size-3.5" strokeWidth={1.75} />
           <span>Search…</span>
-          <kbd className="ml-auto rounded border border-border bg-muted px-1.5 font-sans text-[10px] leading-4 text-muted-foreground">
+          <kbd className="ml-auto rounded border border-border bg-muted px-1.5 font-sans text-micro leading-4 text-muted-foreground">
             {isMac ? '⌘K' : 'Ctrl K'}
           </kbd>
         </button>
@@ -98,9 +98,9 @@ export function AppSidebar({
             to={item.to}
             onClick={onNavigate}
             className={cn(
-              'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors',
+              'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-ui font-medium text-muted-foreground transition-colors',
               'hover:bg-sidebar-accent hover:text-foreground',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+              'focus-ring',
             )}
             activeProps={{
               className: 'bg-selected text-foreground',
@@ -118,9 +118,9 @@ export function AppSidebar({
           to="/settings"
           onClick={onNavigate}
           className={cn(
-            'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors',
+            'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-ui font-medium text-muted-foreground transition-colors',
             'hover:bg-sidebar-accent hover:text-foreground',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+            'focus-ring',
           )}
           activeProps={{
             className: 'bg-selected text-foreground',
@@ -136,7 +136,7 @@ export function AppSidebar({
             className={cn(
               'flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-left transition-colors',
               'hover:bg-sidebar-accent',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+              'focus-ring',
             )}
           >
             {/* Neutral, never the primary — that means action/selection/focus
@@ -146,10 +146,10 @@ export function AppSidebar({
               {user.name.charAt(0).toUpperCase()}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium leading-tight">
+              <span className="block truncate text-ui font-medium leading-tight">
                 {user.name}
               </span>
-              <span className="block truncate text-[11px] leading-tight text-muted-foreground">
+              <span className="block truncate text-micro leading-tight text-muted-foreground">
                 {user.email}
               </span>
             </span>

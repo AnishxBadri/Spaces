@@ -122,7 +122,7 @@ export function RecordFiles({
       className={cn(
         'mt-4 rounded-md transition-colors',
         // Flat at rest: the ring only appears because the user is dragging.
-        dragging && 'ring-2 ring-ring/60 ring-offset-2 ring-offset-background',
+        dragging && 'ring-2 ring-ring ring-offset-2 ring-offset-background',
       )}
     >
       <div className="flex items-center justify-between">
@@ -153,10 +153,10 @@ export function RecordFiles({
 
       {documents.length === 0 && pending.length === 0 ? (
         <div className="mt-3 rounded-md border border-dashed border-border px-4 py-8 text-center">
-          <p className="text-[13px] text-muted-foreground">
+          <p className="text-ui text-muted-foreground">
             No files yet. Drag one in, or use Upload.
           </p>
-          <p className="mt-1 text-xs text-muted-foreground/80">
+          <p className="mt-1 text-xs text-muted-foreground">
             PDF, DOCX, PPTX and XLSX get their text extracted and searched.
           </p>
         </div>
@@ -165,7 +165,7 @@ export function RecordFiles({
           {pending.map((p) => (
             <li
               key={p.key}
-              className="flex items-center gap-3 px-1 py-2.5 text-[13px]"
+              className="flex items-center gap-3 px-1 py-2.5 text-ui"
             >
               {p.error ? (
                 <FileIcon
@@ -241,7 +241,7 @@ function DocumentRow({
   }
 
   return (
-    <li className="group flex items-start gap-3 px-1 py-2.5 text-[13px]">
+    <li className="group flex items-start gap-3 px-1 py-2.5 text-ui">
       <Icon
         className="mt-0.5 size-4 shrink-0 text-muted-foreground"
         strokeWidth={1.75}
@@ -260,7 +260,7 @@ function DocumentRow({
             {DOCUMENT_KIND_LABELS[doc.kind]}
           </span>
         </div>
-        <p className="tabular mt-0.5 text-xs text-muted-foreground/80">
+        <p className="tabular mt-0.5 text-xs text-muted-foreground">
           {[
             formatBytes(doc.sizeBytes),
             doc.uploadedByName,
@@ -311,7 +311,7 @@ function DocumentRow({
 function ExtractionNote({ doc }: { doc: Documents[number] }) {
   if (doc.extractionStatus === 'pending') {
     return (
-      <p className="mt-1 text-xs text-muted-foreground/80">Extracting text…</p>
+      <p className="mt-1 text-xs text-muted-foreground">Extracting text…</p>
     )
   }
   if (doc.extractionStatus === 'failed') {
@@ -323,14 +323,14 @@ function ExtractionNote({ doc }: { doc: Documents[number] }) {
   }
   if (doc.extractionStatus === 'unsupported') {
     return (
-      <p className="mt-1 text-xs text-muted-foreground/80">
+      <p className="mt-1 text-xs text-muted-foreground">
         {doc.extractionError ?? 'No extractable text'}
       </p>
     )
   }
   if (doc.snippet) {
     return (
-      <p className="mt-1 truncate text-xs text-muted-foreground/80">
+      <p className="mt-1 truncate text-xs text-muted-foreground">
         {doc.snippet}
       </p>
     )

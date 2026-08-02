@@ -87,7 +87,7 @@ function DealRecordPage() {
     <div className="mx-auto max-w-7xl px-6 py-8 md:px-10">
       <Link
         to="/deals"
-        className="flex w-fit items-center gap-1.5 rounded-md text-[13px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground hover:text-foreground focus-ring"
       >
         <ArrowLeft className="size-3.5" strokeWidth={1.75} />
         Deals
@@ -101,7 +101,7 @@ function DealRecordPage() {
           />
         </span>
         <div className="min-w-0">
-          <h1 className="truncate text-[22px] font-semibold tracking-tight">
+          <h1 className="truncate text-page font-semibold tracking-tight">
             {deal.name}
           </h1>
           {companyId ? (
@@ -109,7 +109,7 @@ function DealRecordPage() {
               <Link
                 to="/companies/$companyId"
                 params={{ companyId }}
-                className="flex w-fit items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground"
+                className="flex w-fit items-center gap-1 text-ui text-muted-foreground hover:text-foreground"
               >
                 <Building2 className="size-3" strokeWidth={1.75} />
                 {deal.refNames[companyId]?.name ?? 'Company'}
@@ -152,7 +152,7 @@ function DealRecordPage() {
             objectKind="deal"
             onCreated={() => router.invalidate()}
             trigger={
-              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-ring">
                 <Plus className="size-3" strokeWidth={2} />
                 Add attribute
               </button>
@@ -171,7 +171,7 @@ function DealRecordPage() {
                   aria-selected={tab === t}
                   onClick={() => setTab(t)}
                   className={cn(
-                    'relative px-3 pb-2.5 text-[13px] font-medium capitalize text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded-t-md',
+                    'relative px-3 pb-2.5 text-ui font-medium capitalize text-muted-foreground transition-colors hover:text-foreground focus-ring rounded-t-md',
                     tab === t &&
                       'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
                   )}
@@ -202,7 +202,7 @@ function DealRecordPage() {
           ) : (
             <ul className="mt-4 space-y-1">
               {noteMentions.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">
+                <p className="text-ui text-muted-foreground">
                   No notes mention this deal yet — diligence notes land here.
                 </p>
               ) : (
@@ -211,7 +211,7 @@ function DealRecordPage() {
                     <Link
                       to="/notes/$noteId"
                       params={{ noteId: m.fromId }}
-                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-ui hover:bg-accent focus-ring"
                     >
                       <FileText
                         className="size-4 text-muted-foreground"

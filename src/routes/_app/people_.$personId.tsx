@@ -98,22 +98,22 @@ function PersonRecordPage() {
     <div className="mx-auto max-w-7xl px-6 py-8 md:px-10">
       <Link
         to="/people"
-        className="flex w-fit items-center gap-1.5 rounded-md text-[13px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground hover:text-foreground focus-ring"
       >
         <ArrowLeft className="size-3.5" strokeWidth={1.75} />
         People
       </Link>
 
       <header className="mt-5 flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-full bg-muted text-[15px] font-semibold text-muted-foreground">
+        <span className="flex size-9 items-center justify-center rounded-full bg-muted text-title font-semibold text-muted-foreground">
           {person.name.charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0">
-          <h1 className="truncate text-[22px] font-semibold tracking-tight">
+          <h1 className="truncate text-page font-semibold tracking-tight">
             {person.name}
           </h1>
           {person.values.job_title ? (
-            <p className="truncate text-[13px] text-muted-foreground">
+            <p className="truncate text-ui text-muted-foreground">
               {String(person.values.job_title)}
             </p>
           ) : null}
@@ -160,7 +160,7 @@ function PersonRecordPage() {
             objectKind="person"
             onCreated={() => router.invalidate()}
             trigger={
-              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-ring">
                 <Plus className="size-3" strokeWidth={2} />
                 Add attribute
               </button>
@@ -179,7 +179,7 @@ function PersonRecordPage() {
                   aria-selected={tab === t}
                   onClick={() => setTab(t)}
                   className={cn(
-                    'relative px-3 pb-2.5 text-[13px] font-medium capitalize text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded-t-md',
+                    'relative px-3 pb-2.5 text-ui font-medium capitalize text-muted-foreground transition-colors hover:text-foreground focus-ring rounded-t-md',
                     tab === t &&
                       'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
                   )}
@@ -209,7 +209,7 @@ function PersonRecordPage() {
           ) : (
             <ul className="mt-4 space-y-1">
               {noteMentions.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">
+                <p className="text-ui text-muted-foreground">
                   No notes mention {person.name} yet.
                 </p>
               ) : (
@@ -218,7 +218,7 @@ function PersonRecordPage() {
                     <Link
                       to="/notes/$noteId"
                       params={{ noteId: m.fromId }}
-                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-ui hover:bg-accent focus-ring"
                     >
                       <FileText
                         className="size-4 text-muted-foreground"
@@ -243,7 +243,7 @@ function PersonRecordPage() {
               {person.companies.map((c) => (
                 <li
                   key={c.id}
-                  className="group flex h-7 items-center gap-2 rounded-md px-1.5 text-[13px] hover:bg-accent"
+                  className="group flex h-7 items-center gap-2 rounded-md px-1.5 text-ui hover:bg-accent"
                 >
                   <Building2
                     className="size-3.5 shrink-0 text-muted-foreground"
@@ -268,7 +268,7 @@ function PersonRecordPage() {
                       })
                       router.invalidate()
                     }}
-                    className="hidden size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground group-hover:flex focus-visible:flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                    className="hidden size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground group-hover:flex focus-visible:flex focus-ring"
                   >
                     <X className="size-3" strokeWidth={2} />
                   </button>
@@ -290,7 +290,7 @@ function PersonRecordPage() {
                   })
                   router.invalidate()
                 }}
-                className="border-input mt-2 h-7 w-full rounded-md border bg-transparent px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="border-input mt-2 h-7 w-full rounded-md border bg-transparent px-2 text-xs text-muted-foreground focus-ring"
               >
                 <option value="">+ Link to company…</option>
                 {unlinkedCompanies.map((c) => (
@@ -307,13 +307,11 @@ function PersonRecordPage() {
               Mentioned in
             </h2>
             {person.mentionedIn.length === 0 ? (
-              <p className="mt-2 text-xs text-muted-foreground/80">
-                Nowhere yet.
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">Nowhere yet.</p>
             ) : (
               <ul className="mt-2 space-y-1">
                 {person.mentionedIn.map((m) => (
-                  <li key={m.fromId} className="truncate text-[13px]">
+                  <li key={m.fromId} className="truncate text-ui">
                     {m.kind === 'note' ? (
                       <Link
                         to="/notes/$noteId"
@@ -381,7 +379,7 @@ function ContactField({
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <ul className="space-y-1">
         {values.map((v) => (
-          <li key={v} className="flex h-7 items-center gap-2 text-[13px]">
+          <li key={v} className="flex h-7 items-center gap-2 text-ui">
             <Icon
               className="size-3.5 shrink-0 text-muted-foreground"
               strokeWidth={1.75}
@@ -403,7 +401,7 @@ function ContactField({
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-ring"
         >
           <Plus className="size-3" strokeWidth={2} />
           Add

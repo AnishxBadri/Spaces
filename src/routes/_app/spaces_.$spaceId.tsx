@@ -72,11 +72,11 @@ function SpacePage() {
       {/* Breadcrumb */}
       <nav
         aria-label="Breadcrumb"
-        className="flex items-center gap-1 text-[13px] text-muted-foreground"
+        className="flex items-center gap-1 text-ui text-muted-foreground"
       >
         <Link
           to="/spaces"
-          className="flex items-center gap-1.5 rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="flex items-center gap-1.5 rounded-md hover:text-foreground focus-ring"
         >
           <ArrowLeft className="size-3.5" strokeWidth={1.75} />
           Spaces
@@ -84,13 +84,13 @@ function SpacePage() {
         {spc.ancestors.map((a) => (
           <span key={a.id} className="flex items-center gap-1">
             <ChevronRight
-              className="size-3 text-muted-foreground/50"
+              className="size-3 text-muted-foreground"
               strokeWidth={2}
             />
             <Link
               to="/spaces/$spaceId"
               params={{ spaceId: a.id }}
-              className="rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              className="rounded-md hover:text-foreground focus-ring"
             >
               {a.name}
             </Link>
@@ -106,9 +106,7 @@ function SpacePage() {
               strokeWidth={1.75}
             />
           </span>
-          <h1 className="text-[22px] font-semibold tracking-tight">
-            {spc.name}
-          </h1>
+          <h1 className="text-page font-semibold tracking-tight">{spc.name}</h1>
         </div>
         <span className="flex items-center gap-2">
           <SaveAsTemplateAction
@@ -132,7 +130,7 @@ function SpacePage() {
             key={c.id}
             to="/spaces/$spaceId"
             params={{ spaceId: c.id }}
-            className="flex h-6 items-center gap-1 rounded-full border border-border px-2.5 text-xs font-medium text-muted-foreground hover:border-input hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="flex h-6 items-center gap-1 rounded-full border border-border px-2.5 text-xs font-medium text-muted-foreground hover:border-input hover:text-foreground focus-ring"
           >
             <Layers className="size-3" strokeWidth={1.75} />
             {c.name}
@@ -148,10 +146,10 @@ function SpacePage() {
             key={f.id}
             to="/notes/$noteId"
             params={{ noteId: f.id }}
-            className="block rounded-lg border border-border p-4 hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="block rounded-lg border border-border p-4 hover:border-input focus-ring"
           >
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="min-w-0 truncate text-[15px] font-semibold">
+              <h2 className="min-w-0 truncate text-title font-semibold">
                 {f.title || `${spc.name} ${f.kind}`}
               </h2>
               <span className="shrink-0 text-xs text-muted-foreground">
@@ -159,12 +157,12 @@ function SpacePage() {
               </span>
             </div>
             {f.snippet ? (
-              <p className="mt-2 font-serif text-[15px] leading-relaxed text-muted-foreground">
+              <p className="mt-2 font-serif text-title leading-relaxed text-muted-foreground">
                 {f.snippet}
                 {f.snippet.length >= 400 ? '…' : ''}
               </p>
             ) : (
-              <p className="mt-2 text-[13px] text-muted-foreground">
+              <p className="mt-2 text-ui text-muted-foreground">
                 Empty so far — open it and set down what you know.
               </p>
             )}
@@ -173,14 +171,14 @@ function SpacePage() {
 
         <button
           onClick={writeMemo}
-          className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border p-4 text-left hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border p-4 text-left hover:border-input focus-ring"
         >
           <PenLine
             className="size-4 shrink-0 text-muted-foreground"
             strokeWidth={1.75}
           />
           <span>
-            <span className="block text-[13px] font-medium">
+            <span className="block text-ui font-medium">
               {spc.filed.length === 0 ? 'Write the memo' : 'File another'}
             </span>
             <span className="block text-xs text-muted-foreground">
@@ -198,7 +196,7 @@ function SpacePage() {
           Companies · {spc.companies.length}
         </h2>
         {spc.companies.length === 0 ? (
-          <p className="mt-2 text-[13px] text-muted-foreground">
+          <p className="mt-2 text-ui text-muted-foreground">
             Nothing tracked here yet — tag companies into this space from their
             record page.
           </p>
@@ -209,7 +207,7 @@ function SpacePage() {
                 <Link
                   to="/companies/$companyId"
                   params={{ companyId: c.id }}
-                  className="flex h-9 items-center gap-3 rounded-md px-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  className="flex h-9 items-center gap-3 rounded-md px-2 text-ui hover:bg-accent focus-ring"
                 >
                   <Building2
                     className="size-4 shrink-0 text-muted-foreground"
@@ -244,7 +242,7 @@ function SpacePage() {
           Referenced · {spc.notes.length}
         </h2>
         {spc.notes.length === 0 ? (
-          <p className="mt-2 text-[13px] text-muted-foreground">
+          <p className="mt-2 text-ui text-muted-foreground">
             Nothing yet. Notes that @mention {spc.name} without being filed here
             collect in this list.
           </p>
@@ -255,7 +253,7 @@ function SpacePage() {
                 <Link
                   to="/notes/$noteId"
                   params={{ noteId: n.id }}
-                  className="flex h-9 items-center gap-3 rounded-md px-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  className="flex h-9 items-center gap-3 rounded-md px-2 text-ui hover:bg-accent focus-ring"
                 >
                   <FileText
                     className="size-4 shrink-0 text-muted-foreground"
@@ -264,7 +262,7 @@ function SpacePage() {
                   <span className="min-w-0 flex-1 truncate font-medium">
                     {n.title}
                   </span>
-                  <span className="tabular text-xs text-muted-foreground/80">
+                  <span className="tabular text-xs text-muted-foreground">
                     {dateFmt.format(new Date(n.updatedAt))}
                   </span>
                 </Link>
@@ -304,7 +302,7 @@ function NewSubspace({ parentId }: { parentId: string }) {
   ) : (
     <button
       onClick={() => setEditing(true)}
-      className="flex h-6 items-center gap-1 rounded-full border border-dashed border-border px-2.5 text-xs text-muted-foreground hover:border-input hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+      className="flex h-6 items-center gap-1 rounded-full border border-dashed border-border px-2.5 text-xs text-muted-foreground hover:border-input hover:text-foreground focus-ring"
     >
       <Plus className="size-3" strokeWidth={2} />
       Subspace

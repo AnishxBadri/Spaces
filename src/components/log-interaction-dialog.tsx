@@ -107,7 +107,7 @@ export function LogInteractionDialog({
                 aria-pressed={kind === k}
                 onClick={() => setKind(k)}
                 className={cn(
-                  'flex-1 rounded px-2 py-1 text-xs font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+                  'flex-1 rounded px-2 py-1 text-xs font-medium capitalize transition-colors focus-ring',
                   kind === k
                     ? 'bg-selected text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
@@ -142,7 +142,7 @@ export function LogInteractionDialog({
           <AttendeePicker attendees={attendees} onChange={setAttendees} />
 
           {error ? (
-            <p role="alert" className="text-[13px] text-destructive">
+            <p role="alert" className="text-ui text-destructive">
               {error}
             </p>
           ) : null}
@@ -204,7 +204,7 @@ function AttendeePicker({
                   onClick={() =>
                     onChange(attendees.filter((x) => x.id !== a.id))
                   }
-                  className="rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  className="rounded-full text-muted-foreground hover:text-foreground focus-ring"
                 >
                   <X className="size-2.5" strokeWidth={2} />
                 </button>
@@ -218,7 +218,7 @@ function AttendeePicker({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Add people, companies, deals…"
-        className="h-8 text-[13px]"
+        className="h-8 text-ui"
       />
       {results.length > 0 ? (
         <ul className="max-h-40 overflow-y-auto rounded-md border border-border">
@@ -232,7 +232,7 @@ function AttendeePicker({
                     onChange([...attendees, r])
                     setQuery('')
                   }}
-                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-ui hover:bg-accent focus-ring"
                 >
                   <Icon
                     className="size-3.5 text-muted-foreground"

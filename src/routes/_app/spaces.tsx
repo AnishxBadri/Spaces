@@ -32,8 +32,8 @@ function SpacesPage() {
     <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight">Spaces</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+          <h1 className="text-page font-semibold tracking-tight">Spaces</h1>
+          <p className="mt-1 text-ui text-muted-foreground">
             The shared map of markets you work — taxonomy first, deals later.
           </p>
         </div>
@@ -56,20 +56,18 @@ function SpacesPage() {
                 to="/spaces/$spaceId"
                 params={{ spaceId: s.id }}
                 className={cn(
-                  'group flex h-9 items-center gap-2 rounded-md px-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+                  'group flex h-9 items-center gap-2 rounded-md px-2 text-ui hover:bg-accent focus-ring',
                 )}
                 style={{ paddingLeft: `${8 + s.depth * 20}px` }}
               >
                 {s.depth > 0 ? (
                   <ChevronRight
-                    className="size-3 shrink-0 text-muted-foreground/60"
+                    className="size-3 shrink-0 text-muted-foreground"
                     strokeWidth={2}
                   />
                 ) : null}
                 <span className="font-medium">{s.name}</span>
-                <span className="text-xs text-muted-foreground/70">
-                  {s.slug}
-                </span>
+                <span className="text-xs text-muted-foreground">{s.slug}</span>
               </Link>
             </li>
           ))}
@@ -184,7 +182,7 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
               id="space-parent"
               name="parent"
               defaultValue=""
-              className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs focus-ring"
             >
               <option value="">None — top level</option>
               {spaces.map((s) => (
@@ -197,7 +195,7 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
           </div>
 
           {error ? (
-            <p role="alert" className="text-[13px] text-destructive">
+            <p role="alert" className="text-ui text-destructive">
               {error}
             </p>
           ) : null}

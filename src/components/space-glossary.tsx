@@ -55,7 +55,7 @@ export function SpaceGlossary({
       ) : null}
 
       {terms.length === 0 && !adding ? (
-        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+        <p className="mt-2 text-ui leading-relaxed text-muted-foreground">
           No terms yet. Define one and it auto-links in every note filed into{' '}
           {spaceName} — worth its weight when you are learning a space.
         </p>
@@ -100,12 +100,12 @@ function TermRow({ term }: { term: Term }) {
         <dt className="flex flex-wrap items-baseline gap-2">
           <button
             onClick={() => setEditing(true)}
-            className="rounded text-[13px] font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="rounded text-ui font-medium hover:underline focus-ring"
           >
             {term.name}
           </button>
           {term.aliases.length > 0 ? (
-            <span className="text-xs text-muted-foreground/80">
+            <span className="text-xs text-muted-foreground">
               also {term.aliases.join(', ')}
             </span>
           ) : null}
@@ -117,7 +117,7 @@ function TermRow({ term }: { term: Term }) {
             </span>
           ) : null}
         </dt>
-        <dd className="mt-0.5 font-serif text-[14px] leading-relaxed text-muted-foreground">
+        <dd className="mt-0.5 font-serif text-body leading-relaxed text-muted-foreground">
           {term.definitionMd || 'No definition yet.'}
         </dd>
       </div>
@@ -132,7 +132,7 @@ function TermRow({ term }: { term: Term }) {
             toast.error(err instanceof Error ? err.message : 'Could not delete')
           }
         }}
-        className="hidden size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-destructive group-hover:flex focus-visible:flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        className="hidden size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-destructive group-hover:flex focus-visible:flex focus-ring"
       >
         <X className="size-3" strokeWidth={2} />
       </button>
@@ -209,7 +209,7 @@ function TermForm({
         value={definition}
         onChange={(e) => setDefinition(e.target.value)}
         placeholder="What it means here — the definition someone new to this space needs."
-        className="border-input w-full rounded-md border bg-transparent px-2.5 py-1.5 font-serif text-[14px] leading-relaxed outline-none placeholder:text-muted-foreground/50 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="border-input w-full rounded-md border bg-transparent px-2.5 py-1.5 font-serif text-body leading-relaxed outline-none placeholder:text-muted-foreground focus-ring"
       />
       <div className="flex justify-end gap-2">
         <Button size="xs" variant="ghost" type="button" onClick={onCancel}>

@@ -95,10 +95,10 @@ function AdminStep({ onDone }: { onDone: () => void }) {
 
   return (
     <>
-      <h1 className="mt-6 text-[22px] font-semibold tracking-tight">
+      <h1 className="mt-6 text-page font-semibold tracking-tight">
         Create the admin account
       </h1>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+      <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
         This deployment is yours. Signup closes permanently after this account
         exists — everyone else joins by invitation.
       </p>
@@ -160,7 +160,7 @@ function AdminStep({ onDone }: { onDone: () => void }) {
         </div>
 
         {error ? (
-          <p role="alert" className="text-[13px] text-destructive">
+          <p role="alert" className="text-ui text-destructive">
             {error}
           </p>
         ) : null}
@@ -198,17 +198,17 @@ function DemoStep() {
 
   return (
     <>
-      <h1 className="mt-6 text-[22px] font-semibold tracking-tight">
+      <h1 className="mt-6 text-page font-semibold tracking-tight">
         Start with demo data?
       </h1>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+      <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
         A worked example in data-center cooling — a small space tree, three
         companies, a memo, and a glossary. Obviously fictional, and safe to
         delete once you have seen how the pieces connect.
       </p>
 
       {error ? (
-        <p role="alert" className="mt-4 text-[13px] text-destructive">
+        <p role="alert" className="mt-4 text-ui text-destructive">
           {error}
         </p>
       ) : null}

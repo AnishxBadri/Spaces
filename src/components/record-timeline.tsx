@@ -48,17 +48,15 @@ export function RecordTimeline({
   refNames?: RefNames
 }) {
   if (items.length === 0) {
-    return (
-      <p className="mt-4 text-[13px] text-muted-foreground">Nothing yet.</p>
-    )
+    return <p className="mt-4 text-ui text-muted-foreground">Nothing yet.</p>
   }
   return (
     <ul className="mt-4 space-y-1">
       {items.map((item) => (
         <li key={item.id}>
           {item.type === 'macro' ? (
-            <div className="flex items-baseline gap-3 px-1 py-1 text-[13px]">
-              <span className="tabular w-28 shrink-0 text-xs text-muted-foreground/80">
+            <div className="flex items-baseline gap-3 px-1 py-1 text-ui">
+              <span className="tabular w-28 shrink-0 text-xs text-muted-foreground">
                 {dateTimeFmt.format(new Date(item.at))}
               </span>
               <span>
@@ -91,8 +89,8 @@ function InteractionItem({
   item: Extract<Items[number], { type: 'interaction' }>
 }) {
   return (
-    <div className="flex items-baseline gap-3 rounded-md bg-muted/40 px-1 py-1.5 text-[13px]">
-      <span className="tabular w-28 shrink-0 text-xs text-muted-foreground/80">
+    <div className="flex items-baseline gap-3 rounded-md bg-muted/40 px-1 py-1.5 text-ui">
+      <span className="tabular w-28 shrink-0 text-xs text-muted-foreground">
         {dateTimeFmt.format(new Date(item.at))}
       </span>
       <span className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -147,13 +145,13 @@ function AttrBurst({
   }
 
   return (
-    <div className="rounded-md px-1 py-1 text-[13px]">
+    <div className="rounded-md px-1 py-1 text-ui">
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-baseline gap-3 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        className="flex w-full items-baseline gap-3 rounded text-left focus-ring"
       >
-        <span className="tabular w-28 shrink-0 text-xs text-muted-foreground/80">
+        <span className="tabular w-28 shrink-0 text-xs text-muted-foreground">
           {dateTimeFmt.format(new Date(item.at))}
         </span>
         <span className="flex items-center gap-1">

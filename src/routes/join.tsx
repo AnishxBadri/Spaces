@@ -37,10 +37,10 @@ function JoinPage() {
   if (!preview.valid) {
     return (
       <Shell>
-        <h1 className="mt-6 text-[22px] font-semibold tracking-tight">
+        <h1 className="mt-6 text-page font-semibold tracking-tight">
           This invitation isn’t valid
         </h1>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+        <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
           The link may have expired, been revoked, or already been used —
           invitations work exactly once. Ask the person who invited you for a
           fresh one.
@@ -75,12 +75,12 @@ function JoinPage() {
 
   return (
     <Shell>
-      <h1 className="mt-6 text-[22px] font-semibold tracking-tight">
+      <h1 className="mt-6 text-page font-semibold tracking-tight">
         {preview.workspaceName
           ? `Join ${preview.workspaceName}`
           : 'Join this workspace'}
       </h1>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+      <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
         You’ve been invited{preview.role === 'admin' ? ' as an admin' : ''}.
         Create your account to get in.
       </p>
@@ -122,7 +122,7 @@ function JoinPage() {
         </div>
 
         {error ? (
-          <p role="alert" className="text-[13px] text-destructive">
+          <p role="alert" className="text-ui text-destructive">
             {error}
           </p>
         ) : null}

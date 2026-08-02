@@ -58,7 +58,7 @@ function MandatePage() {
           strokeWidth={1.25}
           aria-hidden
         />
-        <h1 className="mt-4 text-[26px] font-semibold tracking-tight">
+        <h1 className="mt-4 text-display font-semibold tracking-tight">
           State your mandate
         </h1>
         <p className="mt-3 max-w-[52ch] font-serif text-[17px] leading-relaxed text-muted-foreground">
@@ -95,7 +95,7 @@ function MandatePage() {
           strokeWidth={1.5}
           aria-hidden
         />
-        <h1 className="text-[22px] font-semibold tracking-tight">Mandate</h1>
+        <h1 className="text-page font-semibold tracking-tight">Mandate</h1>
       </header>
 
       <div className="mt-6 grid gap-10 lg:grid-cols-[240px_minmax(0,1fr)]">

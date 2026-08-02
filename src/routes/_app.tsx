@@ -42,7 +42,7 @@ function AppShell() {
           aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
           aria-expanded={mobileNavOpen}
           onClick={() => setMobileNavOpen((v) => !v)}
-          className="-ml-1 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="-ml-1 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent focus-ring"
         >
           {mobileNavOpen ? (
             <X className="size-4.5" strokeWidth={1.75} />

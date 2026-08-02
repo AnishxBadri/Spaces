@@ -96,14 +96,14 @@ function NotePage() {
       <div className="flex items-center justify-between">
         <Link
           to="/notes"
-          className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded-md"
+          className="flex items-center gap-1.5 text-ui text-muted-foreground hover:text-foreground focus-ring rounded-md"
         >
           <ArrowLeft className="size-3.5" strokeWidth={1.75} />
           Notes
         </Link>
         <span className="flex items-center gap-3">
           <span
-            className="text-xs text-muted-foreground/80"
+            className="text-xs text-muted-foreground"
             role="status"
             aria-live="polite"
           >
@@ -142,7 +142,7 @@ function NotePage() {
         }}
         placeholder="Untitled"
         aria-label="Note title"
-        className="mt-6 w-full bg-transparent text-[26px] font-semibold tracking-tight outline-none placeholder:text-muted-foreground/50"
+        className="mt-6 w-full bg-transparent text-display font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
       />
 
       <SpaceFiling
@@ -179,7 +179,7 @@ function NotePage() {
                       b.kind === 'note' ? '/notes/$noteId' : KIND_ROUTES[b.kind]
                     }
                     params={b.kind === 'note' ? { noteId: b.fromId } : {}}
-                    className="flex items-center gap-2 rounded-md px-1 py-0.5 text-[13px] text-muted-foreground hover:text-foreground"
+                    className="flex items-center gap-2 rounded-md px-1 py-0.5 text-ui text-muted-foreground hover:text-foreground"
                   >
                     {Icon ? (
                       <Icon className="size-3.5" strokeWidth={1.75} />
@@ -239,7 +239,7 @@ function VisibilityToggle({
       type="button"
       onClick={toggle}
       disabled={pending}
-      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-ring"
       title={
         isPrivate
           ? 'Private — only you. Click to share with the workspace.'
@@ -292,7 +292,7 @@ function SpaceFiling({
           <Link
             to="/spaces/$spaceId"
             params={{ spaceId: s.id }}
-            className="rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="rounded hover:text-foreground focus-ring"
           >
             {s.name}
           </Link>
@@ -304,7 +304,7 @@ function SpaceFiling({
                 untagFromSpace({ data: { entityId: noteId, spaceId: s.id } }),
               )
             }
-            className="flex size-4 items-center justify-center rounded-full text-muted-foreground/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            className="flex size-4 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-ring"
           >
             <X className="size-2.5" strokeWidth={2.5} />
           </button>
@@ -322,7 +322,7 @@ function SpaceFiling({
             e.target.value = ''
             run(() => tagIntoSpace({ data: { entityId: noteId, spaceId } }))
           }}
-          className="h-6 rounded-full border border-dashed border-border bg-transparent px-2 text-xs text-muted-foreground outline-none hover:border-input hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="h-6 rounded-full border border-dashed border-border bg-transparent px-2 text-xs text-muted-foreground outline-none hover:border-input hover:text-foreground focus-ring"
         >
           <option value="">+ File in space…</option>
           {unfiled.map((s) => (

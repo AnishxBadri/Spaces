@@ -35,10 +35,10 @@ function DedupePage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
       <header>
-        <h1 className="text-[22px] font-semibold tracking-tight">
+        <h1 className="text-page font-semibold tracking-tight">
           Possible duplicates
         </h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <p className="mt-1 text-ui text-muted-foreground">
           The system never merges on a guess — you make the call. Dismissed
           pairs never come back.
         </p>
@@ -80,7 +80,7 @@ function PairCard({ pair }: { pair: Pair }) {
 
   return (
     <li className="rounded-lg border border-border">
-      <p className="border-b border-border px-4 py-2.5 text-[13px] font-medium">
+      <p className="border-b border-border px-4 py-2.5 text-ui font-medium">
         {reasonLabel(pair)}
       </p>
       <div className="grid gap-px bg-border sm:grid-cols-2">
@@ -117,7 +117,7 @@ function PairCard({ pair }: { pair: Pair }) {
               'Dismissed — will not be suggested again',
             )
           }
-          className="flex items-center gap-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="flex items-center gap-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground focus-ring"
         >
           <X className="size-3" strokeWidth={2} />
           Not duplicates
@@ -130,7 +130,7 @@ function PairCard({ pair }: { pair: Pair }) {
 function SidePanel({ side }: { side: Side }) {
   const Icon = side.kind === 'person' ? User : Building2
   return (
-    <div className="text-[13px]">
+    <div className="text-ui">
       <div className="flex items-center gap-2">
         <Icon
           className="size-4 shrink-0 text-muted-foreground"

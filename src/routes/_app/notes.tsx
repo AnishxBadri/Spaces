@@ -28,8 +28,8 @@ function NotesPage() {
     <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight">Notes</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+          <h1 className="text-page font-semibold tracking-tight">Notes</h1>
+          <p className="mt-1 text-ui text-muted-foreground">
             Research lives here — @mention companies, people, and spaces to
             weave the graph.
           </p>
@@ -72,7 +72,7 @@ function NotesPage() {
               <Link
                 to="/notes/$noteId"
                 params={{ noteId: n.id }}
-                className="group flex h-11 items-center gap-3 rounded-md px-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                className="group flex h-11 items-center gap-3 rounded-md px-2 text-ui hover:bg-accent focus-ring"
               >
                 <FileText
                   className="size-4 shrink-0 text-muted-foreground"
@@ -86,7 +86,7 @@ function NotesPage() {
                     </span>
                   ) : null}
                 </span>
-                <span className="tabular w-16 text-right text-xs text-muted-foreground/80">
+                <span className="tabular w-16 text-right text-xs text-muted-foreground">
                   {dateFmt.format(new Date(n.updatedAt))}
                 </span>
               </Link>

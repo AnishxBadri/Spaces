@@ -202,7 +202,7 @@ export function CommandPalette({
                           </span>
                           {/* Where the match came from, because "why is this
                               here" is the first question a fuzzy hit raises. */}
-                          <span className="shrink-0 text-xs text-muted-foreground/70">
+                          <span className="shrink-0 text-xs text-muted-foreground">
                             {hit.kind === 'document' && hit.parent
                               ? `in ${hit.parent.name}`
                               : hit.matchedIn === 'name'

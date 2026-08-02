@@ -118,7 +118,7 @@ function CompanyRecordPage() {
     <div className="mx-auto max-w-7xl px-6 py-8 md:px-10">
       <Link
         to="/companies"
-        className="flex w-fit items-center gap-1.5 rounded-md text-[13px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground hover:text-foreground focus-ring"
       >
         <ArrowLeft className="size-3.5" strokeWidth={1.75} />
         Companies
@@ -132,7 +132,7 @@ function CompanyRecordPage() {
           />
         </span>
         <div className="min-w-0">
-          <h1 className="truncate text-[22px] font-semibold tracking-tight">
+          <h1 className="truncate text-page font-semibold tracking-tight">
             {company.name}
           </h1>
           {nameAliases.length > 0 ? (
@@ -178,7 +178,7 @@ function CompanyRecordPage() {
             objectKind="company"
             onCreated={() => router.invalidate()}
             trigger={
-              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-ring">
                 <Plus className="size-3" strokeWidth={2} />
                 Add attribute
               </button>
@@ -197,7 +197,7 @@ function CompanyRecordPage() {
                   aria-selected={tab === t}
                   onClick={() => setTab(t)}
                   className={cn(
-                    'relative px-3 pb-2.5 text-[13px] font-medium capitalize text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded-t-md',
+                    'relative px-3 pb-2.5 text-ui font-medium capitalize text-muted-foreground transition-colors hover:text-foreground focus-ring rounded-t-md',
                     tab === t &&
                       'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
                   )}
@@ -227,7 +227,7 @@ function CompanyRecordPage() {
           ) : (
             <ul className="mt-4 space-y-1">
               {noteMentions.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">
+                <p className="text-ui text-muted-foreground">
                   No notes mention {company.name} yet. Write one — it links
                   itself here.
                 </p>
@@ -237,7 +237,7 @@ function CompanyRecordPage() {
                     <Link
                       to="/notes/$noteId"
                       params={{ noteId: m.fromId }}
-                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-ui hover:bg-accent focus-ring"
                     >
                       <FileText
                         className="size-4 text-muted-foreground"
@@ -266,7 +266,7 @@ function CompanyRecordPage() {
               />
             </div>
             {deals.length === 0 ? (
-              <p className="mt-2 text-xs text-muted-foreground/80">
+              <p className="mt-2 text-xs text-muted-foreground">
                 No deals yet — watching only.
               </p>
             ) : (
@@ -276,7 +276,7 @@ function CompanyRecordPage() {
                     <Link
                       to="/deals/$dealId"
                       params={{ dealId: d.id }}
-                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-ui hover:bg-accent focus-ring"
                     >
                       <span className="min-w-0 flex-1 truncate">{d.name}</span>
                       {d.stage && stageDef ? (
@@ -299,7 +299,7 @@ function CompanyRecordPage() {
               {company.spaces.map((s) => (
                 <li
                   key={s.id}
-                  className="group flex h-7 items-center gap-2 rounded-md px-1.5 text-[13px] hover:bg-accent"
+                  className="group flex h-7 items-center gap-2 rounded-md px-1.5 text-ui hover:bg-accent"
                 >
                   <Layers
                     className="size-3.5 shrink-0 text-muted-foreground"
@@ -314,7 +314,7 @@ function CompanyRecordPage() {
                       })
                       router.invalidate()
                     }}
-                    className="hidden size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground group-hover:flex focus-visible:flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                    className="hidden size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground group-hover:flex focus-visible:flex focus-ring"
                   >
                     <X className="size-3" strokeWidth={2} />
                   </button>
@@ -332,7 +332,7 @@ function CompanyRecordPage() {
                   })
                   router.invalidate()
                 }}
-                className="border-input mt-2 h-7 w-full rounded-md border bg-transparent px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="border-input mt-2 h-7 w-full rounded-md border bg-transparent px-2 text-xs text-muted-foreground focus-ring"
               >
                 <option value="">+ Tag into space…</option>
                 {untaggedSpaces.map((s) => (
@@ -350,7 +350,7 @@ function CompanyRecordPage() {
               People
             </h2>
             {company.people.length === 0 ? (
-              <p className="mt-2 text-xs text-muted-foreground/80">
+              <p className="mt-2 text-xs text-muted-foreground">
                 No contacts yet — link people from their records.
               </p>
             ) : (
@@ -360,9 +360,9 @@ function CompanyRecordPage() {
                     <Link
                       to="/people/$personId"
                       params={{ personId: p.id }}
-                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-[13px] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-ui hover:bg-accent focus-ring"
                     >
-                      <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-semibold text-muted-foreground">
+                      <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-muted text-micro font-semibold text-muted-foreground">
                         {p.name.charAt(0).toUpperCase()}
                       </span>
                       <span className="min-w-0 flex-1 truncate">{p.name}</span>
@@ -378,13 +378,11 @@ function CompanyRecordPage() {
               Mentioned in
             </h2>
             {company.mentionedIn.length === 0 ? (
-              <p className="mt-2 text-xs text-muted-foreground/80">
-                Nowhere yet.
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">Nowhere yet.</p>
             ) : (
               <ul className="mt-2 space-y-1">
                 {company.mentionedIn.map((m) => (
-                  <li key={m.fromId} className="truncate text-[13px]">
+                  <li key={m.fromId} className="truncate text-ui">
                     {m.kind === 'note' ? (
                       <Link
                         to="/notes/$noteId"
@@ -460,7 +458,7 @@ function DomainsField({
       <span className="text-xs font-medium text-muted-foreground">Domains</span>
       <ul className="space-y-1">
         {domains.map((d) => (
-          <li key={d.id} className="flex h-7 items-center gap-2 text-[13px]">
+          <li key={d.id} className="flex h-7 items-center gap-2 text-ui">
             <Globe
               className="size-3.5 text-muted-foreground"
               strokeWidth={1.75}
@@ -482,7 +480,7 @@ function DomainsField({
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-ring"
         >
           <Plus className="size-3" strokeWidth={2} />
           Add domain
