@@ -59,6 +59,21 @@ Annotations tie terms to our architecture:
 - **Capital account** — per-LP ledger of contributions, allocated gains/losses, fees,
   and distributions. The atomic unit of fund accounting; what Fundwave's "automated
   allocations" maintain. **[fenced]**.
+- **ILPA reporting standard** — the LP-side reporting canon (Capital Account Statement
+  + Schedule of Fees, 2026 framework). Its core structure is instructive even fenced:
+  everything is a **roll-forward** — NAV and commitment evolving through categorized,
+  dated capital events — presented quarter-to-date / year-to-date / inception-to-date.
+  Independent confirmation of the phase-15 rule: model dated events, derive every
+  aggregate; the three period frames are then just filters.
+- **India (SEBI AIF) structures** — funds register as **AIF Category I** (VC, angel
+  funds), **II** (sector-agnostic unlisted), or **III** (trading strategies). An
+  **Angel Fund** is a Cat-I subtype: min corpus ₹10cr, per-investor minimum ₹25L,
+  per-deal band ₹25L–₹10cr. The LPA analog is the tripartite **contribution
+  agreement** (contributor / trustee / manager); Indian funds issue **units**
+  (unitized accounting — why Fundwave supports it), and regulation bakes in
+  **per-deal pro-rata** participation — the deal-by-deal shape is *regulatory* in
+  India, not a GP choice. **[fenced]**, but it defines what the lightweight capital
+  ledger must look like if Indian fund-I customers ever pull it into scope.
 
 ## 3. Sourcing & deal flow *(the layer Affinity/Edda lead; largely shipped for us)*
 
@@ -89,9 +104,16 @@ Annotations tie terms to our architecture:
   the new cash) + amount raised = **post-money**. Price per share = pre-money ÷ fully
   diluted shares. **[P15]** — the `round` object.
 - **SAFE (Simple Agreement for Future Equity)** — money now, shares later, priced at
-  the next round with a **valuation cap** and/or **discount**. Until conversion there is
-  cost basis but *no ownership %*. **[P15]** — the honest-holdings rule: never fake a
-  % for unconverted instruments.
+  the next round via a **valuation cap** and/or **discount** (whichever gives the lower
+  price converts). Two generations with *different ownership math*: the **post-money
+  SAFE** (YC 2018+, now dominant) locks ownership at signing — exactly
+  investment ÷ cap, regardless of later SAFEs (stacked post-money SAFEs dilute only the
+  founders); the older **pre-money SAFE** and Indian **CCDs** leave ownership genuinely
+  unknowable until the priced round. **[P15]** — the honest-holdings rule, refined
+  (2026-08, per YC mechanics): post-money SAFEs display an *implied %*
+  (amount ÷ cap, labeled as implied); pre-money instruments and CCDs display cost basis
+  only, never a faked %. The instrument enum must therefore distinguish
+  safe_post_money / safe_pre_money / ccd / priced.
 - **Convertible note / CCD** — debt that converts to equity; the CCD (compulsorily
   convertible debenture) is the standard Indian flavor for regulatory reasons.
   **[P15]** — instrument enum includes it by name.
@@ -139,8 +161,13 @@ Annotations tie terms to our architecture:
   ideology that marks are evidence-driven and append-only — you never overwrite
   history. **[P15]** — the `mark` table, death-is-information applied to valuations.
 - **IPEV / ASC 820** — the valuation guidelines auditors hold funds to; why "structured
-  valuation workflows" (TagHash) exist. **[fenced]** as compliance; our mark basis
-  field is the lightweight cousin.
+  valuation workflows" (TagHash) exist. Two IPEV concepts worth knowing even unaudited:
+  **PORI** (price of recent investment) is explicitly *not* a default fair value — a
+  starting point that decays, which is why marks must carry dates and staleness must be
+  visible; and **calibration** — the entry price is deemed fair value at inception, and
+  model assumptions are expected to *evolve* every measurement date (unchanged marks
+  should be the exception, not the norm). **[fenced]** as compliance; our dated
+  mark-with-basis design is the lightweight, IPEV-aligned cousin.
 - **NAV (Net Asset Value)** — sum of holding fair values + uninvested cash − liabilities;
   fund-level "what it's worth today." **[P15]** computes the holdings sum; cash
   accounting is **[fenced]**.

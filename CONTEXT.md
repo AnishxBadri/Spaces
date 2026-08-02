@@ -1256,8 +1256,12 @@ snippets.
     - **Append-only dated events; aggregates always derived, never stored.** This is
       what makes "as on <date>" point-in-time views free — filter events ≤ date and
       recompute. Stated as a rule so nobody adds a mutable current_value column.
+    - **Instrument subtypes carry ownership semantics** (2026-08, YC mechanics):
+      post-money SAFEs lock ownership at signing (amount ÷ cap — display as *implied %*);
+      pre-money SAFEs and CCDs have cost basis only until conversion — never fake a %.
+      Enum: priced / safe_post_money / safe_pre_money / ccd.
     - **Share-level columns from day one**: price_per_share + shares_outstanding on
-      `round`, optional shares on `investment` and `distribution` — ownership %,
+      `round`, optional shares on `investment` and `distribution` (shares_outstanding stated as the *fully diluted* count) — ownership %,
       dilution deltas, and divestment math all need them; retrofitting means
       re-entering history. Ownership stays ours-position-only (our shares ÷
       outstanding ⇒ our % and fully-diluted %); a full all-shareholder cap table is
