@@ -11,7 +11,10 @@ import { Building2, Copy, Globe, Layers, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
-import { ValueEditor } from '#/components/attributes/value-editor'
+import {
+  fieldSpanClass,
+  ValueEditor,
+} from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
 import { TemplatePicker } from '#/components/templates'
@@ -41,6 +44,7 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { cn } from '#/lib/utils'
 import {
   countOpenDuplicates,
   createCompany,
@@ -310,7 +314,7 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
           New company
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>New company</DialogTitle>
           <DialogDescription>
@@ -329,7 +333,11 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
             }}
           />
         </div>
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        <form
+          onSubmit={onSubmit}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+          noValidate
+        >
           <div className="space-y-1.5">
             <Label htmlFor="company-name">Name</Label>
             <Input
@@ -351,7 +359,10 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
           </div>
 
           {registry.map((def) => (
-            <div key={def.slug} className="space-y-1.5">
+            <div
+              key={def.slug}
+              className={cn('space-y-1.5', fieldSpanClass(def))}
+            >
               <Label>{def.name}</Label>
               <ValueEditor
                 def={def}
@@ -363,12 +374,12 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
           ))}
 
           {error ? (
-            <p role="alert" className="text-ui text-destructive">
+            <p role="alert" className="text-ui text-destructive sm:col-span-2">
               {error}
             </p>
           ) : null}
 
-          <DialogFooter>
+          <DialogFooter className="sm:col-span-2">
             <Button type="submit" disabled={pending}>
               {pending ? 'Adding…' : 'Create company'}
             </Button>

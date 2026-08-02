@@ -1148,10 +1148,11 @@ Decisions worth keeping:
 - **Mentions are stripped to plain text at note-template capture** — a template holding a
   real entity reference would materialize ghost backlinks on every instantiation.
 - **Record templates exclude reference/actor slugs at capture** and pre-fill the create
-  modal visibly; nothing writes silently. v1 limit, on purpose: the picker only sits on
-  the **company** dialog — the person and deal dialogs are deliberately minimal and don't
-  render registry fields, and silently applying template values would break the
-  pre-fill-visibly rule. The picker joins them when they grow fields.
+  modal visibly; nothing writes silently. The original v1 limit (picker on the company
+  dialog only) was lifted 2026-08 by the dialog restructure: person and deal creates now
+  render registry fields in a type-driven two-column grid (`fieldSpanClass` — half-width
+  default, long-form `description` spans both; layout survives any custom attribute), so
+  all three dialogs carry the template picker.
 - **Scaffold stamping is skip-existing** (same-named child reused, never duplicated) and
   captures names + glossary terms only, never memo content — a scaffold that copied
   memos would smuggle one market's research into another.

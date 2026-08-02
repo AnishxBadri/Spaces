@@ -10,10 +10,15 @@ import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { Handshake, Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { ValueEditor, optionLabel } from '#/components/attributes/value-editor'
+import {
+  fieldSpanClass,
+  optionLabel,
+  ValueEditor,
+} from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { EmptyState } from '#/components/empty-state'
+import { TemplatePicker } from '#/components/templates'
 import { IconBadge, RecordLinkCell } from '#/components/table/cells'
 import {
   AddColumnButton,
@@ -368,9 +373,15 @@ export function CreateDealDialog({
   )
   const [companyName, setCompanyName] = useState(presetCompany?.name ?? '')
   const [stage, setStage] = useState<string>('pre_lead')
+  const [values, setValues] = useState<Record<string, unknown>>({})
 
   const companyDef = registry.find((d) => d.slug === 'company')
   const stageDef = registry.find((d) => d.slug === 'stage')
+  // The judgment fields worth setting at birth; refs and owner stay on the
+  // record page.
+  const extraDefs = registry.filter((d) =>
+    ['value', 'source', 'close_date'].includes(d.slug),
+  )
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -379,9 +390,23 @@ export function CreateDealDialog({
     const dealName = name.trim() || `${companyName || 'New'} deal`
     setPending(true)
     try {
-      await createDeal({ data: { companyId, name: dealName, stage } })
+      const { id } = await createDeal({
+        data: {
+          companyId,
+          name: dealName,
+          stage,
+          value: typeof values.value === 'number' ? values.value : undefined,
+          source: typeof values.source === 'string' ? values.source : undefined,
+        },
+      })
+      if (values.close_date != null) {
+        await updateRecord({
+          data: { id, patch: { close_date: values.close_date } },
+        })
+      }
       setOpen(false)
       setName('')
+      setValues({})
       if (!presetCompany) {
         setCompanyId(null)
         setCompanyName('')
@@ -403,14 +428,32 @@ export function CreateDealDialog({
           {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>New deal</DialogTitle>
           <DialogDescription>
             One opportunity in one company. It starts at Pre-lead.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        {/* Pre-fills the fields below, visibly and editably — never writes. */}
+        <div className="flex justify-end">
+          <TemplatePicker
+            kind="record"
+            objectKind="deal"
+            context="deal"
+            onPick={(t) => {
+              const tv = (t.body as { values?: Record<string, unknown> }).values
+              if (!tv) return
+              if (typeof tv.stage === 'string') setStage(tv.stage)
+              setValues((s) => ({ ...tv, ...s }))
+            }}
+          />
+        </div>
+        <form
+          onSubmit={onSubmit}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+          noValidate
+        >
           {companyDef && !presetCompany ? (
             <div className="space-y-1.5">
               <Label>Company</Label>
@@ -455,13 +498,28 @@ export function CreateDealDialog({
             </div>
           ) : null}
 
+          {extraDefs.map((def) => (
+            <div
+              key={def.slug}
+              className={cn('space-y-1.5', fieldSpanClass(def))}
+            >
+              <Label>{def.name}</Label>
+              <ValueEditor
+                def={def}
+                value={values[def.slug] ?? null}
+                variant="field"
+                onSave={(v) => setValues((s) => ({ ...s, [def.slug]: v }))}
+              />
+            </div>
+          ))}
+
           {error ? (
-            <p role="alert" className="text-ui text-destructive">
+            <p role="alert" className="text-ui text-destructive sm:col-span-2">
               {error}
             </p>
           ) : null}
 
-          <DialogFooter>
+          <DialogFooter className="sm:col-span-2">
             <Button type="submit" disabled={pending}>
               {pending ? 'Creating…' : 'Create deal'}
             </Button>

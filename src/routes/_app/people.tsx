@@ -10,10 +10,15 @@ import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { AtSign, Building2, Plus, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { cn } from '#/lib/utils'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
-import { ValueEditor } from '#/components/attributes/value-editor'
+import {
+  fieldSpanClass,
+  ValueEditor,
+} from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
+import { TemplatePicker } from '#/components/templates'
 import {
   ChipLink,
   DateCell,
@@ -192,7 +197,12 @@ function PeoplePage() {
       <PageHeader
         title="People"
         description="Founders, operators, co-investors — deduped by email, linked to their companies."
-        action={<CreatePersonDialog companies={companies} />}
+        action={
+          <CreatePersonDialog
+            companies={companies}
+            registry={registry as Array<RegistryEntry>}
+          />
+        }
       />
 
       {rows.length === 0 ? (
@@ -200,7 +210,12 @@ function PeoplePage() {
           icon={Users}
           title="No people yet"
           body="Add someone by name and email. Email is identity — the same person arriving from two directions becomes one record."
-          action={<CreatePersonDialog companies={companies} />}
+          action={
+            <CreatePersonDialog
+              companies={companies}
+              registry={registry as Array<RegistryEntry>}
+            />
+          }
           hint="Gmail and calendar sync will create these automatically later — through the same dedupe gate."
         />
       ) : (
@@ -235,13 +250,16 @@ function PeoplePage() {
 
 function CreatePersonDialog({
   companies,
+  registry,
 }: {
   companies: Array<{ id: string; name: string }>
+  registry: Array<RegistryEntry>
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [values, setValues] = useState<Record<string, unknown>>({})
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -263,7 +281,14 @@ function CreatePersonDialog({
           companyId: companyId || undefined,
         },
       })
+      const patch = Object.fromEntries(
+        Object.entries(values).filter(([, v]) => v !== null && v !== undefined),
+      )
+      if (result.action === 'created' && Object.keys(patch).length > 0) {
+        await updateRecord({ data: { id: result.entityId, patch } })
+      }
       setOpen(false)
+      setValues({})
       if (result.action === 'attached') {
         toast(`Matched existing person — ${result.name}`, {
           description: `Same ${result.matchedOn}. No duplicate created.`,
@@ -287,14 +312,30 @@ function CreatePersonDialog({
           New person
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>New person</DialogTitle>
           <DialogDescription>
             Email is the strongest identity — add it when you have it.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        {/* Pre-fills the fields below, visibly and editably — never writes. */}
+        <div className="flex justify-end">
+          <TemplatePicker
+            kind="record"
+            objectKind="person"
+            context="person"
+            onPick={(t) => {
+              const tv = (t.body as { values?: Record<string, unknown> }).values
+              if (tv) setValues((s) => ({ ...tv, ...s }))
+            }}
+          />
+        </div>
+        <form
+          onSubmit={onSubmit}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+          noValidate
+        >
           <div className="space-y-1.5">
             <Label htmlFor="person-name">Name</Label>
             <Input
@@ -331,15 +372,30 @@ function CreatePersonDialog({
             </select>
           </div>
 
+          {registry.map((def) => (
+            <div
+              key={def.slug}
+              className={cn('space-y-1.5', fieldSpanClass(def))}
+            >
+              <Label>{def.name}</Label>
+              <ValueEditor
+                def={def}
+                value={values[def.slug] ?? null}
+                variant="field"
+                onSave={(v) => setValues((s) => ({ ...s, [def.slug]: v }))}
+              />
+            </div>
+          ))}
+
           {error ? (
-            <p role="alert" className="text-ui text-destructive">
+            <p role="alert" className="text-ui text-destructive sm:col-span-2">
               {error}
             </p>
           ) : null}
 
-          <DialogFooter>
+          <DialogFooter className="sm:col-span-2">
             <Button type="submit" disabled={pending}>
-              {pending ? 'Adding…' : 'Add person'}
+              {pending ? 'Adding\u2026' : 'Create person'}
             </Button>
           </DialogFooter>
         </form>

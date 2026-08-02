@@ -58,6 +58,17 @@ type Props = {
   refNames?: RefNames
 }
 
+/**
+ * Create-dialog layout is type-driven, never hand-placed — the registry
+ * generates the form, so the span rule must survive any custom attribute.
+ * Half-width is the default; only genuinely long-form fields span both
+ * columns. Until a long-text type exists (the expansion path), description
+ * is the one long-form field, by convention.
+ */
+export function fieldSpanClass(def: { type: string; slug: string }): string {
+  return def.slug === 'description' ? 'sm:col-span-2' : ''
+}
+
 export function optionLabel(def: RegistryEntry, id: unknown): string {
   const opt = def.options?.options?.find((o) => o.id === id)
   return opt?.label ?? String(id ?? '')
