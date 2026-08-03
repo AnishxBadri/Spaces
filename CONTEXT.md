@@ -1304,6 +1304,17 @@ snippets.
       Passed without touching the original holding. Banked alongside: structured
       **deal-rights capture** (pro-rata, information rights, board/observer, MFN) —
       prose until the follow-on flow needs them as data.
+    **LP-portal extension doctrine (recorded 2026-08, demand-gated, after this
+    phase proves out):** LPs are never workspace members — not even a read-only role
+    (hiding the workspace behind filters is one missed WHERE clause from leaking deal
+    flow and other LPs' data). LPs are *data* (contacts linked to commitments);
+    access is **publish-don't-expose**: the GP publishes immutable snapshots
+    (quarterly statement, capital-account roll-forward, docs) and any portal reads
+    only published snapshots via tokenized links (the invite/founder-link pattern) —
+    never live tables. Forced sequence: capital ledger lite → published statements →
+    portal login. Valuations nuance, restated: marks (with basis + date) are core to
+    this phase; the valuations *ceremony* (IPEV/ASC-820 committee workflows, audit
+    packets) stays fenced. Tax/compliance is permanently export-only.
     **Deliberately not in this phase (TagHash-scale fund admin):** capital ledger
     (commitments/drawdowns/notices), fund-level NAV statements, multi-vehicle/SPV
     structures, LP reporting (standing non-goal), FoF look-through (wrong customer),
