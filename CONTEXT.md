@@ -981,7 +981,12 @@ lens** over the portfolio as the first consumer if MIS ever lands; their deal
 tasks/reminders reinforce that known gap), 4Degrees (warm-intro paths as the differentiator), TagHash (fund-admin tier —
 fenced out of phase 15), Visible.vc (portfolio MIS = structured founder requests with a
 standard-six metric default — Revenue, Net Income, Cash, Runway, Burn, Headcount — via
-login-free tokenized links; the shape to copy if MIS ever lands). Three ideas banked for
+login-free tokenized links; the shape to copy if MIS ever lands). US-stack contrast (2026-08): US
+emerging managers *outsource* the entire fenced tier to service platforms (AngelList
+Stack, Carta fund admin at $8–30k/yr, Juniper Square) and run the front office on
+Airtable/Notion/Excel — which makes our fence doubly correct there and the DIY front
+office our exact wedge; US integration targets are Carta exports and Standard Metrics,
+vs India's MIS-workbook parsing. Three ideas banked for
 the BYOK AI phase: **meeting-prep brief** (one-pager from record + filed notes + recent
 interactions ahead of a calendar event — our research half makes this richer than
 Affinity's), **pass-letter drafting** from the recorded pass reason (Edda's Decision
