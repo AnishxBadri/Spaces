@@ -1029,6 +1029,16 @@ Both halves ship, or the seam — the whole point — doesn't exist.
 Then: **Gmail sync (forward-only)**, Apollo enrichment, signals, co-investor graph
 (seeded by round co-investor links from the portfolio layer, phase 15), Outlook.
 
+MIS, when it lands, is **dual-path**: structured founder requests (tokenized links,
+standard-six default) *and* parsing what founders actually send (MIS Excel / board-deck
+PDF / update email — India reality). Parsing rides the existing document-extraction
+pipeline plus a BYOK extraction job; results land as append-only
+`kpi_observation(company, metric, period, value, currency, source, source_document,
+confidence)` events — restatement-friendly, as-of capable — and AI-extracted numbers
+always enter through the review inbox, never silently (a hallucinated revenue figure
+in fund records kills trust permanently). Known hard parts, non-architectural:
+per-company metric aliases, Indian fiscal periods and lakh/crore units.
+
 **Ordering rationale.** Nothing in 1–10 needs an external dependency, OAuth consent screen,
 or provider doc. Gmail is the single longest step in the project and gates nothing above it.
 Build the graph first and feed it automatically second — a hand-populated graph is already
