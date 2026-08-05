@@ -442,7 +442,21 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
   anywhere. So Attio "currency" is number formatting, not multi-currency — our
   registry's currency type (per-attribute `options.code`, bare number) already matches
   it, and real multi-currency correctly lives in the phase-15 event tables (per-event
-  currency + base-currency roll-up), not the attribute layer.
+  currency + base-currency roll-up), not the attribute layer. *AI attributes* (their
+  shipped version of our AI-autofill family): an "AI autofill" toggle on custom
+  attributes of type text/number/currency/select/multi-select, four modes — Summarize
+  Record, Classify Record (select options, optionally AI-inventable), Prompt Completion
+  (custom prompt over designated attribute variables), and a Web Agent (live external
+  research, text/number/currency only, green/yellow/red confidence indicator). Three
+  facts worth keeping: (1) **never auto-computed** — user triggers per cell, bulk
+  selection, or column header; even Attio doesn't let AI write on its own schedule,
+  which lands on the same side as our suggestion-never-silent doctrine; (2) **context
+  is attribute values only — their AI cannot read notes or emails**, which is exactly
+  the gap our research-graph-fed version exploits (memos, extracted decks, mandate as
+  prompt context); (3) metered credits (web agent 10/record, others 1) — a hosted-
+  margin constraint BYOK sidesteps entirely. Their Web Agent maps to our
+  enrichment lane (Apollo/Exa), not autofill; the confidence indicator is a UI idea
+  worth stealing when enrichment lands.
 - **Record-references materialize into the graph:** the uuid in `values` is source of
   truth; every reference write syncs a `link` row (`relation: references`, `attr_slug`)
   in the same transaction — the note-mentions pattern. Backlinks, "related" rails, and
