@@ -421,6 +421,28 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
   provenance doctrine: AI-written values are suggestions, never silent overwrites.
   Custom objects stay a non-goal; a fourth object that proves universal ships as a
   system release, not a builder.
+- **Attio surveyed on the two deferred/settled types (2026-08-04).** *Formula*: an
+  expression language — operators (`+`, `==`, `??`), functions (`if()`, `dateAdd()`),
+  `{Attribute}` references with editor autocomplete; output type inferred from the
+  expression (number-returning formula becomes a number attribute); nulls explicit
+  (any null input → null, `??` for fallback); reactive recompute on dependency change
+  within seconds, except `now()`/`today()` formulas which recompute once daily at
+  midnight UTC; formulas compose (may reference other formulas); natural-language →
+  AI-generated formula that stays inspectable text. Their differentiator: **attribute-
+  history functions** (`timeSpentIn`, `hasBeenIn`, `valueAt`, `previousValue`,
+  `valueSetAt`) — formulas read the change log, not just current values. Two takeaways:
+  (1) our `attribute_event` log means history functions would be nearly free if formula
+  ever lands — the most differentiated piece is the one we're already positioned for;
+  (2) the deferral holds — the real cost is an interpreter + dependency-graph reactive
+  invalidation + type inference, and phase 15's metrics are cross-event aggregates
+  (derived-metric kit), not per-record scalar formulas — different layer. *Currency*:
+  strictly per-attribute — `default_currency_code` (ISO 4217) fixed in attribute
+  config, never overridable per record; value is a bare number (4 dp precision) with
+  the code echoed back; `display_type` renders via `Intl.NumberFormat`; no conversion
+  anywhere. So Attio "currency" is number formatting, not multi-currency — our
+  registry's currency type (per-attribute `options.code`, bare number) already matches
+  it, and real multi-currency correctly lives in the phase-15 event tables (per-event
+  currency + base-currency roll-up), not the attribute layer.
 - **Record-references materialize into the graph:** the uuid in `values` is source of
   truth; every reference write syncs a `link` row (`relation: references`, `attr_slug`)
   in the same transaction — the note-mentions pattern. Backlinks, "related" rails, and
