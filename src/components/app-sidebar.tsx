@@ -1,5 +1,6 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
+  Briefcase,
   Building2,
   ChevronsUpDown,
   Compass,
@@ -31,6 +32,7 @@ export const NAV_ITEMS = [
   { to: '/companies', label: 'Companies', icon: Building2 },
   { to: '/people', label: 'People', icon: Users },
   { to: '/deals', label: 'Deals', icon: Kanban },
+  { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
   { to: '/notes', label: 'Notes', icon: FileText },
 ] as const
 

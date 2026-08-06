@@ -13,14 +13,10 @@ import {
   roundCoInvestor,
 } from '#/db/schema/portfolio'
 import { activity } from '#/db/schema/activity'
-import {
-  holdingMetrics
-  
-  
-} from '../portfolio/metrics'
-import type {HoldingEvents, MetricsResult} from '../portfolio/metrics';
-import { ownership  } from '../portfolio/ownership'
-import type {Ownership} from '../portfolio/ownership';
+import { holdingMetrics } from '../portfolio/metrics'
+import type { HoldingEvents, MetricsResult } from '../portfolio/metrics'
+import { ownership } from '../portfolio/ownership'
+import type { Ownership } from '../portfolio/ownership'
 import type { FxRate } from '../portfolio/fx'
 import { birthHolding, requireUser } from './shared'
 
@@ -53,12 +49,26 @@ async function loadFxRates(): Promise<Array<FxRate>> {
   }))
 }
 
+type LoadedHolding = {
+  events: HoldingEvents
+  ownershipInputs: Array<{
+    date: string
+    amount: number
+    instrument: 'priced' | 'safe_post_money' | 'safe_pre_money' | 'ccd'
+    shares: number | null
+    cap: number | null
+  }>
+}
+
 async function loadHoldingEvents(
   holdingIds: Array<string>,
-): Promise<Map<string, HoldingEvents>> {
-  const byHolding = new Map<string, HoldingEvents>()
+): Promise<Map<string, LoadedHolding>> {
+  const byHolding = new Map<string, LoadedHolding>()
   for (const id of holdingIds) {
-    byHolding.set(id, { investments: [], marks: [], distributions: [] })
+    byHolding.set(id, {
+      events: { investments: [], marks: [], distributions: [] },
+      ownershipInputs: [],
+    })
   }
   if (holdingIds.length === 0) return byHolding
   const [investments, marks, distributions] = await Promise.all([
@@ -79,21 +89,29 @@ async function loadHoldingEvents(
       .orderBy(asc(distribution.date)),
   ])
   for (const r of investments) {
-    byHolding.get(r.holdingId)?.investments.push({
+    const h = byHolding.get(r.holdingId)
+    h?.events.investments.push({
       date: r.date,
       amount: Number(r.amount),
       currency: r.currency,
     })
+    h?.ownershipInputs.push({
+      date: r.date,
+      amount: Number(r.amount),
+      instrument: r.instrument,
+      shares: num(r.shares),
+      cap: num(r.cap),
+    })
   }
   for (const r of marks) {
-    byHolding.get(r.holdingId)?.marks.push({
+    byHolding.get(r.holdingId)?.events.marks.push({
       date: r.date,
       fairValue: Number(r.fairValue),
       currency: r.currency,
     })
   }
   for (const r of distributions) {
-    byHolding.get(r.holdingId)?.distributions.push({
+    byHolding.get(r.holdingId)?.events.distributions.push({
       date: r.date,
       amount: Number(r.amount),
       currency: r.currency,
@@ -127,21 +145,55 @@ export const listHoldings = createServerFn()
         .innerJoin(entity, eq(entity.id, holding.companyId))
         .orderBy(asc(holding.openedAt)),
     ])
-    const events = await loadHoldingEvents(rows.map((r) => r.id))
+    const loaded = await loadHoldingEvents(rows.map((r) => r.id))
 
+    // Rounds power the ownership ledger — one query for every company.
+    const companyIds = rows.map((r) => r.companyId)
+    const roundRows =
+      companyIds.length > 0
+        ? await db
+            .select({
+              companyId: round.companyId,
+              date: round.date,
+              kind: round.kind,
+              sharesOutstanding: round.sharesOutstanding,
+            })
+            .from(round)
+            .where(inArray(round.companyId, companyIds))
+            .orderBy(asc(round.date))
+        : []
+    const roundsByCompany = new Map<
+      string,
+      Array<{ date: string; kind: string; sharesOutstanding: number | null }>
+    >()
+    for (const r of roundRows) {
+      const list = roundsByCompany.get(r.companyId) ?? []
+      list.push({
+        date: r.date,
+        kind: r.kind,
+        sharesOutstanding: num(r.sharesOutstanding),
+      })
+      roundsByCompany.set(r.companyId, list)
+    }
+
+    const empty: LoadedHolding = {
+      events: { investments: [], marks: [], distributions: [] },
+      ownershipInputs: [],
+    }
     const holdings = rows.map((r) => {
-      const ev = events.get(r.id) ?? {
-        investments: [],
-        marks: [],
-        distributions: [],
-      }
+      const l = loaded.get(r.id) ?? empty
       return {
         ...r,
-        metrics: holdingMetrics(ev, {
+        metrics: holdingMetrics(l.events, {
           baseCurrency: base,
           fxRates: rates,
           asOf,
         }),
+        ownership: ownership(
+          l.ownershipInputs,
+          roundsByCompany.get(r.companyId) ?? [],
+          asOf,
+        ),
       }
     })
 
@@ -150,11 +202,7 @@ export const listHoldings = createServerFn()
     const totals = { costBasis: 0, realized: 0, unrealized: 0 }
     const excluded: Array<string> = []
     for (const r of rows) {
-      const ev = events.get(r.id) ?? {
-        investments: [],
-        marks: [],
-        distributions: [],
-      }
+      const ev = (loaded.get(r.id) ?? empty).events
       const inBase = holdingMetrics(ev, {
         baseCurrency: base,
         fxRates: rates,

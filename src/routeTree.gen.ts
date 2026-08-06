@@ -20,6 +20,7 @@ import { Route as AppDedupeRouteImport } from './routes/_app/dedupe'
 import { Route as AppMandateRouteImport } from './routes/_app/mandate'
 import { Route as AppNotesRouteImport } from './routes/_app/notes'
 import { Route as AppPeopleRouteImport } from './routes/_app/people'
+import { Route as AppPortfolioRouteImport } from './routes/_app/portfolio'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSpacesRouteImport } from './routes/_app/spaces'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
@@ -27,6 +28,7 @@ import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/compani
 import { Route as AppDealsDealIdRouteImport } from './routes/_app/deals_.$dealId'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId'
 import { Route as AppPeoplePersonIdRouteImport } from './routes/_app/people_.$personId'
+import { Route as AppPortfolioHoldingIdRouteImport } from './routes/_app/portfolio_.$holdingId'
 import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
@@ -85,6 +87,11 @@ const AppPeopleRoute = AppPeopleRouteImport.update({
   path: '/people',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPortfolioRoute = AppPortfolioRouteImport.update({
+  id: '/portfolio',
+  path: '/portfolio',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -120,6 +127,11 @@ const AppPeoplePersonIdRoute = AppPeoplePersonIdRouteImport.update({
   path: '/people/$personId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPortfolioHoldingIdRoute = AppPortfolioHoldingIdRouteImport.update({
+  id: '/portfolio_/$holdingId',
+  path: '/portfolio/$holdingId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSpacesSpaceIdRoute = AppSpacesSpaceIdRouteImport.update({
   id: '/spaces_/$spaceId',
   path: '/spaces/$spaceId',
@@ -147,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/mandate': typeof AppMandateRoute
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
+  '/portfolio': typeof AppPortfolioRoute
   '/settings': typeof AppSettingsRoute
   '/spaces': typeof AppSpacesRoute
   '/api/health': typeof ApiHealthRoute
@@ -154,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/deals/$dealId': typeof AppDealsDealIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
+  '/portfolio/$holdingId': typeof AppPortfolioHoldingIdRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
@@ -169,6 +183,7 @@ export interface FileRoutesByTo {
   '/mandate': typeof AppMandateRoute
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
+  '/portfolio': typeof AppPortfolioRoute
   '/settings': typeof AppSettingsRoute
   '/spaces': typeof AppSpacesRoute
   '/api/health': typeof ApiHealthRoute
@@ -176,6 +191,7 @@ export interface FileRoutesByTo {
   '/deals/$dealId': typeof AppDealsDealIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
+  '/portfolio/$holdingId': typeof AppPortfolioHoldingIdRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
@@ -193,6 +209,7 @@ export interface FileRoutesById {
   '/_app/mandate': typeof AppMandateRoute
   '/_app/notes': typeof AppNotesRoute
   '/_app/people': typeof AppPeopleRoute
+  '/_app/portfolio': typeof AppPortfolioRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/spaces': typeof AppSpacesRoute
   '/api/health': typeof ApiHealthRoute
@@ -200,6 +217,7 @@ export interface FileRoutesById {
   '/_app/deals_/$dealId': typeof AppDealsDealIdRoute
   '/_app/notes_/$noteId': typeof AppNotesNoteIdRoute
   '/_app/people_/$personId': typeof AppPeoplePersonIdRoute
+  '/_app/portfolio_/$holdingId': typeof AppPortfolioHoldingIdRoute
   '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
@@ -217,6 +235,7 @@ export interface FileRouteTypes {
     | '/mandate'
     | '/notes'
     | '/people'
+    | '/portfolio'
     | '/settings'
     | '/spaces'
     | '/api/health'
@@ -224,6 +243,7 @@ export interface FileRouteTypes {
     | '/deals/$dealId'
     | '/notes/$noteId'
     | '/people/$personId'
+    | '/portfolio/$holdingId'
     | '/spaces/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
@@ -239,6 +259,7 @@ export interface FileRouteTypes {
     | '/mandate'
     | '/notes'
     | '/people'
+    | '/portfolio'
     | '/settings'
     | '/spaces'
     | '/api/health'
@@ -246,6 +267,7 @@ export interface FileRouteTypes {
     | '/deals/$dealId'
     | '/notes/$noteId'
     | '/people/$personId'
+    | '/portfolio/$holdingId'
     | '/spaces/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
@@ -262,6 +284,7 @@ export interface FileRouteTypes {
     | '/_app/mandate'
     | '/_app/notes'
     | '/_app/people'
+    | '/_app/portfolio'
     | '/_app/settings'
     | '/_app/spaces'
     | '/api/health'
@@ -269,6 +292,7 @@ export interface FileRouteTypes {
     | '/_app/deals_/$dealId'
     | '/_app/notes_/$noteId'
     | '/_app/people_/$personId'
+    | '/_app/portfolio_/$holdingId'
     | '/_app/spaces_/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
@@ -364,6 +388,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPeopleRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/portfolio': {
+      id: '/_app/portfolio'
+      path: '/portfolio'
+      fullPath: '/portfolio'
+      preLoaderRoute: typeof AppPortfolioRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -413,6 +444,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPeoplePersonIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/portfolio_/$holdingId': {
+      id: '/_app/portfolio_/$holdingId'
+      path: '/portfolio/$holdingId'
+      fullPath: '/portfolio/$holdingId'
+      preLoaderRoute: typeof AppPortfolioHoldingIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/spaces_/$spaceId': {
       id: '/_app/spaces_/$spaceId'
       path: '/spaces/$spaceId'
@@ -444,12 +482,14 @@ interface AppRouteChildren {
   AppMandateRoute: typeof AppMandateRoute
   AppNotesRoute: typeof AppNotesRoute
   AppPeopleRoute: typeof AppPeopleRoute
+  AppPortfolioRoute: typeof AppPortfolioRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSpacesRoute: typeof AppSpacesRoute
   AppCompaniesCompanyIdRoute: typeof AppCompaniesCompanyIdRoute
   AppDealsDealIdRoute: typeof AppDealsDealIdRoute
   AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
   AppPeoplePersonIdRoute: typeof AppPeoplePersonIdRoute
+  AppPortfolioHoldingIdRoute: typeof AppPortfolioHoldingIdRoute
   AppSpacesSpaceIdRoute: typeof AppSpacesSpaceIdRoute
 }
 
@@ -460,12 +500,14 @@ const AppRouteChildren: AppRouteChildren = {
   AppMandateRoute: AppMandateRoute,
   AppNotesRoute: AppNotesRoute,
   AppPeopleRoute: AppPeopleRoute,
+  AppPortfolioRoute: AppPortfolioRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSpacesRoute: AppSpacesRoute,
   AppCompaniesCompanyIdRoute: AppCompaniesCompanyIdRoute,
   AppDealsDealIdRoute: AppDealsDealIdRoute,
   AppNotesNoteIdRoute: AppNotesNoteIdRoute,
   AppPeoplePersonIdRoute: AppPeoplePersonIdRoute,
+  AppPortfolioHoldingIdRoute: AppPortfolioHoldingIdRoute,
   AppSpacesSpaceIdRoute: AppSpacesSpaceIdRoute,
 }
 
@@ -484,12 +526,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
