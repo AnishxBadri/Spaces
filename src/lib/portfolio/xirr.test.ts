@@ -66,6 +66,15 @@ describe('xirr', () => {
     ).toBeNull()
   })
 
+  it('zero elapsed time is undefined, not the solver guess', () => {
+    expect(
+      xirr([
+        { date: '2024-06-15', amount: -250000 },
+        { date: '2024-06-15', amount: 250000 },
+      ]),
+    ).toBeNull()
+  })
+
   it('total loss lands at the domain floor', () => {
     const r = xirr([
       { date: '2020-01-01', amount: -100 },

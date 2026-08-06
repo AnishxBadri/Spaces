@@ -48,6 +48,9 @@ export function xirr(flows: Array<CashFlow>): number | null {
 
   const sorted = [...flows].sort((a, b) => a.date.localeCompare(b.date))
   const t0 = sorted[0].date
+  // Zero elapsed time: NPV is rate-independent, every rate is a "root" and
+  // Newton would return its initial guess. The rate is undefined, not 10%.
+  if (sorted[sorted.length - 1].date === t0) return null
   const LO = -0.9999
   const HI = 10
 

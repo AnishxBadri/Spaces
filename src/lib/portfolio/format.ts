@@ -9,12 +9,38 @@ export function fmtMoney(
   currency: string,
   opts?: { compact?: boolean },
 ): string {
+  // Compact is hand-rolled: Intl's compact notation differs across ICU
+  // builds (Node vs browser), which breaks SSR hydration.
+  if (opts?.compact) {
+    const abs = Math.abs(amount)
+    const sign = amount < 0 ? '-' : ''
+    const symbol = currencySymbol(currency)
+    if (abs >= 1e9) return `${sign}${symbol}${trim1(abs / 1e9)}B`
+    if (abs >= 1e6) return `${sign}${symbol}${trim1(abs / 1e6)}M`
+    if (abs >= 1e3) return `${sign}${symbol}${trim1(abs / 1e3)}K`
+    return `${sign}${symbol}${Math.round(abs)}`
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-    notation: opts?.compact ? 'compact' : 'standard',
-    maximumFractionDigits: opts?.compact ? 1 : 0,
+    maximumFractionDigits: 0,
   }).format(amount)
+}
+
+function trim1(x: number): string {
+  const s = x.toFixed(1)
+  return s.endsWith('.0') ? s.slice(0, -2) : s
+}
+
+function currencySymbol(currency: string): string {
+  const part = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  })
+    .formatToParts(0)
+    .find((p) => p.type === 'currency')
+  return part?.value ?? `${currency} `
 }
 
 export function fmtMultiple(x: number | null): string {

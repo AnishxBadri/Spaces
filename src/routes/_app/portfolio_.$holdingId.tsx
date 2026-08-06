@@ -290,9 +290,14 @@ function useEventForm(onDone: () => void) {
   return { open, setOpen, pending, error, run }
 }
 
-function AddTrigger({ label }: { label: string }) {
+function AddTrigger({
+  label,
+  ...props
+}: { label: string } & React.ComponentProps<typeof Button>) {
+  // Spreads DialogTrigger's asChild-injected props (onClick, aria-*)
+  // through to the real button — without this the dialog never opens.
   return (
-    <Button size="sm" variant="outline">
+    <Button size="sm" variant="outline" {...props}>
       <Plus className="size-4" strokeWidth={2} />
       {label}
     </Button>
