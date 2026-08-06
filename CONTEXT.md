@@ -1350,6 +1350,17 @@ snippets.
       must land on one holding. Known limit, accepted: one-active-mandate assumes
       serial vintages; parallel distinct-strategy vehicles would need
       mandate-per-vehicle (a loosening, not a redesign).
+    - **Currency conversion (decided 2026-08-06):** original currency is truth —
+      every money event stores amount + currency as entered; converted values are
+      never stored (same derive-don't-store rule as aggregates). One workspace
+      `base_currency`. Sparse manual `fx_rate(currency, date, rate_to_base)` table,
+      append-only; lookup = latest rate ≤ event date; a missing rate is *surfaced*
+      ("N events need a rate"), never silently 1.0. Convention: cash flows convert at
+      transaction-date rates, unrealized value (marks) at current/as-of rates — FX
+      gain/loss correctly lands inside base-currency performance. Holdings whose
+      flows share one currency compute natively; conversion enters only at roll-up.
+      Auto rate fetch is a later BYOK provider; manual entry at check-time is fine
+      and audit-friendly at our scale.
     - **The follow-on decision is a new deal** — "one deal = one opportunity" means a
       pro-rata decision enters the pipeline with its own judgment trail and can be
       Passed without touching the original holding. Banked alongside: structured
