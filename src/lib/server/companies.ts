@@ -274,6 +274,20 @@ export const updateRecord = createServerFn({ method: 'POST' })
     if (data.patch && Object.keys(data.patch).length > 0) {
       const { setValues } = await import('../attributes/values')
       await setValues({ entityId: data.id, patch: data.patch, actorId: u.id })
+      // The pipeline→portfolio seam: a deal reaching Invested births a
+      // holding (idempotent — follow-ons land on the existing one).
+      if (data.patch.stage === 'invested') {
+        const [row] = await db
+          .select({ kind: entity.kind, values: entity.values })
+          .from(entity)
+          .where(eq(entity.id, data.id))
+        const companyId = (row?.values as Record<string, unknown> | null)
+          ?.company
+        if (row?.kind === 'deal' && typeof companyId === 'string') {
+          const { birthHolding } = await import('./shared')
+          await birthHolding({ companyId, actorId: u.id })
+        }
+      }
     }
     return { ok: true }
   })

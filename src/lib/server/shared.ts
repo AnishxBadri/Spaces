@@ -105,6 +105,41 @@ export async function createSpaceRow(
   })
 }
 
+/**
+ * The pipeline→portfolio seam: a deal reaching Invested births a holding
+ * (CONTEXT.md phase 15). Idempotent — one holding per company, follow-ons
+ * land on the existing row. Lives here (not server/portfolio.ts) because
+ * the deal-stage write path needs it and the barrel must never export
+ * non-serverFn helpers.
+ */
+export async function birthHolding(opts: {
+  companyId: string
+  actorId: string
+  openedAt?: string
+}): Promise<{ id: string; created: boolean }> {
+  const { holding } = await import('#/db/schema/portfolio')
+  const { activity } = await import('#/db/schema/activity')
+  const openedAt = opts.openedAt ?? new Date().toISOString().slice(0, 10)
+  const inserted = await db
+    .insert(holding)
+    .values({ companyId: opts.companyId, openedAt, createdBy: opts.actorId })
+    .onConflictDoNothing()
+    .returning({ id: holding.id })
+  if (inserted.length > 0) {
+    await db.insert(activity).values({
+      actorId: opts.actorId,
+      verb: 'holding.created',
+      subjectEntityId: opts.companyId,
+    })
+    return { id: inserted[0].id, created: true }
+  }
+  const [existing] = await db
+    .select({ id: holding.id })
+    .from(holding)
+    .where(eq(holding.companyId, opts.companyId))
+  return { id: existing.id, created: false }
+}
+
 /** Latest interaction per entity — the "last touched" signal for tables. */
 export async function lastTouchedMap(): Promise<Record<string, string>> {
   const rows = await db

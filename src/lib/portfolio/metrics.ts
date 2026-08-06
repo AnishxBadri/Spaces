@@ -83,6 +83,11 @@ export function holdingMetrics(
     fxRates?: Array<FxRate>
     /** ISO date; defaults to including everything */
     asOf?: string
+    /**
+     * 'base' disables the single-currency native shortcut so results are
+     * always in base currency — required when rolling holdings up.
+     */
+    reportIn?: 'native' | 'base'
   },
 ): MetricsResult {
   const asOf = opts.asOf ?? '9999-12-31'
@@ -95,7 +100,10 @@ export function holdingMetrics(
     ...marks.map((e) => e.currency),
     ...distributions.map((e) => e.currency),
   ])
-  const single = currencies.size === 1 ? [...currencies][0] : null
+  const single =
+    opts.reportIn === 'base' || currencies.size !== 1
+      ? null
+      : [...currencies][0]
 
   const ctx: Ctx = {
     baseCurrency: opts.baseCurrency,
