@@ -60,6 +60,10 @@ export const auth = betterAuth({
                 'Setup token required. It is printed in the server logs.',
               )
             }
+            // Consume the token NOW, not in the after-hook: two concurrent
+            // first-run signups both pass the count()==0 check, but only
+            // the first finds the file — the second fails verification.
+            clearSetupToken()
             return { data: { ...newUser, role: 'admin' } }
           }
 
@@ -69,9 +73,13 @@ export const auth = betterAuth({
             throw new Error('Signup is closed. Ask an admin for an invitation.')
           }
           const hash = createHash('sha256').update(raw.trim()).digest('hex')
+          // Atomic consume: UPDATE ... WHERE usedAt IS NULL ... RETURNING
+          // makes single-use a database fact — two concurrent redemptions
+          // of the same open invite race the row, and exactly one wins.
+          // (usedBy is filled in the after-hook once the user id exists.)
           const [inv] = await db
-            .select()
-            .from(invite)
+            .update(invite)
+            .set({ usedAt: new Date() })
             .where(
               and(
                 eq(invite.tokenHash, hash),
@@ -79,6 +87,7 @@ export const auth = betterAuth({
                 gt(invite.expiresAt, new Date()),
               ),
             )
+            .returning({ role: invite.role, email: invite.email })
           if (!inv) {
             throw new Error('This invitation is invalid or has expired.')
           }
@@ -86,6 +95,12 @@ export const auth = betterAuth({
             inv.email &&
             inv.email.toLowerCase() !== newUser.email.toLowerCase()
           ) {
+            // Wrong email: hand the invite back — the rightful recipient
+            // must still be able to use it.
+            await db
+              .update(invite)
+              .set({ usedAt: null })
+              .where(eq(invite.tokenHash, hash))
             throw new Error('This invitation is for a different email address.')
           }
           return { data: { ...newUser, role: inv.role } }

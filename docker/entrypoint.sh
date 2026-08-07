@@ -27,18 +27,24 @@ case "$ROLE" in
     WORKER_PID=$!
     node .output/server/index.mjs &
     WEB_PID=$!
-    trap 'kill -TERM $WORKER_PID $WEB_PID 2>/dev/null' TERM INT
+    # EC distinguishes operator stop from crash: the trap is the one place
+    # we know the shutdown was asked for — exit 0 there, 1 everywhere else,
+    # so `docker ps -a` and on-failure restart policies read the truth.
+    EC=1
+    trap 'EC=0; kill -TERM $WORKER_PID $WEB_PID 2>/dev/null' TERM INT
     while kill -0 "$WORKER_PID" 2>/dev/null && kill -0 "$WEB_PID" 2>/dev/null; do
       sleep 1
     done
-    if ! kill -0 "$WORKER_PID" 2>/dev/null; then
+    if [ "$EC" = 0 ]; then
+      echo "[entrypoint] stopping on signal" >&2
+    elif ! kill -0 "$WORKER_PID" 2>/dev/null; then
       echo "[entrypoint] worker exited — stopping container" >&2
     else
       echo "[entrypoint] web exited — stopping container" >&2
     fi
     kill -TERM $WORKER_PID $WEB_PID 2>/dev/null || true
     wait
-    exit 1
+    exit $EC
     ;;
   *)
     echo "Unknown ROLE: $ROLE (expected web|worker|all)" >&2

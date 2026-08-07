@@ -59,12 +59,20 @@ export const setMemberRole = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await requireAdmin()
     if (data.role === 'member') {
+      // Banned admins don't count — they cannot log in, so a workspace
+      // whose only other "admin" is banned is functionally admin-less.
       const [{ value: otherAdmins }] = await db
         .select({ value: count() })
         .from(user)
-        .where(and(eq(user.role, 'admin'), ne(user.id, data.userId)))
+        .where(
+          and(
+            eq(user.role, 'admin'),
+            eq(user.banned, false),
+            ne(user.id, data.userId),
+          ),
+        )
       if (otherAdmins === 0) {
-        throw new Error('Cannot demote the only admin.')
+        throw new Error('Cannot demote the only active admin.')
       }
     }
     await db
@@ -81,6 +89,29 @@ export const setMemberBanned = createServerFn({ method: 'POST' })
     const admin = await requireAdmin()
     if (data.userId === admin.id) {
       throw new Error('You cannot ban yourself.')
+    }
+    if (data.banned) {
+      // Same lockout as demotion: banning the last active admin bricks
+      // the workspace just as surely.
+      const [target] = await db
+        .select({ role: user.role })
+        .from(user)
+        .where(eq(user.id, data.userId))
+      if (target?.role === 'admin') {
+        const [{ value: otherAdmins }] = await db
+          .select({ value: count() })
+          .from(user)
+          .where(
+            and(
+              eq(user.role, 'admin'),
+              eq(user.banned, false),
+              ne(user.id, data.userId),
+            ),
+          )
+        if (otherAdmins === 0) {
+          throw new Error('Cannot ban the only active admin.')
+        }
+      }
     }
     await db
       .update(user)

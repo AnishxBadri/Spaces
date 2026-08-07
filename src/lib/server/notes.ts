@@ -193,10 +193,12 @@ export const setNoteVisibility = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const u = await requireUser()
     const [row] = await db
-      .select({ authorId: note.authorId })
+      .select({ authorId: note.authorId, visibility: note.visibility })
       .from(note)
       .where(eq(note.entityId, data.id))
-    if (!row) throw new Error('Note not found')
+    // Same collapse as getNote: an unreadable private note answers exactly
+    // like a nonexistent one — a distinct error would confirm it exists.
+    if (!row || !canRead(u, row)) throw new Error('Note not found')
     if (row.authorId !== u.id) {
       throw new Error('Only the author can change a note’s visibility.')
     }

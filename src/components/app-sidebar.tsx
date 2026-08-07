@@ -69,7 +69,14 @@ export function AppSidebar({
         <div className="h-3" />
       ) : (
         <div className="flex h-14 items-center px-4">
-          <Link to="/spaces" onClick={onNavigate} aria-label="DealOS home">
+          <Link
+            to="/spaces"
+            onClick={onNavigate}
+            // Accessible name must contain the visible text (WCAG 2.5.3) —
+            // hard-coding the product name breaks voice control the moment
+            // the workspace has its own.
+            aria-label={workspaceName ? `${workspaceName} home` : 'DealOS home'}
+          >
             {workspaceName ? (
               <span className="block truncate text-title font-semibold tracking-tight">
                 {workspaceName}

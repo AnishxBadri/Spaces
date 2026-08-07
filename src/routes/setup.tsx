@@ -27,16 +27,21 @@ export const Route = createFileRoute('/setup')({
   beforeLoad: async () => {
     const { needsSetup } = await getSetupState()
     if (!needsSetup) {
-      // Admin exists. Only a signed-in user (mid-wizard step 2) may stay.
+      // Admin exists. Only a signed-in user (mid-wizard step 2) may stay —
+      // and a refresh must land them on step 2, not the dead admin form
+      // (the setup token is gone; resubmitting can only fail).
       const session = await getSession()
       if (!session) throw redirect({ to: '/login' })
+      return { initialStep: 2 as const }
     }
+    return { initialStep: 1 as const }
   },
   component: SetupWizard,
 })
 
 function SetupWizard() {
-  const [step, setStep] = useState<1 | 2>(1)
+  const { initialStep } = Route.useRouteContext()
+  const [step, setStep] = useState<1 | 2>(initialStep)
 
   return (
     <main className="flex min-h-dvh flex-col items-center bg-background px-6">
