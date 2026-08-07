@@ -66,7 +66,7 @@ function AdminStep({ onDone }: { onDone: () => void }) {
     }
     const workspaceName = String(form.get('workspace')).trim()
     if (!workspaceName) {
-      setError('Give the workspace a name — usually the fund’s.')
+      setError('Give the workspace a name — yours or the fund’s.')
       return
     }
     setPending(true)
@@ -126,8 +126,12 @@ function AdminStep({ onDone }: { onDone: () => void }) {
             id="workspace"
             name="workspace"
             required
-            placeholder="Meridian Ventures"
+            placeholder="Priya Mehta, or Meridian Ventures"
+            aria-describedby="workspace-hint"
           />
+          <p id="workspace-hint" className="text-xs text-muted-foreground">
+            Your name if you invest solo, your fund’s if you don’t.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="name">Your name</Label>
