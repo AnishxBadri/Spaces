@@ -2,6 +2,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import {
   Briefcase,
   Building2,
+  CheckSquare,
   ChevronsUpDown,
   Compass,
   FileText,
@@ -33,6 +34,7 @@ export const NAV_ITEMS = [
   { to: '/people', label: 'People', icon: Users },
   { to: '/deals', label: 'Deals', icon: Kanban },
   { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
+  { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/notes', label: 'Notes', icon: FileText },
 ] as const
 
