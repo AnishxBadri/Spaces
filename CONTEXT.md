@@ -1397,6 +1397,34 @@ snippets.
     structures, LP reporting (standing non-goal), FoF look-through (wrong customer),
     MIS collection. A lightweight single-vehicle capital ledger may earn a later slot
     if fund-I customers ask; nothing else on that list should.
+15b. **Tasks + Today page (decided 2026-08-07; tasks pulled ahead, built now —
+    Today page follows post-phase-15).** The known gap the Edda survey flagged,
+    made concrete: **Parked ("Early — revisit") is a silent grave** — nothing
+    resurfaces a parked deal; tasks are the resurrection machinery ("revisit
+    when their round closes"), plus diligence chores and portfolio hygiene.
+    Model: plain `task` table (content, nullable due_date, assignee,
+    done_at, created_by) + `task_entity` join — deliberately NOT an entity
+    kind (no backlinks/search/mentions payload; kinds stay fixed) and not
+    attributes. **Composer-first UX, Attio's create-bar as the reference**
+    (screenshots reviewed 2026-08-07): one-line input; pills for due date
+    (natural-language parse — deterministic parser, not AI — plus
+    Today/Tomorrow/Next week/**No date** chips; dateless tasks are legal),
+    assignee (defaults to creator), linked records (existing entity
+    search); Create-more toggle; global `t` shortcut. Mention-in-content
+    (`@Pixxel` auto-linking the record) is the v2 nicety once the composer
+    reuses mention infra. Surfacing: /tasks page grouped by urgency
+    (overdue/today/this week/later/no date), record-page rails, and — the
+    self-hosted divergence from Attio — **the Today page is the reminder
+    channel**, not email: no SMTP by doctrine, so opening the app is the
+    notification. Optional SMTP daily digest is additive, later, never
+    required. Skipped from Attio: workflow-generated tasks (no workflow
+    engine), round-robin (wrong scale). **Overview/Today page banked with
+    it (2026-08-07): attention-driven, not chart-driven** — overdue/due
+    tasks as its spine, plus stale marks, missing fx rates, dedupe inbox,
+    deals idle in stage, compact portfolio strip, activity feed;
+    getting-started card migrates there until 5/5. A metrics dashboard
+    answers "how are we doing" (a solo GP knows); the landing page answers
+    "what needs my attention today."
 16. **Ship polish — deferred, scope TBD (2026-08).** No release before this: more dev
     work and manual testing come first. CI, images, upgrade CI, install docs get decided
     when a release is actually in sight. Still banked from the earlier grill, to reuse
