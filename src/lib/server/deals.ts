@@ -44,6 +44,13 @@ export const createDeal = createServerFn({ method: 'POST' })
       subjectEntityId: data.companyId,
       objectEntityId: ent.id,
     })
+    // The pipeline→portfolio seam applies at birth too: a deal *created*
+    // at Invested (import flows, direct entry) births its holding just
+    // like one moved there (companies.ts updateRecord has the twin hook).
+    if (data.stage === 'invested') {
+      const { birthHolding } = await import('./shared')
+      await birthHolding({ companyId: data.companyId, actorId: u.id })
+    }
     return { id: ent.id }
   })
 

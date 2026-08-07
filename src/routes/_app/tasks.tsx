@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { EmptyState } from '#/components/empty-state'
 import { TaskComposer } from '#/components/task-composer'
 import { listTasks, setTaskDone } from '#/lib/server-fns'
+import { localToday } from '#/lib/tasks/parse-due'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/tasks')({
@@ -13,11 +14,6 @@ export const Route = createFileRoute('/_app/tasks')({
 })
 
 type TaskRow = Awaited<ReturnType<typeof listTasks>>['open'][number]
-
-function localToday(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 function endOfWeek(today: string): string {
   const d = new Date(`${today}T00:00:00Z`)
@@ -167,15 +163,24 @@ function TaskItem({
       />
       <span className={cn('text-ui', done && 'line-through')}>{t.content}</span>
       <span className="ml-auto flex shrink-0 items-baseline gap-3">
-        {t.entities.map((e) => (
-          <Link
-            key={e.id}
-            to={entityPath(e.kind, e.id)}
-            className="focus-ring rounded text-label text-muted-foreground hover:text-foreground"
-          >
-            {e.name}
-          </Link>
-        ))}
+        {t.entities.map((e) => {
+          const path = entityPath(e.kind, e.id)
+          // Kinds without a record page (organizations) stay plain text —
+          // a wrong-kind route is worse than no link.
+          return path ? (
+            <Link
+              key={e.id}
+              to={path}
+              className="focus-ring rounded text-label text-muted-foreground hover:text-foreground"
+            >
+              {e.name}
+            </Link>
+          ) : (
+            <span key={e.id} className="text-label text-muted-foreground">
+              {e.name}
+            </span>
+          )
+        })}
         {t.dueDate ? (
           <span
             className={cn(
@@ -194,7 +199,7 @@ function TaskItem({
   )
 }
 
-function entityPath(kind: string, id: string): string {
+function entityPath(kind: string, id: string): string | null {
   switch (kind) {
     case 'company':
       return `/companies/${id}`
@@ -203,6 +208,6 @@ function entityPath(kind: string, id: string): string {
     case 'deal':
       return `/deals/${id}`
     default:
-      return `/companies/${id}`
+      return null
   }
 }

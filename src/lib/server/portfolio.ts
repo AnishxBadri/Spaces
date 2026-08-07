@@ -145,13 +145,13 @@ export const listHoldings = createServerFn()
         .innerJoin(entity, eq(entity.id, holding.companyId))
         .orderBy(asc(holding.openedAt)),
     ])
-    const loaded = await loadHoldingEvents(rows.map((r) => r.id))
-
-    // Rounds power the ownership ledger — one query for every company.
+    // Rounds power the ownership ledger — one query for every company,
+    // fetched alongside the events (independent queries, one round-trip).
     const companyIds = rows.map((r) => r.companyId)
-    const roundRows =
+    const [loaded, roundRows] = await Promise.all([
+      loadHoldingEvents(rows.map((r) => r.id)),
       companyIds.length > 0
-        ? await db
+        ? db
             .select({
               companyId: round.companyId,
               date: round.date,
@@ -161,7 +161,8 @@ export const listHoldings = createServerFn()
             .from(round)
             .where(inArray(round.companyId, companyIds))
             .orderBy(asc(round.date))
-        : []
+        : Promise.resolve([]),
+    ])
     const roundsByCompany = new Map<
       string,
       Array<{ date: string; kind: string; sharesOutstanding: number | null }>
@@ -198,17 +199,22 @@ export const listHoldings = createServerFn()
     })
 
     // Roll-up: everything forced to base; holdings with missing rates are
-    // excluded and reported, never silently converted at 1.0.
+    // excluded and reported, never silently converted at 1.0. A holding
+    // whose display metrics are already base-denominated (the common case:
+    // single currency = base) is reused, not recomputed.
     const totals = { costBasis: 0, realized: 0, unrealized: 0 }
     const excluded: Array<string> = []
-    for (const r of rows) {
-      const ev = (loaded.get(r.id) ?? empty).events
-      const inBase = holdingMetrics(ev, {
-        baseCurrency: base,
-        fxRates: rates,
-        asOf,
-        reportIn: 'base',
-      })
+    for (const [i, r] of rows.entries()) {
+      const display = holdings[i].metrics
+      const inBase =
+        display.ok && display.metrics.currency === base
+          ? display
+          : holdingMetrics((loaded.get(r.id) ?? empty).events, {
+              baseCurrency: base,
+              fxRates: rates,
+              asOf,
+              reportIn: 'base',
+            })
       if (!inBase.ok) {
         excluded.push(r.id)
         continue

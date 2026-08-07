@@ -48,7 +48,9 @@ function SpacesPage() {
             The shared map of markets you work — taxonomy first, deals later.
           </p>
         </div>
-        {spaces.length > 0 ? <CreateSpaceDialog spaces={spaces} /> : null}
+        {/* Always available — the first-run creator below only makes bare
+            top-level spaces; scaffold stamping and nesting live here. */}
+        <CreateSpaceDialog spaces={spaces} />
       </header>
 
       <GettingStarted progress={progress} />
@@ -99,22 +101,37 @@ function MarketsCreator() {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const filled = names.map((n) => n.trim()).filter(Boolean)
+    // Dedupe case-insensitively — two "Fintech" inputs are one market, and
+    // the second would trip the slug-per-parent unique index.
+    const seen = new Set<string>()
+    const filled = names
+      .map((n) => n.trim())
+      .filter(Boolean)
+      .filter((n) => {
+        const key = n.toLowerCase()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
     if (filled.length === 0) {
       setError('Name at least one market.')
       return
     }
     setPending(true)
     setError(null)
-    try {
-      for (const name of filled) {
+    const failed: Array<string> = []
+    for (const name of filled) {
+      try {
         await createSpace({ data: { name } })
+      } catch {
+        failed.push(name)
       }
-      router.invalidate()
-    } catch {
-      setError('Could not create the spaces — try again.')
+    }
+    if (failed.length > 0) {
+      setError(`Could not create: ${failed.join(', ')}. The rest are in.`)
       setPending(false)
     }
+    if (failed.length < filled.length) router.invalidate()
   }
 
   return (

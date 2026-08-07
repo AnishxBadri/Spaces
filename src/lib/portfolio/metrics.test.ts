@@ -69,6 +69,23 @@ describe('holdingMetrics', () => {
     expect(result.metrics.grossXirr).toBe(-1)
   })
 
+  it('a mark dated after the write-off revives the position', () => {
+    const result = holdingMetrics(
+      {
+        investments: [{ date: '2022-01-01', amount: 100, currency: 'INR' }],
+        marks: [{ date: '2025-01-01', fairValue: 500, currency: 'INR' }],
+        distributions: [
+          { date: '2024-01-01', amount: 0, currency: 'INR', kind: 'writeoff' },
+        ],
+      },
+      BASE,
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.metrics.writtenOff).toBe(false)
+    expect(result.metrics.unrealized).toBe(500)
+  })
+
   it('as-of filters events: the past has no knowledge of later marks', () => {
     const events = {
       investments: [{ date: '2022-01-01', amount: 100, currency: 'INR' }],

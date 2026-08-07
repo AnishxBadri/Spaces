@@ -15,6 +15,15 @@ import {
   signal,
 } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
+import {
+  distribution,
+  holding,
+  investment,
+  mark,
+  round,
+  roundCoInvestor,
+} from '#/db/schema/portfolio'
+import { taskEntity } from '#/db/schema/tasks'
 
 /**
  * Merge executor, per CONTEXT.md: repoint at write time, resolve nothing at
@@ -391,6 +400,137 @@ export async function mergeEntities(opts: {
       .update(attributeEvent)
       .set({ entityId: winnerId })
       .where(eq(attributeEvent.entityId, loserId))
+
+    // --- portfolio: holdings collapse onto the winner ---------------------
+    // One holding per company is doctrine; when both sides hold, the
+    // loser's events move onto the winner's holding and the loser holding
+    // row is dropped — cross-entity follow-ons land on one holding.
+    const [loserHolding] = await tx
+      .select({ id: holding.id })
+      .from(holding)
+      .where(eq(holding.companyId, loserId))
+    if (loserHolding) {
+      const [winnerHolding] = await tx
+        .select({ id: holding.id })
+        .from(holding)
+        .where(eq(holding.companyId, winnerId))
+      if (winnerHolding) {
+        for (const [tbl, name] of [
+          [investment, 'investment'],
+          [mark, 'mark'],
+          [distribution, 'distribution'],
+        ] as const) {
+          for (const row of await tx
+            .select({ id: tbl.id })
+            .from(tbl)
+            .where(eq(tbl.holdingId, loserHolding.id))) {
+            snapshot.push({
+              table: name,
+              action: 'repointed',
+              pk: { id: row.id },
+              old: { holdingId: loserHolding.id },
+            })
+          }
+          await tx
+            .update(tbl)
+            .set({ holdingId: winnerHolding.id })
+            .where(eq(tbl.holdingId, loserHolding.id))
+        }
+        snapshot.push({
+          table: 'holding',
+          action: 'dropped',
+          pk: { id: loserHolding.id },
+          old: { companyId: loserId },
+        })
+        await tx.delete(holding).where(eq(holding.id, loserHolding.id))
+      } else {
+        snapshot.push({
+          table: 'holding',
+          action: 'repointed',
+          pk: { id: loserHolding.id },
+          old: { companyId: loserId },
+        })
+        await tx
+          .update(holding)
+          .set({ companyId: winnerId })
+          .where(eq(holding.id, loserHolding.id))
+      }
+    }
+
+    // --- rounds: plain company_id repoint ---------------------------------
+    for (const r of await tx
+      .select({ id: round.id })
+      .from(round)
+      .where(eq(round.companyId, loserId))) {
+      snapshot.push({
+        table: 'round',
+        action: 'repointed',
+        pk: { id: r.id },
+        old: { companyId: loserId },
+      })
+    }
+    await tx
+      .update(round)
+      .set({ companyId: winnerId })
+      .where(eq(round.companyId, loserId))
+
+    // --- co-investors + task links: repoint, drop unique-pair dupes -------
+    for (const ci of await tx
+      .select({ id: roundCoInvestor.id, roundId: roundCoInvestor.roundId })
+      .from(roundCoInvestor)
+      .where(eq(roundCoInvestor.investorEntityId, loserId))) {
+      const [dupe] = await tx
+        .select({ id: roundCoInvestor.id })
+        .from(roundCoInvestor)
+        .where(
+          and(
+            eq(roundCoInvestor.roundId, ci.roundId),
+            eq(roundCoInvestor.investorEntityId, winnerId),
+          ),
+        )
+      snapshot.push({
+        table: 'round_co_investor',
+        action: dupe ? 'dropped' : 'repointed',
+        pk: { id: ci.id },
+        old: { investorEntityId: loserId },
+      })
+      if (dupe) {
+        await tx.delete(roundCoInvestor).where(eq(roundCoInvestor.id, ci.id))
+      } else {
+        await tx
+          .update(roundCoInvestor)
+          .set({ investorEntityId: winnerId })
+          .where(eq(roundCoInvestor.id, ci.id))
+      }
+    }
+    for (const te of await tx
+      .select({ id: taskEntity.id, taskId: taskEntity.taskId })
+      .from(taskEntity)
+      .where(eq(taskEntity.entityId, loserId))) {
+      const [dupe] = await tx
+        .select({ id: taskEntity.id })
+        .from(taskEntity)
+        .where(
+          and(
+            eq(taskEntity.taskId, te.taskId),
+            eq(taskEntity.entityId, winnerId),
+          ),
+        )
+      snapshot.push({
+        table: 'task_entity',
+        action: dupe ? 'dropped' : 'repointed',
+        pk: { id: te.id },
+        old: { entityId: loserId },
+      })
+      if (dupe) {
+        await tx.delete(taskEntity).where(eq(taskEntity.id, te.id))
+      } else {
+        await tx
+          .update(taskEntity)
+          .set({ entityId: winnerId })
+          .where(eq(taskEntity.id, te.id))
+      }
+    }
 
     // --- other open candidates touching the loser repoint to winner -------
     const loserCandidates = await tx

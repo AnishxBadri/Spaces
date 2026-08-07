@@ -72,35 +72,29 @@ async function linkedEntities(taskIds: Array<string>) {
   return map
 }
 
+const taskColumns = {
+  id: task.id,
+  content: task.content,
+  dueDate: task.dueDate,
+  assigneeId: task.assigneeId,
+  assigneeName: user.name,
+  doneAt: task.doneAt,
+  createdAt: task.createdAt,
+}
+
 export const listTasks = createServerFn()
   .validator(z.object({ includeDone: z.boolean().optional() }).optional())
   .handler(async ({ data }) => {
     await requireUser()
     const open = await db
-      .select({
-        id: task.id,
-        content: task.content,
-        dueDate: task.dueDate,
-        assigneeId: task.assigneeId,
-        assigneeName: user.name,
-        doneAt: task.doneAt,
-        createdAt: task.createdAt,
-      })
+      .select(taskColumns)
       .from(task)
       .innerJoin(user, eq(user.id, task.assigneeId))
       .where(isNull(task.doneAt))
       .orderBy(asc(task.dueDate), asc(task.createdAt))
     const done = data?.includeDone
       ? await db
-          .select({
-            id: task.id,
-            content: task.content,
-            dueDate: task.dueDate,
-            assigneeId: task.assigneeId,
-            assigneeName: user.name,
-            doneAt: task.doneAt,
-            createdAt: task.createdAt,
-          })
+          .select(taskColumns)
           .from(task)
           .innerJoin(user, eq(user.id, task.assigneeId))
           .where(isNotNull(task.doneAt))

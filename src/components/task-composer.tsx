@@ -13,7 +13,7 @@ import {
 import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { createTask, listUsers, searchEntities } from '#/lib/server-fns'
-import { parseDue } from '#/lib/tasks/parse-due'
+import { localToday, parseDue } from '#/lib/tasks/parse-due'
 import { cn } from '#/lib/utils'
 
 /**
@@ -21,11 +21,6 @@ import { cn } from '#/lib/utils'
  * one line of text, pills for due date / assignee / linked records.
  * Natural-language dates parse deterministically; "no date" is legal.
  */
-
-function localToday(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 function dueLabel(due: string | null, today: string): string {
   if (!due) return 'No date'
@@ -98,8 +93,21 @@ export function TaskComposer({
     }
   }
 
+  // Cancel/close discards the draft entirely — a chip linked in an
+  // abandoned draft must never leak into the next task.
+  function onOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) {
+      setContent('')
+      setDue(null)
+      setAssignee(null)
+      setRecords(presetEntity ? [presetEntity] : [])
+      setError(null)
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm">
@@ -148,7 +156,7 @@ export function TaskComposer({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setOpen(false)}
+                onClick={() => onOpenChange(false)}
               >
                 Cancel
               </Button>
@@ -331,17 +339,24 @@ function RecordsPill({
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Array<LinkedRecord>>([])
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Monotonic sequence: a slow older response must never overwrite the
+  // results of a newer query.
+  const seq = useRef(0)
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current)
     if (!q.trim()) {
+      seq.current++
       setResults([])
       return
     }
+    const mySeq = ++seq.current
     timer.current = setTimeout(() => {
       searchEntities({
         data: { q, kinds: ['company', 'person', 'deal', 'organization'] },
-      }).then(setResults)
+      }).then((r) => {
+        if (seq.current === mySeq) setResults(r)
+      })
     }, 150)
   }, [q])
 

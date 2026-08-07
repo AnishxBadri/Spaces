@@ -124,10 +124,20 @@ export function holdingMetrics(
 
   const lastMark =
     marks.length > 0 ? marks.reduce((a, b) => (b.date >= a.date ? b : a)) : null
-  const writtenOff = distributions.some((d) => d.kind === 'writeoff')
+  // A write-off zeroes residual value even if nobody entered a final 0
+  // mark — but a mark dated *after* the latest write-off wins (revivals
+  // happen; the newest dated statement about value is the truth).
+  const lastWriteoff = distributions
+    .filter((d) => d.kind === 'writeoff')
+    .reduce<string | null>(
+      (a, d) => (a === null || d.date > a ? d.date : a),
+      null,
+    )
+  const writtenOff =
+    lastWriteoff !== null &&
+    (lastMark === null || lastMark.date <= lastWriteoff)
   // Marks convert at the as-of rate (current value in today's money), not
-  // the mark date's. A write-off zeroes residual value even if nobody
-  // entered a final 0 mark.
+  // the mark date's.
   const unrealized = writtenOff
     ? 0
     : lastMark !== null
