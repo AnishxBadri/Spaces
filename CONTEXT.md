@@ -929,6 +929,21 @@ Rules that decide adoption:
   as Next's `NEXT_PUBLIC_*`; a prebuilt image cannot be reconfigured at `docker run` otherwise.
 - Prebuilt multi-arch image (arm64 matters) on GHCR + Docker Hub.
   Non-root UID 1000. Docs tell people to pin tags, not `latest`.
+- **Onboarding direction lives on the surface, not in the wizard (decided
+  2026-08-07).** Goal: the user thinks in spaces from minute one. Considered a
+  wizard "name your markets" step; rejected — same question asked one screen
+  later on /spaces teaches the same model *on the surface they'll use
+  tomorrow*, and the wizard stays minimal. Shipped as: (1) /spaces empty state
+  is an active **markets creator** ("What markets do you look at?" — three
+  inputs → real top-level spaces via createSpace); (2) a dismissible
+  **getting-started card** on /spaces (map markets → first memo → mandate →
+  track companies → invite partner) whose steps are *derived* — done when the
+  real artifact exists (getOnboardingProgress counts spaces/notes/active
+  mandate/companies/users+invites), never by being clicked; dismissal is
+  localStorage, guidance not state. Persona bifurcation (angel vs fund)
+  rejected: every difference is copy or a default, nothing structural —
+  empty states let users self-select. Setup-wizard copy made
+  persona-neutral instead.
 - First-run web wizard (**minimal, decided 2026-08**): setup token -> admin + workspace
   name -> optional demo data. Under a minute. AI-key and Gmail steps join the wizard only
   when their features ship — a wizard step collecting a key nothing consumes is a broken

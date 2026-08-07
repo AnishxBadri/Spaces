@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { ChevronRight, Layers, Plus } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
 import { useState } from 'react'
-import { EmptyState } from '#/components/empty-state'
+import { GettingStarted } from '#/components/getting-started'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
@@ -15,18 +15,29 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import { applySpaceTemplate, createSpace, listSpaces } from '#/lib/server-fns'
+import {
+  applySpaceTemplate,
+  createSpace,
+  getOnboardingProgress,
+  listSpaces,
+} from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/spaces')({
-  loader: () => listSpaces(),
+  loader: async () => {
+    const [spaces, progress] = await Promise.all([
+      listSpaces(),
+      getOnboardingProgress(),
+    ])
+    return { spaces, progress }
+  },
   component: SpacesPage,
 })
 
 type SpaceRow = Awaited<ReturnType<typeof listSpaces>>[number]
 
 function SpacesPage() {
-  const spaces = Route.useLoaderData()
+  const { spaces, progress } = Route.useLoaderData()
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
@@ -40,14 +51,10 @@ function SpacesPage() {
         {spaces.length > 0 ? <CreateSpaceDialog spaces={spaces} /> : null}
       </header>
 
+      <GettingStarted progress={progress} />
+
       {spaces.length === 0 ? (
-        <EmptyState
-          icon={Layers}
-          title="No spaces yet"
-          body="Spaces are the market map — Aerospace, then In-space Manufacturing inside it. Notes, sources, and companies all hang off them."
-          action={<CreateSpaceDialog spaces={spaces} />}
-          hint="The tree is yours — a few starter spaces ship, the rest you build as the research earns them."
-        />
+        <MarketsCreator />
       ) : (
         <ul className="mt-6 -mx-2">
           {spaces.map((s) => (
@@ -73,6 +80,77 @@ function SpacesPage() {
           ))}
         </ul>
       )}
+    </div>
+  )
+}
+
+/**
+ * The active empty state (decided 2026-08-07): instead of describing
+ * spaces, it asks the one question every investor can answer on day zero —
+ * "what markets do you look at?" — and turns the answers into the first
+ * top-level spaces. The mental model is taught by using it, on the surface
+ * where space creation actually lives, not in the setup wizard.
+ */
+function MarketsCreator() {
+  const router = useRouter()
+  const [names, setNames] = useState(['', '', ''])
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const filled = names.map((n) => n.trim()).filter(Boolean)
+    if (filled.length === 0) {
+      setError('Name at least one market.')
+      return
+    }
+    setPending(true)
+    setError(null)
+    try {
+      for (const name of filled) {
+        await createSpace({ data: { name } })
+      }
+      router.invalidate()
+    } catch {
+      setError('Could not create the spaces — try again.')
+      setPending(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto mt-14 max-w-md">
+      <h2 className="text-title font-semibold tracking-tight">
+        What markets do you look at?
+      </h2>
+      <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
+        Each one becomes a space — a node in your market map. Memos file into
+        them, companies get tagged into them, and your glossary grows inside
+        them. Rename, nest, or delete freely later.
+      </p>
+      <form onSubmit={onSubmit} className="mt-5 space-y-3" noValidate>
+        {names.map((n, i) => (
+          <Input
+            key={i}
+            value={n}
+            autoFocus={i === 0}
+            onChange={(e) =>
+              setNames((s) => s.map((v, j) => (j === i ? e.target.value : v)))
+            }
+            placeholder={
+              ['Climate — industrial heat', 'Vertical SaaS', 'Space infra'][i]
+            }
+            aria-label={`Market ${i + 1}`}
+          />
+        ))}
+        {error ? (
+          <p role="alert" className="text-ui text-destructive">
+            {error}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={pending} className="w-full">
+          {pending ? 'Creating…' : 'Create my map'}
+        </Button>
+      </form>
     </div>
   )
 }
