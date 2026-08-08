@@ -42,6 +42,7 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import {
   createDeal,
+  dealFunnelStats,
   listDealsTable,
   listRegistry,
   updateRecord,
@@ -50,11 +51,12 @@ import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/deals')({
   loader: async () => {
-    const [deals, registry] = await Promise.all([
+    const [deals, registry, funnel] = await Promise.all([
       listDealsTable(),
       listRegistry({ data: { kind: 'deal' } }),
+      dealFunnelStats(),
     ])
-    return { deals, registry }
+    return { deals, registry, funnel }
   },
   component: DealsPage,
 })
@@ -119,7 +121,7 @@ function sortValue(
 }
 
 function DealsPage() {
-  const { deals, registry } = Route.useLoaderData()
+  const { deals, registry, funnel } = Route.useLoaderData()
   const router = useRouter()
   const [globalFilter, setGlobalFilter] = useState('')
   const [sorting, setSorting] = useState<SortingState>([])
@@ -286,9 +288,7 @@ function DealsPage() {
         <>
           <div className="mb-3 flex items-center justify-between gap-3">
             <ViewToggle view={view} onChange={switchView} />
-            <span className="tabular text-label text-muted-foreground">
-              {deals.rows.length} deals
-            </span>
+            <TerminalSplit rows={deals.rows} />
           </div>
           <DealBoard
             deals={deals.rows}
@@ -300,6 +300,7 @@ function DealsPage() {
                   { code?: string } | undefined
               )?.code ?? 'USD'
             }
+            medianDaysInStage={funnel.medianDaysInStage}
           />
         </>
       ) : (
@@ -382,6 +383,24 @@ function DealsPage() {
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * The all-time terminal split — our-no vs their-no is the post-mortem
+ * doctrine's headline number, so it sits above the funnel.
+ */
+function TerminalSplit({ rows }: { rows: Array<DealRow> }) {
+  const counts = { invested: 0, passed: 0, lost: 0 }
+  for (const d of rows) {
+    const s = String(d.values.stage ?? '')
+    if (s === 'invested' || s === 'passed' || s === 'lost') counts[s] += 1
+  }
+  return (
+    <span className="tabular text-label text-muted-foreground">
+      {rows.length} deals · {counts.invested} invested · {counts.passed} passed
+      · {counts.lost} lost
+    </span>
   )
 }
 

@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '#/db'
 import { user } from '#/db/schema/auth'
-import { entity, link } from '#/db/schema'
+import { attributeEvent, entity, link } from '#/db/schema'
 import { mandate } from '#/db/schema/workspace'
 import { activity } from '#/db/schema/activity'
 import { requireUser } from './shared'
@@ -234,3 +234,72 @@ export const getDeal = createServerFn()
       mentionedIn,
     }
   })
+
+/**
+ * Funnel stats over the stage change log (attribute_event, attr_slug =
+ * 'stage') — nothing stored, everything derived: median days a live deal
+ * has sat in its current stage, and the all-time terminal split. The stage
+ * history was free the moment attribute_event existed; this is the first
+ * read that cashes it in.
+ */
+export const dealFunnelStats = createServerFn().handler(async () => {
+  await requireUser()
+  const deals = await db
+    .select({ id: entity.id, values: entity.values })
+    .from(entity)
+    .where(and(eq(entity.kind, 'deal'), isNull(entity.mergedIntoId)))
+  const events = await db
+    .select({
+      entityId: attributeEvent.entityId,
+      to: attributeEvent.to,
+      at: attributeEvent.at,
+    })
+    .from(attributeEvent)
+    .where(
+      and(
+        eq(attributeEvent.attrSlug, 'stage'),
+        inArray(
+          attributeEvent.entityId,
+          deals.map((d) => d.id),
+        ),
+      ),
+    )
+    .orderBy(desc(attributeEvent.at))
+
+  // Latest stage-entry time per deal = the newest event whose `to` matches
+  // the current stage (events are newest-first, so first hit wins).
+  const enteredAt = new Map<string, number>()
+  for (const d of deals) {
+    const stage = (d.values as Record<string, unknown> | null)?.stage
+    const hit = events.find((e) => e.entityId === d.id && e.to === stage)
+    if (hit) enteredAt.set(d.id, hit.at.getTime())
+  }
+
+  const now = Date.now()
+  const daysByStage = new Map<string, Array<number>>()
+  const countByStage = new Map<string, number>()
+  for (const d of deals) {
+    const stage = String(
+      (d.values as Record<string, unknown> | null)?.stage ?? '',
+    )
+    if (!stage) continue
+    countByStage.set(stage, (countByStage.get(stage) ?? 0) + 1)
+    const entered = enteredAt.get(d.id)
+    if (entered !== undefined) {
+      const list = daysByStage.get(stage) ?? []
+      list.push((now - entered) / 86_400_000)
+      daysByStage.set(stage, list)
+    }
+  }
+
+  const medianDays: Record<string, number> = {}
+  for (const [stage, days] of daysByStage) {
+    const sorted = [...days].sort((a, b) => a - b)
+    medianDays[stage] = sorted[Math.floor(sorted.length / 2)]
+  }
+
+  return {
+    countByStage: Object.fromEntries(countByStage),
+    medianDaysInStage: medianDays,
+  }
+})
