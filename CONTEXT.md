@@ -421,6 +421,47 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
   provenance doctrine: AI-written values are suggestions, never silent overwrites.
   Custom objects stay a non-goal; a fourth object that proves universal ships as a
   system release, not a builder.
+- **Machine-write design for the integrations phase (decided 2026-08-08; design
+  only, nothing built).** The dividing line is the kind of claim, not the vendor:
+  **a sourced fact may fill an empty field; anything generated, or anything
+  conflicting with what a human wrote, waits for a human.**
+  - *Deterministic facts* (Apollo-class lookups: employee count, HQ, founded
+    year, LinkedIn — externally checkable, receipt stored): **direct write,
+    fill-blanks only**, through setValues so attribute_event logs it with the
+    stored `enrichment_record` raw response as provenance anchor; per-field
+    history makes every write revertable. A conflict with an existing value —
+    especially a human edit — is never silent: it becomes an "Apollo says X,
+    you have Y — accept?" prompt. Identity keys (domain/linkedin) never touch
+    values: they enter as aliases via resolveEntity, where collisions become
+    duplicate_candidates (Apollo's real failure mode — wrong company match —
+    lands in the dedupe inbox by construction).
+  - *Generated judgment* (AI classify/summarize/prompt): fully gated through a
+    **`suggestion` table** — (entity, attr_slug, value, source ai|apollo|gmail,
+    confidence, provenance jsonb, status open|accepted|dismissed). Chips on the
+    record rail + a review inbox (the twice-flagged missing baseline; this is
+    its first build driver). Accept writes via setValues with the *accepter*
+    as actor; dismissed persists forever (the duplicate_candidate lesson).
+    This keeps the "suggestions never silent" doctrine intact — it was always
+    aimed at generative judgment, and the review burden stays proportional
+    (nobody clicks accept on employee_count fifty times; everyone approves a
+    model's sector classification before it drives filters).
+  - *AI-enhanceable types*: text, select, multi_select, number. Excluded:
+    status (the funnel is judgment — AI never touches stage), currency (money
+    assertions), references/actors (identity is resolveEntity's job),
+    domain/email/phone (aliases). Registry carries per-attribute config —
+    `ai: { mode: summarize|classify|prompt, prompt?, context: [...] }`.
+  - *Trigger*: manual only (per cell / per column) — Attio independently
+    converged here. *Context assembly* (the differentiator): attributes +
+    linked memos + extracted deck text + mandate, with one hard rule — the
+    context builder routes through canRead; **a private note never leaks into
+    a prompt whose suggestion a teammate reads**.
+  - *Gmail later, same rule*: participants → deterministic aliases;
+    content-derived facts → suggestions.
+  - *Sourcing gap noted*: deal `source` covers the channel; a `referred_by`
+    record-reference (person) is the missing who — add with the substrate.
+  - *Build order*: ① suggestion table + review surface + referred_by →
+    ② BYOK AI autofill (keys/vault already shipped) → ③ Apollo →
+    ④ Google Workspace (design already recorded in the Gmail block).
 - **Attio surveyed on the two deferred/settled types (2026-08-04).** *Formula*: an
   expression language — operators (`+`, `==`, `??`), functions (`if()`, `dateAdd()`),
   `{Attribute}` references with editor autocomplete; output type inferred from the
