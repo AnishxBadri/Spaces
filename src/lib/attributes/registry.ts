@@ -233,5 +233,13 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
         ],
       },
     },
+    {
+      // Post-mortem memory (CONTEXT.md): Passed and Lost carry distinct
+      // lessons — the reason is captured at close time, while it's fresh.
+      slug: 'close_reason',
+      name: 'Close reason',
+      type: 'text',
+      options: {},
+    },
   ],
 }
