@@ -7,9 +7,10 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
-import { Handshake, Plus } from 'lucide-react'
+import { Handshake, Kanban, Plus, Table2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { DealBoard } from '#/components/deal-board'
 import {
   fieldSpanClass,
   optionLabel,
@@ -126,6 +127,15 @@ function DealsPage() {
   // Stage filter: group chips (Active/Parked/Closed) + per-stage narrowing.
   const [groupFilter, setGroupFilter] = useState<string | null>('active')
   const [stageFilter, setStageFilter] = useState<string | null>(null)
+  // View toggle — read post-mount so SSR and client agree on first paint.
+  const [view, setView] = useState<'table' | 'board'>('table')
+  useEffect(() => {
+    if (localStorage.getItem('dealos.deals-view') === 'board') setView('board')
+  }, [])
+  function switchView(v: 'table' | 'board') {
+    setView(v)
+    localStorage.setItem('dealos.deals-view', v)
+  }
 
   const stageDef = registry.find((d) => d.slug === 'stage') as
     RegistryEntry | undefined
@@ -272,6 +282,26 @@ function DealsPage() {
             <CreateDealDialog registry={registry as Array<RegistryEntry>} />
           }
         />
+      ) : view === 'board' ? (
+        <>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <ViewToggle view={view} onChange={switchView} />
+            <span className="tabular text-label text-muted-foreground">
+              {deals.rows.length} deals
+            </span>
+          </div>
+          <DealBoard
+            deals={deals.rows}
+            stages={stageOptions}
+            refNames={refNames}
+            valueCurrency={
+              (
+                registry.find((d) => d.slug === 'value')?.options as
+                  { code?: string } | undefined
+              )?.code ?? 'USD'
+            }
+          />
+        </>
       ) : (
         <>
           <TableToolbar
@@ -284,6 +314,7 @@ function DealsPage() {
             total={deals.rows.length}
             shown={table.getRowModel().rows.length}
           >
+            <ViewToggle view={view} onChange={switchView} />
             <div
               className="flex items-center gap-1"
               role="group"
@@ -350,6 +381,45 @@ function DealsPage() {
           />
         </>
       )}
+    </div>
+  )
+}
+
+function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: 'table' | 'board'
+  onChange: (v: 'table' | 'board') => void
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="View"
+      className="flex items-center rounded-md border border-border p-0.5"
+    >
+      {(
+        [
+          ['table', Table2, 'Table'],
+          ['board', Kanban, 'Board'],
+        ] as const
+      ).map(([v, Icon, label]) => (
+        <button
+          key={v}
+          type="button"
+          aria-pressed={view === v}
+          onClick={() => onChange(v)}
+          className={cn(
+            'focus-ring flex h-6 items-center gap-1 rounded px-2 text-label transition-colors duration-150',
+            view === v
+              ? 'bg-selected font-medium text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          <Icon className="size-3.5" strokeWidth={2} />
+          {label}
+        </button>
+      ))}
     </div>
   )
 }
