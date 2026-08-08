@@ -245,7 +245,11 @@ export const getDeal = createServerFn()
 export const dealFunnelStats = createServerFn().handler(async () => {
   await requireUser()
   const deals = await db
-    .select({ id: entity.id, values: entity.values })
+    .select({
+      id: entity.id,
+      name: entity.canonicalName,
+      values: entity.values,
+    })
     .from(entity)
     .where(and(eq(entity.kind, 'deal'), isNull(entity.mergedIntoId)))
   const events = await db
@@ -298,8 +302,24 @@ export const dealFunnelStats = createServerFn().handler(async () => {
     medianDays[stage] = sorted[Math.floor(sorted.length / 2)]
   }
 
+  // Per-deal staleness for the Today page — clients filter by group/cutoff.
+  const daysInStage = deals
+    .map((d) => {
+      const entered = enteredAt.get(d.id)
+      return {
+        id: d.id,
+        name: d.name,
+        stage: String(
+          (d.values as Record<string, unknown> | null)?.stage ?? '',
+        ),
+        days: entered === undefined ? null : (now - entered) / 86_400_000,
+      }
+    })
+    .filter((d) => d.stage)
+
   return {
     countByStage: Object.fromEntries(countByStage),
     medianDaysInStage: medianDays,
+    daysInStage,
   }
 })

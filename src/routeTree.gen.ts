@@ -24,6 +24,7 @@ import { Route as AppPortfolioRouteImport } from './routes/_app/portfolio'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSpacesRouteImport } from './routes/_app/spaces'
 import { Route as AppTasksRouteImport } from './routes/_app/tasks'
+import { Route as AppTodayRouteImport } from './routes/_app/today'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/companies_.$companyId'
 import { Route as AppDealsDealIdRouteImport } from './routes/_app/deals_.$dealId'
@@ -108,6 +109,11 @@ const AppTasksRoute = AppTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AppRoute,
 } as any)
+const AppTodayRoute = AppTodayRouteImport.update({
+  id: '/today',
+  path: '/today',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -169,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/spaces': typeof AppSpacesRoute
   '/tasks': typeof AppTasksRoute
+  '/today': typeof AppTodayRoute
   '/api/health': typeof ApiHealthRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
@@ -194,6 +201,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/spaces': typeof AppSpacesRoute
   '/tasks': typeof AppTasksRoute
+  '/today': typeof AppTodayRoute
   '/api/health': typeof ApiHealthRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
@@ -221,6 +229,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/spaces': typeof AppSpacesRoute
   '/_app/tasks': typeof AppTasksRoute
+  '/_app/today': typeof AppTodayRoute
   '/api/health': typeof ApiHealthRoute
   '/_app/companies_/$companyId': typeof AppCompaniesCompanyIdRoute
   '/_app/deals_/$dealId': typeof AppDealsDealIdRoute
@@ -248,6 +257,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/spaces'
     | '/tasks'
+    | '/today'
     | '/api/health'
     | '/companies/$companyId'
     | '/deals/$dealId'
@@ -273,6 +283,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/spaces'
     | '/tasks'
+    | '/today'
     | '/api/health'
     | '/companies/$companyId'
     | '/deals/$dealId'
@@ -299,6 +310,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/spaces'
     | '/_app/tasks'
+    | '/_app/today'
     | '/api/health'
     | '/_app/companies_/$companyId'
     | '/_app/deals_/$dealId'
@@ -428,6 +440,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTasksRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/today': {
+      id: '/_app/today'
+      path: '/today'
+      fullPath: '/today'
+      preLoaderRoute: typeof AppTodayRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -505,6 +524,7 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppSpacesRoute: typeof AppSpacesRoute
   AppTasksRoute: typeof AppTasksRoute
+  AppTodayRoute: typeof AppTodayRoute
   AppCompaniesCompanyIdRoute: typeof AppCompaniesCompanyIdRoute
   AppDealsDealIdRoute: typeof AppDealsDealIdRoute
   AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
@@ -524,6 +544,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppSpacesRoute: AppSpacesRoute,
   AppTasksRoute: AppTasksRoute,
+  AppTodayRoute: AppTodayRoute,
   AppCompaniesCompanyIdRoute: AppCompaniesCompanyIdRoute,
   AppDealsDealIdRoute: AppDealsDealIdRoute,
   AppNotesNoteIdRoute: AppNotesNoteIdRoute,

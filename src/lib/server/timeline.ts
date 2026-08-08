@@ -142,3 +142,32 @@ export const getRecordTimeline = createServerFn()
 
     return items.slice(0, 60)
   })
+
+/** Workspace-wide recent activity — the Today page's feed. */
+export const getWorkspaceActivity = createServerFn().handler(async () => {
+  await requireUser()
+  const rows = await db
+    .select({
+      id: activity.id,
+      verb: activity.verb,
+      at: activity.at,
+      actorName: user.name,
+      subjectId: activity.subjectEntityId,
+      subjectName: entity.canonicalName,
+      subjectKind: entity.kind,
+    })
+    .from(activity)
+    .leftJoin(user, eq(user.id, activity.actorId))
+    .leftJoin(entity, eq(entity.id, activity.subjectEntityId))
+    .orderBy(desc(activity.at))
+    .limit(15)
+  return rows.map((r) => ({
+    id: r.id,
+    verb: r.verb,
+    at: r.at.toISOString(),
+    actorName: r.actorName ?? 'System',
+    subjectId: r.subjectId,
+    subjectName: r.subjectName,
+    subjectKind: r.subjectKind,
+  }))
+})

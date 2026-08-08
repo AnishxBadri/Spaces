@@ -13,7 +13,7 @@ export const Route = createFileRoute('/login')({
     const { needsSetup } = await getSetupState()
     if (needsSetup) throw redirect({ to: '/setup' })
     const session = await getSession()
-    if (session) throw redirect({ to: '/spaces' })
+    if (session) throw redirect({ to: '/today' })
   },
   component: LoginPage,
 })
@@ -41,7 +41,7 @@ function LoginPage() {
       )
       return
     }
-    navigate({ to: '/spaces' })
+    navigate({ to: '/today' })
   }
 
   return (

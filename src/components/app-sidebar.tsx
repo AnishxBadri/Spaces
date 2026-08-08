@@ -11,6 +11,7 @@ import {
   LogOut,
   Search,
   Settings,
+  Sunrise,
   Users,
 } from 'lucide-react'
 import { Wordmark } from './wordmark'
@@ -26,8 +27,10 @@ import { authClient } from '#/lib/auth-client'
 import { cn } from '#/lib/utils'
 
 export const NAV_ITEMS = [
-  // Mandate first — the fund's identity tops the nav; login still lands on
-  // /spaces, where daily work happens (CONTEXT.md, 2026-08).
+  // Today first and login lands there (2026-08-08): the attention page is
+  // the notification channel in a self-hosted product. Mandate follows —
+  // the fund's identity still tops the object nav.
+  { to: '/today', label: 'Today', icon: Sunrise },
   { to: '/mandate', label: 'Mandate', icon: Compass },
   { to: '/spaces', label: 'Spaces', icon: Layers },
   { to: '/companies', label: 'Companies', icon: Building2 },

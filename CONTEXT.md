@@ -1424,7 +1424,17 @@ snippets.
     deals idle in stage, compact portfolio strip, activity feed;
     getting-started card migrates there until 5/5. A metrics dashboard
     answers "how are we doing" (a solo GP knows); the landing page answers
-    "what needs my attention today."
+    "what needs my attention today." **Shipped 2026-08-08** along with the
+    dealflow-completeness pass: /today (due tasks · idle active deals >21d
+    from the stage log · stale marks >180d · missing-fx count · compact
+    portfolio strip · activity feed; getting-started card migrated here),
+    login/index now land on /today (setup still lands /spaces where the
+    markets creator lives), deal **board view** (native-drag stage columns,
+    table/board toggle, per-column median days-in-stage from
+    dealFunnelStats), **close_reason** system attribute captured via a
+    skippable dialog on Passed/Lost board drops, task rails on deal/company
+    records, and the FX-rates settings section (base currency +
+    sparse manual rate table).
 16. **Ship polish — deferred, scope TBD (2026-08).** No release before this: more dev
     work and manual testing come first. CI, images, upgrade CI, install docs get decided
     when a release is actually in sight. Still banked from the earlier grill, to reuse

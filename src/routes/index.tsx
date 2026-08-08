@@ -7,6 +7,6 @@ export const Route = createFileRoute('/')({
     if (needsSetup) throw redirect({ to: '/setup' })
     const session = await getSession()
     if (!session) throw redirect({ to: '/login' })
-    throw redirect({ to: '/spaces' })
+    throw redirect({ to: '/today' })
   },
 })

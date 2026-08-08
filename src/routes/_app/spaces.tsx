@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { ChevronRight, Plus } from 'lucide-react'
 import { useState } from 'react'
-import { GettingStarted } from '#/components/getting-started'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
@@ -15,29 +14,18 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import {
-  applySpaceTemplate,
-  createSpace,
-  getOnboardingProgress,
-  listSpaces,
-} from '#/lib/server-fns'
+import { applySpaceTemplate, createSpace, listSpaces } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/spaces')({
-  loader: async () => {
-    const [spaces, progress] = await Promise.all([
-      listSpaces(),
-      getOnboardingProgress(),
-    ])
-    return { spaces, progress }
-  },
+  loader: () => listSpaces(),
   component: SpacesPage,
 })
 
 type SpaceRow = Awaited<ReturnType<typeof listSpaces>>[number]
 
 function SpacesPage() {
-  const { spaces, progress } = Route.useLoaderData()
+  const spaces = Route.useLoaderData()
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
@@ -52,8 +40,6 @@ function SpacesPage() {
             top-level spaces; scaffold stamping and nesting live here. */}
         <CreateSpaceDialog spaces={spaces} />
       </header>
-
-      <GettingStarted progress={progress} />
 
       {spaces.length === 0 ? (
         <MarketsCreator />
