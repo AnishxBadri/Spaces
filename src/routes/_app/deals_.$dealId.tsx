@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import { ValueEditor } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
+import { TasksRail } from '#/components/tasks-rail'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
@@ -157,6 +158,11 @@ function DealRecordPage() {
                 Add attribute
               </button>
             }
+          />
+          <TasksRail
+            entityId={deal.id}
+            entityName={deal.name}
+            entityKind="deal"
           />
         </aside>
 

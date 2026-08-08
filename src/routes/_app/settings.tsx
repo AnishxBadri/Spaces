@@ -680,7 +680,9 @@ function FxSection({
           <Input
             id="fx-ccy"
             value={form.currency}
-            onChange={(e) => setForm((s) => ({ ...s, currency: e.target.value }))}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, currency: e.target.value }))
+            }
             placeholder="USD"
             maxLength={3}
             className="w-24 uppercase"

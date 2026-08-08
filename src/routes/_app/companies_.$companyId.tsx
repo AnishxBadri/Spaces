@@ -20,6 +20,7 @@ import { SaveAsTemplateAction } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
+import { TasksRail } from '#/components/tasks-rail'
 import { ValueEditor, optionLabel } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
@@ -183,6 +184,11 @@ function CompanyRecordPage() {
                 Add attribute
               </button>
             }
+          />
+          <TasksRail
+            entityId={company.id}
+            entityName={company.name}
+            entityKind="company"
           />
         </aside>
 
