@@ -603,3 +603,28 @@ export const listFxRates = createServerFn().handler(async () => {
   const [base, rates] = await Promise.all([baseCurrency(), loadFxRates()])
   return { baseCurrency: base, rates }
 })
+
+/**
+ * Base currency is a workspace-settings key, admin-only: changing it
+ * re-denominates every roll-up at next read (nothing stored converts).
+ */
+export const setBaseCurrency = createServerFn({ method: 'POST' })
+  .validator(z.object({ currency: ccy }))
+  .handler(async ({ data }) => {
+    const { requireAdmin } = await import('./shared')
+    await requireAdmin()
+    const [ws] = await db
+      .select({ settings: workspace.settings })
+      .from(workspace)
+    await db
+      .update(workspace)
+      .set({
+        settings: {
+          ...((ws?.settings as Record<string, unknown> | null) ?? {}),
+          base_currency: data.currency,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(workspace.id, 1))
+    return { ok: true }
+  })

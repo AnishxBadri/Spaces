@@ -38,10 +38,13 @@ import {
   getWorkspace,
   listInvites,
   listMembers,
+  listFxRates,
   listRegistry,
   listTemplates,
   revokeInvite,
   saveWorkspace,
+  setBaseCurrency,
+  setFxRate,
   setMemberBanned,
   setMemberRole,
   updateAttribute,
@@ -56,7 +59,7 @@ import { cn } from '#/lib/utils'
  */
 export const Route = createFileRoute('/_app/settings')({
   loader: async () => {
-    const [session, workspace, members, templates, company, person, deal] =
+    const [session, workspace, members, templates, company, person, deal, fx] =
       await Promise.all([
         getSession(),
         getWorkspace(),
@@ -65,6 +68,7 @@ export const Route = createFileRoute('/_app/settings')({
         listRegistry({ data: { kind: 'company', includeArchived: true } }),
         listRegistry({ data: { kind: 'person', includeArchived: true } }),
         listRegistry({ data: { kind: 'deal', includeArchived: true } }),
+        listFxRates(),
       ])
     const isAdmin = session?.user.role === 'admin'
     const invites = isAdmin ? await listInvites() : []
@@ -78,6 +82,7 @@ export const Route = createFileRoute('/_app/settings')({
       company,
       person,
       deal,
+      fx,
     }
   },
   component: SettingsPage,
@@ -144,6 +149,12 @@ function SettingsPage() {
       />
 
       <TemplatesSection templates={data.templates} />
+
+      <FxSection
+        isAdmin={data.isAdmin}
+        baseCurrency={data.fx.baseCurrency}
+        rates={data.fx.rates}
+      />
 
       <h2 className="mt-10 text-title font-semibold tracking-tight">Objects</h2>
       <p className="mt-1 text-ui text-muted-foreground">
@@ -568,6 +579,174 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
             </li>
           ))}
         </ul>
+      )}
+    </section>
+  )
+}
+
+/**
+ * FX rates — the manual rate table behind portfolio currency conversion
+ * (CONTEXT.md, 2026-08-06). Sparse on purpose: a rate per (currency, date)
+ * when a non-base event needs one; upserting a correction just recomputes.
+ */
+function FxSection({
+  isAdmin,
+  baseCurrency,
+  rates,
+}: {
+  isAdmin: boolean
+  baseCurrency: string
+  rates: Array<{ currency: string; date: string; rateToBase: number }>
+}) {
+  const router = useRouter()
+  const [base, setBase] = useState(baseCurrency)
+  const [form, setForm] = useState({ currency: '', date: '', rate: '' })
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+
+  async function saveBase() {
+    if (base.trim().toUpperCase() === baseCurrency) return
+    setPending(true)
+    setError(null)
+    try {
+      await setBaseCurrency({ data: { currency: base.trim().toUpperCase() } })
+      toast('Base currency saved')
+      router.invalidate()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  async function addRate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const rate = Number(form.rate)
+    if (!form.currency.trim() || !form.date || !(rate > 0)) {
+      setError('Currency, date, and a positive rate — all three.')
+      return
+    }
+    setPending(true)
+    setError(null)
+    try {
+      await setFxRate({
+        data: {
+          currency: form.currency.trim().toUpperCase(),
+          date: form.date,
+          rateToBase: rate,
+        },
+      })
+      toast('Rate saved')
+      setForm({ currency: '', date: '', rate: '' })
+      router.invalidate()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save the rate')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <section className="mt-10">
+      <h2 className="text-title font-semibold tracking-tight">FX rates</h2>
+      <p className="mt-1 text-ui text-muted-foreground">
+        Portfolio events keep their own currency; roll-ups convert to the base
+        at the latest rate on or before each event's date. A missing rate is
+        surfaced, never guessed.
+      </p>
+
+      <div className="mt-4 flex items-end gap-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="fx-base">Base currency</Label>
+          <Input
+            id="fx-base"
+            value={base}
+            onChange={(e) => setBase(e.target.value)}
+            maxLength={3}
+            className="w-24 uppercase"
+            disabled={!isAdmin}
+          />
+        </div>
+        {isAdmin && base.trim().toUpperCase() !== baseCurrency ? (
+          <Button size="sm" onClick={saveBase} disabled={pending}>
+            Save
+          </Button>
+        ) : null}
+      </div>
+
+      <form onSubmit={addRate} className="mt-4 flex flex-wrap items-end gap-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="fx-ccy">Currency</Label>
+          <Input
+            id="fx-ccy"
+            value={form.currency}
+            onChange={(e) => setForm((s) => ({ ...s, currency: e.target.value }))}
+            placeholder="USD"
+            maxLength={3}
+            className="w-24 uppercase"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="fx-date">As of</Label>
+          <Input
+            id="fx-date"
+            type="date"
+            value={form.date}
+            onChange={(e) => setForm((s) => ({ ...s, date: e.target.value }))}
+            className="w-40"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="fx-rate">1 unit = ? {baseCurrency}</Label>
+          <Input
+            id="fx-rate"
+            type="number"
+            step="any"
+            min="0"
+            value={form.rate}
+            onChange={(e) => setForm((s) => ({ ...s, rate: e.target.value }))}
+            placeholder="83.20"
+            className="w-32"
+          />
+        </div>
+        <Button type="submit" size="sm" variant="outline" disabled={pending}>
+          Add rate
+        </Button>
+      </form>
+      {error ? (
+        <p role="alert" className="mt-2 text-ui text-destructive">
+          {error}
+        </p>
+      ) : null}
+
+      {rates.length > 0 ? (
+        <ol className="mt-4 max-w-md divide-y divide-border rounded-lg border border-border">
+          {[...rates]
+            .sort(
+              (a, b) =>
+                a.currency.localeCompare(b.currency) ||
+                b.date.localeCompare(a.date),
+            )
+            .map((r) => (
+              <li
+                key={`${r.currency}:${r.date}`}
+                className="flex items-baseline gap-3 px-4 py-2"
+              >
+                <span className="w-12 font-medium">{r.currency}</span>
+                <span className="tabular text-label text-muted-foreground">
+                  {r.date}
+                </span>
+                <span className="tabular ml-auto">
+                  {r.rateToBase} {baseCurrency}
+                </span>
+              </li>
+            ))}
+        </ol>
+      ) : (
+        <p className="mt-4 text-ui text-muted-foreground">
+          No rates yet — you'll be prompted the first time a non-
+          {baseCurrency} event needs a roll-up.
+        </p>
       )}
     </section>
   )
