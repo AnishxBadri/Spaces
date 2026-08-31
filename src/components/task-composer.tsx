@@ -116,8 +116,11 @@ export function TaskComposer({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="top-[20%] translate-y-0 p-0 sm:max-w-2xl">
-        <DialogHeader className="border-b border-border px-4 py-3">
+      {/* gap-0 kills DialogContent's default grid gap — with p-0 overridden,
+          that gap reads as phantom bands around the input. py-3.5 centers the
+          title on the close button's fixed top-4 line. */}
+      <DialogContent className="top-[20%] translate-y-0 gap-0 p-0 sm:max-w-2xl">
+        <DialogHeader className="border-b border-border px-4 py-3.5">
           <DialogTitle className="text-ui font-medium">Create task</DialogTitle>
         </DialogHeader>
         <form
