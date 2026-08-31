@@ -15,7 +15,7 @@ import { extractDocumentText } from '#/lib/documents/extract'
  * disagree, or search silently returns rows whose text says otherwise.
  */
 
-export const extractDocumentJob = z.object({
+const extractDocumentJob = z.object({
   documentId: z.string().uuid(),
 })
 

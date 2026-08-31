@@ -24,9 +24,14 @@ pnpm worker                                       # background worker
 1. `pnpm exec tsc --noEmit`
 2. `pnpm exec vitest run` — must be fully green
 3. prettier on touched files
-4. eslint: a baseline of `no-unnecessary-condition` / `no-unnecessary-type-assertion`
-   errors exists and is tolerated — **new error TYPES are not accepted**. If
-   unsure whether an error is pre-existing, compare via `git stash`.
+4. `pnpm lint` — must be zero errors (the old tolerated baseline was
+   eliminated 2026-09; don't reintroduce one). Where drizzle's `const [row] =`
+   destructure lies about presence, use the `.at(0)` pattern instead of
+   deleting the guard.
+
+Pre-commit hooks (lefthook) run prettier + eslint on staged files; pre-push
+runs tsc. CI (`.github/workflows/ci.yml`) runs all four gates against a real
+Postgres.
 
 ## After specific change kinds
 
