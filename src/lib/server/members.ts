@@ -11,7 +11,9 @@ import { requireAdmin, requireUser } from './shared'
 
 export const getWorkspace = createServerFn().handler(async () => {
   await requireUser()
-  const [row] = await db.select().from(workspace).where(eq(workspace.id, 1))
+  const row = (await db.select().from(workspace).where(eq(workspace.id, 1))).at(
+    0,
+  )
   if (!row) return null
   return { name: row.name }
 })
@@ -93,10 +95,12 @@ export const setMemberBanned = createServerFn({ method: 'POST' })
     if (data.banned) {
       // Same lockout as demotion: banning the last active admin bricks
       // the workspace just as surely.
-      const [target] = await db
-        .select({ role: user.role })
-        .from(user)
-        .where(eq(user.id, data.userId))
+      const target = (
+        await db
+          .select({ role: user.role })
+          .from(user)
+          .where(eq(user.id, data.userId))
+      ).at(0)
       if (target?.role === 'admin') {
         const [{ value: otherAdmins }] = await db
           .select({ value: count() })
@@ -200,21 +204,25 @@ export const getInvitePreview = createServerFn()
   .validator(z.object({ token: z.string().min(1).max(200) }))
   .handler(async ({ data }) => {
     const hash = createHash('sha256').update(data.token.trim()).digest('hex')
-    const [inv] = await db
-      .select({ email: invite.email, role: invite.role })
-      .from(invite)
-      .where(
-        and(
-          eq(invite.tokenHash, hash),
-          isNull(invite.usedAt),
-          gt(invite.expiresAt, new Date()),
-        ),
-      )
+    const inv = (
+      await db
+        .select({ email: invite.email, role: invite.role })
+        .from(invite)
+        .where(
+          and(
+            eq(invite.tokenHash, hash),
+            isNull(invite.usedAt),
+            gt(invite.expiresAt, new Date()),
+          ),
+        )
+    ).at(0)
     if (!inv) return { valid: false as const }
-    const [ws] = await db
-      .select({ name: workspace.name })
-      .from(workspace)
-      .where(eq(workspace.id, 1))
+    const ws = (
+      await db
+        .select({ name: workspace.name })
+        .from(workspace)
+        .where(eq(workspace.id, 1))
+    ).at(0)
     return {
       valid: true as const,
       email: inv.email,

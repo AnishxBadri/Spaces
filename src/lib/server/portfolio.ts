@@ -29,7 +29,9 @@ import { birthHolding, requireUser } from './shared'
 const num = (s: string | null): number | null => (s === null ? null : Number(s))
 
 async function baseCurrency(): Promise<string> {
-  const [ws] = await db.select({ settings: workspace.settings }).from(workspace)
+  const ws = (
+    await db.select({ settings: workspace.settings }).from(workspace)
+  ).at(0)
   const base = (ws?.settings as Record<string, unknown> | null)?.base_currency
   return typeof base === 'string' && base.length === 3 ? base : 'USD'
 }
@@ -253,16 +255,18 @@ export const getHolding = createServerFn()
   .validator(z.object({ id: z.string().uuid(), asOf: z.string().optional() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const [row] = await db
-      .select({
-        id: holding.id,
-        companyId: holding.companyId,
-        openedAt: holding.openedAt,
-        companyName: entity.canonicalName,
-      })
-      .from(holding)
-      .innerJoin(entity, eq(entity.id, holding.companyId))
-      .where(eq(holding.id, data.id))
+    const row = (
+      await db
+        .select({
+          id: holding.id,
+          companyId: holding.companyId,
+          openedAt: holding.openedAt,
+          companyName: entity.canonicalName,
+        })
+        .from(holding)
+        .innerJoin(entity, eq(entity.id, holding.companyId))
+        .where(eq(holding.id, data.id))
+    ).at(0)
     if (!row) throw new Error('Holding not found')
 
     const [base, rates, invRows, markRows, distRows, roundRows] =
@@ -507,10 +511,12 @@ export const addMark = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const [h] = await db
-      .select({ companyId: holding.companyId })
-      .from(holding)
-      .where(eq(holding.id, data.holdingId))
+    const h = (
+      await db
+        .select({ companyId: holding.companyId })
+        .from(holding)
+        .where(eq(holding.id, data.holdingId))
+    ).at(0)
     if (!h) throw new Error('Holding not found')
     const [row] = await db
       .insert(mark)
@@ -545,10 +551,12 @@ export const addDistribution = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const [h] = await db
-      .select({ companyId: holding.companyId })
-      .from(holding)
-      .where(eq(holding.id, data.holdingId))
+    const h = (
+      await db
+        .select({ companyId: holding.companyId })
+        .from(holding)
+        .where(eq(holding.id, data.holdingId))
+    ).at(0)
     if (!h) throw new Error('Holding not found')
     const [row] = await db
       .insert(distribution)
@@ -613,14 +621,14 @@ export const setBaseCurrency = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { requireAdmin } = await import('./shared')
     await requireAdmin()
-    const [ws] = await db
-      .select({ settings: workspace.settings })
-      .from(workspace)
+    const ws = (
+      await db.select({ settings: workspace.settings }).from(workspace)
+    ).at(0)
     await db
       .update(workspace)
       .set({
         settings: {
-          ...((ws?.settings) ?? {}),
+          ...(ws?.settings ?? {}),
           base_currency: data.currency,
         },
         updatedAt: new Date(),

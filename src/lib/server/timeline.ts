@@ -50,7 +50,7 @@ export const getRecordTimeline = createServerFn()
     }
     const bursts: Array<Burst> = []
     for (const ev of events) {
-      const last = bursts[bursts.length - 1]
+      const last = bursts.at(-1)
       if (
         last &&
         last.actor === (ev.actorId ?? null) &&

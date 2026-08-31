@@ -48,7 +48,7 @@ export function DealBoard({
   /** options.code of the deal value attribute — never hardcode a symbol. */
   valueCurrency?: string
   /** Median days live deals have sat in each stage (funnel stats). */
-  medianDaysInStage?: Record<string, number>
+  medianDaysInStage?: Record<string, number | undefined>
 }) {
   const router = useRouter()
   const [dragOver, setDragOver] = useState<string | null>(null)
@@ -132,6 +132,7 @@ export function DealBoard({
       <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-4">
         {stages.map((stage) => {
           const cards = deals.filter((d) => stageOf(d) === stage.id)
+          const medianDays = medianDaysInStage[stage.id]
           return (
             <div
               key={stage.id}
@@ -158,13 +159,12 @@ export function DealBoard({
                 <span className="tabular text-label text-muted-foreground">
                   {cards.length}
                 </span>
-                {cards.length > 0 &&
-                medianDaysInStage[stage.id] !== undefined ? (
+                {cards.length > 0 && medianDays !== undefined ? (
                   <span
                     className="tabular ml-auto text-label text-muted-foreground"
                     title="Median days in this stage"
                   >
-                    ~{Math.round(medianDaysInStage[stage.id])}d
+                    ~{Math.round(medianDays)}d
                   </span>
                 ) : null}
               </div>

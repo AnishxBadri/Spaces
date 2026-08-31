@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
-import type { listTerms} from '#/lib/server-fns';
+import type { listTerms } from '#/lib/server-fns'
 import { createTerm, deleteTerm, updateTerm } from '#/lib/server-fns'
 
 /**

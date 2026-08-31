@@ -54,22 +54,26 @@ export async function mergeEntities(opts: {
     throw new Error('Cannot merge an entity into itself')
 
   return db.transaction(async (tx) => {
-    const [winner] = await tx
-      .select({
-        id: entity.id,
-        kind: entity.kind,
-        mergedIntoId: entity.mergedIntoId,
-      })
-      .from(entity)
-      .where(eq(entity.id, winnerId))
-    const [loser] = await tx
-      .select({
-        id: entity.id,
-        kind: entity.kind,
-        mergedIntoId: entity.mergedIntoId,
-      })
-      .from(entity)
-      .where(eq(entity.id, loserId))
+    const winner = (
+      await tx
+        .select({
+          id: entity.id,
+          kind: entity.kind,
+          mergedIntoId: entity.mergedIntoId,
+        })
+        .from(entity)
+        .where(eq(entity.id, winnerId))
+    ).at(0)
+    const loser = (
+      await tx
+        .select({
+          id: entity.id,
+          kind: entity.kind,
+          mergedIntoId: entity.mergedIntoId,
+        })
+        .from(entity)
+        .where(eq(entity.id, loserId))
+    ).at(0)
     if (!winner || !loser) throw new Error('Entity not found')
     if (winner.mergedIntoId || loser.mergedIntoId)
       throw new Error('One side is already merged')
@@ -266,15 +270,17 @@ export async function mergeEntities(opts: {
       .from(listEntry)
       .where(eq(listEntry.entityId, loserId))
     for (const le of loserEntries) {
-      const [collision] = await tx
-        .select({ id: listEntry.id })
-        .from(listEntry)
-        .where(
-          and(
-            eq(listEntry.listId, le.listId),
-            eq(listEntry.entityId, winnerId),
-          ),
-        )
+      const collision = (
+        await tx
+          .select({ id: listEntry.id })
+          .from(listEntry)
+          .where(
+            and(
+              eq(listEntry.listId, le.listId),
+              eq(listEntry.entityId, winnerId),
+            ),
+          )
+      ).at(0)
       if (collision) {
         // Winner already sits in this list — keep winner's entry, snapshot
         // loser's values and its event history, then drop them.
@@ -309,14 +315,18 @@ export async function mergeEntities(opts: {
 
     // --- attribute values: winner keeps, loser fills the gaps -------------
     {
-      const [w] = await tx
-        .select({ values: entity.values })
-        .from(entity)
-        .where(eq(entity.id, winnerId))
-      const [l] = await tx
-        .select({ values: entity.values })
-        .from(entity)
-        .where(eq(entity.id, loserId))
+      const w = (
+        await tx
+          .select({ values: entity.values })
+          .from(entity)
+          .where(eq(entity.id, winnerId))
+      ).at(0)
+      const l = (
+        await tx
+          .select({ values: entity.values })
+          .from(entity)
+          .where(eq(entity.id, loserId))
+      ).at(0)
       const wv = (w?.values ?? {}) as Record<string, unknown>
       const lv = (l?.values ?? {}) as Record<string, unknown>
       const fill: Record<string, unknown> = {}
@@ -357,10 +367,12 @@ export async function mergeEntities(opts: {
 
     // --- referrers' record-reference values: loser id → winner id ---------
     for (const ref of inboundRefs) {
-      const [referrer] = await tx
-        .select({ values: entity.values })
-        .from(entity)
-        .where(eq(entity.id, ref.fromEntityId))
+      const referrer = (
+        await tx
+          .select({ values: entity.values })
+          .from(entity)
+          .where(eq(entity.id, ref.fromEntityId))
+      ).at(0)
       if (!referrer) continue
       const vals = { ...(referrer.values ?? {}) } as Record<string, unknown>
       const cur = vals[ref.attrSlug]
@@ -405,15 +417,19 @@ export async function mergeEntities(opts: {
     // One holding per company is doctrine; when both sides hold, the
     // loser's events move onto the winner's holding and the loser holding
     // row is dropped — cross-entity follow-ons land on one holding.
-    const [loserHolding] = await tx
-      .select({ id: holding.id })
-      .from(holding)
-      .where(eq(holding.companyId, loserId))
-    if (loserHolding) {
-      const [winnerHolding] = await tx
+    const loserHolding = (
+      await tx
         .select({ id: holding.id })
         .from(holding)
-        .where(eq(holding.companyId, winnerId))
+        .where(eq(holding.companyId, loserId))
+    ).at(0)
+    if (loserHolding) {
+      const winnerHolding = (
+        await tx
+          .select({ id: holding.id })
+          .from(holding)
+          .where(eq(holding.companyId, winnerId))
+      ).at(0)
       if (winnerHolding) {
         for (const [tbl, name] of [
           [investment, 'investment'],
@@ -479,15 +495,17 @@ export async function mergeEntities(opts: {
       .select({ id: roundCoInvestor.id, roundId: roundCoInvestor.roundId })
       .from(roundCoInvestor)
       .where(eq(roundCoInvestor.investorEntityId, loserId))) {
-      const [dupe] = await tx
-        .select({ id: roundCoInvestor.id })
-        .from(roundCoInvestor)
-        .where(
-          and(
-            eq(roundCoInvestor.roundId, ci.roundId),
-            eq(roundCoInvestor.investorEntityId, winnerId),
-          ),
-        )
+      const dupe = (
+        await tx
+          .select({ id: roundCoInvestor.id })
+          .from(roundCoInvestor)
+          .where(
+            and(
+              eq(roundCoInvestor.roundId, ci.roundId),
+              eq(roundCoInvestor.investorEntityId, winnerId),
+            ),
+          )
+      ).at(0)
       snapshot.push({
         table: 'round_co_investor',
         action: dupe ? 'dropped' : 'repointed',
@@ -507,15 +525,17 @@ export async function mergeEntities(opts: {
       .select({ id: taskEntity.id, taskId: taskEntity.taskId })
       .from(taskEntity)
       .where(eq(taskEntity.entityId, loserId))) {
-      const [dupe] = await tx
-        .select({ id: taskEntity.id })
-        .from(taskEntity)
-        .where(
-          and(
-            eq(taskEntity.taskId, te.taskId),
-            eq(taskEntity.entityId, winnerId),
-          ),
-        )
+      const dupe = (
+        await tx
+          .select({ id: taskEntity.id })
+          .from(taskEntity)
+          .where(
+            and(
+              eq(taskEntity.taskId, te.taskId),
+              eq(taskEntity.entityId, winnerId),
+            ),
+          )
+      ).at(0)
       snapshot.push({
         table: 'task_entity',
         action: dupe ? 'dropped' : 'repointed',

@@ -146,18 +146,20 @@ export const getCompany = createServerFn()
   .handler(async ({ data }) => {
     await requireUser()
 
-    const [head] = await db
-      .select({
-        id: entity.id,
-        name: entity.canonicalName,
-        source: entity.source,
-        mergedIntoId: entity.mergedIntoId,
-        createdAt: entity.createdAt,
-        values: entity.values,
-      })
-      .from(entity)
-      .innerJoin(company, eq(company.entityId, entity.id))
-      .where(eq(entity.id, data.id))
+    const head = (
+      await db
+        .select({
+          id: entity.id,
+          name: entity.canonicalName,
+          source: entity.source,
+          mergedIntoId: entity.mergedIntoId,
+          createdAt: entity.createdAt,
+          values: entity.values,
+        })
+        .from(entity)
+        .innerJoin(company, eq(company.entityId, entity.id))
+        .where(eq(entity.id, data.id))
+    ).at(0)
     if (!head) throw new Error('Company not found')
 
     const aliases = await db
@@ -204,8 +206,8 @@ export const getCompany = createServerFn()
       id: p.id,
       name: p.name,
       headline:
-        (((p.values ?? {}) as Record<string, unknown>).job_title as string) ??
-        null,
+        (((p.values ?? {}) as Record<string, unknown>).job_title as
+          string | undefined) ?? null,
     }))
 
     // Notes (and anything else) that mention this company.
@@ -277,10 +279,12 @@ export const updateRecord = createServerFn({ method: 'POST' })
       // The pipeline→portfolio seam: a deal reaching Invested births a
       // holding (idempotent — follow-ons land on the existing one).
       if (data.patch.stage === 'invested') {
-        const [row] = await db
-          .select({ kind: entity.kind, values: entity.values })
-          .from(entity)
-          .where(eq(entity.id, data.id))
+        const row = (
+          await db
+            .select({ kind: entity.kind, values: entity.values })
+            .from(entity)
+            .where(eq(entity.id, data.id))
+        ).at(0)
         const companyId = (row?.values as Record<string, unknown> | null)
           ?.company
         if (row?.kind === 'deal' && typeof companyId === 'string') {

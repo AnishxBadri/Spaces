@@ -66,10 +66,12 @@ export async function createSpaceRow(
   return db.transaction(async (tx) => {
     let parentPath: string | null = null
     if (parentId) {
-      const [parent] = await tx
-        .select({ path: space.path })
-        .from(space)
-        .where(eq(space.entityId, parentId))
+      const parent = (
+        await tx
+          .select({ path: space.path })
+          .from(space)
+          .where(eq(space.entityId, parentId))
+      ).at(0)
       if (!parent) throw new Error('Parent space not found')
       parentPath = parent.path
     }
@@ -141,7 +143,9 @@ export async function birthHolding(opts: {
 }
 
 /** Latest interaction per entity — the "last touched" signal for tables. */
-export async function lastTouchedMap(): Promise<Record<string, string>> {
+export async function lastTouchedMap(): Promise<
+  Record<string, string | undefined>
+> {
   const rows = await db
     .select({
       entityId: interactionEntity.entityId,

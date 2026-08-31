@@ -55,7 +55,7 @@ export function deriveMarkdown(lossyMd: string, doc: unknown): string {
     if (!node || typeof node !== 'object') return
     const n = node as Record<string, unknown>
     if (n.type === 'mention') {
-      const props = n.props as { entityId?: string; label?: string }
+      const props = n.props as { entityId?: string; label?: string } | undefined
       if (props?.entityId && !seen.has(props.entityId)) {
         seen.add(props.entityId)
         mentions.push({ id: props.entityId, label: props.label ?? '' })

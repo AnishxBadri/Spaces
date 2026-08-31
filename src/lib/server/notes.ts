@@ -131,17 +131,19 @@ export const getNote = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const [row] = await db
-      .select({
-        id: note.entityId,
-        title: note.title,
-        bodyJson: note.bodyJson,
-        updatedAt: note.updatedAt,
-        authorId: note.authorId,
-        visibility: note.visibility,
-      })
-      .from(note)
-      .where(eq(note.entityId, data.id))
+    const row = (
+      await db
+        .select({
+          id: note.entityId,
+          title: note.title,
+          bodyJson: note.bodyJson,
+          updatedAt: note.updatedAt,
+          authorId: note.authorId,
+          visibility: note.visibility,
+        })
+        .from(note)
+        .where(eq(note.entityId, data.id))
+    ).at(0)
     // "Not found" on purpose — a 403 would confirm a private note exists.
     if (!row || !canRead(u, row)) throw new Error('Note not found')
     // jsonb comes back as unknown; it's a BlockNote document array.
@@ -192,10 +194,12 @@ export const setNoteVisibility = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const [row] = await db
-      .select({ authorId: note.authorId, visibility: note.visibility })
-      .from(note)
-      .where(eq(note.entityId, data.id))
+    const row = (
+      await db
+        .select({ authorId: note.authorId, visibility: note.visibility })
+        .from(note)
+        .where(eq(note.entityId, data.id))
+    ).at(0)
     // Same collapse as getNote: an unreadable private note answers exactly
     // like a nonexistent one — a distinct error would confirm it exists.
     if (!row || !canRead(u, row)) throw new Error('Note not found')
@@ -229,10 +233,12 @@ export const saveNote = createServerFn({ method: 'POST' })
     const u = await requireUser()
 
     // Shared notes are team-editable; private ones are the author's alone.
-    const [existing] = await db
-      .select({ authorId: note.authorId, visibility: note.visibility })
-      .from(note)
-      .where(eq(note.entityId, data.id))
+    const existing = (
+      await db
+        .select({ authorId: note.authorId, visibility: note.visibility })
+        .from(note)
+        .where(eq(note.entityId, data.id))
+    ).at(0)
     if (!existing || !canRead(u, existing)) throw new Error('Note not found')
 
     await db.transaction(async (tx) => {
@@ -254,7 +260,7 @@ export const saveNote = createServerFn({ method: 'POST' })
       if (!data.body) return
 
       // Diff-sync mention links (only rows this sync owns: extracted).
-      const existing = await tx
+      const existingLinks = await tx
         .select({ id: link.id, toEntityId: link.toEntityId })
         .from(link)
         .where(
@@ -265,8 +271,8 @@ export const saveNote = createServerFn({ method: 'POST' })
           ),
         )
       const wanted = new Set(data.body.mentionIds.filter((m) => m !== data.id))
-      const current = new Set(existing.map((e) => e.toEntityId))
-      for (const row of existing) {
+      const current = new Set(existingLinks.map((e) => e.toEntityId))
+      for (const row of existingLinks) {
         if (!wanted.has(row.toEntityId)) {
           await tx.delete(link).where(eq(link.id, row.id))
         }

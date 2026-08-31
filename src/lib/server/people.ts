@@ -50,7 +50,8 @@ export const listPeople = createServerFn().handler(async () => {
     id: r.id,
     name: r.name,
     headline:
-      ((r.values as Record<string, unknown>)?.job_title as string) ?? null,
+      ((r.values as Record<string, unknown> | null)?.job_title as
+        string | undefined) ?? null,
     email: emailBy.get(r.id) ?? null,
     company: companyBy.get(r.id) ?? null,
     createdAt: r.createdAt.toISOString(),
@@ -155,17 +156,19 @@ export const getPerson = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const [head] = await db
-      .select({
-        id: entity.id,
-        name: entity.canonicalName,
-        mergedIntoId: entity.mergedIntoId,
-        createdAt: entity.createdAt,
-        values: entity.values,
-      })
-      .from(entity)
-      .innerJoin(person, eq(person.entityId, entity.id))
-      .where(eq(entity.id, data.id))
+    const head = (
+      await db
+        .select({
+          id: entity.id,
+          name: entity.canonicalName,
+          mergedIntoId: entity.mergedIntoId,
+          createdAt: entity.createdAt,
+          values: entity.values,
+        })
+        .from(entity)
+        .innerJoin(person, eq(person.entityId, entity.id))
+        .where(eq(entity.id, data.id))
+    ).at(0)
     if (!head) throw new Error('Person not found')
 
     const aliases = await db

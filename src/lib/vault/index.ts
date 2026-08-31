@@ -52,36 +52,40 @@ export async function resolveSecret(
   userId?: string,
 ): Promise<string | null> {
   if (userId) {
-    const [userRow] = await db
-      .select()
-      .from(credential)
-      .where(
-        and(
-          eq(credential.scope, 'user'),
-          eq(credential.provider, provider),
-          eq(credential.userId, userId),
-          eq(credential.status, 'active'),
-        ),
-      )
-      .limit(1)
+    const userRow = (
+      await db
+        .select()
+        .from(credential)
+        .where(
+          and(
+            eq(credential.scope, 'user'),
+            eq(credential.provider, provider),
+            eq(credential.userId, userId),
+            eq(credential.status, 'active'),
+          ),
+        )
+        .limit(1)
+    ).at(0)
     if (userRow) {
       touch(userRow.id)
       return decryptSecret(userRow.secretEnc, aadFor('user', provider))
     }
   }
 
-  const [wsRow] = await db
-    .select()
-    .from(credential)
-    .where(
-      and(
-        eq(credential.scope, 'workspace'),
-        eq(credential.provider, provider),
-        isNull(credential.userId),
-        eq(credential.status, 'active'),
-      ),
-    )
-    .limit(1)
+  const wsRow = (
+    await db
+      .select()
+      .from(credential)
+      .where(
+        and(
+          eq(credential.scope, 'workspace'),
+          eq(credential.provider, provider),
+          isNull(credential.userId),
+          eq(credential.status, 'active'),
+        ),
+      )
+      .limit(1)
+  ).at(0)
   if (wsRow) {
     touch(wsRow.id)
     return decryptSecret(wsRow.secretEnc, aadFor('workspace', provider))

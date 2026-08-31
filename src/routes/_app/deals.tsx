@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { Handshake, Kanban, Plus, Table2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { DealBoard } from '#/components/deal-board'
 import {
@@ -141,7 +141,10 @@ function DealsPage() {
 
   const stageDef = registry.find((d) => d.slug === 'stage') as
     RegistryEntry | undefined
-  const stageOptions = stageDef?.options?.options ?? []
+  const stageOptions = useMemo(
+    () => stageDef?.options?.options ?? [],
+    [stageDef],
+  )
 
   const refNames = useMemo(
     () => ({
@@ -185,15 +188,18 @@ function DealsPage() {
       setStageFilter(null)
   }, [groupFilter, stageFilter, stageOptions])
 
-  async function saveCell(id: string, slug: string, value: unknown) {
-    try {
-      await updateRecord({ data: { id, patch: { [slug]: value } } })
-      router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not save')
-      router.invalidate()
-    }
-  }
+  const saveCell = useCallback(
+    async (id: string, slug: string, value: unknown) => {
+      try {
+        await updateRecord({ data: { id, patch: { [slug]: value } } })
+        router.invalidate()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not save')
+        router.invalidate()
+      }
+    },
+    [router],
+  )
 
   const columns = useMemo(() => {
     const defs: Array<ColumnDef<DealRow, unknown>> = [
@@ -235,7 +241,7 @@ function DealsPage() {
       ),
     ]
     return defs
-  }, [registry, refNames])
+  }, [registry, refNames, saveCell])
 
   const table = useReactTable({
     data: staged,
@@ -645,6 +651,3 @@ function CompanyNameCapture({
   }, [companyId])
   return null
 }
-
-// optionLabel imported for potential external use with deal stages
-export { optionLabel }

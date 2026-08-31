@@ -149,17 +149,19 @@ export const getDeal = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const [head] = await db
-      .select({
-        id: entity.id,
-        name: entity.canonicalName,
-        kind: entity.kind,
-        mergedIntoId: entity.mergedIntoId,
-        values: entity.values,
-        createdAt: entity.createdAt,
-      })
-      .from(entity)
-      .where(and(eq(entity.id, data.id), eq(entity.kind, 'deal')))
+    const head = (
+      await db
+        .select({
+          id: entity.id,
+          name: entity.canonicalName,
+          kind: entity.kind,
+          mergedIntoId: entity.mergedIntoId,
+          values: entity.values,
+          createdAt: entity.createdAt,
+        })
+        .from(entity)
+        .where(and(eq(entity.id, data.id), eq(entity.kind, 'deal')))
+    ).at(0)
     if (!head) throw new Error('Deal not found')
 
     // Resolve referenced entities + users for display.
@@ -193,15 +195,19 @@ export const getDeal = createServerFn()
     const values = (head.values ?? {}) as Record<string, Json>
     const companyId = values.company as string | undefined
     if (companyId) {
-      const [m] = await db
-        .select({ stages: mandate.stages })
-        .from(mandate)
-        .where(eq(mandate.status, 'active'))
+      const m = (
+        await db
+          .select({ stages: mandate.stages })
+          .from(mandate)
+          .where(eq(mandate.status, 'active'))
+      ).at(0)
       if (m && m.stages.length > 0) {
-        const [comp] = await db
-          .select({ values: entity.values })
-          .from(entity)
-          .where(eq(entity.id, companyId))
+        const comp = (
+          await db
+            .select({ values: entity.values })
+            .from(entity)
+            .where(eq(entity.id, companyId))
+        ).at(0)
         const stage = (comp?.values as Record<string, unknown> | null)
           ?.funding_stage as string | undefined
         if (stage) outsideMandate = !m.stages.includes(stage)

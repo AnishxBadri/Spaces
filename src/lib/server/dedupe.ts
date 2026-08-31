@@ -86,10 +86,12 @@ export const mergeDuplicate = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const [cand] = await db
-      .select()
-      .from(duplicateCandidate)
-      .where(eq(duplicateCandidate.id, data.candidateId))
+    const cand = (
+      await db
+        .select()
+        .from(duplicateCandidate)
+        .where(eq(duplicateCandidate.id, data.candidateId))
+    ).at(0)
     if (!cand || cand.status !== 'open') throw new Error('Candidate not open')
     if (data.winnerId !== cand.entityA && data.winnerId !== cand.entityB)
       throw new Error('Winner must be one of the pair')

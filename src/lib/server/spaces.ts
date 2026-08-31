@@ -30,18 +30,20 @@ export const getSpace = createServerFn()
   .handler(async ({ data }) => {
     const u = await requireUser()
 
-    const [head] = await db
-      .select({
-        id: space.entityId,
-        name: entity.canonicalName,
-        slug: space.slug,
-        path: space.path,
-        parentId: space.parentId,
-        isSeeded: space.isSeeded,
-      })
-      .from(space)
-      .innerJoin(entity, eq(entity.id, space.entityId))
-      .where(eq(space.entityId, data.id))
+    const head = (
+      await db
+        .select({
+          id: space.entityId,
+          name: entity.canonicalName,
+          slug: space.slug,
+          path: space.path,
+          parentId: space.parentId,
+          isSeeded: space.isSeeded,
+        })
+        .from(space)
+        .innerJoin(entity, eq(entity.id, space.entityId))
+        .where(eq(space.entityId, data.id))
+    ).at(0)
     if (!head) throw new Error('Space not found')
 
     // Breadcrumb chain: every ancestor, resolved by path prefix.
@@ -86,8 +88,8 @@ export const getSpace = createServerFn()
       return {
         id: c.id,
         name: c.name,
-        stage: (v.funding_stage as string) ?? null,
-        geo: (v.location as string) ?? null,
+        stage: (v.funding_stage as string | undefined) ?? null,
+        geo: (v.location as string | undefined) ?? null,
         taggedVia: c.taggedVia,
       }
     })

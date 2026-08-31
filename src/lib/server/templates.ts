@@ -108,14 +108,16 @@ export const saveNoteAsTemplate = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const [row] = await db
-      .select({
-        bodyJson: note.bodyJson,
-        authorId: note.authorId,
-        visibility: note.visibility,
-      })
-      .from(note)
-      .where(eq(note.entityId, data.noteId))
+    const row = (
+      await db
+        .select({
+          bodyJson: note.bodyJson,
+          authorId: note.authorId,
+          visibility: note.visibility,
+        })
+        .from(note)
+        .where(eq(note.entityId, data.noteId))
+    ).at(0)
     if (!row || !canRead(u, row)) throw new Error('Note not found')
     const body = stripMentions(row.bodyJson ?? [])
     const [t] = await db
@@ -134,10 +136,12 @@ export const createNoteFromTemplate = createServerFn({ method: 'POST' })
   .validator(z.object({ templateId: z.string().uuid() }))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const [t] = await db
-      .select()
-      .from(template)
-      .where(and(eq(template.id, data.templateId), eq(template.kind, 'note')))
+    const t = (
+      await db
+        .select()
+        .from(template)
+        .where(and(eq(template.id, data.templateId), eq(template.kind, 'note')))
+    ).at(0)
     if (!t) throw new Error('Template not found')
     return db.transaction(async (tx) => {
       const [ent] = await tx
@@ -175,10 +179,12 @@ export const saveRecordAsTemplate = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const [row] = await db
-      .select({ kind: entity.kind, values: entity.values })
-      .from(entity)
-      .where(and(eq(entity.id, data.recordId), isNull(entity.mergedIntoId)))
+    const row = (
+      await db
+        .select({ kind: entity.kind, values: entity.values })
+        .from(entity)
+        .where(and(eq(entity.id, data.recordId), isNull(entity.mergedIntoId)))
+    ).at(0)
     if (!row || !['company', 'person', 'deal'].includes(row.kind)) {
       throw new Error('Record not found')
     }
@@ -286,10 +292,14 @@ export const applySpaceTemplate = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const [t] = await db
-      .select()
-      .from(template)
-      .where(and(eq(template.id, data.templateId), eq(template.kind, 'space')))
+    const t = (
+      await db
+        .select()
+        .from(template)
+        .where(
+          and(eq(template.id, data.templateId), eq(template.kind, 'space')),
+        )
+    ).at(0)
     if (!t) throw new Error('Template not found')
     const manifest = t.body as SpaceManifest
 

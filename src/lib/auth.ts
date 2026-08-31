@@ -77,17 +77,19 @@ export const auth = betterAuth({
           // makes single-use a database fact — two concurrent redemptions
           // of the same open invite race the row, and exactly one wins.
           // (usedBy is filled in the after-hook once the user id exists.)
-          const [inv] = await db
-            .update(invite)
-            .set({ usedAt: new Date() })
-            .where(
-              and(
-                eq(invite.tokenHash, hash),
-                isNull(invite.usedAt),
-                gt(invite.expiresAt, new Date()),
-              ),
-            )
-            .returning({ role: invite.role, email: invite.email })
+          const inv = (
+            await db
+              .update(invite)
+              .set({ usedAt: new Date() })
+              .where(
+                and(
+                  eq(invite.tokenHash, hash),
+                  isNull(invite.usedAt),
+                  gt(invite.expiresAt, new Date()),
+                ),
+              )
+              .returning({ role: invite.role, email: invite.email })
+          ).at(0)
           if (!inv) {
             throw new Error('This invitation is invalid or has expired.')
           }

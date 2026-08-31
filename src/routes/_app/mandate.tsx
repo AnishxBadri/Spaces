@@ -50,7 +50,7 @@ function MandatePage() {
   const router = useRouter()
   const [creating, setCreating] = useState(false)
 
-  if (!mandate || !note) {
+  if (!mandate) {
     return (
       <div className="mx-auto max-w-[72ch] px-6 py-16 md:px-10">
         <Compass

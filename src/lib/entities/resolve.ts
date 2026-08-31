@@ -85,10 +85,12 @@ function normalizeKeys(input: ResolveInput): Array<NormalizedKey> {
 
 /** Follow a merge redirect. Chains are flattened at merge time → one hop. */
 async function canonicalId(id: string): Promise<string> {
-  const [row] = await db
-    .select({ mergedIntoId: entity.mergedIntoId })
-    .from(entity)
-    .where(eq(entity.id, id))
+  const row = (
+    await db
+      .select({ mergedIntoId: entity.mergedIntoId })
+      .from(entity)
+      .where(eq(entity.id, id))
+  ).at(0)
   return row?.mergedIntoId ?? id
 }
 
@@ -103,17 +105,19 @@ export async function resolveEntity(
 
   // 1. Deterministic: exact identity-key match → attach.
   for (const key of keys) {
-    const [hit] = await db
-      .select({ entityId: entityAlias.entityId })
-      .from(entityAlias)
-      .where(
-        and(
-          eq(entityAlias.kind, key.kind),
-          eq(entityAlias.valueNorm, key.valueNorm),
-          eq(entityAlias.isIdentity, true),
-        ),
-      )
-      .limit(1)
+    const hit = (
+      await db
+        .select({ entityId: entityAlias.entityId })
+        .from(entityAlias)
+        .where(
+          and(
+            eq(entityAlias.kind, key.kind),
+            eq(entityAlias.valueNorm, key.valueNorm),
+            eq(entityAlias.isIdentity, true),
+          ),
+        )
+        .limit(1)
+    ).at(0)
     if (hit) {
       const id = await canonicalId(hit.entityId)
       // New name for a known entity is still signal — record as alias.
@@ -226,17 +230,19 @@ export async function addIdentityAlias(
   }[kind](rawValue)
   if (!norm) throw new Error(`Invalid ${kind}: ${rawValue}`)
 
-  const [holder] = await db
-    .select({ entityId: entityAlias.entityId })
-    .from(entityAlias)
-    .where(
-      and(
-        eq(entityAlias.kind, kind),
-        eq(entityAlias.valueNorm, norm),
-        eq(entityAlias.isIdentity, true),
-      ),
-    )
-    .limit(1)
+  const holder = (
+    await db
+      .select({ entityId: entityAlias.entityId })
+      .from(entityAlias)
+      .where(
+        and(
+          eq(entityAlias.kind, kind),
+          eq(entityAlias.valueNorm, norm),
+          eq(entityAlias.isIdentity, true),
+        ),
+      )
+      .limit(1)
+  ).at(0)
 
   if (holder) {
     const holderId = await canonicalId(holder.entityId)

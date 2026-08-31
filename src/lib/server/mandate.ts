@@ -17,19 +17,21 @@ import { requireUser } from './shared'
 
 export const getMandate = createServerFn().handler(async () => {
   await requireUser()
-  const [row] = await db
-    .select({
-      id: mandate.id,
-      noteEntityId: mandate.noteEntityId,
-      stages: mandate.stages,
-      geos: mandate.geos,
-      checkMin: mandate.checkMin,
-      checkMax: mandate.checkMax,
-      currency: mandate.currency,
-      updatedAt: mandate.updatedAt,
-    })
-    .from(mandate)
-    .where(eq(mandate.status, 'active'))
+  const row = (
+    await db
+      .select({
+        id: mandate.id,
+        noteEntityId: mandate.noteEntityId,
+        stages: mandate.stages,
+        geos: mandate.geos,
+        checkMin: mandate.checkMin,
+        checkMax: mandate.checkMax,
+        currency: mandate.currency,
+        updatedAt: mandate.updatedAt,
+      })
+      .from(mandate)
+      .where(eq(mandate.status, 'active'))
+  ).at(0)
   if (!row) return null
   return { ...row, updatedAt: row.updatedAt.toISOString() }
 })
@@ -75,10 +77,12 @@ export const updateMandateFacts = createServerFn({ method: 'POST' })
   .validator(factsInput)
   .handler(async ({ data }) => {
     await requireUser()
-    const [row] = await db
-      .select({ id: mandate.id })
-      .from(mandate)
-      .where(eq(mandate.status, 'active'))
+    const row = (
+      await db
+        .select({ id: mandate.id })
+        .from(mandate)
+        .where(eq(mandate.status, 'active'))
+    ).at(0)
     if (!row) throw new Error('No active mandate')
     if (
       data.checkMin != null &&

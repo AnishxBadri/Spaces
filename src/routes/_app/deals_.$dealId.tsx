@@ -80,6 +80,10 @@ function DealRecordPage() {
     ),
   }
   const companyId = deal.values.company as string | undefined
+  // refNames' Record index type hides misses — annotate the lookup honestly.
+  const companyRef: { name: string } | undefined = companyId
+    ? deal.refNames[companyId]
+    : undefined
   const noteMentions = deal.mentionedIn.filter((m) => m.kind === 'note')
 
   const stageDef = registry.find((d) => d.slug === 'stage') as
@@ -148,7 +152,7 @@ function DealRecordPage() {
                 className="flex w-fit items-center gap-1 text-ui text-muted-foreground hover:text-foreground"
               >
                 <Building2 className="size-3" strokeWidth={1.75} />
-                {deal.refNames[companyId]?.name ?? 'Company'}
+                {companyRef?.name ?? 'Company'}
               </Link>
             ) : null}
             {stageOption ? (

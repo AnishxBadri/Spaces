@@ -73,10 +73,9 @@ export const updateAttribute = createServerFn({ method: 'POST' })
     // and a two-person fund should not need ceremony to add a field.
     await requireAdmin()
     const { attribute } = await import('#/db/schema')
-    const [attr] = await db
-      .select()
-      .from(attribute)
-      .where(eq(attribute.id, data.id))
+    const attr = (
+      await db.select().from(attribute).where(eq(attribute.id, data.id))
+    ).at(0)
     if (!attr) throw new Error('Attribute not found')
 
     if (data.options) {
@@ -85,9 +84,8 @@ export const updateAttribute = createServerFn({ method: 'POST' })
       )
       if (!isOptionType) throw new Error('This attribute type has no options')
       const existing =
-        ((attr.options as Record<string, unknown>).options as Array<{
-          id: string
-        }>) ?? []
+        ((attr.options as Record<string, unknown>).options as
+          Array<{ id: string }> | undefined) ?? []
       const existingIds = new Set(existing.map((o) => o.id))
       const keptIds = new Set(
         data.options.filter((o) => o.id).map((o) => o.id!),
@@ -152,8 +150,8 @@ export const updateAttribute = createServerFn({ method: 'POST' })
         .where(eq(attribute.objectKind, attr.objectKind))
         .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
       const idx = siblings.findIndex((s) => s.id === data.id)
-      const swapWith =
-        data.move === 'up' ? siblings[idx - 1] : siblings[idx + 1]
+      const swapIdx = data.move === 'up' ? idx - 1 : idx + 1
+      const swapWith = swapIdx >= 0 ? siblings.at(swapIdx) : undefined
       if (swapWith) {
         await db
           .update(attribute)

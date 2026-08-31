@@ -102,7 +102,7 @@ function CompaniesPage() {
             badge={<IconBadge icon={Building2} />}
           />
         ),
-      }) as ColumnDef<Row, unknown>,
+      }),
       col.accessor((r) => r.domains.join(', '), {
         id: 'domains',
         header: 'Domains',
@@ -113,7 +113,7 @@ function CompaniesPage() {
               {info.row.original.domains.join(', ')}
             </MetaCell>
           ) : null,
-      }) as ColumnDef<Row, unknown>,
+      }),
       ...registry.map(
         (def) =>
           col.accessor((r) => r.values[def.slug] ?? null, {
@@ -148,20 +148,20 @@ function CompaniesPage() {
             ))}
           </span>
         ),
-      }) as ColumnDef<Row, unknown>,
+      }),
       col.accessor((r) => r.lastTouched ?? '', {
         id: 'lastTouched',
         header: 'Last touched',
         size: 120,
         sortUndefined: 'last',
         cell: (info) => <DateCell value={info.row.original.lastTouched} />,
-      }) as ColumnDef<Row, unknown>,
+      }),
       col.accessor('createdAt', {
         id: 'createdAt',
         header: 'Added',
         size: 110,
         cell: (info) => <DateCell value={info.getValue()} />,
-      }) as ColumnDef<Row, unknown>,
+      }),
     ]
     return defs
     // eslint-disable-next-line react-hooks/exhaustive-deps

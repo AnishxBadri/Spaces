@@ -102,7 +102,7 @@ function PeoplePage() {
             badge={<InitialBadge name={String(info.getValue())} />}
           />
         ),
-      }) as ColumnDef<Row, unknown>,
+      }),
       col.accessor((r) => r.emails.join(', '), {
         id: 'emails',
         header: 'Email',
@@ -113,7 +113,7 @@ function PeoplePage() {
               {info.row.original.emails.join(', ')}
             </MetaCell>
           ) : null,
-      }) as ColumnDef<Row, unknown>,
+      }),
       col.accessor((r) => r.company?.name ?? '', {
         id: 'company',
         header: 'Company',
@@ -129,7 +129,7 @@ function PeoplePage() {
               />
             </span>
           ) : null,
-      }) as ColumnDef<Row, unknown>,
+      }),
       ...registry.map(
         (def) =>
           col.accessor((r) => r.values[def.slug] ?? null, {
@@ -153,13 +153,13 @@ function PeoplePage() {
         size: 120,
         sortUndefined: 'last',
         cell: (info) => <DateCell value={info.row.original.lastTouched} />,
-      }) as ColumnDef<Row, unknown>,
+      }),
       col.accessor('createdAt', {
         id: 'createdAt',
         header: 'Added',
         size: 110,
         cell: (info) => <DateCell value={info.getValue()} />,
-      }) as ColumnDef<Row, unknown>,
+      }),
     ]
     return defs
     // eslint-disable-next-line react-hooks/exhaustive-deps

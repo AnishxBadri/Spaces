@@ -5,6 +5,7 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import { ArrowLeft, Globe, Layers, Lock, X } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -171,7 +172,10 @@ function NotePage() {
           </h2>
           <ul className="mt-2 space-y-1">
             {initial.backlinks.map((b) => {
-              const Icon = KIND_ICONS[b.kind]
+              // KIND_ICONS' Record index type hides misses — widen honestly.
+              const Icon = (
+                KIND_ICONS as Record<string, LucideIcon | undefined>
+              )[b.kind]
               return (
                 <li key={b.fromId}>
                   <Link

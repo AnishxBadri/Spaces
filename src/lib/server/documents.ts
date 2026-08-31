@@ -66,26 +66,30 @@ export const finalizeDocumentUpload = createServerFn({ method: 'POST' })
       throw new Error('Upload incomplete — the file never reached storage')
     }
 
-    const [target] = await db
-      .select({ id: entity.id, mergedIntoId: entity.mergedIntoId })
-      .from(entity)
-      .where(eq(entity.id, data.attachTo))
+    const target = (
+      await db
+        .select({ id: entity.id, mergedIntoId: entity.mergedIntoId })
+        .from(entity)
+        .where(eq(entity.id, data.attachTo))
+    ).at(0)
     if (!target) throw new Error('Record not found')
     if (target.mergedIntoId) throw new Error('That record has been merged away')
 
     // Same file, same record, twice — one row. Filing it again is almost
     // always a double-click or a re-drop, not a second document.
-    const [existing] = await db
-      .select({ id: document.entityId })
-      .from(document)
-      .innerJoin(link, eq(link.fromEntityId, document.entityId))
-      .where(
-        and(
-          eq(document.blobSha, data.sha),
-          eq(link.toEntityId, data.attachTo),
-          eq(link.relation, 'tagged_in'),
-        ),
-      )
+    const existing = (
+      await db
+        .select({ id: document.entityId })
+        .from(document)
+        .innerJoin(link, eq(link.fromEntityId, document.entityId))
+        .where(
+          and(
+            eq(document.blobSha, data.sha),
+            eq(link.toEntityId, data.attachTo),
+            eq(link.relation, 'tagged_in'),
+          ),
+        )
+    ).at(0)
     if (existing) return { id: existing.id, deduped: true }
 
     const id = await db.transaction(async (tx) => {
@@ -207,10 +211,12 @@ export const getDocumentDownloadUrl = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const [row] = await db
-      .select({ blobSha: document.blobSha, filename: document.filename })
-      .from(document)
-      .where(eq(document.entityId, data.id))
+    const row = (
+      await db
+        .select({ blobSha: document.blobSha, filename: document.filename })
+        .from(document)
+        .where(eq(document.entityId, data.id))
+    ).at(0)
     if (!row?.blobSha) throw new Error('This document has no stored file')
     return {
       url: await storage().getDownloadUrl(row.blobSha, 300, {
@@ -229,10 +235,12 @@ export const deleteDocument = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const [row] = await db
-      .select({ blobSha: document.blobSha })
-      .from(document)
-      .where(eq(document.entityId, data.id))
+    const row = (
+      await db
+        .select({ blobSha: document.blobSha })
+        .from(document)
+        .where(eq(document.entityId, data.id))
+    ).at(0)
     if (!row) return { ok: true }
 
     await db.transaction(async (tx) => {

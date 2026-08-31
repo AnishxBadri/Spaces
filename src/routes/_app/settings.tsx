@@ -782,12 +782,14 @@ function AttributeRow({
   }
 
   const options =
-    ((attr.options as Record<string, unknown> | null)?.options as Array<{
-      id: string
-      label: string
-      group?: string
-      color?: string
-    }>) ?? []
+    ((attr.options as Record<string, unknown> | null)?.options as
+      | Array<{
+          id: string
+          label: string
+          group?: string
+          color?: string
+        }>
+      | undefined) ?? []
   const hasOptions = ['select', 'multi_select', 'status'].includes(attr.type)
 
   return (

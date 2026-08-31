@@ -80,10 +80,9 @@ async function insertNode(
  * moment they touch it.
  */
 export async function seedStarterTaxonomy(): Promise<void> {
-  const [any] = await db
-    .select({ entityId: space.entityId })
-    .from(space)
-    .limit(1)
+  const any = (
+    await db.select({ entityId: space.entityId }).from(space).limit(1)
+  ).at(0)
   if (any) return
 
   for (const node of STARTER) await insertNode(node, null)

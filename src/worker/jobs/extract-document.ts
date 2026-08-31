@@ -22,14 +22,16 @@ export const extractDocumentJob = z.object({
 export async function extractDocument(data: unknown): Promise<void> {
   const { documentId } = extractDocumentJob.parse(data)
 
-  const [row] = await db
-    .select({
-      blobSha: document.blobSha,
-      filename: document.filename,
-      mime: document.mime,
-    })
-    .from(document)
-    .where(eq(document.entityId, documentId))
+  const row = (
+    await db
+      .select({
+        blobSha: document.blobSha,
+        filename: document.filename,
+        mime: document.mime,
+      })
+      .from(document)
+      .where(eq(document.entityId, documentId))
+  ).at(0)
 
   if (!row) {
     console.warn(`[worker] document ${documentId} vanished before extraction`)
