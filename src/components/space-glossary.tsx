@@ -209,6 +209,12 @@ function TermForm({
         rows={2}
         value={definition}
         onChange={(e) => setDefinition(e.target.value)}
+        onKeyDown={(e) => {
+          // Cmd/Ctrl+Enter submits — Enter alone stays a newline.
+          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            e.currentTarget.form?.requestSubmit()
+          }
+        }}
         placeholder="What it means here — the definition someone new to this space needs."
         className="w-full rounded-md border border-input bg-transparent px-2.5 py-1.5 font-serif text-body leading-relaxed focus-ring outline-none placeholder:text-muted-foreground"
       />

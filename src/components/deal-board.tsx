@@ -256,6 +256,13 @@ export function CloseReasonDialog({
             value={reason}
             autoFocus
             onChange={(e) => setReason(e.target.value)}
+            onKeyDown={(e) => {
+              // Cmd/Ctrl+Enter submits — Enter alone stays a newline.
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault()
+                onSave(reason.trim() || undefined)
+              }
+            }}
           />
           <DialogFooter className="mt-3">
             <Button

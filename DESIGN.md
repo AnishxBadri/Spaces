@@ -282,6 +282,29 @@ entire app. Principles, after Rauno Freiberg's interface guidelines:
 **The Compositor Rule.** If a motion can't be expressed in transform + opacity, it
 doesn't ship.
 
+### Interaction Engineering (2026-09, after Emil Kowalski)
+
+The engineering floor under the aesthetics — vendored in full as the
+`design-engineering` skill (`.claude/skills/design-engineering/`), with the
+load-bearing rules promoted here:
+
+- **The No-Shift Rule.** Dynamic content never moves its neighbors: fixed
+  dimensions on async slots, tabular figures on changing numbers, and **weight
+  never changes with state** — hover/selected speak through color and the wash,
+  not font-weight. (Nav items are medium always, per §Navigation.)
+- **Name your transitions.** `transition: all` is banned — list the properties.
+- **Hover is an enhancement.** Nothing requires hover to function; Tailwind v4
+  already gates `hover:` behind `(hover: hover)` — never undo it. Controls take
+  `touch-action: manipulation`; on coarse pointers inputs render ≥16px (iOS
+  zoom) and hit areas reach 44px even when the visual is smaller.
+- **Keyboard parity.** Tab reaches only visible elements (`inert` the hidden),
+  keyboard focus scrolls into view, Enter submits forms, Cmd/Ctrl+Enter submits
+  textareas, icon-only buttons carry `aria-label`.
+- **The z-index scale.** dropdown 100 · sticky 150 · modal 200 · tooltip 300 ·
+  toast 400. No other values; prefer `isolation: isolate` over climbing.
+- **Virtualize past ~200 rows.** The ledger stays dense by drawing less, not
+  by paginating.
+
 ### Buttons
 
 - **Shape:** crisp corners (6px radius), heights 24 / 32 / 36 / 40px (`xs / sm / default / lg`).
@@ -338,6 +361,24 @@ Fixed 240px sidebar on the panel neutral; items are 32px rows, `text-ui` medium,
 Ink at rest → ink on hover with the accent tint → the selection wash + ink when active
 (`aria-current="page"`). The workspace name (or wordmark) heads it; Cmd-K search sits
 directly beneath. Collapses to a drawer under a 48px top bar on mobile.
+
+### Record Pages (header actions · composer)
+
+- **The Header Actions Rule (2026-09).** A record's verbs live top-right of its header,
+  never in the tab bar: outline `sm` (32px) buttons for the common verbs (Log
+  interaction, Note about this), the primary fill reserved for the record's one
+  state-changing verb (Move stage on deals). Meta actions (Save as template) trail last
+  and stay quiet. The tab bar is for switching views only — the deal, company, and
+  person pages all follow this; a new record page must too.
+- **The Composer Bar.** Adding to a stream never starts from a corner button: a
+  full-width fake-input bar (36px, input border, muted hint text) sits above the stream
+  and opens the real dialog. It states what it accepts in the hint ("Log a call,
+  meeting, or note…" / "chase data room Friday"). One pattern on the activity tabs and
+  the tasks page; reuse it anywhere else a list accepts entries.
+- **The Timeline Lane.** Activity timelines use a fixed 24px icon lane — verb-mapped
+  icons in muted circles, the selection wash + pine only for attribute changes — with a
+  1px connector thread between entries. Entries align on the lane however their bodies
+  wrap; note bodies inside a timeline keep the prose register.
 
 ### Overlays (Dialogs · Menus · Tooltips)
 

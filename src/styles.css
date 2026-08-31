@@ -227,10 +227,15 @@
  * 3:1 between focused and unfocused pixels). This draws at full `--ring` (4.52:1)
  * and uses `outline` rather than a box-shadow ring so it costs no layout and
  * never needs an offset color plumbed through.
+ *
+ * Offset is 2px, not 1px (2026-09): on a primary-filled button the ring is the
+ * same pine as the fill, and a 1px white gap fused them into "slightly bigger
+ * button". Two pixels of ground reads as a distinct halo — tested against a
+ * darker ring, which taxed every non-primary focus to fix one case.
  */
 @utility focus-ring {
   outline: 2px solid transparent;
-  outline-offset: 1px;
+  outline-offset: 2px;
 
   &:focus-visible {
     outline-color: var(--ring);
@@ -284,6 +289,25 @@
 
   ::selection {
     background: var(--selected);
+  }
+
+  /* Interaction Engineering (DESIGN.md): no double-tap zoom on controls; on
+     coarse pointers inputs render ≥16px so iOS Safari never zooms on focus. */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+
+  @media (pointer: coarse) {
+    input,
+    select,
+    textarea {
+      font-size: 1rem;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
