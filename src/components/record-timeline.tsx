@@ -1,20 +1,28 @@
 import {
+  ArrowRight,
   Building2,
   ChevronDown,
   ChevronRight,
+  Circle,
+  Compass,
+  FileText,
+  GitMerge,
   Kanban,
+  PenLine,
   Phone,
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
-import { optionLabel } from './attributes/value-editor'
+import { optionLabel, refName } from './attributes/value-editor'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
-import { refName } from './attributes/value-editor'
+import { cn } from '#/lib/utils'
 import type { getRecordTimeline } from '#/lib/server-fns'
 
 /**
- * The condensed activity timeline: macro verbs plus attribute-change
- * bursts ("changed 3 attributes", expandable to attr → new value).
+ * The activity timeline: an icon lane with a connector thread, macro verbs
+ * plus attribute-change bursts ("changed 3 attributes", expandable to
+ * attr → new value). The lane is a fixed 24px slot so entries align however
+ * their bodies wrap.
  */
 
 type Items = Awaited<ReturnType<typeof getRecordTimeline>>
@@ -38,6 +46,48 @@ const VERB_LABELS: Record<string, string> = {
   renamed: 'renamed this record',
 }
 
+const VERB_ICONS: Record<string, typeof Users> = {
+  'company.created': Building2,
+  'person.created': Users,
+  'deal.created': Kanban,
+  'note.created': PenLine,
+  'document.filed': FileText,
+  'space.tagged': Compass,
+  'space.untagged': Compass,
+  'entity.merged': GitMerge,
+  renamed: PenLine,
+}
+
+function LaneIcon({
+  icon: Icon,
+  accent = false,
+  last,
+}: {
+  icon: typeof Users
+  accent?: boolean
+  last: boolean
+}) {
+  return (
+    <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
+      <span
+        className={cn(
+          'flex size-6 shrink-0 items-center justify-center rounded-full',
+          accent ? 'bg-selected' : 'bg-muted',
+        )}
+      >
+        <Icon
+          className={cn(
+            'size-3',
+            accent ? 'text-primary' : 'text-muted-foreground',
+          )}
+          strokeWidth={2}
+        />
+      </span>
+      {!last ? <span className="mt-1 w-px flex-1 bg-border" /> : null}
+    </div>
+  )
+}
+
 export function RecordTimeline({
   items,
   registry,
@@ -51,28 +101,41 @@ export function RecordTimeline({
     return <p className="mt-4 text-ui text-muted-foreground">Nothing yet.</p>
   }
   return (
-    <ul className="mt-4 space-y-1">
-      {items.map((item) => (
-        <li key={item.id}>
-          {item.type === 'macro' ? (
-            <div className="flex items-baseline gap-3 px-1 py-1 text-ui">
-              <span className="tabular w-28 shrink-0 text-xs text-muted-foreground">
-                {dateTimeFmt.format(new Date(item.at))}
-              </span>
-              <span>
-                <span className="font-medium">
-                  {item.actorName ?? 'System'}
-                </span>{' '}
-                {VERB_LABELS[item.verb] ?? item.verb}
-              </span>
-            </div>
-          ) : item.type === 'interaction' ? (
-            <InteractionItem item={item} />
-          ) : (
-            <AttrBurst item={item} registry={registry} refNames={refNames} />
-          )}
-        </li>
-      ))}
+    <ul className="mt-4">
+      {items.map((item, i) => {
+        const last = i === items.length - 1
+        return (
+          <li key={item.id} className="flex gap-3">
+            {item.type === 'macro' ? (
+              <>
+                <LaneIcon icon={VERB_ICONS[item.verb] ?? Circle} last={last} />
+                <div className={cn('min-w-0 pt-1', !last && 'pb-4')}>
+                  <span className="flex items-baseline gap-2 text-ui">
+                    <span>
+                      <span className="font-medium">
+                        {item.actorName ?? 'System'}
+                      </span>{' '}
+                      {VERB_LABELS[item.verb] ?? item.verb}
+                    </span>
+                    <span className="tabular shrink-0 text-xs text-muted-foreground">
+                      {dateTimeFmt.format(new Date(item.at))}
+                    </span>
+                  </span>
+                </div>
+              </>
+            ) : item.type === 'interaction' ? (
+              <InteractionItem item={item} last={last} />
+            ) : (
+              <AttrBurst
+                item={item}
+                registry={registry}
+                refNames={refNames}
+                last={last}
+              />
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }
@@ -85,35 +148,40 @@ const ATTENDEE_ICONS: Record<string, typeof Users> = {
 
 function InteractionItem({
   item,
+  last,
 }: {
   item: Extract<Items[number], { type: 'interaction' }>
+  last: boolean
 }) {
   return (
-    <div className="flex items-baseline gap-3 rounded-md bg-muted/40 px-1 py-1.5 text-ui">
-      <span className="tabular w-28 shrink-0 text-xs text-muted-foreground">
-        {dateTimeFmt.format(new Date(item.at))}
-      </span>
-      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <Phone
-          className="size-3.5 shrink-0 text-muted-foreground"
-          strokeWidth={1.75}
-        />
-        <span className="font-medium capitalize">{item.kind}</span>
-        <span className="truncate">— {item.subject}</span>
-        {item.attendees.map((a) => {
-          const Icon = ATTENDEE_ICONS[a.kind] ?? Users
-          return (
-            <span
-              key={a.id}
-              className="flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium"
-            >
-              <Icon className="size-2.5" strokeWidth={1.75} />
-              {a.name}
-            </span>
-          )
-        })}
-      </span>
-    </div>
+    <>
+      <LaneIcon icon={Phone} last={last} />
+      <div className={cn('min-w-0 pt-1', !last && 'pb-4')}>
+        <span className="flex items-baseline gap-2 text-ui">
+          <span className="font-medium capitalize">{item.kind}</span>
+          <span className="truncate">{item.subject}</span>
+          <span className="tabular shrink-0 text-xs text-muted-foreground">
+            {dateTimeFmt.format(new Date(item.at))}
+          </span>
+        </span>
+        {item.attendees.length > 0 ? (
+          <span className="mt-1 flex flex-wrap items-center gap-1">
+            {item.attendees.map((a) => {
+              const Icon = ATTENDEE_ICONS[a.kind] ?? Users
+              return (
+                <span
+                  key={a.id}
+                  className="flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium"
+                >
+                  <Icon className="size-2.5" strokeWidth={1.75} />
+                  {a.name}
+                </span>
+              )
+            })}
+          </span>
+        ) : null}
+      </div>
+    </>
   )
 }
 
@@ -121,10 +189,12 @@ function AttrBurst({
   item,
   registry,
   refNames,
+  last,
 }: {
   item: Extract<Items[number], { type: 'attrs' }>
   registry: Array<RegistryEntry>
   refNames?: RefNames
+  last: boolean
 }) {
   const [open, setOpen] = useState(false)
   const bySlug = new Map(registry.map((d) => [d.slug, d]))
@@ -145,41 +215,46 @@ function AttrBurst({
   }
 
   return (
-    <div className="rounded-md px-1 py-1 text-ui">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-baseline gap-3 rounded text-left focus-ring"
-      >
-        <span className="tabular w-28 shrink-0 text-xs text-muted-foreground">
-          {dateTimeFmt.format(new Date(item.at))}
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="font-medium">{item.actorName ?? 'System'}</span>{' '}
-          changed{' '}
-          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
-            {item.changes.length} attribute
-            {item.changes.length === 1 ? '' : 's'}
+    <>
+      <LaneIcon icon={ArrowRight} accent last={last} />
+      <div className={cn('min-w-0 pt-1', !last && 'pb-4')}>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="focus-ring flex items-baseline gap-2 rounded text-left text-ui"
+        >
+          <span className="flex items-center gap-1">
+            <span className="font-medium">{item.actorName ?? 'System'}</span>{' '}
+            changed{' '}
+            <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
+              {item.changes.length} attribute
+              {item.changes.length === 1 ? '' : 's'}
+            </span>
+            {open ? (
+              <ChevronDown className="size-3 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="size-3 text-muted-foreground" />
+            )}
           </span>
-          {open ? (
-            <ChevronDown className="size-3 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="size-3 text-muted-foreground" />
-          )}
-        </span>
-      </button>
-      {open ? (
-        <dl className="mt-1.5 ml-31 space-y-1 border-l border-border pl-3">
-          {item.changes.map((c, i) => (
-            <div key={i} className="flex items-baseline gap-2 text-xs">
-              <dt className="w-28 shrink-0 text-muted-foreground">
-                {bySlug.get(c.slug)?.name ?? c.slug}
-              </dt>
-              <dd className="min-w-0 truncate">{renderValue(c.slug, c.to)}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
-    </div>
+          <span className="tabular shrink-0 text-xs text-muted-foreground">
+            {dateTimeFmt.format(new Date(item.at))}
+          </span>
+        </button>
+        {open ? (
+          <dl className="mt-1.5 space-y-1 border-l border-border pl-3">
+            {item.changes.map((c, i) => (
+              <div key={i} className="flex items-baseline gap-2 text-xs">
+                <dt className="w-28 shrink-0 text-muted-foreground">
+                  {bySlug.get(c.slug)?.name ?? c.slug}
+                </dt>
+                <dd className="min-w-0 truncate">
+                  {renderValue(c.slug, c.to)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </div>
+    </>
   )
 }
