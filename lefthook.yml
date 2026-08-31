@@ -1,0 +1,20 @@
+# Git hooks (lefthook). Installed via the package.json "prepare" script.
+# Pre-commit stays fast: format + lint only what's staged.
+# The full gates (tsc, vitest) run in CI and before push.
+
+pre-commit:
+  parallel: false
+  jobs:
+    - name: prettier
+      glob: '*.{ts,tsx,js,jsx,css,md,json,yml,yaml}'
+      run: pnpm exec prettier --write {staged_files}
+      stage_fixed: true
+    - name: eslint
+      glob: '*.{ts,tsx,js,jsx}'
+      run: pnpm exec eslint --fix {staged_files}
+      stage_fixed: true
+
+pre-push:
+  jobs:
+    - name: typecheck
+      run: pnpm exec tsc --noEmit

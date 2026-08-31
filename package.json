@@ -1,5 +1,6 @@
 {
   "name": "dealos",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "imports": {
@@ -19,7 +20,10 @@
     "db:studio": "drizzle-kit studio",
     "lint": "eslint",
     "format": "prettier --write . && eslint --fix",
-    "check": "prettier --check ."
+    "check": "prettier --check .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepare": "lefthook install"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1101.0",
@@ -79,8 +83,10 @@
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.9",
     "eslint": "^9.20.0",
+    "lefthook": "^2.1.12",
     "playwright": "^1.62.0",
     "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
     "vitest": "^4.1.10"

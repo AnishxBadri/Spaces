@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: dealos
+          POSTGRES_PASSWORD: dealos
+          POSTGRES_DB: dealos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dealos -d dealos"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://dealos:dealos@localhost:5432/dealos
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --check .
+      - run: pnpm exec eslint src
+      - run: pnpm exec tsc --noEmit
+      # migrate.ts + vitest read .env.local via dotenv; hand them the CI db
+      - run: echo "DATABASE_URL=$DATABASE_URL" > .env.local
+      - run: pnpm exec tsx src/db/migrate.ts
+      - run: pnpm exec vitest run
