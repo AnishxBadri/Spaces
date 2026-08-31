@@ -8,9 +8,11 @@ import {
 import {
   ArrowLeft,
   Building2,
+  ChevronDown,
   Compass,
   FileText,
   Kanban,
+  MessageSquare,
   Plus,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -19,10 +21,18 @@ import { ValueEditor } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
+import { CloseReasonDialog } from '#/components/deal-board'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { Button } from '#/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
+import { badgeStyle, optionColor } from '#/lib/attributes/colors'
 import {
   createNote,
   getDeal,
@@ -57,6 +67,11 @@ function DealRecordPage() {
   const router = useRouter()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'activity' | 'notes' | 'files'>('activity')
+  // Same post-mortem gate the board's drag path has — Passed/Lost pause here.
+  const [closing, setClosing] = useState<{
+    stageId: string
+    stageLabel: string
+  } | null>(null)
 
   const refNames = {
     ...deal.refNames,
@@ -66,6 +81,12 @@ function DealRecordPage() {
   }
   const companyId = deal.values.company as string | undefined
   const noteMentions = deal.mentionedIn.filter((m) => m.kind === 'note')
+
+  const stageDef = registry.find((d) => d.slug === 'stage') as
+    RegistryEntry | undefined
+  const stageOptions = stageDef?.options?.options ?? []
+  const stageIdx = stageOptions.findIndex((o) => o.id === deal.values.stage)
+  const stageOption = stageIdx >= 0 ? stageOptions[stageIdx] : undefined
 
   async function save(patch: Record<string, unknown>) {
     try {
@@ -86,6 +107,20 @@ function DealRecordPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8 md:px-10">
+      {closing ? (
+        <CloseReasonDialog
+          dealName={deal.name}
+          stageLabel={closing.stageLabel}
+          onCancel={() => setClosing(null)}
+          onSave={(reason) => {
+            void save({
+              stage: closing.stageId,
+              ...(reason ? { close_reason: reason } : {}),
+            })
+            setClosing(null)
+          }}
+        />
+      ) : null}
       <Link
         to="/deals"
         className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground hover:text-foreground focus-ring"
@@ -105,8 +140,8 @@ function DealRecordPage() {
           <h1 className="truncate text-page font-semibold tracking-tight">
             {deal.name}
           </h1>
-          {companyId ? (
-            <span className="flex items-center gap-2">
+          <span className="flex items-center gap-2">
+            {companyId ? (
               <Link
                 to="/companies/$companyId"
                 params={{ companyId }}
@@ -115,19 +150,71 @@ function DealRecordPage() {
                 <Building2 className="size-3" strokeWidth={1.75} />
                 {deal.refNames[companyId]?.name ?? 'Company'}
               </Link>
-              {deal.outsideMandate ? (
-                // A hint, never a block — edge cases are the job. Deliberately
-                // quiet: same-hue tint, no red.
-                <Link
-                  to="/mandate"
-                  className="flex items-center gap-1 rounded-full bg-[var(--badge-amber)] px-2 py-0.5 text-xs font-medium text-[var(--badge-amber-ink)] hover:opacity-80"
-                  title="This company's stage is outside the mandate's stages. Click to review the mandate."
-                >
-                  <Compass className="size-3" strokeWidth={2} />
-                  Outside mandate
-                </Link>
-              ) : null}
-            </span>
+            ) : null}
+            {stageOption ? (
+              <span
+                className="rounded-full px-2 py-0.5 text-xs font-medium"
+                style={badgeStyle(optionColor(stageOption, stageIdx))}
+              >
+                {stageOption.label}
+              </span>
+            ) : null}
+            {deal.outsideMandate ? (
+              // A hint, never a block — edge cases are the job. Deliberately
+              // quiet: same-hue tint, no red.
+              <Link
+                to="/mandate"
+                className="flex items-center gap-1 rounded-full bg-[var(--badge-amber)] px-2 py-0.5 text-xs font-medium text-[var(--badge-amber-ink)] hover:opacity-80"
+                title="This company's stage is outside the mandate's stages. Click to review the mandate."
+              >
+                <Compass className="size-3" strokeWidth={2} />
+                Outside mandate
+              </Link>
+            ) : null}
+          </span>
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <LogInteractionDialog
+            seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
+            trigger={
+              <Button size="sm" variant="outline">
+                <MessageSquare className="size-3.5" strokeWidth={1.75} />
+                Log interaction
+              </Button>
+            }
+          />
+          {stageOptions.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm">
+                  Move stage
+                  <ChevronDown className="size-3.5" strokeWidth={2} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {stageOptions.map((o, i) => (
+                  <DropdownMenuItem
+                    key={o.id}
+                    disabled={o.id === deal.values.stage}
+                    onSelect={() => {
+                      if (o.id === 'passed' || o.id === 'lost') {
+                        setClosing({ stageId: o.id, stageLabel: o.label })
+                        return
+                      }
+                      void save({ stage: o.id })
+                    }}
+                  >
+                    <span
+                      className="size-2 rounded-full"
+                      style={{
+                        backgroundColor: `var(--badge-${optionColor(o, i)}-ink)`,
+                      }}
+                    />
+                    {o.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
         </div>
       </header>
@@ -187,9 +274,6 @@ function DealRecordPage() {
               ))}
             </div>
             <div className="flex items-center gap-1.5">
-              <LogInteractionDialog
-                seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
-              />
               <Button size="xs" variant="outline" onClick={newNoteAboutThis}>
                 <Plus className="size-3" strokeWidth={2} />
                 Note about this
@@ -198,11 +282,25 @@ function DealRecordPage() {
           </div>
 
           {tab === 'activity' ? (
-            <RecordTimeline
-              items={timeline}
-              registry={registry as Array<RegistryEntry>}
-              refNames={refNames}
-            />
+            <>
+              <LogInteractionDialog
+                seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
+                trigger={
+                  <button className="focus-ring mt-4 flex h-9 w-full items-center gap-2 rounded-md border border-input px-3 text-left text-ui text-muted-foreground transition-colors duration-150 ease-out-quart hover:border-border hover:bg-accent">
+                    <MessageSquare
+                      className="size-3.5 shrink-0"
+                      strokeWidth={1.75}
+                    />
+                    Log a call, meeting, or note…
+                  </button>
+                }
+              />
+              <RecordTimeline
+                items={timeline}
+                registry={registry as Array<RegistryEntry>}
+                refNames={refNames}
+              />
+            </>
           ) : tab === 'files' ? (
             <RecordFiles entityId={deal.id} documents={documents} />
           ) : (

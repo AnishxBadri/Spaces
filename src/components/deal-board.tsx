@@ -215,7 +215,7 @@ export function DealBoard({
  * Skippable on purpose: capture-while-fresh beats forced friction, and the
  * close_reason attribute stays editable on the record afterwards.
  */
-function CloseReasonDialog({
+export function CloseReasonDialog({
   dealName,
   stageLabel,
   onCancel,

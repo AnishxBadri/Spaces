@@ -41,10 +41,13 @@ function localNow(): string {
 export function LogInteractionDialog({
   seed,
   onLogged,
+  trigger,
 }: {
   /** the record the dialog was opened from — pre-added as an attendee */
   seed: Attendee
   onLogged?: () => void
+  /** custom trigger element — must forward props (plain DOM elements do) */
+  trigger?: React.ReactNode
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -86,10 +89,12 @@ export function LogInteractionDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="xs" variant="outline">
-          <Phone className="size-3" strokeWidth={1.75} />
-          Log meeting
-        </Button>
+        {trigger ?? (
+          <Button size="xs" variant="outline">
+            <Phone className="size-3" strokeWidth={1.75} />
+            Log meeting
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
