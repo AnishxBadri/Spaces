@@ -11,6 +11,7 @@ import {
   FileText,
   Globe,
   Layers,
+  MessageSquare,
   Plus,
   X,
 } from 'lucide-react'
@@ -142,7 +143,22 @@ function CompanyRecordPage() {
             </p>
           ) : null}
         </div>
-        <span className="ml-auto">
+        {/* Header actions — the record's verbs live top-right, same as the
+            deal page. Save-as-template is meta, so it stays quiet at the end. */}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <LogInteractionDialog
+            seed={{ id: company.id, name: company.name, kind: 'company' }}
+            trigger={
+              <Button size="sm" variant="outline">
+                <MessageSquare className="size-3.5" strokeWidth={1.75} />
+                Log interaction
+              </Button>
+            }
+          />
+          <Button size="sm" variant="outline" onClick={newNoteAboutThis}>
+            <Plus className="size-3.5" strokeWidth={2} />
+            Note about this
+          </Button>
           <SaveAsTemplateAction
             entityLabel="company"
             onSave={async (name) => {
@@ -151,7 +167,7 @@ function CompanyRecordPage() {
               })
             }}
           />
-        </span>
+        </div>
       </header>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
@@ -212,22 +228,27 @@ function CompanyRecordPage() {
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-1.5">
-              <LogInteractionDialog
-                seed={{ id: company.id, name: company.name, kind: 'company' }}
-              />
-              <Button size="xs" variant="outline" onClick={newNoteAboutThis}>
-                <Plus className="size-3" strokeWidth={2} />
-                Note about this
-              </Button>
-            </div>
           </div>
 
           {tab === 'activity' ? (
-            <RecordTimeline
-              items={timeline}
-              registry={registry as Array<RegistryEntry>}
-            />
+            <>
+              <LogInteractionDialog
+                seed={{ id: company.id, name: company.name, kind: 'company' }}
+                trigger={
+                  <button className="mt-4 flex h-9 w-full items-center gap-2 rounded-md border border-input px-3 text-left text-ui text-muted-foreground focus-ring transition-colors duration-150 ease-out-quart hover:border-border hover:bg-accent">
+                    <MessageSquare
+                      className="size-3.5 shrink-0"
+                      strokeWidth={1.75}
+                    />
+                    Log a call, meeting, or note…
+                  </button>
+                }
+              />
+              <RecordTimeline
+                items={timeline}
+                registry={registry as Array<RegistryEntry>}
+              />
+            </>
           ) : tab === 'files' ? (
             <RecordFiles entityId={company.id} documents={documents} />
           ) : (

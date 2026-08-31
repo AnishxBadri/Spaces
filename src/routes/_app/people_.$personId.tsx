@@ -11,6 +11,7 @@ import {
   Building2,
   FileText,
   Linkedin,
+  MessageSquare,
   Plus,
   X,
 } from 'lucide-react'
@@ -118,6 +119,23 @@ function PersonRecordPage() {
             </p>
           ) : null}
         </div>
+        {/* Header actions — the record's verbs live top-right, same as the
+            deal and company pages. */}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <LogInteractionDialog
+            seed={{ id: person.id, name: person.name, kind: 'person' }}
+            trigger={
+              <Button size="sm" variant="outline">
+                <MessageSquare className="size-3.5" strokeWidth={1.75} />
+                Log interaction
+              </Button>
+            }
+          />
+          <Button size="sm" variant="outline" onClick={newNoteAboutThis}>
+            <Plus className="size-3.5" strokeWidth={2} />
+            Note about this
+          </Button>
+        </div>
       </header>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
@@ -188,22 +206,27 @@ function PersonRecordPage() {
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-1.5">
-              <LogInteractionDialog
-                seed={{ id: person.id, name: person.name, kind: 'person' }}
-              />
-              <Button size="xs" variant="outline" onClick={newNoteAboutThis}>
-                <Plus className="size-3" strokeWidth={2} />
-                Note about this
-              </Button>
-            </div>
           </div>
 
           {tab === 'activity' ? (
-            <RecordTimeline
-              items={timeline}
-              registry={registry as Array<RegistryEntry>}
-            />
+            <>
+              <LogInteractionDialog
+                seed={{ id: person.id, name: person.name, kind: 'person' }}
+                trigger={
+                  <button className="mt-4 flex h-9 w-full items-center gap-2 rounded-md border border-input px-3 text-left text-ui text-muted-foreground focus-ring transition-colors duration-150 ease-out-quart hover:border-border hover:bg-accent">
+                    <MessageSquare
+                      className="size-3.5 shrink-0"
+                      strokeWidth={1.75}
+                    />
+                    Log a call, meeting, or note…
+                  </button>
+                }
+              />
+              <RecordTimeline
+                items={timeline}
+                registry={registry as Array<RegistryEntry>}
+              />
+            </>
           ) : tab === 'files' ? (
             <RecordFiles entityId={person.id} documents={documents} />
           ) : (
