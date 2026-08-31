@@ -16,6 +16,7 @@ docs/
   ARCHITECTURE.md       full product synthesis (fastest onboarding read)
   adr/                  formal ADRs (e.g. 0001 deals-are-an-object)
   survey-*.md           prior-art code studies (Twenty email + calendar sync)
+  tour/                 file-by-file walkthrough (deeper than this map)
   CODEBASE.md           this file
 drizzle/                generated SQL migrations, numbered (0001…0015)
 docker-compose.yml      production self-host (app + pgvector), build-from-source
