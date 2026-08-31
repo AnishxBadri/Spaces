@@ -37,7 +37,7 @@ export const prepareDocumentUpload = createServerFn({ method: 'POST' })
     if (await store.exists(data.sha)) {
       return {
         uploadUrl: null as string | null,
-        uploadHeaders: {} as Record<string, string>,
+        uploadHeaders: {},
         alreadyStored: true,
       }
     }

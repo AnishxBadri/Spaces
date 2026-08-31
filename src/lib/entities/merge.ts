@@ -98,7 +98,7 @@ export async function mergeEntities(opts: {
           table: 'entity_alias',
           action: 'dropped',
           pk: { id: a.id },
-          old: a as unknown as Record<string, unknown>,
+          old: a,
         })
         await tx.delete(entityAlias).where(eq(entityAlias.id, a.id))
       } else {
@@ -153,7 +153,7 @@ export async function mergeEntities(opts: {
         table: 'entity_space',
         action: 'repointed',
         pk: { entityId: loserId, spaceId: t.spaceId },
-        old: t as unknown as Record<string, unknown>,
+        old: t,
       })
       await tx
         .delete(entitySpace)
@@ -179,7 +179,7 @@ export async function mergeEntities(opts: {
         table: 'interaction_entity',
         action: 'repointed',
         pk: { interactionId: ie.interactionId, entityId: loserId },
-        old: ie as unknown as Record<string, unknown>,
+        old: ie,
       })
       await tx
         .delete(interactionEntity)
@@ -287,8 +287,8 @@ export async function mergeEntities(opts: {
           action: 'dropped',
           pk: { id: le.id },
           old: {
-            entry: le as unknown as Record<string, unknown>,
-            events: events as unknown as Array<Record<string, unknown>>,
+            entry: le,
+            events: events,
           },
         })
         await tx.delete(listEntryEvent).where(eq(listEntryEvent.entryId, le.id))
@@ -552,7 +552,7 @@ export async function mergeEntities(opts: {
         table: 'duplicate_candidate',
         action: 'dropped',
         pk: { id: c.id },
-        old: c as unknown as Record<string, unknown>,
+        old: c,
       })
       await tx.delete(duplicateCandidate).where(eq(duplicateCandidate.id, c.id))
       if (otherId !== winnerId) {

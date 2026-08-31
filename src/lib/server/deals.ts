@@ -79,11 +79,8 @@ export const listDealsTable = createServerFn().handler(async () => {
         values: Record<string, Json>
         createdAt: string
       }>,
-      refNames: {} as Record<
-        string,
-        { id: string; name: string; kind: string }
-      >,
-      userNames: {} as Record<string, string>,
+      refNames: {},
+      userNames: {},
     }
   const dealIds = rows.map((r) => r.id)
   const refs = await db
@@ -112,14 +109,8 @@ export const listDealsTable = createServerFn().handler(async () => {
       values: (r.values ?? {}) as Record<string, Json>,
       createdAt: r.createdAt.toISOString(),
     })),
-    refNames: Object.fromEntries(refNames) as Record<
-      string,
-      { id: string; name: string; kind: string }
-    >,
-    userNames: Object.fromEntries(users.map((u) => [u.id, u.name])) as Record<
-      string,
-      string
-    >,
+    refNames: Object.fromEntries(refNames),
+    userNames: Object.fromEntries(users.map((u) => [u.id, u.name])),
   }
 })
 
@@ -226,11 +217,8 @@ export const getDeal = createServerFn()
       outsideMandate,
       refNames: Object.fromEntries(
         refs.map((r) => [r.toId, { name: r.name, kind: r.kind }]),
-      ) as Record<string, { name: string; kind: string }>,
-      userNames: Object.fromEntries(users.map((u) => [u.id, u.name])) as Record<
-        string,
-        string
-      >,
+      ),
+      userNames: Object.fromEntries(users.map((u) => [u.id, u.name])),
       mentionedIn,
     }
   })

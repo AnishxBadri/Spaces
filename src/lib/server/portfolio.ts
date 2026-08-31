@@ -620,7 +620,7 @@ export const setBaseCurrency = createServerFn({ method: 'POST' })
       .update(workspace)
       .set({
         settings: {
-          ...((ws?.settings as Record<string, unknown> | null) ?? {}),
+          ...((ws?.settings) ?? {}),
           base_currency: data.currency,
         },
         updatedAt: new Date(),

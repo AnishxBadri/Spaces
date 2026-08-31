@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
-import { createTerm, deleteTerm, listTerms, updateTerm } from '#/lib/server-fns'
+import type { listTerms} from '#/lib/server-fns';
+import { createTerm, deleteTerm, updateTerm } from '#/lib/server-fns'
 
 /**
  * A space's glossary. Terms are scoped here because "stage" means something

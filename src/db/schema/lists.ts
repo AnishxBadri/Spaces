@@ -11,6 +11,9 @@ import {
 import { entity } from './entities'
 import { user } from './auth'
 
+// Shares the engine's type enum — one type menu everywhere.
+import { attributeType } from './attributes'
+
 /**
  * Attio-inspired list/entry primitive: pipeline data lives on list
  * membership, not on the company. Same company sits in "Q3 Pipeline"
@@ -32,9 +35,6 @@ export const list = pgTable('list', {
     .notNull()
     .defaultNow(),
 })
-
-// Shares the engine's type enum — one type menu everywhere.
-import { attributeType } from './attributes'
 
 export const listAttribute = pgTable(
   'list_attribute',
