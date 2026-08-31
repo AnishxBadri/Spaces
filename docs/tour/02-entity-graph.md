@@ -143,33 +143,33 @@ the ordering itself is load-bearing):
    you reorder these sections, step 10 breaks silently.
 4. **Space tags** and 5. **interaction attendees**: delete + re-insert
    under the winner, duplicates absorbed.
-6. **Signals, enrichment records**, 7. **activity** (both subject and
+5. **Signals, enrichment records**, 7. **activity** (both subject and
    object roles): plain FK repoints, snapshotted.
-8. **List entries**: if the winner already has an entry in the same list,
+6. **List entries**: if the winner already has an entry in the same list,
    the loser's entry plus its full event history is snapshotted and
    dropped (no attempt to merge histories); otherwise repoint.
-9. **Attribute values**: winner's `entity.values` wins field by field.
+7. **Attribute values**: winner's `entity.values` wins field by field.
    Loser value fills a winner null (`field_filled`); a genuine conflict is
    recorded (`field_conflict`) and the loser's value is discarded, no user
    prompt. The snapshot keeps both sides.
-10. **Referrers' record-reference values**: for each captured inbound
-    `references` link, rewrite the referring entity's `values[attrSlug]`,
-    scalar or array, with a Set dedupe (a deal referencing both loser and
-    winner in a multi-reference collapses to one).
-11. **attribute_event** history repoints: history follows the record.
-12. **Portfolio holdings**: one holding per company. If both sides have
+8. **Referrers' record-reference values**: for each captured inbound
+   `references` link, rewrite the referring entity's `values[attrSlug]`,
+   scalar or array, with a Set dedupe (a deal referencing both loser and
+   winner in a multi-reference collapses to one).
+9. **attribute_event** history repoints: history follows the record.
+10. **Portfolio holdings**: one holding per company. If both sides have
     one, every investment/mark/distribution repoints onto the winner's
     holding and the loser's holding row is deleted (snapshotted);
     otherwise the holding's companyId repoints.
-13. **Rounds**, 14. **round co-investors and task links**: repoints with
+11. **Rounds**, 14. **round co-investors and task links**: repoints with
     duplicate-drop where a unique pair already exists.
-15. **Other open duplicate candidates** touching the loser: dropped, and
+12. **Other open duplicate candidates** touching the loser: dropped, and
     re-filed against the winner (suggestions transfer to the survivor).
-16. The triggering candidate flips to `merged`.
-17. **Redirect + chain flatten**: set the loser's `mergedIntoId`, and
+13. The triggering candidate flips to `merged`.
+14. **Redirect + chain flatten**: set the loser's `mergedIntoId`, and
     repoint every entity whose `mergedIntoId` pointed at the loser. This is
     what keeps `canonicalId()` a single hop.
-18. Insert the `merge_event` and an `activity` row (`entity.merged`).
+15. Insert the `merge_event` and an `activity` row (`entity.merged`).
 
 One caller: `mergeDuplicate` in `server/dedupe.ts`.
 

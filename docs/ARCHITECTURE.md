@@ -1,10 +1,10 @@
 # Architecture — the fund-management system, end to end
 
-*Written 2026-08. This is the synthesis view: what the system is, model by model, and
+_Written 2026-08. This is the synthesis view: what the system is, model by model, and
 what remains to build. The deep decision record (with dated reasoning and reversals)
 stays in `CONTEXT.md`; the domain vocabulary is `docs/private-capital-glossary.md`;
 the visual system is `DESIGN.md`. Product name: **Angle** (rename lands at ship-polish
-start; code says DealOS until then).*
+start; code says DealOS until then)._
 
 ## 1. What this is
 
@@ -35,23 +35,23 @@ Two Node processes, one database, one blob location. Production = **two containe
 (app + Postgres); TLS via an optional Caddy overlay; ephemeral-disk platforms (Fly/
 Railway/Render) supported via `STORAGE_DRIVER=s3` + R2/B2.
 
-| Layer | Choice | Why (one line) |
-|---|---|---|
-| Framework | TanStack Start + React 19 | one data-fetching model (server fns + Query) for a client-heavy authed app; typed URL state for saved views |
-| DB | Postgres 17 + Drizzle | one stateful service carries relational data, jobs (pg-boss), lexical+fuzzy search (tsvector, pg_trgm), hierarchy (ltree), vectors (pgvector) |
-| Auth | Better Auth | self-hosted sessions; no SaaS identity dependency |
-| Editor | BlockNote (ProseMirror) | Notion-grade blocks; JSON authoritative, markdown derived |
-| Table | TanStack Table | headless spreadsheet-grade grid — the hardest UI, owned not rented |
-| Storage | local FS / `@aws-sdk/client-s3` | content-addressed sha256 blobs; checksum-signed presigned PUTs; worker re-verifies digests |
-| Extraction | unpdf · mammoth · fflate+OOXML | in-process on the worker; no OCR container (BYOK vision later) |
-| Motion/UI | Tailwind 4 + Radix + tw-animate-css | pure-CSS motion (Freiberg timing), one focus ring, OKLCH token system ("Pine") |
-| Validation | Zod at write-path choke points | hand-written; schema-derivation can't carry business rules |
+| Layer      | Choice                              | Why (one line)                                                                                                                                |
+| ---------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework  | TanStack Start + React 19           | one data-fetching model (server fns + Query) for a client-heavy authed app; typed URL state for saved views                                   |
+| DB         | Postgres 17 + Drizzle               | one stateful service carries relational data, jobs (pg-boss), lexical+fuzzy search (tsvector, pg_trgm), hierarchy (ltree), vectors (pgvector) |
+| Auth       | Better Auth                         | self-hosted sessions; no SaaS identity dependency                                                                                             |
+| Editor     | BlockNote (ProseMirror)             | Notion-grade blocks; JSON authoritative, markdown derived                                                                                     |
+| Table      | TanStack Table                      | headless spreadsheet-grade grid — the hardest UI, owned not rented                                                                            |
+| Storage    | local FS / `@aws-sdk/client-s3`     | content-addressed sha256 blobs; checksum-signed presigned PUTs; worker re-verifies digests                                                    |
+| Extraction | unpdf · mammoth · fflate+OOXML      | in-process on the worker; no OCR container (BYOK vision later)                                                                                |
+| Motion/UI  | Tailwind 4 + Radix + tw-animate-css | pure-CSS motion (Freiberg timing), one focus ring, OKLCH token system ("Pine")                                                                |
+| Validation | Zod at write-path choke points      | hand-written; schema-derivation can't carry business rules                                                                                    |
 
 Doctrines that shape everything: **append-only where history is information** ·
 **AI writes are suggestions, never silent** · **structure fixed, content free** ·
 **required env frozen at {DATABASE_URL, APP_URL}** · **no workspace_id FK, ever**.
 
-## 3. Workspace model *(shipped)*
+## 3. Workspace model _(shipped)_
 
 One deployment = one workspace = one shared dataset. **No multi-tenancy** — two funds
 run two containers.
@@ -70,7 +70,7 @@ run two containers.
   Notes); `private` is per-note opt-in, author-controlled, enforced in SQL everywhere a
   title or body could leak (lists, search CTEs, autocomplete, space pages).
 
-## 4. Entity graph *(shipped — the substrate everything sits on)*
+## 4. Entity graph _(shipped — the substrate everything sits on)_
 
 Everything linkable is an `entity(id, kind, canonical_name, …)`; kinds are **fixed in
 code**: company · person · organization · deal · space · note · document · term. One
@@ -87,14 +87,14 @@ transaction, so rails, backlinks, and merge all live on one graph.
 
 **Entity resolution** (`resolveEntity()`, the single choke point every creator calls):
 deterministic keys auto-attach (domain, email, LinkedIn, CIN — normalized: eTLD+1,
-free-mail domains never make companies); fuzzy names only *suggest* into a dedupe
+free-mail domains never make companies); fuzzy names only _suggest_ into a dedupe
 inbox. **Merge** repoints at write with a full snapshot (unmerge-able), never resolves
 at read.
 
-## 5. Object model — the attribute engine *(shipped; expansion path decided)*
+## 5. Object model — the attribute engine _(shipped; expansion path decided)_
 
 **Companies, People, Deals** are objects with a registry; notes/spaces/terms are
-deliberately *not* object-modeled (they're the research layer that links in).
+deliberately _not_ object-modeled (they're the research layer that links in).
 
 - All values — system and custom — live in `entity.values` jsonb keyed by slug. One
   write path (`setValues`, row-locked), one Zod-per-type validator, one renderer; the
@@ -106,17 +106,17 @@ deliberately *not* object-modeled (they're the research layer that links in).
 - Hard exclusions: identity (domains/emails) and kind/name live outside attributes.
 - `attribute_event` logs every change in-transaction → stage history and
   time-in-stage fall out free; timelines condense at read.
-- **Expansion path**: attribute *descriptions* → timestamp → structured location →
+- **Expansion path**: attribute _descriptions_ → timestamp → structured location →
   (deliberately last) formula. Headline: **AI-autofill attributes** (classify /
   summarize / prompt-completion) with the BYOK phase — fed by the research graph,
-  provenance-tracked, suggestion-only. Custom *objects* stay out; a universal fourth
+  provenance-tracked, suggestion-only. Custom _objects_ stay out; a universal fourth
   object ships as a system release.
 
-## 6. Research model *(shipped)*
+## 6. Research model _(shipped)_
 
 - **Spaces** — the investor's own market taxonomy (ltree paths, arbitrary depth,
   many-to-many tagging via `entity_space` with source/confidence). Hierarchy decides
-  where memos *file*; tagging handles cross-cutting. Tiny seed, never an ontology.
+  where memos _file_; tagging handles cross-cutting. Tiny seed, never an ontology.
 - **Notes/memos** — BlockNote JSON authoritative, markdown derived per save (feeds
   search); mentions diff-sync link rows; a "memo" is presentation, not structure.
 - **Glossary** — per-space terms, inherited down the tree, auto-linked in the editor
@@ -129,7 +129,7 @@ deliberately *not* object-modeled (they're the research layer that links in).
   extracted deck text, fused by reciprocal-rank fusion in a single Postgres query;
   pgvector joins as a fourth CTE when embeddings land.
 
-## 7. Mandate model *(shipped)*
+## 7. Mandate model _(shipped)_
 
 The fund's **prescriptive strategy** — what an LP reads in the deck — distinct from
 market claims (which live as prose in spaces). One active row per workspace
@@ -140,7 +140,7 @@ consumer is the **outside-mandate hint** on deal records (company stage ∉ mand
 stages → quiet flag, never a block). Portfolio construction stays prose until a
 feature consumes it.
 
-## 8. Deal model *(shipped)*
+## 8. Deal model _(shipped)_
 
 **One deal = one opportunity (round/instrument) in one company**; many deals per
 company over time is the institutional memory. Three-state doctrine:
@@ -155,7 +155,7 @@ company over time is the institutional memory. Three-state doctrine:
 Stages are a status attribute with editable options and stable ids; stage analytics
 derive from `attribute_event`.
 
-## 9. Template model *(shipped)*
+## 9. Template model _(shipped)_
 
 One table, three kinds, **all creation by-example** ("Save as template" on a note,
 record, or space — no builder UI):
@@ -170,7 +170,7 @@ record, or space — no builder UI):
 
 Application is manual plus a `suggest_on` context hint. Config, not entities.
 
-## 10. The financial engine *(phase 15 — the next build)*
+## 10. The financial engine _(phase 15 — the next build)_
 
 The layer that turns the CRM into fund management. Design rule #1, confirmed
 independently by ILPA's reporting canon: **everything is an append-only dated event;
@@ -200,10 +200,10 @@ philosophy as research→pipeline; Edda converged on it independently).
 ### Semantics that make it honest
 
 - **Instrument-aware ownership**: post-money SAFEs lock ownership at signing
-  (amount ÷ cap — displayed as *implied %*); pre-money SAFEs and CCDs show cost basis
+  (amount ÷ cap — displayed as _implied %_); pre-money SAFEs and CCDs show cost basis
   only until conversion — a % is never faked.
 - **Ownership ledger**: our shares ÷ fully-diluted outstanding, recomputed per round —
-  an ownership *history* (entry % → current %, dilution per event), deliberately not
+  an ownership _history_ (entry % → current %, dilution per event), deliberately not
   cap-table management (that's Carta; we integrate someday, we don't compete).
 - **Multi-currency from the first migration**: per-event currency, base-currency
   roll-up, manual rates first.
@@ -214,7 +214,7 @@ philosophy as research→pipeline; Edda converged on it independently).
 
 Per holding and portfolio roll-up: **cost basis · net cost · unrealized (latest
 marks) · realized (distributions) · MOIC · TVPI · RVPI · DPI · gross XIRR**
-(Newton-Raphson + bisection fallback) — all as-of-date capable. *Net* IRR (fees,
+(Newton-Raphson + bisection fallback) — all as-of-date capable. _Net_ IRR (fees,
 carry, waterfalls) is deliberately fenced: that's the LPA-bespoke accounting engine
 (Fundwave's tier) a solo GP doesn't need.
 
@@ -227,21 +227,21 @@ the tear sheet falls out of it).
 
 ## 11. Metric parity vs TagHash-class tools — what it takes
 
-| Their feature | Status on our engine |
-|---|---|
-| IRR, MOIC, TVPI, DPI, RVPI | **falls out of phase 15** (gross; live-computed) |
-| NAV (holdings value) | **falls out** (Σ latest marks); fund cash accounting fenced |
-| Valuation history / marks workflow | **phase 15** (`mark` with basis + date, append-only) |
-| Round & ownership tracking, dilution after follow-ons | **phase 15** (ownership ledger) |
-| Divestment math (shares sold, proceeds, ownership delta) | **phase 15** (`distribution` with shares) |
-| "As on <date>" point-in-time dashboards | **free** — consequence of the event rule |
-| Latest-round / latest-transaction cards, cost & value breakdowns | rendering over the same events |
-| Tear sheets | **banked** — the holding detail view, exportable later |
-| KPI / MIS collection from founders | **banked** — Visible-style: standard six metrics, tokenized founder links, runway lens |
-| Deal scorecards (weighted partner votes) | **banked** — post-portfolio, maps onto rating attributes |
-| Total commitments, capital calls/notices, capital accounts | **fenced** — lightweight single-vehicle ledger only if fund-I customers ask (India note: SEBI bakes per-deal pro-rata into regulation — that defines its shape) |
-| Multi-fund / SPV / FoF look-through, LP portal & reports | **fenced** — fund-admin tier; wrong customer |
-| Net IRR / waterfalls / fees / carry | **fenced** — the LPA-bespoke engine |
+| Their feature                                                    | Status on our engine                                                                                                                                            |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IRR, MOIC, TVPI, DPI, RVPI                                       | **falls out of phase 15** (gross; live-computed)                                                                                                                |
+| NAV (holdings value)                                             | **falls out** (Σ latest marks); fund cash accounting fenced                                                                                                     |
+| Valuation history / marks workflow                               | **phase 15** (`mark` with basis + date, append-only)                                                                                                            |
+| Round & ownership tracking, dilution after follow-ons            | **phase 15** (ownership ledger)                                                                                                                                 |
+| Divestment math (shares sold, proceeds, ownership delta)         | **phase 15** (`distribution` with shares)                                                                                                                       |
+| "As on <date>" point-in-time dashboards                          | **free** — consequence of the event rule                                                                                                                        |
+| Latest-round / latest-transaction cards, cost & value breakdowns | rendering over the same events                                                                                                                                  |
+| Tear sheets                                                      | **banked** — the holding detail view, exportable later                                                                                                          |
+| KPI / MIS collection from founders                               | **banked** — Visible-style: standard six metrics, tokenized founder links, runway lens                                                                          |
+| Deal scorecards (weighted partner votes)                         | **banked** — post-portfolio, maps onto rating attributes                                                                                                        |
+| Total commitments, capital calls/notices, capital accounts       | **fenced** — lightweight single-vehicle ledger only if fund-I customers ask (India note: SEBI bakes per-deal pro-rata into regulation — that defines its shape) |
+| Multi-fund / SPV / FoF look-through, LP portal & reports         | **fenced** — fund-admin tier; wrong customer                                                                                                                    |
+| Net IRR / waterfalls / fees / carry                              | **fenced** — the LPA-bespoke engine                                                                                                                             |
 
 What we have that none of them do: the **research half on the same graph**
 (spaces/memos/glossary/backlinks feeding deals), self-hosting in two containers, and
@@ -253,8 +253,8 @@ Shipped through phase 14: object model & tables · interactions · documents · 
 glossary/seeds · auth+onboarding · mandate · templates · S3 driver · design-debt pass.
 
 - **15 — Portfolio layer** (§10; the financial engine)
-- **16 — Ship polish** *(deferred; scope TBD — rename to Angle, test-db harness, CI,
-  GHCR images, install docs — decided when a release is in sight)*
+- **16 — Ship polish** _(deferred; scope TBD — rename to Angle, test-db harness, CI,
+  GHCR images, install docs — decided when a release is in sight)_
 - **Post-v1 backlog**: dark theme · MIS + runway lens · scorecards · meeting-prep
   briefs, pass-letter drafting, deck-reader autofill (BYOK AI) · MCP server (last) ·
   integrations: Calendar → Gmail (forward-only) → Apollo/Exa enrichment
@@ -270,6 +270,6 @@ speaks investing (deals born from decks, mandate screening, pass-vs-lost memory)
 and — after phase 15 — the honest financial core (what did I invest, what do I own,
 what is it worth, what has it returned) computed from an event ledger an auditor
 would recognize the shape of, without the fund-admin apparatus none of them need.
-The fenced tier is the moat *against* scope creep: TagHash-class fund administration
+The fenced tier is the moat _against_ scope creep: TagHash-class fund administration
 is a different product for a different buyer, and every locked decision above keeps
 this one two containers small.

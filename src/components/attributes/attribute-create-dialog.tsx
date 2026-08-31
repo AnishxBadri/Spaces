@@ -109,7 +109,7 @@ export function AttributeCreateDialog({
               id="attr-type"
               value={type}
               onChange={(e) => setType(e.target.value as TypeId)}
-              className="focus-ring border-input h-9 w-full rounded-md border bg-transparent px-3 text-body shadow-xs"
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-body shadow-xs focus-ring"
             >
               {TYPE_CHOICES.map((t) => (
                 <option key={t.id} value={t.id}>

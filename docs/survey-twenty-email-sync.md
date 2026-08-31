@@ -1,10 +1,10 @@
 # Survey: Twenty CRM's email sync implementation
 
-*Written 2026-08-12, from a code-level read of `twentyhq/twenty` (shallow clone at
+_Written 2026-08-12, from a code-level read of `twentyhq/twenty` (shallow clone at
 HEAD of that date). Feeds the integrations phase — specifically the Gmail design
 (CONTEXT.md Gmail block: forward-only, BYO GCP client). This documents how a
 production open-source CRM does full-mailbox sync, what it costs, and what we
-take from it.*
+take from it._
 
 All file paths below are relative to `packages/twenty-server/src/` in the Twenty
 repo unless noted.
@@ -13,7 +13,7 @@ repo unless noted.
 
 Twenty runs a **pull-based, two-stage, cron-driven pipeline** per connected
 mailbox. A state machine on each `messageChannel` alternates between
-*list-fetch* (ask the provider what changed since a cursor) and *import* (fetch
+_list-fetch_ (ask the provider what changed since a cursor) and _import_ (fetch
 full bodies in batches), with a Redis set as the staging buffer between the
 stages. Incremental sync rides provider cursors — Gmail `historyId`, Microsoft
 Graph delta links, IMAP UID/QRESYNC. Provider webhooks (Gmail `watch`, Graph
@@ -34,7 +34,7 @@ are per-workspace entities (`modules/messaging/common/standard-objects/`).
   constraint), `handleAliases[]` (the account's alias addresses), `scopes[]`,
   `authFailedAt` (set on permanent auth failure → drives the "reconnect"
   UX).
-- **`messageChannel`** — one per synced mailbox; carries *all* sync state and
+- **`messageChannel`** — one per synced mailbox; carries _all_ sync state and
   all sharing policy: `syncStage`, `syncStatus`, `syncCursor` (Gmail
   historyId), `syncStageStartedAt`, `throttleFailureCount`,
   `throttleRetryAfter`, webhook subscription fields, plus the policy knobs —
@@ -43,7 +43,7 @@ are per-workspace entities (`modules/messaging/common/standard-objects/`).
   `messageFolderImportPolicy` (`ALL_FOLDERS | SELECTED_FOLDERS`),
   `isSyncEnabled`.
 - **`messageFolder`** — provider folder/label with its own `syncCursor`
-  (Microsoft delta links and IMAP cursors are *per-folder*; Gmail's cursor is
+  (Microsoft delta links and IMAP cursors are _per-folder_; Gmail's cursor is
   channel-level), `externalId`, `isSentFolder`, `pendingSyncAction`.
 - **`message`** — the deduped payload: `headerMessageId` (RFC 5322
   Message-ID — **the workspace-wide dedup key**), `subject`, `text`,
@@ -59,7 +59,7 @@ are per-workspace entities (`modules/messaging/common/standard-objects/`).
 ### Dedup and threading
 
 `messaging-message.service.ts` (`saveMessagesWithinTransaction`): incoming
-messages are looked up by `headerMessageId IN (...)`. A hit — from *any*
+messages are looked up by `headerMessageId IN (...)`. A hit — from _any_
 channel — creates no new `message` row, only a new MCMA pointing at the
 existing one. So two teammates on the same email produce **one message, two
 provenance edges**. (Gmail drafts can lack a Message-ID; a synthetic
@@ -83,13 +83,13 @@ Drivers of the machine — five cron jobs
 (`message-import-manager/crons/jobs/`), each fanning out per-channel jobs onto
 a worker queue:
 
-| Cron | Schedule | Does |
-|---|---|---|
-| message-list-fetch | every 5 min | channels at `LIST_FETCH_PENDING` → CAS to `SCHEDULED` → enqueue fetch job. Skips throttled channels; skips channels with an ACTIVE webhook subscription unless the last sync is stale |
-| messages-import | every 1 min | channels at `IMPORT_PENDING` → CAS → enqueue import job |
-| ongoing-stale | hourly | resets channels stuck in ONGOING/SCHEDULED > 30 min (crash janitor) |
-| relaunch-failed | every 30 min | re-launches `FAILED_UNKNOWN` channels; **never** auth failures (those wait for user reconnect) |
-| sync-status monitoring | every 10 min | metrics/monitoring |
+| Cron                   | Schedule     | Does                                                                                                                                                                                  |
+| ---------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| message-list-fetch     | every 5 min  | channels at `LIST_FETCH_PENDING` → CAS to `SCHEDULED` → enqueue fetch job. Skips throttled channels; skips channels with an ACTIVE webhook subscription unless the last sync is stale |
+| messages-import        | every 1 min  | channels at `IMPORT_PENDING` → CAS → enqueue import job                                                                                                                               |
+| ongoing-stale          | hourly       | resets channels stuck in ONGOING/SCHEDULED > 30 min (crash janitor)                                                                                                                   |
+| relaunch-failed        | every 30 min | re-launches `FAILED_UNKNOWN` channels; **never** auth failures (those wait for user reconnect)                                                                                        |
+| sync-status monitoring | every 10 min | metrics/monitoring                                                                                                                                                                    |
 
 Scheduling uses atomic compare-and-swap updates (`.returning('id')`) so
 concurrent crons can't double-schedule a channel, and worker jobs re-check the
@@ -128,7 +128,7 @@ Dispatch switches on `connectedAccount.provider` in two services:
   the same persistence service. **No cursors, no state machine, no OAuth.**
 
 Token handling: refresh tokens decrypt on demand; the Google client relies on
-googleapis auto-refresh. Per-provider constant lists of *permanent* OAuth error
+googleapis auto-refresh. Per-provider constant lists of _permanent_ OAuth error
 codes distinguish "refresh token dead → reconnect" from transient network
 failures.
 
@@ -139,7 +139,7 @@ ONGOING → sync folder list → driver returns added/deleted external IDs →
 dedup against existing MCMAs **in chunks of 200** → stage the new IDs into a
 **Redis set** `messages-to-import:{workspace}:{channel}` with **1-week TTL** →
 advance cursor (`messaging-cursor.service.ts` — channel-level cursor only
-advances monotonically, guarding Gmail historyId regressions). On a *full*
+advances monotonically, guarding Gmail historyId regressions). On a _full_
 sync it also sweeps MCMAs whose external IDs vanished from the provider
 (deletion reconciliation) in id-paginated batches of 200. Nothing to import →
 sync complete; else → import stage (started inline, cron as fallback).
@@ -156,16 +156,16 @@ into the Redis set** before the exception handler runs — no work lost.
 **Error taxonomy** (`messaging-import-exception-handler.service.ts`) — the
 production-hardened part:
 
-- *Temporary* (network errors, read timeouts, provider throttles) →
+- _Temporary_ (network errors, read timeouts, provider throttles) →
   exponential backoff: `1 min × 2^(failureCount−1)`, cap **5 attempts**,
   provider `Retry-After` honored; stage reset to PENDING. Past the cap →
   `FAILED_UNKNOWN` (the relaunch cron will retry later).
-- *Auth* (invalid/missing refresh token, insufficient permissions) →
+- _Auth_ (invalid/missing refresh token, insufficient permissions) →
   `FAILED_INSUFFICIENT_PERMISSIONS`, `authFailedAt` set, account queued for
   the reconnect UX. Never auto-retried.
-- *Cursor invalidation* (Gmail expires old historyIds) → wipe channel and
+- _Cursor invalidation_ (Gmail expires old historyIds) → wipe channel and
   folder cursors, restart full sync from zero.
-- *NOT_FOUND* → fatal during list-fetch; resets to full sync during import.
+- _NOT_FOUND_ → fatal during list-fetch; resets to full sync during import.
 
 ## 5. Visibility, blocklist, contact creation
 
@@ -179,7 +179,7 @@ production-hardened part:
   already-synced matching MCMAs (and orphaned messages/threads); removing an
   entry triggers re-import.
 - **Contact auto-creation** (`contact-creation-manager/`): policy default is
-  **`SENT`-only** — participants of messages *you sent* become person
+  **`SENT`-only** — participants of messages _you sent_ become person
   records; inbound senders don't (automatic spam filter).
   `SENT_AND_RECEIVED` and `NONE` are the other options. A company record is
   created **only for work domains** (free-provider list — gmail.com etc. —
@@ -201,7 +201,7 @@ on send.
 ## 7. Takeaways for us
 
 Our recorded Gmail design (CONTEXT.md: forward-only, BYO GCP client) is
-deliberately *not* this. This survey prices the alternative: full-mailbox sync
+deliberately _not_ this. This survey prices the alternative: full-mailbox sync
 costs an 8-stage state machine, 5 cron jobs, Redis staging, cursor-invalidation
 recovery, webhook subscription renewal, and a read-time redaction layer.
 
@@ -218,7 +218,7 @@ recovery, webhook subscription renewal, and a read-time redaction layer.
    exist from day one; retrofitting redaction into a store that assumed
    share-everything is miserable.
 4. **`SENT`-only contact creation is the right default** whenever
-   participants→person creation lands: records for people *you emailed*
+   participants→person creation lands: records for people _you emailed_
    filters spam by construction and matches investor behavior. Pair with a
    free-email-provider list: work domain → company; gmail.com → person only.
 5. **Copy the error taxonomy into any external-API worker** (Apollo included,

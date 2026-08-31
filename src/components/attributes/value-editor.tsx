@@ -133,7 +133,7 @@ export function ValueEditor({
           aria-label={def.name}
           onClick={() => onSave(!value)}
           className={cn(
-            'flex size-4 items-center justify-center rounded border transition-colors duration-150 ease-out-quart focus-ring',
+            'flex size-4 items-center justify-center rounded border focus-ring transition-colors duration-150 ease-out-quart',
             value
               ? 'border-primary bg-primary text-primary-foreground'
               : 'border-input hover:border-ring',
@@ -231,7 +231,7 @@ function DateCellEditor({ def, value, onSave }: Props) {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           if (e.key === 'Escape') setEditing(false)
         }}
-        className="focus-ring-inset h-full w-full min-w-0 rounded bg-transparent px-1 text-ui"
+        className="h-full w-full min-w-0 rounded bg-transparent px-1 text-ui focus-ring-inset"
       />
     )
   }
@@ -242,7 +242,7 @@ function DateCellEditor({ def, value, onSave }: Props) {
       aria-label={def.name}
       onClick={() => setEditing(true)}
       className={cn(
-        'focus-ring-inset h-full w-full rounded px-1 text-ui',
+        'h-full w-full rounded px-1 text-ui focus-ring-inset',
         stored ? 'numeric' : 'text-left text-muted-foreground',
       )}
     >
@@ -298,10 +298,10 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
         'w-full min-w-0 bg-transparent text-ui',
         (def.type === 'number' || def.type === 'currency') && 'numeric',
         variant === 'field'
-          ? 'focus-ring border-input h-8 rounded-md border px-2.5 shadow-xs'
+          ? 'h-8 rounded-md border border-input px-2.5 shadow-xs focus-ring'
           : // Inset inside a cell: an offset ring would be clipped by the
             // table's scroll container and overlap the neighbouring column.
-            'focus-ring-inset h-full rounded px-1',
+            'h-full rounded px-1 focus-ring-inset',
       )}
     />
   )
@@ -346,8 +346,8 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
         className={cn(
           'flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'focus-ring border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
-            : 'focus-ring-inset h-full w-full rounded px-1',
+            ? 'h-8 w-full rounded-md border border-input px-2.5 shadow-xs focus-ring'
+            : 'h-full w-full rounded px-1 focus-ring-inset',
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
@@ -428,8 +428,8 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
         className={cn(
           'flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'focus-ring border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
-            : 'focus-ring-inset h-full w-full rounded px-1',
+            ? 'h-8 w-full rounded-md border border-input px-2.5 shadow-xs focus-ring'
+            : 'h-full w-full rounded px-1 focus-ring-inset',
         )}
       >
         <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-ui">
@@ -488,8 +488,8 @@ function OptionPicker({
         className={cn(
           'flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'focus-ring border-input h-8 w-full rounded-md border px-2.5 shadow-xs'
-            : 'focus-ring-inset h-full w-full rounded px-1',
+            ? 'h-8 w-full rounded-md border border-input px-2.5 shadow-xs focus-ring'
+            : 'h-full w-full rounded px-1 focus-ring-inset',
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">

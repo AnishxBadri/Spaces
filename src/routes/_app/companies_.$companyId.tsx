@@ -119,7 +119,7 @@ function CompanyRecordPage() {
     <div className="mx-auto max-w-7xl px-6 py-8 md:px-10">
       <Link
         to="/companies"
-        className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground hover:text-foreground focus-ring"
+        className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground focus-ring hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" strokeWidth={1.75} />
         Companies
@@ -179,7 +179,7 @@ function CompanyRecordPage() {
             objectKind="company"
             onCreated={() => router.invalidate()}
             trigger={
-              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-ring">
+              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground focus-ring hover:text-foreground">
                 <Plus className="size-3" strokeWidth={2} />
                 Add attribute
               </button>
@@ -203,7 +203,7 @@ function CompanyRecordPage() {
                   aria-selected={tab === t}
                   onClick={() => setTab(t)}
                   className={cn(
-                    'relative px-3 pb-2.5 text-ui font-medium capitalize text-muted-foreground transition-colors hover:text-foreground focus-ring rounded-t-md',
+                    'relative rounded-t-md px-3 pb-2.5 text-ui font-medium text-muted-foreground capitalize focus-ring transition-colors hover:text-foreground',
                     tab === t &&
                       'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
                   )}
@@ -243,7 +243,7 @@ function CompanyRecordPage() {
                     <Link
                       to="/notes/$noteId"
                       params={{ noteId: m.fromId }}
-                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-ui hover:bg-accent focus-ring"
+                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-ui focus-ring hover:bg-accent"
                     >
                       <FileText
                         className="size-4 text-muted-foreground"
@@ -282,7 +282,7 @@ function CompanyRecordPage() {
                     <Link
                       to="/deals/$dealId"
                       params={{ dealId: d.id }}
-                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-ui hover:bg-accent focus-ring"
+                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-ui focus-ring hover:bg-accent"
                     >
                       <span className="min-w-0 flex-1 truncate">{d.name}</span>
                       {d.stage && stageDef ? (
@@ -320,7 +320,7 @@ function CompanyRecordPage() {
                       })
                       router.invalidate()
                     }}
-                    className="hidden size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground group-hover:flex focus-visible:flex focus-ring"
+                    className="hidden size-5 items-center justify-center rounded text-muted-foreground focus-ring group-hover:flex hover:text-foreground focus-visible:flex"
                   >
                     <X className="size-3" strokeWidth={2} />
                   </button>
@@ -338,7 +338,7 @@ function CompanyRecordPage() {
                   })
                   router.invalidate()
                 }}
-                className="border-input mt-2 h-7 w-full rounded-md border bg-transparent px-2 text-xs text-muted-foreground focus-ring"
+                className="mt-2 h-7 w-full rounded-md border border-input bg-transparent px-2 text-xs text-muted-foreground focus-ring"
               >
                 <option value="">+ Tag into space…</option>
                 {untaggedSpaces.map((s) => (
@@ -366,7 +366,7 @@ function CompanyRecordPage() {
                     <Link
                       to="/people/$personId"
                       params={{ personId: p.id }}
-                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-ui hover:bg-accent focus-ring"
+                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-ui focus-ring hover:bg-accent"
                     >
                       <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-muted text-micro font-semibold text-muted-foreground">
                         {p.name.charAt(0).toUpperCase()}
@@ -486,7 +486,7 @@ function DomainsField({
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-ring"
+          className="flex items-center gap-1 rounded-md text-xs text-muted-foreground focus-ring hover:text-foreground"
         >
           <Plus className="size-3" strokeWidth={2} />
           Add domain

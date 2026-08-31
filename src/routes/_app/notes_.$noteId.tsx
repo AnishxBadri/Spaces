@@ -96,7 +96,7 @@ function NotePage() {
       <div className="flex items-center justify-between">
         <Link
           to="/notes"
-          className="flex items-center gap-1.5 text-ui text-muted-foreground hover:text-foreground focus-ring rounded-md"
+          className="flex items-center gap-1.5 rounded-md text-ui text-muted-foreground focus-ring hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" strokeWidth={1.75} />
           Notes
@@ -239,7 +239,7 @@ function VisibilityToggle({
       type="button"
       onClick={toggle}
       disabled={pending}
-      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-ring"
+      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground focus-ring hover:bg-accent hover:text-foreground"
       title={
         isPrivate
           ? 'Private — only you. Click to share with the workspace.'
@@ -286,13 +286,13 @@ function SpaceFiling({
       {filed.map((s) => (
         <span
           key={s.id}
-          className="group flex h-6 items-center gap-1 rounded-full border border-border pl-2 pr-1 text-xs font-medium text-muted-foreground"
+          className="group flex h-6 items-center gap-1 rounded-full border border-border pr-1 pl-2 text-xs font-medium text-muted-foreground"
         >
           <Layers className="size-3 shrink-0" strokeWidth={1.75} />
           <Link
             to="/spaces/$spaceId"
             params={{ spaceId: s.id }}
-            className="rounded hover:text-foreground focus-ring"
+            className="rounded focus-ring hover:text-foreground"
           >
             {s.name}
           </Link>
@@ -304,7 +304,7 @@ function SpaceFiling({
                 untagFromSpace({ data: { entityId: noteId, spaceId: s.id } }),
               )
             }
-            className="flex size-4 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-ring"
+            className="flex size-4 items-center justify-center rounded-full text-muted-foreground focus-ring hover:text-foreground"
           >
             <X className="size-2.5" strokeWidth={2.5} />
           </button>
@@ -322,7 +322,7 @@ function SpaceFiling({
             e.target.value = ''
             run(() => tagIntoSpace({ data: { entityId: noteId, spaceId } }))
           }}
-          className="h-6 rounded-full border border-dashed border-border bg-transparent px-2 text-xs text-muted-foreground outline-none hover:border-input hover:text-foreground focus-ring"
+          className="h-6 rounded-full border border-dashed border-border bg-transparent px-2 text-xs text-muted-foreground focus-ring outline-none hover:border-input hover:text-foreground"
         >
           <option value="">+ File in space…</option>
           {unfiled.map((s) => (

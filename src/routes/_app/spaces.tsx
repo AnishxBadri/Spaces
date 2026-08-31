@@ -44,14 +44,14 @@ function SpacesPage() {
       {spaces.length === 0 ? (
         <MarketsCreator />
       ) : (
-        <ul className="mt-6 -mx-2">
+        <ul className="-mx-2 mt-6">
           {spaces.map((s) => (
             <li key={s.id}>
               <Link
                 to="/spaces/$spaceId"
                 params={{ spaceId: s.id }}
                 className={cn(
-                  'group flex h-9 items-center gap-2 rounded-md px-2 text-ui hover:bg-accent focus-ring',
+                  'group flex h-9 items-center gap-2 rounded-md px-2 text-ui focus-ring hover:bg-accent',
                 )}
                 style={{ paddingLeft: `${8 + s.depth * 20}px` }}
               >
@@ -229,7 +229,7 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
               <button
                 type="button"
                 onClick={() => setScaffold(null)}
-                className="focus-ring rounded text-muted-foreground hover:text-foreground"
+                className="rounded text-muted-foreground focus-ring hover:text-foreground"
                 aria-label="Clear scaffold"
               >
                 ×
@@ -263,7 +263,7 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
               id="space-parent"
               name="parent"
               defaultValue=""
-              className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs focus-ring"
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs focus-ring"
             >
               <option value="">None — top level</option>
               {spaces.map((s) => (

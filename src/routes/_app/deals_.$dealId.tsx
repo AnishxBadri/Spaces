@@ -123,7 +123,7 @@ function DealRecordPage() {
       ) : null}
       <Link
         to="/deals"
-        className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground hover:text-foreground focus-ring"
+        className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground focus-ring hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" strokeWidth={1.75} />
         Deals
@@ -240,7 +240,7 @@ function DealRecordPage() {
             objectKind="deal"
             onCreated={() => router.invalidate()}
             trigger={
-              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground focus-ring">
+              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground focus-ring hover:text-foreground">
                 <Plus className="size-3" strokeWidth={2} />
                 Add attribute
               </button>
@@ -264,7 +264,7 @@ function DealRecordPage() {
                   aria-selected={tab === t}
                   onClick={() => setTab(t)}
                   className={cn(
-                    'relative px-3 pb-2.5 text-ui font-medium capitalize text-muted-foreground transition-colors hover:text-foreground focus-ring rounded-t-md',
+                    'relative rounded-t-md px-3 pb-2.5 text-ui font-medium text-muted-foreground capitalize focus-ring transition-colors hover:text-foreground',
                     tab === t &&
                       'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
                   )}
@@ -286,7 +286,7 @@ function DealRecordPage() {
               <LogInteractionDialog
                 seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
                 trigger={
-                  <button className="focus-ring mt-4 flex h-9 w-full items-center gap-2 rounded-md border border-input px-3 text-left text-ui text-muted-foreground transition-colors duration-150 ease-out-quart hover:border-border hover:bg-accent">
+                  <button className="mt-4 flex h-9 w-full items-center gap-2 rounded-md border border-input px-3 text-left text-ui text-muted-foreground focus-ring transition-colors duration-150 ease-out-quart hover:border-border hover:bg-accent">
                     <MessageSquare
                       className="size-3.5 shrink-0"
                       strokeWidth={1.75}
@@ -315,7 +315,7 @@ function DealRecordPage() {
                     <Link
                       to="/notes/$noteId"
                       params={{ noteId: m.fromId }}
-                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-ui hover:bg-accent focus-ring"
+                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-ui focus-ring hover:bg-accent"
                     >
                       <FileText
                         className="size-4 text-muted-foreground"

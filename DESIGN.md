@@ -2,96 +2,96 @@
 name: DealOS
 description: Self-hosted deal-management OS for angel and private-capital investing
 colors:
-  pine: "oklch(0.55 0.14 155)"
-  pine-hover: "oklch(0.5 0.14 155)"
-  selected-wash: "oklch(0.962 0.022 155)"
-  ground: "oklch(1 0 0)"
-  ink: "oklch(0.24 0.012 155)"
-  muted-ink: "oklch(0.49 0.016 155)"
-  panel: "oklch(0.976 0.003 155)"
-  border: "oklch(0.92 0.005 155)"
-  input-border: "oklch(0.885 0.006 155)"
-  row-hover: "oklch(0.977 0.003 155)"
-  destructive-crimson: "oklch(0.48 0.17 12)"
-  success-teal: "oklch(0.55 0.09 190)"
-  warning-amber: "oklch(0.7 0.13 75)"
-  info-blue: "oklch(0.55 0.1 240)"
+  pine: 'oklch(0.55 0.14 155)'
+  pine-hover: 'oklch(0.5 0.14 155)'
+  selected-wash: 'oklch(0.962 0.022 155)'
+  ground: 'oklch(1 0 0)'
+  ink: 'oklch(0.24 0.012 155)'
+  muted-ink: 'oklch(0.49 0.016 155)'
+  panel: 'oklch(0.976 0.003 155)'
+  border: 'oklch(0.92 0.005 155)'
+  input-border: 'oklch(0.885 0.006 155)'
+  row-hover: 'oklch(0.977 0.003 155)'
+  destructive-crimson: 'oklch(0.48 0.17 12)'
+  success-teal: 'oklch(0.55 0.09 190)'
+  warning-amber: 'oklch(0.7 0.13 75)'
+  info-blue: 'oklch(0.55 0.1 240)'
 typography:
   display:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "1.625rem"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '1.625rem'
     fontWeight: 600
-    lineHeight: "2rem"
-    letterSpacing: "-0.025em"
+    lineHeight: '2rem'
+    letterSpacing: '-0.025em'
   headline:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "1.375rem"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '1.375rem'
     fontWeight: 600
-    lineHeight: "1.75rem"
-    letterSpacing: "-0.025em"
+    lineHeight: '1.75rem'
+    letterSpacing: '-0.025em'
   title:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.9375rem"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '0.9375rem'
     fontWeight: 600
-    lineHeight: "1.375rem"
+    lineHeight: '1.375rem'
   body:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.875rem"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '0.875rem'
     fontWeight: 400
-    lineHeight: "1.25rem"
+    lineHeight: '1.25rem'
   ui:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.8125rem"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '0.8125rem'
     fontWeight: 400
-    lineHeight: "1.25rem"
+    lineHeight: '1.25rem'
   label:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.75rem"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '0.75rem'
     fontWeight: 500
-    lineHeight: "1rem"
+    lineHeight: '1rem'
   micro:
-    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.6875rem"
+    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '0.6875rem'
     fontWeight: 500
-    lineHeight: "1rem"
+    lineHeight: '1rem'
   prose:
-    fontFamily: "Source Serif 4 Variable, Georgia, serif"
-    fontSize: "1.0625rem"
+    fontFamily: 'Source Serif 4 Variable, Georgia, serif'
+    fontSize: '1.0625rem'
     fontWeight: 400
     lineHeight: 1.65
 rounded:
-  sm: "4px"
-  md: "6px"
-  lg: "8px"
-  xl: "12px"
+  sm: '4px'
+  md: '6px'
+  lg: '8px'
+  xl: '12px'
 spacing:
-  row: "2.25rem"
+  row: '2.25rem'
 components:
   button-primary:
-    backgroundColor: "{colors.pine}"
-    textColor: "#ffffff"
-    rounded: "{rounded.md}"
-    padding: "8px 16px"
-    height: "36px"
+    backgroundColor: '{colors.pine}'
+    textColor: '#ffffff'
+    rounded: '{rounded.md}'
+    padding: '8px 16px'
+    height: '36px'
   button-primary-hover:
-    backgroundColor: "{colors.pine-hover}"
+    backgroundColor: '{colors.pine-hover}'
   button-outline:
-    backgroundColor: "{colors.ground}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.md}"
-    padding: "6px 12px"
-    height: "32px"
+    backgroundColor: '{colors.ground}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.md}'
+    padding: '6px 12px'
+    height: '32px'
   button-ghost:
-    backgroundColor: "transparent"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.md}"
-    height: "32px"
+    backgroundColor: 'transparent'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.md}'
+    height: '32px'
   input:
-    backgroundColor: "transparent"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.md}"
-    padding: "4px 12px"
-    height: "36px"
+    backgroundColor: 'transparent'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.md}'
+    padding: '4px 12px'
+    height: '36px'
 ---
 
 # Design System: DealOS
@@ -112,6 +112,7 @@ identical card grids), and the dark terminal aesthetic (monospace-everything, ne
 Familiarity is earned through craft — typography, spacing, alignment — not through decoration.
 
 **Key Characteristics:**
+
 - Pure white ground; color appears only where it carries meaning
 - Two registers, one system: ledger for data, page for prose
 - Keyboard-first; latency is a design defect
@@ -125,6 +126,7 @@ rarely and therefore clearly. Every value below is live in `src/styles.css` — 
 describes; the CSS decides.
 
 ### Primary
+
 - **Pine** (oklch(0.55 0.14 155) ≈ #00884b): primary actions, current selection, focus
   rings. Third primary, by owner decision (2026-08): Ochre Gold fell to contrast physics
   (2026-07), Vermilion to preference for a quieter, capital-coded voice. Costs accepted
@@ -138,6 +140,7 @@ describes; the CSS decides.
   under ink.
 
 ### Neutral
+
 - **Pure White** (oklch(1 0 0)): the body background. Literal white, no hidden tint —
   the mood lives in the pine and the type, never in a tinted surface.
 - **Ink** (oklch(0.24 0.012 155)): body text, ~13:1 against white.
@@ -150,16 +153,18 @@ describes; the CSS decides.
   feel of-the-brand without reading tinted.
 
 ### Semantic
+
 - **Destructive** is deep crimson (oklch(0.48 0.17 12)) — chosen under the vermilion
   primary to keep delete unmistakable from act, kept under pine because it still reads
   unambiguously destructive against everything else.
 - **Success moved to teal** (oklch(0.55 0.09 190), 2026-08): pine owns green now, and a
-  success *state* sharing the action hue would blur two meanings — the Meaning Rule
+  success _state_ sharing the action hue would blur two meanings — the Meaning Rule
   applied to the system itself. Warning oklch(0.7 0.13 75) · info oklch(0.55 0.1 240).
   Standardized once, used identically everywhere. Stage and status colors are data, not
   decoration.
 
 ### Badge palette
+
 Twelve hues (slate → cyan around the wheel) for select/status options, every one built
 the same way: a pale tint at L 0.955 and same-hue ink at L 0.45, chroma fitted to the
 largest the sRGB gamut allows at that lightness. Fixing lightness across all twelve is
@@ -168,6 +173,7 @@ quietly fall below the contrast floor — the worst pair measures 6.26:1, the be
 Options get a hue auto-assigned; users can override per option in settings.
 
 ### Named Rules
+
 **The Two-Tier Rule** (2026-07 — supersedes the Ten Percent Rule). Badges may take any of
 twelve hues, so rarity can no longer be what marks the primary out. Instead: **the primary
 is the only fully saturated fill on a surface; option badges are always a pale tint with
@@ -196,23 +202,25 @@ fluid). A text serif appears only where the user reads: note bodies, memos, the 
 Data reads like a ledger; prose reads like a page.
 
 ### The named scale
+
 Seven steps, each mapping to one role. **If a size isn't on this list it does not go in
 the app** — no `text-[15px]` arbitraries.
 
-| step | size | role |
-|---|---|---|
-| `text-micro` | 11px | timestamps, chip counts, avatar initials |
-| `text-label` | 12px | field labels, metadata |
-| `text-ui` | 13px | the table + form workhorse |
-| `text-body` | 14px | default running text in UI (the body baseline) |
-| `text-title` | 15px | section headers, panel titles |
-| `text-page` | 22px | page titles |
-| `text-display` | 26px | record names |
+| step           | size | role                                           |
+| -------------- | ---- | ---------------------------------------------- |
+| `text-micro`   | 11px | timestamps, chip counts, avatar initials       |
+| `text-label`   | 12px | field labels, metadata                         |
+| `text-ui`      | 13px | the table + form workhorse                     |
+| `text-body`    | 14px | default running text in UI (the body baseline) |
+| `text-title`   | 15px | section headers, panel titles                  |
+| `text-page`    | 22px | page titles                                    |
+| `text-display` | 26px | record names                                   |
 
 The prose register opts out of the scale: note bodies render serif at 17px, line-height
 1.65 (`.prose-note`), headings inside prose stay sans.
 
 ### Named Rules
+
 **The Two Registers Rule.** Serif appears only in prose bodies the user reads and writes.
 Never in buttons, labels, tables, navigation, or data. Sans everywhere else. No exceptions.
 
@@ -223,11 +231,12 @@ class, so the two halves cannot drift apart; `.tabular` alone is for figures inl
 sentence or chip ("12 of 40"), where right-alignment would be wrong.
 
 ### Rhythm
+
 - **Row height:** one token, `--row-h: 2.25rem`, shared by table headers and body rows so
   a sticky header sits flush against the first row. Exposed as `spacing-row`.
 - **Radius:** `--radius: 0.375rem` — crisper than shadcn's 10px default; this is a tool,
   not a toy.
-- Row hover is an *opaque* neutral (`--row-hover`), never a translucent tint: a
+- Row hover is an _opaque_ neutral (`--row-hover`), never a translucent tint: a
   translucent hover on a sticky column lets the columns scrolling underneath bleed
   through it.
 
@@ -251,6 +260,7 @@ Documented from the shipped code (2026-08, post-sweep) — one focus treatment, 
 steps, and the motion doctrine below apply to every component without exception.
 
 ### Motion
+
 **Pure CSS, used extensively, never decoratively.** No JS animation runtime — Radix
 `data-state` attributes + `tw-animate-css` keyframes + Tailwind transitions carry
 everything, which is what lets the one global `prefers-reduced-motion` query silence the
@@ -273,6 +283,7 @@ entire app. Principles, after Rauno Freiberg's interface guidelines:
 doesn't ship.
 
 ### Buttons
+
 - **Shape:** crisp corners (6px radius), heights 24 / 32 / 36 / 40px (`xs / sm / default / lg`).
 - **Primary:** the only saturated fill on any surface — Pine on white text
   (oklch(0.55 0.14 155), 4.52:1), hover deepens to pine-hover, press compresses to 0.97.
@@ -283,6 +294,7 @@ doesn't ship.
   deliberately replaced and must not return with re-vendored primitives.
 
 ### Inputs / Fields
+
 - **Style:** transparent background, 1px `input-border` stroke, 6px radius, 36px height,
   `shadow-xs`; selection highlight uses the primary.
 - **Focus:** `focus-ring` outline plus the border shifting to the ring color.
@@ -293,16 +305,19 @@ doesn't ship.
   convention).
 
 ### The Record Table (signature)
+
 The hardest-working surface; spreadsheet-grade or the audience leaves.
+
 - **Rows:** one `--row-h` (36px) shared by header and body — the sticky header sits
   flush; borders at 60% border color between rows, none after the last.
 - **Header:** sticky, white, `text-ui` medium; resizable and hideable columns.
-- **Hover:** the *opaque* `row-hover` neutral (translucency bleeds under sticky columns).
+- **Hover:** the _opaque_ `row-hover` neutral (translucency bleeds under sticky columns).
 - **Cells:** `text-ui` (13px); editors are borderless until hover ('cell' variant);
   comparable numbers set `.numeric`; empty cells render an em dash.
 - **Focus inside the scroll container:** `focus-ring-inset`, never the offset ring.
 
 ### Typed Value Editors (signature)
+
 One implementation shared by table cells, record rails, and create dialogs — `variant`
 only changes chrome ('cell' is borderless-until-hover; 'field' looks like a form input).
 Selects/statuses/multi-selects render option badges; ratings render primary-filled stars;
@@ -312,17 +327,20 @@ spanning both — the registry generates the form, so the span rule survives any
 attribute.
 
 ### Option Badges
+
 Pills carrying select/status/stage values: pale tint background + same-hue ink from the
 twelve-hue palette, `text-label` (12px) medium, full radius. Data colors, never
 decoration; the Two-Tier Rule guarantees they never compete with the primary.
 
 ### Navigation
+
 Fixed 240px sidebar on the panel neutral; items are 32px rows, `text-ui` medium, Muted
 Ink at rest → ink on hover with the accent tint → the selection wash + ink when active
 (`aria-current="page"`). The workspace name (or wordmark) heads it; Cmd-K search sits
 directly beneath. Collapses to a drawer under a 48px top bar on mobile.
 
 ### Overlays (Dialogs · Menus · Tooltips)
+
 - **Dialogs:** centered, max-height 85vh with internal scroll, 8px radius, `shadow-lg`,
   1px border; enter 180ms fade+zoom-in-95, exit 120ms. Wide (672px) when a form has >4
   fields, narrow (384–448px) otherwise. A modal must be argued for — previews and
@@ -333,6 +351,7 @@ directly beneath. Collapses to a drawer under a 48px top bar on mobile.
 - **Toasts:** sonner, bottom-right, self-contained motion.
 
 ### Empty States (teaching)
+
 Centered, max 24rem: an icon in a 44px muted rounded square, `text-title` semibold
 headline, two sentences of Muted Ink body that explain what the surface will do, then the
 create action — and, where relevant, a quiet hint line about what automation will fill
@@ -341,6 +360,7 @@ this later. A table should almost never be empty at all (demo seed exists for th
 ## 6. Do's and Don'ts
 
 ### Do:
+
 - **Do** keep the ground pure white (oklch(1 0 0)) and let pine + typography carry all character.
 - **Do** hold body text at ≥4.5:1 contrast — muted gray "for elegance" is the first failure mode of this aesthetic lane.
 - **Do** set every comparable number in tabular figures, right-aligned.
@@ -348,6 +368,7 @@ this later. A table should almost never be empty at all (demo seed exists for th
 - **Do** use density confidently in tables; calm comes from alignment and rhythm, not sparseness.
 
 ### Don't:
+
 - **Don't** ship anything that reads as "Salesforce/HubSpot CRM" — enterprise chrome, dashboards-first, configuration sprawl.
 - **Don't** ship the "generic SaaS template" look — shadcn-default styling, gradient heroes, identical card grids, default purple accents.
 - **Don't** drift into the "dark terminal aesthetic" — dark-only, monospace-everything, neon accents. (A proper dark theme is a feature; terminal cosplay is a ban.)

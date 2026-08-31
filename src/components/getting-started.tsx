@@ -75,14 +75,14 @@ export function GettingStarted({ progress }: { progress: OnboardingProgress }) {
       <div className="flex items-baseline justify-between">
         <h2 className="text-ui font-semibold">
           Getting started
-          <span className="text-muted-foreground ml-2 font-normal tabular">
+          <span className="tabular ml-2 font-normal text-muted-foreground">
             {done}/{STEPS.length}
           </span>
         </h2>
         <button
           type="button"
           aria-label="Dismiss getting started"
-          className="focus-ring rounded text-muted-foreground hover:text-foreground"
+          className="rounded text-muted-foreground focus-ring hover:text-foreground"
           onClick={() => {
             localStorage.setItem(DISMISS_KEY, '1')
             setVisible(false)
@@ -99,7 +99,7 @@ export function GettingStarted({ progress }: { progress: OnboardingProgress }) {
               <Link
                 to={s.to}
                 className={cn(
-                  'focus-ring group flex items-baseline gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent',
+                  'group flex items-baseline gap-2.5 rounded-md px-2 py-1.5 focus-ring hover:bg-accent',
                   isDone && 'opacity-60',
                 )}
               >

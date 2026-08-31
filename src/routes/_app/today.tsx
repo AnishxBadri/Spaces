@@ -116,7 +116,7 @@ function TodayPage() {
           <Stat label="MOIC" value={fmtMultiple(holdings.rollup.moic)} />
           <Link
             to="/portfolio"
-            className="focus-ring ml-auto rounded text-label text-muted-foreground hover:text-foreground"
+            className="ml-auto rounded text-label text-muted-foreground focus-ring hover:text-foreground"
           >
             Portfolio →
           </Link>
@@ -159,7 +159,7 @@ function TodayPage() {
               <li className="px-4 py-2">
                 <Link
                   to="/tasks"
-                  className="focus-ring rounded text-label text-muted-foreground hover:text-foreground"
+                  className="rounded text-label text-muted-foreground focus-ring hover:text-foreground"
                 >
                   All tasks →
                 </Link>
@@ -174,7 +174,7 @@ function TodayPage() {
                   <Link
                     to="/deals/$dealId"
                     params={{ dealId: d.id }}
-                    className="focus-ring flex items-baseline gap-3 px-4 py-2 hover:bg-accent"
+                    className="flex items-baseline gap-3 px-4 py-2 focus-ring hover:bg-accent"
                   >
                     <span className="min-w-0 flex-1 truncate text-ui">
                       {d.name}
@@ -198,7 +198,7 @@ function TodayPage() {
                   <Link
                     to="/portfolio/$holdingId"
                     params={{ holdingId: h.id }}
-                    className="focus-ring flex items-baseline gap-3 px-4 py-2 hover:bg-accent"
+                    className="flex items-baseline gap-3 px-4 py-2 focus-ring hover:bg-accent"
                   >
                     <span className="min-w-0 flex-1 truncate text-ui">
                       {h.companyName}
@@ -219,7 +219,7 @@ function TodayPage() {
               <li className="px-4 py-2">
                 <Link
                   to="/settings"
-                  className="focus-ring rounded text-ui text-destructive hover:opacity-80"
+                  className="rounded text-ui text-destructive focus-ring hover:opacity-80"
                 >
                   {missingRates} holding{missingRates === 1 ? '' : 's'} excluded
                   from portfolio totals — add rates in Settings →

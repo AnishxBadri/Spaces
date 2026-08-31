@@ -112,7 +112,7 @@ export function LogInteractionDialog({
                 aria-pressed={kind === k}
                 onClick={() => setKind(k)}
                 className={cn(
-                  'flex-1 rounded px-2 py-1 text-xs font-medium capitalize transition-colors focus-ring',
+                  'flex-1 rounded px-2 py-1 text-xs font-medium capitalize focus-ring transition-colors',
                   kind === k
                     ? 'bg-selected text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
@@ -209,7 +209,7 @@ function AttendeePicker({
                   onClick={() =>
                     onChange(attendees.filter((x) => x.id !== a.id))
                   }
-                  className="rounded-full text-muted-foreground hover:text-foreground focus-ring"
+                  className="rounded-full text-muted-foreground focus-ring hover:text-foreground"
                 >
                   <X className="size-2.5" strokeWidth={2} />
                 </button>
@@ -237,7 +237,7 @@ function AttendeePicker({
                     onChange([...attendees, r])
                     setQuery('')
                   }}
-                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-ui hover:bg-accent focus-ring"
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-ui focus-ring hover:bg-accent"
                 >
                   <Icon
                     className="size-3.5 text-muted-foreground"

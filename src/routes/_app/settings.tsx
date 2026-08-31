@@ -171,7 +171,7 @@ function SettingsPage() {
               aria-selected={kind === o.kind}
               onClick={() => setKind(o.kind)}
               className={cn(
-                'relative flex items-center gap-1.5 px-3 pb-2.5 text-ui font-medium text-muted-foreground transition-colors hover:text-foreground focus-ring rounded-t-md',
+                'relative flex items-center gap-1.5 rounded-t-md px-3 pb-2.5 text-ui font-medium text-muted-foreground focus-ring transition-colors hover:text-foreground',
                 kind === o.kind &&
                   'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
               )}
@@ -345,7 +345,7 @@ function MembersSection({
             </span>
             {isAdmin && m.id !== me.id ? (
               <DropdownMenu>
-                <DropdownMenuTrigger className="rounded-md px-2 py-1 text-xs font-medium capitalize text-muted-foreground hover:bg-accent hover:text-foreground focus-ring">
+                <DropdownMenuTrigger className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground capitalize focus-ring hover:bg-accent hover:text-foreground">
                   {m.role}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
@@ -382,7 +382,7 @@ function MembersSection({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <span className="px-2 text-xs font-medium capitalize text-muted-foreground">
+              <span className="px-2 text-xs font-medium text-muted-foreground capitalize">
                 {m.role}
               </span>
             )}
@@ -455,7 +455,7 @@ function MembersSection({
                     {new Date(inv.expiresAt).toLocaleDateString()}
                   </span>
                   <button
-                    className="rounded px-1.5 py-0.5 hover:bg-accent hover:text-foreground focus-ring"
+                    className="rounded px-1.5 py-0.5 focus-ring hover:bg-accent hover:text-foreground"
                     onClick={() =>
                       act(
                         () => revokeInvite({ data: { id: inv.id } }),
@@ -527,7 +527,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
                 <span className="block truncate text-ui font-medium">
                   {t.name}
                 </span>
-                <span className="block text-xs capitalize text-muted-foreground">
+                <span className="block text-xs text-muted-foreground capitalize">
                   {t.kind === 'record' ? (t.objectKind ?? 'record') : t.kind}
                 </span>
               </span>
@@ -552,7 +552,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
                         )
                       }
                       className={cn(
-                        'focus-ring rounded-full px-2 py-0.5 text-xs capitalize',
+                        'rounded-full px-2 py-0.5 text-xs capitalize focus-ring',
                         on
                           ? 'bg-selected font-medium text-foreground'
                           : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -572,7 +572,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
                     t.archived ? 'Template restored' : 'Template archived',
                   )
                 }
-                className="focus-ring rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="rounded px-1.5 py-0.5 text-xs text-muted-foreground focus-ring hover:bg-accent hover:text-foreground"
               >
                 {t.archived ? 'Restore' : 'Archive'}
               </button>
@@ -911,7 +911,7 @@ function InlineName({
           ;(e.target as HTMLInputElement).blur()
         }
       }}
-      className="focus-ring block w-full truncate rounded bg-transparent text-ui font-medium"
+      className="block w-full truncate rounded bg-transparent text-ui font-medium focus-ring"
     />
   )
 }
@@ -978,7 +978,7 @@ function OptionsEditor({
                     ),
                   )
                 }
-                className="border-input h-7 rounded-md border bg-transparent px-2 text-xs outline-none"
+                className="h-7 rounded-md border border-input bg-transparent px-2 text-xs outline-none"
               >
                 <option value="active">Active</option>
                 <option value="parked">Parked</option>
@@ -1063,7 +1063,7 @@ function IconBtn({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="flex size-6.5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40 focus-ring"
+      className="flex size-6.5 items-center justify-center rounded text-muted-foreground focus-ring transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
     >
       {children}
     </button>
@@ -1089,7 +1089,7 @@ function ColorPicker({
       <DropdownMenuTrigger
         aria-label={`Colour for ${label}`}
         title={`Colour: ${value}`}
-        className="focus-ring size-6 shrink-0 rounded-full border border-border transition-colors duration-150 ease-out-quart hover:border-input"
+        className="size-6 shrink-0 rounded-full border border-border focus-ring transition-colors duration-150 ease-out-quart hover:border-input"
         style={{ backgroundColor: `var(--badge-${value})` }}
       >
         <span
@@ -1111,7 +1111,7 @@ function ColorPicker({
               onSelect={() => onPick(c)}
               style={badgeStyle(c)}
               className={cn(
-                'focus-ring flex size-7 items-center justify-center rounded-full border p-0 transition-colors duration-150 ease-out-quart',
+                'flex size-7 items-center justify-center rounded-full border p-0 focus-ring transition-colors duration-150 ease-out-quart',
                 c === value ? 'border-foreground' : 'border-transparent',
               )}
             >

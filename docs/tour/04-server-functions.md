@@ -67,7 +67,7 @@ the public signup endpoint would happily bypass any route-level check:
   token file. The new user is admin.
 - Ever after: signup is closed; require `x-invite-token`. Redemption is an
   atomic conditional UPDATE (`SET usedAt WHERE tokenHash AND usedAt IS NULL
-  AND expiresAt > now() RETURNING role`), so two concurrent redemptions
+AND expiresAt > now() RETURNING role`), so two concurrent redemptions
   race the row and exactly one wins. If the invite was email-locked and the
   email mismatches, the invite is handed back (`usedAt = null`) so the
   rightful recipient can still use it, then the signup throws.

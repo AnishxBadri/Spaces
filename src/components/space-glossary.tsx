@@ -100,7 +100,7 @@ function TermRow({ term }: { term: Term }) {
         <dt className="flex flex-wrap items-baseline gap-2">
           <button
             onClick={() => setEditing(true)}
-            className="rounded text-ui font-medium hover:underline focus-ring"
+            className="rounded text-ui font-medium focus-ring hover:underline"
           >
             {term.name}
           </button>
@@ -132,7 +132,7 @@ function TermRow({ term }: { term: Term }) {
             toast.error(err instanceof Error ? err.message : 'Could not delete')
           }
         }}
-        className="hidden size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-destructive group-hover:flex focus-visible:flex focus-ring"
+        className="hidden size-5 shrink-0 items-center justify-center rounded text-muted-foreground focus-ring group-hover:flex hover:text-destructive focus-visible:flex"
       >
         <X className="size-3" strokeWidth={2} />
       </button>
@@ -209,7 +209,7 @@ function TermForm({
         value={definition}
         onChange={(e) => setDefinition(e.target.value)}
         placeholder="What it means here — the definition someone new to this space needs."
-        className="border-input w-full rounded-md border bg-transparent px-2.5 py-1.5 font-serif text-body leading-relaxed outline-none placeholder:text-muted-foreground focus-ring"
+        className="w-full rounded-md border border-input bg-transparent px-2.5 py-1.5 font-serif text-body leading-relaxed focus-ring outline-none placeholder:text-muted-foreground"
       />
       <div className="flex justify-end gap-2">
         <Button size="xs" variant="ghost" type="button" onClick={onCancel}>

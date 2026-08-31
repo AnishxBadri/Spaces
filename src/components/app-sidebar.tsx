@@ -95,7 +95,7 @@ export function AppSidebar({
         <button
           type="button"
           onClick={onOpenCommand}
-          className="flex h-8 w-full items-center gap-2 rounded-md border border-sidebar-border bg-background px-2.5 text-ui text-muted-foreground transition-colors hover:border-input focus-ring"
+          className="flex h-8 w-full items-center gap-2 rounded-md border border-sidebar-border bg-background px-2.5 text-ui text-muted-foreground focus-ring transition-colors hover:border-input"
         >
           <Search className="size-3.5" strokeWidth={1.75} />
           <span>Search…</span>
@@ -160,7 +160,7 @@ export function AppSidebar({
               {user.name.charAt(0).toUpperCase()}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-ui font-medium leading-tight">
+              <span className="block truncate text-ui leading-tight font-medium">
                 {user.name}
               </span>
               <span className="block truncate text-micro leading-tight text-muted-foreground">

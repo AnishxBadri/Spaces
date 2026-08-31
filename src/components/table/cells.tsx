@@ -30,7 +30,7 @@ export const RecordLinkCell = createLink(function RecordLinkAnchor({
     <a
       {...props}
       className={cn(
-        'focus-ring-inset flex h-full min-w-0 items-center gap-2 rounded px-1 font-medium hover:underline',
+        'flex h-full min-w-0 items-center gap-2 rounded px-1 font-medium focus-ring-inset hover:underline',
         className,
       )}
     >
@@ -72,7 +72,7 @@ export const ChipLink = createLink(function ChipAnchor({
     <a
       {...props}
       className={cn(
-        'focus-ring flex min-w-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-label font-medium transition-colors duration-150 ease-out-quart hover:bg-selected',
+        'flex min-w-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-label font-medium focus-ring transition-colors duration-150 ease-out-quart hover:bg-selected',
         className,
       )}
     >
@@ -112,7 +112,7 @@ export function DateCell({
   const text = formatDate(value)
   if (!text) return null
   return (
-    <span className={cn('numeric block px-1 text-muted-foreground', className)}>
+    <span className={cn('block px-1 numeric text-muted-foreground', className)}>
       {text}
     </span>
   )

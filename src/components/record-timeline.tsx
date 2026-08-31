@@ -221,7 +221,7 @@ function AttrBurst({
         <button
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="focus-ring flex items-baseline gap-2 rounded text-left text-ui"
+          className="flex items-baseline gap-2 rounded text-left text-ui focus-ring"
         >
           <span className="flex items-center gap-1">
             <span className="font-medium">{item.actorName ?? 'System'}</span>{' '}

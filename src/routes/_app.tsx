@@ -42,7 +42,7 @@ function AppShell() {
           aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
           aria-expanded={mobileNavOpen}
           onClick={() => setMobileNavOpen((v) => !v)}
-          className="-ml-1 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent focus-ring"
+          className="-ml-1 flex size-8 items-center justify-center rounded-md text-muted-foreground focus-ring hover:bg-accent"
         >
           {mobileNavOpen ? (
             <X className="size-4.5" strokeWidth={1.75} />
@@ -61,7 +61,7 @@ function AppShell() {
             onClick={() => setMobileNavOpen(false)}
             aria-hidden
           />
-          <div className="absolute inset-y-0 left-0 top-12 w-60 border-r border-sidebar-border shadow-lg">
+          <div className="absolute inset-y-0 top-12 left-0 w-60 border-r border-sidebar-border shadow-lg">
             <AppSidebar
               hideWordmark
               user={session.user}

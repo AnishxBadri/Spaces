@@ -160,7 +160,7 @@ function HeaderCell<T>({
           type="button"
           onClick={column.getToggleSortingHandler()}
           title={`Sort by ${title}`}
-          className="focus-ring group/sort flex w-full items-center gap-1 truncate rounded text-left transition-colors duration-150 ease-out-quart hover:text-foreground"
+          className="group/sort flex w-full items-center gap-1 truncate rounded text-left focus-ring transition-colors duration-150 ease-out-quart hover:text-foreground"
         >
           <span className="truncate">
             {flexRender(column.columnDef.header, header.getContext())}
@@ -207,7 +207,7 @@ function HeaderCell<T>({
               nudge(RESIZE_STEP)
             }
           }}
-          className="focus-ring-inset absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none select-none transition-colors duration-150 ease-out-quart hover:bg-primary"
+          className="absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none focus-ring-inset transition-colors duration-150 ease-out-quart select-none hover:bg-primary"
         />
       ) : null}
     </th>
@@ -292,7 +292,7 @@ export function TableToolbar<T>({
 
         {/* A bare "3" reads as an unlabelled artefact; the count says what it
             counts, and only says "of N" once a filter is actually hiding rows. */}
-        <output className="ml-auto whitespace-nowrap text-label text-muted-foreground">
+        <output className="ml-auto text-label whitespace-nowrap text-muted-foreground">
           <span className="tabular">{shown}</span>
           {shown === total ? null : (
             <>
@@ -322,7 +322,7 @@ export function AddColumnButton() {
       type="button"
       aria-label="Add column"
       title="Add column"
-      className="focus-ring flex size-6 items-center justify-center rounded text-muted-foreground transition-colors duration-150 ease-out-quart hover:bg-accent hover:text-foreground"
+      className="flex size-6 items-center justify-center rounded text-muted-foreground focus-ring transition-colors duration-150 ease-out-quart hover:bg-accent hover:text-foreground"
     >
       <Plus className="size-3.5" strokeWidth={2} />
     </button>

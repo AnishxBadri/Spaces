@@ -76,7 +76,7 @@ function SpacePage() {
       >
         <Link
           to="/spaces"
-          className="flex items-center gap-1.5 rounded-md hover:text-foreground focus-ring"
+          className="flex items-center gap-1.5 rounded-md focus-ring hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" strokeWidth={1.75} />
           Spaces
@@ -90,7 +90,7 @@ function SpacePage() {
             <Link
               to="/spaces/$spaceId"
               params={{ spaceId: a.id }}
-              className="rounded-md hover:text-foreground focus-ring"
+              className="rounded-md focus-ring hover:text-foreground"
             >
               {a.name}
             </Link>
@@ -130,7 +130,7 @@ function SpacePage() {
             key={c.id}
             to="/spaces/$spaceId"
             params={{ spaceId: c.id }}
-            className="flex h-6 items-center gap-1 rounded-full border border-border px-2.5 text-xs font-medium text-muted-foreground hover:border-input hover:text-foreground focus-ring"
+            className="flex h-6 items-center gap-1 rounded-full border border-border px-2.5 text-xs font-medium text-muted-foreground focus-ring hover:border-input hover:text-foreground"
           >
             <Layers className="size-3" strokeWidth={1.75} />
             {c.name}
@@ -146,7 +146,7 @@ function SpacePage() {
             key={f.id}
             to="/notes/$noteId"
             params={{ noteId: f.id }}
-            className="block rounded-lg border border-border p-4 hover:border-input focus-ring"
+            className="block rounded-lg border border-border p-4 focus-ring hover:border-input"
           >
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="min-w-0 truncate text-title font-semibold">
@@ -171,7 +171,7 @@ function SpacePage() {
 
         <button
           onClick={writeMemo}
-          className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border p-4 text-left hover:border-input focus-ring"
+          className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border p-4 text-left focus-ring hover:border-input"
         >
           <PenLine
             className="size-4 shrink-0 text-muted-foreground"
@@ -201,13 +201,13 @@ function SpacePage() {
             record page.
           </p>
         ) : (
-          <ul className="mt-2 -mx-2">
+          <ul className="-mx-2 mt-2">
             {spc.companies.map((c) => (
               <li key={c.id}>
                 <Link
                   to="/companies/$companyId"
                   params={{ companyId: c.id }}
-                  className="flex h-9 items-center gap-3 rounded-md px-2 text-ui hover:bg-accent focus-ring"
+                  className="flex h-9 items-center gap-3 rounded-md px-2 text-ui focus-ring hover:bg-accent"
                 >
                   <Building2
                     className="size-4 shrink-0 text-muted-foreground"
@@ -247,13 +247,13 @@ function SpacePage() {
             collect in this list.
           </p>
         ) : (
-          <ul className="mt-2 -mx-2">
+          <ul className="-mx-2 mt-2">
             {spc.notes.map((n) => (
               <li key={n.id}>
                 <Link
                   to="/notes/$noteId"
                   params={{ noteId: n.id }}
-                  className="flex h-9 items-center gap-3 rounded-md px-2 text-ui hover:bg-accent focus-ring"
+                  className="flex h-9 items-center gap-3 rounded-md px-2 text-ui focus-ring hover:bg-accent"
                 >
                   <FileText
                     className="size-4 shrink-0 text-muted-foreground"
@@ -302,7 +302,7 @@ function NewSubspace({ parentId }: { parentId: string }) {
   ) : (
     <button
       onClick={() => setEditing(true)}
-      className="flex h-6 items-center gap-1 rounded-full border border-dashed border-border px-2.5 text-xs text-muted-foreground hover:border-input hover:text-foreground focus-ring"
+      className="flex h-6 items-center gap-1 rounded-full border border-dashed border-border px-2.5 text-xs text-muted-foreground focus-ring hover:border-input hover:text-foreground"
     >
       <Plus className="size-3" strokeWidth={2} />
       Subspace

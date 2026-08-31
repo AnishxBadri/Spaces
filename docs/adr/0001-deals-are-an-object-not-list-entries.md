@@ -9,7 +9,7 @@ attribute instead of requiring a list engine, and per-opportunity records preser
 reasoning across years ("why did we pass in 2024?"), which membership rows model poorly.
 
 The list/entry tables stay in the schema for possible watchlist/portfolio use, but nothing
-waits on them. Watching-without-a-deal is deliberately *not* a deal stage — it lives in
+waits on them. Watching-without-a-deal is deliberately _not_ a deal stage — it lives in
 spaces tagging ("tracking, not evaluating"); real funds' data showed "Tracking" as a
 pipeline stage is a workaround for tools that lack a research layer.
 

@@ -58,7 +58,7 @@ are set, null clears, absent keys are untouched. The write path:
 1. One transaction, opening with `SELECT … FOR UPDATE` on the entity row.
    This lock is load-bearing: the write is a read-modify-write of the whole
    `values` blob, and at READ COMMITTED two concurrent editors of
-   *different* attributes would both read the same starting blob and the
+   _different_ attributes would both read the same starting blob and the
    second commit would silently erase the first's key. The row lock
    serializes the merges.
 2. Load the registry for the entity's kind; unknown slug → validation

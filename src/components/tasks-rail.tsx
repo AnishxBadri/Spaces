@@ -70,7 +70,7 @@ export function TasksRail({
           presetEntity={{ id: entityId, name: entityName, kind: entityKind }}
           onCreated={load}
           trigger={
-            <button className="focus-ring flex items-center gap-1 rounded-md text-xs text-muted-foreground hover:text-foreground">
+            <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground focus-ring hover:text-foreground">
               <Plus className="size-3" strokeWidth={2} />
               Add
             </button>
@@ -85,7 +85,7 @@ export function TasksRail({
             <li key={t.id} className="flex items-baseline gap-2">
               <input
                 type="checkbox"
-                className="accent-primary translate-y-0.5"
+                className="translate-y-0.5 accent-primary"
                 checked={false}
                 onChange={() => complete(t.id)}
                 aria-label={`Complete: ${t.content}`}

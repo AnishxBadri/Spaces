@@ -181,7 +181,7 @@ export function DealBoard({
                     <Link
                       to="/deals/$dealId"
                       params={{ dealId: d.id }}
-                      className="focus-ring block rounded-md border border-border bg-background px-3 py-2 shadow-xs transition-colors duration-150 hover:border-input"
+                      className="block rounded-md border border-border bg-background px-3 py-2 shadow-xs focus-ring transition-colors duration-150 hover:border-input"
                     >
                       <span className="block truncate text-ui font-medium">
                         {d.name}
@@ -247,7 +247,7 @@ export function CloseReasonDialog({
           }}
         >
           <textarea
-            className="focus-ring min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-ui placeholder:text-muted-foreground"
+            className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-ui focus-ring placeholder:text-muted-foreground"
             placeholder={
               stageLabel === 'Passed'
                 ? 'Too early for our check size; team question on GTM…'

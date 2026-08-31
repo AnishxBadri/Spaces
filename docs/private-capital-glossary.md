@@ -2,10 +2,11 @@
 
 Written 2026-08 to inform the portfolio layer (CONTEXT.md phase 15) and everything after
 it. Sources: standard industry usage plus the surveyed products — TagHash, Edda, Totem,
-Fundwave, Affinity, Visible, Carta — each of which is really a bet on *which slice of
-this glossary to productize*.
+Fundwave, Affinity, Visible, Carta — each of which is really a bet on _which slice of
+this glossary to productize_.
 
 Annotations tie terms to our architecture:
+
 - **[P15]** — modeled in the phase-15 portfolio layer (or already shipped).
 - **[banked]** — recorded future work with a decided shape.
 - **[fenced]** — deliberately out of scope (fund-administration tier); understand it,
@@ -17,7 +18,7 @@ Annotations tie terms to our architecture:
 
 - **GP (General Partner)** — the fund's managers; legally the entity that runs the fund
   and carries unlimited liability (in practice via an LLC). In our world: the workspace.
-- **LP (Limited Partner)** — investors *in the fund* (endowments, family offices,
+- **LP (Limited Partner)** — investors _in the fund_ (endowments, family offices,
   wealthy individuals). They commit capital, receive reports, and stay passive.
   **[fenced]** — LP-facing anything is the recorded non-goal.
 - **Management company / ManCo** — the GP's operating business that collects fees and
@@ -30,12 +31,12 @@ Annotations tie terms to our architecture:
 - **SPV (Special Purpose Vehicle)** — a single-deal entity raised ad-hoc, common for
   syndicates and pro-rata top-ups. **[fenced]** as a structure; representable as a
   `vehicle` label.
-- **Fund of funds (FoF)** — a fund whose holdings are other funds; needs *look-through*
+- **Fund of funds (FoF)** — a fund whose holdings are other funds; needs _look-through_
   (below). **[fenced]** — wrong customer.
 - **Angel / syndicate / family office / accelerator** — the small end of the market and
   our design target: check-writers without fund-admin apparatus.
 
-## 2. Fundraising & capital mechanics *(the layer Fundwave lives in)*
+## 2. Fundraising & capital mechanics _(the layer Fundwave lives in)_
 
 - **Commitment** — an LP's contractual promise of capital ("$5M to Fund II"). Total
   commitments = fund size. **[fenced]**, save the "lightweight capital ledger if fund-I
@@ -60,26 +61,26 @@ Annotations tie terms to our architecture:
   and distributions. The atomic unit of fund accounting; what Fundwave's "automated
   allocations" maintain. **[fenced]**.
 - **ILPA reporting standard** — the LP-side reporting canon (Capital Account Statement
-  + Schedule of Fees, 2026 framework). Its core structure is instructive even fenced:
-  everything is a **roll-forward** — NAV and commitment evolving through categorized,
-  dated capital events — presented quarter-to-date / year-to-date / inception-to-date.
-  Independent confirmation of the phase-15 rule: model dated events, derive every
-  aggregate; the three period frames are then just filters.
+  - Schedule of Fees, 2026 framework). Its core structure is instructive even fenced:
+    everything is a **roll-forward** — NAV and commitment evolving through categorized,
+    dated capital events — presented quarter-to-date / year-to-date / inception-to-date.
+    Independent confirmation of the phase-15 rule: model dated events, derive every
+    aggregate; the three period frames are then just filters.
 - **India (SEBI AIF) structures** — funds register as **AIF Category I** (VC, angel
   funds), **II** (sector-agnostic unlisted), or **III** (trading strategies). An
   **Angel Fund** is a Cat-I subtype: min corpus ₹10cr, per-investor minimum ₹25L,
   per-deal band ₹25L–₹10cr. The LPA analog is the tripartite **contribution
   agreement** (contributor / trustee / manager); Indian funds issue **units**
   (unitized accounting — why Fundwave supports it), and regulation bakes in
-  **per-deal pro-rata** participation — the deal-by-deal shape is *regulatory* in
+  **per-deal pro-rata** participation — the deal-by-deal shape is _regulatory_ in
   India, not a GP choice. **[fenced]**, but it defines what the lightweight capital
   ledger must look like if Indian fund-I customers ever pull it into scope.
 
-## 3. Sourcing & deal flow *(the layer Affinity/Edda lead; largely shipped for us)*
+## 3. Sourcing & deal flow _(the layer Affinity/Edda lead; largely shipped for us)_
 
 - **Deal flow** — the stream of investable opportunities. Quality ∝ network.
 - **Warm intro** — an introduction through a mutual connection; the currency of VC
-  sourcing. *Relationship intelligence* (Affinity's moat) = mining email/calendar to
+  sourcing. _Relationship intelligence_ (Affinity's moat) = mining email/calendar to
   find the warmest path. **[banked]** — our `interaction_entity` graph + Gmail sync.
 - **Thesis** — a falsifiable market belief driving sourcing. (We removed it as an
   object, 2026-08; it lives as prose in spaces.)
@@ -92,25 +93,25 @@ Annotations tie terms to our architecture:
   (Edda). **[banked]** for multi-member workspaces.
 - **Data room** — the folder of company documents opened during diligence.
 - **Term sheet** — the non-binding offer: valuation, amount, rights.
-- **Pass vs. lost** — *we said no* vs. *they said no / missed allocation*. Different
+- **Pass vs. lost** — _we said no_ vs. _they said no / missed allocation_. Different
   post-mortem lessons; **[shipped]** as distinct terminal stages.
-- **Signaling risk** — the ideology that a top-tier fund *not* following on is read by
+- **Signaling risk** — the ideology that a top-tier fund _not_ following on is read by
   the market as negative information; shapes whether founders want funds on small
   checks.
 
-## 4. Instruments & rounds *(phase-15 foundation)*
+## 4. Instruments & rounds _(phase-15 foundation)_
 
 - **Priced round** — equity sold at a negotiated valuation. **Pre-money** (value before
   the new cash) + amount raised = **post-money**. Price per share = pre-money ÷ fully
   diluted shares. **[P15]** — the `round` object.
 - **SAFE (Simple Agreement for Future Equity)** — money now, shares later, priced at
   the next round via a **valuation cap** and/or **discount** (whichever gives the lower
-  price converts). Two generations with *different ownership math*: the **post-money
+  price converts). Two generations with _different ownership math_: the **post-money
   SAFE** (YC 2018+, now dominant) locks ownership at signing — exactly
   investment ÷ cap, regardless of later SAFEs (stacked post-money SAFEs dilute only the
   founders); the older **pre-money SAFE** and Indian **CCDs** leave ownership genuinely
   unknowable until the priced round. **[P15]** — the honest-holdings rule, refined
-  (2026-08, per YC mechanics): post-money SAFEs display an *implied %*
+  (2026-08, per YC mechanics): post-money SAFEs display an _implied %_
   (amount ÷ cap, labeled as implied); pre-money instruments and CCDs display cost basis
   only, never a faked %. The instrument enum must therefore distinguish
   safe_post_money / safe_pre_money / ccd / priced.
@@ -127,30 +128,30 @@ Annotations tie terms to our architecture:
 - **Down round / flat round** — priced below / at the previous post-money; triggers
   anti-dilution provisions.
 
-## 5. Ownership & the cap table *(Carta's kingdom; we track our position only)*
+## 5. Ownership & the cap table _(Carta's kingdom; we track our position only)_
 
 - **Cap table** — the authoritative registry of every holder's shares and instruments.
-  Carta's product is *being* this ledger. **[fenced]** — we model *our* position
+  Carta's product is _being_ this ledger. **[fenced]** — we model _our_ position
   (our shares ÷ shares outstanding), never all holders.
 - **Fully diluted** — share count assuming every option, warrant, and convertible
   exercises; the honest denominator for ownership %. **[P15]** — `shares_outstanding`
   on rounds should be the fully diluted count, stated as such.
 - **ESOP pool** — shares reserved for employees; the **option-pool shuffle** is
-  negotiating pool expansion *pre-money* so dilution lands on existing holders.
+  negotiating pool expansion _pre-money_ so dilution lands on existing holders.
 - **Dilution** — ownership % shrinking as new shares issue. **[P15]** — the ownership
   ledger's whole purpose: entry % → current %, per round.
 - **Liquidation preference** — who gets paid first on exit and how much (1× non-
   participating is standard); the **pref stack** is the ordering across rounds. Affects
-  what a mark is *worth* in downside scenarios — a reason marks ≠ payouts.
+  what a mark is _worth_ in downside scenarios — a reason marks ≠ payouts.
 - **Anti-dilution** — protection repricing earlier investors on a down round (weighted
   average, or the brutal full ratchet).
-- **Secondary** — buying/selling *existing* shares (no new money to the company);
+- **Secondary** — buying/selling _existing_ shares (no new money to the company);
   partial exits happen this way. **[P15]** — a `distribution` of kind `secondary`
   carrying shares sold.
 - **409A** — the US fair-market-value appraisal of common stock (Carta's cash cow); a
   legitimate mark basis. **[P15]** — one of the mark `basis` values.
 
-## 6. Portfolio & performance *(the phase-15 engine itself)*
+## 6. Portfolio & performance _(the phase-15 engine itself)_
 
 - **Holding** — our position in one company: investments − exits, cost basis, current
   value. **[P15]** — born when a deal reaches Invested.
@@ -162,10 +163,10 @@ Annotations tie terms to our architecture:
   history. **[P15]** — the `mark` table, death-is-information applied to valuations.
 - **IPEV / ASC 820** — the valuation guidelines auditors hold funds to; why "structured
   valuation workflows" (TagHash) exist. Two IPEV concepts worth knowing even unaudited:
-  **PORI** (price of recent investment) is explicitly *not* a default fair value — a
+  **PORI** (price of recent investment) is explicitly _not_ a default fair value — a
   starting point that decays, which is why marks must carry dates and staleness must be
   visible; and **calibration** — the entry price is deemed fair value at inception, and
-  model assumptions are expected to *evolve* every measurement date (unchanged marks
+  model assumptions are expected to _evolve_ every measurement date (unchanged marks
   should be the exception, not the norm). **[fenced]** as compliance; our dated
   mark-with-basis design is the lightweight, IPEV-aligned cousin.
 - **NAV (Net Asset Value)** — sum of holding fair values + uninvested cash − liabilities;
@@ -174,7 +175,7 @@ Annotations tie terms to our architecture:
 - **Unrealized / realized** — value still on paper vs. cash actually returned.
 - **Distribution** — cash (or shares) returned: exit proceeds, secondaries, dividends,
   write-off recognition. **[P15]** — the `distribution` table.
-- **The metric kit** *(all computed live from dated events — never stored)*:
+- **The metric kit** _(all computed live from dated events — never stored)_:
   - **MOIC** — multiple on invested capital: total value ÷ invested.
   - **TVPI** — (distributions + NAV) ÷ paid-in. = DPI + RVPI.
   - **DPI** — distributions ÷ paid-in; the "cash back" multiple LPs trust most.
@@ -200,7 +201,7 @@ Annotations tie terms to our architecture:
 - **Exposure** — concentration by sector/stage/geo across the book; a computed
   group-by over holdings once spaces/attributes join the portfolio data. **[banked]**.
 
-## 7. Fund economics *(why "net" is hard; all [fenced], understood not built)*
+## 7. Fund economics _(why "net" is hard; all [fenced], understood not built)_
 
 - **Management fee** — annual % (≈2%) charged on committed capital early, often
   stepping down to invested-cost basis later. Fundwave: "fees on Commitment, Cost of
@@ -216,30 +217,30 @@ Annotations tie terms to our architecture:
 - **Fee offsets / expense allocation** — which costs the fund bears vs the ManCo;
   audit-sensitive.
 
-## 8. Ideologies worth encoding *(the beliefs that shape good product decisions)*
+## 8. Ideologies worth encoding _(the beliefs that shape good product decisions)_
 
 - **Power law** — returns concentrate in 1–2 holdings per fund; most go to zero. The
-  product consequence: the *winner's* record must support deep history (every round,
+  product consequence: the _winner's_ record must support deep history (every round,
   every mark), and write-offs deserve one-click honesty, not shame-hiding.
 - **Ownership targets & reserves** — funds underwrite to a target % at entry and
   reserve 1–2× initial checks for follow-ons; **pacing** is deploying over ~3 years for
-  vintage diversification. All three are *portfolio-construction* prose in the mandate
+  vintage diversification. All three are _portfolio-construction_ prose in the mandate
   today; reserves math is a candidate future consumer of the capital ledger.
 - **Loss ratio / graduation rate** — % of dollars in write-offs; % of companies
   reaching the next round. Computable from rounds + distributions once phase 15 lands.
 - **Evidence over narrative** — disconfirmation recorded next to conviction (our
   removed-thesis instinct, now prose discipline).
-- **Access vs. picking** — the belief that returns come from *getting into* the best
+- **Access vs. picking** — the belief that returns come from _getting into_ the best
   deals more than selecting them; why warm-intro graphs and signaling matter.
 - **Mark conservatism** — don't mark up on your own follow-on price alone; don't let
   stale marks masquerade as current. Product form: marks carry basis + date, and
-  staleness is *visible* (last-mark-date column in the portfolio table).
+  staleness is _visible_ (last-mark-date column in the portfolio table).
 
-## 9. What each surveyed product actually is *(one line each, against this glossary)*
+## 9. What each surveyed product actually is _(one line each, against this glossary)_
 
 - **Carta** — §5 as the legal system of record, plus §7 fund admin as a service.
 - **Fundwave** — §2 + §7 productized: allocations, capital accounts, notices,
-  waterfalls, NAV statements, LP portal. The deepest *accounting* engine of the set.
+  waterfalls, NAV statements, LP portal. The deepest _accounting_ engine of the set.
 - **TagHash** — §6 at fund-ops depth (50+ metrics, valuation workflows, look-through)
   with §2 capital activity; India-strong.
 - **Totem** — §6 with AI dressing: tear sheets, automated IRR, Carta ingestion, LP

@@ -1,11 +1,11 @@
 # Survey: Twenty CRM's calendar sync implementation
 
-*Written 2026-08-13, from a code-level read of `twentyhq/twenty` (same shallow
+_Written 2026-08-13, from a code-level read of `twentyhq/twenty` (same shallow
 clone as the email survey — see `survey-twenty-email-sync.md`). Feeds the
 integrations phase: calendar sync is a candidate rider on phase ④ (Google
 Workspace — shared OAuth/`account_connection` substrate), and unlike Gmail it
 has no forward-only equivalent, so if we do it at all we do a real read-only
-pull.*
+pull._
 
 All file paths relative to `packages/twenty-server/src/` in the Twenty repo
 unless noted.
@@ -80,12 +80,12 @@ FAILED_INSUFFICIENT_PERMISSIONS | FAILED_UNKNOWN`. One transition writer:
 
 Four crons (on the shared cron queue, dispatching to a calendar worker queue):
 
-| Cron | Schedule | Does |
-|---|---|---|
-| event-list-fetch | every 5 min | CAS `LIST_FETCH_PENDING → SCHEDULED`, enqueue fetch; skips throttled; skips channels with an ACTIVE webhook subscription unless last sync stale |
-| events-import | every 1 min | schedules import for `IMPORT_PENDING` channels |
-| ongoing-stale | hourly | resets channels stuck ONGOING/SCHEDULED > 30 min |
-| relaunch-failed | every 30 min | re-launches `FAILED_UNKNOWN`; never auth failures |
+| Cron             | Schedule     | Does                                                                                                                                            |
+| ---------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| event-list-fetch | every 5 min  | CAS `LIST_FETCH_PENDING → SCHEDULED`, enqueue fetch; skips throttled; skips channels with an ACTIVE webhook subscription unless last sync stale |
+| events-import    | every 1 min  | schedules import for `IMPORT_PENDING` channels                                                                                                  |
+| ongoing-stale    | hourly       | resets channels stuck ONGOING/SCHEDULED > 30 min                                                                                                |
+| relaunch-failed  | every 30 min | re-launches `FAILED_UNKNOWN`; never auth failures                                                                                               |
 
 Throttling literally shares messaging's constants (`isThrottled` imports
 `MESSAGING_THROTTLE_DURATION`; exponential `1 min × 2^(failures−1)`, cap 5).
@@ -97,7 +97,7 @@ Dispatch on `connectedAccount.provider` in `calendar-get-events.service.ts`.
 - **Google**
   (`drivers/google-calendar/services/google-calendar-get-events.service.ts`) —
   `events.list({ calendarId: 'primary', maxResults: 500, singleEvents: true,
-  syncToken, showDeleted: true })`. Empty cursor → full sync; stored cursor →
+syncToken, showDeleted: true })`. Empty cursor → full sync; stored cursor →
   incremental; new cursor = returned `nextSyncToken`. `status: 'cancelled'`
   items become the delete list. **Primary calendar only.** **No
   `timeMin`/`timeMax` on initial sync — full history imported.**
@@ -161,7 +161,7 @@ trigger, the 5-min poll is the fallback.
   Applied across user, API-key, and application auth contexts.
 - **Contact auto-creation policy** on the channel:
   `AS_PARTICIPANT_AND_ORGANIZER` (default) | `AS_PARTICIPANT` |
-  `AS_ORGANIZER` | `NONE`. The calendar module enqueues *all* participants
+  `AS_ORGANIZER` | `NONE`. The calendar module enqueues _all_ participants
   (`source: CALENDAR`) onto the shared contact-creation queue; the policy
   filter, work-vs-personal-domain rules, and self/colleague exclusion all
   live downstream in `contact-creation-manager/` — the same machinery email
@@ -187,14 +187,14 @@ trigger, the 5-min poll is the fallback.
 3. **Events are mutable state, not append-only events.** Calendar entries get
    edited and cancelled upstream; Twenty updates in place and diffs
    participants. For us this means calendar data belongs in a
-   mirror-shaped table (upsert semantics, `externalUpdatedAt`), *not* in the
+   mirror-shaped table (upsert semantics, `externalUpdatedAt`), _not_ in the
    phase-15 append-only family — it's a cache of someone else's mutable
    truth, which also means the event-correction question doesn't apply to it.
 4. **Recurring events: sync expanded instances** (`singleEvents: true`) and
    keep the master id as provenance. Never store RRULEs — expansion is the
    provider's job.
-5. **Bound the initial import window.** Twenty's Google driver imports *all
-   history* (no `timeMin`) — for meeting-recency features, ~2 years back is
+5. **Bound the initial import window.** Twenty's Google driver imports _all
+   history_ (no `timeMin`) — for meeting-recency features, ~2 years back is
    plenty and keeps first sync fast. (Only their CalDAV driver bounds time;
    copy that instinct, not the Google driver's.)
 6. **Filter differently than they do.** Twenty keeps participant-less events;
@@ -206,6 +206,6 @@ trigger, the 5-min poll is the fallback.
    error path with a log/metric (their own Microsoft/CalDAV drivers do it
    properly — the Google driver is the outlier).
 8. **Webhooks optional at our scale.** Push with 7-day non-renewable watches
-   + renewal cron + handshake verification is real machinery; a 5-minute (or
-   even 15-minute) poll alone is fine for meeting-prep and recency features
-   at 1–15 users. Add push only if staleness ever actually bites.
+   - renewal cron + handshake verification is real machinery; a 5-minute (or
+     even 15-minute) poll alone is fine for meeting-prep and recency features
+     at 1–15 users. Add push only if staleness ever actually bites.

@@ -47,7 +47,7 @@ function SetupWizard() {
     <main className="flex min-h-dvh flex-col items-center bg-background px-6">
       <div className="w-full max-w-[400px] pt-[18vh] pb-16">
         <Wordmark />
-        <p className="mt-3 text-xs font-medium text-muted-foreground tabular">
+        <p className="tabular mt-3 text-xs font-medium text-muted-foreground">
           Step {step} of 2
         </p>
         {step === 1 ? <AdminStep onDone={() => setStep(2)} /> : <DemoStep />}

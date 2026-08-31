@@ -125,7 +125,7 @@ mentionable for free); typed facts are `stages text[]`, `geos text[]`,
   executor; this snapshot is the only contract that makes one possible
   later.
 - **`link`**: the one edge table. `(fromEntityId, toEntityId, relation,
-  attrSlug)` where relation is mentions / tagged_in / contact_at /
+attrSlug)` where relation is mentions / tagged_in / contact_at /
   derived_from / supersedes / references. For `references`, `attrSlug` names
   the record-reference attribute the edge materializes. `attrSlug` defaults
   to `''` rather than null so the unique edge index has no NULL-distinctness
@@ -274,7 +274,7 @@ for S3-compatible stores that don't enforce checksums, like Garage), then
 `extractDocumentText`, then a single UPDATE writing `extractedText` and
 `tsv` together so they can never disagree. The retry semantics are worth
 internalizing: business failures (unsupported format, corrupt blob) are
-caught and written to the document row, and the pg-boss job *succeeds*, so
+caught and written to the document row, and the pg-boss job _succeeds_, so
 there is no retry storm. Only infra exceptions (DB down) escape to
 pg-boss's default retry machinery. The app-level recovery path is the
 document row's `pending` status plus a re-queue, not pg-boss state.
@@ -302,7 +302,7 @@ ships vector, pg_trgm, ltree, and unaccent in one image.
 driver and never appears in prod compose.
 
 **`Dockerfile`**: node:22-alpine, three stages. The runtime image carries
-the compiled Nitro output for the web *and* the raw `src/` + `drizzle/`
+the compiled Nitro output for the web _and_ the raw `src/` + `drizzle/`
 trees, because the worker and migrations run TypeScript directly via tsx.
 No build-time env vars, non-root user, `VOLUME /data`, healthcheck on
 `/api/health`.

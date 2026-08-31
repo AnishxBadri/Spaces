@@ -1,10 +1,10 @@
 # Codebase map
 
-*A navigation aid: where things live, how a request flows, and where each
+_A navigation aid: where things live, how a request flows, and where each
 architectural decision is recorded. Mechanics/conventions live in `CLAUDE.md`;
 the decision record is `CONTEXT.md`; product synthesis is
 `docs/ARCHITECTURE.md`. Reading order for a newcomer: `ARCHITECTURE.md` →
-this file → CONTEXT.md blocks as needed.*
+this file → CONTEXT.md blocks as needed._
 
 ## Top-level layout
 
@@ -103,21 +103,21 @@ what they are: `deal-board`, `record-timeline`, `tasks-rail`,
 
 ## Feature → files, quick index
 
-| Feature | Look at |
-|---|---|
-| Deal pipeline/board | `routes/_app/deals.tsx`, `components/deal-board.tsx`, `lib/server/deals.ts` |
-| Today page | `routes/_app/today.tsx`, aggregation in `lib/server/timeline.ts` + domain fns |
-| Portfolio | `routes/_app/portfolio*.tsx`, `lib/server/portfolio.ts`, `lib/portfolio/*`, `db/schema/portfolio.ts` |
-| Invested → holding | `birthHolding` in `lib/server/shared.ts` (both updateRecord and createDeal paths) |
-| Attribute engine | `lib/attributes/registry.ts`, `components/attributes/`, `db/schema/attributes.ts` |
-| Identity / dedupe / merge | `lib/entities/*`, `routes/_app/dedupe.tsx` |
-| Spaces / taxonomy | `routes/_app/spaces*.tsx`, `lib/server/spaces.ts`, ltree paths in `db/schema/entities.ts` |
-| Notes / memos | `routes/_app/notes*.tsx`, `components/editor/`, mentions-sync in `lib/server/notes.ts` |
-| Documents pipeline | `lib/server/documents.ts` → queue → `worker/jobs/extract-document.ts`; `lib/storage/` |
-| Tasks | `components/task-composer.tsx`, `lib/tasks/parse-due.ts`, `lib/server/tasks.ts` |
-| Mandate | `routes/_app/mandate.tsx`, `lib/server/mandate.ts` |
-| BYOK / vault | `lib/vault/`, settings surface in `lib/server/settings.ts` |
-| Auth / setup / invites | `routes/setup.tsx`, `routes/join.tsx`, `lib/auth.ts`, `lib/setup-token.ts`, `lib/server/members.ts` |
+| Feature                   | Look at                                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Deal pipeline/board       | `routes/_app/deals.tsx`, `components/deal-board.tsx`, `lib/server/deals.ts`                          |
+| Today page                | `routes/_app/today.tsx`, aggregation in `lib/server/timeline.ts` + domain fns                        |
+| Portfolio                 | `routes/_app/portfolio*.tsx`, `lib/server/portfolio.ts`, `lib/portfolio/*`, `db/schema/portfolio.ts` |
+| Invested → holding        | `birthHolding` in `lib/server/shared.ts` (both updateRecord and createDeal paths)                    |
+| Attribute engine          | `lib/attributes/registry.ts`, `components/attributes/`, `db/schema/attributes.ts`                    |
+| Identity / dedupe / merge | `lib/entities/*`, `routes/_app/dedupe.tsx`                                                           |
+| Spaces / taxonomy         | `routes/_app/spaces*.tsx`, `lib/server/spaces.ts`, ltree paths in `db/schema/entities.ts`            |
+| Notes / memos             | `routes/_app/notes*.tsx`, `components/editor/`, mentions-sync in `lib/server/notes.ts`               |
+| Documents pipeline        | `lib/server/documents.ts` → queue → `worker/jobs/extract-document.ts`; `lib/storage/`                |
+| Tasks                     | `components/task-composer.tsx`, `lib/tasks/parse-due.ts`, `lib/server/tasks.ts`                      |
+| Mandate                   | `routes/_app/mandate.tsx`, `lib/server/mandate.ts`                                                   |
+| BYOK / vault              | `lib/vault/`, settings surface in `lib/server/settings.ts`                                           |
+| Auth / setup / invites    | `routes/setup.tsx`, `routes/join.tsx`, `lib/auth.ts`, `lib/setup-token.ts`, `lib/server/members.ts`  |
 
 ## The architectural spine (with pointers into CONTEXT.md)
 
@@ -150,11 +150,11 @@ the full reasoning:
 
 ## Where to look when…
 
-- *…adding any table that references entities* → merge executor first
+- _…adding any table that references entities_ → merge executor first
   (`lib/entities/merge.ts`), then schema.
-- *…adding a system attribute* → `lib/attributes/registry.ts`.
-- *…touching money display* → `lib/format.ts` (`fmtMoney`), never Intl compact.
-- *…adding a route* → `routes/_app/`, then `pnpm generate-routes`.
-- *…adding background work* → `lib/queue.ts` + `worker/jobs/`.
-- *…deciding anything* → search CONTEXT.md first; if it's a new decision,
+- _…adding a system attribute_ → `lib/attributes/registry.ts`.
+- _…touching money display_ → `lib/format.ts` (`fmtMoney`), never Intl compact.
+- _…adding a route_ → `routes/_app/`, then `pnpm generate-routes`.
+- _…adding background work_ → `lib/queue.ts` + `worker/jobs/`.
+- _…deciding anything_ → search CONTEXT.md first; if it's a new decision,
   record it there with a date.

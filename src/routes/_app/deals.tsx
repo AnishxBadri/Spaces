@@ -328,7 +328,7 @@ function DealsPage() {
                   aria-pressed={groupFilter === g}
                   onClick={() => setGroupFilter(groupFilter === g ? null : g)}
                   className={cn(
-                    'focus-ring flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-label font-medium whitespace-nowrap transition-colors duration-150 ease-out-quart',
+                    'flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-label font-medium whitespace-nowrap focus-ring transition-colors duration-150 ease-out-quart',
                     groupFilter === g
                       ? 'border-primary/40 bg-selected text-foreground'
                       : 'border-border text-muted-foreground hover:border-input hover:text-foreground',
@@ -356,7 +356,7 @@ function DealsPage() {
                         setStageFilter(stageFilter === o.id ? null : o.id)
                       }
                       className={cn(
-                        'focus-ring h-7 shrink-0 rounded-full border px-2.5 text-label whitespace-nowrap transition-colors duration-150 ease-out-quart',
+                        'h-7 shrink-0 rounded-full border px-2.5 text-label whitespace-nowrap focus-ring transition-colors duration-150 ease-out-quart',
                         stageFilter === o.id
                           ? 'border-primary/40 bg-selected font-medium text-foreground'
                           : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -429,7 +429,7 @@ function ViewToggle({
           aria-pressed={view === v}
           onClick={() => onChange(v)}
           className={cn(
-            'focus-ring flex h-6 items-center gap-1 rounded px-2 text-label transition-colors duration-150',
+            'flex h-6 items-center gap-1 rounded px-2 text-label focus-ring transition-colors duration-150',
             view === v
               ? 'bg-selected font-medium text-foreground'
               : 'text-muted-foreground hover:text-foreground',

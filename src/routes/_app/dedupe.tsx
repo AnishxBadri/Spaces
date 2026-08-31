@@ -117,7 +117,7 @@ function PairCard({ pair }: { pair: Pair }) {
               'Dismissed — will not be suggested again',
             )
           }
-          className="flex items-center gap-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground focus-ring"
+          className="flex items-center gap-1.5 rounded-md text-xs text-muted-foreground focus-ring hover:text-foreground"
         >
           <X className="size-3" strokeWidth={2} />
           Not duplicates

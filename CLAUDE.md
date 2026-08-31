@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Self-hosted deal management for angel/private-capital investing (product name:
-Spaces; code still says DealOS). This file is *mechanics only*. Decisions and
+Spaces; code still says DealOS). This file is _mechanics only_. Decisions and
 domain language live in `CONTEXT.md` (the decision record — read the relevant
 block before designing anything); synthesis in `docs/ARCHITECTURE.md`; ADRs in
 `docs/adr/`.

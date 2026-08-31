@@ -44,7 +44,7 @@ function HoldingPage() {
     <div className="mx-auto w-full max-w-4xl px-6 py-6 md:px-8">
       <Link
         to="/portfolio"
-        className="focus-ring mb-4 inline-flex items-center gap-1.5 text-ui text-muted-foreground transition-colors duration-150 hover:text-foreground"
+        className="mb-4 inline-flex items-center gap-1.5 text-ui text-muted-foreground focus-ring transition-colors duration-150 hover:text-foreground"
       >
         <ArrowLeft className="size-4" strokeWidth={2} />
         Portfolio
@@ -55,7 +55,7 @@ function HoldingPage() {
         <Link
           to="/companies/$companyId"
           params={{ companyId: h.companyId }}
-          className="focus-ring text-ui text-muted-foreground transition-colors duration-150 hover:text-foreground"
+          className="text-ui text-muted-foreground focus-ring transition-colors duration-150 hover:text-foreground"
         >
           Company record →
         </Link>
@@ -174,7 +174,7 @@ function Stat({
   return (
     <div className="rounded-lg border border-border px-4 py-3">
       <div className="text-label text-muted-foreground">{label}</div>
-      <div className="text-ui tabular mt-1 font-medium">{value}</div>
+      <div className="tabular mt-1 text-ui font-medium">{value}</div>
       {hint ? (
         <div className="mt-0.5 text-label text-muted-foreground">{hint}</div>
       ) : null}
@@ -401,7 +401,7 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
           <Field id="inv-instrument" label="Instrument">
             <select
               id="inv-instrument"
-              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui"
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui focus-ring"
               value={form.instrument}
               onChange={(e) =>
                 setForm((s) => ({ ...s, instrument: e.target.value }))
@@ -660,7 +660,7 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
           <Field id="mk-basis" label="Basis">
             <select
               id="mk-basis"
-              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui"
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui focus-ring"
               value={form.basis}
               onChange={(e) =>
                 setForm((s) => ({ ...s, basis: e.target.value }))
@@ -737,7 +737,7 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
           <Field id="ds-kind" label="Kind">
             <select
               id="ds-kind"
-              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui"
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui focus-ring"
               value={form.kind}
               onChange={(e) => setForm((s) => ({ ...s, kind: e.target.value }))}
             >

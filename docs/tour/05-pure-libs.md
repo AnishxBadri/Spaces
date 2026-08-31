@@ -80,7 +80,7 @@ faked:
    result is an ownership **history** with dilution per round, plus
    `currentPct`. Deliberately not cap-table management. Rounds without a
    share count produce no point; staleness stays visible.
-2. **implied**: only when *every* investment in the window is a post-money
+2. **implied**: only when _every_ investment in the window is a post-money
    SAFE with a cap. `pct = Σ amount/cap`, locked at signing. The UI renders
    it as `~X%`.
 3. **cost_basis_only**: everything else. Pre-money SAFEs, CCDs, or any mix
@@ -97,7 +97,7 @@ request is not used). Unknown currency → null, never 1.
 `format.ts` is client-safe display formatting. `fmtMoney`'s compact path is
 hand-rolled (thresholds K/M/B, one trimmed decimal) because Intl's compact
 notation differs between Node and Chrome ICU builds, which breaks SSR
-hydration; that's the CLAUDE.md trap. The currency *symbol* still comes
+hydration; that's the CLAUDE.md trap. The currency _symbol_ still comes
 from Intl via formatToParts; only the compact notation is hand-rolled.
 `fmtMultiple` (`2.40×`), `fmtPct`/`fmtXirr`, and `fmtDate` (month + year,
 parsed at local midnight to dodge UTC day-shift) round out the kit. Note
@@ -180,7 +180,7 @@ atomic rename into place. Without this, the key is whatever the client
 claimed, and "same sha ⇒ same bytes" — which dedupe, the immutable cache
 header, and the extraction worker all lean on — dies the first time a
 client lies or an upload truncates. S3 gets this from the service; local
-must do it itself because the app *is* the store.
+must do it itself because the app _is_ the store.
 
 **`s3.ts`**: one driver for every S3-compatible target (AWS, R2, B2,
 MinIO, Garage). Uploads are presigned PUTs with the sha256 baked into a

@@ -254,7 +254,7 @@ function RollupStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="text-label text-muted-foreground">{label}</span>
-      <span className="text-ui tabular font-medium">{value}</span>
+      <span className="tabular text-ui font-medium">{value}</span>
     </div>
   )
 }

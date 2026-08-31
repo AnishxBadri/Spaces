@@ -135,7 +135,7 @@ export function SaveAsTemplateAction({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-ring"
+          className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground focus-ring hover:bg-accent hover:text-foreground"
         >
           <LayoutTemplate className="size-3" strokeWidth={1.75} />
           Save as template

@@ -92,7 +92,7 @@ function TasksPage() {
                 )}
               >
                 {g.title}
-                <span className="ml-2 font-normal tabular">
+                <span className="tabular ml-2 font-normal">
                   {g.rows.length}
                 </span>
               </h2>
@@ -113,11 +113,11 @@ function TasksPage() {
             <section>
               <button
                 type="button"
-                className="focus-ring rounded text-label font-semibold tracking-wide text-muted-foreground uppercase"
+                className="rounded text-label font-semibold tracking-wide text-muted-foreground uppercase focus-ring"
                 onClick={() => setShowDone((s) => !s)}
               >
                 Done {showDone ? '▾' : '▸'}
-                <span className="ml-2 font-normal tabular">
+                <span className="tabular ml-2 font-normal">
                   {data.done.length}
                 </span>
               </button>
@@ -156,7 +156,7 @@ function TaskItem({
     <li className="flex items-baseline gap-3 px-4 py-2.5">
       <input
         type="checkbox"
-        className="accent-primary translate-y-0.5"
+        className="translate-y-0.5 accent-primary"
         checked={!!done}
         onChange={onToggle}
         aria-label={done ? 'Reopen task' : 'Complete task'}
@@ -171,7 +171,7 @@ function TaskItem({
             <Link
               key={e.id}
               to={path}
-              className="focus-ring rounded text-label text-muted-foreground hover:text-foreground"
+              className="rounded text-label text-muted-foreground focus-ring hover:text-foreground"
             >
               {e.name}
             </Link>
@@ -184,7 +184,7 @@ function TaskItem({
         {t.dueDate ? (
           <span
             className={cn(
-              'text-label tabular',
+              'tabular text-label',
               overdue ? 'text-destructive' : 'text-muted-foreground',
             )}
           >

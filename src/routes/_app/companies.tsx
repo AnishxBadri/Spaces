@@ -207,7 +207,7 @@ function CompaniesPage() {
       {openDuplicates > 0 ? (
         <Link
           to="/dedupe"
-          className="focus-ring mt-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-ui transition-colors duration-150 ease-out-quart hover:bg-accent"
+          className="mt-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-ui focus-ring transition-colors duration-150 ease-out-quart hover:bg-accent"
         >
           <Copy className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
           <span className="tabular font-medium">{openDuplicates}</span>

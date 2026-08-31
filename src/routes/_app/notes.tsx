@@ -66,13 +66,13 @@ function NotesPage() {
           }
         />
       ) : (
-        <ul className="mt-6 -mx-2">
+        <ul className="-mx-2 mt-6">
           {notes.map((n) => (
             <li key={n.id}>
               <Link
                 to="/notes/$noteId"
                 params={{ noteId: n.id }}
-                className="group flex h-11 items-center gap-3 rounded-md px-2 text-ui hover:bg-accent focus-ring"
+                className="group flex h-11 items-center gap-3 rounded-md px-2 text-ui focus-ring hover:bg-accent"
               >
                 <FileText
                   className="size-4 shrink-0 text-muted-foreground"

@@ -252,7 +252,7 @@ function DocumentRow({
             type="button"
             onClick={onPreview}
             title={`Preview ${doc.filename}`}
-            className="focus-ring min-w-0 truncate rounded text-left font-medium hover:underline"
+            className="min-w-0 truncate rounded text-left font-medium focus-ring hover:underline"
           >
             {doc.filename}
           </button>
@@ -294,7 +294,7 @@ function DocumentRow({
           disabled={busy}
           aria-label={`Delete ${doc.filename}`}
           onClick={remove}
-          className="text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive"
+          className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
         >
           <Trash2 />
         </Button>

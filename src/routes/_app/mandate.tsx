@@ -148,7 +148,7 @@ function FactsRail({
                   })
                 }
                 className={cn(
-                  'flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors focus-ring',
+                  'flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium focus-ring transition-colors',
                   active
                     ? ''
                     : 'border border-border text-muted-foreground hover:border-input hover:text-foreground',
@@ -215,7 +215,7 @@ function GeoEditor({
               type="button"
               aria-label={`Remove ${g}`}
               onClick={() => onSave(geos.filter((x) => x !== g))}
-              className="rounded-full text-muted-foreground hover:text-foreground focus-ring"
+              className="rounded-full text-muted-foreground focus-ring hover:text-foreground"
             >
               <X className="size-3" strokeWidth={2} />
             </button>
@@ -286,7 +286,7 @@ function CheckSizeEditor({
           onChange={(e) => setCur(e.target.value.toUpperCase())}
           onBlur={commit}
           placeholder="USD"
-          className="numeric h-8 w-16 text-ui"
+          className="h-8 w-16 numeric text-ui"
           aria-label="Currency"
         />
         <Input
@@ -295,7 +295,7 @@ function CheckSizeEditor({
           onBlur={commit}
           placeholder="Min"
           inputMode="numeric"
-          className="numeric h-8 text-ui"
+          className="h-8 numeric text-ui"
           aria-label="Minimum check"
         />
         <span className="text-xs text-muted-foreground">–</span>
@@ -305,7 +305,7 @@ function CheckSizeEditor({
           onBlur={commit}
           placeholder="Max"
           inputMode="numeric"
-          className="numeric h-8 text-ui"
+          className="h-8 numeric text-ui"
           aria-label="Maximum check"
         />
       </div>

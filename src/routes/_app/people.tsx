@@ -361,7 +361,7 @@ function CreatePersonDialog({
               id="person-company"
               name="company"
               defaultValue=""
-              className="focus-ring border-input h-9 w-full rounded-md border bg-transparent px-3 text-body shadow-xs transition-colors duration-150 ease-out-quart"
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-body shadow-xs focus-ring transition-colors duration-150 ease-out-quart"
             >
               <option value="">None</option>
               {companies.map((c) => (
