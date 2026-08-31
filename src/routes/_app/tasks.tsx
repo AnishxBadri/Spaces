@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { CheckSquare } from 'lucide-react'
+import { Building2, CheckSquare, Kanban, Plus, Users } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { EmptyState } from '#/components/empty-state'
@@ -61,16 +61,28 @@ function TasksPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8 md:px-10">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-page font-semibold tracking-tight">Tasks</h1>
-          <p className="mt-1 text-ui text-muted-foreground">
-            Follow-ups with dates attached — what resurfaces parked deals and
-            keeps diligence moving.
-          </p>
-        </div>
-        <TaskComposer />
+      <header>
+        <h1 className="text-page font-semibold tracking-tight">Tasks</h1>
+        <p className="mt-1 text-ui text-muted-foreground">
+          Follow-ups with dates attached — what resurfaces parked deals and
+          keeps diligence moving.
+        </p>
       </header>
+
+      {/* The one way to add things, everywhere: a composer bar, not a corner
+          button. Opens the same TaskComposer dialog. Hidden when empty — the
+          empty state carries its own composer action. */}
+      {data.open.length === 0 && data.done.length === 0 ? null : (
+        <TaskComposer
+          trigger={
+            <button className="mt-5 flex h-9 w-full items-center gap-2 rounded-md border border-input px-3 text-left text-ui text-muted-foreground focus-ring transition-colors duration-150 ease-out-quart hover:border-border hover:bg-accent">
+              <Plus className="size-3.5 shrink-0" strokeWidth={2} />
+              Add a task — "chase data room Friday", "revisit after their
+              raise"…
+            </button>
+          }
+        />
+      )}
 
       {data.open.length === 0 && data.done.length === 0 ? (
         <EmptyState
@@ -153,34 +165,51 @@ function TaskItem({
   onToggle: () => void
 }) {
   return (
-    <li className="flex items-baseline gap-3 px-4 py-2.5">
+    // The row reads check → what → where → when: entity chips sit inline
+    // after the content; the date holds the right lane alone.
+    <li className="flex h-10 items-center gap-3 px-4">
       <input
         type="checkbox"
-        className="translate-y-0.5 accent-primary"
+        className="accent-primary"
         checked={!!done}
         onChange={onToggle}
         aria-label={done ? 'Reopen task' : 'Complete task'}
       />
-      <span className={cn('text-ui', done && 'line-through')}>{t.content}</span>
+      <span className={cn('truncate text-ui', done && 'line-through')}>
+        {t.content}
+      </span>
+      {t.entities.map((e) => {
+        const path = entityPath(e.kind, e.id)
+        const Icon = ENTITY_ICONS[e.kind] ?? Building2
+        const chip = (
+          <>
+            <Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
+            {e.name}
+          </>
+        )
+        // Kinds without a record page (organizations) stay plain chips —
+        // a wrong-kind route is worse than no link.
+        return path ? (
+          <Link
+            key={e.id}
+            to={path}
+            className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-micro font-medium focus-ring hover:bg-selected"
+          >
+            {chip}
+          </Link>
+        ) : (
+          <span
+            key={e.id}
+            className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-micro font-medium text-muted-foreground"
+          >
+            {chip}
+          </span>
+        )
+      })}
       <span className="ml-auto flex shrink-0 items-baseline gap-3">
-        {t.entities.map((e) => {
-          const path = entityPath(e.kind, e.id)
-          // Kinds without a record page (organizations) stay plain text —
-          // a wrong-kind route is worse than no link.
-          return path ? (
-            <Link
-              key={e.id}
-              to={path}
-              className="rounded text-label text-muted-foreground focus-ring hover:text-foreground"
-            >
-              {e.name}
-            </Link>
-          ) : (
-            <span key={e.id} className="text-label text-muted-foreground">
-              {e.name}
-            </span>
-          )
-        })}
+        <span className="text-label text-muted-foreground">
+          {t.assigneeName}
+        </span>
         {t.dueDate ? (
           <span
             className={cn(
@@ -191,12 +220,15 @@ function TaskItem({
             {t.dueDate}
           </span>
         ) : null}
-        <span className="text-label text-muted-foreground">
-          {t.assigneeName}
-        </span>
       </span>
     </li>
   )
+}
+
+const ENTITY_ICONS: Record<string, typeof Users> = {
+  person: Users,
+  company: Building2,
+  deal: Kanban,
 }
 
 function entityPath(kind: string, id: string): string | null {
