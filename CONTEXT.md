@@ -1,10 +1,13 @@
 # DealOS — context
 
-**Name decided 2026-08: Angle** (angel/angle — your angle on the market). Collision check
-killed the other candidates: Thesis* is an a16z-backed crypto venture studio, dealbase.app
-is VC deal-management software, Tessera is three funded companies. The mechanical rename
-(repo, wordmark, package, image names) lands at ship-polish start, after domain/npm
-diligence — before GHCR images bake the old name in. "DealOS" persists in code until then.
+**Name re-decided 2026-08-13: Spaces** (supersedes Angle, decided 2026-08). Named for the
+product's own core concept — the user-built taxonomy is the thesis of the tool. Costs
+weighed and accepted by owner: the name collides with the spaces _feature_ (may later
+rename the feature to Markets — the onboarding block already says "markets creator"), and
+"Spaces" is externally crowded (X Spaces, DigitalOcean Spaces; weak trademark/SEO) —
+irrelevant for a self-hosted, word-of-mouth tool. The mechanical rename (repo, wordmark,
+package, image names) still lands at ship-polish start, after domain/npm diligence —
+before GHCR images bake the old name in. "DealOS" persists in code until then.
 
 ## What this is
 
@@ -17,16 +20,20 @@ Not a horizontal CRM. Opinionated for investors. That constraint is the product.
 ## Who runs it
 
 **Design target is one investor.** Must not preclude 1–15 users on one deployment later.
-Two different funds run two containers. No multi-tenancy — one deployment, one shared dataset.
+One deployment = one organization holding **N workspaces (books)**; only the user account
+is global (revised 2026-08-15 — see the multi-workspace block in _Single user first, team
+ready_). Two unrelated funds still run two containers today; hosted multi-org is a noted
+future intent, not built.
 
 Practically: build single-user UI, but carry `author_id` / `owner_id` / `visibility` on every
-row that could ever be personal, from the first migration. See *Single user first, team ready*.
+row that could ever be personal, from the first migration. See _Single user first, team ready_.
 
 ## Non-goals
 
-- No hosted SaaS. Author never touches user data.
-- No multi-tenant isolation.
-- No no-code object builder (custom *attributes* yes, custom *objects* no).
+- No hosted SaaS _yet_ — self-host remains the product; selling a deployed version is
+  recorded future intent (2026-08-15), gated on its own design + security pass.
+- No stranger-tenancy isolation (RLS/per-tenant schemas) until that pass.
+- No no-code object builder (custom _attributes_ yes, custom _objects_ no).
 - Not at MVP: LP reporting, portfolio MIS collection, mobile, sequences, dashboards, workflow automation.
 
 ## Why self-host wins here
@@ -53,22 +60,22 @@ AGPL-3.0. Can relicense permissively later; reverse is impossible once contribut
 
 One language, TypeScript, one codebase. Two processes (web, worker), two containers (app, db).
 
-| Layer | Choice |
-|---|---|
-| Framework | **TanStack Start** (TanStack Router + Vite + Nitro), React 19 |
-| DB | Postgres 17 + Drizzle |
-| Extensions | `pgvector`, `pg_trgm`, `ltree`, `unaccent` |
-| Data layer | TanStack Query + Start server functions — one model everywhere |
-| Jobs | pg-boss, Postgres-backed, separate Node process |
-| Auth | Better Auth (`tanstackStartCookies` plugin, Postgres adapter) |
-| Editor | **BlockNote** (ProseMirror/TipTap-based), Notion-grade block UX; JSON authoritative, markdown derived |
-| Grid | TanStack Table + TanStack Virtual, DOM-based |
-| UI | shadcn/ui + Tailwind + Radix, `cmdk` for Cmd-K |
-| LLM | Vercel AI SDK, BYOK |
-| Blobs | local filesystem default, S3 opt-in |
+| Layer      | Choice                                                                                                                                                |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework  | **TanStack Start** (TanStack Router + Vite + Nitro), React 19                                                                                         |
+| DB         | Postgres 17 + Drizzle                                                                                                                                 |
+| Extensions | `pgvector`, `pg_trgm`, `ltree`, `unaccent`                                                                                                            |
+| Data layer | TanStack Query + Start server functions — one model everywhere                                                                                        |
+| Jobs       | pg-boss, Postgres-backed, separate Node process                                                                                                       |
+| Auth       | Better Auth (`tanstackStartCookies` plugin, Postgres adapter)                                                                                         |
+| Editor     | **BlockNote** (ProseMirror/TipTap-based), Notion-grade block UX; JSON authoritative, markdown derived                                                 |
+| Grid       | TanStack Table + TanStack Virtual, DOM-based                                                                                                          |
+| UI         | shadcn/ui + Tailwind + Radix, `cmdk` for Cmd-K                                                                                                        |
+| LLM        | Vercel AI SDK, BYOK                                                                                                                                   |
+| Blobs      | local filesystem default, S3 opt-in                                                                                                                   |
 | Validation | Zod, hand-written at write-path choke points (drizzle-zod considered and skipped — schema-derived validators can't carry the per-type business rules) |
-| Tests | Vitest + Playwright |
-| Tooling | pnpm, single app, no monorepo |
+| Tests      | Vitest + Playwright                                                                                                                                   |
+| Tooling    | pnpm, single app, no monorepo                                                                                                                         |
 
 Server functions live in `src/lib/server/`, one file per domain, re-exported through the
 `#/lib/server-fns` barrel (split 2026-08 at ~2,900 lines, before auth/mandate/templates
@@ -87,13 +94,14 @@ return. Not a bundle-size or memory argument — those are noise next to TipTap 
 It is a **model mismatch** argument, and the cost is daily.
 
 Concretely:
+
 - **One data-fetching model.** Under Next this app needed three primitives — Server Components
   for reads, Server Actions for mutations, route handlers + TanStack Query for the grid and
   search-as-you-type, because Server Actions serialize per request and can't carry rapid cell
   edits with optimistic rollback. Start does all of it with TanStack Query + server functions.
   One idiom in the two hardest components in the project.
 - **Typed search params.** TanStack Router treats URL search state as validated, typed,
-  serializable state. Saved views *are* serialized filter/sort/group-by/column state. Near-free
+  serializable state. Saved views _are_ serialized filter/sort/group-by/column state. Near-free
   here, hand-rolled in Next. Drops `nuqs` from the stack.
 - **Nitro `node-server` preset.** Plain Node output, simpler than `output: standalone` and its
   manual `public/` + `.next/static` copying. Deploy-anywhere, no platform gravity.
@@ -109,13 +117,13 @@ cheap after the grid and editor exist.
 
 ### Rejected
 
-- **A Rust/Go backend service.** Wealthfolio has Rust because Tauri desktop apps *must* — the
+- **A Rust/Go backend service.** Wealthfolio has Rust because Tauri desktop apps _must_ — the
   Axum server reuses crates written for the desktop shell. That's the consequence of a
   constraint we don't have. For 1–15 users the bottleneck is Postgres, Gmail, and LLM calls;
   Node is idle in all three. A second language halves the contributor pool, kills end-to-end
   types, splits migration ownership, and forces reimplementing unpdf/mammoth/sheetjs/TipTap.
   The real concern — CPU-bound extraction and embedding blocking the event loop — is solved by
-  splitting the *process*, not the language. If one job ever truly needs native speed, sidecar
+  splitting the _process_, not the language. If one job ever truly needs native speed, sidecar
   that job; and prefer an existing binary (Ollama) over writing one.
 - **SQLite** — need pgvector/tsvector/pg_trgm and concurrent sync workers.
 - **Clerk/Auth0** — SaaS dependency kills self-host.
@@ -138,7 +146,7 @@ cheap after the grid and editor exist.
 
 - **Note storage (amended 2026-07 with the BlockNote switch).** `note.body_json` (BlockNote
   document) is authoritative — BlockNote's markdown export is lossy, so round-tripping through
-  markdown would corrupt notes progressively. `note.body_md` is *derived* on every save and
+  markdown would corrupt notes progressively. `note.body_md` is _derived_ on every save and
   feeds search, embeddings, and plain-text export; mentions land in it as `[[Label|entity:uuid]]`.
   The original notes-outlive-the-app doctrine survives in weakened form: the derived markdown
   is always exportable and readable, but is not the editing source of truth.
@@ -188,7 +196,7 @@ Kinds are fixed in code. This is not a custom-object builder (see non-goals).
 Rejected: nullable-FK-per-type (N columns and N joins per attach point), and untyped
 `(src_type, src_id)` (no referential integrity, every query hand-checks).
 
-**Note the reinterpretation:** `document.entity_id` is now the document's *own* identity, not
+**Note the reinterpretation:** `document.entity_id` is now the document's _own_ identity, not
 the company it belongs to. Attachment goes through `link`. Same for `note`.
 
 ### Filed vs referenced (decided 2026-07)
@@ -196,11 +204,11 @@ the company it belongs to. Attachment goes through `link`. Same for `note`.
 Two ways a thing ends up "in" something else, and they must not be conflated — one is an act,
 the other is a side effect of writing.
 
-| | meaning | mechanism |
-|---|---|---|
-| **Filed in a space** | you deliberately put it there | `entity_space` |
-| **Filed against a record** | a document belongs to this company/person/deal | `link(tagged_in)` |
-| **Referenced** | the body happens to mention it | `link(mentions)`, diff-synced on save |
+|                            | meaning                                        | mechanism                             |
+| -------------------------- | ---------------------------------------------- | ------------------------------------- |
+| **Filed in a space**       | you deliberately put it there                  | `entity_space`                        |
+| **Filed against a record** | a document belongs to this company/person/deal | `link(tagged_in)`                     |
+| **Referenced**             | the body happens to mention it                 | `link(mentions)`, diff-synced on save |
 
 **Space membership goes through `entity_space` for every kind, not just companies** — notes,
 documents, and people file the same way a company is tagged. `link` cannot express what that
@@ -243,12 +251,12 @@ evidence tallies and the kill-requires-a-reason machinery are gone; disconfirmat
 lives in prose, not in a queryable edge.
 
 **Space remains taxonomy** — Aerospace → In-space manufacturing, hierarchical, shared
-vocabulary, effectively never deleted. Market *claims* now live as notes filed in the
+vocabulary, effectively never deleted. Market _claims_ now live as notes filed in the
 space they are about.
 
 ### Mandate — the fund's strategy (decided 2026-08)
 
-The **mandate** is the fund's *prescriptive* strategy — deep-tech, pre-seed to seed,
+The **mandate** is the fund's _prescriptive_ strategy — deep-tech, pre-seed to seed,
 India, check size, portfolio construction — what an LP reads in the deck. It evolves per
 vintage rather than being disproven, and it is a filter over deal flow, not a claim
 about a market.
@@ -261,7 +269,7 @@ mandate(id, status: active|archived, note_entity_id → note,
 - **The prose body is a real note** (`kind: memo`) — search, `[[mentions]]` of spaces
   and companies, and future AI-screening input all come free. No new entity kind.
 - **Structured columns, deliberately few.** `stages` shares the company `funding_stage`
-  option vocabulary; `geos` are free tags; check range. Typed columns, *not* the
+  option vocabulary; `geos` are free tags; check range. Typed columns, _not_ the
   attribute engine — one row, a registry buys nothing.
 - **Portfolio construction stays prose.** Nothing consumes "25 checks, 20% follow-on
   reserve" as data; promote only when a feature (reserve tracking, pacing) demands it.
@@ -284,7 +292,7 @@ entity_space(entity_id, space_id, source: manual|ai|inherited, confidence, creat
 
 A company is tagged Aerospace whether or not it sits in any pipeline. **Tags outlive pipelines** —
 route them through `list_entry` and the tag dies when the deal dies. A company may sit in a
-space and no pipeline at all: *tracking, not evaluating.* That is a first-class state.
+space and no pipeline at all: _tracking, not evaluating._ That is a first-class state.
 
 AI-suggested tags land as `source: ai` in a review queue, never silently written. Same
 provenance rule as enrichment.
@@ -293,22 +301,22 @@ provenance rule as enrichment.
 
 Two dimensions that must never share a field. **The litmus test is the rule, not a hint:**
 
-- **Space — could I write a memo about it and track companies in it?** *Where* a company
-  competes **and *how* it competes.** Hierarchical, researchable. **Spaces own this
+- **Space — could I write a memo about it and track companies in it?** _Where_ a company
+  competes **and _how_ it competes.** Hierarchical, researchable. **Spaces own this
   exclusively** — industry/sector never becomes an attribute. The companies table shows a
   graph-backed Spaces column, not a sectors field.
 - **Attribute — is it a property of the business itself, true in any market?** B2B/B2C,
   hardware, capital intensity, GTM motion. Orthogonal facets. Flat, filterable, no research
   attached.
 
-**Amended 2026-07:** the rule used to read *"markets are **where** a company operates"*,
+**Amended 2026-07:** the rule used to read _"markets are **where** a company operates"_,
 which put competing approaches (Data centers → Cooling → Immersion) on the wrong side. You
 would absolutely write a memo on immersion cooling and track companies in it, so it is a
-space. The *where* framing also failed its own test — approaches cut across markets, since
+space. The _where_ framing also failed its own test — approaches cut across markets, since
 immersion cooling is EV packs and mining rigs too.
 
 **That cross-cutting is handled by tagging, not by the tree.** The hierarchy decides where a
-memo *files*; it does not decide what a company *is*. `entity_space` is many-to-many, so a
+memo _files_; it does not decide what a company _is_. `entity_space` is many-to-many, so a
 company doing immersion for data centers and for EV packs is tagged into both nodes — no
 duplication, no forced choice, no polyhierarchy. PitchBook needs a second classification
 system (flat "verticals" over hierarchical "industries") to express this; one object plus
@@ -332,11 +340,12 @@ investor's own vocabulary, and a shipped ontology quietly pre-empts it. NAICS/SI
 rejected — useless for deeptech and tech.
 
 What the small seed buys, beyond flexibility:
+
 - **No reconciliation machinery.** `is_seeded` was reserved so upgrades could add nodes
   without stomping user edits — which needs a stable per-node seed key, because slugs and
   names change under the user's hands. With a handful of nodes there is nothing to
   reconcile. The flag stays as provenance; the machinery never gets built.
-- **Depth is earned.** Nobody creates *Immersion cooling* until they have companies and a
+- **Depth is earned.** Nobody creates _Immersion cooling_ until they have companies and a
   memo to put in it. A node that exists before its research is a filing decision made by
   the wrong person, and it makes every space picker worse — the tag-into-space control
   lists every space in the tree.
@@ -371,9 +380,10 @@ history is the institutional memory an angel pays for.
 3. **Funnel proper** through to a terminal state.
 
 **Default stage set** (status attribute; options editable, each option carries a group):
+
 - Funnel (`active`): Pre-lead → Screening → Meeting → Diligence → Term sheet
-- Parked (`parked`): Early — revisit  *(nurture pool: "come back at seed"; not terminal,
-  not active — without it people abuse Rejected and lose warm relationships)*
+- Parked (`parked`): Early — revisit _(nurture pool: "come back at seed"; not terminal,
+  not active — without it people abuse Rejected and lose warm relationships)_
 - Terminal (`closed`): Invested · Passed (our no) · Lost (their no / missed allocation —
   a different post-mortem lesson than Passed)
 
@@ -387,7 +397,7 @@ attribute engine like every object.
 
 The object model: **Companies, People, Deals** are objects with an attribute registry —
 system attributes we ship, custom attributes users add. Notes, spaces, terms are
-deliberately *not* object-modeled; they're the research layer that links in.
+deliberately _not_ object-modeled; they're the research layer that links in.
 
 ```
 attribute(id, object_kind: company|person|deal, slug, name, type,
@@ -411,7 +421,7 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
 - The registry generates the UI: table columns, create-modal fields, record-page detail
   rails all read the registry. Attio's structure, self-hosted.
 - **Expansion path (decided 2026-08): the attribute engine grows, objects don't.** The
-  type menu widens by release — attribute *descriptions* first (human docs now, prompt
+  type menu widens by release — attribute _descriptions_ first (human docs now, prompt
   context for AI later), then timestamp, then structured location (needs a migration
   story off free-text), formula deliberately deferred (an expression engine; most
   domain formulas are better as system-computed columns). The headline is the
@@ -425,7 +435,7 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
   only, nothing built).** The dividing line is the kind of claim, not the vendor:
   **a sourced fact may fill an empty field; anything generated, or anything
   conflicting with what a human wrote, waits for a human.**
-  - *Deterministic facts* (Apollo-class lookups: employee count, HQ, founded
+  - _Deterministic facts_ (Apollo-class lookups: employee count, HQ, founded
     year, LinkedIn — externally checkable, receipt stored): **direct write,
     fill-blanks only**, through setValues so attribute_event logs it with the
     stored `enrichment_record` raw response as provenance anchor; per-field
@@ -435,34 +445,34 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
     values: they enter as aliases via resolveEntity, where collisions become
     duplicate_candidates (Apollo's real failure mode — wrong company match —
     lands in the dedupe inbox by construction).
-  - *Generated judgment* (AI classify/summarize/prompt): fully gated through a
+  - _Generated judgment_ (AI classify/summarize/prompt): fully gated through a
     **`suggestion` table** — (entity, attr_slug, value, source ai|apollo|gmail,
     confidence, provenance jsonb, status open|accepted|dismissed). Chips on the
     record rail + a review inbox (the twice-flagged missing baseline; this is
-    its first build driver). Accept writes via setValues with the *accepter*
+    its first build driver). Accept writes via setValues with the _accepter_
     as actor; dismissed persists forever (the duplicate_candidate lesson).
     This keeps the "suggestions never silent" doctrine intact — it was always
     aimed at generative judgment, and the review burden stays proportional
     (nobody clicks accept on employee_count fifty times; everyone approves a
     model's sector classification before it drives filters).
-  - *AI-enhanceable types*: text, select, multi_select, number. Excluded:
+  - _AI-enhanceable types_: text, select, multi_select, number. Excluded:
     status (the funnel is judgment — AI never touches stage), currency (money
     assertions), references/actors (identity is resolveEntity's job),
     domain/email/phone (aliases). Registry carries per-attribute config —
     `ai: { mode: summarize|classify|prompt, prompt?, context: [...] }`.
-  - *Trigger*: manual only (per cell / per column) — Attio independently
-    converged here. *Context assembly* (the differentiator): attributes +
+  - _Trigger_: manual only (per cell / per column) — Attio independently
+    converged here. _Context assembly_ (the differentiator): attributes +
     linked memos + extracted deck text + mandate, with one hard rule — the
     context builder routes through canRead; **a private note never leaks into
     a prompt whose suggestion a teammate reads**.
-  - *Gmail later, same rule*: participants → deterministic aliases;
+  - _Gmail later, same rule_: participants → deterministic aliases;
     content-derived facts → suggestions.
-  - *Sourcing gap noted*: deal `source` covers the channel; a `referred_by`
+  - _Sourcing gap noted_: deal `source` covers the channel; a `referred_by`
     record-reference (person) is the missing who — add with the substrate.
-  - *Build order*: ① suggestion table + review surface + referred_by →
+  - _Build order_: ① suggestion table + review surface + referred_by →
     ② BYOK AI autofill (keys/vault already shipped) → ③ Apollo →
     ④ Google Workspace (design already recorded in the Gmail block).
-- **Attio surveyed on the two deferred/settled types (2026-08-04).** *Formula*: an
+- **Attio surveyed on the two deferred/settled types (2026-08-04).** _Formula_: an
   expression language — operators (`+`, `==`, `??`), functions (`if()`, `dateAdd()`),
   `{Attribute}` references with editor autocomplete; output type inferred from the
   expression (number-returning formula becomes a number attribute); nulls explicit
@@ -476,14 +486,14 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
   ever lands — the most differentiated piece is the one we're already positioned for;
   (2) the deferral holds — the real cost is an interpreter + dependency-graph reactive
   invalidation + type inference, and phase 15's metrics are cross-event aggregates
-  (derived-metric kit), not per-record scalar formulas — different layer. *Currency*:
+  (derived-metric kit), not per-record scalar formulas — different layer. _Currency_:
   strictly per-attribute — `default_currency_code` (ISO 4217) fixed in attribute
   config, never overridable per record; value is a bare number (4 dp precision) with
   the code echoed back; `display_type` renders via `Intl.NumberFormat`; no conversion
   anywhere. So Attio "currency" is number formatting, not multi-currency — our
   registry's currency type (per-attribute `options.code`, bare number) already matches
   it, and real multi-currency correctly lives in the phase-15 event tables (per-event
-  currency + base-currency roll-up), not the attribute layer. *AI attributes* (their
+  currency + base-currency roll-up), not the attribute layer. _AI attributes_ (their
   shipped version of our AI-autofill family): an "AI autofill" toggle on custom
   attributes of type text/number/currency/select/multi-select, four modes — Summarize
   Record, Classify Record (select options, optionally AI-inventable), Prompt Completion
@@ -541,7 +551,7 @@ longer wait on a list engine, and kanban falls out of the Deal stage attribute.
 
 ### Templates (decided 2026-08)
 
-One mechanism, three kinds — standardized *capture*, never automation.
+One mechanism, three kinds — standardized _capture_, never automation.
 
 ```
 template(id, kind: note|space|record, object_kind,   -- object_kind only when kind=record
@@ -562,6 +572,7 @@ template(id, kind: note|space|record, object_kind,   -- object_kind only when ki
   survive vocabulary edits.
 
 Doctrine:
+
 - **User-created, workspace-shared; we ship none.** A shipped template pre-empts the
   user's vocabulary — the same reasoning that killed the big seed taxonomy. The demo
   seed may carry examples, opt-in like the rest of it.
@@ -571,7 +582,7 @@ Doctrine:
   Managed in settings, plus "save this note as a template" in place.
 - **Application is manual plus a context hint.** The picker is scoped by `suggest_on` —
   a deal page surfaces deal-tagged templates first. Ordering, not automation; nothing
-  auto-creates. Contextual *defaults* (new deal auto-creates a checklist) were
+  auto-creates. Contextual _defaults_ (new deal auto-creates a checklist) were
   considered and rejected as the first step toward workflow-config sprawl.
 
 ### Interactions and enrichment
@@ -623,10 +634,11 @@ merge_event(id, winner_id, loser_id, merged_by, merged_at, snapshot jsonb, unmer
 ```
 
 **Normalization:**
+
 - Domain → registrable domain (eTLD+1, public suffix list), lowercase, strip www.
   **Free-mail domains never create or match a company** — founder@gmail.com is a person
   signal only.
-- Email → lowercase exact. Gmail-only dot/+tag stripping *for matching*; store original.
+- Email → lowercase exact. Gmail-only dot/+tag stripping _for matching_; store original.
   Role prefixes (info@, hello@, team@, careers@) are never person-identity.
 - Name → unaccent, lowercase, strip legal suffixes (Inc, Ltd, Pvt Ltd, LLC, GmbH, SAS…).
   Feeds `pg_trgm` only.
@@ -660,7 +672,7 @@ flip `is_identity` off on one alias. Rare, manual, possible.
 6. Duplicate `link` rows (same from/to/relation) dedupe on repoint.
 
 **Unmerge** = clear `merged_into_id`, replay snapshot backwards. Documented limit: data
-created *after* the merge stays with winner — attribution is unknowable. Snapshot machinery
+created _after_ the merge stays with winner — attribution is unknowable. Snapshot machinery
 ships in v1 (cheap at merge time, impossible to retrofit); unmerge UI can land later.
 
 Any member can merge — two-person fund, no ceremony. Every merge writes `activity` +
@@ -697,12 +709,50 @@ The UI is single-user. The schema is not. Every row that could ever be personal 
 - **`canWrite(entity, user)` from day one too (decided 2026-08).** v1 ships admin/member
   only, but every mutation routes through the choke point, so a read-only viewer role
   (LP, intern, advisor) later is a one-line change instead of a write-path audit.
-  Retrofitting a role *column* is trivial; retrofitting *enforcement* is not.
+  Retrofitting a role _column_ is trivial; retrofitting _enforcement_ is not.
 - **Explicit workspace singleton (decided 2026-08).** One enforced row — name, logo,
   settings — anchoring the mandate, `credential(scope: workspace)`, and sidebar identity,
   which otherwise reference a ghost. Hard rule: **no other table ever grows a
   `workspace_id` FK.** The moment one appears, the no-multi-tenancy decision is being
   relitigated by accident.
+- **DIRECTION REVERSED (owner decision, 2026-08-15): multiple workspaces.** The
+  singleton and its "no workspace_id FK" hard rule are rescinded — deliberately. No
+  deployments exist yet, so the change is destructive-migration-friendly: the CHECK
+  constraint and magic `id = 1` simply go away; no upgrade path owed.
+  **Decided design (2026-08-15):**
+  - _Shape_: an organization runs one install holding **N workspaces (books)**. The
+    ONLY global product object is the **user** (one login; per-workspace membership).
+    Instance config (MASTER_KEY, SMTP, APP_URL) stays operator-level. Everything else
+    — entity graph, spaces/taxonomy, glossary, mandate, attribute registry, pipelines,
+    portfolio, tasks, vault credentials, base currency — is **per-workspace**. Twenty's
+    core-schema split independently confirms this boundary (only identity + instance
+    plumbing are global there too).
+  - _Entity graph is per-workspace_: the same founder in two books is two records.
+    Correct isolation default; if cross-book knowledge ever itches, the answer is a
+    deliberate cross-workspace link/import gesture, never automatic sharing.
+  - _Roles go two-layer_: instance admin/member (Better Auth, unchanged) ×
+    per-workspace admin/member on the membership row. **Workspace creation is
+    instance-admin-only** (books are org-level acts; member-created workspaces are
+    the sprawl that kills shared memory — Twenty allows any-user creation because
+    workspaces are their growth loop; ours aren't). Creator becomes workspace admin;
+    workspace admins invite into their workspace; existing users join additional
+    workspaces without re-onboarding. Setup wizard still creates workspace #1 +
+    founding admin. **Multiple admins allowed at both layers**; the banned-admin
+    lockout guard generalizes: ≥1 instance admin always, ≥1 workspace-admin per
+    workspace.
+  - _No `organization` object._ The install IS the org — setup creates an admin and
+    workspace #1, nothing else. An org table is the shape-(b) tenant/billing anchor
+    and arrives only with the hosted design pass. (Twenty likewise has no org layer:
+    workspace is their top unit.)
+  - _Hosted-future rider (owner intent: selling a deployed version later)._ Shape (b)
+    — strangers on one deployment — is NOT being built now, but nothing may foreclose
+    it. Discipline that keeps it a hardening pass instead of a remodel: workspace ids
+    are uuids (no magic row); **all scoping flows through one choke point** (server
+    fns resolve the session's active-workspace membership in one place — the future
+    RLS attachment site); no query ever joins across workspaces; credentials stay
+    per-workspace-encrypted. When hosting becomes real it adds: RLS (or stricter),
+    an org/billing layer above workspaces, and its own security pass — a business
+    decision with its own design block, not an increment.
 - **Spaces, terms, taxonomy, the mandate are global.** Never per-user. Shared vocabulary is
   the point; a per-user taxonomy is two people building two ontologies of the same market.
 
@@ -725,6 +775,7 @@ them now costs nothing.
   This DB holds deal terms and cap tables, so it stays on the roadmap.
 
 Two token stores, never conflated:
+
 - `session` — who you are in the app
 - `account_connection` — Gmail/Calendar OAuth grants, per user, encrypted
 
@@ -780,9 +831,14 @@ silently garbage** — search degrades quietly rather than erroring. This bites 
 ```ts
 interface Enricher {
   id: 'apollo' | 'pdl' | 'crunchbase' | 'hunter'
-  enrichCompany(input: {domain?, name?}): Promise<EnrichResult>
-  enrichPerson(input: {email?, linkedin?, name?, domain?}): Promise<EnrichResult>
-  estimateCost(n: number): {credits: number}
+  enrichCompany(input: { domain?; name? }): Promise<EnrichResult>
+  enrichPerson(input: {
+    email?
+    linkedin?
+    name?
+    domain?
+  }): Promise<EnrichResult>
+  estimateCost(n: number): { credits: number }
 }
 ```
 
@@ -794,6 +850,7 @@ and plan-dependent — read response headers and self-throttle, don't hardcode. 
 paid-plan-only; surface Apollo's real error text, don't swallow it.
 
 **Credit safety** (first GitHub issue you'll get is someone torching credits on 4000 companies):
+
 - Never auto-enrich in bulk. On-demand button + auto-enrich on new company creation only, toggleable.
 - Bulk enrich -> confirm dialog with estimated credit count.
 - Per-day credit cap in settings, enforced in worker.
@@ -815,10 +872,10 @@ don't inherit that. If bundling an object store, prefer **Garage** (single Rust 
 
 - **A bundled object store does not solve the problem that motivates it.** Single-node
   Garage/MinIO writes to the same local disk. An operator with an ephemeral disk needs
-  *remote* storage, which bundling does not provide.
+  _remote_ storage, which bundling does not provide.
 - **Backup regresses.** Today: `tar czf blobs.tgz ./data` — plain files, restorable
   anywhere. Bundled store: an opaque data dir needing a compatible daemon. The product
-  thesis is *you own your data*; this cuts against it.
+  thesis is _you own your data_; this cuts against it.
 - **Prior art agrees** (verified against primary sources): Paperless-ngx — closest
   analogue, PDFs + OCR + metadata in Postgres — is **filesystem only, no native S3**.
   Immich (terabytes of media): filesystem only; a maintainer's stated position is that
@@ -845,7 +902,7 @@ don't inherit that. If bundling an object store, prefer **Garage** (single Rust 
 ```ts
 interface Storage {
   put(key, stream, meta): Promise<void>
-  getDownloadUrl(key, ttl): Promise<string>   // presigned (s3) | signed app route (local)
+  getDownloadUrl(key, ttl): Promise<string> // presigned (s3) | signed app route (local)
   getUploadUrl(key, ttl): Promise<string>
   delete(key): Promise<void>
 }
@@ -859,6 +916,7 @@ Test against MinIO in CI -> works everywhere. Recommend in docs (don't bundle): 
 (zero egress, best cloud pick), Backblaze B2 (cheapest), Garage (self-host), AWS S3.
 
 Ship `docker-compose.s3.yml` as an overlay:
+
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.s3.yml up
 ```
@@ -867,6 +925,7 @@ docker compose -f docker-compose.yml -f docker-compose.s3.yml up
 two `document` rows. Dedupe free, immutable, cache-forever.
 
 **Text extraction, in-process, no extra containers:**
+
 - PDF -> `unpdf`/pdfjs · DOCX -> `mammoth` · PPTX/XLSX -> `fflate` + OOXML XML directly
   (SheetJS was dropped — the shared unzip covers both, decks matter most). Macro/template
   variants (`.xlsm`/`.xltx`/`.docm`/`.pptm`) route to the same extractors.
@@ -891,6 +950,7 @@ generalized into a reusable **review inbox** for assistant/AI suggestions.
 
 **Deferred — post-MVP.** Decided 2026-07: ship the graph and both halves first; feed it
 automatically later. Two consequences of the decision:
+
 - **Forward-only sync.** Sync starts at connection date. No historical backfill in v1 of the
   integration (revisit later). This turns the entity-creation flood (3 years of mail, hundreds
   of noise companies) into a trickle, and makes "create all, visible" the obvious policy.
@@ -943,7 +1003,7 @@ Attio is the reference for shape and craft.
 - **Cmd-K everywhere:** search, create, navigate, jump to record.
 - Optimistic updates, no page reloads.
 - **Never show an empty table.** Onboarding aha = connect Gmail, companies and people are already
-  there, *then* organize. Demo-data seed for anyone who skips Gmail.
+  there, _then_ organize. Demo-data seed for anyone who skips Gmail.
 
 ---
 
@@ -953,8 +1013,8 @@ Target: `docker compose up` works first try.
 
 ```yaml
 services:
-  app:   # Nitro node-server (web) + pg-boss worker, two processes, one image
-  db:    # pgvector/pgvector:pg17
+  app: # Nitro node-server (web) + pg-boss worker, two processes, one image
+  db: # pgvector/pgvector:pg17
 ```
 
 Two processes in one image, selected by entrypoint. Web must never run CPU-bound extraction or
@@ -963,6 +1023,7 @@ split: `pnpm dev` is web only; run `pnpm worker` alongside, or extraction never 
 Office previews sit on "Extracting text…" forever.
 
 Rules that decide adoption:
+
 - Migrations auto-run on boot. No `docker exec` step.
 - Every env var optional except `DATABASE_URL` and `APP_URL`. `MASTER_KEY` auto-generated if absent.
 - **No build-time env vars.** Vite bakes `VITE_*` at build time, so nothing client-visible may
@@ -973,12 +1034,12 @@ Rules that decide adoption:
 - **Onboarding direction lives on the surface, not in the wizard (decided
   2026-08-07).** Goal: the user thinks in spaces from minute one. Considered a
   wizard "name your markets" step; rejected — same question asked one screen
-  later on /spaces teaches the same model *on the surface they'll use
-  tomorrow*, and the wizard stays minimal. Shipped as: (1) /spaces empty state
+  later on /spaces teaches the same model _on the surface they'll use
+  tomorrow_, and the wizard stays minimal. Shipped as: (1) /spaces empty state
   is an active **markets creator** ("What markets do you look at?" — three
   inputs → real top-level spaces via createSpace); (2) a dismissible
   **getting-started card** on /spaces (map markets → first memo → mandate →
-  track companies → invite partner) whose steps are *derived* — done when the
+  track companies → invite partner) whose steps are _derived_ — done when the
   real artifact exists (getOnboardingProgress counts spaces/notes/active
   mandate/companies/users+invites), never by being clicked; dismissal is
   localStorage, guidance not state. Persona bifurcation (angel vs fund)
@@ -995,6 +1056,7 @@ Rules that decide adoption:
   self-hosters live.
 
 Env surface:
+
 ```
 DATABASE_URL=        # required
 APP_URL=             # required, e.g. https://deals.yourfund.com
@@ -1014,12 +1076,12 @@ Six contracts, decided before any release work so nothing gets built against wea
 1. **`./data` ownership is fixed structurally, not by docs.** Entrypoint starts as root,
    repairs `/data` ownership if wrong, drops to UID 1000 via `su-exec` before running
    anything. The Linux bind-mount trap stops existing. (Named volume rejected — plain
-   files under `./data` that the operator can `tar` anywhere *is* the you-own-your-data
+   files under `./data` that the operator can `tar` anywhere _is_ the you-own-your-data
    story.)
 2. **Either process dies → the container exits.** `ROLE=all` currently waits on the web
    PID only; a crashed worker leaves a "healthy" container with extraction silently
    stopped. Supervision contract: worker death kills the container; `restart:
-   unless-stopped` heals it.
+unless-stopped` heals it.
 3. **The app never terminates TLS.** Reverse proxy always in front; `APP_URL` is the
    single source of truth for scheme, cookies, OAuth redirects; `X-Forwarded-Proto`
    trusted only from the proxy. Ship a worked Caddy overlay
@@ -1035,6 +1097,7 @@ Six contracts, decided before any release work so nothing gets built against wea
    "compose up works first try" true five features from now.
 
 Backup — three artifacts, one cron line, ship as `scripts/backup.sh`:
+
 ```bash
 docker compose exec db pg_dump -U dealos dealos > dump.sql
 tar czf blobs.tgz ./data/blobs ./data/secret.key
@@ -1074,7 +1137,7 @@ tasks/reminders reinforce that known gap), 4Degrees (warm-intro paths as the dif
 fenced out of phase 15), Visible.vc (portfolio MIS = structured founder requests with a
 standard-six metric default — Revenue, Net Income, Cash, Runway, Burn, Headcount — via
 login-free tokenized links; the shape to copy if MIS ever lands). US-stack contrast (2026-08): US
-emerging managers *outsource* the entire fenced tier to service platforms (AngelList
+emerging managers _outsource_ the entire fenced tier to service platforms (AngelList
 Stack, Carta fund admin at $8–30k/yr, Juniper Square) and run the front office on
 Airtable/Notion/Excel — which makes our fence doubly correct there and the DIY front
 office our exact wedge; US integration targets are Carta exports and Standard Metrics,
@@ -1090,9 +1153,9 @@ attributes).
 # Hard parts, in order
 
 1. **Entity resolution + merge semantics.** ~~Design this before the first migration~~ —
-   **done, spec'd 2026-07, see *Entity resolution & merge* in the data model.** Doctrine:
+   **done, spec'd 2026-07, see _Entity resolution & merge_ in the data model.** Doctrine:
    deterministic auto, probabilistic suggest. Repoint-at-write merge with snapshot. Still
-   hard to *build well* (merge preview UI, dedupe inbox), but no longer blocks the schema.
+   hard to _build well_ (merge preview UI, dedupe inbox), but no longer blocks the schema.
 2. **The table component.** Spreadsheet-grade or investors leave. See UI.
 3. **The note editor.** `[[mention]]` autocomplete over all entity kinds, backlink panel,
    glossary auto-linking, paste-a-URL-becomes-a-source. Everything in the research half routes
@@ -1117,7 +1180,7 @@ Both halves ship, or the seam — the whole point — doesn't exist.
 4. Notes: markdown, `[[mentions]]`, backlinks, attach to anything
 5. Documents: upload + URL clip, text extraction, attach to any entity
 6. Deals: object with stage/value/company attributes, table + kanban by stage, activity feed
-7. ~~Theses~~ — shipped 2026-07, **removed 2026-08** (see *Thesis — removed*); the
+7. ~~Theses~~ — shipped 2026-07, **removed 2026-08** (see _Thesis — removed_); the
    mandate page takes the "why we invest" slot
 8. Glossary with in-note auto-linking
 9. Entity resolution: `resolveEntity()` choke point, aliases, dedupe inbox, merge + snapshot
@@ -1127,7 +1190,7 @@ Then: **Gmail sync (forward-only)**, Apollo enrichment, signals, co-investor gra
 (seeded by round co-investor links from the portfolio layer, phase 15), Outlook.
 
 MIS, when it lands, is **dual-path**: structured founder requests (tokenized links,
-standard-six default) *and* parsing what founders actually send (MIS Excel / board-deck
+standard-six default) _and_ parsing what founders actually send (MIS Excel / board-deck
 PDF / update email — India reality). Parsing rides the existing document-extraction
 pipeline plus a BYOK extraction job; results land as append-only
 `kpi_observation(company, metric, period, value, currency, source, source_document,
@@ -1165,6 +1228,7 @@ same bytes" true enough for the dedupe, the immutable cache header, and the work
 on. Extraction runs on the worker (`unpdf`, `mammoth`, `fflate` + OOXML for PPTX/XLSX) and
 writes `extracted_text` + `tsv` together — phase 8 search inherits a populated index.
 Decisions worth keeping:
+
 - **`extraction_status` is three-way, not a boolean.** `unsupported` (scanned deck, image —
   a BYOK vision model is its upgrade path) is a normal permanent state, not a failure.
 - **Downloads are always `attachment` + `application/octet-stream`.** Echoing an upload's own
@@ -1172,7 +1236,7 @@ Decisions worth keeping:
   **The preview surface arrived (2026-08) and kept this intact:** the blob route is
   unchanged; `document-preview.tsx` fetches the same opaque bytes and renders them itself —
   PDF via pdf.js to a canvas (the browser never navigates to the file), images via an
-  object URL whose type *we* choose, Office via the worker's already-extracted text (a
+  object URL whose type _we_ choose, Office via the worker's already-extracted text (a
   tab-separated sheet renders back into a grid). SVG stays download-only — it is a script
   vector and `<img>` is the only safe element for it. Preview is a modal, argued for: an
   inspection, not a destination — a route would make the back button undo reading position.
@@ -1183,17 +1247,18 @@ Decisions worth keeping:
 - **Delete is real, and GCs the blob when no other row shares its digest.** A misfiled upload
   the operator can't remove is worse than the audit trail it costs.
 - Deferred by name: URL clip (`origin: 'url'`, `@mozilla/readability` + `linkedom`) moves to
-  phase 7 where space pages actually want *sources*; chunking + embeddings wait on BYOK; the
+  phase 7 where space pages actually want _sources_; chunking + embeddings wait on BYOK; the
   S3 driver still throws.
 
 **Theses (phase 7): done 2026-07 — removed 2026-08.** Shipped as claim/conviction/status
 with evidence on both sides, then removed by owner decision; the reasoning and the
-removal's scope live in *Thesis — removed* in the data model. Migration 0010 dropped the
+removal's scope live in _Thesis — removed_ in the data model. Migration 0010 dropped the
 tables, the entity kind, and the evidence relations; routes, space-page claims, and the
 demo-seed thesis went with them.
 
 **Search (phase 8): done, 2026-07.** One Cmd-K box over names, note bodies, and extracted
 document text, fused in Postgres. Decisions:
+
 - **Everything searchable is an entity, so RRF is honest.** Trigram similarity and `ts_rank`
   produce incomparable scores, but ranks fuse cleanly — reciprocal rank fusion (k=60) over
   three CTEs ranking the same id space. The pgvector half joins as a fourth CTE when
@@ -1213,6 +1278,7 @@ document text, fused in Postgres. Decisions:
 
 **Glossary + seeds (phase 9): done, 2026-07.** Aho-Corasick auto-linking in the editor,
 per-space glossary, starter taxonomy, opt-in demo data. Decisions:
+
 - **Auto-linking is a ProseMirror decoration, not document content.** This is the TipTap
   escape hatch this doc reserved, reached through BlockNote's `_tiptapOptions.extensions`.
   Writing highlights into `body_json` would put derived data in the source of truth and
@@ -1234,13 +1300,13 @@ per-space glossary, starter taxonomy, opt-in demo data. Decisions:
   companies in someone's CRM.
 
 **Design craft pass (partial): 2026-08.** Not a redesign — the v1 scope lines held.
-Shipped: the token/primitive layer (see *UI craft debt* below), **one shared record table
+Shipped: the token/primitive layer (see _UI craft debt_ below), **one shared record table
 behind Companies/People/Deals** (three copies collapsed; the table is the hardest UI in
 the project and now has one implementation to be good at), per-option badge colours
 (auto-assigned, overridable in settings), and in-browser document preview (see the phase 6
 notes — the download hardening survives it). Verified by driving the real app, which is
 what caught a colour picker that didn't close on selection, a sticky-column hover seam,
-and mouse-only column resizing. Remaining craft work is itemised in *UI craft debt*.
+and mouse-only column resizing. Remaining craft work is itemised in _UI craft debt_.
 
 **Auth + onboarding (phase 10): done, 2026-08.** Workspace singleton (CHECK-enforced one
 row; sidebar shows its name), /setup one-time token (file under DATA_DIR, printed to
@@ -1249,6 +1315,7 @@ workspace name → optional demo data; the AI-key step was removed until a featu
 consumes keys), invites (hash-only storage, single-use, 7-day, role baked in, copyable
 /join link — no SMTP needed), member management in settings (roles, suspend, last-admin
 guard), and the authz choke points. Decisions worth keeping:
+
 - **Token and invite enforcement live in the Better Auth database hook**, not routes —
   the public signup endpoint would bypass anything checked route-side. Wizard and /join
   merely carry the token as a header. Verified by driving the endpoint directly: no
@@ -1274,6 +1341,7 @@ partial unique index; archived rows are vintages), prose as a real memo note, fa
 (stage chips off the live `funding_stage` vocabulary, geo tags, check range), Mandate
 first in nav with login still landing on `/spaces`, teaching empty state, and the
 outside-mandate hint on the deal record. Decisions worth keeping:
+
 - **Member-writable, not admin.** The mandate is judgment, not settings — same
   no-ceremony rule as merge. Note prose follows normal note rules.
 - **`mandate.stages` stores option ids**, so the operator renaming "Seed" in settings
@@ -1288,6 +1356,7 @@ outside-mandate hint on the deal record. Decisions worth keeping:
 by-example ("Save as template" on a note, record, or space — no builder UI anywhere), one
 shared picker component with `suggest_on` context ordering, management in settings.
 Decisions worth keeping:
+
 - **Mentions are stripped to plain text at note-template capture** — a template holding a
   real entity reference would materialize ghost backlinks on every instantiation.
 - **Record templates exclude reference/actor slugs at capture** and pre-fill the create
@@ -1310,8 +1379,9 @@ Decisions worth keeping:
 interface (`@aws-sdk/client-s3` + presigner), selected by `STORAGE_DRIVER=s3`; env is
 `S3_BUCKET/S3_ENDPOINT/S3_REGION/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY/S3_FORCE_PATH_STYLE`
 (path-style defaults **on** — right for R2/B2/MinIO/Garage). MinIO + one-shot bucket-init
-live in the *dev* compose only. Local FS stays the default; production compose unchanged.
+live in the _dev_ compose only. Local FS stays the default; production compose unchanged.
 Decisions worth keeping:
+
 - **The checksum matrix, answered.** `x-amz-checksum-sha256` is baked into the presigned
   PUT's signature and returned as a required header for the browser to send. Empirical:
   MinIO rejects mismatched bytes (`XAmzContentChecksumMismatch`, 400) and refuses PUTs
@@ -1322,7 +1392,7 @@ Decisions worth keeping:
   partially-compatible endpoints can't quietly break "same sha ⇒ same bytes". Mismatch
   → extraction fails loudly, document flagged.
 - **Download hardening survives S3:** attachment + octet-stream are baked into the
-  *signed* response params of every presigned GET — an uploaded `.html` can't be served
+  _signed_ response params of every presigned GET — an uploaded `.html` can't be served
   inline from the bucket either.
 - **Interface changes the second driver forced** (the predicted leak-finding):
   `getUploadUrl` now returns `{url, headers}` (local returns empty headers), and the
@@ -1347,145 +1417,128 @@ machine-readable frontmatter tokens (OKLCH, per doctrine), a real §5 Components
 scanned from the shipped code (record table and typed value editors documented as the
 signature components; motion doctrine folded in per the six-section spec), and an
 `.impeccable/design.json` sidecar with ramps, motion tokens, and renderable component
-snippets.
-15. **Portfolio layer** (decided 2026-08; the full domain vocabulary behind this layer —
-    terms, fund mechanics, ideologies, and what each surveyed vendor covers — lives in
-    `docs/private-capital-glossary.md`, annotated with [P15]/[banked]/[fenced] tags;
-    surveyed against TagHash-class products —
-    this is the tier where an investing CRM stops being a pipeline tracker; it is also
-    where we currently lose any feature comparison). Pure graph + registry + computed
-    values: no external dependency, no OAuth, fully in-wheelhouse. Build order is the
-    dependency order:
-    1. `round` — financing event per company: date, kind, raised, pre/post-money,
-       co-investors (link rows → the co-investor graph falls out later).
-    2. `investment` — *our* checks: amount, **currency**, instrument
-       (SAFE / CCD / priced — CCDs matter for India), date, round ref, shares or
-       ownership %. **A deal reaching Invested births one** — the pipeline→portfolio
-       seam, same philosophy as research→pipeline.
-    3. Ownership & dilution ledger — % at entry, recomputed per subsequent round.
-       An ownership *history*, deliberately not cap-table management (Carta's job).
-    4. `mark` — fair value per holding over time, each carrying basis
-       (round price / manual / 409A) and date, never overwritten: death-is-information
-       applied to valuations.
-    5. `distribution` — realized proceeds: exits, secondaries, dividends, write-offs.
-    6. Computed performance, live at our scale (dozens of holdings, no metrics
-       warehouse): MOIC, TVPI, RVPI, DPI, XIRR, realized/unrealized — per holding and
-       portfolio roll-up.
-    7. Portfolio surface — holdings table (invested / current value / ownership /
-       MOIC / IRR / last mark) on the existing record-table engine + holding detail.
-    8. Multi-currency minimally but from the first migration: per-cash-flow currency,
-       base-currency roll-up, manual rates first.
-    9. **Portfolio bootstrap import** (decided 2026-08) — inside this phase, not
-       deferred with general CSV import: an empty financial engine is dead on arrival
-       for anyone with existing checks. One wizard — upload (CSV/XLSX) → map columns
-       onto the registry/event fields → resolve-preview (`resolveEntity` does the
-       matching; `source: 'import'` provenance already exists) → dry-run report →
-       idempotent commit. Target shape is the universal tracking spreadsheet: company /
-       date / amount / instrument / round info / current mark, decomposed into dated
-       `round` + `investment` + `mark` events so IRR and as-of views work on day one
-       for pre-existing positions. Per-row errors, never all-or-nothing.
-    Spec refinements (2026-08, stress-tested against a TagHash analytics dashboard):
-    - **Append-only dated events; aggregates always derived, never stored.** This is
-      what makes "as on <date>" point-in-time views free — filter events ≤ date and
-      recompute. Stated as a rule so nobody adds a mutable current_value column.
-    - **Instrument subtypes carry ownership semantics** (2026-08, YC mechanics):
-      post-money SAFEs lock ownership at signing (amount ÷ cap — display as *implied %*);
-      pre-money SAFEs and CCDs have cost basis only until conversion — never fake a %.
-      Enum: priced / safe_post_money / safe_pre_money / ccd.
-    - **Share-level columns from day one**: price_per_share + shares_outstanding on
-      `round`, optional shares on `investment` and `distribution` (shares_outstanding stated as the *fully diluted* count) — ownership %,
-      dilution deltas, and divestment math all need them; retrofitting means
-      re-entering history. Ownership stays ours-position-only (our shares ÷
-      outstanding ⇒ our % and fully-diluted %); a full all-shareholder cap table is
-      Carta-tier and stays out.
-    - **Nullable `vehicle` label on money events** — data, not tenancy (the
-      no-workspace_id rule is untouched): one optional column so an All-funds/Fund-I
-      grouping is possible later without a migration. Doctrine (2026-08): **workspace =
-      firm, never fund** — research, relationships, and pipeline are firm-level; which
-      vehicle wrote the check is a late accounting detail, and cross-vehicle follow-ons
-      must land on one holding. Known limit, accepted: one-active-mandate assumes
-      serial vintages; parallel distinct-strategy vehicles would need
-      mandate-per-vehicle (a loosening, not a redesign).
-    - **Currency conversion (decided 2026-08-06):** original currency is truth —
-      every money event stores amount + currency as entered; converted values are
-      never stored (same derive-don't-store rule as aggregates). One workspace
-      `base_currency`. Sparse manual `fx_rate(currency, date, rate_to_base)` table,
-      append-only; lookup = latest rate ≤ event date; a missing rate is *surfaced*
-      ("N events need a rate"), never silently 1.0. Convention: cash flows convert at
-      transaction-date rates, unrealized value (marks) at current/as-of rates — FX
-      gain/loss correctly lands inside base-currency performance. Holdings whose
-      flows share one currency compute natively; conversion enters only at roll-up.
-      Auto rate fetch is a later BYOK provider; manual entry at check-time is fine
-      and audit-friendly at our scale.
-    - **The follow-on decision is a new deal** — "one deal = one opportunity" means a
-      pro-rata decision enters the pipeline with its own judgment trail and can be
-      Passed without touching the original holding. Banked alongside: structured
-      **deal-rights capture** (pro-rata, information rights, board/observer, MFN) —
-      prose until the follow-on flow needs them as data.
-    **LP-portal extension doctrine (recorded 2026-08, demand-gated, after this
-    phase proves out):** LPs are never workspace members — not even a read-only role
-    (hiding the workspace behind filters is one missed WHERE clause from leaking deal
-    flow and other LPs' data). LPs are *data* (contacts linked to commitments);
-    access is **publish-don't-expose**: the GP publishes immutable snapshots
-    (quarterly statement, capital-account roll-forward, docs) and any portal reads
-    only published snapshots via tokenized links (the invite/founder-link pattern) —
-    never live tables. Forced sequence: capital ledger lite → published statements →
-    portal login. Valuations nuance, restated: marks (with basis + date) are core to
-    this phase; the valuations *ceremony* (IPEV/ASC-820 committee workflows, audit
-    packets) stays fenced. Tax/compliance is permanently export-only.
-    **Deliberately not in this phase (TagHash-scale fund admin):** capital ledger
-    (commitments/drawdowns/notices), fund-level NAV statements, multi-vehicle/SPV
-    structures, LP reporting (standing non-goal), FoF look-through (wrong customer),
-    MIS collection. A lightweight single-vehicle capital ledger may earn a later slot
-    if fund-I customers ask; nothing else on that list should.
+snippets. 15. **Portfolio layer** (decided 2026-08; the full domain vocabulary behind this layer —
+terms, fund mechanics, ideologies, and what each surveyed vendor covers — lives in
+`docs/private-capital-glossary.md`, annotated with [P15]/[banked]/[fenced] tags;
+surveyed against TagHash-class products —
+this is the tier where an investing CRM stops being a pipeline tracker; it is also
+where we currently lose any feature comparison). Pure graph + registry + computed
+values: no external dependency, no OAuth, fully in-wheelhouse. Build order is the
+dependency order: 1. `round` — financing event per company: date, kind, raised, pre/post-money,
+co-investors (link rows → the co-investor graph falls out later). 2. `investment` — _our_ checks: amount, **currency**, instrument
+(SAFE / CCD / priced — CCDs matter for India), date, round ref, shares or
+ownership %. **A deal reaching Invested births one** — the pipeline→portfolio
+seam, same philosophy as research→pipeline. 3. Ownership & dilution ledger — % at entry, recomputed per subsequent round.
+An ownership _history_, deliberately not cap-table management (Carta's job). 4. `mark` — fair value per holding over time, each carrying basis
+(round price / manual / 409A) and date, never overwritten: death-is-information
+applied to valuations. 5. `distribution` — realized proceeds: exits, secondaries, dividends, write-offs. 6. Computed performance, live at our scale (dozens of holdings, no metrics
+warehouse): MOIC, TVPI, RVPI, DPI, XIRR, realized/unrealized — per holding and
+portfolio roll-up. 7. Portfolio surface — holdings table (invested / current value / ownership /
+MOIC / IRR / last mark) on the existing record-table engine + holding detail. 8. Multi-currency minimally but from the first migration: per-cash-flow currency,
+base-currency roll-up, manual rates first. 9. **Portfolio bootstrap import** (decided 2026-08) — inside this phase, not
+deferred with general CSV import: an empty financial engine is dead on arrival
+for anyone with existing checks. One wizard — upload (CSV/XLSX) → map columns
+onto the registry/event fields → resolve-preview (`resolveEntity` does the
+matching; `source: 'import'` provenance already exists) → dry-run report →
+idempotent commit. Target shape is the universal tracking spreadsheet: company /
+date / amount / instrument / round info / current mark, decomposed into dated
+`round` + `investment` + `mark` events so IRR and as-of views work on day one
+for pre-existing positions. Per-row errors, never all-or-nothing.
+Spec refinements (2026-08, stress-tested against a TagHash analytics dashboard): - **Append-only dated events; aggregates always derived, never stored.** This is
+what makes "as on <date>" point-in-time views free — filter events ≤ date and
+recompute. Stated as a rule so nobody adds a mutable current_value column. - **Instrument subtypes carry ownership semantics** (2026-08, YC mechanics):
+post-money SAFEs lock ownership at signing (amount ÷ cap — display as _implied %_);
+pre-money SAFEs and CCDs have cost basis only until conversion — never fake a %.
+Enum: priced / safe_post_money / safe_pre_money / ccd. - **Share-level columns from day one**: price_per_share + shares_outstanding on
+`round`, optional shares on `investment` and `distribution` (shares_outstanding stated as the _fully diluted_ count) — ownership %,
+dilution deltas, and divestment math all need them; retrofitting means
+re-entering history. Ownership stays ours-position-only (our shares ÷
+outstanding ⇒ our % and fully-diluted %); a full all-shareholder cap table is
+Carta-tier and stays out. - **Nullable `vehicle` label on money events** — data, not tenancy (the
+no-workspace_id rule is untouched): one optional column so an All-funds/Fund-I
+grouping is possible later without a migration. Doctrine (2026-08): **workspace =
+firm, never fund** — research, relationships, and pipeline are firm-level; which
+vehicle wrote the check is a late accounting detail, and cross-vehicle follow-ons
+must land on one holding. Known limit, accepted: one-active-mandate assumes
+serial vintages; parallel distinct-strategy vehicles would need
+mandate-per-vehicle (a loosening, not a redesign). - **Currency conversion (decided 2026-08-06):** original currency is truth —
+every money event stores amount + currency as entered; converted values are
+never stored (same derive-don't-store rule as aggregates). One workspace
+`base_currency`. Sparse manual `fx_rate(currency, date, rate_to_base)` table,
+append-only; lookup = latest rate ≤ event date; a missing rate is _surfaced_
+("N events need a rate"), never silently 1.0. Convention: cash flows convert at
+transaction-date rates, unrealized value (marks) at current/as-of rates — FX
+gain/loss correctly lands inside base-currency performance. Holdings whose
+flows share one currency compute natively; conversion enters only at roll-up.
+Auto rate fetch is a later BYOK provider; manual entry at check-time is fine
+and audit-friendly at our scale. - **The follow-on decision is a new deal** — "one deal = one opportunity" means a
+pro-rata decision enters the pipeline with its own judgment trail and can be
+Passed without touching the original holding. Banked alongside: structured
+**deal-rights capture** (pro-rata, information rights, board/observer, MFN) —
+prose until the follow-on flow needs them as data.
+**LP-portal extension doctrine (recorded 2026-08, demand-gated, after this
+phase proves out):** LPs are never workspace members — not even a read-only role
+(hiding the workspace behind filters is one missed WHERE clause from leaking deal
+flow and other LPs' data). LPs are _data_ (contacts linked to commitments);
+access is **publish-don't-expose**: the GP publishes immutable snapshots
+(quarterly statement, capital-account roll-forward, docs) and any portal reads
+only published snapshots via tokenized links (the invite/founder-link pattern) —
+never live tables. Forced sequence: capital ledger lite → published statements →
+portal login. Valuations nuance, restated: marks (with basis + date) are core to
+this phase; the valuations _ceremony_ (IPEV/ASC-820 committee workflows, audit
+packets) stays fenced. Tax/compliance is permanently export-only.
+**Deliberately not in this phase (TagHash-scale fund admin):** capital ledger
+(commitments/drawdowns/notices), fund-level NAV statements, multi-vehicle/SPV
+structures, LP reporting (standing non-goal), FoF look-through (wrong customer),
+MIS collection. A lightweight single-vehicle capital ledger may earn a later slot
+if fund-I customers ask; nothing else on that list should.
 15b. **Tasks + Today page (decided 2026-08-07; tasks pulled ahead, built now —
-    Today page follows post-phase-15).** The known gap the Edda survey flagged,
-    made concrete: **Parked ("Early — revisit") is a silent grave** — nothing
-    resurfaces a parked deal; tasks are the resurrection machinery ("revisit
-    when their round closes"), plus diligence chores and portfolio hygiene.
-    Model: plain `task` table (content, nullable due_date, assignee,
-    done_at, created_by) + `task_entity` join — deliberately NOT an entity
-    kind (no backlinks/search/mentions payload; kinds stay fixed) and not
-    attributes. **Composer-first UX, Attio's create-bar as the reference**
-    (screenshots reviewed 2026-08-07): one-line input; pills for due date
-    (natural-language parse — deterministic parser, not AI — plus
-    Today/Tomorrow/Next week/**No date** chips; dateless tasks are legal),
-    assignee (defaults to creator), linked records (existing entity
-    search); Create-more toggle; global `t` shortcut. Mention-in-content
-    (`@Pixxel` auto-linking the record) is the v2 nicety once the composer
-    reuses mention infra. Surfacing: /tasks page grouped by urgency
-    (overdue/today/this week/later/no date), record-page rails, and — the
-    self-hosted divergence from Attio — **the Today page is the reminder
-    channel**, not email: no SMTP by doctrine, so opening the app is the
-    notification. Optional SMTP daily digest is additive, later, never
-    required. Skipped from Attio: workflow-generated tasks (no workflow
-    engine), round-robin (wrong scale). **Overview/Today page banked with
-    it (2026-08-07): attention-driven, not chart-driven** — overdue/due
-    tasks as its spine, plus stale marks, missing fx rates, dedupe inbox,
-    deals idle in stage, compact portfolio strip, activity feed;
-    getting-started card migrates there until 5/5. A metrics dashboard
-    answers "how are we doing" (a solo GP knows); the landing page answers
-    "what needs my attention today." **Shipped 2026-08-08** along with the
-    dealflow-completeness pass: /today (due tasks · idle active deals >21d
-    from the stage log · stale marks >180d · missing-fx count · compact
-    portfolio strip · activity feed; getting-started card migrated here),
-    login/index now land on /today (setup still lands /spaces where the
-    markets creator lives), deal **board view** (native-drag stage columns,
-    table/board toggle, per-column median days-in-stage from
-    dealFunnelStats), **close_reason** system attribute captured via a
-    skippable dialog on Passed/Lost board drops, task rails on deal/company
-    records, and the FX-rates settings section (base currency +
-    sparse manual rate table).
-16. **Ship polish — deferred, scope TBD (2026-08).** No release before this: more dev
-    work and manual testing come first. CI, images, upgrade CI, install docs get decided
-    when a release is actually in sight. Still banked from the earlier grill, to reuse
-    then: rename mechanics first (Angle — domain/npm diligence before images bake the
-    name in), test-db harness before any CI, upgrade CI only once there is a release to
-    upgrade *from*. Also banked for launch: a **comparison page** (vs Twenty/Attio/
-    vertical tools) assembled from the recorded surveys — honest-claims rule: never
-    claim a storage advantage (Twenty has the same local-default/S3-opt-in answer);
-    claim the research half, two-container ops, BYOK-to-Ollama, the investor schema,
-    and the financial engine.
+Today page follows post-phase-15).** The known gap the Edda survey flagged,
+made concrete: **Parked ("Early — revisit") is a silent grave** — nothing
+resurfaces a parked deal; tasks are the resurrection machinery ("revisit
+when their round closes"), plus diligence chores and portfolio hygiene.
+Model: plain `task` table (content, nullable due_date, assignee,
+done_at, created_by) + `task_entity` join — deliberately NOT an entity
+kind (no backlinks/search/mentions payload; kinds stay fixed) and not
+attributes. **Composer-first UX, Attio's create-bar as the reference**
+(screenshots reviewed 2026-08-07): one-line input; pills for due date
+(natural-language parse — deterministic parser, not AI — plus
+Today/Tomorrow/Next week/**No date** chips; dateless tasks are legal),
+assignee (defaults to creator), linked records (existing entity
+search); Create-more toggle; global `t` shortcut. Mention-in-content
+(`@Pixxel` auto-linking the record) is the v2 nicety once the composer
+reuses mention infra. Surfacing: /tasks page grouped by urgency
+(overdue/today/this week/later/no date), record-page rails, and — the
+self-hosted divergence from Attio — **the Today page is the reminder
+channel**, not email: no SMTP by doctrine, so opening the app is the
+notification. Optional SMTP daily digest is additive, later, never
+required. Skipped from Attio: workflow-generated tasks (no workflow
+engine), round-robin (wrong scale). **Overview/Today page banked with
+it (2026-08-07): attention-driven, not chart-driven** — overdue/due
+tasks as its spine, plus stale marks, missing fx rates, dedupe inbox,
+deals idle in stage, compact portfolio strip, activity feed;
+getting-started card migrates there until 5/5. A metrics dashboard
+answers "how are we doing" (a solo GP knows); the landing page answers
+"what needs my attention today." **Shipped 2026-08-08** along with the
+dealflow-completeness pass: /today (due tasks · idle active deals >21d
+from the stage log · stale marks >180d · missing-fx count · compact
+portfolio strip · activity feed; getting-started card migrated here),
+login/index now land on /today (setup still lands /spaces where the
+markets creator lives), deal **board view** (native-drag stage columns,
+table/board toggle, per-column median days-in-stage from
+dealFunnelStats), **close_reason** system attribute captured via a
+skippable dialog on Passed/Lost board drops, task rails on deal/company
+records, and the FX-rates settings section (base currency +
+sparse manual rate table). 16. **Ship polish — deferred, scope TBD (2026-08).** No release before this: more dev
+work and manual testing come first. CI, images, upgrade CI, install docs get decided
+when a release is actually in sight. Still banked from the earlier grill, to reuse
+then: rename mechanics first (Angle — domain/npm diligence before images bake the
+name in), test-db harness before any CI, upgrade CI only once there is a release to
+upgrade _from_. Also banked for launch: a **comparison page** (vs Twenty/Attio/
+vertical tools) assembled from the recorded surveys — honest-claims rule: never
+claim a storage advantage (Twenty has the same local-default/S3-opt-in answer);
+claim the research half, two-container ops, BYOK-to-Ollama, the investor schema,
+and the financial engine.
 
 Post-v1 backlog unchanged: dark theme, Playwright preview smoke test, a **capture
 extension** (folkX-style, surveyed 2026-08: add a founder/company from LinkedIn without
@@ -1498,7 +1551,8 @@ alongside as a second `Enricher`), BYOK AI features — each adds its own wizard
 it lands.
 
 Standing debt:
-- **Test-db harness.** The suite shares the *dev* database and mutates it; without a live
+
+- **Test-db harness.** The suite shares the _dev_ database and mutates it; without a live
   Postgres on :5432, 8 of 52 tests fail with `ECONNREFUSED`. This is why CI cannot simply
   run `vitest` yet — fixing it is the first technical task inside ship polish (phase 15).
 - **`./data` ownership landmine.** The Dockerfile `chown`s `/data` at build, but the
@@ -1506,8 +1560,8 @@ Standing debt:
   host → cannot write blobs or generate `secret.key`, and it **fails at first upload, not
   at boot**. macOS hides it. Docs need `chown -R 1000:1000 ./data`.
 - **Rollback is unsafe and undocumented.** Migrations are forward-only and auto-apply, so
-  pulling an older tag runs old code against a new schema. The upgrade doc must say *back
-  up first*.
+  pulling an older tag runs old code against a new schema. The upgrade doc must say _back
+  up first_.
 - **No published images yet.** Compose still says `build: .` — installing means building
   on the target box (583MB of node_modules for a 9.3MB `.output`; tight on 2GB RAM, fails
   on 1GB). Phase 11's GHCR multi-arch pipeline is the fix and the biggest adoption win.
@@ -1529,6 +1583,7 @@ action and state apart). DESIGN.md §2–§3 now match the code; the reasoning a
 lives in `src/styles.css` comments — read those before changing any colour.
 
 **Still open, in order:**
+
 - **Old focus rings** (~60 after the thesis routes went) remain outside the table
   surfaces (record pages, spaces, notes, settings) — **5 of them in the shell**
   (`app-sidebar.tsx`, `_app.tsx`). Slotted as phase 14, after the S3 driver. They
@@ -1536,7 +1591,7 @@ lives in `src/styles.css` comments — read those before changing any colour.
   delete the adjacent `outline-none`, which would otherwise cancel it — but controls
   inside a scroll container need `focus-ring-inset`, so not a blind find-and-replace.
 - **`/impeccable polish`** for the surfaces above (arbitrary type sizes ride along).
-- **`/impeccable document`** to write DESIGN.md §5 (Components) — *after* the sweep, not before.
+- **`/impeccable document`** to write DESIGN.md §5 (Components) — _after_ the sweep, not before.
 - **Dark theme** remains a feature, not started: the `dark` custom-variant exists but no
   dark token values do.
 
@@ -1547,10 +1602,10 @@ CSV, virtualization + keyboard-grid, kanban, drawer-over-table, Overview/Highlig
 ## Open questions
 
 - ~~**Space page shape.**~~ **Answered, and shipped:** one scrollable page, memo at top — a
-  space is something you *read*, not something you administer. Still unresolved is what
+  space is something you _read_, not something you administer. Still unresolved is what
   happens when sources and contacts get sections alongside memo · companies · notes.
 - ~~**Does a thesis need its own attributes?**~~ Moot — thesis removed 2026-08.
 - ~~**Note vs memo vs document.**~~ **Answered 2026-07: one object.** A memo is a note with
   `kind = 'memo'` — same table, same editor, same links. The kind drives presentation and a
-  later PDF export, nothing structural. See *Filed vs referenced*.
+  later PDF export, nothing structural. See _Filed vs referenced_.
 - **`values jsonb` indexing strategy** for kanban group-by, per the data model section.
