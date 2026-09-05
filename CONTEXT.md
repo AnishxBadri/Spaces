@@ -33,7 +33,13 @@ row that could ever be personal, from the first migration. See _Single user firs
 - No hosted SaaS _yet_ — self-host remains the product; selling a deployed version is
   recorded future intent (2026-08-15), gated on its own design + security pass.
 - No stranger-tenancy isolation (RLS/per-tenant schemas) until that pass.
-- No no-code object builder (custom _attributes_ yes, custom _objects_ no).
+- ~~No no-code object builder (custom _attributes_ yes, custom _objects_ no).~~
+  **Reversed 2026-09-02:** custom objects yes — but strictly as the
+  **attribute-bag tier** (see "Two-tier object model" in the attribute engine
+  block and `docs/spec-attribute-engine.md`). The non-goal narrows to: custom
+  objects never get identity/dedupe/merge/enrichment/interaction machinery —
+  that stays exclusive to core objects, matching what Attio ships (verified
+  live 2026-09: their custom objects are attribute bags too).
 - Not at MVP: LP reporting, portfolio MIS collection, mobile, sequences, dashboards, workflow automation.
 
 ## Why self-host wins here
@@ -83,6 +89,55 @@ each added a domain). Pin discipline (2026-08): no `latest` version specifiers �
 deps pinned to resolved versions; upgrades are deliberate events. The prod worker runs
 TypeScript via tsx (one build pipeline, accepted 2026-08); bundle it with esbuild when an
 image actually ships.
+
+### Backend paradigm (decided 2026-09-04, "future" branch deliberation)
+
+The integration phase (email, enrichment, AI lanes, feeds — heavy background
+jobs) gets a named paradigm: **typed effect-system backend over a single
+relational coordinator.** Nine decisions:
+
+1. **Effect TS is the backend base, adopted by ratchet, never big-bang:**
+   all _new_ server code is Effect-first (including the attribute-engine
+   sequence); existing modules convert only when open for behavioral change
+   in the same PR; the merge executor converts last, alone, on its test
+   suite; no dedicated migration sprints. Seam: one `effectFn()` adapter
+   (Effect → TanStack server-fn); Effect never crosses into React.
+2. **Zod stays at the boundaries** — `valueValidator` is load-bearing;
+   Effect Schema is a separate later decision, not a rider.
+3. **API layer: oRPC on Effect** (`@orpc/experimental-effect`: handlers as
+   Effect programs, Layers in context, Effect Schema accepted). One
+   procedure definition serves both audiences — typed TanStack Query hooks
+   internally, OpenAPI externally (capture, forms, webhooks, n8n crowd).
+   Risk accepted: the Effect bridge is `@beta` — version pinned, imports
+   isolated to one module. Effect HttpApi is the fallback; tRPC rejected;
+   GraphQL rejected (Twenty needs it for schema-per-workspace SaaS; our
+   registry-generated in-process UI doesn't).
+4. **Internal interactive path stays server-fns** — in-process, already
+   typed; new operations that will ever be externally callable or want
+   generated hooks are born as oRPC procedures instead. The boundary finds
+   itself; nothing rewrites on principle.
+5. **Seam rules:** server-fns never do slow work (>~200ms or any external
+   API → enqueue and return); workers write through the same one-write-paths
+   (`setValues`, `resolveEntity`, suggestions) as typed actor `integration`;
+   UI freshness via query invalidation, no websockets until measured need.
+6. **pg-boss stays the queue; Postgres is the only coordinator** — queue,
+   staging, cursors, vectors, tsv in the one DB. No Redis until a measured
+   reason (precedent: Oban runs Plausible's SaaS, Solid Queue is the Rails 8
+   default — DB-backed queues are the deliberate choice at SaaS scale now,
+   not the toy tier).
+7. **Capability model, not a plugin system:** all code ships dormant;
+   a capability activates via key/toggle/compose-overlay (generalizes the
+   BYOK "no key = feature hidden" rule — embeddings, forwarding, enrichment,
+   feeds, AI lanes all gate this way). Dormant = zero cost. No third-party
+   runtime plugin loading ever; external extensibility is MCP + webhooks +
+   API.
+8. **Dual-end doctrine** (self-host today, recorded SaaS intent later):
+   Postgres-only mandatory dependency, scale by replicas of the same
+   processes, capabilities not forks (GitLab / Plausible / 37signals-ONCE
+   pattern); keep tenancy cheap — no new global state.
+9. **One-write-path enforcement moves to lint** when convenient (ESLint ban
+   on `db.update(entity)` outside `setValues` — Relaticle's PHPStan rule,
+   our flavor).
 
 ### Why TanStack Start over Next.js
 
@@ -191,7 +246,10 @@ link(from_entity_id, to_entity_id, relation, source: manual|ai|extracted,
 Real FKs on both sides. Typing `[[Orbital Composites]]` in a note materializes a `link` row —
 backlinks fall out for free.
 
-Kinds are fixed in code. This is not a custom-object builder (see non-goals).
+Core kinds are fixed in code. **Amended 2026-09-02:** user-created custom
+objects exist as a second tier — attribute-bag records inside the same entity
+graph (see "Two-tier object model" below) — but they never grow identity,
+merge, or enrichment machinery; the opinionated core stays code-owned.
 
 Rejected: nullable-FK-per-type (N columns and N joins per attach point), and untyped
 `(src_type, src_id)` (no referential integrity, every query hand-checks).
@@ -429,8 +487,22 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
   with the BYOK AI phase — fed by the research graph (notes, extracted decks, the
   mandate), which is context Attio's version cannot see, and governed by the existing
   provenance doctrine: AI-written values are suggestions, never silent overwrites.
-  Custom objects stay a non-goal; a fourth object that proves universal ships as a
-  system release, not a builder.
+  ~~Custom objects stay a non-goal~~ — reversed, see "Two-tier object model"
+  (2026-09-02); a custom object that proves universal still ships as a system
+  release (promotion path unchanged).
+- **Two-tier object model (decided 2026-09-02, reversing the custom-object
+  non-goal).** Users can create custom objects — but strictly as
+  **attribute bags**: an `object` registry row (slug, singular/plural nouns),
+  records as entities carrying `object_id`, the full attribute engine, record
+  references both directions, registry-generated routes. What they get free
+  from the polymorphic core: spaces tagging, mentions/backlinks, notes,
+  search, activity. What they are **permanently excluded from** (the narrowed
+  non-goal): alias resolution, dedupe, merge (as merge _targets_; references
+  to merged core records rewrite via the link graph, which is kind-agnostic),
+  enrichment, interactions, seeded attributes. Attio ships the identical
+  exclusions — verified live 2026-09 (their custom objects are born with
+  record_id/created_at/created_by only; domain/email types rejected on them).
+  Full spec: `docs/spec-attribute-engine.md`.
 - **Machine-write design for the integrations phase (decided 2026-08-08; design
   only, nothing built).** The dividing line is the kind of claim, not the vendor:
   **a sourced fact may fill an empty field; anything generated, or anything
@@ -945,6 +1017,70 @@ and the worker. Two small baselines to add when the first push-style integration
 (neither changes the schema's shape): a **generic webhook ingress**
 (`/api/webhooks/:provider`, signature-verified) and the dedupe-inbox pattern
 generalized into a reusable **review inbox** for assistant/AI suggestions.
+
+### The integration map (deliberated 2026-09-02, "future" branch)
+
+By data type, not vendor — every category classifies into the existing
+claim-type lanes (identity → aliases via resolveEntity; sourced facts →
+fill-blanks with receipts; content → document pipeline; generated judgment →
+suggestions). No category needs a new lane; that's the design check.
+
+1. **Storage sources** — Google Drive/Box/Dropbox as places decks and data
+   rooms already live, picked/synced into the document pipeline. (S3/MinIO
+   is our blob backend, not an integration.)
+2. **Email + calendar** — forwarding lane first, full sync later
+   (survey-twenty-email-sync.md is the map; Attio's forward/BCC address is
+   the consent model).
+3. **Call recordings** — Fathom/tl;dv/Granola webhooks → transcript as
+   document on participant-matched people; summary as suggestion.
+4. **Enrichment** — the Enricher interface (BYOK block); Exa-class live web
+   is the _research_ lane, distinct doctrine from field-fill.
+5. **AI (BYOK)** — the substrate, `docs/spec-ai-substrate.md`.
+6. **Native forms** — registry-rendered-outward intake: pitch submission
+   (structured pre-lead birth), founder update collection, DD
+   questionnaires, referral intake. Native first; Typeform/GForms webhook
+   mapping later. Open ground: Attio/Twenty/Relaticle all lack native forms.
+7. **Messaging (WhatsApp)** — where half of angel deal-talk actually lives
+   (folk proved the category). Three lanes, deliberated 2026-09-02:
+   _Lane 0 (v1, zero infra)_: parse WhatsApp's native "export chat" .txt
+   (+ media) uploads — messages → interactions on phone-alias-matched
+   people, media → document pipeline; user-curated per conversation, the
+   same consent shape as email forwarding, no ToS exposure. _Lane 1 (real
+   sync)_: optional opt-in companion container speaking the WhatsApp Web
+   multi-device protocol (Baileys, or whatsmeow via mautrix-whatsapp),
+   QR-linked as companion device, streaming to the webhook ingress —
+   **read-only, 1:1 chats only, opt-in per chat or known-person-matched
+   only**; docs must state plainly: ToS-violating protocol reverse-
+   engineering, nonzero ban risk, runs on the user's box at their risk.
+   _Lane 2 (Business Cloud API)_: wrong shape (outbound template messaging
+   on a dedicated number), not our use case. Sequence: lane 0 whenever
+   cheap; lane 1 last on the whole map.
+8. **Capture extension (LinkedIn)** — manual per-profile capture from the
+   user's own browser session; the manual cousin of enrichment. Shape
+   (deliberated 2026-09-02): MV3 WebExtension in-repo (`apps/extension`),
+   thin client — grabs visible page text, POSTs to the user's own instance
+   (`/api/capture`, instance URL + PAT configured once); extraction happens
+   server-side via the AI extract lane against the registry schema (no
+   brittle LinkedIn selectors — markup churn can't break it), then
+   resolveEntity + suggestions. Nothing to host: Bitwarden distribution
+   model — one generic store-published build (plus a release zip for
+   load-unpacked), instance URL user-configured, no middleman endpoint.
+   Versioned capture API so extension/instance drift degrades to "update
+   me", never breakage. Defensibility line: manual, user-initiated, their
+   own session, no background crawling or bulk automation.
+9. **Link-based deck ingestion** — DocSend/Pitch/Notion links snapshotted to
+   PDF into the document pipeline before they expire.
+10. **Migration/import** — CSV/Airtable/Notion/CRM import; onboarding-
+    critical (every prospective user has deal flow in a spreadsheet today).
+11. **Outbound** — MCP server (AI agents), generic webhooks/API (n8n
+    automation), digest delivery channel (Monday brief → Slack/Telegram/
+    email; pull-based doctrine, delivered somewhere).
+
+Sequencing instinct (revised 2026-09-02): email forwarding + link ingestion
+first (inbound arrival, cheap, feed everything), enrichment second,
+calendar/call recordings third. **Forms, the capture extension, and
+WhatsApp are all much further down the pipeline** — deliberated and mapped
+above so the shapes are on record, not because they're near-term.
 
 ## Email / calendar ingestion
 

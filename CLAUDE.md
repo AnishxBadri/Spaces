@@ -45,6 +45,17 @@ Postgres.
   was the worst bug of a review cycle; there is no unmerge executor — the
   snapshot convention is the only contract.
 
+## Backend paradigm (Effect ratchet — CONTEXT.md "Backend paradigm" is the contract)
+
+- **All new server code is Effect-first** (v4); existing modules convert only
+  when already open for behavioral change, in the same PR. Effect never
+  crosses into React — the seam is the `effectFn()` adapter (server-fns) /
+  oRPC handlers.
+- Writing Effect: invoke the vendored `effect-ts` skill; it defers to
+  `node_modules/effect/AGENTS.md` (version-matched guidance).
+- TanStack guidance: the installed packages ship their own `SKILL.md`
+  (TanStack Intent) — check `node_modules/@tanstack/*` before guessing APIs.
+
 ## Git
 
 - One-line commit messages, no co-author trailer.
