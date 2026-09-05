@@ -49,6 +49,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "drizzle-orm": "^0.45.1",
+    "effect": "4.0.0-rc.112",
     "fflate": "^0.8.3",
     "lucide-react": "^0.577.0",
     "mammoth": "^1.12.0",

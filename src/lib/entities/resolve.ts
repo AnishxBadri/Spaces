@@ -128,11 +128,20 @@ export async function resolveEntity(
 
   // 2. No identity match → create.
   const canonicalName = name ?? keys[0].valueNorm
+  // Companies and people are object records; organization is an entity
+  // kind without a registry, so it carries no object row.
+  const objectId =
+    input.kind === 'organization'
+      ? null
+      : await (
+          await import('../attributes/objects')
+        ).objectIdForKindAsync(input.kind)
   const created = await db.transaction(async (tx) => {
     const [ent] = await tx
       .insert(entity)
       .values({
         kind: input.kind,
+        objectId,
         canonicalName,
         source: input.source,
         createdBy: input.createdBy,

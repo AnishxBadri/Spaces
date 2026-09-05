@@ -13,11 +13,13 @@ import {
 // (values column) — attribute registry lives in ./attributes
 import { sql } from 'drizzle-orm'
 import { user } from './auth'
+import { objectDef } from './objects'
 
 /**
  * Polymorphic entity core. Everything linkable is an entity: one mention
  * system, one backlink query, one search index, one attach mechanism.
- * Kinds are fixed in code — this is not a custom-object builder.
+ * Core kinds are fixed in code; custom objects share the 'custom' kind and
+ * are differentiated by object_id (CONTEXT.md "Two-tier object model").
  */
 
 export const entityKind = pgEnum('entity_kind', [
@@ -29,6 +31,7 @@ export const entityKind = pgEnum('entity_kind', [
   'note',
   'document',
   'term',
+  'custom',
 ])
 
 export const entitySource = pgEnum('entity_source', [
@@ -45,6 +48,10 @@ export const entity = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     kind: entityKind('kind').notNull(),
+    // Set for every record-of-an-object (core kinds + custom), null for
+    // research kinds (space/note/document/term). Invariant enforced in
+    // code: a core entity's kind agrees with its object row.
+    objectId: uuid('object_id').references(() => objectDef.id),
     canonicalName: text('canonical_name').notNull(),
     // Soft merge: loser rows survive and redirect. Chains are flattened at
     // write time — merging B into C repoints every merged_into_id at B.

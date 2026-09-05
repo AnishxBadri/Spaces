@@ -21,9 +21,15 @@ export const createDeal = createServerFn({ method: 'POST' })
   .validator(createDealInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
+    const { objectIdForKindAsync } = await import('../attributes/objects')
     const [ent] = await db
       .insert(entity)
-      .values({ kind: 'deal', canonicalName: data.name, createdBy: u.id })
+      .values({
+        kind: 'deal',
+        objectId: await objectIdForKindAsync('deal'),
+        canonicalName: data.name,
+        createdBy: u.id,
+      })
       .returning({ id: entity.id })
 
     const { setValues } = await import('../attributes/values')

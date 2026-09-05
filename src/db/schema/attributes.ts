@@ -11,20 +11,15 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { entity } from './entities'
+import { objectDef } from './objects'
 import { user } from './auth'
 
 /**
- * The attribute engine (CONTEXT.md "Attribute engine"). Objects —
- * company/person/deal — carry a registry of attributes; ALL values (system
- * and custom) live in entity.values jsonb keyed by slug. Identity, kind,
- * canonical_name never enter this system.
+ * The attribute engine (CONTEXT.md "Attribute engine"). Every object — core
+ * or custom — carries a registry of attributes keyed by object_id; ALL
+ * values (system and custom) live in entity.values jsonb keyed by slug.
+ * Identity, kind, canonical_name never enter this system.
  */
-
-export const attributeObjectKind = pgEnum('attribute_object_kind', [
-  'company',
-  'person',
-  'deal',
-])
 
 /** Fixed menu — users define attributes, never types. */
 export const attributeType = pgEnum('attribute_type', [
@@ -49,7 +44,9 @@ export const attribute = pgTable(
   'attribute',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    objectKind: attributeObjectKind('object_kind').notNull(),
+    objectId: uuid('object_id')
+      .notNull()
+      .references(() => objectDef.id),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
     type: attributeType('type').notNull(),
@@ -70,7 +67,7 @@ export const attribute = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex('attribute_kind_slug_unique').on(t.objectKind, t.slug)],
+  (t) => [uniqueIndex('attribute_object_slug_unique').on(t.objectId, t.slug)],
 )
 
 /**

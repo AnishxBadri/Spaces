@@ -14,30 +14,51 @@ export const listRegistry = createServerFn()
     }),
   )
   .handler(async ({ data }) => {
+    // Effect-first through the effectFn seam (backend-paradigm ratchet);
+    // auth stays promise-land outside the program.
     await requireUser()
     const { attribute } = await import('#/db/schema')
-    const rows = await db
-      .select()
-      .from(attribute)
-      .where(
-        data.includeArchived
-          ? eq(attribute.objectKind, data.kind)
-          : and(
-              eq(attribute.objectKind, data.kind),
-              eq(attribute.archived, false),
-            ),
-      )
-      .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
-    return rows.map((d) => ({
-      id: d.id,
-      slug: d.slug,
-      name: d.name,
-      type: d.type,
-      options: d.options as Json,
-      isSystem: d.isSystem,
-      archived: d.archived,
-      sortOrder: d.sortOrder,
-    }))
+    const { objectIdForKind } = await import('../attributes/objects')
+    const { effectFn } = await import('./effect')
+    const { Effect } = await import('effect')
+
+    const listRegistryProgram = Effect.fn('listRegistryProgram')(function* (
+      kind: 'company' | 'person' | 'deal',
+      includeArchived: boolean,
+    ) {
+      const objectId = yield* objectIdForKind(kind)
+      const rows = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select()
+            .from(attribute)
+            .where(
+              includeArchived
+                ? eq(attribute.objectId, objectId)
+                : and(
+                    eq(attribute.objectId, objectId),
+                    eq(attribute.archived, false),
+                  ),
+            )
+            .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt)),
+        catch: (cause) => new Error(`Registry read failed: ${String(cause)}`),
+      })
+      return rows.map((d) => ({
+        id: d.id,
+        slug: d.slug,
+        name: d.name,
+        type: d.type,
+        options: d.options as Json,
+        isSystem: d.isSystem,
+        archived: d.archived,
+        sortOrder: d.sortOrder,
+      }))
+    })
+
+    return effectFn(listRegistryProgram)(
+      data.kind,
+      data.includeArchived ?? false,
+    )
   })
 
 const optionEdit = z.object({
@@ -147,7 +168,7 @@ export const updateAttribute = createServerFn({ method: 'POST' })
       const siblings = await db
         .select({ id: attribute.id, sortOrder: attribute.sortOrder })
         .from(attribute)
-        .where(eq(attribute.objectKind, attr.objectKind))
+        .where(eq(attribute.objectId, attr.objectId))
         .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
       const idx = siblings.findIndex((s) => s.id === data.id)
       const swapIdx = data.move === 'up' ? idx - 1 : idx + 1
@@ -191,6 +212,8 @@ export const createAttribute = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { attribute } = await import('#/db/schema')
+    const { objectIdForKindAsync } = await import('../attributes/objects')
+    const objectId = await objectIdForKindAsync(data.objectKind)
 
     const baseSlug =
       data.name
@@ -206,12 +229,7 @@ export const createAttribute = createServerFn({ method: 'POST' })
       const existing = await db
         .select({ id: attribute.id })
         .from(attribute)
-        .where(
-          and(
-            eq(attribute.objectKind, data.objectKind),
-            eq(attribute.slug, slug),
-          ),
-        )
+        .where(and(eq(attribute.objectId, objectId), eq(attribute.slug, slug)))
       if (existing.length === 0) break
       slug = `${baseSlug}_${i}`
     }
@@ -248,12 +266,12 @@ export const createAttribute = createServerFn({ method: 'POST' })
         maxOrder: sql<number>`coalesce(max(${attribute.sortOrder}), 0)`,
       })
       .from(attribute)
-      .where(eq(attribute.objectKind, data.objectKind))
+      .where(eq(attribute.objectId, objectId))
 
     const [row] = await db
       .insert(attribute)
       .values({
-        objectKind: data.objectKind,
+        objectId,
         slug,
         name: data.name,
         type: data.type,

@@ -9,6 +9,20 @@ import type { BadgeColor } from './colors'
 
 export type ObjectKind = 'company' | 'person' | 'deal'
 
+/**
+ * The seeded system rows of the object registry (one registry, system
+ * rows — CONTEXT.md "Two-tier object model"). Slugs are plural, matching
+ * the rule custom objects follow (slug derived from the plural noun).
+ */
+export const CORE_OBJECTS: Record<
+  ObjectKind,
+  { slug: string; singular: string; plural: string }
+> = {
+  company: { slug: 'companies', singular: 'Company', plural: 'Companies' },
+  person: { slug: 'people', singular: 'Person', plural: 'People' },
+  deal: { slug: 'deals', singular: 'Deal', plural: 'Deals' },
+}
+
 export type AttributeType =
   | 'text'
   | 'number'
@@ -49,7 +63,7 @@ export type AttributeOptions = {
 
 export type AttributeDef = {
   id: string
-  objectKind: ObjectKind
+  objectId: string
   slug: string
   name: string
   type: AttributeType

@@ -25,6 +25,14 @@ export default [
     },
   },
   {
-    ignores: ['eslint.config.js', 'prettier.config.js'],
+    ignores: [
+      'eslint.config.js',
+      'prettier.config.js',
+      // Build artifacts — regenerated, never linted.
+      '.output/**',
+      '.nitro/**',
+      '.tanstack/**',
+      'dist/**',
+    ],
   },
 ]

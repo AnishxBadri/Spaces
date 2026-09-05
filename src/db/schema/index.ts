@@ -1,6 +1,7 @@
 export * from './auth'
 export * from './workspace'
 export * from './templates'
+export * from './objects'
 export * from './entities'
 export * from './attributes'
 export * from './kinds'

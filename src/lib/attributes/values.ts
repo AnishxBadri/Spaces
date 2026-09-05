@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db'
 import { attribute, attributeEvent, entity, link } from '#/db/schema'
+import { objectIdForKindAsync } from './objects'
 import { valueValidator } from './registry'
 import type { AttributeDef, ObjectKind } from './registry'
 
@@ -10,15 +11,21 @@ import type { AttributeDef, ObjectKind } from './registry'
  * record-reference link rows — all in one transaction.
  */
 
-export async function getRegistry(
-  kind: ObjectKind,
+export async function getRegistryByObjectId(
+  objectId: string,
 ): Promise<Array<AttributeDef>> {
   const rows = await db
     .select()
     .from(attribute)
-    .where(and(eq(attribute.objectKind, kind), eq(attribute.archived, false)))
+    .where(and(eq(attribute.objectId, objectId), eq(attribute.archived, false)))
     .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
   return rows as Array<AttributeDef>
+}
+
+export async function getRegistry(
+  kind: ObjectKind,
+): Promise<Array<AttributeDef>> {
+  return getRegistryByObjectId(await objectIdForKindAsync(kind))
 }
 
 export class AttributeValidationError extends Error {
@@ -49,14 +56,23 @@ export async function setValues(opts: {
     // serializes the merges instead.
     const ent = (
       await tx
-        .select({ id: entity.id, kind: entity.kind, values: entity.values })
+        .select({
+          id: entity.id,
+          kind: entity.kind,
+          objectId: entity.objectId,
+          values: entity.values,
+        })
         .from(entity)
         .where(eq(entity.id, entityId))
         .for('update')
     ).at(0)
     if (!ent) throw new Error('Entity not found')
-    const kind = ent.kind as ObjectKind
-    const registry = await getRegistry(kind)
+    // objectId is the registry key; kind fallback covers rows created
+    // outside the creation server-fns (tests, raw inserts) — core kinds
+    // resolve to their system object row.
+    const objectId =
+      ent.objectId ?? (await objectIdForKindAsync(ent.kind as ObjectKind))
+    const registry = await getRegistryByObjectId(objectId)
     const bySlug = new Map(registry.map((d) => [d.slug, d]))
     const current = (ent.values ?? {}) as Record<string, unknown>
 
