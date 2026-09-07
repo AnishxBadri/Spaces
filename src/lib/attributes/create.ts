@@ -30,7 +30,10 @@ export class AttributeCreateRejected extends Schema.TaggedError<AttributeCreateR
 ) {}
 
 export type CreateAttributeInput = {
-  objectKind: ObjectKind
+  /** the object row, directly — the only key custom objects have */
+  objectId?: string
+  /** or a core kind, resolved to its system object row */
+  objectKind?: ObjectKind
   name: string
   type: AttributeType
   description?: string | null
@@ -158,7 +161,13 @@ export const createAttributeProgram = Effect.fn('createAttributeProgram')(
       return yield* new AttributeCreateRejected({
         message: 'Name the attribute',
       })
-    const objectId = yield* objectIdForKind(input.objectKind)
+    const objectId =
+      input.objectId ??
+      (input.objectKind
+        ? yield* objectIdForKind(input.objectKind)
+        : yield* new AttributeCreateRejected({
+            message: 'Pick the object this attribute belongs to',
+          }))
     const options = yield* buildOptions(input)
 
     // Slug: derived once, suffixed on collision within the object, then

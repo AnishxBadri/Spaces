@@ -322,3 +322,39 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
     return { ok: true }
   },
 )
+
+/**
+ * Drag-to-reorder from the per-object attributes page: the full order of
+ * one object's attributes, written as sort_order = position × 10 in one
+ * transaction. Ids that don't belong to the object are ignored rather than
+ * rejected — a stale page must not be able to reorder someone else's
+ * registry. Table columns and record rails read sort_order, so the change
+ * shows everywhere.
+ */
+export const reorderAttributesProgram = Effect.fn('reorderAttributesProgram')(
+  function* (
+    objectId: string,
+    ids: Array<string>,
+  ): Effect.fn.Return<{ ok: true }, AttributeQueryFailed> {
+    const owned = new Set(
+      (yield* query(() =>
+        db
+          .select({ id: attribute.id })
+          .from(attribute)
+          .where(eq(attribute.objectId, objectId)),
+      )).map((r) => r.id),
+    )
+    const ordered = ids.filter((id) => owned.has(id))
+    yield* query(() =>
+      db.transaction(async (tx) => {
+        for (const [i, id] of ordered.entries()) {
+          await tx
+            .update(attribute)
+            .set({ sortOrder: (i + 1) * 10 })
+            .where(eq(attribute.id, id))
+        }
+      }),
+    )
+    return { ok: true }
+  },
+)

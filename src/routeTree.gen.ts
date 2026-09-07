@@ -34,6 +34,7 @@ import { Route as AppPortfolioHoldingIdRouteImport } from './routes/_app/portfol
 import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
+import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings_.objects.$objectSlug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -159,6 +160,12 @@ const ApiBlobKeyRoute = ApiBlobKeyRouteImport.update({
   path: '/api/blob/$key',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppSettingsObjectsObjectSlugRoute =
+  AppSettingsObjectsObjectSlugRouteImport.update({
+    id: '/settings_/objects/$objectSlug',
+    path: '/settings/objects/$objectSlug',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -185,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -211,6 +219,7 @@ export interface FileRoutesByTo {
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -239,6 +248,7 @@ export interface FileRoutesById {
   '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/_app/settings_/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/spaces/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/settings/objects/$objectSlug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/spaces/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/settings/objects/$objectSlug'
   id:
     | '__root__'
     | '/'
@@ -320,6 +332,7 @@ export interface FileRouteTypes {
     | '/_app/spaces_/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/_app/settings_/objects/$objectSlug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -510,6 +523,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBlobKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/settings_/objects/$objectSlug': {
+      id: '/_app/settings_/objects/$objectSlug'
+      path: '/settings/objects/$objectSlug'
+      fullPath: '/settings/objects/$objectSlug'
+      preLoaderRoute: typeof AppSettingsObjectsObjectSlugRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -531,6 +551,7 @@ interface AppRouteChildren {
   AppPeoplePersonIdRoute: typeof AppPeoplePersonIdRoute
   AppPortfolioHoldingIdRoute: typeof AppPortfolioHoldingIdRoute
   AppSpacesSpaceIdRoute: typeof AppSpacesSpaceIdRoute
+  AppSettingsObjectsObjectSlugRoute: typeof AppSettingsObjectsObjectSlugRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -551,6 +572,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPeoplePersonIdRoute: AppPeoplePersonIdRoute,
   AppPortfolioHoldingIdRoute: AppPortfolioHoldingIdRoute,
   AppSpacesSpaceIdRoute: AppSpacesSpaceIdRoute,
+  AppSettingsObjectsObjectSlugRoute: AppSettingsObjectsObjectSlugRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

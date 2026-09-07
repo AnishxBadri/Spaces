@@ -146,3 +146,63 @@ describe.skipIf(!hasDb)('createAttributeProgram', () => {
     await rejects({ ...base, name: name('dt'), type: 'date', default: 'soon' })
   })
 })
+
+describe.skipIf(!hasDb)('reorderAttributesProgram', () => {
+  const tag = randomUUID().slice(0, 8)
+
+  afterAll(async () => {
+    const { db } = await import('#/db')
+    const { attribute } = await import('#/db/schema')
+    const { like } = await import('drizzle-orm')
+    await db.delete(attribute).where(like(attribute.name, `Zo % ${tag}`))
+  })
+
+  it('persists a full order and ignores ids from other objects', async () => {
+    const { Effect } = await import('effect')
+    const { createAttributeProgram } = await import('./create')
+    const { reorderAttributesProgram } = await import('./update')
+    const { getRegistryByObjectId } = await import('./values')
+    const { objectIdForKindAsync } = await import('./objects')
+    const { db } = await import('#/db')
+    const { user } = await import('#/db/schema/auth')
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    const objectId = await objectIdForKindAsync('deal')
+    const personObjectId = await objectIdForKindAsync('person')
+
+    const made: Array<string> = []
+    for (const n of ['a', 'b', 'c']) {
+      const { id } = await Effect.runPromise(
+        createAttributeProgram({
+          objectId,
+          name: `Zo ${n} ${tag}`,
+          type: 'text',
+          createdBy: actor.id,
+        }),
+      )
+      made.push(id)
+    }
+    const foreign = await Effect.runPromise(
+      createAttributeProgram({
+        objectId: personObjectId,
+        name: `Zo foreign ${tag}`,
+        type: 'text',
+        createdBy: actor.id,
+      }),
+    )
+    const [a, b, c] = made
+
+    // Reverse the three, smuggle in another object's attribute: the order
+    // lands, the stranger is ignored, and the registry read reflects it.
+    await Effect.runPromise(
+      reorderAttributesProgram(objectId, [c, foreign.id, b, a]),
+    )
+    const mine = (await getRegistryByObjectId(objectId))
+      .filter((d) => made.includes(d.id))
+      .map((d) => d.id)
+    expect(mine).toEqual([c, b, a])
+    const [foreignRow] = (await getRegistryByObjectId(personObjectId)).filter(
+      (d) => d.id === foreign.id,
+    )
+    expect(foreignRow).toBeTruthy()
+  })
+})

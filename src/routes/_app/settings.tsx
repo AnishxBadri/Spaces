@@ -1,21 +1,15 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import {
-  Archive,
-  ArchiveRestore,
-  ArrowDown,
-  ArrowUp,
+  Boxes,
   Building2,
+  ChevronRight,
   Copy,
   Kanban,
-  Pencil,
   Plus,
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
-import { AttributeDialog } from '#/components/attributes/attribute-dialog'
-import { IconBtn } from '#/components/attributes/option-list-editor'
 import { Button } from '#/components/ui/button'
 import {
   DropdownMenu,
@@ -25,7 +19,6 @@ import {
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import { badgeStyle, optionColor } from '#/lib/attributes/colors'
 import {
   createInvite,
   getSession,
@@ -33,7 +26,7 @@ import {
   listInvites,
   listMembers,
   listFxRates,
-  listRegistry,
+  listObjects,
   listTemplates,
   revokeInvite,
   saveWorkspace,
@@ -41,7 +34,6 @@ import {
   setFxRate,
   setMemberBanned,
   setMemberRole,
-  updateAttribute,
   updateTemplate,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -53,15 +45,13 @@ import { cn } from '#/lib/utils'
  */
 export const Route = createFileRoute('/_app/settings')({
   loader: async () => {
-    const [session, workspace, members, templates, company, person, deal, fx] =
+    const [session, workspace, members, templates, objects, fx] =
       await Promise.all([
         getSession(),
         getWorkspace(),
         listMembers(),
         listTemplates({ data: { includeArchived: true } }),
-        listRegistry({ data: { kind: 'company', includeArchived: true } }),
-        listRegistry({ data: { kind: 'person', includeArchived: true } }),
-        listRegistry({ data: { kind: 'deal', includeArchived: true } }),
+        listObjects(),
         listFxRates(),
       ])
     const isAdmin = session?.user.role === 'admin'
@@ -73,53 +63,23 @@ export const Route = createFileRoute('/_app/settings')({
       members,
       templates,
       invites,
-      company,
-      person,
-      deal,
+      objects,
       fx,
     }
   },
   component: SettingsPage,
 })
 
-type Registry = Awaited<ReturnType<typeof listRegistry>>
-type Attr = Registry[number]
-type Kind = 'company' | 'person' | 'deal'
+type ObjectRow = Awaited<ReturnType<typeof listObjects>>[number]
 
-const OBJECTS: Array<{ kind: Kind; label: string; icon: typeof Building2 }> = [
-  { kind: 'company', label: 'Companies', icon: Building2 },
-  { kind: 'person', label: 'People', icon: Users },
-  { kind: 'deal', label: 'Deals', icon: Kanban },
-]
-
-const TYPE_LABELS: Record<string, string> = {
-  text: 'Text',
-  number: 'Number',
-  currency: 'Currency',
-  date: 'Date',
-  checkbox: 'Checkbox',
-  select: 'Select',
-  multi_select: 'Multi-select',
-  status: 'Status',
-  domain: 'Domain',
-  email: 'Email',
-  url: 'URL',
-  phone: 'Phone',
-  rating: 'Rating',
-  record_reference: 'Relationship',
-  actor_reference: 'User',
+const OBJECT_ICONS: Record<string, typeof Building2> = {
+  companies: Building2,
+  people: Users,
+  deals: Kanban,
 }
 
 function SettingsPage() {
   const data = Route.useLoaderData()
-  const registries = {
-    company: data.company,
-    person: data.person,
-    deal: data.deal,
-  }
-  const router = useRouter()
-  const [kind, setKind] = useState<Kind>('company')
-  const registry = registries[kind]
 
   return (
     <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
@@ -150,57 +110,7 @@ function SettingsPage() {
         rates={data.fx.rates}
       />
 
-      <h2 className="mt-10 text-title font-semibold tracking-tight">Objects</h2>
-      <p className="mt-1 text-ui text-muted-foreground">
-        Attributes behind Companies, People, Deals. Rename anything, edit
-        options, archive what you don't use — types are fixed.
-      </p>
-
-      <div className="mt-4 flex items-center justify-between border-b border-border">
-        <div role="tablist" className="flex gap-1">
-          {OBJECTS.map((o) => (
-            <button
-              key={o.kind}
-              role="tab"
-              aria-selected={kind === o.kind}
-              onClick={() => setKind(o.kind)}
-              className={cn(
-                'relative flex items-center gap-1.5 rounded-t-md px-3 pb-2.5 text-ui font-medium text-muted-foreground focus-ring transition-colors hover:text-foreground',
-                kind === o.kind &&
-                  'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
-              )}
-            >
-              <o.icon className="size-3.5" strokeWidth={1.75} />
-              {o.label}
-              <span className="tabular text-xs text-muted-foreground">
-                {registries[o.kind].filter((a) => !a.archived).length}
-              </span>
-            </button>
-          ))}
-        </div>
-        <AttributeCreateDialog
-          objectKind={kind}
-          onCreated={() => router.invalidate()}
-          trigger={
-            <Button size="xs" variant="outline">
-              <Plus className="size-3" strokeWidth={2} />
-              New attribute
-            </Button>
-          }
-        />
-      </div>
-
-      <ul className="mt-4 divide-y divide-border/60 rounded-lg border border-border">
-        {registry.map((attr, idx) => (
-          <AttributeRow
-            key={attr.id}
-            attr={attr}
-            objectKind={kind}
-            isFirst={idx === 0}
-            isLast={idx === registry.length - 1}
-          />
-        ))}
-      </ul>
+      <ObjectsSection objects={data.objects} />
     </div>
   )
 }
@@ -752,191 +662,63 @@ function FxSection({
   )
 }
 
-function AttributeRow({
-  attr,
-  objectKind,
-  isFirst,
-  isLast,
-}: {
-  attr: Attr
-  objectKind: Kind
-  isFirst: boolean
-  isLast: boolean
-}) {
-  const router = useRouter()
-  const [editing, setEditing] = useState(false)
-
-  async function act(
-    patch: Parameters<typeof updateAttribute>[0]['data'] extends infer D
-      ? Omit<D, 'id'>
-      : never,
-    message?: string,
-  ) {
-    try {
-      await updateAttribute({ data: { id: attr.id, ...patch } })
-      if (message) toast(message)
-      void router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not update')
-    }
-  }
-
-  const stored = (attr.options ?? {}) as {
-    options?: Array<{
-      id: string
-      label: string
-      group?: string
-      color?: string
-      archived?: boolean
-    }>
-    code?: string
-    max?: number
-    precision?: number
-    targetKind?: string
-    required?: boolean
-    default?: unknown
-  }
-  const options = stored.options ?? []
-  const hasOptions = ['select', 'multi_select', 'status'].includes(attr.type)
-  const summary = [
-    attr.type === 'record_reference' && stored.targetKind
-      ? `→ ${stored.targetKind}`
-      : null,
-    attr.type === 'currency' ? (stored.code ?? 'USD') : null,
-    attr.type === 'rating' ? `out of ${stored.max ?? 5}` : null,
-    attr.type === 'number' && stored.precision !== undefined
-      ? `${stored.precision} decimals`
-      : null,
-    stored.required ? 'required' : null,
-    stored.default !== undefined && stored.default !== null
-      ? 'has default'
-      : null,
-  ].filter(Boolean)
-
+/**
+ * The object index: one row per object (system rows first), each linking to
+ * its attributes page. Custom objects join this list when SPA-13 lands —
+ * the page they get is the same one.
+ */
+function ObjectsSection({ objects }: { objects: Array<ObjectRow> }) {
   return (
-    <li
-      className={cn(
-        'flex flex-col gap-2 px-4 py-3',
-        attr.archived && 'opacity-50',
-      )}
-    >
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <InlineName name={attr.name} onSave={(name) => act({ name })} />
-          <span className="text-xs text-muted-foreground">
-            {TYPE_LABELS[attr.type] ?? attr.type}
-            {summary.length > 0 ? ` · ${summary.join(' · ')}` : ''}
-          </span>
-          {attr.description ? (
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              {attr.description}
-            </p>
-          ) : null}
-        </div>
-
-        <span
-          className={cn(
-            'rounded-full px-2 py-0.5 text-xs font-medium',
-            attr.isSystem
-              ? 'bg-muted text-muted-foreground'
-              : 'bg-selected text-foreground',
-          )}
-        >
-          {attr.isSystem ? 'System' : 'Custom'}
-        </span>
-
-        <div className="flex items-center gap-0.5">
-          <IconBtn
-            label="Move up"
-            disabled={isFirst}
-            onClick={() => act({ move: 'up' })}
-          >
-            <ArrowUp className="size-3.5" strokeWidth={1.75} />
-          </IconBtn>
-          <IconBtn
-            label="Move down"
-            disabled={isLast}
-            onClick={() => act({ move: 'down' })}
-          >
-            <ArrowDown className="size-3.5" strokeWidth={1.75} />
-          </IconBtn>
-          <IconBtn label="Edit attribute" onClick={() => setEditing(true)}>
-            <Pencil className="size-3.5" strokeWidth={1.75} />
-          </IconBtn>
-          <IconBtn
-            label={attr.archived ? 'Restore' : 'Archive'}
-            onClick={() =>
-              act(
-                { archived: !attr.archived },
-                attr.archived
-                  ? `${attr.name} restored`
-                  : `${attr.name} archived`,
-              )
-            }
-          >
-            {attr.archived ? (
-              <ArchiveRestore className="size-3.5" strokeWidth={1.75} />
-            ) : (
-              <Archive className="size-3.5" strokeWidth={1.75} />
-            )}
-          </IconBtn>
-        </div>
-      </div>
-
-      {hasOptions && options.length > 0 ? (
-        <div className="flex flex-wrap gap-1">
-          {options.map((o, i) => (
-            <span
-              key={o.id}
-              style={o.archived ? undefined : badgeStyle(optionColor(o, i))}
-              title={o.archived ? 'Archived option' : undefined}
-              className={cn(
-                'rounded-full px-2 py-0.5 text-label font-medium',
-                o.archived && 'bg-muted text-muted-foreground',
-              )}
-            >
-              {o.label}
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      {/* The morphing dialog in edit mode (spec §7): type static, config
-          edits ride the §3 guards server-side. */}
-      <AttributeDialog
-        mode="edit"
-        attr={attr}
-        objectKind={objectKind}
-        open={editing}
-        onOpenChange={setEditing}
-        onSaved={() => router.invalidate()}
-      />
-    </li>
-  )
-}
-
-function InlineName({
-  name,
-  onSave,
-}: {
-  name: string
-  onSave: (name: string) => void
-}) {
-  const [draft, setDraft] = useState(name)
-  return (
-    <input
-      value={draft}
-      aria-label="Attribute name"
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => draft.trim() && draft !== name && onSave(draft.trim())}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-        if (e.key === 'Escape') {
-          setDraft(name)
-          ;(e.target as HTMLInputElement).blur()
-        }
-      }}
-      className="block w-full truncate rounded bg-transparent text-ui font-medium focus-ring"
-    />
+    <section className="mt-10">
+      <h2 className="text-title font-semibold tracking-tight">Objects</h2>
+      <p className="mt-1 text-ui text-muted-foreground">
+        The records you keep and the attributes on each. Open one to rename,
+        reorder, archive, or add attributes — types are fixed.
+      </p>
+      <ul className="mt-4 divide-y divide-border/60 rounded-lg border border-border">
+        {objects.map((o) => {
+          const Icon = OBJECT_ICONS[o.slug] ?? Boxes
+          return (
+            <li key={o.id}>
+              <Link
+                to="/settings/objects/$objectSlug"
+                params={{ objectSlug: o.slug }}
+                className="flex items-center gap-3 px-4 py-3 focus-ring-inset transition-colors duration-150 ease-out-quart hover:bg-accent"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                  <Icon
+                    className="size-4 text-muted-foreground"
+                    strokeWidth={1.75}
+                  />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-ui font-medium">
+                    {o.plural}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    <span className="tabular">{o.attributeCount}</span>{' '}
+                    attribute{o.attributeCount === 1 ? '' : 's'}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-xs font-medium',
+                    o.isSystem
+                      ? 'bg-muted text-muted-foreground'
+                      : 'bg-selected text-foreground',
+                  )}
+                >
+                  {o.isSystem ? 'System' : 'Custom'}
+                </span>
+                <ChevronRight
+                  className="size-4 shrink-0 text-muted-foreground"
+                  strokeWidth={1.75}
+                />
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }

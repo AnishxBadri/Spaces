@@ -8,10 +8,17 @@ import type { Json } from './shared'
 
 export const listRegistry = createServerFn()
   .validator(
-    z.object({
-      kind: z.enum(['company', 'person', 'deal']),
-      includeArchived: z.boolean().optional(),
-    }),
+    z
+      .object({
+        /** a core kind — resolves to its system object row */
+        kind: z.enum(['company', 'person', 'deal']).optional(),
+        /** or the object row itself, the only key a custom object has */
+        objectId: z.string().uuid().optional(),
+        includeArchived: z.boolean().optional(),
+      })
+      .refine((v) => v.kind || v.objectId, {
+        message: 'Give a kind or an objectId',
+      }),
   )
   .handler(async ({ data }) => {
     // Effect-first through the effectFn seam (backend-paradigm ratchet);
@@ -23,10 +30,11 @@ export const listRegistry = createServerFn()
     const { Effect } = await import('effect')
 
     const listRegistryProgram = Effect.fn('listRegistryProgram')(function* (
-      kind: 'company' | 'person' | 'deal',
+      key: { kind?: 'company' | 'person' | 'deal'; objectId?: string },
       includeArchived: boolean,
     ) {
-      const objectId = yield* objectIdForKind(kind)
+      const objectId =
+        key.objectId ?? (yield* objectIdForKind(key.kind ?? 'company'))
       const rows = yield* Effect.tryPromise({
         try: () =>
           db
@@ -57,9 +65,27 @@ export const listRegistry = createServerFn()
     })
 
     return effectFn(listRegistryProgram)(
-      data.kind,
+      { kind: data.kind, objectId: data.objectId },
       data.includeArchived ?? false,
     )
+  })
+
+/**
+ * Drag-to-reorder on the per-object attributes page. Admin, like every
+ * other reshaping of shared vocabulary.
+ */
+export const reorderAttributes = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      objectId: z.string().uuid(),
+      ids: z.array(z.string().uuid()).max(200),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    const { reorderAttributesProgram } = await import('../attributes/update')
+    const { effectFn } = await import('./effect')
+    return effectFn(reorderAttributesProgram)(data.objectId, data.ids)
   })
 
 const optionEdit = z.object({
@@ -152,7 +178,8 @@ const ATTRIBUTE_TYPES = [
  * from labels the same way the dialog previews them (`deriveOptionIds`).
  */
 export const createAttributeInput = z.object({
-  objectKind: z.enum(['company', 'person', 'deal']),
+  objectKind: z.enum(['company', 'person', 'deal']).optional(),
+  objectId: z.string().uuid().optional(),
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(500).optional(),
   type: z.enum(ATTRIBUTE_TYPES),

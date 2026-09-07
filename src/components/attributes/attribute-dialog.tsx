@@ -178,7 +178,11 @@ type StoredOptions = {
 }
 
 type Props = {
-  objectKind: ObjectKind
+  /** a core kind, or an object row id — custom objects only have the latter */
+  objectKind?: ObjectKind
+  objectId?: string
+  /** singular noun for copy ("every company"); defaults from objectKind */
+  objectLabel?: string
   onSaved: () => void
   trigger?: ReactNode
   open?: boolean
@@ -189,7 +193,7 @@ type Props = {
 )
 
 export function AttributeDialog(props: Props) {
-  const { objectKind, onSaved, trigger, mode } = props
+  const { objectKind, objectId, objectLabel, onSaved, trigger, mode } = props
   const [selfOpen, setSelfOpen] = useState(false)
   const open = props.open ?? selfOpen
   const setOpen = props.onOpenChange ?? setSelfOpen
@@ -203,6 +207,8 @@ export function AttributeDialog(props: Props) {
           <AttributeForm
             key={mode === 'edit' ? props.attr.id : 'create'}
             objectKind={objectKind}
+            objectId={objectId}
+            objectLabel={objectLabel ?? objectKind ?? 'record'}
             mode={mode}
             attr={props.attr}
             onDone={(saved) => {
@@ -218,11 +224,15 @@ export function AttributeDialog(props: Props) {
 
 function AttributeForm({
   objectKind,
+  objectId,
+  objectLabel,
   mode,
   attr,
   onDone,
 }: {
-  objectKind: ObjectKind
+  objectKind?: ObjectKind
+  objectId?: string
+  objectLabel: string
   mode: 'create' | 'edit'
   attr?: EditableAttribute
   onDone: (saved: boolean) => void
@@ -365,7 +375,7 @@ function AttributeForm({
       if (mode === 'create') {
         await createAttribute({
           data: {
-            objectKind,
+            ...(objectId ? { objectId } : { objectKind }),
             name: trimmed,
             description: description.trim() || undefined,
             type: type as Parameters<typeof createAttribute>[0]['data']['type'],
@@ -648,7 +658,7 @@ function AttributeForm({
         </DialogTitle>
         <DialogDescription>
           {mode === 'create'
-            ? `Your own field on every ${objectKind} — it becomes a column and a record field.`
+            ? `Your own field on every ${objectLabel.toLowerCase()} — it becomes a column and a record field.`
             : 'Type is fixed; everything else is yours to change.'}
         </DialogDescription>
       </DialogHeader>
