@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { DealBoard } from '#/components/deal-board'
 import {
   fieldSpanClass,
+  liveOptions,
   optionLabel,
   ValueEditor,
 } from '#/components/attributes/value-editor'
@@ -353,24 +354,46 @@ function DealsPage() {
               >
                 {stageOptions
                   .filter((o) => (o.group ?? 'active') === groupFilter)
+                  .filter((o) => !o.archived)
                   .map((o) => (
-                    <button
+                    <StageChip
                       key={o.id}
-                      type="button"
-                      aria-pressed={stageFilter === o.id}
-                      onClick={() =>
+                      option={o}
+                      pressed={stageFilter === o.id}
+                      onToggle={() =>
                         setStageFilter(stageFilter === o.id ? null : o.id)
                       }
-                      className={cn(
-                        'h-7 shrink-0 rounded-full border px-2.5 text-label whitespace-nowrap focus-ring transition-colors duration-150 ease-out-quart',
-                        stageFilter === o.id
-                          ? 'border-primary/40 bg-selected font-medium text-foreground'
-                          : 'border-transparent text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      {o.label}
-                    </button>
+                    />
                   ))}
+                {/* Filtering is reading history, so retired stages stay
+                    filterable behind a divider — that's how the records
+                    still parked on one get found and retagged (spec §3). */}
+                {stageOptions.some(
+                  (o) => o.archived && (o.group ?? 'active') === groupFilter,
+                ) ? (
+                  <>
+                    <span
+                      role="separator"
+                      aria-orientation="vertical"
+                      className="mx-1 flex h-4 items-center self-center border-l border-border pl-2 text-micro font-medium tracking-wide text-muted-foreground uppercase"
+                    >
+                      Archived
+                    </span>
+                    {stageOptions
+                      .filter((o) => (o.group ?? 'active') === groupFilter)
+                      .filter((o) => o.archived)
+                      .map((o) => (
+                        <StageChip
+                          key={o.id}
+                          option={o}
+                          pressed={stageFilter === o.id}
+                          onToggle={() =>
+                            setStageFilter(stageFilter === o.id ? null : o.id)
+                          }
+                        />
+                      ))}
+                  </>
+                ) : null}
               </div>
             ) : null}
           </TableToolbar>
@@ -389,6 +412,34 @@ function DealsPage() {
         </>
       )}
     </div>
+  )
+}
+
+function StageChip({
+  option,
+  pressed,
+  onToggle,
+}: {
+  option: { id: string; label: string; archived?: boolean }
+  pressed: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onToggle}
+      title={option.archived ? 'Archived option' : undefined}
+      className={cn(
+        'h-7 shrink-0 rounded-full border px-2.5 text-label whitespace-nowrap focus-ring transition-colors duration-150 ease-out-quart',
+        pressed
+          ? 'border-primary/40 bg-selected font-medium text-foreground'
+          : 'border-transparent text-muted-foreground hover:text-foreground',
+        option.archived && !pressed && 'opacity-70',
+      )}
+    >
+      {option.label}
+    </button>
   )
 }
 
@@ -467,11 +518,14 @@ export function CreateDealDialog({
     presetCompany?.id ?? null,
   )
   const [companyName, setCompanyName] = useState(presetCompany?.name ?? '')
-  const [stage, setStage] = useState<string>('pre_lead')
-  const [values, setValues] = useState<Record<string, unknown>>({})
-
   const companyDef = registry.find((d) => d.slug === 'company')
   const stageDef = registry.find((d) => d.slug === 'stage')
+  // Born on the first live stage: a retired Pre-lead would be rejected.
+  const [stage, setStage] = useState<string>(
+    () =>
+      (stageDef ? liveOptions(stageDef).at(0)?.id : undefined) ?? 'pre_lead',
+  )
+  const [values, setValues] = useState<Record<string, unknown>>({})
   // The judgment fields worth setting at birth; refs and owner stay on the
   // record page.
   const extraDefs = registry.filter((d) =>

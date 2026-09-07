@@ -19,3 +19,6 @@ docs/*
 
 # stray desktop screenshots dropped at repo root
 /Screenshot*.png
+
+# agent worktrees (separate checkouts, never committed from here)
+.claude/worktrees/

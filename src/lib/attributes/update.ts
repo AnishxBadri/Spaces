@@ -47,6 +47,8 @@ export type OptionEdit = {
   label: string
   group?: SelectOption['group']
   color?: BadgeColor
+  /** true retires the option; false or absent restores it */
+  archived?: boolean
 }
 
 /**
@@ -127,10 +129,10 @@ export const countRatingsAbove = Effect.fn('countRatingsAbove')(function* (
 })
 
 /**
- * Option-list edit: options can be added and renamed but never removed —
- * stored values may reference them (archive is the spec'd path; not built
- * yet). Colours are pinned on save so the editor never reshuffles what the
- * user has been looking at.
+ * Option-list edit: options can be added, renamed and archived but never
+ * removed — stored values may reference them, and archiving leaves those
+ * values untouched (spec §3). Colours are pinned on save so the editor never
+ * reshuffles what the user has been looking at.
  */
 const mergeOptions = Effect.fn('mergeOptions')(function* (
   type: string,
@@ -147,7 +149,7 @@ const mergeOptions = Effect.fn('mergeOptions')(function* (
     if (!keptIds.has(id))
       return yield* new AttributeConfigRejected({
         message:
-          'Options cannot be removed — records may hold that value. Rename it instead.',
+          'Options cannot be removed — records may hold that value. Archive it instead.',
       })
   }
   const seen = new Set<string>()
@@ -163,6 +165,7 @@ const mergeOptions = Effect.fn('mergeOptions')(function* (
       label: o.label,
       ...(o.group ? { group: o.group } : {}),
       color: o.color ?? nextBadgeColor(i, o.group),
+      ...(o.archived ? { archived: true } : {}),
     }
   })
 })

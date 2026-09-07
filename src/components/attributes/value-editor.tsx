@@ -9,6 +9,7 @@ import {
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { badgeStyle, optionColor } from '#/lib/attributes/colors'
+import { liveOptions, optionState } from '#/lib/attributes/options'
 import { formatDate } from '#/lib/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -29,6 +30,7 @@ export type RegistryEntry = {
       label: string
       group?: string
       color?: string
+      archived?: boolean
     }>
     max?: number
     code?: string
@@ -70,8 +72,43 @@ export function fieldSpanClass(def: { type: string; slug: string }): string {
 }
 
 export function optionLabel(def: RegistryEntry, id: unknown): string {
-  const opt = def.options?.options?.find((o) => o.id === id)
-  return opt?.label ?? String(id ?? '')
+  return optionState(def, id).label
+}
+
+export { liveOptions, optionState }
+
+/**
+ * The one chip for a select/status/multi_select value. Archived options
+ * lose their hue and gain a tooltip rather than disappearing — the
+ * deliberate deviation from Attio (spec §3).
+ */
+export function OptionChip({
+  def,
+  id,
+  className,
+}: {
+  def: RegistryEntry
+  id: unknown
+  className?: string
+}) {
+  const state = optionState(def, id)
+  return (
+    <span
+      style={
+        state.archived
+          ? undefined
+          : badgeStyle(optionColor(state.option, state.index))
+      }
+      title={state.archived ? 'Archived option' : undefined}
+      className={cn(
+        'truncate rounded-full px-2 py-0.5 text-label font-medium',
+        state.archived && 'bg-muted text-muted-foreground',
+        className,
+      )}
+    >
+      {state.label}
+    </span>
+  )
 }
 
 export function ValueEditor({
@@ -474,7 +511,7 @@ function OptionPicker({
   variant,
   multi,
 }: Props & { multi: boolean }) {
-  const opts = def.options?.options ?? []
+  const opts = liveOptions(def)
   const selected: Array<string> = multi
     ? Array.isArray(value)
       ? (value as Array<string>)
@@ -482,6 +519,11 @@ function OptionPicker({
     : value == null
       ? []
       : [String(value)]
+  // A held archived tag can only be dropped, never re-asserted: the cleanup
+  // path for a multi-select is unchecking it, so it stays in the menu greyed.
+  const heldArchived = multi
+    ? selected.filter((id) => optionState(def, id).archived)
+    : []
 
   return (
     <DropdownMenu>
@@ -498,53 +540,45 @@ function OptionPicker({
           {selected.length === 0 ? (
             <span className="text-ui text-muted-foreground">—</span>
           ) : (
-            selected.map((id) => {
-              const idx = opts.findIndex((o) => o.id === id)
-              const opt = idx >= 0 ? opts[idx] : undefined
-              return (
-                <span
-                  key={id}
-                  style={badgeStyle(optionColor(opt, Math.max(idx, 0)))}
-                  className="truncate rounded-full px-2 py-0.5 text-label font-medium"
-                >
-                  {opt?.label ?? String(id)}
-                </span>
-              )
-            })
+            selected.map((id) => <OptionChip key={id} def={def} id={id} />)
           )}
         </span>
         <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
         {multi
-          ? opts.map((o, i) => (
-              <DropdownMenuCheckboxItem
-                key={o.id}
-                checked={selected.includes(o.id)}
-                onCheckedChange={(checked) => {
-                  const next = checked
-                    ? [...selected, o.id]
-                    : selected.filter((s) => s !== o.id)
-                  onSave(next.length === 0 ? null : next)
-                }}
-              >
-                <span
-                  style={badgeStyle(optionColor(o, i))}
-                  className="rounded-full px-2 py-0.5 text-label font-medium"
+          ? [
+              ...opts.map((o) => (
+                <DropdownMenuCheckboxItem
+                  key={o.id}
+                  checked={selected.includes(o.id)}
+                  onCheckedChange={(checked) => {
+                    const next = checked
+                      ? [...selected, o.id]
+                      : selected.filter((s) => s !== o.id)
+                    onSave(next.length === 0 ? null : next)
+                  }}
                 >
-                  {o.label}
-                </span>
-              </DropdownMenuCheckboxItem>
-            ))
+                  <OptionChip def={def} id={o.id} />
+                </DropdownMenuCheckboxItem>
+              )),
+              ...heldArchived.map((id) => (
+                <DropdownMenuCheckboxItem
+                  key={id}
+                  checked
+                  onCheckedChange={() => {
+                    const next = selected.filter((s) => s !== id)
+                    onSave(next.length === 0 ? null : next)
+                  }}
+                >
+                  <OptionChip def={def} id={id} />
+                </DropdownMenuCheckboxItem>
+              )),
+            ]
           : [
-              ...opts.map((o, i) => (
+              ...opts.map((o) => (
                 <DropdownMenuItem key={o.id} onSelect={() => onSave(o.id)}>
-                  <span
-                    style={badgeStyle(optionColor(o, i))}
-                    className="rounded-full px-2 py-0.5 text-label font-medium"
-                  >
-                    {o.label}
-                  </span>
+                  <OptionChip def={def} id={o.id} />
                 </DropdownMenuItem>
               )),
               selected.length > 0 ? (

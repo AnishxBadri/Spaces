@@ -33,6 +33,8 @@ export type BoardStage = {
   label: string
   group?: string
   color?: string
+  /** retired stage: shown greyed while deals remain, gone once emptied */
+  archived?: boolean
 }
 
 export function DealBoard({
@@ -133,6 +135,12 @@ export function DealBoard({
         {stages.map((stage) => {
           const cards = deals.filter((d) => stageOf(d) === stage.id)
           const medianDays = medianDaysInStage[stage.id]
+          // An archived stage is history: it stays on the board only while
+          // deals still sit in it (spec §3), and nothing can be dropped into
+          // it — the write would be rejected anyway, so the drop is not
+          // offered. Cards can still be dragged out; that's the cleanup.
+          if (stage.archived && cards.length === 0) return null
+          const droppable = !stage.archived
           return (
             <div
               key={stage.id}
@@ -141,21 +149,38 @@ export function DealBoard({
                 dragOver === stage.id
                   ? 'border-primary/50 bg-selected'
                   : 'border-border',
+                stage.archived && 'border-dashed bg-muted/40',
               )}
               onDragOver={(e) => {
+                if (!droppable) {
+                  e.dataTransfer.dropEffect = 'none'
+                  return
+                }
                 e.preventDefault()
                 setDragOver(stage.id)
               }}
               onDragLeave={() => setDragOver(null)}
               onDrop={(e) => {
+                if (!droppable) return
                 e.preventDefault()
                 setDragOver(null)
                 const id = e.dataTransfer.getData('text/deal-id')
                 if (id) moveTo(id, stage.id)
               }}
             >
-              <div className="flex items-baseline gap-2 px-3 pt-2.5 pb-1.5">
+              <div
+                className={cn(
+                  'flex items-baseline gap-2 px-3 pt-2.5 pb-1.5',
+                  stage.archived && 'text-muted-foreground',
+                )}
+                title={stage.archived ? 'Archived stage' : undefined}
+              >
                 <span className="text-label font-semibold">{stage.label}</span>
+                {stage.archived ? (
+                  <span className="rounded-full bg-muted px-1.5 text-micro font-medium tracking-wide text-muted-foreground uppercase">
+                    archived
+                  </span>
+                ) : null}
                 <span className="tabular text-label text-muted-foreground">
                   {cards.length}
                 </span>

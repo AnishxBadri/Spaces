@@ -66,6 +66,7 @@ function TodayPage() {
               label: string
               group?: string
               color?: string
+              archived?: boolean
             }>
           }
         | undefined
@@ -80,6 +81,12 @@ function TodayPage() {
   // Badge styling for the stage pill — same data-driven colors the board uses.
   const stageBadge = (id: string) => {
     const idx = stageOptions.findIndex((o) => o.id === id)
+    // A retired stage reads as history here too: no hue, muted ink.
+    if (idx >= 0 && stageOptions[idx].archived)
+      return {
+        backgroundColor: 'var(--muted)',
+        color: 'var(--muted-foreground)',
+      }
     return badgeStyle(
       optionColor(idx >= 0 ? stageOptions[idx] : undefined, Math.max(idx, 0)),
     )

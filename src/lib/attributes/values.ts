@@ -101,7 +101,7 @@ export const planPatch = Effect.fn('planPatch')(function* (
     let value: unknown = raw
     if (value === undefined || value === null || value === '') value = null
     if (value !== null) {
-      const parsed = valueValidator(def).safeParse(value)
+      const parsed = valueValidator(def, current[slug]).safeParse(value)
       if (!parsed.success) {
         return yield* invalid(
           slug,

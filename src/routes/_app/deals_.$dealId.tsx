@@ -18,6 +18,7 @@ import {
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { RailField } from '#/components/attributes/rail-field'
+import { OptionChip } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
@@ -32,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
-import { badgeStyle, optionColor } from '#/lib/attributes/colors'
+import { optionColor } from '#/lib/attributes/colors'
 import {
   createNote,
   getDeal,
@@ -89,8 +90,9 @@ function DealRecordPage() {
   const stageDef = registry.find((d) => d.slug === 'stage') as
     RegistryEntry | undefined
   const stageOptions = stageDef?.options?.options ?? []
-  const stageIdx = stageOptions.findIndex((o) => o.id === deal.values.stage)
-  const stageOption = stageIdx >= 0 ? stageOptions[stageIdx] : undefined
+  const stageOption = stageOptions.find((o) => o.id === deal.values.stage)
+  // Move-stage never offers a retired stage; the header chip still shows one.
+  const liveStages = stageOptions.filter((o) => !o.archived)
 
   async function save(patch: Record<string, unknown>) {
     try {
@@ -159,13 +161,12 @@ function DealRecordPage() {
                 {companyRef?.name ?? 'Company'}
               </Link>
             ) : null}
-            {stageOption ? (
-              <span
-                className="rounded-full px-2 py-0.5 text-xs font-medium"
-                style={badgeStyle(optionColor(stageOption, stageIdx))}
-              >
-                {stageOption.label}
-              </span>
+            {stageOption && stageDef ? (
+              <OptionChip
+                def={stageDef}
+                id={stageOption.id}
+                className="text-xs"
+              />
             ) : null}
             {deal.outsideMandate ? (
               // A hint, never a block — edge cases are the job. Deliberately
@@ -191,7 +192,7 @@ function DealRecordPage() {
               </Button>
             }
           />
-          {stageOptions.length > 0 ? (
+          {liveStages.length > 0 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm">
@@ -200,7 +201,7 @@ function DealRecordPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {stageOptions.map((o, i) => (
+                {liveStages.map((o) => (
                   <DropdownMenuItem
                     key={o.id}
                     disabled={o.id === deal.values.stage}
@@ -215,7 +216,7 @@ function DealRecordPage() {
                     <span
                       className="size-2 rounded-full"
                       style={{
-                        backgroundColor: `var(--badge-${optionColor(o, i)}-ink)`,
+                        backgroundColor: `var(--badge-${optionColor(o, stageOptions.indexOf(o))}-ink)`,
                       }}
                     />
                     {o.label}
