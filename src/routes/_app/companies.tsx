@@ -273,18 +273,19 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
     }
     setPending(true)
     try {
+      // Initial values ride the create call: the server writes them before
+      // defaults fill the blanks, so a value typed here always wins.
       const result = await createCompany({
         data: {
           name: name.trim() || undefined,
           domain: domain.trim() || undefined,
+          values: Object.fromEntries(
+            Object.entries(values).filter(
+              ([, v]) => v !== null && v !== undefined,
+            ),
+          ),
         },
       })
-      const patch = Object.fromEntries(
-        Object.entries(values).filter(([, v]) => v !== null && v !== undefined),
-      )
-      if (result.action === 'created' && Object.keys(patch).length > 0) {
-        await updateRecord({ data: { id: result.entityId, patch } })
-      }
       setOpen(false)
       setName('')
       setDomain('')

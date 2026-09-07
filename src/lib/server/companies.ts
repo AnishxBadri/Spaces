@@ -54,6 +54,8 @@ const createCompanyInput = z
   .object({
     name: z.string().trim().max(160).optional(),
     domain: z.string().trim().max(255).optional(),
+    /** attribute values set in the create dialog — win over defaults */
+    values: z.record(z.string(), z.unknown()).optional(),
   })
   .refine((v) => v.name || v.domain, {
     message: 'Give a name or a domain',
@@ -69,6 +71,7 @@ export const createCompany = createServerFn({ method: 'POST' })
       keys: data.domain ? { domain: data.domain } : undefined,
       source: 'manual',
       createdBy: u.id,
+      values: data.values,
     })
 
     if (result.action === 'created') {

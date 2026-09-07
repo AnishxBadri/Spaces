@@ -98,6 +98,8 @@ export const updateAttributeInput = z.object({
       max: z.number().int().min(1).max(10).optional(),
       /** number — decimals shown */
       precision: z.number().int().min(0).max(6).optional(),
+      /** spec §4 default — shape checked by the program, per type */
+      default: z.unknown().optional(),
     })
     .optional(),
 })

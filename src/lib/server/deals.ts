@@ -32,17 +32,19 @@ export const createDeal = createServerFn({ method: 'POST' })
       })
       .returning({ id: entity.id })
 
-    const { setValues } = await import('../attributes/values')
-    await setValues({
+    // Birth = supplied values, then defaults (spec §4). Owner is no longer
+    // stamped here: `deal.owner` defaults to current-user, so the dialog and
+    // any future path that has a human present agree on who owns it.
+    const { birthValues } = await import('../attributes/defaults')
+    await birthValues({
       entityId: ent.id,
-      patch: {
+      actor: { type: 'user', id: u.id },
+      supplied: {
         company: data.companyId,
         stage: data.stage ?? 'pre_lead',
-        owner: u.id,
         ...(data.value !== undefined ? { value: data.value } : {}),
         ...(data.source ? { source: data.source } : {}),
       },
-      actor: { type: 'user', id: u.id },
     })
     await db.insert(activity).values({
       actorId: u.id,

@@ -61,6 +61,14 @@ export type AttributeOptions = {
   max?: number
   /** number: display decimals; stored numbers untouched */
   precision?: number
+  /**
+   * Default (spec §4): a static value in the type's write shape, or one of
+   * exactly two dynamic forms — `'current-user'` (actor_reference) and an
+   * ISO-8601 duration for dates (`'P7D'` = a week out). Fires on every
+   * creation path, fills blanks only. Validated at attribute save
+   * (`validateDefault`), resolved at record birth (`resolveDefault`).
+   */
+  default?: unknown
 }
 
 export type AttributeDef = {
@@ -234,7 +242,15 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       type: 'record_reference',
       options: { targetKind: 'person', multi: true },
     },
-    { slug: 'owner', name: 'Owner', type: 'actor_reference' },
+    {
+      // New deals arrive owned — the most repetitive click in deal capture.
+      // Existing deployments get this default via migration 0019 (the seed
+      // never rewrites rows a user may have edited).
+      slug: 'owner',
+      name: 'Owner',
+      type: 'actor_reference',
+      options: { default: 'current-user' },
+    },
     { slug: 'close_date', name: 'Close date', type: 'date' },
     {
       slug: 'source',

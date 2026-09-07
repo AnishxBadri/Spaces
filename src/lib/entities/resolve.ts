@@ -40,6 +40,8 @@ export type ResolveInput = {
   }
   source: 'manual' | 'gmail' | 'apollo' | 'import' | 'clip'
   createdBy?: string
+  /** attribute values asserted at birth — always win over defaults */
+  values?: Record<string, unknown>
 }
 
 export type ResolveResult = {
@@ -177,6 +179,23 @@ export async function resolveEntity(
     }
     return ent
   })
+
+  // Birth values (spec §4): supplied first, then defaults for the blanks.
+  // After the transaction, since setValues takes its own row lock. Actor is
+  // the human when one is present; a keyless sync or import is an
+  // integration, and `current-user` defaults skip for it.
+  if (input.kind !== 'organization') {
+    const { birthValues } = await import('../attributes/defaults')
+    await birthValues({
+      entityId: created.id,
+      actor: input.createdBy
+        ? { type: 'user', id: input.createdBy }
+        : input.source === 'manual'
+          ? { type: 'system' }
+          : { type: 'integration' },
+      supplied: input.values,
+    })
+  }
 
   // 3. Probabilistic: fuzzy name sweep → suggestions only, never merges.
   if (name) {

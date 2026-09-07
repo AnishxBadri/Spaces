@@ -3,8 +3,9 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '#/db'
 import { attribute, entity } from '#/db/schema'
 import { nextBadgeColor } from './colors'
+import { validateDefault } from './defaults'
 import type { BadgeColor } from './colors'
-import type { AttributeOptions, SelectOption } from './registry'
+import type { AttributeOptions, AttributeType, SelectOption } from './registry'
 
 /**
  * Attribute maintenance as an Effect program (backend-paradigm ratchet: the
@@ -60,6 +61,12 @@ export type AttributeConfigPatch = {
   max?: number
   /** number — display-only */
   precision?: number
+  /**
+   * spec §4 — static value in the write shape, `'current-user'`, or an
+   * ISO-8601 duration for dates; null clears. Validated here, at config
+   * time, never at record creation.
+   */
+  default?: unknown
 }
 
 export type UpdateAttributePatch = {
@@ -201,6 +208,24 @@ const applyConfig = Effect.fn('applyConfig')(function* (
   if (patch.precision !== undefined) {
     if (attr.type !== 'number') return yield* reject('Precision')
     next = { ...next, precision: patch.precision }
+  }
+  if (patch.default !== undefined) {
+    if (patch.default === null) {
+      next = { ...next }
+      delete next.default
+    } else {
+      // Validated against the options as they'll be after this save, so a
+      // default can't point at an option the same edit removed.
+      const problem = validateDefault(
+        { type: attr.type as AttributeType, options: next },
+        patch.default,
+      )
+      if (problem)
+        return yield* new AttributeConfigRejected({
+          message: `Default: ${problem}`,
+        })
+      next = { ...next, default: patch.default }
+    }
   }
   return next
 })

@@ -109,6 +109,8 @@ export default [
     ignores: [
       'eslint.config.js',
       'prettier.config.js',
+      // Agent worktrees are separate checkouts; each lints itself.
+      '.claude/worktrees/**',
       // Build artifacts — regenerated, never linted.
       '.output/**',
       '.nitro/**',

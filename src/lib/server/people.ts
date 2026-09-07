@@ -113,6 +113,8 @@ const createPersonInput = z.object({
   name: z.string().trim().min(1).max(160),
   email: z.string().trim().max(255).optional(),
   companyId: z.string().uuid().optional(),
+  /** attribute values set in the create dialog — win over defaults */
+  values: z.record(z.string(), z.unknown()).optional(),
 })
 
 export const createPerson = createServerFn({ method: 'POST' })
@@ -125,6 +127,7 @@ export const createPerson = createServerFn({ method: 'POST' })
       keys: data.email ? { email: data.email } : undefined,
       source: 'manual',
       createdBy: u.id,
+      values: data.values,
     })
     if (data.companyId) {
       await db

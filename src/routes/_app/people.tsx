@@ -274,19 +274,20 @@ function CreatePersonDialog({
     }
     setPending(true)
     try {
+      // Initial values ride the create call: the server writes them before
+      // defaults fill the blanks, so a value typed here always wins.
       const result = await createPerson({
         data: {
           name,
           email: email || undefined,
           companyId: companyId || undefined,
+          values: Object.fromEntries(
+            Object.entries(values).filter(
+              ([, v]) => v !== null && v !== undefined,
+            ),
+          ),
         },
       })
-      const patch = Object.fromEntries(
-        Object.entries(values).filter(([, v]) => v !== null && v !== undefined),
-      )
-      if (result.action === 'created' && Object.keys(patch).length > 0) {
-        await updateRecord({ data: { id: result.entityId, patch } })
-      }
       setOpen(false)
       setValues({})
       if (result.action === 'attached') {
