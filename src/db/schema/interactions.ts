@@ -24,11 +24,28 @@ export const interactionKind = pgEnum('interaction_kind', [
   'call',
 ])
 
+/**
+ * Which lane produced the interaction (integration map, CONTEXT.md). A
+ * Calendar meeting, a Fireflies transcript, and a WhatsApp export are
+ * different evidence with different trust; the timeline and relationship
+ * scoring need to tell them apart.
+ */
+export const interactionSource = pgEnum('interaction_source', [
+  'manual',
+  'email_sync',
+  'forwarding',
+  'calendar',
+  'recorder',
+  'whatsapp',
+  'import',
+])
+
 export const interaction = pgTable(
   'interaction',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     kind: interactionKind('kind').notNull(),
+    source: interactionSource('source').notNull().default('manual'),
     // RFC822 Message-ID — dedupe across mailboxes: same thread in both
     // partners' inboxes must be one interaction.
     messageId: text('message_id'),

@@ -66,13 +66,13 @@ describe.skipIf(!hasDb)('setValues', () => {
         location: 'Bengaluru',
         founded_year: 2021,
       },
-      actorId: actor.id,
+      actor: { type: 'user', id: actor.id },
     })
     await expect(
       setValues({
         entityId: co.entityId,
         patch: { funding_stage: 'not_a_stage' },
-        actorId: actor.id,
+        actor: { type: 'user', id: actor.id },
       }),
     ).rejects.toThrow(AttributeValidationError)
 
@@ -91,6 +91,14 @@ describe.skipIf(!hasDb)('setValues', () => {
       .from(attributeEvent)
       .where(eq(attributeEvent.entityId, co.entityId))
     expect(events.length).toBe(3)
+    // A direct human edit: typed actor + default door, no receipt.
+    for (const ev of events) {
+      expect(ev.actorType).toBe('user')
+      expect(ev.actorId).toBe(actor.id)
+      expect(ev.source).toBe('direct')
+      expect(ev.suggestionId).toBeNull()
+      expect(ev.refs).toBeNull()
+    }
 
     // A deal referencing the company materializes a link
     const [dealEnt] = await db
@@ -100,7 +108,7 @@ describe.skipIf(!hasDb)('setValues', () => {
     await setValues({
       entityId: dealEnt.id,
       patch: { stage: 'pre_lead', company: co.entityId },
-      actorId: actor.id,
+      actor: { type: 'user', id: actor.id },
     })
     const refLinks = await db
       .select()
@@ -120,7 +128,7 @@ describe.skipIf(!hasDb)('setValues', () => {
       setValues({
         entityId: dealEnt.id,
         patch: { company: null },
-        actorId: actor.id,
+        actor: { type: 'user', id: actor.id },
       }),
     ).rejects.toThrow(/Required/)
 
@@ -129,7 +137,7 @@ describe.skipIf(!hasDb)('setValues', () => {
       setValues({
         entityId: dealEnt.id,
         patch: { company: dealEnt.id },
-        actorId: actor.id,
+        actor: { type: 'user', id: actor.id },
       }),
     ).rejects.toThrow(/Must reference a company/)
 
@@ -138,12 +146,74 @@ describe.skipIf(!hasDb)('setValues', () => {
     await setValues({
       entityId: co.entityId,
       patch: { location: 'Bengaluru' },
-      actorId: actor.id,
+      actor: { type: 'user', id: actor.id },
     })
     const after = await db
       .select()
       .from(attributeEvent)
       .where(eq(attributeEvent.entityId, co.entityId))
     expect(after.length).toBe(before)
+  })
+
+  it('carries provenance on the event row and honours non-user actors', async () => {
+    const { resolveEntity } = await import('../entities/resolve')
+    const { setValues } = await import('./values')
+    const { db } = await import('#/db')
+    const { attributeEvent } = await import('#/db/schema')
+    const { user } = await import('#/db/schema/auth')
+    const { and, eq } = await import('drizzle-orm')
+
+    const tag = randomUUID().slice(0, 8)
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    const co = await resolveEntity({
+      kind: 'company',
+      name: `ValCo ${tag}`,
+      source: 'manual',
+    })
+
+    // Accepting a suggestion: the accepter is the actor, the receipt rides
+    // the event — "from p.4 of the deck" survives acceptance.
+    const suggestionId = randomUUID()
+    await setValues({
+      entityId: co.entityId,
+      patch: { location: 'Pune' },
+      actor: { type: 'user', id: actor.id },
+      source: 'suggestion',
+      suggestionId,
+      refs: ['doc:abc#chunk:4'],
+    })
+    const [accepted] = await db
+      .select()
+      .from(attributeEvent)
+      .where(
+        and(
+          eq(attributeEvent.entityId, co.entityId),
+          eq(attributeEvent.attrSlug, 'location'),
+        ),
+      )
+    expect(accepted.actorType).toBe('user')
+    expect(accepted.source).toBe('suggestion')
+    expect(accepted.suggestionId).toBe(suggestionId)
+    expect(accepted.refs).toEqual(['doc:abc#chunk:4'])
+
+    // A system write has no user FK; the check constraint holds the invariant.
+    await setValues({
+      entityId: co.entityId,
+      patch: { founded_year: 2019 },
+      actor: { type: 'system' },
+      source: 'seed',
+    })
+    const [sys] = await db
+      .select()
+      .from(attributeEvent)
+      .where(
+        and(
+          eq(attributeEvent.entityId, co.entityId),
+          eq(attributeEvent.attrSlug, 'founded_year'),
+        ),
+      )
+    expect(sys.actorType).toBe('system')
+    expect(sys.actorId).toBeNull()
+    expect(sys.source).toBe('seed')
   })
 })

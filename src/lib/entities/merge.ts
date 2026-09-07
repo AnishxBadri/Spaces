@@ -36,12 +36,44 @@ import { taskEntity } from '#/db/schema/tasks'
 
 type SnapshotEntry = {
   table: string
-  action: 'repointed' | 'dropped' | 'field_filled' | 'field_conflict'
+  action:
+    'repointed' | 'dropped' | 'field_filled' | 'field_conflict' | 'inserted'
   pk: Record<string, unknown>
   old: Record<string, unknown>
 }
 
 const MERGEABLE = new Set(['company', 'person', 'organization'])
+
+/**
+ * The merge executor's value rewrites (fills, reference repoints) get an
+ * attribute_event like any other write — actor `system`, door `merge` —
+ * so the timeline never shows them as a teammate's edit. Inserted rows go
+ * in the snapshot: the snapshot convention is the only unmerge contract.
+ */
+async function logMergeEvent(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  snapshot: Array<SnapshotEntry>,
+  change: { entityId: string; attrSlug: string; from: unknown; to: unknown },
+) {
+  const [ev] = await tx
+    .insert(attributeEvent)
+    .values({
+      entityId: change.entityId,
+      attrSlug: change.attrSlug,
+      from: change.from,
+      to: change.to,
+      actorType: 'system',
+      actorId: null,
+      source: 'merge',
+    })
+    .returning({ id: attributeEvent.id })
+  snapshot.push({
+    table: 'attribute_event',
+    action: 'inserted',
+    pk: { id: ev.id },
+    old: {},
+  })
+}
 
 export async function mergeEntities(opts: {
   winnerId: string
@@ -362,6 +394,17 @@ export async function mergeEntities(opts: {
           .update(entity)
           .set({ values: { ...wv, ...fill } })
           .where(eq(entity.id, winnerId))
+        // History stays honest: a fill is a value change nobody asserted,
+        // logged as the system's, through the merge door (typed actor,
+        // spec §4). Snapshotted so unmerge can drop the rows again.
+        for (const [key, filledWith] of Object.entries(fill)) {
+          await logMergeEvent(tx, snapshot, {
+            entityId: winnerId,
+            attrSlug: key,
+            from: wv[key] ?? null,
+            to: filledWith,
+          })
+        }
       }
     }
 
@@ -393,6 +436,12 @@ export async function mergeEntities(opts: {
           .update(entity)
           .set({ values: vals })
           .where(eq(entity.id, ref.fromEntityId))
+        await logMergeEvent(tx, snapshot, {
+          entityId: ref.fromEntityId,
+          attrSlug: ref.attrSlug,
+          from: cur ?? null,
+          to: nextVal,
+        })
       }
     }
 

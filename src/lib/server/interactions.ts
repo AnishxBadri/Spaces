@@ -22,6 +22,7 @@ export const logInteraction = createServerFn({ method: 'POST' })
         .insert(interaction)
         .values({
           kind: data.kind,
+          source: 'manual',
           subject: data.subject,
           occurredAt: new Date(data.occurredAt),
         })

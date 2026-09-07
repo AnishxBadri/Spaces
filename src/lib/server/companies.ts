@@ -275,7 +275,11 @@ export const updateRecord = createServerFn({ method: 'POST' })
     }
     if (data.patch && Object.keys(data.patch).length > 0) {
       const { setValues } = await import('../attributes/values')
-      await setValues({ entityId: data.id, patch: data.patch, actorId: u.id })
+      await setValues({
+        entityId: data.id,
+        patch: data.patch,
+        actor: { type: 'user', id: u.id },
+      })
       // The pipeline→portfolio seam: a deal reaching Invested births a
       // holding (idempotent — follow-ons land on the existing one).
       if (data.patch.stage === 'invested') {

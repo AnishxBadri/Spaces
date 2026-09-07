@@ -42,7 +42,7 @@ export const createDeal = createServerFn({ method: 'POST' })
         ...(data.value !== undefined ? { value: data.value } : {}),
         ...(data.source ? { source: data.source } : {}),
       },
-      actorId: u.id,
+      actor: { type: 'user', id: u.id },
     })
     await db.insert(activity).values({
       actorId: u.id,

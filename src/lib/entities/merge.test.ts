@@ -22,6 +22,7 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
     const { mergeEntities } = await import('./merge')
     const { db } = await import('#/db')
     const {
+      attributeEvent,
       duplicateCandidate,
       entity,
       entityAlias,
@@ -155,6 +156,23 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
       .from(entity)
       .where(eq(entity.id, winner.entityId))
     expect((wEnt.values as Record<string, unknown>).funding_stage).toBe('seed')
+
+    // …and the fill is logged as the system's rewrite through the merge
+    // door — never as the merging user's edit.
+    const [fillEvent] = await db
+      .select()
+      .from(attributeEvent)
+      .where(
+        and(
+          eq(attributeEvent.entityId, winner.entityId),
+          eq(attributeEvent.attrSlug, 'funding_stage'),
+        ),
+      )
+    expect(fillEvent).toBeTruthy()
+    expect(fillEvent.actorType).toBe('system')
+    expect(fillEvent.actorId).toBeNull()
+    expect(fillEvent.source).toBe('merge')
+    expect(fillEvent.to).toBe('seed')
 
     // Candidate closed; no open candidates left on the pair.
     const openLeft = await db

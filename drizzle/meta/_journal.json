@@ -127,6 +127,13 @@
       "when": 1788574923285,
       "tag": "0017_object_registry_finalize",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788759796827,
+      "tag": "0018_typed_actor_provenance",
+      "breakpoints": true
     }
   ]
 }

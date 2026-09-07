@@ -27,6 +27,21 @@ import type { getRecordTimeline } from '#/lib/server-fns'
 
 type Items = Awaited<ReturnType<typeof getRecordTimeline>>
 
+/**
+ * A burst names who attended to the values (typed actor, spec §4): a person
+ * by name, an integration, or the system — the merge executor's rewrites
+ * must never read as a teammate's edit.
+ */
+function burstActorLabel(item: {
+  actorType: 'user' | 'integration' | 'system'
+  actorName: string | null
+  source: string
+}): string {
+  if (item.actorType === 'user') return item.actorName ?? 'Someone'
+  if (item.actorType === 'integration') return 'An integration'
+  return item.source === 'merge' ? 'A merge' : 'System'
+}
+
 const dateTimeFmt = new Intl.DateTimeFormat('en', {
   day: '2-digit',
   month: 'short',
@@ -224,8 +239,8 @@ function AttrBurst({
           className="flex items-baseline gap-2 rounded text-left text-ui focus-ring"
         >
           <span className="flex items-center gap-1">
-            <span className="font-medium">{item.actorName ?? 'System'}</span>{' '}
-            changed{' '}
+            <span className="font-medium">{burstActorLabel(item)}</span>{' '}
+            {item.source === 'merge' ? 'rewrote' : 'changed'}{' '}
             <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
               {item.changes.length} attribute
               {item.changes.length === 1 ? '' : 's'}

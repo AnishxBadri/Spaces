@@ -44,23 +44,31 @@ export const getRecordTimeline = createServerFn()
     const GAP_MS = 10 * 60 * 1000
     type Burst = {
       type: 'attrs'
+      actorType: (typeof events)[number]['actorType']
       actor: string | null
+      source: (typeof events)[number]['source']
       at: string
       changes: Array<{ slug: string; to: Json }>
     }
     const bursts: Array<Burst> = []
     for (const ev of events) {
       const last = bursts.at(-1)
+      // Same attender, same door, within the gap — a merge's rewrites never
+      // fold into the person's edits around them.
       if (
         last &&
+        last.actorType === ev.actorType &&
         last.actor === (ev.actorId ?? null) &&
+        last.source === ev.source &&
         new Date(last.at).getTime() - ev.at.getTime() < GAP_MS
       ) {
         last.changes.push({ slug: ev.attrSlug, to: ev.to as Json })
       } else {
         bursts.push({
           type: 'attrs',
+          actorType: ev.actorType,
           actor: ev.actorId ?? null,
+          source: ev.source,
           at: ev.at.toISOString(),
           changes: [{ slug: ev.attrSlug, to: ev.to as Json }],
         })
@@ -126,7 +134,9 @@ export const getRecordTimeline = createServerFn()
       ...bursts.map((b, i) => ({
         type: 'attrs' as const,
         id: `burst-${i}`,
+        actorType: b.actorType,
         actorName: b.actor ? (userNames.get(b.actor) ?? null) : null,
+        source: b.source,
         at: b.at,
         changes: b.changes,
       })),

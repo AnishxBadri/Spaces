@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db'
 import { attribute, attributeEvent, entity, link } from '#/db/schema'
+import type { attributeEventSource } from '#/db/schema'
 import { objectIdForKindAsync } from './objects'
 import { valueValidator } from './registry'
 import type { AttributeDef, ObjectKind } from './registry'
@@ -38,15 +39,33 @@ export class AttributeValidationError extends Error {
 }
 
 /**
+ * Who attended to a write (spec §4). `user` carries the user FK; `integration`
+ * gains an id when the integration table lands; `system` is the merge
+ * executor and seeds — rewrites no person asserted.
+ */
+export type Actor =
+  { type: 'user'; id: string } | { type: 'integration' } | { type: 'system' }
+
+export type EventSource = (typeof attributeEventSource.enumValues)[number]
+
+/**
  * Patch semantics: keys present are set; null clears; absent keys untouched.
  * Returns the changed slugs (empty patch or no-op diffs write nothing).
+ *
+ * Provenance rides the event row: `source` names the door the write came
+ * through (default: a direct human edit), `suggestionId` and `refs` carry
+ * the receipt when a suggestion or enrichment is accepted.
  */
 export async function setValues(opts: {
   entityId: string
   patch: Record<string, unknown>
-  actorId: string
+  actor: Actor
+  source?: EventSource
+  suggestionId?: string
+  refs?: Array<string>
 }): Promise<{ changed: Array<string> }> {
-  const { entityId, patch, actorId } = opts
+  const { entityId, patch, actor, source = 'direct', suggestionId, refs } = opts
+  const actorId = actor.type === 'user' ? actor.id : null
 
   return db.transaction(async (tx) => {
     // FOR UPDATE: this is a read-modify-write of the whole values blob. At
@@ -147,7 +166,11 @@ export async function setValues(opts: {
         attrSlug: slug,
         from: before,
         to: value,
+        actorType: actor.type,
         actorId,
+        source,
+        suggestionId: suggestionId ?? null,
+        refs: refs ?? null,
       })
 
       // Materialize record-references into the graph (values authoritative).
