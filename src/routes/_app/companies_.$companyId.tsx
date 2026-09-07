@@ -22,7 +22,8 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
-import { ValueEditor, optionLabel } from '#/components/attributes/value-editor'
+import { RailField } from '#/components/attributes/rail-field'
+import { optionLabel } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordFiles } from '#/components/record-files'
@@ -178,19 +179,17 @@ function CompanyRecordPage() {
         {/* Left: registry-generated attribute rail */}
         <aside className="space-y-4">
           {registry.map((def) => (
-            <div key={def.slug} className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">
-                {def.name}
-              </span>
-              <ValueEditor
-                def={def as RegistryEntry}
-                value={company.values[def.slug] ?? null}
-                variant="field"
-                onSave={(v) =>
-                  save({ id: company.id, patch: { [def.slug]: v } }, router)
-                }
-              />
-            </div>
+            <RailField
+              key={def.slug}
+              def={def as RegistryEntry}
+              value={company.values[def.slug] ?? null}
+              onSave={async (v) => {
+                await updateRecord({
+                  data: { id: company.id, patch: { [def.slug]: v } },
+                })
+                void router.invalidate()
+              }}
+            />
           ))}
 
           <DomainsField companyId={company.id} domains={domains} />
@@ -434,20 +433,6 @@ function CompanyRecordPage() {
       </div>
     </div>
   )
-}
-
-async function save(
-  data: Parameters<typeof updateRecord>[0] extends { data: infer D }
-    ? D
-    : never,
-  router: ReturnType<typeof useRouter>,
-) {
-  try {
-    await updateRecord({ data })
-    void router.invalidate()
-  } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Could not save')
-  }
 }
 
 function DomainsField({

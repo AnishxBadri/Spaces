@@ -32,7 +32,138 @@ describe('valueValidator', () => {
   })
 })
 
+describe('planPatch (pure)', () => {
+  const def = (type: 'text' | 'checkbox', slug: string, required: boolean) =>
+    ({
+      id: slug,
+      objectId: 'o',
+      slug,
+      name: slug,
+      type,
+      options: { required },
+      isSystem: false,
+      archived: false,
+      sortOrder: 0,
+    }) as const
+
+  it('rejects clearing a required value, any type', async () => {
+    const { Effect } = await import('effect')
+    const { planPatch, AttributeValidationError } = await import('./values')
+    const registry = [
+      def('text', 'thesis', true),
+      def('checkbox', 'lead', true),
+    ]
+    for (const [slug, held] of [
+      ['thesis', 'x'],
+      ['lead', true],
+    ] as const) {
+      const run = () =>
+        Effect.runSync(planPatch(registry, { [slug]: held }, { [slug]: null }))
+      expect(run).toThrow(AttributeValidationError)
+      expect(run).toThrow(/can't be cleared/)
+    }
+  })
+
+  it('treats clearing an already-empty required value as a no-op', async () => {
+    const { Effect } = await import('effect')
+    const { planPatch } = await import('./values')
+    const registry = [def('text', 'thesis', true)]
+    // Born without the value (creation completeness is the dialog's job);
+    // an explicit null later has nothing to clear.
+    expect(Effect.runSync(planPatch(registry, {}, { thesis: null }))).toEqual(
+      [],
+    )
+    expect(
+      Effect.runSync(planPatch(registry, {}, { thesis: 'now set' })),
+    ).toMatchObject([{ slug: 'thesis', before: null, value: 'now set' }])
+  })
+})
+
 const hasDb = Boolean(process.env.DATABASE_URL)
+
+describe.skipIf(!hasDb)('required means can’t-clear (all types)', () => {
+  const tag = randomUUID().slice(0, 8)
+  const slug = (t: string) => `req_${t}_${tag}`
+
+  afterAll(async () => {
+    const { db } = await import('#/db')
+    const { attribute } = await import('#/db/schema')
+    const { like } = await import('drizzle-orm')
+    await cleanupTestEntities([`^ReqCo ${tag}$`])
+    await db.delete(attribute).where(like(attribute.slug, `req_%_${tag}`))
+  })
+
+  it('rejects an explicit clear per type family, allows born-empty', async () => {
+    const { resolveEntity } = await import('../entities/resolve')
+    const { setValues, AttributeValidationError } = await import('./values')
+    const { objectIdForKindAsync } = await import('./objects')
+    const { db } = await import('#/db')
+    const { attribute } = await import('#/db/schema')
+    const { user } = await import('#/db/schema/auth')
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    const objectId = await objectIdForKindAsync('company')
+
+    // One required custom attribute per type family, on the company object.
+    const families = [
+      { type: 'text', held: 'thesis', options: {} },
+      { type: 'number', held: 7, options: {} },
+      { type: 'date', held: '2026-01-01', options: {} },
+      { type: 'checkbox', held: true, options: {} },
+      { type: 'rating', held: 3, options: { max: 5 } },
+      {
+        type: 'select',
+        held: 'a',
+        options: { options: [{ id: 'a', label: 'A' }] },
+      },
+      {
+        type: 'multi_select',
+        held: ['a'],
+        options: { options: [{ id: 'a', label: 'A' }] },
+      },
+    ] as const
+    await db.insert(attribute).values(
+      families.map((f) => ({
+        objectId,
+        slug: slug(f.type),
+        name: `Req ${f.type}`,
+        type: f.type,
+        options: { ...f.options, required: true },
+      })),
+    )
+
+    // Born without any of them: legal (creation completeness is the
+    // dialog's concern, imports create partial records).
+    const co = await resolveEntity({
+      kind: 'company',
+      name: `ReqCo ${tag}`,
+      source: 'manual',
+    })
+    const actorArg = { type: 'user' as const, id: actor.id }
+
+    // Later non-null writes work; the clear is what's rejected.
+    for (const f of families) {
+      await setValues({
+        entityId: co.entityId,
+        patch: { [slug(f.type)]: f.held },
+        actor: actorArg,
+      })
+      await expect(
+        setValues({
+          entityId: co.entityId,
+          patch: { [slug(f.type)]: null },
+          actor: actorArg,
+        }),
+      ).rejects.toThrow(AttributeValidationError)
+      await expect(
+        setValues({
+          entityId: co.entityId,
+          patch: { [slug(f.type)]: '' },
+          actor: actorArg,
+        }),
+      ).rejects.toThrow(/can't be cleared/)
+    }
+  })
+})
 
 describe.skipIf(!hasDb)('setValues', () => {
   afterAll(async () => {

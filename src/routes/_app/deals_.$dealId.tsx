@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { ValueEditor } from '#/components/attributes/value-editor'
+import { RailField } from '#/components/attributes/rail-field'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
@@ -231,18 +231,18 @@ function DealRecordPage() {
         {/* Left: registry rail */}
         <aside className="space-y-4">
           {registry.map((def) => (
-            <div key={def.slug} className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">
-                {def.name}
-              </span>
-              <ValueEditor
-                def={def as RegistryEntry}
-                value={deal.values[def.slug] ?? null}
-                variant="field"
-                refNames={refNames}
-                onSave={(v) => save({ [def.slug]: v })}
-              />
-            </div>
+            <RailField
+              key={def.slug}
+              def={def as RegistryEntry}
+              value={deal.values[def.slug] ?? null}
+              refNames={refNames}
+              onSave={async (v) => {
+                await updateRecord({
+                  data: { id: deal.id, patch: { [def.slug]: v } },
+                })
+                void router.invalidate()
+              }}
+            />
           ))}
           <AttributeCreateDialog
             objectKind="deal"

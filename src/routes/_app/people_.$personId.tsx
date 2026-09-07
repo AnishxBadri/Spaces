@@ -20,7 +20,7 @@ import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
-import { ValueEditor } from '#/components/attributes/value-editor'
+import { RailField } from '#/components/attributes/rail-field'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordFiles } from '#/components/record-files'
@@ -90,15 +90,6 @@ function PersonRecordPage() {
     }
   }
 
-  async function save(data: Parameters<typeof updateRecord>[0]['data']) {
-    try {
-      await updateRecord({ data })
-      void router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not save')
-    }
-  }
-
   return (
     <div className="px-6 py-8 md:px-10">
       <Link
@@ -146,19 +137,17 @@ function PersonRecordPage() {
         {/* Left: details */}
         <aside className="space-y-5">
           {registry.map((def) => (
-            <div key={def.slug} className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">
-                {def.name}
-              </span>
-              <ValueEditor
-                def={def as RegistryEntry}
-                value={person.values[def.slug] ?? null}
-                variant="field"
-                onSave={(v) =>
-                  save({ id: person.id, patch: { [def.slug]: v } })
-                }
-              />
-            </div>
+            <RailField
+              key={def.slug}
+              def={def as RegistryEntry}
+              value={person.values[def.slug] ?? null}
+              onSave={async (v) => {
+                await updateRecord({
+                  data: { id: person.id, patch: { [def.slug]: v } },
+                })
+                void router.invalidate()
+              }}
+            />
           ))}
 
           <ContactField
