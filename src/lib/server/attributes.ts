@@ -73,118 +73,52 @@ const optionEdit = z.object({
 })
 
 /**
- * Attribute maintenance. Structure fixed, content free: names and options
- * are editable (system included); types never change; options can be added
- * and renamed but not removed — stored values may reference them.
+ * The update boundary (spec-attribute-engine §3). `type` and `slug` are not
+ * here, and neither are record_reference's `targetKind` / `multi`: zod
+ * strips unknown keys, so those edits cannot reach the program at all —
+ * unrepresentable, not validated away. The per-type rules for what *is*
+ * here live in the program (`src/lib/attributes/update.ts`).
+ */
+export const updateAttributeInput = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(80).optional(),
+  archived: z.boolean().optional(),
+  move: z.enum(['up', 'down']).optional(),
+  options: z.array(optionEdit).max(50).optional(),
+  config: z
+    .object({
+      /** currency — ISO 4217 */
+      code: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^[A-Z]{3}$/, 'Three-letter currency code')
+        .optional(),
+      /** rating */
+      max: z.number().int().min(1).max(10).optional(),
+      /** number — decimals shown */
+      precision: z.number().int().min(0).max(6).optional(),
+    })
+    .optional(),
+})
+
+/**
+ * Attribute maintenance. Structure fixed, content free: names, options and
+ * per-type config are editable (system included); types never change;
+ * options can be added and renamed but not removed — stored values may
+ * reference them.
  */
 export const updateAttribute = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({
-      id: z.string().uuid(),
-      name: z.string().trim().min(1).max(80).optional(),
-      archived: z.boolean().optional(),
-      move: z.enum(['up', 'down']).optional(),
-      options: z.array(optionEdit).max(50).optional(),
-    }),
-  )
+  .validator(updateAttributeInput)
   .handler(async ({ data }) => {
     // canWrite's admin edge: renames, option edits, and archiving reshape
     // shared vocabulary for everyone, so they are settings — admin-owned.
     // Creating an attribute stays member (the "+ Add column" flow): additive,
     // and a two-person fund should not need ceremony to add a field.
     await requireAdmin()
-    const { attribute } = await import('#/db/schema')
-    const attr = (
-      await db.select().from(attribute).where(eq(attribute.id, data.id))
-    ).at(0)
-    if (!attr) throw new Error('Attribute not found')
-
-    if (data.options) {
-      const isOptionType = ['select', 'multi_select', 'status'].includes(
-        attr.type,
-      )
-      if (!isOptionType) throw new Error('This attribute type has no options')
-      const existing =
-        ((attr.options as Record<string, unknown>).options as
-          Array<{ id: string }> | undefined) ?? []
-      const existingIds = new Set(existing.map((o) => o.id))
-      const keptIds = new Set(
-        data.options.filter((o) => o.id).map((o) => o.id!),
-      )
-      for (const id of existingIds) {
-        if (!keptIds.has(id))
-          throw new Error(
-            'Options cannot be removed — records may hold that value. Rename it instead.',
-          )
-      }
-      const seen = new Set<string>()
-      const nextOptions = data.options.map((o, i) => {
-        let id = o.id
-        if (!id) {
-          id =
-            o.label
-              .toLowerCase()
-              .normalize('NFKD')
-              .replace(/[^a-z0-9]+/g, '_')
-              .replace(/^_+|_+$/g, '')
-              .slice(0, 48) || 'option'
-          while (seen.has(id) || existingIds.has(id)) id = `${id}_2`
-        }
-        seen.add(id)
-        return {
-          id,
-          label: o.label,
-          ...(o.group ? { group: o.group } : {}),
-          // An option without an explicit colour is stored with the one it was
-          // already rendering, so saving the editor never silently reshuffles
-          // the colours the user has been looking at.
-          color: o.color ?? nextBadgeColor(i, o.group),
-        }
-      })
-      await db
-        .update(attribute)
-        .set({
-          options: {
-            ...(attr.options as Record<string, unknown>),
-            options: nextOptions,
-          },
-        })
-        .where(eq(attribute.id, data.id))
-    }
-
-    if (data.name) {
-      await db
-        .update(attribute)
-        .set({ name: data.name })
-        .where(eq(attribute.id, data.id))
-    }
-    if (data.archived !== undefined) {
-      await db
-        .update(attribute)
-        .set({ archived: data.archived })
-        .where(eq(attribute.id, data.id))
-    }
-    if (data.move) {
-      const siblings = await db
-        .select({ id: attribute.id, sortOrder: attribute.sortOrder })
-        .from(attribute)
-        .where(eq(attribute.objectId, attr.objectId))
-        .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
-      const idx = siblings.findIndex((s) => s.id === data.id)
-      const swapIdx = data.move === 'up' ? idx - 1 : idx + 1
-      const swapWith = swapIdx >= 0 ? siblings.at(swapIdx) : undefined
-      if (swapWith) {
-        await db
-          .update(attribute)
-          .set({ sortOrder: swapWith.sortOrder })
-          .where(eq(attribute.id, data.id))
-        await db
-          .update(attribute)
-          .set({ sortOrder: attr.sortOrder })
-          .where(eq(attribute.id, swapWith.id))
-      }
-    }
-    return { ok: true }
+    const { updateAttributeProgram } = await import('../attributes/update')
+    const { effectFn } = await import('./effect')
+    return effectFn(updateAttributeProgram)(data)
   })
 
 const createAttributeInput = z.object({

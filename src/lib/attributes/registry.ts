@@ -59,6 +59,8 @@ export type AttributeOptions = {
   code?: string
   /** rating */
   max?: number
+  /** number: display decimals; stored numbers untouched */
+  precision?: number
 }
 
 export type AttributeDef = {

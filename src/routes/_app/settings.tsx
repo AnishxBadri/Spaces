@@ -23,6 +23,14 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { Button } from '#/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import {
@@ -768,6 +776,9 @@ function AttributeRow({
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
+  // A currency-code change waits here for the warning dialog (spec §3: a
+  // relabel of every stored amount, never a conversion).
+  const [pendingCode, setPendingCode] = useState<string | null>(null)
 
   async function act(
     patch: Parameters<typeof updateAttribute>[0]['data'] extends infer D
@@ -794,6 +805,16 @@ function AttributeRow({
         }>
       | undefined) ?? []
   const hasOptions = ['select', 'multi_select', 'status'].includes(attr.type)
+  const config = (attr.options ?? {}) as AttributeConfig
+  const hasConfig = ['currency', 'rating', 'number'].includes(attr.type)
+  const configSummary =
+    attr.type === 'currency'
+      ? (config.code ?? 'USD')
+      : attr.type === 'rating'
+        ? `out of ${config.max ?? 5}`
+        : attr.type === 'number' && config.precision !== undefined
+          ? `${config.precision} decimals`
+          : null
 
   return (
     <li
@@ -810,6 +831,7 @@ function AttributeRow({
             {attr.type === 'record_reference'
               ? ` → ${(attr.options as Record<string, unknown> | null)?.targetKind ?? ''}`
               : ''}
+            {configSummary ? ` · ${configSummary}` : ''}
           </span>
         </div>
 
@@ -839,9 +861,17 @@ function AttributeRow({
           >
             <ArrowDown className="size-3.5" strokeWidth={1.75} />
           </IconBtn>
-          {hasOptions ? (
+          {hasOptions || hasConfig ? (
             <IconBtn
-              label={editing ? 'Close options' : 'Edit options'}
+              label={
+                editing
+                  ? hasOptions
+                    ? 'Close options'
+                    : 'Close settings'
+                  : hasOptions
+                    ? 'Edit options'
+                    : 'Edit settings'
+              }
               onClick={() => setEditing((v) => !v)}
             >
               <Pencil className="size-3.5" strokeWidth={1.75} />
@@ -891,7 +921,172 @@ function AttributeRow({
           }}
         />
       ) : null}
+
+      {hasConfig && editing ? (
+        <ConfigEditor
+          attr={attr}
+          config={config}
+          onDone={(next) => {
+            setEditing(false)
+            if (!next) return
+            if (
+              next.code !== undefined &&
+              next.code !== (config.code ?? 'USD')
+            ) {
+              setPendingCode(next.code)
+              return
+            }
+            void act({ config: next }, 'Settings saved')
+          }}
+        />
+      ) : null}
+
+      <Dialog
+        open={pendingCode !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingCode(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              Show {attr.name} in {pendingCode}?
+            </DialogTitle>
+            <DialogDescription>
+              This changes how all existing values display — every amount
+              already stored will read as {pendingCode}. Nothing is converted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPendingCode(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const code = pendingCode
+                setPendingCode(null)
+                if (code)
+                  void act(
+                    { config: { code } },
+                    `${attr.name} now shows ${code}`,
+                  )
+              }}
+            >
+              Change to {pendingCode}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </li>
+  )
+}
+
+type AttributeConfig = { code?: string; max?: number; precision?: number }
+
+/**
+ * Per-type scalar config (spec §3). Currency and rating each carry one
+ * setting; number carries display decimals. Relationships have no editor by
+ * design: target and cardinality are fixed at creation.
+ */
+function ConfigEditor({
+  attr,
+  config,
+  onDone,
+}: {
+  attr: Attr
+  config: AttributeConfig
+  onDone: (next: AttributeConfig | null) => void
+}) {
+  const [code, setCode] = useState(config.code ?? 'USD')
+  const [max, setMax] = useState(String(config.max ?? 5))
+  const [precision, setPrecision] = useState(String(config.precision ?? 0))
+  const inputId = `attr-config-${attr.id}`
+
+  function save() {
+    if (attr.type === 'currency') {
+      const next = code.trim().toUpperCase()
+      if (!/^[A-Z]{3}$/.test(next)) {
+        toast.error('Use a three-letter currency code')
+        return
+      }
+      onDone({ code: next })
+    } else if (attr.type === 'rating') {
+      const next = Number(max)
+      if (!Number.isInteger(next) || next < 1 || next > 10) {
+        toast.error('Max must be a whole number from 1 to 10')
+        return
+      }
+      onDone({ max: next })
+    } else {
+      onDone({ precision: Number(precision) })
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-border p-3">
+      <div className="flex items-end gap-3">
+        {attr.type === 'currency' ? (
+          <div className="space-y-1.5">
+            <Label htmlFor={inputId}>Currency code</Label>
+            <Input
+              id={inputId}
+              value={code}
+              maxLength={3}
+              autoCapitalize="characters"
+              spellCheck={false}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              className="h-7 w-20 text-xs uppercase"
+            />
+          </div>
+        ) : attr.type === 'rating' ? (
+          <div className="space-y-1.5">
+            <Label htmlFor={inputId}>Max</Label>
+            <Input
+              id={inputId}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={10}
+              value={max}
+              onChange={(e) => setMax(e.target.value)}
+              className="h-7 w-20 text-xs"
+            />
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label htmlFor={inputId}>Decimals</Label>
+            <select
+              id={inputId}
+              value={precision}
+              onChange={(e) => setPrecision(e.target.value)}
+              className="h-7 rounded-md border border-input bg-transparent px-2 text-xs focus-ring outline-none"
+            >
+              {[0, 1, 2, 3, 4, 5, 6].map((n) => (
+                <option key={n} value={String(n)}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <span className="pb-1.5 text-xs text-muted-foreground">
+          {attr.type === 'currency'
+            ? 'A relabel — stored amounts are never converted.'
+            : attr.type === 'rating'
+              ? 'Raise freely; lowering is refused while records exceed it.'
+              : 'Display only; stored numbers are untouched.'}
+        </span>
+        <div className="ml-auto flex gap-1.5">
+          <Button size="xs" variant="ghost" onClick={() => onDone(null)}>
+            Cancel
+          </Button>
+          <Button size="xs" onClick={save}>
+            <Check className="size-3" strokeWidth={2} />
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
 
