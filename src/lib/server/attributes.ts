@@ -198,6 +198,7 @@ export const createAttributeInput = z.object({
       max: z.number().int().min(1).max(10).optional(),
       precision: z.number().int().min(0).max(6).optional(),
       targetKind: z.enum(['company', 'person', 'deal']).optional(),
+      targetObjectId: z.string().uuid().optional(),
       multi: z.boolean().optional(),
     })
     .optional(),

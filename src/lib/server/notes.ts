@@ -17,6 +17,8 @@ export const createNote = createServerFn({ method: 'POST' })
             entityId: z.string().uuid(),
             label: z.string().max(200),
             kind: z.string().max(30),
+            /** custom records route through their object's slug */
+            objectSlug: z.string().max(80).optional(),
           })
           .optional(),
         /** memo: the note IS the memo of `about` (tagged_in, not mentions). */
@@ -45,6 +47,7 @@ export const createNote = createServerFn({ method: 'POST' })
                     entityId: about.entityId,
                     label: about.label,
                     kind: about.kind,
+                    objectSlug: about.objectSlug ?? '',
                   },
                 },
                 { type: 'text', text: ' — ', styles: {} },

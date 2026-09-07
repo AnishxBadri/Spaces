@@ -114,7 +114,12 @@ export function NoteEditor({
             editor.insertInlineContent([
               {
                 type: 'mention',
-                props: { entityId: r.id, label: r.name, kind: r.kind },
+                props: {
+                  entityId: r.id,
+                  label: r.name,
+                  kind: r.kind,
+                  objectSlug: r.objectSlug ?? '',
+                },
               },
               ' ',
             ])

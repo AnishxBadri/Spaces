@@ -2,7 +2,15 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, desc, eq, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '#/db'
-import { company, entity, entitySpace, link, note, space } from '#/db/schema'
+import {
+  company,
+  entity,
+  entitySpace,
+  link,
+  note,
+  objectDef,
+  space,
+} from '#/db/schema'
 import { activity } from '#/db/schema/activity'
 import { createSpaceRow, requireUser } from './shared'
 
@@ -94,6 +102,30 @@ export const getSpace = createServerFn()
       }
     })
 
+    // Custom-object records tagged here (spec §9: customs live in the
+    // research graph). Grouped by object on the page; each links through
+    // its object's slug.
+    const recordRows = await db
+      .select({
+        id: entity.id,
+        name: entity.canonicalName,
+        objectSlug: objectDef.slug,
+        objectPlural: objectDef.plural,
+        objectIcon: objectDef.icon,
+      })
+      .from(entitySpace)
+      .innerJoin(entity, eq(entity.id, entitySpace.entityId))
+      .innerJoin(objectDef, eq(objectDef.id, entity.objectId))
+      .where(
+        and(
+          eq(entitySpace.spaceId, data.id),
+          eq(entity.kind, 'custom'),
+          isNull(entity.mergedIntoId),
+          eq(objectDef.archived, false),
+        ),
+      )
+      .orderBy(asc(objectDef.plural), asc(entity.canonicalName))
+
     // Filed: notes the user deliberately put in this space. No singleton —
     // a space holds as many as its owner wants, and the "memo" is just the
     // first one filed.
@@ -147,6 +179,7 @@ export const getSpace = createServerFn()
       ancestors: ancestors.map((a) => ({ id: a.id, name: a.name })),
       children,
       companies,
+      records: recordRows,
       filed: filedRows.map((f) => ({
         id: f.id,
         title: f.title,

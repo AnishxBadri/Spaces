@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '#/db'
-import { entity, entityAlias, link } from '#/db/schema'
+import { entity, entityAlias, link, objectDef } from '#/db/schema'
 import { requireUser } from './shared'
 
 /** Autocomplete over entities — mentions and reference pickers share it. */
@@ -19,9 +19,12 @@ export const searchEntities = createServerFn()
             'deal',
             'space',
             'note',
+            'custom',
           ]),
         )
         .optional(),
+      /** narrow to one object's records — a custom-object reference picker */
+      objectId: z.string().uuid().optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -34,15 +37,21 @@ export const searchEntities = createServerFn()
         id: entity.id,
         name: entity.canonicalName,
         kind: entity.kind,
+        // Custom records route through their object's slug; core kinds
+        // carry it too, harmlessly.
+        objectSlug: objectDef.slug,
       })
       .from(entity)
       .leftJoin(entityAlias, eq(entityAlias.entityId, entity.id))
+      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
       .where(
         and(
           isNull(entity.mergedIntoId),
-          data.kinds
-            ? inArray(entity.kind, data.kinds)
-            : ne(entity.kind, 'document'),
+          data.objectId
+            ? eq(entity.objectId, data.objectId)
+            : data.kinds
+              ? inArray(entity.kind, data.kinds)
+              : ne(entity.kind, 'document'),
           // canRead at the SQL layer: a private note's title must not
           // surface in anyone else's autocomplete.
           sql`not exists (select 1 from note pn where pn.entity_id = ${entity.id} and pn.visibility = 'private' and pn.author_id <> ${u.id})`,
@@ -76,6 +85,7 @@ export const searchAll = createServerFn()
       id: string
       kind: string
       name: string
+      object_slug: string | null
       snippet: string | null
       sources: Array<string>
       score: number
@@ -159,12 +169,14 @@ export const searchAll = createServerFn()
       select f.id,
              e.kind,
              e.canonical_name as name,
+             o.slug as object_slug,
              (array_remove(array_agg(f.snippet order by f.rnk), null))[1] as snippet,
              array_agg(distinct f.source) as sources,
              sum(1.0 / (60 + f.rnk)) as score
       from fused f
       join entity e on e.id = f.id
-      group by f.id, e.kind, e.canonical_name
+      left join object o on o.id = e.object_id
+      group by f.id, e.kind, e.canonical_name, o.slug
       order by score desc, e.canonical_name
       limit 20
     `)
@@ -185,9 +197,11 @@ export const searchAll = createServerFn()
               parentId: entity.id,
               parentKind: entity.kind,
               parentName: entity.canonicalName,
+              parentObjectSlug: objectDef.slug,
             })
             .from(link)
             .innerJoin(entity, eq(entity.id, link.toEntityId))
+            .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
             .where(
               and(
                 inArray(link.fromEntityId, documentIds),
@@ -202,6 +216,7 @@ export const searchAll = createServerFn()
         id: h.id,
         kind: h.kind,
         name: h.name,
+        objectSlug: h.object_slug,
         snippet: h.snippet?.replace(/\s+/g, ' ').trim() ?? null,
         matchedIn: h.sources.includes('name')
           ? 'name'
@@ -211,6 +226,7 @@ export const searchAll = createServerFn()
               id: parent.parentId,
               kind: parent.parentKind,
               name: parent.parentName,
+              objectSlug: parent.parentObjectSlug,
             }
           : null,
       }

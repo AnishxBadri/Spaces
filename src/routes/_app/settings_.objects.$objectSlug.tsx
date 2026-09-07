@@ -1,9 +1,16 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeft, Pencil, Plus } from 'lucide-react'
+import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
+import { ObjectDialog } from '#/components/objects/object-dialog'
 import { RegistryList } from '#/components/attributes/registry-list'
 import { Button } from '#/components/ui/button'
-import { getObject, getSession, listRegistry } from '#/lib/server-fns'
+import {
+  getObject,
+  getSession,
+  listRegistry,
+  updateObject,
+} from '#/lib/server-fns'
 
 /**
  * One object's attributes (spec §7, §9): the registry as a settings page,
@@ -52,19 +59,71 @@ function ObjectAttributesPage() {
             {isAdmin ? '' : ' Reshaping is admin-only.'}
           </p>
         </div>
-        <AttributeDialog
-          mode="create"
-          objectId={object.id}
-          objectLabel={object.singular}
-          onSaved={() => router.invalidate()}
-          trigger={
-            <Button size="sm">
-              <Plus className="size-4" strokeWidth={2} />
-              New attribute
-            </Button>
-          }
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          {!object.isSystem && isAdmin ? (
+            <>
+              <ObjectDialog
+                mode="edit"
+                object={object}
+                onSaved={() => router.invalidate()}
+                trigger={
+                  <Button size="sm" variant="outline">
+                    <Pencil className="size-3.5" strokeWidth={1.75} />
+                    Edit
+                  </Button>
+                }
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await updateObject({
+                      data: { id: object.id, archived: !object.archived },
+                    })
+                    toast(
+                      object.archived
+                        ? `${object.plural} restored`
+                        : `${object.plural} archived — records kept`,
+                    )
+                    void router.invalidate()
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error ? err.message : 'Could not update',
+                    )
+                  }
+                }}
+              >
+                {object.archived ? (
+                  <ArchiveRestore className="size-3.5" strokeWidth={1.75} />
+                ) : (
+                  <Archive className="size-3.5" strokeWidth={1.75} />
+                )}
+                {object.archived ? 'Restore' : 'Archive'}
+              </Button>
+            </>
+          ) : null}
+          <AttributeDialog
+            mode="create"
+            objectId={object.id}
+            objectLabel={object.singular}
+            onSaved={() => router.invalidate()}
+            trigger={
+              <Button size="sm">
+                <Plus className="size-4" strokeWidth={2} />
+                New attribute
+              </Button>
+            }
+          />
+        </div>
       </header>
+
+      {object.archived ? (
+        <p className="mt-4 rounded-md border border-dashed border-border px-3 py-2 text-ui text-muted-foreground">
+          Archived: the list and record pages are hidden and pickers skip it.
+          Records and their values are kept; Restore brings everything back.
+        </p>
+      ) : null}
 
       <div className="mt-6">
         <RegistryList

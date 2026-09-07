@@ -29,11 +29,13 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/companies_.$companyId'
 import { Route as AppDealsDealIdRouteImport } from './routes/_app/deals_.$dealId'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId'
+import { Route as AppOObjectSlugRouteImport } from './routes/_app/o.$objectSlug'
 import { Route as AppPeoplePersonIdRouteImport } from './routes/_app/people_.$personId'
 import { Route as AppPortfolioHoldingIdRouteImport } from './routes/_app/portfolio_.$holdingId'
 import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
+import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
 import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings_.objects.$objectSlug'
 
 const IndexRoute = IndexRouteImport.update({
@@ -135,6 +137,11 @@ const AppNotesNoteIdRoute = AppNotesNoteIdRouteImport.update({
   path: '/notes/$noteId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOObjectSlugRoute = AppOObjectSlugRouteImport.update({
+  id: '/o/$objectSlug',
+  path: '/o/$objectSlug',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPeoplePersonIdRoute = AppPeoplePersonIdRouteImport.update({
   id: '/people_/$personId',
   path: '/people/$personId',
@@ -159,6 +166,11 @@ const ApiBlobKeyRoute = ApiBlobKeyRouteImport.update({
   id: '/api/blob/$key',
   path: '/api/blob/$key',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppOObjectSlugRecordIdRoute = AppOObjectSlugRecordIdRouteImport.update({
+  id: '/o_/$objectSlug/$recordId',
+  path: '/o/$objectSlug/$recordId',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsObjectsObjectSlugRoute =
   AppSettingsObjectsObjectSlugRouteImport.update({
@@ -187,11 +199,13 @@ export interface FileRoutesByFullPath {
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
+  '/o/$objectSlug': typeof AppOObjectSlugRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/portfolio/$holdingId': typeof AppPortfolioHoldingIdRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
 export interface FileRoutesByTo {
@@ -214,11 +228,13 @@ export interface FileRoutesByTo {
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
+  '/o/$objectSlug': typeof AppOObjectSlugRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/portfolio/$holdingId': typeof AppPortfolioHoldingIdRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
 export interface FileRoutesById {
@@ -243,11 +259,13 @@ export interface FileRoutesById {
   '/_app/companies_/$companyId': typeof AppCompaniesCompanyIdRoute
   '/_app/deals_/$dealId': typeof AppDealsDealIdRoute
   '/_app/notes_/$noteId': typeof AppNotesNoteIdRoute
+  '/_app/o/$objectSlug': typeof AppOObjectSlugRoute
   '/_app/people_/$personId': typeof AppPeoplePersonIdRoute
   '/_app/portfolio_/$holdingId': typeof AppPortfolioHoldingIdRoute
   '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/_app/settings_/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
 export interface FileRouteTypes {
@@ -272,11 +290,13 @@ export interface FileRouteTypes {
     | '/companies/$companyId'
     | '/deals/$dealId'
     | '/notes/$noteId'
+    | '/o/$objectSlug'
     | '/people/$personId'
     | '/portfolio/$holdingId'
     | '/spaces/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/o/$objectSlug/$recordId'
     | '/settings/objects/$objectSlug'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -299,11 +319,13 @@ export interface FileRouteTypes {
     | '/companies/$companyId'
     | '/deals/$dealId'
     | '/notes/$noteId'
+    | '/o/$objectSlug'
     | '/people/$personId'
     | '/portfolio/$holdingId'
     | '/spaces/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/o/$objectSlug/$recordId'
     | '/settings/objects/$objectSlug'
   id:
     | '__root__'
@@ -327,11 +349,13 @@ export interface FileRouteTypes {
     | '/_app/companies_/$companyId'
     | '/_app/deals_/$dealId'
     | '/_app/notes_/$noteId'
+    | '/_app/o/$objectSlug'
     | '/_app/people_/$personId'
     | '/_app/portfolio_/$holdingId'
     | '/_app/spaces_/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/_app/o_/$objectSlug/$recordId'
     | '/_app/settings_/objects/$objectSlug'
   fileRoutesById: FileRoutesById
 }
@@ -488,6 +512,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNotesNoteIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/o/$objectSlug': {
+      id: '/_app/o/$objectSlug'
+      path: '/o/$objectSlug'
+      fullPath: '/o/$objectSlug'
+      preLoaderRoute: typeof AppOObjectSlugRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/people_/$personId': {
       id: '/_app/people_/$personId'
       path: '/people/$personId'
@@ -523,6 +554,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBlobKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/o_/$objectSlug/$recordId': {
+      id: '/_app/o_/$objectSlug/$recordId'
+      path: '/o/$objectSlug/$recordId'
+      fullPath: '/o/$objectSlug/$recordId'
+      preLoaderRoute: typeof AppOObjectSlugRecordIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings_/objects/$objectSlug': {
       id: '/_app/settings_/objects/$objectSlug'
       path: '/settings/objects/$objectSlug'
@@ -548,9 +586,11 @@ interface AppRouteChildren {
   AppCompaniesCompanyIdRoute: typeof AppCompaniesCompanyIdRoute
   AppDealsDealIdRoute: typeof AppDealsDealIdRoute
   AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
+  AppOObjectSlugRoute: typeof AppOObjectSlugRoute
   AppPeoplePersonIdRoute: typeof AppPeoplePersonIdRoute
   AppPortfolioHoldingIdRoute: typeof AppPortfolioHoldingIdRoute
   AppSpacesSpaceIdRoute: typeof AppSpacesSpaceIdRoute
+  AppOObjectSlugRecordIdRoute: typeof AppOObjectSlugRecordIdRoute
   AppSettingsObjectsObjectSlugRoute: typeof AppSettingsObjectsObjectSlugRoute
 }
 
@@ -569,9 +609,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppCompaniesCompanyIdRoute: AppCompaniesCompanyIdRoute,
   AppDealsDealIdRoute: AppDealsDealIdRoute,
   AppNotesNoteIdRoute: AppNotesNoteIdRoute,
+  AppOObjectSlugRoute: AppOObjectSlugRoute,
   AppPeoplePersonIdRoute: AppPeoplePersonIdRoute,
   AppPortfolioHoldingIdRoute: AppPortfolioHoldingIdRoute,
   AppSpacesSpaceIdRoute: AppSpacesSpaceIdRoute,
+  AppOObjectSlugRecordIdRoute: AppOObjectSlugRecordIdRoute,
   AppSettingsObjectsObjectSlugRoute: AppSettingsObjectsObjectSlugRoute,
 }
 

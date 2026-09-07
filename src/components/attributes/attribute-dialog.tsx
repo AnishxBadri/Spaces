@@ -48,7 +48,7 @@ import {
 } from '#/components/ui/popover'
 import { optionColor } from '#/lib/attributes/colors'
 import { deriveOptionIds } from '#/lib/attributes/options'
-import { createAttribute, updateAttribute } from '#/lib/server-fns'
+import { createAttribute, listObjects, updateAttribute } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 import { OptionListEditor, newDraft } from './option-list-editor'
 import { ValueEditor } from './value-editor'
@@ -117,11 +117,12 @@ const TYPES: Array<TypeMeta> = [
   },
 ]
 
-const OBJECTS: Array<{ id: ObjectKind; label: string }> = [
-  { id: 'company', label: 'Company' },
-  { id: 'person', label: 'Person' },
-  { id: 'deal', label: 'Deal' },
-]
+/** System objects map to a core kind; customs are addressed by object id. */
+const CORE_BY_SLUG: Partial<Record<string, ObjectKind>> = {
+  companies: 'company',
+  people: 'person',
+  deals: 'deal',
+}
 
 const CURRENCIES = [
   'USD',
@@ -160,6 +161,17 @@ export type EditableAttribute = {
   options: unknown
 }
 
+type ObjectChoice = {
+  id: string
+  slug: string
+  singular: string
+  isSystem: boolean
+}
+
+/** One value for the picker: a core kind, or `object:<id>` for a custom object. */
+const targetValue = (o: ObjectChoice) =>
+  (o.isSystem ? CORE_BY_SLUG[o.slug] : undefined) ?? `object:${o.id}`
+
 type StoredOptions = {
   options?: Array<{
     id: string
@@ -172,6 +184,7 @@ type StoredOptions = {
   max?: number
   precision?: number
   targetKind?: ObjectKind
+  targetObjectId?: string
   multi?: boolean
   required?: boolean
   default?: unknown
@@ -254,9 +267,37 @@ function AttributeForm({
   const [code, setCode] = useState(stored.code ?? 'USD')
   const [max, setMax] = useState(stored.max ?? 5)
   const [precision, setPrecision] = useState(stored.precision ?? 0)
-  const [targetKind, setTargetKind] = useState<ObjectKind | ''>(
-    stored.targetKind ?? '',
+  // The relationship target: a core kind or `object:<id>`.
+  const [target, setTarget] = useState<string>(
+    stored.targetKind ??
+      (stored.targetObjectId ? `object:${stored.targetObjectId}` : ''),
   )
+  const [objects, setObjects] = useState<Array<ObjectChoice>>([])
+  useEffect(() => {
+    if (type !== 'record_reference' || mode !== 'create') return
+    let alive = true
+    listObjects()
+      .then((rows) => {
+        if (alive)
+          setObjects(
+            rows.map((o) => ({
+              id: o.id,
+              slug: o.slug,
+              singular: o.singular,
+              isSystem: o.isSystem,
+            })),
+          )
+      })
+      .catch(() => setObjects([]))
+    return () => {
+      alive = false
+    }
+  }, [type, mode])
+  const targetKind = (target && !target.startsWith('object:') ? target : '') as
+    ObjectKind | ''
+  const targetObjectId = target.startsWith('object:')
+    ? target.slice('object:'.length)
+    : ''
   const [multi, setMulti] = useState(stored.multi ?? false)
   const [required, setRequired] = useState(stored.required ?? false)
   const [dflt, setDflt] = useState<unknown>(stored.default ?? null)
@@ -281,7 +322,7 @@ function AttributeForm({
     )
     setDflt(null)
     setRelative(false)
-    setTargetKind('')
+    setTarget('')
     setMulti(false)
     requestAnimationFrame(() => nameRef.current?.focus())
   }
@@ -319,10 +360,11 @@ function AttributeForm({
         max,
         code,
         ...(targetKind ? { targetKind } : {}),
+        ...(targetObjectId ? { targetObjectId } : {}),
         multi,
       },
     }
-  }, [drafts, type, max, code, targetKind, multi])
+  }, [drafts, type, max, code, targetKind, targetObjectId, multi])
 
   function buildDefault(): unknown {
     if (dflt === null || dflt === undefined || dflt === '') return null
@@ -345,7 +387,7 @@ function AttributeForm({
       setError('Give at least one option.')
       return
     }
-    if (type === 'record_reference' && !targetKind) {
+    if (type === 'record_reference' && !target) {
       setError('Pick what the relationship points at.')
       return
     }
@@ -386,7 +428,9 @@ function AttributeForm({
               ...(type === 'number' ? { precision } : {}),
               ...(type === 'record_reference' && targetKind
                 ? { targetKind, multi }
-                : {}),
+                : type === 'record_reference' && targetObjectId
+                  ? { targetObjectId, multi }
+                  : {}),
             },
             default: defaultValue ?? undefined,
             required,
@@ -511,7 +555,11 @@ function AttributeForm({
           <p className="text-ui text-muted-foreground sm:col-span-2">
             Points at{' '}
             <span className="text-foreground">
-              {OBJECTS.find((o) => o.id === stored.targetKind)?.label ?? '—'}
+              {stored.targetKind
+                ? { company: 'Company', person: 'Person', deal: 'Deal' }[
+                    stored.targetKind
+                  ]
+                : 'one of your objects'}
             </span>
             {stored.multi ? ', several at once' : ', one at a time'}. Fixed
             since creation — changing it would invalidate every stored link.
@@ -521,14 +569,14 @@ function AttributeForm({
             <Field label="Points at" htmlFor="attr-target">
               <select
                 id="attr-target"
-                value={targetKind}
-                onChange={(e) => setTargetKind(e.target.value as ObjectKind)}
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui shadow-xs focus-ring"
               >
                 <option value="">Pick an object…</option>
-                {OBJECTS.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
+                {objects.map((o) => (
+                  <option key={o.id} value={targetValue(o)}>
+                    {o.singular}
                   </option>
                 ))}
               </select>
@@ -548,7 +596,7 @@ function AttributeForm({
   })()
 
   const defaultWidget = (() => {
-    if (type === 'record_reference' && !targetKind)
+    if (type === 'record_reference' && !target)
       return (
         <p className="text-label text-muted-foreground">
           Pick what it points at first.

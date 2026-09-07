@@ -1,5 +1,5 @@
 import { createReactInlineContentSpec } from '@blocknote/react'
-import { Building2, FileText, Layers, User } from 'lucide-react'
+import { Boxes, Building2, FileText, Layers, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 /**
@@ -14,6 +14,7 @@ export const KIND_ICONS: Record<string, LucideIcon> = {
   organization: Building2,
   space: Layers,
   note: FileText,
+  custom: Boxes,
 }
 
 export const KIND_ROUTES: Record<string, string> = {
@@ -31,24 +32,30 @@ export const Mention = createReactInlineContentSpec(
       entityId: { default: '' },
       label: { default: '' },
       kind: { default: 'company' },
+      /** custom records: the object slug their page lives under */
+      objectSlug: { default: '' },
     },
     content: 'none',
   },
   {
     render: (props) => {
-      const { entityId, label, kind } = props.inlineContent.props
+      const { entityId, label, kind, objectSlug } = props.inlineContent.props
       const Icon = KIND_ICONS[kind] ?? Building2
       // Plain anchor, not router Link — renders inside BlockNote's tree.
       const href =
-        kind === 'company'
-          ? `/companies/${entityId}`
-          : kind === 'note'
-            ? `/notes/${entityId}`
-            : kind === 'space'
-              ? `/spaces/${entityId}`
-              : kind === 'person'
-                ? `/people/${entityId}`
-                : KIND_ROUTES[kind]
+        kind === 'custom'
+          ? objectSlug
+            ? `/o/${objectSlug}/${entityId}`
+            : undefined
+          : kind === 'company'
+            ? `/companies/${entityId}`
+            : kind === 'note'
+              ? `/notes/${entityId}`
+              : kind === 'space'
+                ? `/spaces/${entityId}`
+                : kind === 'person'
+                  ? `/people/${entityId}`
+                  : KIND_ROUTES[kind]
       return (
         <a
           href={href}

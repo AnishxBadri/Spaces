@@ -1,15 +1,8 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import {
-  Boxes,
-  Building2,
-  ChevronRight,
-  Copy,
-  Kanban,
-  Plus,
-  Users,
-} from 'lucide-react'
+import { ChevronRight, Copy, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { ObjectDialog } from '#/components/objects/object-dialog'
 import { Button } from '#/components/ui/button'
 import {
   DropdownMenu,
@@ -27,6 +20,7 @@ import {
   listMembers,
   listFxRates,
   listObjects,
+  updateObject,
   listTemplates,
   revokeInvite,
   saveWorkspace,
@@ -36,6 +30,7 @@ import {
   setMemberRole,
   updateTemplate,
 } from '#/lib/server-fns'
+import { objectIcon } from '#/lib/object-icons'
 import { cn } from '#/lib/utils'
 
 /**
@@ -51,7 +46,7 @@ export const Route = createFileRoute('/_app/settings')({
         getWorkspace(),
         listMembers(),
         listTemplates({ data: { includeArchived: true } }),
-        listObjects(),
+        listObjects({ data: { includeArchived: true } }),
         listFxRates(),
       ])
     const isAdmin = session?.user.role === 'admin'
@@ -71,12 +66,6 @@ export const Route = createFileRoute('/_app/settings')({
 })
 
 type ObjectRow = Awaited<ReturnType<typeof listObjects>>[number]
-
-const OBJECT_ICONS: Record<string, typeof Building2> = {
-  companies: Building2,
-  people: Users,
-  deals: Kanban,
-}
 
 function SettingsPage() {
   const data = Route.useLoaderData()
@@ -110,7 +99,7 @@ function SettingsPage() {
         rates={data.fx.rates}
       />
 
-      <ObjectsSection objects={data.objects} />
+      <ObjectsSection objects={data.objects} isAdmin={data.isAdmin} />
     </div>
   )
 }
@@ -667,17 +656,42 @@ function FxSection({
  * its attributes page. Custom objects join this list when SPA-13 lands —
  * the page they get is the same one.
  */
-function ObjectsSection({ objects }: { objects: Array<ObjectRow> }) {
+function ObjectsSection({
+  objects,
+  isAdmin,
+}: {
+  objects: Array<ObjectRow>
+  isAdmin: boolean
+}) {
+  const router = useRouter()
+  const live = objects.filter((o) => !o.archived)
+  const archived = objects.filter((o) => o.archived)
   return (
     <section className="mt-10">
-      <h2 className="text-title font-semibold tracking-tight">Objects</h2>
-      <p className="mt-1 text-ui text-muted-foreground">
-        The records you keep and the attributes on each. Open one to rename,
-        reorder, archive, or add attributes — types are fixed.
-      </p>
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h2 className="text-title font-semibold tracking-tight">Objects</h2>
+          <p className="mt-1 text-ui text-muted-foreground">
+            The records you keep and the attributes on each. Open one to rename,
+            reorder, archive, or add attributes — types are fixed.
+          </p>
+        </div>
+        {isAdmin ? (
+          <ObjectDialog
+            mode="create"
+            onSaved={() => router.invalidate()}
+            trigger={
+              <Button size="xs" variant="outline">
+                <Plus className="size-3" strokeWidth={2} />
+                New object
+              </Button>
+            }
+          />
+        ) : null}
+      </div>
       <ul className="mt-4 divide-y divide-border/60 rounded-lg border border-border">
-        {objects.map((o) => {
-          const Icon = OBJECT_ICONS[o.slug] ?? Boxes
+        {live.map((o) => {
+          const Icon = objectIcon(o)
           return (
             <li key={o.id}>
               <Link
@@ -719,6 +733,46 @@ function ObjectsSection({ objects }: { objects: Array<ObjectRow> }) {
           )
         })}
       </ul>
+      {archived.length > 0 ? (
+        <ul className="mt-3 divide-y divide-border/60 rounded-lg border border-dashed border-border opacity-70">
+          {archived.map((o) => {
+            const Icon = objectIcon(o)
+            return (
+              <li key={o.id} className="flex items-center gap-3 px-4 py-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                  <Icon
+                    className="size-4 text-muted-foreground"
+                    strokeWidth={1.75}
+                  />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-ui font-medium">
+                    {o.plural}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Archived — records kept, routes and pickers hidden
+                  </span>
+                </span>
+                {isAdmin ? (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={async () => {
+                      await updateObject({
+                        data: { id: o.id, archived: false },
+                      })
+                      toast(`${o.plural} restored`)
+                      void router.invalidate()
+                    }}
+                  >
+                    Restore
+                  </Button>
+                ) : null}
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
     </section>
   )
 }

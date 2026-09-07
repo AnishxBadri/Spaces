@@ -132,14 +132,25 @@ async function checkReferences(tx: Tx, change: Change) {
   const ids = Array.isArray(value) ? value : [value as string]
   if (ids.length === 0) return
   const targets = await tx
-    .select({ id: entity.id, kind: entity.kind, merged: entity.mergedIntoId })
+    .select({
+      id: entity.id,
+      kind: entity.kind,
+      objectId: entity.objectId,
+      merged: entity.mergedIntoId,
+    })
     .from(entity)
     .where(inArray(entity.id, ids))
   if (targets.length !== ids.length)
     throw invalid(slug, 'Referenced record not found')
   for (const t of targets) {
-    if (t.kind !== def.options.targetKind)
+    // Targets stay single-object (§6): a core kind for the system objects,
+    // an object row for custom ones — the picker just lists more objects.
+    if (def.options.targetObjectId) {
+      if (t.objectId !== def.options.targetObjectId)
+        throw invalid(slug, 'Must reference a record of the target object')
+    } else if (t.kind !== def.options.targetKind) {
       throw invalid(slug, `Must reference a ${def.options.targetKind}`)
+    }
     if (t.merged) throw invalid(slug, 'Referenced record was merged')
   }
 }

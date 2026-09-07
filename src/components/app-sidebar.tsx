@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 import { authClient } from '#/lib/auth-client'
+import { objectIcon } from '#/lib/object-icons'
 import { cn } from '#/lib/utils'
 
 export const NAV_ITEMS = [
@@ -47,6 +48,7 @@ const isMac =
 export function AppSidebar({
   user,
   workspaceName,
+  objects = [],
   onOpenCommand,
   onNavigate,
   hideWordmark = false,
@@ -54,6 +56,8 @@ export function AppSidebar({
   user: { name: string; email: string }
   /** The workspace singleton's name — the deployment's identity. */
   workspaceName?: string | null
+  /** Custom objects (spec §9) — they join the nav under Records. */
+  objects?: Array<{ slug: string; plural: string; icon: string | null }>
   onOpenCommand: () => void
   onNavigate?: () => void
   /** Drawer usage — the mobile top bar already shows the wordmark. */
@@ -125,6 +129,36 @@ export function AppSidebar({
             {item.label}
           </Link>
         ))}
+        {objects.length > 0 ? (
+          <>
+            <p className="px-2.5 pt-3 pb-1 text-micro font-medium tracking-wide text-muted-foreground uppercase">
+              Records
+            </p>
+            {objects.map((o) => {
+              const Icon = objectIcon(o)
+              return (
+                <Link
+                  key={o.slug}
+                  to="/o/$objectSlug"
+                  params={{ objectSlug: o.slug }}
+                  onClick={onNavigate}
+                  className={cn(
+                    'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-ui font-medium text-muted-foreground transition-colors',
+                    'hover:bg-sidebar-accent hover:text-foreground',
+                    'focus-ring',
+                  )}
+                  activeProps={{
+                    className: 'bg-selected text-foreground',
+                    'aria-current': 'page',
+                  }}
+                >
+                  <Icon className="size-4" strokeWidth={1.75} />
+                  {o.plural}
+                </Link>
+              )
+            })}
+          </>
+        ) : null}
       </nav>
 
       <div className="space-y-0.5 border-t border-sidebar-border p-3">

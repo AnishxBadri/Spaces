@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router'
 import {
   ArrowLeft,
+  Boxes,
   Building2,
   ChevronRight,
   FileText,
@@ -241,6 +242,36 @@ function SpacePage() {
           </ul>
         )}
       </section>
+
+      {spc.records.length > 0 ? (
+        <section className="mt-10">
+          <h2 className="text-xs font-medium text-muted-foreground">
+            Records · {spc.records.length}
+          </h2>
+          <ul className="-mx-2 mt-2">
+            {spc.records.map((r) => (
+              <li key={r.id}>
+                <Link
+                  to="/o/$objectSlug/$recordId"
+                  params={{ objectSlug: r.objectSlug, recordId: r.id }}
+                  className="flex h-9 items-center gap-3 rounded-md px-2 text-ui focus-ring hover:bg-accent"
+                >
+                  <Boxes
+                    className="size-4 shrink-0 text-muted-foreground"
+                    strokeWidth={1.75}
+                  />
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {r.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {r.objectPlural}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <SpaceGlossary spaceId={spc.id} spaceName={spc.name} terms={terms} />
 

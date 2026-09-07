@@ -50,6 +50,7 @@ const dateTimeFmt = new Intl.DateTimeFormat('en', {
 })
 
 const VERB_LABELS: Record<string, string> = {
+  'record.created': 'created this record',
   'company.created': 'created this company',
   'person.created': 'created this person',
   'deal.created': 'created a deal',

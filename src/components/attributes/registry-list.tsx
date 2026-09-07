@@ -248,8 +248,8 @@ function AttributeRow({
   const options = stored.options ?? []
   const hasOptions = ['select', 'multi_select', 'status'].includes(attr.type)
   const summary = [
-    attr.type === 'record_reference' && stored.targetKind
-      ? `→ ${stored.targetKind}`
+    attr.type === 'record_reference'
+      ? `→ ${stored.targetKind ?? 'your object'}`
       : null,
     attr.type === 'currency' ? (stored.code ?? 'USD') : null,
     attr.type === 'rating' ? `out of ${stored.max ?? 5}` : null,

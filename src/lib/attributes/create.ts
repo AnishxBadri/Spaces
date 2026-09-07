@@ -48,6 +48,7 @@ export type CreateAttributeInput = {
     max?: number
     precision?: number
     targetKind?: ObjectKind
+    targetObjectId?: string
     multi?: boolean
   }
   default?: unknown
@@ -123,11 +124,16 @@ const buildOptions = Effect.fn('buildOptions')(function* (
   }
 
   if (input.type === 'record_reference') {
-    if (!cfg.targetKind)
+    if (!cfg.targetKind && !cfg.targetObjectId)
       return yield* reject('Pick what the relationship points at')
-    out.targetKind = cfg.targetKind
+    if (cfg.targetKind) out.targetKind = cfg.targetKind
+    else out.targetObjectId = cfg.targetObjectId
     out.multi = cfg.multi ?? false
-  } else if (cfg.targetKind !== undefined || cfg.multi !== undefined) {
+  } else if (
+    cfg.targetKind !== undefined ||
+    cfg.targetObjectId !== undefined ||
+    cfg.multi !== undefined
+  ) {
     return yield* reject('Relationship settings are not settings of this type')
   }
 

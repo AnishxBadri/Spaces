@@ -1,5 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import {
+  Boxes,
   Building2,
   FileText,
   Kanban,
@@ -22,6 +23,7 @@ import {
   CommandSeparator,
 } from './ui/command'
 import { authClient } from '#/lib/auth-client'
+import { recordPath } from '#/lib/record-path'
 import { searchAll } from '#/lib/server-fns'
 
 /**
@@ -41,6 +43,7 @@ const KIND_ICONS: Record<string, LucideIcon> = {
   space: Layers,
   note: FileText,
   document: Paperclip,
+  custom: Boxes,
 }
 
 /** Documents have no page — a hit lands on the record it is filed against. */
@@ -48,25 +51,15 @@ function hrefFor(hit: Hit): string | null {
   const target =
     hit.kind === 'document'
       ? hit.parent
-        ? { kind: hit.parent.kind, id: hit.parent.id }
+        ? {
+            kind: hit.parent.kind,
+            id: hit.parent.id,
+            objectSlug: hit.parent.objectSlug,
+          }
         : null
-      : { kind: hit.kind, id: hit.id }
+      : { kind: hit.kind, id: hit.id, objectSlug: hit.objectSlug }
   if (!target) return null
-  switch (target.kind) {
-    case 'company':
-    case 'organization':
-      return `/companies/${target.id}`
-    case 'person':
-      return `/people/${target.id}`
-    case 'deal':
-      return `/deals/${target.id}`
-    case 'space':
-      return `/spaces/${target.id}`
-    case 'note':
-      return `/notes/${target.id}`
-    default:
-      return null
-  }
+  return recordPath(target)
 }
 
 /**

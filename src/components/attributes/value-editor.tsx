@@ -1,4 +1,4 @@
-import { Building2, Check, ChevronDown, Star, User } from 'lucide-react'
+import { Boxes, Building2, Check, ChevronDown, Star, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   DropdownMenu,
@@ -35,6 +35,7 @@ export type RegistryEntry = {
     max?: number
     code?: string
     targetKind?: string
+    targetObjectId?: string
     multi?: boolean
     required?: boolean
     precision?: number
@@ -350,6 +351,8 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
 function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
   const multi = Boolean(def.options?.multi)
   const targetKind = def.options?.targetKind ?? 'company'
+  // A custom-object target: search that object's records, not a kind.
+  const targetObjectId = def.options?.targetObjectId
   const selected: Array<string> = multi
     ? Array.isArray(value)
       ? (value as Array<string>)
@@ -368,7 +371,9 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
     const t = setTimeout(() => {
       void (async () => {
         const r = await searchEntities({
-          data: { q: query, kinds: [targetKind as 'company'] },
+          data: targetObjectId
+            ? { q: query, objectId: targetObjectId }
+            : { q: query, kinds: [targetKind as 'company'] },
         })
         if (alive) setResults(r)
       })()
@@ -377,9 +382,14 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
       alive = false
       clearTimeout(t)
     }
-  }, [query, targetKind])
+  }, [query, targetKind, targetObjectId])
 
-  const Icon = targetKind === 'person' ? User : Building2
+  const Icon = targetObjectId
+    ? Boxes
+    : targetKind === 'person'
+      ? User
+      : Building2
+  const targetLabel = targetObjectId ? 'records' : targetKind
 
   return (
     <DropdownMenu>
@@ -414,7 +424,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
           <Input
             value={query}
             autoFocus
-            placeholder={`Search ${targetKind}…`}
+            placeholder={`Search ${targetLabel}…`}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.stopPropagation()}
             className="h-7 text-label"

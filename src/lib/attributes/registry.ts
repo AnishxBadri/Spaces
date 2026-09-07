@@ -53,8 +53,9 @@ export type SelectOption = {
 
 export type AttributeOptions = {
   options?: Array<SelectOption>
-  /** record_reference */
+  /** record_reference — a core kind, or any object row (custom objects) */
   targetKind?: ObjectKind
+  targetObjectId?: string
   multi?: boolean
   required?: boolean
   /** currency */
