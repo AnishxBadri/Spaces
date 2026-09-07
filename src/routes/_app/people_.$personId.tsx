@@ -140,6 +140,9 @@ function PersonRecordPage() {
             <RailField
               key={def.slug}
               def={def as RegistryEntry}
+              attr={def}
+              objectLabel={'person'}
+              onAttributeSaved={() => router.invalidate()}
               value={person.values[def.slug] ?? null}
               onSave={async (v) => {
                 await updateRecord({

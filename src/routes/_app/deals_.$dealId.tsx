@@ -235,6 +235,9 @@ function DealRecordPage() {
             <RailField
               key={def.slug}
               def={def as RegistryEntry}
+              attr={def}
+              objectLabel={'deal'}
+              onAttributeSaved={() => router.invalidate()}
               value={deal.values[def.slug] ?? null}
               refNames={refNames}
               onSave={async (v) => {

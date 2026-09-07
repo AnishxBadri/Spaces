@@ -10,7 +10,7 @@ import {
 import { Input } from '#/components/ui/input'
 import { badgeStyle, optionColor } from '#/lib/attributes/colors'
 import { liveOptions, optionState } from '#/lib/attributes/options'
-import { formatDate } from '#/lib/format'
+import { formatDate, formatNumber } from '#/lib/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
@@ -21,6 +21,7 @@ import { cn } from '#/lib/utils'
  */
 
 export type RegistryEntry = {
+  id?: string
   slug: string
   name: string
   type: string
@@ -295,11 +296,16 @@ function DateCellEditor({ def, value, onSave }: Props) {
 function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
   const display = value == null ? '' : String(value)
   const [draft, setDraft] = useState(display)
+  const [focused, setFocused] = useState(false)
   const committed = useRef(display)
   useEffect(() => {
     setDraft(display)
     committed.current = display
   }, [display])
+  // A number with a precision setting reads formatted (grouping, fixed
+  // decimals) until it's being edited; the stored number is untouched.
+  const precision = def.type === 'number' ? def.options?.precision : undefined
+  const formatted = precision !== undefined && !focused
 
   function commit() {
     if (draft === committed.current) return
@@ -315,19 +321,26 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
   const inputType =
     def.type === 'date'
       ? 'date'
-      : def.type === 'number' || def.type === 'currency'
-        ? 'number'
-        : 'text'
+      : formatted
+        ? 'text'
+        : def.type === 'number' || def.type === 'currency'
+          ? 'number'
+          : 'text'
 
   return (
     <input
       type={inputType}
-      value={draft}
+      inputMode={def.type === 'number' ? 'decimal' : undefined}
+      value={formatted ? formatNumber(draft, precision) : draft}
       autoFocus={autoFocus}
       aria-label={def.name}
       placeholder="—"
+      onFocus={() => setFocused(true)}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
+      onBlur={() => {
+        setFocused(false)
+        commit()
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
         if (e.key === 'Escape') {

@@ -16,13 +16,24 @@ const hasDb = Boolean(process.env.DATABASE_URL)
 describe.skipIf(!hasDb)('custom objects', () => {
   const tag = randomUUID().slice(0, 8)
   const created: Array<string> = []
+  // Fixtures on the system Deal object — tracked by id, never by object, so
+  // a failing test can never take the real deal registry down with it.
+  const dealFixtures: Array<{ entityId: string; attributeId: string }> = []
 
   afterAll(async () => {
     const { db } = await import('#/db')
     const { attribute, entity, link, objectDef } = await import('#/db/schema')
     const { attributeEvent } = await import('#/db/schema')
     const { activity } = await import('#/db/schema/activity')
-    const { inArray, or } = await import('drizzle-orm')
+    const { eq, inArray, or } = await import('drizzle-orm')
+    for (const f of dealFixtures) {
+      await db.delete(link).where(eq(link.fromEntityId, f.entityId))
+      await db
+        .delete(attributeEvent)
+        .where(eq(attributeEvent.entityId, f.entityId))
+      await db.delete(entity).where(eq(entity.id, f.entityId))
+      await db.delete(attribute).where(eq(attribute.id, f.attributeId))
+    }
     if (created.length === 0) return
     const rows = await db
       .select({ id: entity.id })
@@ -162,7 +173,7 @@ describe.skipIf(!hasDb)('custom objects', () => {
         canonicalName: `Zz deal ${tag}`,
       })
       .returning({ id: entity.id })
-    created.push(dealObjectId) // cleanup scans entities by object; deal rows below are removed by name filter instead
+    dealFixtures.push({ entityId: dealRow.id, attributeId: dealRef.id })
     await setValues({
       entityId: dealRow.id,
       patch: { [dealRef.slug]: rec.id },
@@ -222,16 +233,5 @@ describe.skipIf(!hasDb)('custom objects', () => {
         createRecordProgram({ objectId: fund.id, name: 'late', actor: me }),
       ),
     ).rejects.toThrow(/archived/)
-
-    // Tidy the deal-side fixtures this test made on the system object.
-    created.pop()
-    const { attribute } = await import('#/db/schema')
-    const { attributeEvent } = await import('#/db/schema')
-    await db.delete(link).where(eq(link.fromEntityId, dealRow.id))
-    await db
-      .delete(attributeEvent)
-      .where(eq(attributeEvent.entityId, dealRow.id))
-    await db.delete(entity).where(eq(entity.id, dealRow.id))
-    await db.delete(attribute).where(eq(attribute.id, dealRef.id))
   })
 })

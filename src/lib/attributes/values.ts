@@ -3,6 +3,7 @@ import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db'
 import { attribute, attributeEvent, entity, link } from '#/db/schema'
 import type { attributeEventSource } from '#/db/schema'
+import { resolveDefault } from './default-values'
 import { objectIdForKindAsync } from './objects'
 import { valueValidator } from './registry'
 import type { AttributeDef, ObjectKind } from './registry'
@@ -72,6 +73,8 @@ type Change = {
   def: AttributeDef
   before: unknown
   value: unknown
+  /** set when the change came from a default rather than the patch */
+  door?: 'default'
 }
 
 /**
@@ -167,15 +170,29 @@ export type SetValuesInput = {
   source?: EventSource
   suggestionId?: string
   refs?: Array<string>
+  /**
+   * Birth mode (spec §4): after the patch, fill every still-blank attribute
+   * that carries a default, logged through the `default` door — inside the
+   * same transaction and registry read as the supplied values.
+   */
+  fillDefaults?: { now: Date }
 }
 
 export const setValuesEffect = Effect.fn('setValues')(function* (
   opts: SetValuesInput,
 ): Effect.fn.Return<
-  { changed: Array<string> },
+  { changed: Array<string>; defaulted: Array<string> },
   AttributeValidationError | EntityNotFound | ValuesWriteFailed
 > {
-  const { entityId, patch, actor, source = 'direct', suggestionId, refs } = opts
+  const {
+    entityId,
+    patch,
+    actor,
+    source = 'direct',
+    suggestionId,
+    refs,
+    fillDefaults,
+  } = opts
   const actorId = actor.type === 'user' ? actor.id : null
 
   return yield* Effect.tryPromise({
@@ -212,6 +229,34 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
         // throw here and is passed through untouched by the catch below.
         const changes = Effect.runSync(planPatch(registry, current, patch))
 
+        // Birth mode: defaults for whatever the patch left blank, planned
+        // against the same registry snapshot and written through their own
+        // door. Supplied values always win — a default never touches a slug
+        // the patch named.
+        if (fillDefaults) {
+          const afterPatch = { ...current }
+          for (const c of changes) {
+            if (c.value === null) delete afterPatch[c.slug]
+            else afterPatch[c.slug] = c.value
+          }
+          const userId = actor.type === 'user' ? actor.id : null
+          const defaultPatch: Record<string, unknown> = {}
+          for (const def of registry) {
+            if (def.slug in patch) continue
+            if (
+              afterPatch[def.slug] !== undefined &&
+              afterPatch[def.slug] !== null
+            )
+              continue
+            const v = resolveDefault(def, { now: fillDefaults.now, userId })
+            if (v !== undefined) defaultPatch[def.slug] = v
+          }
+          for (const c of Effect.runSync(
+            planPatch(registry, afterPatch, defaultPatch),
+          ))
+            changes.push({ ...c, door: 'default' })
+        }
+
         const next = { ...current }
         for (const change of changes) {
           await checkReferences(tx, change)
@@ -219,6 +264,7 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
           if (value === null) delete next[slug]
           else next[slug] = value
 
+          const viaDefault = change.door === 'default'
           await tx.insert(attributeEvent).values({
             entityId,
             attrSlug: slug,
@@ -226,9 +272,9 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
             to: value,
             actorType: actor.type,
             actorId,
-            source,
-            suggestionId: suggestionId ?? null,
-            refs: refs ?? null,
+            source: viaDefault ? 'default' : source,
+            suggestionId: viaDefault ? null : (suggestionId ?? null),
+            refs: viaDefault ? null : (refs ?? null),
           })
 
           // Materialize record-references into the graph (values
@@ -271,7 +317,14 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
             .set({ values: next })
             .where(eq(entity.id, entityId))
         }
-        return { changed: changes.map((c) => c.slug) }
+        return {
+          changed: changes
+            .filter((c) => c.door !== 'default')
+            .map((c) => c.slug),
+          defaulted: changes
+            .filter((c) => c.door === 'default')
+            .map((c) => c.slug),
+        }
       }),
     catch: (cause) =>
       cause instanceof AttributeValidationError ||
@@ -284,5 +337,5 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
 /** Promise seam for server-fns and tests; new Effect code composes `setValuesEffect`. */
 export const setValues = (
   opts: SetValuesInput,
-): Promise<{ changed: Array<string> }> =>
+): Promise<{ changed: Array<string>; defaulted: Array<string> }> =>
   Effect.runPromise(setValuesEffect(opts))

@@ -1,4 +1,7 @@
+import { Pencil } from 'lucide-react'
 import { useState } from 'react'
+import { AttributeDialog } from './attribute-dialog'
+import type { EditableAttribute } from './attribute-dialog'
 import { ValueEditor } from './value-editor'
 import type { RefNames, RegistryEntry } from './value-editor'
 
@@ -14,20 +17,51 @@ export function RailField({
   value,
   refNames,
   onSave,
+  attr,
+  objectLabel,
+  onAttributeSaved,
 }: {
   def: RegistryEntry
   value: unknown
   refNames?: RefNames
   onSave: (value: unknown) => Promise<void>
+  /** the attribute row, when the rail may open the edit dialog (spec §7) */
+  attr?: EditableAttribute
+  objectLabel?: string
+  onAttributeSaved?: () => void
 }) {
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const [editing, setEditing] = useState(false)
 
   return (
-    <div className="space-y-1">
-      <span className="text-xs font-medium text-muted-foreground">
-        {def.name}
+    <div className="group/rail space-y-1">
+      <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+        <span className="min-w-0 truncate" title={def.description ?? undefined}>
+          {def.name}
+        </span>
+        {attr ? (
+          <button
+            type="button"
+            aria-label={`Edit attribute ${def.name}`}
+            title="Edit attribute"
+            onClick={() => setEditing(true)}
+            className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 focus-ring transition-opacity duration-150 group-hover/rail:opacity-100 hover:text-foreground focus-visible:opacity-100"
+          >
+            <Pencil className="size-3" strokeWidth={1.75} />
+          </button>
+        ) : null}
       </span>
+      {attr ? (
+        <AttributeDialog
+          mode="edit"
+          attr={attr}
+          objectLabel={objectLabel}
+          open={editing}
+          onOpenChange={setEditing}
+          onSaved={() => onAttributeSaved?.()}
+        />
+      ) : null}
       <ValueEditor
         key={attempt}
         def={def}

@@ -201,8 +201,8 @@ export function CommandPalette({
                             {hit.kind === 'document' && hit.parent
                               ? `in ${hit.parent.name}`
                               : hit.matchedIn === 'name'
-                                ? hit.kind
-                                : `${hit.kind} · text`}
+                                ? (hit.objectSlug ?? hit.kind)
+                                : `${hit.objectSlug ?? hit.kind} · text`}
                           </span>
                         </span>
                         {hit.snippet ? (

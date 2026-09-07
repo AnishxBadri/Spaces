@@ -350,10 +350,14 @@ describe.skipIf(!hasDb)('setValues', () => {
       patch: { location: 'Bengaluru' },
       actor: { type: 'user', id: actor.id },
     })
-    const after = await db
-      .select()
-      .from(attributeEvent)
-      .where(eq(attributeEvent.entityId, co.entityId))
+    const after = (
+      await db
+        .select()
+        .from(attributeEvent)
+        .where(eq(attributeEvent.entityId, co.entityId))
+    ).filter((e) =>
+      ['funding_stage', 'location', 'founded_year'].includes(e.attrSlug),
+    )
     expect(after.length).toBe(before)
   })
 

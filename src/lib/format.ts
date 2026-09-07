@@ -20,3 +20,32 @@ export function formatDate(value: string | Date | null | undefined): string {
   const d = typeof value === 'string' ? new Date(value) : value
   return Number.isNaN(d.getTime()) ? '' : dateFmt.format(d)
 }
+
+const numberFmts = new Map<number, Intl.NumberFormat>()
+
+/**
+ * A plain number with thousands grouping and a fixed number of decimals —
+ * the `number.precision` display rule (spec §2: "Founded 1,987" is the bug
+ * without it, so grouping is off for precision-less integers that read as
+ * years). Never compact notation: that differs between Node and Chrome
+ * and breaks hydration; `fmtMoney` owns compact.
+ */
+export function formatNumber(
+  value: number | string | null | undefined,
+  precision?: number,
+): string {
+  if (value === null || value === undefined || value === '') return ''
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return String(value)
+  if (precision === undefined) return String(n)
+  let fmt = numberFmts.get(precision)
+  if (!fmt) {
+    fmt = new Intl.NumberFormat('en', {
+      minimumFractionDigits: precision,
+      maximumFractionDigits: precision,
+      useGrouping: true,
+    })
+    numberFmts.set(precision, fmt)
+  }
+  return fmt.format(n)
+}

@@ -182,6 +182,9 @@ function CompanyRecordPage() {
             <RailField
               key={def.slug}
               def={def as RegistryEntry}
+              attr={def}
+              objectLabel={'company'}
+              onAttributeSaved={() => router.invalidate()}
               value={company.values[def.slug] ?? null}
               onSave={async (v) => {
                 await updateRecord({

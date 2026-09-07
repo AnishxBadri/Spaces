@@ -79,6 +79,33 @@ export default [
       ],
     },
   },
+  // One write path for attribute values (CONTEXT.md "Backend paradigm" #9):
+  // entity.values is written by setValues and nowhere else — it validates,
+  // diffs, logs attribute_event, and materializes reference links in one
+  // transaction. A direct `.update(entity).set({ values })` skips all four.
+  // The merge executor rewrites values with its own snapshot contract;
+  // seeds and tests set fixtures.
+  {
+    files: ['src/**'],
+    ignores: [
+      'src/lib/attributes/values.ts',
+      'src/lib/entities/merge.ts',
+      'src/lib/seeds/**',
+      'src/**/*.test.ts',
+      'src/lib/entities/test-helpers.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name='set'][callee.object.callee.property.name='update'][callee.object.arguments.0.name='entity'] > ObjectExpression > Property[key.name='values']",
+          message:
+            'entity.values has one write path — go through setValues (src/lib/attributes/values.ts) so validation, attribute_event, and reference links stay in one transaction.',
+        },
+      ],
+    },
+  },
   // Guard against accidental full-table update/delete (portfolio event
   // tables are append-only by design).
   {

@@ -134,6 +134,9 @@ function ObjectRecordPage() {
             <RailField
               key={def.slug}
               def={def as RegistryEntry}
+              attr={def}
+              objectLabel={record.object.singular}
+              onAttributeSaved={() => router.invalidate()}
               value={record.values[def.slug] ?? null}
               refNames={record.refNames}
               onSave={async (v) => {

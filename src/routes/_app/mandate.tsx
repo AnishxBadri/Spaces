@@ -43,7 +43,12 @@ export const Route = createFileRoute('/_app/mandate')({
   component: MandatePage,
 })
 
-type StageOption = { id: string; label: string; color?: string }
+type StageOption = {
+  id: string
+  label: string
+  color?: string
+  archived?: boolean
+}
 
 function MandatePage() {
   const { mandate, note, stageOptions } = Route.useLoaderData()
@@ -133,33 +138,39 @@ function FactsRail({
       <section>
         <h2 className="text-label font-medium text-muted-foreground">Stages</h2>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {stageOptions.map((opt) => {
-            const active = mandate.stages.includes(opt.id)
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() =>
-                  save({
-                    stages: active
-                      ? mandate.stages.filter((s) => s !== opt.id)
-                      : [...mandate.stages, opt.id],
-                  })
-                }
-                className={cn(
-                  'flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium focus-ring transition-colors',
-                  active
-                    ? ''
-                    : 'border border-border text-muted-foreground hover:border-input hover:text-foreground',
-                )}
-                style={active ? badgeStyle(optionColor(opt, 0)) : undefined}
-              >
-                {active ? <Check className="size-3" strokeWidth={2.5} /> : null}
-                {opt.label}
-              </button>
-            )
-          })}
+          {/* Archived stages leave the picker (spec §3: writes never assert
+              them) but a mandate that already names one keeps it, greyed. */}
+          {stageOptions
+            .filter((opt) => !opt.archived || mandate.stages.includes(opt.id))
+            .map((opt) => {
+              const active = mandate.stages.includes(opt.id)
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() =>
+                    save({
+                      stages: active
+                        ? mandate.stages.filter((s) => s !== opt.id)
+                        : [...mandate.stages, opt.id],
+                    })
+                  }
+                  className={cn(
+                    'flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium focus-ring transition-colors',
+                    active
+                      ? ''
+                      : 'border border-border text-muted-foreground hover:border-input hover:text-foreground',
+                  )}
+                  style={active ? badgeStyle(optionColor(opt, 0)) : undefined}
+                >
+                  {active ? (
+                    <Check className="size-3" strokeWidth={2.5} />
+                  ) : null}
+                  {opt.label}
+                </button>
+              )
+            })}
         </div>
         <p className="mt-1.5 text-xs text-muted-foreground">
           Company stages you invest at. Powers the outside-mandate hint on
