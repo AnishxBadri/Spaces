@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '#/db'
-import { BADGE_COLORS, nextBadgeColor } from '../attributes/colors'
+import { BADGE_COLORS } from '../attributes/colors'
 import { requireAdmin, requireUser } from './shared'
 import type { Json } from './shared'
 
@@ -47,6 +47,7 @@ export const listRegistry = createServerFn()
         id: d.id,
         slug: d.slug,
         name: d.name,
+        description: d.description,
         type: d.type,
         options: d.options as Json,
         isSystem: d.isSystem,
@@ -84,6 +85,8 @@ const optionEdit = z.object({
 export const updateAttributeInput = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(1).max(80).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+  required: z.boolean().optional(),
   archived: z.boolean().optional(),
   move: z.enum(['up', 'down']).optional(),
   options: z.array(optionEdit).max(50).optional(),
@@ -125,99 +128,64 @@ export const updateAttribute = createServerFn({ method: 'POST' })
     return effectFn(updateAttributeProgram)(data)
   })
 
-const createAttributeInput = z.object({
+const ATTRIBUTE_TYPES = [
+  'text',
+  'number',
+  'currency',
+  'date',
+  'checkbox',
+  'select',
+  'multi_select',
+  'status',
+  'domain',
+  'email',
+  'url',
+  'phone',
+  'rating',
+  'record_reference',
+  'actor_reference',
+] as const
+
+/**
+ * The create boundary (spec §7): everything the morphing dialog can set.
+ * No slug — derived server-side, immutable forever. Option ids are derived
+ * from labels the same way the dialog previews them (`deriveOptionIds`).
+ */
+export const createAttributeInput = z.object({
   objectKind: z.enum(['company', 'person', 'deal']),
   name: z.string().trim().min(1).max(80),
-  type: z.enum([
-    'text',
-    'number',
-    'currency',
-    'date',
-    'checkbox',
-    'select',
-    'multi_select',
-    'rating',
-    'url',
-    'email',
-    'phone',
-  ]),
-  /** select/multi_select: option labels; ids derived */
-  optionLabels: z.array(z.string().trim().min(1).max(60)).max(50).optional(),
+  description: z.string().trim().max(500).optional(),
+  type: z.enum(ATTRIBUTE_TYPES),
+  options: z
+    .array(optionEdit.omit({ id: true, archived: true }))
+    .max(50)
+    .optional(),
+  config: z
+    .object({
+      code: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^[A-Z]{3}$/, 'Three-letter currency code')
+        .optional(),
+      max: z.number().int().min(1).max(10).optional(),
+      precision: z.number().int().min(0).max(6).optional(),
+      targetKind: z.enum(['company', 'person', 'deal']).optional(),
+      multi: z.boolean().optional(),
+    })
+    .optional(),
+  default: z.unknown().optional(),
+  required: z.boolean().optional(),
 })
 
 export const createAttribute = createServerFn({ method: 'POST' })
   .validator(createAttributeInput)
   .handler(async ({ data }) => {
+    // Additive, so member-level: a two-person fund should not need ceremony
+    // to add a field. Reshaping (rename, options, archive) is admin — see
+    // updateAttribute.
     const u = await requireUser()
-    const { attribute } = await import('#/db/schema')
-    const { objectIdForKindAsync } = await import('../attributes/objects')
-    const objectId = await objectIdForKindAsync(data.objectKind)
-
-    const baseSlug =
-      data.name
-        .toLowerCase()
-        .normalize('NFKD')
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '')
-        .slice(0, 48) || 'attribute'
-
-    // Suffix on slug collision within the object kind.
-    let slug = baseSlug
-    for (let i = 2; ; i++) {
-      const existing = await db
-        .select({ id: attribute.id })
-        .from(attribute)
-        .where(and(eq(attribute.objectId, objectId), eq(attribute.slug, slug)))
-      if (existing.length === 0) break
-      slug = `${baseSlug}_${i}`
-    }
-
-    const needsOptions = data.type === 'select' || data.type === 'multi_select'
-    if (
-      needsOptions &&
-      (!data.optionLabels || data.optionLabels.length === 0)
-    ) {
-      throw new Error('Select attributes need at least one option')
-    }
-    const options = needsOptions
-      ? {
-          options: data.optionLabels!.map((label, i) => ({
-            id:
-              label
-                .toLowerCase()
-                .normalize('NFKD')
-                .replace(/[^a-z0-9]+/g, '_')
-                .replace(/^_+|_+$/g, '')
-                .slice(0, 48) || 'option',
-            label,
-            // Coloured on creation, so a new select is legible immediately
-            // rather than a column of identical grey chips.
-            color: nextBadgeColor(i),
-          })),
-        }
-      : data.type === 'rating'
-        ? { max: 5 }
-        : {}
-
-    const [{ maxOrder }] = await db
-      .select({
-        maxOrder: sql<number>`coalesce(max(${attribute.sortOrder}), 0)`,
-      })
-      .from(attribute)
-      .where(eq(attribute.objectId, objectId))
-
-    const [row] = await db
-      .insert(attribute)
-      .values({
-        objectId,
-        slug,
-        name: data.name,
-        type: data.type,
-        options,
-        isSystem: false,
-        sortOrder: maxOrder + 10,
-        createdBy: u.id,
-      })
-      .returning({ id: attribute.id, slug: attribute.slug })
-    return row
+    const { createAttributeProgram } = await import('../attributes/create')
+    const { effectFn } = await import('./effect')
+    return effectFn(createAttributeProgram)({ ...data, createdBy: u.id })
   })

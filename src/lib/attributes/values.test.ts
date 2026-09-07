@@ -281,10 +281,17 @@ describe.skipIf(!hasDb)('setValues', () => {
       founded_year: 2021,
     })
 
-    const events = await db
-      .select()
-      .from(attributeEvent)
-      .where(eq(attributeEvent.entityId, co.entityId))
+    // Only this test's own writes: another suite may hold custom attributes
+    // with defaults on the company object at the same moment, and those
+    // fire at birth (SPA-9), so the row count alone is not ours to assert.
+    const events = (
+      await db
+        .select()
+        .from(attributeEvent)
+        .where(eq(attributeEvent.entityId, co.entityId))
+    ).filter((e) =>
+      ['funding_stage', 'location', 'founded_year'].includes(e.attrSlug),
+    )
     expect(events.length).toBe(3)
     // A direct human edit: typed actor + default door, no receipt.
     for (const ev of events) {

@@ -37,8 +37,11 @@ export type RegistryEntry = {
     targetKind?: string
     multi?: boolean
     required?: boolean
+    precision?: number
+    default?: unknown
   } | null
   isSystem: boolean
+  description?: string | null
 }
 
 /** id → display name for reference/actor values, supplied by the caller. */

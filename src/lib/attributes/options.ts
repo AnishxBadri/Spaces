@@ -39,3 +39,33 @@ export function liveOptions<T extends OptionLike>(def: {
 }): Array<T> {
   return (def.options?.options ?? []).filter((o) => !o.archived)
 }
+
+/** Slug an option label the way the server does; empty labels become `option`. */
+export function slugifyOption(label: string): string {
+  return (
+    label
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 48) || 'option'
+  )
+}
+
+/**
+ * Ids for a fresh option list, deduped with the `_2` suffix rule. Shared by
+ * the create program and the dialog, so a default picked before the
+ * attribute exists points at the id the server will actually store.
+ */
+export function deriveOptionIds(
+  labels: Array<string>,
+  taken: Iterable<string> = [],
+): Array<string> {
+  const seen = new Set(taken)
+  return labels.map((label) => {
+    let id = slugifyOption(label)
+    while (seen.has(id)) id = `${id}_2`
+    seen.add(id)
+    return id
+  })
+}

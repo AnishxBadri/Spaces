@@ -1,0 +1,148 @@
+import { randomUUID } from 'node:crypto'
+import { afterAll, describe, expect, it } from 'vitest'
+import { deriveOptionIds, slugifyOption } from './options'
+
+describe('option ids (pure)', () => {
+  it('derives slugs and dedupes with the _2 rule, exactly like the server', () => {
+    expect(slugifyOption('Series A+')).toBe('series_a')
+    expect(slugifyOption('   ')).toBe('option')
+    expect(deriveOptionIds(['High', 'high', 'Low'])).toEqual([
+      'high',
+      'high_2',
+      'low',
+    ])
+    expect(deriveOptionIds(['High'], ['high'])).toEqual(['high_2'])
+  })
+})
+
+const hasDb = Boolean(process.env.DATABASE_URL)
+
+describe.skipIf(!hasDb)('createAttributeProgram', () => {
+  const tag = randomUUID().slice(0, 8)
+  const name = (t: string) => `Zz ${t} ${tag}`
+
+  afterAll(async () => {
+    const { db } = await import('#/db')
+    const { attribute } = await import('#/db/schema')
+    const { like } = await import('drizzle-orm')
+    await db.delete(attribute).where(like(attribute.name, `Zz % ${tag}`))
+  })
+
+  it('creates every type with its config, default and required flag', async () => {
+    const { Effect } = await import('effect')
+    const { createAttributeProgram } = await import('./create')
+    const { db } = await import('#/db')
+    const { attribute } = await import('#/db/schema')
+    const { user } = await import('#/db/schema/auth')
+    const { eq } = await import('drizzle-orm')
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    const base = { objectKind: 'deal' as const, createdBy: actor.id }
+
+    const cases = [
+      { type: 'text', default: 'Untriaged', required: true },
+      { type: 'number', config: { precision: 2 } },
+      { type: 'currency', config: { code: 'INR' }, default: 5 },
+      { type: 'date', default: 'P7D' },
+      { type: 'checkbox', default: true, required: true },
+      {
+        type: 'select',
+        options: [{ label: 'Low' }, { label: 'High' }],
+        default: 'high',
+      },
+      {
+        type: 'multi_select',
+        options: [{ label: 'A' }, { label: 'B' }],
+        default: ['a'],
+      },
+      {
+        type: 'status',
+        options: [
+          { label: 'Open', group: 'active' },
+          { label: 'Won', group: 'closed' },
+        ],
+        default: 'open',
+      },
+      { type: 'domain' },
+      { type: 'email' },
+      { type: 'url' },
+      { type: 'phone' },
+      { type: 'rating', config: { max: 7 }, default: 3 },
+      {
+        type: 'record_reference',
+        config: { targetKind: 'person', multi: true },
+      },
+      { type: 'actor_reference', default: 'current-user' },
+    ] as const
+
+    for (const c of cases) {
+      const { id, slug } = await Effect.runPromise(
+        createAttributeProgram({ ...base, name: name(c.type), ...c }),
+      )
+      const [row] = await db
+        .select()
+        .from(attribute)
+        .where(eq(attribute.id, id))
+      const opts = row.options as Record<string, unknown>
+      expect(slug).toBe(`zz_${c.type}_${tag}`)
+      expect(row.isSystem).toBe(false)
+      if ('default' in c) expect(opts.default).toEqual(c.default)
+      if ('required' in c)
+        // checkbox: unchecked is a value, so required is never stored
+        expect(opts.required).toBe(c.type === 'checkbox' ? undefined : true)
+      if (c.type === 'currency') expect(opts.code).toBe('INR')
+      if (c.type === 'rating') expect(opts.max).toBe(7)
+      if (c.type === 'number') expect(opts.precision).toBe(2)
+      if (c.type === 'record_reference') {
+        expect(opts.targetKind).toBe('person')
+        expect(opts.multi).toBe(true)
+      }
+      if (c.type === 'status')
+        expect(
+          (opts.options as Array<{ id: string; group: string }>).map(
+            (o) => `${o.id}:${o.group}`,
+          ),
+        ).toEqual(['open:active', 'won:closed'])
+    }
+  })
+
+  it('suffixes a colliding slug, rejects bad config and bad defaults', async () => {
+    const { Effect } = await import('effect')
+    const { createAttributeProgram, AttributeCreateRejected } =
+      await import('./create')
+    const { db } = await import('#/db')
+    const { user } = await import('#/db/schema/auth')
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    const base = { objectKind: 'person' as const, createdBy: actor.id }
+
+    const first = await Effect.runPromise(
+      createAttributeProgram({ ...base, name: name('dup'), type: 'text' }),
+    )
+    const second = await Effect.runPromise(
+      createAttributeProgram({ ...base, name: name('dup'), type: 'text' }),
+    )
+    expect(second.slug).toBe(`${first.slug}_2`)
+
+    const rejects = async (
+      input: Parameters<typeof createAttributeProgram>[0],
+    ) =>
+      expect(Effect.runPromise(createAttributeProgram(input))).rejects.toThrow(
+        AttributeCreateRejected,
+      )
+    await rejects({ ...base, name: name('sel'), type: 'select' })
+    await rejects({ ...base, name: name('ref'), type: 'record_reference' })
+    await rejects({
+      ...base,
+      name: name('txt'),
+      type: 'text',
+      config: { max: 5 },
+    })
+    await rejects({
+      ...base,
+      name: name('bad'),
+      type: 'select',
+      options: [{ label: 'One' }],
+      default: 'two',
+    })
+    await rejects({ ...base, name: name('dt'), type: 'date', default: 'soon' })
+  })
+})

@@ -74,6 +74,10 @@ export type AttributeConfigPatch = {
 export type UpdateAttributePatch = {
   id: string
   name?: string
+  /** null clears */
+  description?: string | null
+  /** can't-clear (spec §5); freely toggleable — it never rewrites data */
+  required?: boolean
   archived?: boolean
   move?: 'up' | 'down'
   /** select/multi_select/status option list */
@@ -258,6 +262,11 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
         options: yield* mergeOptions(attr.type, current, patch.options),
       }
     if (patch.config) next = yield* applyConfig(attr, next, patch.config)
+    if (patch.required !== undefined && attr.type !== 'checkbox') {
+      next = { ...next }
+      if (patch.required) next.required = true
+      else delete next.required
+    }
     if (next !== current)
       yield* query(() =>
         db
@@ -271,6 +280,13 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
         db
           .update(attribute)
           .set({ name: patch.name })
+          .where(eq(attribute.id, patch.id)),
+      )
+    if (patch.description !== undefined)
+      yield* query(() =>
+        db
+          .update(attribute)
+          .set({ description: patch.description?.trim() || null })
           .where(eq(attribute.id, patch.id)),
       )
     if (patch.archived !== undefined)

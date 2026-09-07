@@ -51,6 +51,9 @@ export const attribute = pgTable(
       .references(() => objectDef.id),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
+    // Optional, human-facing. The expansion path (spec §8) later feeds it to
+    // the AI extract lane as prompt context; today it's help text.
+    description: text('description'),
     type: attributeType('type').notNull(),
     /**
      * Per-type config: select/multi_select/status → {options: [{id, label,

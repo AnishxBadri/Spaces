@@ -5,41 +5,27 @@ import {
   ArrowDown,
   ArrowUp,
   Building2,
-  Check,
   Copy,
   Kanban,
   Pencil,
   Plus,
   Users,
-  X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
+import { AttributeDialog } from '#/components/attributes/attribute-dialog'
+import { IconBtn } from '#/components/attributes/option-list-editor'
+import { Button } from '#/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
-import { Button } from '#/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import {
-  BADGE_COLORS,
-  badgeStyle,
-  nextBadgeColor,
-  optionColor,
-} from '#/lib/attributes/colors'
-import type { BadgeColor } from '#/lib/attributes/colors'
+import { badgeStyle, optionColor } from '#/lib/attributes/colors'
 import {
   createInvite,
   getSession,
@@ -209,6 +195,7 @@ function SettingsPage() {
           <AttributeRow
             key={attr.id}
             attr={attr}
+            objectKind={kind}
             isFirst={idx === 0}
             isLast={idx === registry.length - 1}
           />
@@ -767,18 +754,17 @@ function FxSection({
 
 function AttributeRow({
   attr,
+  objectKind,
   isFirst,
   isLast,
 }: {
   attr: Attr
+  objectKind: Kind
   isFirst: boolean
   isLast: boolean
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
-  // A currency-code change waits here for the warning dialog (spec §3: a
-  // relabel of every stored amount, never a conversion).
-  const [pendingCode, setPendingCode] = useState<string | null>(null)
 
   async function act(
     patch: Parameters<typeof updateAttribute>[0]['data'] extends infer D
@@ -795,27 +781,37 @@ function AttributeRow({
     }
   }
 
-  const options =
-    ((attr.options as Record<string, unknown> | null)?.options as
-      | Array<{
-          id: string
-          label: string
-          group?: string
-          color?: string
-          archived?: boolean
-        }>
-      | undefined) ?? []
+  const stored = (attr.options ?? {}) as {
+    options?: Array<{
+      id: string
+      label: string
+      group?: string
+      color?: string
+      archived?: boolean
+    }>
+    code?: string
+    max?: number
+    precision?: number
+    targetKind?: string
+    required?: boolean
+    default?: unknown
+  }
+  const options = stored.options ?? []
   const hasOptions = ['select', 'multi_select', 'status'].includes(attr.type)
-  const config = (attr.options ?? {}) as AttributeConfig
-  const hasConfig = ['currency', 'rating', 'number'].includes(attr.type)
-  const configSummary =
-    attr.type === 'currency'
-      ? (config.code ?? 'USD')
-      : attr.type === 'rating'
-        ? `out of ${config.max ?? 5}`
-        : attr.type === 'number' && config.precision !== undefined
-          ? `${config.precision} decimals`
-          : null
+  const summary = [
+    attr.type === 'record_reference' && stored.targetKind
+      ? `→ ${stored.targetKind}`
+      : null,
+    attr.type === 'currency' ? (stored.code ?? 'USD') : null,
+    attr.type === 'rating' ? `out of ${stored.max ?? 5}` : null,
+    attr.type === 'number' && stored.precision !== undefined
+      ? `${stored.precision} decimals`
+      : null,
+    stored.required ? 'required' : null,
+    stored.default !== undefined && stored.default !== null
+      ? 'has default'
+      : null,
+  ].filter(Boolean)
 
   return (
     <li
@@ -829,11 +825,13 @@ function AttributeRow({
           <InlineName name={attr.name} onSave={(name) => act({ name })} />
           <span className="text-xs text-muted-foreground">
             {TYPE_LABELS[attr.type] ?? attr.type}
-            {attr.type === 'record_reference'
-              ? ` → ${(attr.options as Record<string, unknown> | null)?.targetKind ?? ''}`
-              : ''}
-            {configSummary ? ` · ${configSummary}` : ''}
+            {summary.length > 0 ? ` · ${summary.join(' · ')}` : ''}
           </span>
+          {attr.description ? (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {attr.description}
+            </p>
+          ) : null}
         </div>
 
         <span
@@ -862,22 +860,9 @@ function AttributeRow({
           >
             <ArrowDown className="size-3.5" strokeWidth={1.75} />
           </IconBtn>
-          {hasOptions || hasConfig ? (
-            <IconBtn
-              label={
-                editing
-                  ? hasOptions
-                    ? 'Close options'
-                    : 'Close settings'
-                  : hasOptions
-                    ? 'Edit options'
-                    : 'Edit settings'
-              }
-              onClick={() => setEditing((v) => !v)}
-            >
-              <Pencil className="size-3.5" strokeWidth={1.75} />
-            </IconBtn>
-          ) : null}
+          <IconBtn label="Edit attribute" onClick={() => setEditing(true)}>
+            <Pencil className="size-3.5" strokeWidth={1.75} />
+          </IconBtn>
           <IconBtn
             label={attr.archived ? 'Restore' : 'Archive'}
             onClick={() =>
@@ -898,7 +883,7 @@ function AttributeRow({
         </div>
       </div>
 
-      {hasOptions && !editing && options.length > 0 ? (
+      {hasOptions && options.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {options.map((o, i) => (
             <span
@@ -916,182 +901,17 @@ function AttributeRow({
         </div>
       ) : null}
 
-      {hasOptions && editing ? (
-        <OptionsEditor
-          attr={attr}
-          options={options}
-          onDone={(next) => {
-            setEditing(false)
-            if (next) void act({ options: next }, 'Options saved')
-          }}
-        />
-      ) : null}
-
-      {hasConfig && editing ? (
-        <ConfigEditor
-          attr={attr}
-          config={config}
-          onDone={(next) => {
-            setEditing(false)
-            if (!next) return
-            if (
-              next.code !== undefined &&
-              next.code !== (config.code ?? 'USD')
-            ) {
-              setPendingCode(next.code)
-              return
-            }
-            void act({ config: next }, 'Settings saved')
-          }}
-        />
-      ) : null}
-
-      <Dialog
-        open={pendingCode !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingCode(null)
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              Show {attr.name} in {pendingCode}?
-            </DialogTitle>
-            <DialogDescription>
-              This changes how all existing values display — every amount
-              already stored will read as {pendingCode}. Nothing is converted.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setPendingCode(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                const code = pendingCode
-                setPendingCode(null)
-                if (code)
-                  void act(
-                    { config: { code } },
-                    `${attr.name} now shows ${code}`,
-                  )
-              }}
-            >
-              Change to {pendingCode}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* The morphing dialog in edit mode (spec §7): type static, config
+          edits ride the §3 guards server-side. */}
+      <AttributeDialog
+        mode="edit"
+        attr={attr}
+        objectKind={objectKind}
+        open={editing}
+        onOpenChange={setEditing}
+        onSaved={() => router.invalidate()}
+      />
     </li>
-  )
-}
-
-type AttributeConfig = { code?: string; max?: number; precision?: number }
-
-/**
- * Per-type scalar config (spec §3). Currency and rating each carry one
- * setting; number carries display decimals. Relationships have no editor by
- * design: target and cardinality are fixed at creation.
- */
-function ConfigEditor({
-  attr,
-  config,
-  onDone,
-}: {
-  attr: Attr
-  config: AttributeConfig
-  onDone: (next: AttributeConfig | null) => void
-}) {
-  const [code, setCode] = useState(config.code ?? 'USD')
-  const [max, setMax] = useState(String(config.max ?? 5))
-  const [precision, setPrecision] = useState(String(config.precision ?? 0))
-  const inputId = `attr-config-${attr.id}`
-
-  function save() {
-    if (attr.type === 'currency') {
-      const next = code.trim().toUpperCase()
-      if (!/^[A-Z]{3}$/.test(next)) {
-        toast.error('Use a three-letter currency code')
-        return
-      }
-      onDone({ code: next })
-    } else if (attr.type === 'rating') {
-      const next = Number(max)
-      if (!Number.isInteger(next) || next < 1 || next > 10) {
-        toast.error('Max must be a whole number from 1 to 10')
-        return
-      }
-      onDone({ max: next })
-    } else {
-      onDone({ precision: Number(precision) })
-    }
-  }
-
-  return (
-    <div className="rounded-md border border-border p-3">
-      <div className="flex items-end gap-3">
-        {attr.type === 'currency' ? (
-          <div className="space-y-1.5">
-            <Label htmlFor={inputId}>Currency code</Label>
-            <Input
-              id={inputId}
-              value={code}
-              maxLength={3}
-              autoCapitalize="characters"
-              spellCheck={false}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              className="h-7 w-20 text-xs uppercase"
-            />
-          </div>
-        ) : attr.type === 'rating' ? (
-          <div className="space-y-1.5">
-            <Label htmlFor={inputId}>Max</Label>
-            <Input
-              id={inputId}
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={10}
-              value={max}
-              onChange={(e) => setMax(e.target.value)}
-              className="h-7 w-20 text-xs"
-            />
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            <Label htmlFor={inputId}>Decimals</Label>
-            <select
-              id={inputId}
-              value={precision}
-              onChange={(e) => setPrecision(e.target.value)}
-              className="h-7 rounded-md border border-input bg-transparent px-2 text-xs focus-ring outline-none"
-            >
-              {[0, 1, 2, 3, 4, 5, 6].map((n) => (
-                <option key={n} value={String(n)}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        <span className="pb-1.5 text-xs text-muted-foreground">
-          {attr.type === 'currency'
-            ? 'A relabel — stored amounts are never converted.'
-            : attr.type === 'rating'
-              ? 'Raise freely; lowering is refused while records exceed it.'
-              : 'Display only; stored numbers are untouched.'}
-        </span>
-        <div className="ml-auto flex gap-1.5">
-          <Button size="xs" variant="ghost" onClick={() => onDone(null)}>
-            Cancel
-          </Button>
-          <Button size="xs" onClick={save}>
-            <Check className="size-3" strokeWidth={2} />
-            Save
-          </Button>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -1118,252 +938,5 @@ function InlineName({
       }}
       className="block w-full truncate rounded bg-transparent text-ui font-medium focus-ring"
     />
-  )
-}
-
-function OptionsEditor({
-  attr,
-  options,
-  onDone,
-}: {
-  attr: Attr
-  options: Array<{
-    id: string
-    label: string
-    group?: string
-    color?: string
-    archived?: boolean
-  }>
-  onDone: (
-    next: Array<{
-      id?: string
-      label: string
-      group?: 'active' | 'parked' | 'closed'
-      color?: BadgeColor
-      archived?: boolean
-    }> | null,
-  ) => void
-}) {
-  const [drafts, setDrafts] = useState(
-    options.map((o, i) => ({
-      ...o,
-      color: optionColor(o, i),
-    })) as Array<{
-      id?: string
-      label: string
-      group?: 'active' | 'parked' | 'closed'
-      color: BadgeColor
-      archived?: boolean
-    }>,
-  )
-  const isStatus = attr.type === 'status'
-
-  return (
-    <div className="rounded-md border border-border p-3">
-      <div className="space-y-1.5">
-        {drafts.map((o, i) => (
-          <div
-            key={o.id ?? `new-${i}`}
-            className={cn(
-              'flex items-center gap-2',
-              o.archived && 'text-muted-foreground opacity-60',
-            )}
-          >
-            <Input
-              value={o.label}
-              aria-label={`Option ${i + 1}`}
-              onChange={(e) =>
-                setDrafts((ds) =>
-                  ds.map((d, j) =>
-                    j === i ? { ...d, label: e.target.value } : d,
-                  ),
-                )
-              }
-              className="h-7 max-w-56 text-xs"
-            />
-            {isStatus ? (
-              <select
-                value={o.group ?? 'active'}
-                aria-label="Group"
-                onChange={(e) =>
-                  setDrafts((ds) =>
-                    ds.map((d, j) =>
-                      j === i ? { ...d, group: e.target.value as 'active' } : d,
-                    ),
-                  )
-                }
-                className="h-7 rounded-md border border-input bg-transparent px-2 text-xs outline-none"
-              >
-                <option value="active">Active</option>
-                <option value="parked">Parked</option>
-                <option value="closed">Closed</option>
-              </select>
-            ) : null}
-            <ColorPicker
-              value={o.color}
-              label={o.label || `Option ${i + 1}`}
-              onPick={(color) =>
-                setDrafts((ds) =>
-                  ds.map((d, j) => (j === i ? { ...d, color } : d)),
-                )
-              }
-            />
-            {!o.id ? (
-              <IconBtn
-                label="Remove new option"
-                onClick={() => setDrafts((ds) => ds.filter((_, j) => j !== i))}
-              >
-                <X className="size-3" strokeWidth={2} />
-              </IconBtn>
-            ) : (
-              // Archive replaces removal (spec §3): the option leaves every
-              // picker, records still holding it keep it, greyed.
-              <IconBtn
-                label={
-                  o.archived
-                    ? `Restore ${o.label || 'option'}`
-                    : `Archive ${o.label || 'option'}`
-                }
-                onClick={() =>
-                  setDrafts((ds) =>
-                    ds.map((d, j) =>
-                      j === i ? { ...d, archived: !d.archived } : d,
-                    ),
-                  )
-                }
-              >
-                {o.archived ? (
-                  <ArchiveRestore className="size-3" strokeWidth={1.75} />
-                ) : (
-                  <Archive className="size-3" strokeWidth={1.75} />
-                )}
-              </IconBtn>
-            )}
-            {o.archived ? (
-              <span className="text-micro font-medium tracking-wide uppercase">
-                archived
-              </span>
-            ) : null}
-          </div>
-        ))}
-      </div>
-      <div className="mt-2.5 flex items-center gap-2">
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={() =>
-            setDrafts((ds) => [
-              ...ds,
-              {
-                label: '',
-                color: nextBadgeColor(
-                  ds.length,
-                  isStatus ? 'active' : undefined,
-                ),
-                ...(isStatus ? { group: 'active' as const } : {}),
-              },
-            ])
-          }
-        >
-          <Plus className="size-3" strokeWidth={2} />
-          Add option
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          Existing options can be renamed or archived, not removed.
-        </span>
-        <div className="ml-auto flex gap-1.5">
-          <Button size="xs" variant="ghost" onClick={() => onDone(null)}>
-            Cancel
-          </Button>
-          <Button
-            size="xs"
-            onClick={() => onDone(drafts.filter((d) => d.label.trim()))}
-          >
-            <Check className="size-3" strokeWidth={2} />
-            Save
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function IconBtn({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string
-  disabled?: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex size-6.5 items-center justify-center rounded text-muted-foreground focus-ring transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-    >
-      {children}
-    </button>
-  )
-}
-
-/**
- * Swatch picker for one option's badge colour. A fixed grid of the shipped
- * palette rather than a colour input: every swatch is already known to clear
- * AA against its own ink, which an arbitrary hex cannot promise.
- */
-function ColorPicker({
-  value,
-  label,
-  onPick,
-}: {
-  value: BadgeColor
-  label: string
-  onPick: (color: BadgeColor) => void
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={`Colour for ${label}`}
-        title={`Colour: ${value}`}
-        className="size-6 shrink-0 rounded-full border border-border focus-ring transition-colors duration-150 ease-out-quart hover:border-input"
-        style={{ backgroundColor: `var(--badge-${value})` }}
-      >
-        <span
-          className="mx-auto block size-2.5 rounded-full"
-          style={{ backgroundColor: `var(--badge-${value}-ink)` }}
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-auto p-2">
-        {/* Menu items rather than plain buttons: a raw <button> inside Radix
-            content leaves the popover open after a pick, so choosing a colour
-            silently traps the next click. Items also get roving arrow-key
-            focus, which a grid of buttons would not. */}
-        <div className="grid grid-cols-6 gap-1.5">
-          {BADGE_COLORS.map((c) => (
-            <DropdownMenuItem
-              key={c}
-              aria-label={c}
-              title={c}
-              onSelect={() => onPick(c)}
-              style={badgeStyle(c)}
-              className={cn(
-                'flex size-7 items-center justify-center rounded-full border p-0 focus-ring transition-colors duration-150 ease-out-quart',
-                c === value ? 'border-foreground' : 'border-transparent',
-              )}
-            >
-              {c === value ? (
-                <Check className="size-3" strokeWidth={3} />
-              ) : null}
-            </DropdownMenuItem>
-          ))}
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }
