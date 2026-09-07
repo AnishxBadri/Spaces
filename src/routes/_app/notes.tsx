@@ -21,11 +21,11 @@ function NotesPage() {
 
   async function newNote() {
     const { id } = await createNote()
-    navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    void navigate({ to: '/notes/$noteId', params: { noteId: id } })
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
+    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-page font-semibold tracking-tight">Notes</h1>
@@ -42,7 +42,7 @@ function NotesPage() {
                 const { id } = await createNoteFromTemplate({
                   data: { templateId: t.id },
                 })
-                navigate({ to: '/notes/$noteId', params: { noteId: id } })
+                void navigate({ to: '/notes/$noteId', params: { noteId: id } })
               }}
             />
             <Button size="sm" onClick={newNote}>

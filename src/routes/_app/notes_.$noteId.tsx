@@ -83,7 +83,9 @@ function NotePage() {
   const scheduleSave = useCallback(() => {
     setSaveState('dirty')
     if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(flush, 800)
+    timer.current = setTimeout(() => {
+      void flush()
+    }, 800)
   }, [flush])
 
   useEffect(() => {
@@ -324,7 +326,9 @@ function SpaceFiling({
             if (!e.target.value) return
             const spaceId = e.target.value
             e.target.value = ''
-            run(() => tagIntoSpace({ data: { entityId: noteId, spaceId } }))
+            void run(() =>
+              tagIntoSpace({ data: { entityId: noteId, spaceId } }),
+            )
           }}
           className="h-6 rounded-full border border-dashed border-border bg-transparent px-2 text-xs text-muted-foreground focus-ring outline-none hover:border-input hover:text-foreground"
         >

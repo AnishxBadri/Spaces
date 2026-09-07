@@ -53,14 +53,14 @@ function TasksPage() {
   async function toggle(id: string, done: boolean) {
     try {
       await setTaskDone({ data: { id, done } })
-      router.invalidate()
+      void router.invalidate()
     } catch {
       toast.error('Could not update the task')
     }
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8 md:px-10">
+    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
       <header>
         <h1 className="text-page font-semibold tracking-tight">Tasks</h1>
         <p className="mt-1 text-ui text-muted-foreground">

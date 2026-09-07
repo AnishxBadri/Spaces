@@ -128,7 +128,7 @@ function SettingsPage() {
   const registry = registries[kind]
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8 md:px-10">
+    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
       <header>
         <h1 className="text-page font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-ui text-muted-foreground">
@@ -227,7 +227,7 @@ function WorkspaceSection({
     try {
       await saveWorkspace({ data: { name: value.trim() } })
       toast.success('Workspace renamed')
-      router.invalidate()
+      void router.invalidate()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not rename')
     } finally {
@@ -295,7 +295,7 @@ function MembersSection({
       })
       setInviteUrl(url)
       setInviteEmail('')
-      router.invalidate()
+      void router.invalidate()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not create invite')
     } finally {
@@ -307,7 +307,7 @@ function MembersSection({
     try {
       await fn()
       toast.success(ok)
-      router.invalidate()
+      void router.invalidate()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'That did not work')
     }
@@ -433,8 +433,11 @@ function MembersSection({
                 size="xs"
                 variant="outline"
                 onClick={() => {
-                  navigator.clipboard.writeText(inviteUrl)
-                  toast.success('Link copied — send it however you like')
+                  navigator.clipboard.writeText(inviteUrl).then(
+                    () =>
+                      toast.success('Link copied — send it however you like'),
+                    () => toast.error('Could not copy — select the link above'),
+                  )
                 }}
               >
                 <Copy className="size-3" strokeWidth={2} />
@@ -495,7 +498,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
     try {
       await updateTemplate({ data: { id, ...data } })
       toast.success(ok)
-      router.invalidate()
+      void router.invalidate()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'That did not work')
     }
@@ -611,7 +614,7 @@ function FxSection({
     try {
       await setBaseCurrency({ data: { currency: base.trim().toUpperCase() } })
       toast('Base currency saved')
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save')
     } finally {
@@ -638,7 +641,7 @@ function FxSection({
       })
       toast('Rate saved')
       setForm({ currency: '', date: '', rate: '' })
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the rate')
     } finally {
@@ -775,7 +778,7 @@ function AttributeRow({
     try {
       await updateAttribute({ data: { id: attr.id, ...patch } })
       if (message) toast(message)
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not update')
     }
@@ -884,7 +887,7 @@ function AttributeRow({
           options={options}
           onDone={(next) => {
             setEditing(false)
-            if (next) act({ options: next }, 'Options saved')
+            if (next) void act({ options: next }, 'Options saved')
           }}
         />
       ) : null}

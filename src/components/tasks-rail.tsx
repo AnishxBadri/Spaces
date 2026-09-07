@@ -54,7 +54,7 @@ export function TasksRail({
   async function complete(id: string) {
     try {
       await setTaskDone({ data: { id, done: true } })
-      load()
+      void load()
     } catch {
       toast.error('Could not complete the task')
     }

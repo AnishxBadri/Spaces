@@ -53,8 +53,8 @@ async function main() {
     await boss.stop({ graceful: true, timeout: 15000 })
     process.exit(0)
   }
-  process.on('SIGTERM', shutdown)
-  process.on('SIGINT', shutdown)
+  process.on('SIGTERM', () => void shutdown())
+  process.on('SIGINT', () => void shutdown())
 }
 
 main().catch((err) => {

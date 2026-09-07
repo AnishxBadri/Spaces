@@ -198,7 +198,7 @@ function DemoStep() {
     setError(null)
     try {
       await seedDemo()
-      navigate({ to: '/spaces' })
+      void navigate({ to: '/spaces' })
     } catch {
       setError('Could not load the demo data. You can start empty instead.')
       setPending(false)

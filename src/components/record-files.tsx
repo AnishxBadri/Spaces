@@ -96,7 +96,7 @@ export function RecordFiles({
       try {
         await uploadOne(file, entityId, setPhase)
         setPending((p) => p.filter((x) => x.key !== key))
-        router.invalidate()
+        void router.invalidate()
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Upload failed'
         setPending((p) =>
@@ -117,7 +117,7 @@ export function RecordFiles({
       onDrop={(e) => {
         e.preventDefault()
         setDragging(false)
-        handleFiles(e.dataTransfer.files)
+        void handleFiles(e.dataTransfer.files)
       }}
       className={cn(
         'mt-4 rounded-md transition-colors',
@@ -145,7 +145,7 @@ export function RecordFiles({
           multiple
           className="sr-only"
           onChange={(e) => {
-            handleFiles(e.target.files)
+            void handleFiles(e.target.files)
             e.target.value = ''
           }}
         />
@@ -233,7 +233,7 @@ function DocumentRow({
     setBusy(true)
     try {
       await deleteDocument({ data: { id: doc.id } })
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not delete')
       setBusy(false)
@@ -359,7 +359,7 @@ function useExtractionPolling(
     if (attempts >= 10) return
     const timer = setTimeout(() => {
       setAttempts((n) => n + 1)
-      router.invalidate()
+      void router.invalidate()
     }, 2500)
     return () => clearTimeout(timer)
   }, [waiting, attempts, router])

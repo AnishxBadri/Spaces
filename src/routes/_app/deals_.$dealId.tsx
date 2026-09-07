@@ -95,22 +95,26 @@ function DealRecordPage() {
   async function save(patch: Record<string, unknown>) {
     try {
       await updateRecord({ data: { id: deal.id, patch } })
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
-      router.invalidate()
+      void router.invalidate()
     }
   }
 
   async function newNoteAboutThis() {
-    const { id } = await createNote({
-      data: { about: { entityId: deal.id, label: deal.name, kind: 'deal' } },
-    })
-    navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    try {
+      const { id } = await createNote({
+        data: { about: { entityId: deal.id, label: deal.name, kind: 'deal' } },
+      })
+      void navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not create note')
+    }
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-8 md:px-10">
+    <div className="px-6 py-8 md:px-10">
       {closing ? (
         <CloseReasonDialog
           dealName={deal.name}

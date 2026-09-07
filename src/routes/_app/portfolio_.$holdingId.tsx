@@ -41,7 +41,7 @@ function HoldingPage() {
   const m = h.metrics.ok ? h.metrics.metrics : null
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-6 py-6 md:px-8">
+    <div className="px-6 py-8 md:px-10">
       <Link
         to="/portfolio"
         className="mb-4 inline-flex items-center gap-1.5 text-ui text-muted-foreground focus-ring transition-colors duration-150 hover:text-foreground"
@@ -280,7 +280,7 @@ function useEventForm(onDone: () => void) {
       setOpen(false)
       toast(doneMsg)
       onDone()
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save')
     } finally {
@@ -350,7 +350,7 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
           className="grid grid-cols-2 gap-4"
           onSubmit={(e) => {
             e.preventDefault()
-            f.run(
+            void f.run(
               () =>
                 addInvestment({
                   data: {
@@ -490,7 +490,7 @@ function AddRoundDialog({ companyId }: { companyId: string }) {
           className="grid grid-cols-2 gap-4"
           onSubmit={(e) => {
             e.preventDefault()
-            f.run(
+            void f.run(
               () =>
                 addRound({
                   data: {
@@ -613,7 +613,7 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
           className="grid grid-cols-2 gap-4"
           onSubmit={(e) => {
             e.preventDefault()
-            f.run(
+            void f.run(
               () =>
                 addMark({
                   data: {
@@ -715,7 +715,7 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
           className="grid grid-cols-2 gap-4"
           onSubmit={(e) => {
             e.preventDefault()
-            f.run(
+            void f.run(
               () =>
                 addDistribution({
                   data: {

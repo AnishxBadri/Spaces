@@ -33,7 +33,7 @@ function DedupePage() {
   const pairs = Route.useLoaderData()
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
+    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
       <header>
         <h1 className="text-page font-semibold tracking-tight">
           Possible duplicates
@@ -70,7 +70,7 @@ function PairCard({ pair }: { pair: Pair }) {
     try {
       await fn()
       toast(message)
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Action failed')
     } finally {

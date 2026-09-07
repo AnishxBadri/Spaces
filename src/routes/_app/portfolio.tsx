@@ -187,7 +187,7 @@ function PortfolioPage() {
   const rollup = data.rollup
 
   return (
-    <div className="flex h-full flex-col px-6 py-6 md:px-8">
+    <div className="flex h-full flex-col px-6 py-8 md:px-10">
       <PageHeader
         title="Portfolio"
         description="Every holding computed live from its event ledger — checks, marks, distributions. Staleness is visible on purpose."

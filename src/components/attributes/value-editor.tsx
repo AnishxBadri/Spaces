@@ -325,11 +325,13 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
   useEffect(() => {
     if (!query.trim()) return setResults([])
     let alive = true
-    const t = setTimeout(async () => {
-      const r = await searchEntities({
-        data: { q: query, kinds: [targetKind as 'company'] },
-      })
-      if (alive) setResults(r)
+    const t = setTimeout(() => {
+      void (async () => {
+        const r = await searchEntities({
+          data: { q: query, kinds: [targetKind as 'company'] },
+        })
+        if (alive) setResults(r)
+      })()
     }, 200)
     return () => {
       alive = false

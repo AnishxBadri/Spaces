@@ -70,7 +70,7 @@ function JoinPage() {
       setError(err.message ?? 'Could not create the account.')
       return
     }
-    navigate({ to: '/spaces' })
+    void navigate({ to: '/spaces' })
   }
 
   return (

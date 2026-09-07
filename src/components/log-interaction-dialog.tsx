@@ -78,7 +78,7 @@ export function LogInteractionDialog({
       setAttendees([seed])
       toast(`${kind === 'meeting' ? 'Meeting' : 'Call'} logged`)
       onLogged?.()
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not log it')
     } finally {
@@ -176,12 +176,14 @@ function AttendeePicker({
   useEffect(() => {
     if (!query.trim()) return setResults([])
     let alive = true
-    const t = setTimeout(async () => {
-      const r = await searchEntities({
-        data: { q: query, kinds: ['person', 'company', 'deal'] },
-      })
-      if (alive)
-        setResults(r.filter((x) => !attendees.some((a) => a.id === x.id)))
+    const t = setTimeout(() => {
+      void (async () => {
+        const r = await searchEntities({
+          data: { q: query, kinds: ['person', 'company', 'deal'] },
+        })
+        if (alive)
+          setResults(r.filter((x) => !attendees.some((a) => a.id === x.id)))
+      })()
     }, 200)
     return () => {
       alive = false

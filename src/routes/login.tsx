@@ -41,7 +41,7 @@ function LoginPage() {
       )
       return
     }
-    navigate({ to: '/today' })
+    void navigate({ to: '/today' })
   }
 
   return (

@@ -63,7 +63,7 @@ export function AppSidebar({
 
   async function signOut() {
     await authClient.signOut()
-    navigate({ to: '/login' })
+    void navigate({ to: '/login' })
   }
 
   return (

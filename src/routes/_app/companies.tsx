@@ -80,10 +80,10 @@ function CompaniesPage() {
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
       await updateRecord({ data: { id: entityId, patch: { [slug]: value } } })
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
-      router.invalidate() // revert the editor to server truth
+      void router.invalidate() // revert the editor to server truth
     }
   }
 
@@ -195,7 +195,7 @@ function CompaniesPage() {
   })
 
   return (
-    <div className="flex h-full flex-col px-6 py-6 md:px-8">
+    <div className="flex h-full flex-col px-6 py-8 md:px-10">
       <PageHeader
         title="Companies"
         description="Every company you track — deduped by domain, tagged into spaces."
@@ -296,7 +296,7 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
       } else {
         toast(`${result.name} added`)
       }
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not add the company.',

@@ -82,7 +82,7 @@ export function DealBoard({
           },
         },
       })
-      router.invalidate()
+      void router.invalidate()
     } catch {
       setMoved((m) => {
         const { [dealId]: _, ...rest } = m

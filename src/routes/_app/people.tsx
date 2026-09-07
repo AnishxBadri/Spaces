@@ -80,10 +80,10 @@ function PeoplePage() {
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
       await updateRecord({ data: { id: entityId, patch: { [slug]: value } } })
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
-      router.invalidate()
+      void router.invalidate()
     }
   }
 
@@ -193,7 +193,7 @@ function PeoplePage() {
   })
 
   return (
-    <div className="flex h-full flex-col px-6 py-6 md:px-8">
+    <div className="flex h-full flex-col px-6 py-8 md:px-10">
       <PageHeader
         title="People"
         description="Founders, operators, co-investors — deduped by email, linked to their companies."
@@ -296,7 +296,7 @@ function CreatePersonDialog({
       } else {
         toast(`${result.name} added`)
       }
-      router.invalidate()
+      void router.invalidate()
     } catch {
       setError('Could not add the person.')
     } finally {

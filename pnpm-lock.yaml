@@ -174,6 +174,9 @@ importers:
       eslint:
         specifier: ^9.20.0
         version: 9.39.5(jiti@2.7.0)
+      eslint-plugin-drizzle:
+        specifier: ^0.2.3
+        version: 0.2.3(eslint@9.39.5(jiti@2.7.0))
       eslint-plugin-react-hooks:
         specifier: ^7.1.1
         version: 7.1.1(eslint@9.39.5(jiti@2.7.0))
@@ -3363,6 +3366,11 @@ packages:
     peerDependenciesMeta:
       unrs-resolver:
         optional: true
+
+  eslint-plugin-drizzle@0.2.3:
+    resolution: {integrity: sha512-BO+ymHo33IUNoJlC0rbd7HP9EwwpW4VIp49R/tWQF/d2E1K2kgTf0tCXT0v9MSiBr6gGR1LtPwMLapTKEWSg9A==}
+    peerDependencies:
+      eslint: '>=8.0.0'
 
   eslint-plugin-es-x@7.8.0:
     resolution: {integrity: sha512-7Ds8+wAAoV3T+LAKeu39Y5BzXCrGKrcISfgKEqTS4BDN8SFEDQd0S43jiQ8vIa3wUKD07qitZdfzlenSi8/0qQ==}
@@ -7997,6 +8005,10 @@ snapshots:
       stable-hash-x: 0.2.0
     optionalDependencies:
       unrs-resolver: 1.12.2
+
+  eslint-plugin-drizzle@0.2.3(eslint@9.39.5(jiti@2.7.0)):
+    dependencies:
+      eslint: 9.39.5(jiti@2.7.0)
 
   eslint-plugin-es-x@7.8.0(eslint@9.39.5(jiti@2.7.0)):
     dependencies:

@@ -15,5 +15,7 @@ todos.json
 # runtime data (blobs + secret.key)
 data/
 
+docs/*
+
 # stray desktop screenshots dropped at repo root
 /Screenshot*.png

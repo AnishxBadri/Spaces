@@ -183,7 +183,7 @@ function useBlobBytes(id: string) {
   useEffect(() => {
     const run = ++runRef.current
     setState({ bytes: null, error: null })
-    ;(async () => {
+    void (async () => {
       try {
         const { url } = await getDocumentDownloadUrl({ data: { id } })
         const res = await fetch(url)
@@ -220,7 +220,7 @@ function PdfPreview({ doc }: { doc: Doc }) {
     if (!bytes) return
     const run = ++runRef.current
     let cancelled: { cancel: () => void } | null = null
-    ;(async () => {
+    void (async () => {
       try {
         // Dynamic: pdf.js is large and only this dialog needs it.
         const { getDocument } = await import('unpdf/pdfjs')

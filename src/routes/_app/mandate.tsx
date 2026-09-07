@@ -74,7 +74,7 @@ function MandatePage() {
             setCreating(true)
             try {
               await createMandate()
-              router.invalidate()
+              void router.invalidate()
             } catch {
               toast.error('Could not create the mandate')
               setCreating(false)
@@ -88,7 +88,7 @@ function MandatePage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
+    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
       <header className="flex items-center gap-2">
         <Compass
           className="size-5 text-muted-foreground"
@@ -122,7 +122,7 @@ function FactsRail({
   async function save(patch: Parameters<typeof updateMandateFacts>[0]['data']) {
     try {
       await updateMandateFacts({ data: patch })
-      router.invalidate()
+      void router.invalidate()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not save')
     }
@@ -361,7 +361,9 @@ function MandateProse({
   const scheduleSave = useCallback(() => {
     setSaveState('dirty')
     if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(flush, 800)
+    timer.current = setTimeout(() => {
+      void flush()
+    }, 800)
   }, [flush])
 
   useEffect(() => {

@@ -192,10 +192,10 @@ function DealsPage() {
     async (id: string, slug: string, value: unknown) => {
       try {
         await updateRecord({ data: { id, patch: { [slug]: value } } })
-        router.invalidate()
+        void router.invalidate()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Could not save')
-        router.invalidate()
+        void router.invalidate()
       }
     },
     [router],
@@ -272,7 +272,7 @@ function DealsPage() {
   })
 
   return (
-    <div className="flex h-full flex-col px-6 py-6 md:px-8">
+    <div className="flex h-full flex-col px-6 py-8 md:px-10">
       <PageHeader
         title="Deals"
         description="One record per opportunity — born at Pre-lead, closed as Invested, Passed, or Lost. History is the point."
@@ -507,7 +507,7 @@ export function CreateDealDialog({
         setCompanyName('')
       }
       toast(`${dealName} created`)
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create the deal')
     } finally {
@@ -636,7 +636,7 @@ function CompanyNameCapture({
   useEffect(() => {
     if (!companyId) return
     let alive = true
-    import('#/lib/server-fns').then(async ({ getCompany }) => {
+    void import('#/lib/server-fns').then(async ({ getCompany }) => {
       try {
         const c = await getCompany({ data: { id: companyId } })
         if (alive) onName(c.name)

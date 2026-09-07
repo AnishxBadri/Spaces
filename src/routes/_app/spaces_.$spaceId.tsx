@@ -14,6 +14,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { SpaceGlossary } from '#/components/space-glossary'
@@ -51,24 +52,32 @@ function SpacePage() {
   const navigate = useNavigate()
 
   async function writeMemo() {
-    const { id } = await createNote({
-      data: {
-        about: { entityId: spc.id, label: spc.name, kind: 'space' },
-        noteKind: 'memo',
-      },
-    })
-    navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    try {
+      const { id } = await createNote({
+        data: {
+          about: { entityId: spc.id, label: spc.name, kind: 'space' },
+          noteKind: 'memo',
+        },
+      })
+      void navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not create note')
+    }
   }
 
   async function newNoteHere() {
-    const { id } = await createNote({
-      data: { about: { entityId: spc.id, label: spc.name, kind: 'space' } },
-    })
-    navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    try {
+      const { id } = await createNote({
+        data: { about: { entityId: spc.id, label: spc.name, kind: 'space' } },
+      })
+      void navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not create note')
+    }
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8 md:px-10">
+    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
       {/* Breadcrumb */}
       <nav
         aria-label="Breadcrumb"
@@ -286,7 +295,7 @@ function NewSubspace({ parentId }: { parentId: string }) {
     await createSpace({ data: { name, parentId } })
     setDraft('')
     setEditing(false)
-    router.invalidate()
+    void router.invalidate()
   }
 
   return editing ? (

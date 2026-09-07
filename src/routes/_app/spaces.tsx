@@ -28,7 +28,7 @@ function SpacesPage() {
   const spaces = Route.useLoaderData()
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 md:px-10">
+    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-page font-semibold tracking-tight">Spaces</h1>
@@ -117,7 +117,7 @@ function MarketsCreator() {
       setError(`Could not create: ${failed.join(', ')}. The rest are in.`)
       setPending(false)
     }
-    if (failed.length < filled.length) router.invalidate()
+    if (failed.length < filled.length) void router.invalidate()
   }
 
   return (
@@ -196,7 +196,7 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
       }
       setOpen(false)
       setScaffold(null)
-      router.invalidate()
+      void router.invalidate()
     } catch {
       setError('Could not create the space.')
     } finally {

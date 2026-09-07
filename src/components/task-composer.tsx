@@ -85,7 +85,7 @@ export function TaskComposer({
       if (!presetEntity) setRecords([])
       if (!createMore) setOpen(false)
       onCreated?.()
-      router.invalidate()
+      void router.invalidate()
     } catch {
       setError('Could not create the task.')
     } finally {
@@ -126,7 +126,7 @@ export function TaskComposer({
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            save()
+            void save()
           }}
         >
           <input
@@ -292,9 +292,9 @@ function AssigneePill({
   const [users, setUsers] = useState<Array<{ id: string; name: string }>>([])
   useEffect(() => {
     if (!open || users.length > 0) return
-    listUsers().then((u) =>
-      setUsers(u.map((x) => ({ id: x.id, name: x.name }))),
-    )
+    listUsers()
+      .then((u) => setUsers(u.map((x) => ({ id: x.id, name: x.name }))))
+      .catch(() => toast.error('Could not load teammates'))
   }, [open, users.length])
 
   return (
@@ -355,7 +355,7 @@ function RecordsPill({
     }
     const mySeq = ++seq.current
     timer.current = setTimeout(() => {
-      searchEntities({
+      void searchEntities({
         data: { q, kinds: ['company', 'person', 'deal', 'organization'] },
       }).then((r) => {
         if (seq.current === mySeq) setResults(r)

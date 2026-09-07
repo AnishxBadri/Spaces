@@ -131,17 +131,19 @@ export function CommandPalette({
     }
     setSearching(true)
     let cancelled = false
-    const timer = setTimeout(async () => {
-      try {
-        const rows = await searchAll({ data: { q } })
-        // Out-of-order responses would otherwise show results for a query the
-        // user has already typed past.
-        if (!cancelled) setHits(rows)
-      } catch {
-        if (!cancelled) setHits([])
-      } finally {
-        if (!cancelled) setSearching(false)
-      }
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const rows = await searchAll({ data: { q } })
+          // Out-of-order responses would otherwise show results for a query the
+          // user has already typed past.
+          if (!cancelled) setHits(rows)
+        } catch {
+          if (!cancelled) setHits([])
+        } finally {
+          if (!cancelled) setSearching(false)
+        }
+      })()
     }, 180)
     return () => {
       cancelled = true
@@ -151,7 +153,7 @@ export function CommandPalette({
 
   function go(to: string) {
     onOpenChange(false)
-    navigate({ to })
+    void navigate({ to })
   }
 
   const searchMode = query.trim().length >= 2
@@ -248,7 +250,7 @@ export function CommandPalette({
                 onSelect={async () => {
                   onOpenChange(false)
                   await authClient.signOut()
-                  navigate({ to: '/login' })
+                  void navigate({ to: '/login' })
                 }}
               >
                 <LogOut className="size-4" strokeWidth={1.75} />

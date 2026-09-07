@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Sunrise } from 'lucide-react'
+import { Sunrise, TriangleAlert } from 'lucide-react'
+import { badgeStyle, optionColor } from '#/lib/attributes/colors'
 import { GettingStarted } from '#/components/getting-started'
 import { TaskComposer } from '#/components/task-composer'
 import {
@@ -59,7 +60,14 @@ function TodayPage() {
   const stageOptions =
     (
       stageDef?.options as
-        | { options?: Array<{ id: string; label: string; group?: string }> }
+        | {
+            options?: Array<{
+              id: string
+              label: string
+              group?: string
+              color?: string
+            }>
+          }
         | undefined
     )?.options ?? []
   const activeStages = new Set(
@@ -69,6 +77,13 @@ function TodayPage() {
   )
   const stageLabel = (id: string) =>
     stageOptions.find((o) => o.id === id)?.label ?? id
+  // Badge styling for the stage pill — same data-driven colors the board uses.
+  const stageBadge = (id: string) => {
+    const idx = stageOptions.findIndex((o) => o.id === id)
+    return badgeStyle(
+      optionColor(idx >= 0 ? stageOptions[idx] : undefined, Math.max(idx, 0)),
+    )
+  }
   const idleDeals = funnel.daysInStage
     .filter(
       (d) =>
@@ -84,7 +99,7 @@ function TodayPage() {
     missingRates === 0
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8 md:px-10">
+    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-page font-semibold tracking-tight">Today</h1>
@@ -98,7 +113,7 @@ function TodayPage() {
       <GettingStarted progress={progress} />
 
       {holdings.holdings.length > 0 ? (
-        <div className="mt-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 rounded-lg border border-border px-4 py-3">
+        <div className="mt-6 flex flex-wrap items-center gap-x-10 gap-y-2 rounded-lg border border-border px-4 py-3">
           <Stat
             label="Invested"
             value={fmtMoney(holdings.rollup.costBasis, holdings.baseCurrency, {
@@ -136,27 +151,26 @@ function TodayPage() {
           {dueTasks.length > 0 ? (
             <Attention title={`Due — ${dueTasks.length}`}>
               {dueTasks.map((t) => (
-                <li key={t.id} className="flex items-baseline gap-3 px-4 py-2">
-                  <span className="min-w-0 flex-1 truncate text-ui">
-                    {t.content}
-                  </span>
+                <li key={t.id} className="flex h-10 items-center gap-3 px-4">
+                  <span className="min-w-0 truncate text-ui">{t.content}</span>
                   {t.entities[0] ? (
-                    <span className="text-label text-muted-foreground">
+                    <span className="shrink-0 truncate text-label text-muted-foreground">
                       {t.entities[0].name}
                     </span>
                   ) : null}
                   <span
                     className={
                       t.dueDate && t.dueDate < today
-                        ? 'tabular text-label text-destructive'
-                        : 'tabular text-label text-muted-foreground'
+                        ? 'tabular ml-auto shrink-0 text-label text-destructive'
+                        : 'tabular ml-auto shrink-0 text-label text-muted-foreground'
                     }
                   >
                     {fmtDate(t.dueDate)}
                   </span>
                 </li>
               ))}
-              <li className="px-4 py-2">
+              {/* Footer row on the second neutral — a quiet exit, not a row. */}
+              <li className="flex h-8 items-center bg-sidebar px-4">
                 <Link
                   to="/tasks"
                   className="rounded text-label text-muted-foreground focus-ring hover:text-foreground"
@@ -174,15 +188,18 @@ function TodayPage() {
                   <Link
                     to="/deals/$dealId"
                     params={{ dealId: d.id }}
-                    className="flex items-baseline gap-3 px-4 py-2 focus-ring hover:bg-accent"
+                    className="flex h-10 items-center gap-3 px-4 focus-ring hover:bg-accent"
                   >
-                    <span className="min-w-0 flex-1 truncate text-ui">
+                    <span className="min-w-0 truncate text-ui font-medium">
                       {d.name}
                     </span>
-                    <span className="text-label text-muted-foreground">
+                    <span
+                      className="shrink-0 rounded px-2 py-0.5 text-label font-medium"
+                      style={stageBadge(d.stage)}
+                    >
                       {stageLabel(d.stage)}
                     </span>
-                    <span className="tabular text-label text-destructive">
+                    <span className="tabular ml-auto shrink-0 text-label text-destructive">
                       {Math.round(d.days ?? 0)}d in stage
                     </span>
                   </Link>
@@ -198,12 +215,12 @@ function TodayPage() {
                   <Link
                     to="/portfolio/$holdingId"
                     params={{ holdingId: h.id }}
-                    className="flex items-baseline gap-3 px-4 py-2 focus-ring hover:bg-accent"
+                    className="flex h-10 items-center gap-3 px-4 focus-ring hover:bg-accent"
                   >
-                    <span className="min-w-0 flex-1 truncate text-ui">
+                    <span className="min-w-0 truncate text-ui font-medium">
                       {h.companyName}
                     </span>
-                    <span className="text-label text-muted-foreground">
+                    <span className="ml-auto shrink-0 text-label text-muted-foreground">
                       {h.metrics.ok && h.metrics.metrics.lastMarkDate
                         ? `marked ${fmtDate(h.metrics.metrics.lastMarkDate)}`
                         : 'never marked'}
@@ -215,17 +232,16 @@ function TodayPage() {
           ) : null}
 
           {missingRates > 0 ? (
-            <Attention title="FX rates missing">
-              <li className="px-4 py-2">
-                <Link
-                  to="/settings"
-                  className="rounded text-ui text-destructive focus-ring hover:opacity-80"
-                >
-                  {missingRates} holding{missingRates === 1 ? '' : 's'} excluded
-                  from portfolio totals — add rates in Settings →
-                </Link>
-              </li>
-            </Attention>
+            // A warning line, not a card — this is a data-quality nag, not a
+            // work queue like the sections above it.
+            <Link
+              to="/settings"
+              className="flex w-fit items-center gap-1.5 rounded text-label text-destructive focus-ring hover:opacity-80"
+            >
+              <TriangleAlert className="size-3" strokeWidth={2} />
+              {missingRates} holding{missingRates === 1 ? '' : 's'} excluded
+              from portfolio totals — add rates in Settings →
+            </Link>
           ) : null}
         </div>
       )}
@@ -237,7 +253,7 @@ function TodayPage() {
           </h2>
           <ol className="space-y-1">
             {activity.map((a) => (
-              <li key={a.id} className="flex items-baseline gap-2 text-ui">
+              <li key={a.id} className="flex h-7 items-center gap-2 text-ui">
                 <span className="font-medium">{a.actorName}</span>
                 <span className="text-muted-foreground">
                   {a.verb.replace(/[._]/g, ' ')}
@@ -259,9 +275,11 @@ function TodayPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <span className="flex items-baseline gap-2">
-      <span className="text-label text-muted-foreground">{label}</span>
-      <span className="tabular text-ui font-medium">{value}</span>
+    <span className="flex flex-col gap-0.5">
+      <span className="text-micro font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </span>
+      <span className="tabular text-title font-semibold">{value}</span>
     </span>
   )
 }

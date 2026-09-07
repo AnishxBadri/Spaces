@@ -78,25 +78,29 @@ function PersonRecordPage() {
   )
 
   async function newNoteAboutThis() {
-    const { id } = await createNote({
-      data: {
-        about: { entityId: person.id, label: person.name, kind: 'person' },
-      },
-    })
-    navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    try {
+      const { id } = await createNote({
+        data: {
+          about: { entityId: person.id, label: person.name, kind: 'person' },
+        },
+      })
+      void navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not create note')
+    }
   }
 
   async function save(data: Parameters<typeof updateRecord>[0]['data']) {
     try {
       await updateRecord({ data })
-      router.invalidate()
+      void router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
     }
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-8 md:px-10">
+    <div className="px-6 py-8 md:px-10">
       <Link
         to="/people"
         className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground focus-ring hover:text-foreground"
@@ -289,7 +293,7 @@ function PersonRecordPage() {
                           action: 'unlink',
                         },
                       })
-                      router.invalidate()
+                      void router.invalidate()
                     }}
                     className="hidden size-5 items-center justify-center rounded text-muted-foreground focus-ring group-hover:flex hover:text-foreground focus-visible:flex"
                   >
@@ -311,7 +315,7 @@ function PersonRecordPage() {
                       action: 'link',
                     },
                   })
-                  router.invalidate()
+                  void router.invalidate()
                 }}
                 className="mt-2 h-7 w-full rounded-md border border-input bg-transparent px-2 text-xs text-muted-foreground focus-ring"
               >
@@ -391,7 +395,7 @@ function ContactField({
       }
       setDraft('')
       setAdding(false)
-      router.invalidate()
+      void router.invalidate()
     } catch {
       toast.error(`Not a valid ${kind}`)
     }

@@ -49,7 +49,7 @@ export function SpaceGlossary({
           spaceId={spaceId}
           onDone={() => {
             setAdding(false)
-            router.invalidate()
+            void router.invalidate()
           }}
           onCancel={() => setAdding(false)}
         />
@@ -83,7 +83,7 @@ function TermRow({ term }: { term: Term }) {
           existing={term}
           onDone={() => {
             setEditing(false)
-            router.invalidate()
+            void router.invalidate()
           }}
           onCancel={() => setEditing(false)}
         />
@@ -128,7 +128,7 @@ function TermRow({ term }: { term: Term }) {
           if (!window.confirm(`Delete the term “${term.name}”?`)) return
           try {
             await deleteTerm({ data: { id: term.id } })
-            router.invalidate()
+            void router.invalidate()
           } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Could not delete')
           }
