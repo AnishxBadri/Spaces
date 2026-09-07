@@ -56,6 +56,15 @@ describe('updateAttributeInput (zod boundary)', () => {
       config: { code: 'EUR' },
     })
   })
+
+  it('carries an option archive flag', async () => {
+    const { updateAttributeInput } = await import('../server/attributes')
+    const parsed = updateAttributeInput.parse({
+      id: randomUUID(),
+      options: [{ id: 'a', label: 'A', archived: true }],
+    })
+    expect(parsed.options).toEqual([{ id: 'a', label: 'A', archived: true }])
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -206,6 +215,120 @@ describe.skipIf(!hasDb)('updateAttributeProgram', () => {
       group?: string
     }>
     expect(options.find((o) => o.id === 'open')?.group).toBe('parked')
+  })
+
+  it('archives and restores an option, leaving stored values intact', async () => {
+    const { updateAttributeProgram, AttributeConfigRejected } =
+      await import('./update')
+    const { resolveEntity } = await import('../entities/resolve')
+    const { setValues, AttributeValidationError } = await import('./values')
+    const { db } = await import('#/db')
+    const { entity } = await import('#/db/schema')
+    const { user } = await import('#/db/schema/auth')
+    const { eq } = await import('drizzle-orm')
+    const actor = (await db.select({ id: user.id }).from(user).limit(1)).at(0)
+    if (!actor) throw new Error('no user seeded')
+    const actorArg = { type: 'user' as const, id: actor.id }
+
+    const attr = await makeAttribute('archive', 'status', {
+      options: [
+        { id: 'open', label: 'Open', group: 'active', color: 'blue' },
+        { id: 'stale', label: 'Stale', group: 'parked', color: 'amber' },
+      ],
+    })
+    const co = await resolveEntity({
+      kind: 'company',
+      name: `UpdCo ${tag} archive`,
+      source: 'manual',
+    })
+    await setValues({
+      entityId: co.entityId,
+      patch: { [attr.slug]: 'stale' },
+      actor: actorArg,
+    })
+
+    // Removal is still refused; archive is the path.
+    const removed = await Effect.runPromise(
+      Effect.flip(
+        updateAttributeProgram({
+          id: attr.id,
+          options: [{ id: 'open', label: 'Open', group: 'active' }],
+        }),
+      ),
+    )
+    expect(removed).toBeInstanceOf(AttributeConfigRejected)
+    expect(removed.message).toMatch(/Archive it instead/)
+
+    await Effect.runPromise(
+      updateAttributeProgram({
+        id: attr.id,
+        options: [
+          { id: 'open', label: 'Open', group: 'active', color: 'blue' },
+          {
+            id: 'stale',
+            label: 'Stale',
+            group: 'parked',
+            color: 'amber',
+            archived: true,
+          },
+        ],
+      }),
+    )
+    const archived = (await readOptions(attr.id)).options as Array<{
+      id: string
+      archived?: boolean
+    }>
+    expect(archived.find((o) => o.id === 'stale')?.archived).toBe(true)
+    expect(archived.find((o) => o.id === 'open')?.archived).toBeUndefined()
+
+    // The record still holds the retired value — history stays intact.
+    const held = (
+      await db
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, co.entityId))
+    ).at(0)
+    expect((held?.values as Record<string, unknown>)[attr.slug]).toBe('stale')
+
+    // A fresh write asserting it is rejected; moving off it works.
+    const other = await resolveEntity({
+      kind: 'company',
+      name: `UpdCo ${tag} archive2`,
+      source: 'manual',
+    })
+    await expect(
+      setValues({
+        entityId: other.entityId,
+        patch: { [attr.slug]: 'stale' },
+        actor: actorArg,
+      }),
+    ).rejects.toThrow(AttributeValidationError)
+    await setValues({
+      entityId: co.entityId,
+      patch: { [attr.slug]: 'open' },
+      actor: actorArg,
+    })
+
+    // Unarchive: absent flag restores; the write goes through again.
+    await Effect.runPromise(
+      updateAttributeProgram({
+        id: attr.id,
+        options: [
+          { id: 'open', label: 'Open', group: 'active', color: 'blue' },
+          { id: 'stale', label: 'Stale', group: 'parked', color: 'amber' },
+        ],
+      }),
+    )
+    const restored = (await readOptions(attr.id)).options as Array<{
+      id: string
+      archived?: boolean
+    }>
+    expect(restored.find((o) => o.id === 'stale')?.archived).toBeUndefined()
+    await setValues({
+      entityId: other.entityId,
+      patch: { [attr.slug]: 'stale' },
+      actor: actorArg,
+    })
   })
 
   it('gates each config key to its type', async () => {

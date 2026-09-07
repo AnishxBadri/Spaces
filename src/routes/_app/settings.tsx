@@ -802,6 +802,7 @@ function AttributeRow({
           label: string
           group?: string
           color?: string
+          archived?: boolean
         }>
       | undefined) ?? []
   const hasOptions = ['select', 'multi_select', 'status'].includes(attr.type)
@@ -902,8 +903,12 @@ function AttributeRow({
           {options.map((o, i) => (
             <span
               key={o.id}
-              style={badgeStyle(optionColor(o, i))}
-              className="rounded-full px-2 py-0.5 text-label font-medium"
+              style={o.archived ? undefined : badgeStyle(optionColor(o, i))}
+              title={o.archived ? 'Archived option' : undefined}
+              className={cn(
+                'rounded-full px-2 py-0.5 text-label font-medium',
+                o.archived && 'bg-muted text-muted-foreground',
+              )}
             >
               {o.label}
             </span>
@@ -1127,6 +1132,7 @@ function OptionsEditor({
     label: string
     group?: string
     color?: string
+    archived?: boolean
   }>
   onDone: (
     next: Array<{
@@ -1134,6 +1140,7 @@ function OptionsEditor({
       label: string
       group?: 'active' | 'parked' | 'closed'
       color?: BadgeColor
+      archived?: boolean
     }> | null,
   ) => void
 }) {
@@ -1146,6 +1153,7 @@ function OptionsEditor({
       label: string
       group?: 'active' | 'parked' | 'closed'
       color: BadgeColor
+      archived?: boolean
     }>,
   )
   const isStatus = attr.type === 'status'
@@ -1154,7 +1162,13 @@ function OptionsEditor({
     <div className="rounded-md border border-border p-3">
       <div className="space-y-1.5">
         {drafts.map((o, i) => (
-          <div key={o.id ?? `new-${i}`} className="flex items-center gap-2">
+          <div
+            key={o.id ?? `new-${i}`}
+            className={cn(
+              'flex items-center gap-2',
+              o.archived && 'text-muted-foreground opacity-60',
+            )}
+          >
             <Input
               value={o.label}
               aria-label={`Option ${i + 1}`}
@@ -1201,6 +1215,34 @@ function OptionsEditor({
               >
                 <X className="size-3" strokeWidth={2} />
               </IconBtn>
+            ) : (
+              // Archive replaces removal (spec §3): the option leaves every
+              // picker, records still holding it keep it, greyed.
+              <IconBtn
+                label={
+                  o.archived
+                    ? `Restore ${o.label || 'option'}`
+                    : `Archive ${o.label || 'option'}`
+                }
+                onClick={() =>
+                  setDrafts((ds) =>
+                    ds.map((d, j) =>
+                      j === i ? { ...d, archived: !d.archived } : d,
+                    ),
+                  )
+                }
+              >
+                {o.archived ? (
+                  <ArchiveRestore className="size-3" strokeWidth={1.75} />
+                ) : (
+                  <Archive className="size-3" strokeWidth={1.75} />
+                )}
+              </IconBtn>
+            )}
+            {o.archived ? (
+              <span className="text-micro font-medium tracking-wide uppercase">
+                archived
+              </span>
             ) : null}
           </div>
         ))}
@@ -1227,7 +1269,7 @@ function OptionsEditor({
           Add option
         </Button>
         <span className="text-xs text-muted-foreground">
-          Existing options can be renamed, not removed.
+          Existing options can be renamed or archived, not removed.
         </span>
         <div className="ml-auto flex gap-1.5">
           <Button size="xs" variant="ghost" onClick={() => onDone(null)}>

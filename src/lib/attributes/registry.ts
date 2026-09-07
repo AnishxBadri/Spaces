@@ -47,6 +47,8 @@ export type SelectOption = {
   group?: 'active' | 'parked' | 'closed'
   /** one of BADGE_COLORS; absent falls back to the option's position */
   color?: BadgeColor
+  /** retired: hidden from write pickers, writes rejected, stored values kept */
+  archived?: boolean
 }
 
 export type AttributeOptions = {
@@ -79,12 +81,32 @@ const dateString = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
 
-/** Validator for one attribute's value (null clears — always allowed). */
-export function valueValidator(def: Pick<AttributeDef, 'type' | 'options'>) {
-  const optionIds = (def.options.options ?? []).map((o) => o.id) as [
-    string,
-    ...Array<string>,
-  ]
+/**
+ * Validator for one attribute's value (null clears — always allowed).
+ *
+ * `held` is the value the record currently stores. An archived option is
+ * history, not vocabulary (spec §3): a write may keep one the record already
+ * holds — a multi-select gaining a tag must not lose its retired one — but
+ * never asserts one afresh.
+ */
+export function valueValidator(
+  def: Pick<AttributeDef, 'type' | 'options'>,
+  held?: unknown,
+) {
+  const options = def.options.options ?? []
+  const optionIds = options.map((o) => o.id) as [string, ...Array<string>]
+  const heldIds = new Set(
+    Array.isArray(held) ? held.map(String) : held == null ? [] : [String(held)],
+  )
+  const liveOption = () =>
+    z.enum(optionIds).superRefine((id, ctx) => {
+      const opt = options.find((o) => o.id === id)
+      if (opt?.archived && !heldIds.has(id))
+        ctx.addIssue({
+          code: 'custom',
+          message: `"${opt.label}" is archived — pick a current option`,
+        })
+    })
   switch (def.type) {
     case 'text':
       return z.string().max(2000)
@@ -112,11 +134,9 @@ export function valueValidator(def: Pick<AttributeDef, 'type' | 'options'>) {
       return z.boolean()
     case 'select':
     case 'status':
-      return optionIds.length > 0 ? z.enum(optionIds) : z.never()
+      return optionIds.length > 0 ? liveOption() : z.never()
     case 'multi_select':
-      return optionIds.length > 0
-        ? z.array(z.enum(optionIds)).max(50)
-        : z.never()
+      return optionIds.length > 0 ? z.array(liveOption()).max(50) : z.never()
     case 'record_reference':
       return def.options.multi
         ? z.array(z.string().uuid()).max(100)

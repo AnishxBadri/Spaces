@@ -70,6 +70,8 @@ const optionEdit = z.object({
    *  field is how someone stores 2:1 grey-on-white and the badge stops being
    *  readable. Structure fixed, content free. */
   color: z.enum(BADGE_COLORS).optional(),
+  /** archive replaces removal — stored values keep resolving (spec §3) */
+  archived: z.boolean().optional(),
 })
 
 /**
@@ -105,8 +107,8 @@ export const updateAttributeInput = z.object({
 /**
  * Attribute maintenance. Structure fixed, content free: names, options and
  * per-type config are editable (system included); types never change;
- * options can be added and renamed but not removed — stored values may
- * reference them.
+ * options can be added, renamed and archived but not removed — stored
+ * values may reference them.
  */
 export const updateAttribute = createServerFn({ method: 'POST' })
   .validator(updateAttributeInput)

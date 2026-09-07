@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
 import { valueValidator } from './registry'
+import type { AttributeDef } from './registry'
 import { cleanupTestEntities } from '../entities/test-helpers'
 
 describe('valueValidator', () => {
@@ -29,6 +30,35 @@ describe('valueValidator', () => {
     }
     expect(valueValidator(def).safeParse([randomUUID()]).success).toBe(true)
     expect(valueValidator(def).safeParse(randomUUID()).success).toBe(false)
+  })
+
+  it('rejects an archived option with a clear message unless already held', () => {
+    const options = {
+      options: [
+        { id: 'seed', label: 'Seed' },
+        { id: 'angel', label: 'Angel round', archived: true },
+      ],
+    }
+    const select = { type: 'select' as const, options }
+    const fresh = valueValidator(select).safeParse('angel')
+    expect(fresh.success).toBe(false)
+    expect(fresh.error?.issues[0]?.message).toBe(
+      '"Angel round" is archived — pick a current option',
+    )
+    expect(valueValidator(select).safeParse('seed').success).toBe(true)
+    // Re-asserting what the record already holds is not a new assertion.
+    expect(valueValidator(select, 'angel').safeParse('angel').success).toBe(
+      true,
+    )
+
+    const multi = { type: 'multi_select' as const, options }
+    expect(valueValidator(multi).safeParse(['seed', 'angel']).success).toBe(
+      false,
+    )
+    // A multi-select gaining a tag keeps its retired one.
+    expect(
+      valueValidator(multi, ['angel']).safeParse(['angel', 'seed']).success,
+    ).toBe(true)
   })
 })
 
@@ -62,6 +92,40 @@ describe('planPatch (pure)', () => {
       expect(run).toThrow(AttributeValidationError)
       expect(run).toThrow(/can't be cleared/)
     }
+  })
+
+  it('keeps a held archived value across unrelated writes, rejects asserting one', async () => {
+    const { Effect } = await import('effect')
+    const { planPatch, AttributeValidationError } = await import('./values')
+    const retired: AttributeDef['options'] = {
+      options: [
+        { id: 'seed', label: 'Seed' },
+        { id: 'angel', label: 'Angel', archived: true },
+      ],
+    }
+    const registry: Array<AttributeDef> = [
+      def('text', 'thesis', false),
+      { ...def('text', 'tags', false), type: 'multi_select', options: retired },
+      { ...def('text', 'stage', false), type: 'select', options: retired },
+    ]
+    const current = { tags: ['angel'], stage: 'angel' }
+
+    // Unrelated key: the archived values are not in the patch, so they
+    // are neither validated nor cleared.
+    expect(
+      Effect.runSync(planPatch(registry, current, { thesis: 'x' })),
+    ).toMatchObject([{ slug: 'thesis', value: 'x' }])
+
+    // Adding a live tag next to a held archived one is fine.
+    expect(
+      Effect.runSync(planPatch(registry, current, { tags: ['angel', 'seed'] })),
+    ).toMatchObject([{ slug: 'tags', value: ['angel', 'seed'] }])
+
+    // Asserting the archived option afresh is rejected, slug-prefixed.
+    const run = () =>
+      Effect.runSync(planPatch(registry, { stage: 'seed' }, { stage: 'angel' }))
+    expect(run).toThrow(AttributeValidationError)
+    expect(run).toThrow('stage: "Angel" is archived — pick a current option')
   })
 
   it('treats clearing an already-empty required value as a no-op', async () => {
