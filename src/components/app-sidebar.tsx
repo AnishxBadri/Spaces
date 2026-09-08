@@ -111,54 +111,33 @@ export function AppSidebar({
 
       <nav className="mt-4 flex-1 space-y-0.5 px-3" aria-label="Primary">
         {NAV_ITEMS.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            onClick={onNavigate}
-            className={cn(
-              'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-ui font-medium text-muted-foreground transition-colors',
-              'hover:bg-sidebar-accent hover:text-foreground',
-              'focus-ring',
-            )}
-            activeProps={{
-              className: 'bg-selected text-foreground',
-              'aria-current': 'page',
-            }}
-          >
+          <NavLink key={item.to} to={item.to} onClick={onNavigate}>
             <item.icon className="size-4" strokeWidth={1.75} />
             {item.label}
-          </Link>
-        ))}
-        {objects.length > 0 ? (
-          <>
-            <p className="px-2.5 pt-3 pb-1 text-micro font-medium tracking-wide text-muted-foreground uppercase">
-              Records
-            </p>
-            {objects.map((o) => {
-              const Icon = objectIcon(o)
-              return (
-                <Link
-                  key={o.slug}
-                  to="/o/$objectSlug"
-                  params={{ objectSlug: o.slug }}
-                  onClick={onNavigate}
-                  className={cn(
-                    'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-ui font-medium text-muted-foreground transition-colors',
-                    'hover:bg-sidebar-accent hover:text-foreground',
-                    'focus-ring',
-                  )}
-                  activeProps={{
-                    className: 'bg-selected text-foreground',
-                    'aria-current': 'page',
-                  }}
-                >
-                  <Icon className="size-4" strokeWidth={1.75} />
-                  {o.plural}
-                </Link>
-              )
-            })}
-          </>
-        ) : null}
+          </NavLink>
+        )).flatMap((el, i) =>
+          // Custom objects are objects like the three core ones, so they sit
+          // right after Deals in the same list — no group label, no tier.
+          NAV_ITEMS[i].to === '/deals'
+            ? [
+                el,
+                ...objects.map((o) => {
+                  const Icon = objectIcon(o)
+                  return (
+                    <NavLink
+                      key={`o:${o.slug}`}
+                      to="/o/$objectSlug"
+                      params={{ objectSlug: o.slug }}
+                      onClick={onNavigate}
+                    >
+                      <Icon className="size-4" strokeWidth={1.75} />
+                      {o.plural}
+                    </NavLink>
+                  )
+                }),
+              ]
+            : [el],
+        )}
       </nav>
 
       <div className="space-y-0.5 border-t border-sidebar-border p-3">
@@ -219,5 +198,36 @@ export function AppSidebar({
         </DropdownMenu>
       </div>
     </div>
+  )
+}
+
+function NavLink({
+  to,
+  params,
+  onClick,
+  children,
+}: {
+  to: string
+  params?: Record<string, string>
+  onClick?: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <Link
+      to={to}
+      params={params}
+      onClick={onClick}
+      className={cn(
+        'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-ui font-medium text-muted-foreground transition-colors',
+        'hover:bg-sidebar-accent hover:text-foreground',
+        'focus-ring',
+      )}
+      activeProps={{
+        className: 'bg-selected text-foreground',
+        'aria-current': 'page',
+      }}
+    >
+      {children}
+    </Link>
   )
 }

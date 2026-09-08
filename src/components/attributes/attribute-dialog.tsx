@@ -864,7 +864,10 @@ function TypePicker({
 }) {
   const [open, setOpen] = useState(false)
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    // Modal: the parent Dialog locks scrolling for everything outside
+    // itself, and this popover portals outside it — without its own lock,
+    // wheel events over the list are swallowed and it can't scroll.
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger
         id="attr-type"
         autoFocus
@@ -881,7 +884,7 @@ function TypePicker({
       <PopoverContent align="start" className="w-72 p-0">
         <Command>
           <CommandInput placeholder="Search types…" autoFocus />
-          <CommandList className="max-h-72">
+          <CommandList className="max-h-64">
             <CommandEmpty>No type matches.</CommandEmpty>
             <CommandGroup>
               {TYPES.map((t) => (
