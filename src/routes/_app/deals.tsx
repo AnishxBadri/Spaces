@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -6,10 +6,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import type { ColumnDef } from '@tanstack/react-table'
 import { Handshake, Kanban, Plus, Table2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { z } from 'zod'
+import { ViewBar } from '#/components/views/view-bar'
+import { useViewState } from '#/components/views/use-view-state'
+import { matchesConditions } from '#/lib/views/filter'
 import { DealBoard } from '#/components/deal-board'
 import {
   fieldSpanClass,
@@ -44,20 +48,32 @@ import { Label } from '#/components/ui/label'
 import {
   createDeal,
   dealFunnelStats,
+  getSession,
   listDealsTable,
   listRegistry,
+  listViews,
   updateRecord,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/deals')({
+  validateSearch: z.object({ view: z.string().optional() }),
   loader: async () => {
-    const [deals, registry, funnel] = await Promise.all([
+    const [deals, registry, funnel, viewData, session] = await Promise.all([
       listDealsTable(),
       listRegistry({ data: { kind: 'deal' } }),
       dealFunnelStats(),
+      listViews({ data: { kind: 'deal' } }),
+      getSession(),
     ])
-    return { deals, registry, funnel }
+    return {
+      deals,
+      registry,
+      funnel,
+      views: viewData.views,
+      objectId: viewData.objectId,
+      me: session?.user ?? null,
+    }
   },
   component: DealsPage,
 })
@@ -122,14 +138,39 @@ function sortValue(
 }
 
 function DealsPage() {
-  const { deals, registry, funnel } = Route.useLoaderData()
+  const { deals, registry, funnel, views, objectId, me } = Route.useLoaderData()
   const router = useRouter()
+  const navigate = useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
-  const [sorting, setSorting] = useState<SortingState>([])
   const prefs = useTablePrefs(PREFS_KEY)
+  const { view: activeId } = Route.useSearch()
+  const vs = useViewState<{ group: string | null; stage: string | null }>({
+    views,
+    activeId: activeId ?? null,
+    columnVisibility: prefs.columnVisibility,
+    setColumnVisibility: prefs.setColumnVisibility,
+    defaultExtra: { group: 'active', stage: null },
+  })
+  const { sorting, setSorting } = vs
+  const typeOf = useCallback(
+    (slug: string) => registry.find((d) => d.slug === slug)?.type,
+    [registry],
+  )
   // Stage filter: group chips (Active/Parked/Closed) + per-stage narrowing.
-  const [groupFilter, setGroupFilter] = useState<string | null>('active')
-  const [stageFilter, setStageFilter] = useState<string | null>(null)
+  // Lives in the view's `extra`, so a saved view remembers the chips.
+  const groupFilter = vs.extra.group
+  const stageFilter = vs.extra.stage
+  const { setExtra } = vs
+  const setGroupFilter = useCallback(
+    (group: string | null) => setExtra((e) => ({ ...e, group })),
+    [setExtra],
+  )
+  const setStageFilter = useCallback(
+    (stage: string | null) => setExtra((e) => ({ ...e, stage })),
+    [setExtra],
+  )
+  const selectView = (id: string | null) =>
+    void navigate({ to: '/deals', search: { view: id ?? undefined } })
   // View toggle — read post-mount so SSR and client agree on first paint.
   const [view, setView] = useState<'table' | 'board'>('table')
   useEffect(() => {
@@ -161,13 +202,14 @@ function DealsPage() {
   // control; free-text filtering is the table's own, as on every other surface.
   const staged = useMemo(() => {
     return deals.rows.filter((d) => {
+      if (!matchesConditions(d.values, vs.conditions, typeOf)) return false
       const stage = String(d.values.stage ?? '')
       const opt = stageOptions.find((o) => o.id === stage)
       if (stageFilter) return stage === stageFilter
       if (groupFilter) return (opt?.group ?? 'active') === groupFilter
       return true
     })
-  }, [deals, groupFilter, stageFilter, stageOptions])
+  }, [deals, groupFilter, stageFilter, stageOptions, vs.conditions, typeOf])
 
   // Counts per group for the filter chips.
   const groupCounts = useMemo(() => {
@@ -187,7 +229,7 @@ function DealsPage() {
     const opt = stageOptions.find((o) => o.id === stageFilter)
     if (groupFilter && opt && (opt.group ?? 'active') !== groupFilter)
       setStageFilter(null)
-  }, [groupFilter, stageFilter, stageOptions])
+  }, [groupFilter, stageFilter, stageOptions, setStageFilter])
 
   const saveCell = useCallback(
     async (id: string, slug: string, value: unknown) => {
@@ -323,6 +365,21 @@ function DealsPage() {
             shown={table.getRowModel().rows.length}
           >
             <ViewToggle view={view} onChange={switchView} />
+            <ViewBar
+              objectId={objectId}
+              registry={registry as Array<RegistryEntry>}
+              views={views}
+              activeId={activeId ?? null}
+              snapshot={vs.snapshot}
+              onApply={(v) => {
+                vs.apply(v)
+                selectView(v?.id ?? null)
+              }}
+              selectView={selectView}
+              onFilterChange={vs.setConditions}
+              onSaved={() => router.invalidate()}
+              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+            />
             <div
               className="flex items-center gap-1"
               role="group"

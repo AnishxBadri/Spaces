@@ -155,6 +155,13 @@
       "when": 1788956719897,
       "tag": "0021_lists_are_views",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788956898667,
+      "tag": "0022_views",
+      "breakpoints": true
     }
   ]
 }

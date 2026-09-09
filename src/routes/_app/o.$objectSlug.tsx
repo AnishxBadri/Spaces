@@ -1,4 +1,9 @@
-import { createFileRoute, notFound, useRouter } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  notFound,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -6,10 +11,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import type { ColumnDef } from '@tanstack/react-table'
 import { Layers, Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { z } from 'zod'
+import { ViewBar } from '#/components/views/view-bar'
+import { useViewState } from '#/components/views/use-view-state'
+import { matchesConditions } from '#/lib/views/filter'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import {
   fieldSpanClass,
@@ -46,8 +55,10 @@ import { objectIcon } from '#/lib/object-icons'
 import {
   createObjectRecord,
   getObject,
+  getSession,
   listObjectRecords,
   listRegistry,
+  listViews,
   updateRecord,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -59,15 +70,25 @@ import { cn } from '#/lib/utils'
  * spaces, and when it was added.
  */
 export const Route = createFileRoute('/_app/o/$objectSlug')({
+  validateSearch: z.object({ view: z.string().optional() }),
   loader: async ({ params }) => {
     const object = await getObject({ data: { slug: params.objectSlug } })
     // An archived object hides its routes (§9 lifecycle); records persist.
     if (object.archived || object.isSystem) throw notFound()
-    const [registry, table] = await Promise.all([
+    const [registry, table, viewData, session] = await Promise.all([
       listRegistry({ data: { objectId: object.id } }),
       listObjectRecords({ data: { objectId: object.id } }),
+      listViews({ data: { objectId: object.id } }),
+      getSession(),
     ])
-    return { object, registry, rows: table.rows, refNames: table.refNames }
+    return {
+      object,
+      registry,
+      rows: table.rows,
+      refNames: table.refNames,
+      views: viewData.views,
+      me: session?.user ?? null,
+    }
   },
   component: ObjectListPage,
 })
@@ -76,11 +97,35 @@ type Row = Awaited<ReturnType<typeof listObjectRecords>>['rows'][number]
 const col = createColumnHelper<Row>()
 
 function ObjectListPage() {
-  const { object, registry, rows, refNames } = Route.useLoaderData()
+  const { object, registry, rows, refNames, views, me } = Route.useLoaderData()
   const router = useRouter()
-  const [sorting, setSorting] = useState<SortingState>([])
+  const navigate = useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
   const prefs = useTablePrefs(`dealos.o-${object.slug}-table.v1`)
+  const { view: activeId } = Route.useSearch()
+  const vs = useViewState({
+    views,
+    activeId: activeId ?? null,
+    columnVisibility: prefs.columnVisibility,
+    setColumnVisibility: prefs.setColumnVisibility,
+    defaultExtra: {},
+  })
+  const { sorting, setSorting } = vs
+  const typeOf = useCallback(
+    (slug: string) => registry.find((d) => d.slug === slug)?.type,
+    [registry],
+  )
+  const visibleRows = useMemo(
+    () =>
+      rows.filter((r) => matchesConditions(r.values, vs.conditions, typeOf)),
+    [rows, vs.conditions, typeOf],
+  )
+  const selectView = (id: string | null) =>
+    void navigate({
+      to: '/o/$objectSlug',
+      params: { objectSlug: object.slug },
+      search: { view: id ?? undefined },
+    })
   const Icon = objectIcon(object)
 
   async function saveCell(entityId: string, slug: string, value: unknown) {
@@ -157,7 +202,7 @@ function ObjectListPage() {
   }, [registry, object.slug, refNames])
 
   const table = useReactTable({
-    data: rows,
+    data: visibleRows,
     columns,
     state: {
       sorting,
@@ -227,7 +272,23 @@ function ObjectListPage() {
             noun={noun}
             total={rows.length}
             shown={table.getRowModel().rows.length}
-          />
+          >
+            <ViewBar
+              objectId={object.id}
+              registry={registry as Array<RegistryEntry>}
+              views={views}
+              activeId={activeId ?? null}
+              snapshot={vs.snapshot}
+              onApply={(v) => {
+                vs.apply(v)
+                selectView(v?.id ?? null)
+              }}
+              selectView={selectView}
+              onFilterChange={vs.setConditions}
+              onSaved={() => router.invalidate()}
+              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+            />
+          </TableToolbar>
           <RecordTable
             table={table}
             label={object.plural}

@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -6,10 +6,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import type { ColumnDef } from '@tanstack/react-table'
 import { AtSign, Building2, Plus, Users } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { z } from 'zod'
+import { ViewBar } from '#/components/views/view-bar'
+import { useViewState } from '#/components/views/use-view-state'
+import { matchesConditions } from '#/lib/views/filter'
 import { cn } from '#/lib/utils'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import {
@@ -47,20 +51,32 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import {
   createPerson,
+  getSession,
   listCompanies,
   listPeopleTable,
   listRegistry,
+  listViews,
   updateRecord,
 } from '#/lib/server-fns'
 
 export const Route = createFileRoute('/_app/people')({
+  validateSearch: z.object({ view: z.string().optional() }),
   loader: async () => {
-    const [rows, registry, companies] = await Promise.all([
+    const [rows, registry, companies, viewData, session] = await Promise.all([
       listPeopleTable(),
       listRegistry({ data: { kind: 'person' } }),
       listCompanies(),
+      listViews({ data: { kind: 'person' } }),
+      getSession(),
     ])
-    return { rows, registry, companies }
+    return {
+      rows,
+      registry,
+      companies,
+      views: viewData.views,
+      objectId: viewData.objectId,
+      me: session?.user ?? null,
+    }
   },
   component: PeoplePage,
 })
@@ -71,11 +87,32 @@ const col = createColumnHelper<Row>()
 const PREFS_KEY = 'dealos.people-table.v1'
 
 function PeoplePage() {
-  const { rows, registry, companies } = Route.useLoaderData()
+  const { rows, registry, companies, views, objectId, me } =
+    Route.useLoaderData()
   const router = useRouter()
-  const [sorting, setSorting] = useState<SortingState>([])
+  const navigate = useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
   const prefs = useTablePrefs(PREFS_KEY)
+  const { view: activeId } = Route.useSearch()
+  const vs = useViewState({
+    views,
+    activeId: activeId ?? null,
+    columnVisibility: prefs.columnVisibility,
+    setColumnVisibility: prefs.setColumnVisibility,
+    defaultExtra: {},
+  })
+  const { sorting, setSorting } = vs
+  const typeOf = useCallback(
+    (slug: string) => registry.find((d) => d.slug === slug)?.type,
+    [registry],
+  )
+  const visibleRows = useMemo(
+    () =>
+      rows.filter((r) => matchesConditions(r.values, vs.conditions, typeOf)),
+    [rows, vs.conditions, typeOf],
+  )
+  const selectView = (id: string | null) =>
+    void navigate({ to: '/people', search: { view: id ?? undefined } })
 
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
@@ -166,7 +203,7 @@ function PeoplePage() {
   }, [registry])
 
   const table = useReactTable({
-    data: rows,
+    data: visibleRows,
     columns,
     state: {
       sorting,
@@ -229,7 +266,23 @@ function PeoplePage() {
             noun={{ one: 'person', many: 'people' }}
             total={rows.length}
             shown={table.getRowModel().rows.length}
-          />
+          >
+            <ViewBar
+              objectId={objectId}
+              registry={registry as Array<RegistryEntry>}
+              views={views}
+              activeId={activeId ?? null}
+              snapshot={vs.snapshot}
+              onApply={(v) => {
+                vs.apply(v)
+                selectView(v?.id ?? null)
+              }}
+              selectView={selectView}
+              onFilterChange={vs.setConditions}
+              onSaved={() => router.invalidate()}
+              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+            />
+          </TableToolbar>
           <RecordTable
             table={table}
             label="People"

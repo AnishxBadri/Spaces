@@ -1,4 +1,9 @@
-import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -6,10 +11,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import type { ColumnDef } from '@tanstack/react-table'
 import { Building2, Copy, Globe, Layers, Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { z } from 'zod'
+import { ViewBar } from '#/components/views/view-bar'
+import { useViewState } from '#/components/views/use-view-state'
+import { matchesConditions } from '#/lib/views/filter'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import {
   fieldSpanClass,
@@ -48,19 +57,31 @@ import { cn } from '#/lib/utils'
 import {
   countOpenDuplicates,
   createCompany,
+  getSession,
   listCompaniesTable,
   listRegistry,
+  listViews,
   updateRecord,
 } from '#/lib/server-fns'
 
 export const Route = createFileRoute('/_app/companies')({
+  validateSearch: z.object({ view: z.string().optional() }),
   loader: async () => {
-    const [rows, registry, dupes] = await Promise.all([
+    const [rows, registry, dupes, viewData, session] = await Promise.all([
       listCompaniesTable(),
       listRegistry({ data: { kind: 'company' } }),
       countOpenDuplicates(),
+      listViews({ data: { kind: 'company' } }),
+      getSession(),
     ])
-    return { rows, registry, openDuplicates: dupes.open }
+    return {
+      rows,
+      registry,
+      openDuplicates: dupes.open,
+      views: viewData.views,
+      objectId: viewData.objectId,
+      me: session?.user ?? null,
+    }
   },
   component: CompaniesPage,
 })
@@ -71,11 +92,32 @@ const col = createColumnHelper<Row>()
 const PREFS_KEY = 'dealos.companies-table.v1'
 
 function CompaniesPage() {
-  const { rows, registry, openDuplicates } = Route.useLoaderData()
+  const { rows, registry, openDuplicates, views, objectId, me } =
+    Route.useLoaderData()
   const router = useRouter()
-  const [sorting, setSorting] = useState<SortingState>([])
+  const navigate = useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
   const prefs = useTablePrefs(PREFS_KEY)
+  const { view: activeId } = Route.useSearch()
+  const vs = useViewState({
+    views,
+    activeId: activeId ?? null,
+    columnVisibility: prefs.columnVisibility,
+    setColumnVisibility: prefs.setColumnVisibility,
+    defaultExtra: {},
+  })
+  const { sorting, setSorting } = vs
+  const typeOf = useCallback(
+    (slug: string) => registry.find((d) => d.slug === slug)?.type,
+    [registry],
+  )
+  const visibleRows = useMemo(
+    () =>
+      rows.filter((r) => matchesConditions(r.values, vs.conditions, typeOf)),
+    [rows, vs.conditions, typeOf],
+  )
+  const selectView = (id: string | null) =>
+    void navigate({ to: '/companies', search: { view: id ?? undefined } })
 
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
@@ -168,7 +210,7 @@ function CompaniesPage() {
   }, [registry])
 
   const table = useReactTable({
-    data: rows,
+    data: visibleRows,
     columns,
     state: {
       sorting,
@@ -236,7 +278,23 @@ function CompaniesPage() {
             noun={{ one: 'company', many: 'companies' }}
             total={rows.length}
             shown={table.getRowModel().rows.length}
-          />
+          >
+            <ViewBar
+              objectId={objectId}
+              registry={registry as Array<RegistryEntry>}
+              views={views}
+              activeId={activeId ?? null}
+              snapshot={vs.snapshot}
+              onApply={(v) => {
+                vs.apply(v)
+                selectView(v?.id ?? null)
+              }}
+              selectView={selectView}
+              onFilterChange={vs.setConditions}
+              onSaved={() => router.invalidate()}
+              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+            />
+          </TableToolbar>
           <RecordTable
             table={table}
             label="Companies"
