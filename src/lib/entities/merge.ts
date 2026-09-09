@@ -10,7 +10,6 @@ import {
   interactionEntity,
   link,
   listEntry,
-  listEntryEvent,
   mergeEvent,
   signal,
 } from '#/db/schema'
@@ -314,22 +313,14 @@ export async function mergeEntities(opts: {
           )
       ).at(0)
       if (collision) {
-        // Winner already sits in this list — keep winner's entry, snapshot
-        // loser's values and its event history, then drop them.
-        const events = await tx
-          .select()
-          .from(listEntryEvent)
-          .where(eq(listEntryEvent.entryId, le.id))
+        // Winner already sits in this list — membership is once per record,
+        // so keep the winner's entry, snapshot the loser's, drop it.
         snapshot.push({
           table: 'list_entry',
           action: 'dropped',
           pk: { id: le.id },
-          old: {
-            entry: le,
-            events: events,
-          },
+          old: { entry: le },
         })
-        await tx.delete(listEntryEvent).where(eq(listEntryEvent.entryId, le.id))
         await tx.delete(listEntry).where(eq(listEntry.id, le.id))
       } else {
         snapshot.push({
