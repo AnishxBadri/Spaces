@@ -68,14 +68,18 @@ export function LedgerRow({
 export function LedgerFigure({
   children,
   tone,
+  wide,
 }: {
   children: ReactNode
   tone?: 'bad' | 'muted'
+  /** 80px instead of 64 — for `09-08 · −2d` style figures. */
+  wide?: boolean
 }) {
   return (
     <span
       className={cn(
-        'w-16 shrink-0 numeric text-micro',
+        'shrink-0 numeric text-micro',
+        wide ? 'w-20' : 'w-16',
         tone === 'bad'
           ? 'text-destructive'
           : tone === 'muted'

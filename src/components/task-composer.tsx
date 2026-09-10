@@ -1,7 +1,9 @@
 import { useRouter } from '@tanstack/react-router'
-import { AtSign, Calendar, Link2, Plus, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { KeyHint } from './page-header'
+import { DitherMark, InitialsMark } from './record/record-parts'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -23,6 +25,9 @@ import { cn } from '#/lib/utils'
  * Natural-language dates parse deterministically; "no date" is legal.
  */
 
+const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** The chip's reading of a due date: `Today`, `Tomorrow`, else `Fri 09-12`. */
 function dueLabel(due: string | null, today: string): string {
   if (!due) return 'No date'
   if (due === today) return 'Today'
@@ -30,11 +35,7 @@ function dueLabel(due: string | null, today: string): string {
   const d = new Date(`${due}T00:00:00Z`)
   const days = Math.round((d.getTime() - t.getTime()) / 86400000)
   if (days === 1) return 'Tomorrow'
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  })
+  return `${WEEKDAY[d.getUTCDay()]} ${due.slice(5)}`
 }
 
 type LinkedRecord = { id: string; name: string; kind: string }
@@ -44,6 +45,7 @@ export function TaskComposer({
   presetEntity,
   onCreated,
   hotkey,
+  variant = 'dialog',
 }: {
   trigger?: React.ReactNode
   /** Record page rails pass their record — pre-linked, removable. */
@@ -52,6 +54,9 @@ export function TaskComposer({
   /** A bare key that opens the composer from anywhere on the page — the
    *  key hint printed in the trigger must be true. Ignored while typing. */
   hotkey?: string
+  /** `band` renders the composer inline as the bone band under a page
+   *  header (P6); `dialog` (default) opens it from a trigger. */
+  variant?: 'dialog' | 'band'
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -70,7 +75,9 @@ export function TaskComposer({
 
   useHotkey(hotkey, () => setOpen(true))
 
-  async function save() {
+  /** `keep` holds the chips (date, records) for the next task — the band's
+   *  ⇧↵ and its create-more switch; the dialog's create-more keeps it open. */
+  async function save(keep = createMore) {
     if (!content.trim()) {
       setError('Say what the task is.')
       return
@@ -88,9 +95,11 @@ export function TaskComposer({
       })
       toast('Task created')
       setContent('')
-      setDue(null)
-      if (!presetEntity) setRecords([])
-      if (!createMore) setOpen(false)
+      if (variant === 'dialog' || !keep) {
+        setDue(null)
+        if (!presetEntity) setRecords([])
+      }
+      if (variant === 'dialog' && !keep) setOpen(false)
       onCreated?.()
       void router.invalidate()
     } catch {
@@ -111,6 +120,99 @@ export function TaskComposer({
       setRecords(presetEntity ? [presetEntity] : [])
       setError(null)
     }
+  }
+
+  const chips = (
+    <>
+      <DuePill due={due} today={today} onChange={setDue} />
+      {variant === 'band' ? (
+        <>
+          {(
+            [
+              ['Today', today],
+              ['Tomorrow', parseDue('tomorrow', today)],
+              ['Next week', parseDue('next week', today)],
+              ['No date', null],
+            ] as Array<[string, string | null]>
+          ).map(([label, value]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setDue(value)}
+              className="focus-ring flex h-6 items-center border border-rule bg-paper px-2 mono text-micro text-graphite transition-colors hover:border-hairline hover:text-foreground"
+            >
+              {label}
+            </button>
+          ))}
+          <span aria-hidden className="mx-1 h-4 w-px bg-rule" />
+        </>
+      ) : null}
+      <AssigneePill assignee={assignee} onChange={setAssignee} />
+      <RecordsPill records={records} onChange={setRecords} />
+    </>
+  )
+
+  if (variant === 'band') {
+    return (
+      <form
+        className="flex shrink-0 flex-col gap-2 border-b border-hairline bg-bone px-8 py-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void save()
+        }}
+      >
+        <div className="flex h-9 items-center gap-2.5 rounded-md border border-hairline bg-paper px-3">
+          <span className="mono text-ui text-primary">+</span>
+          <input
+            className="focus-ring h-full min-w-0 flex-1 bg-transparent text-body placeholder:text-graphite"
+            placeholder="Add a task — “chase data room Friday”, “revisit after their raise”…"
+            aria-label="New task"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.shiftKey) {
+                e.preventDefault()
+                void save(true)
+              }
+            }}
+          />
+          <span className="hidden shrink-0 mono text-micro text-graphite md:inline">
+            ↵ add · ⇧↵ add & keep open
+          </span>
+        </div>
+        {error ? (
+          <p role="alert" className="text-label text-destructive">
+            {error}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {chips}
+          <span className="flex-1" />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={createMore}
+            onClick={() => setCreateMore((v) => !v)}
+            className="focus-ring flex items-center gap-2 mono text-micro text-graphite"
+          >
+            <span
+              aria-hidden
+              className={cn(
+                'flex h-3 w-6 border border-hairline bg-paper',
+                createMore && 'justify-end',
+              )}
+            >
+              <span className="size-2.5 bg-hairline" />
+            </span>
+            create more
+          </button>
+          <Button type="submit" size="sm" disabled={pending}>
+            {pending ? 'Saving…' : 'Add task'}
+            <KeyHint>↵</KeyHint>
+          </Button>
+        </div>
+      </form>
+    )
   }
 
   return (
@@ -149,18 +251,16 @@ export function TaskComposer({
             </p>
           ) : null}
           <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
-            <DuePill due={due} today={today} onChange={setDue} />
-            <AssigneePill assignee={assignee} onChange={setAssignee} />
-            <RecordsPill records={records} onChange={setRecords} />
+            {chips}
             <div className="ml-auto flex items-center gap-3">
-              <label className="flex cursor-pointer items-center gap-1.5 text-label text-muted-foreground">
+              <label className="flex cursor-pointer items-center gap-1.5 mono text-micro text-graphite">
                 <input
                   type="checkbox"
-                  className="accent-primary"
+                  className="focus-ring size-3.5 appearance-none border border-hairline bg-paper checked:bg-primary"
                   checked={createMore}
                   onChange={(e) => setCreateMore(e.target.checked)}
                 />
-                Create more
+                create more
               </label>
               <Button
                 type="button"
@@ -182,24 +282,24 @@ export function TaskComposer({
 }
 
 function Pill({
-  icon: Icon,
   children,
   active,
+  dashed,
 }: {
-  icon: typeof Calendar
   children: React.ReactNode
   active?: boolean
+  dashed?: boolean
 }) {
   return (
     <span
       className={cn(
-        'flex h-7 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-label transition-colors duration-150',
+        'flex h-6 cursor-pointer items-center gap-1.5 border bg-paper px-2 mono text-micro transition-colors duration-150',
         active
-          ? 'border-primary/40 bg-selected text-foreground'
-          : 'border-border text-muted-foreground hover:border-input hover:text-foreground',
+          ? 'border-hairline text-foreground'
+          : 'border-rule text-graphite hover:border-hairline hover:text-foreground',
+        dashed && 'border-dashed bg-transparent',
       )}
     >
-      <Icon className="size-3.5" strokeWidth={2} />
       {children}
     </span>
   )
@@ -227,9 +327,9 @@ function DuePill({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" className="focus-ring rounded-md">
-          <Pill icon={Calendar} active={due !== null}>
-            {dueLabel(due, today)}
+        <button type="button" className="focus-ring">
+          <Pill active={due !== null}>
+            {due ? dueLabel(due, today) : 'date…'}
           </Pill>
         </button>
       </PopoverTrigger>
@@ -307,9 +407,16 @@ function AssigneePill({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" className="focus-ring rounded-md">
-          <Pill icon={AtSign} active={assignee !== null}>
-            {assignee ? assignee.name : 'Assigned to you'}
+        <button type="button" className="focus-ring">
+          <Pill active={assignee !== null}>
+            {assignee ? (
+              <>
+                <InitialsMark name={assignee.name} size="xs" />
+                <span className="font-sans text-label">{assignee.name}</span>
+              </>
+            ) : (
+              'assign to me'
+            )}
           </Pill>
         </button>
       </PopoverTrigger>
@@ -375,13 +482,14 @@ function RecordsPill({
       {records.map((r) => (
         <span
           key={r.id}
-          className="flex h-7 items-center gap-1 rounded-md border border-border px-2 text-label"
+          className="flex h-6 items-center gap-1.5 border border-rule bg-paper px-2 text-label"
         >
+          <DitherMark size={12} />
           {r.name}
           <button
             type="button"
             aria-label={`Unlink ${r.name}`}
-            className="focus-ring rounded text-muted-foreground hover:text-foreground"
+            className="focus-ring text-graphite hover:text-foreground"
             onClick={() => onChange(records.filter((x) => x.id !== r.id))}
           >
             <X className="size-3" strokeWidth={2} />
@@ -390,10 +498,8 @@ function RecordsPill({
       ))}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" className="focus-ring rounded-md">
-            <Pill icon={Link2}>
-              {records.length === 0 ? 'Add record' : 'Add'}
-            </Pill>
+          <button type="button" className="focus-ring">
+            <Pill dashed>+ link record</Pill>
           </button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-72 p-2">

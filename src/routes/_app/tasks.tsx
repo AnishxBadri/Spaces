@@ -1,8 +1,14 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { Building2, CheckSquare, Kanban, Plus, Users } from 'lucide-react'
+import { CheckSquare } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { EmptyState } from '#/components/empty-state'
+import {
+  LedgerFigure,
+  LedgerRow,
+  LedgerSection,
+} from '#/components/ledger-section'
+import { PageHeader } from '#/components/page-header'
 import { TaskComposer } from '#/components/task-composer'
 import { listTasks, setTaskDone } from '#/lib/server-fns'
 import { localToday } from '#/lib/tasks/parse-due'
@@ -21,17 +27,60 @@ function endOfWeek(today: string): string {
   return d.toISOString().slice(0, 10)
 }
 
-type Group = { key: string; title: string; tone?: string; rows: Array<TaskRow> }
+type Group = {
+  key: string
+  title: string
+  tone?: string
+  /** The mono note after the count — the group's frame of reference. */
+  hint?: string
+  rows: Array<TaskRow>
+}
+
+const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function weekdayOf(iso: string): string {
+  return WEEKDAY[new Date(`${iso}T00:00:00Z`).getUTCDay()]
+}
+
+/** Whole days from today to `iso` — negative when overdue. */
+function daysFrom(today: string, iso: string): number {
+  return Math.round(
+    (new Date(`${iso}T00:00:00Z`).getTime() -
+      new Date(`${today}T00:00:00Z`).getTime()) /
+      86_400_000,
+  )
+}
+
+/** The when-lane: `09-08 · −2d` overdue, `today`, `Fri 09-12` this week,
+ *  the ISO date later, `—` when dateless. */
+function whenFigure(due: string | null, today: string, groupKey: string) {
+  if (!due) return '—'
+  const d = daysFrom(today, due)
+  if (d < 0) return `${due.slice(5)} · −${-d}d`
+  if (d === 0) return 'today'
+  if (groupKey === 'week') return `${weekdayOf(due)} ${due.slice(5)}`
+  return due
+}
 
 /** Urgency groups, Attio-style: overdue red, today, this week, later, dateless. */
 function groupTasks(open: Array<TaskRow>, today: string): Array<Group> {
   const eow = endOfWeek(today)
   const groups: Array<Group> = [
     { key: 'overdue', title: 'Overdue', tone: 'text-destructive', rows: [] },
-    { key: 'today', title: 'Today', rows: [] },
-    { key: 'week', title: 'This week', rows: [] },
+    {
+      key: 'today',
+      title: 'Today',
+      hint: `${weekdayOf(today)} ${today.slice(5)}`,
+      rows: [],
+    },
+    {
+      key: 'week',
+      title: 'This week',
+      hint: `through ${weekdayOf(eow)} ${eow.slice(5)}`,
+      rows: [],
+    },
     { key: 'later', title: 'Later', rows: [] },
-    { key: 'nodate', title: 'No date', rows: [] },
+    { key: 'nodate', title: 'No date', hint: 'dateless is legal', rows: [] },
   ]
   for (const t of open) {
     if (!t.dueDate) groups[4].rows.push(t)
@@ -59,32 +108,47 @@ function TasksPage() {
     }
   }
 
+  const overdue = groups.find((g) => g.key === 'overdue')?.rows.length ?? 0
+  const dueToday = groups.find((g) => g.key === 'today')?.rows.length ?? 0
+  const empty = data.open.length === 0 && data.done.length === 0
+
   return (
-    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
-      <header>
-        <h1 className="text-page font-semibold tracking-tight">Tasks</h1>
-        <p className="mt-1 text-ui text-muted-foreground">
-          Follow-ups with dates attached — what resurfaces parked deals and
-          keeps diligence moving.
-        </p>
-      </header>
+    <div className="flex min-h-full flex-col">
+      <PageHeader
+        title="Tasks"
+        description={
+          <>
+            <span>{data.open.length} open</span>
+            <span className={overdue > 0 ? 'text-destructive' : undefined}>
+              {overdue} overdue
+            </span>
+            <span>{dueToday} today</span>
+            <span>{data.done.length} done</span>
+          </>
+        }
+        action={
+          data.done.length > 0 ? (
+            <div className="-mb-4 flex items-center" role="group">
+              <HeaderTab active={!showDone} onClick={() => setShowDone(false)}>
+                Open
+              </HeaderTab>
+              <HeaderTab active={showDone} onClick={() => setShowDone(true)}>
+                Done
+                <span className="font-normal tracking-normal normal-case">
+                  {data.done.length}
+                </span>
+              </HeaderTab>
+            </div>
+          ) : undefined
+        }
+      />
 
-      {/* The one way to add things, everywhere: a composer bar, not a corner
-          button. Opens the same TaskComposer dialog. Hidden when empty — the
-          empty state carries its own composer action. */}
-      {data.open.length === 0 && data.done.length === 0 ? null : (
-        <TaskComposer
-          trigger={
-            <button className="mt-5 flex h-9 w-full items-center gap-2 rounded-md border border-input px-3 text-left text-ui text-muted-foreground focus-ring transition-colors duration-150 ease-out-quart hover:border-border hover:bg-accent">
-              <Plus className="size-3.5 shrink-0" strokeWidth={2} />
-              Add a task — "chase data room Friday", "revisit after their
-              raise"…
-            </button>
-          }
-        />
-      )}
+      {/* The one way to add things, everywhere: the composer band under the
+          header (P6), not a corner button. Hidden when empty — the empty
+          state carries its own composer action. */}
+      {empty ? null : <TaskComposer variant="band" />}
 
-      {data.open.length === 0 && data.done.length === 0 ? (
+      {empty ? (
         <EmptyState
           icon={CheckSquare}
           title="Nothing to chase yet"
@@ -94,58 +158,41 @@ function TasksPage() {
           action={<TaskComposer />}
         />
       ) : (
-        <div className="mt-6 space-y-8">
+        <div className="flex flex-col gap-8 px-8 py-6">
           {groups.map((g) => (
-            <section key={g.key}>
-              <h2
-                className={cn(
-                  'mb-2 text-label font-semibold tracking-wide uppercase',
-                  g.tone ?? 'text-muted-foreground',
-                )}
-              >
-                {g.title}
-                <span className="tabular ml-2 font-normal">
-                  {g.rows.length}
-                </span>
-              </h2>
-              <ol className="divide-y divide-border rounded-lg border border-border">
-                {g.rows.map((t) => (
-                  <TaskItem
-                    key={t.id}
-                    task={t}
-                    overdue={g.key === 'overdue'}
-                    onToggle={() => toggle(t.id, true)}
-                  />
-                ))}
-              </ol>
-            </section>
+            <LedgerSection
+              key={g.key}
+              label={<span className={g.tone}>{g.title}</span>}
+              count={
+                g.hint ? `${g.rows.length} · ${g.hint}` : `${g.rows.length}`
+              }
+            >
+              {g.rows.map((t, i) => (
+                <TaskItem
+                  key={t.id}
+                  task={t}
+                  figure={whenFigure(t.dueDate, today, g.key)}
+                  overdue={g.key === 'overdue'}
+                  last={i === g.rows.length - 1}
+                  onToggle={() => toggle(t.id, true)}
+                />
+              ))}
+            </LedgerSection>
           ))}
 
-          {data.done.length > 0 ? (
-            <section>
-              <button
-                type="button"
-                className="rounded text-label font-semibold tracking-wide text-muted-foreground uppercase focus-ring"
-                onClick={() => setShowDone((s) => !s)}
-              >
-                Done {showDone ? '▾' : '▸'}
-                <span className="tabular ml-2 font-normal">
-                  {data.done.length}
-                </span>
-              </button>
-              {showDone ? (
-                <ol className="mt-2 divide-y divide-border rounded-lg border border-border opacity-60">
-                  {data.done.map((t) => (
-                    <TaskItem
-                      key={t.id}
-                      task={t}
-                      done
-                      onToggle={() => toggle(t.id, false)}
-                    />
-                  ))}
-                </ol>
-              ) : null}
-            </section>
+          {showDone && data.done.length > 0 ? (
+            <LedgerSection label="Done" count={`${data.done.length}`}>
+              {data.done.map((t, i) => (
+                <TaskItem
+                  key={t.id}
+                  task={t}
+                  figure="done"
+                  done
+                  last={i === data.done.length - 1}
+                  onToggle={() => toggle(t.id, false)}
+                />
+              ))}
+            </LedgerSection>
           ) : null}
         </div>
       )}
@@ -153,82 +200,98 @@ function TasksPage() {
   )
 }
 
+/** Header tabs: caps mono, pine rule under the current one (the view-tab
+ *  treatment). Sits on the header's hairline. */
+function HeaderTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'focus-ring-inset flex h-9 items-center gap-1.5 border-b-2 px-3 label-caps transition-colors duration-150 ease-out-quart',
+        active
+          ? 'border-primary text-foreground'
+          : 'border-transparent text-graphite hover:text-foreground',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 function TaskItem({
   task: t,
   done,
   overdue,
+  figure,
+  last,
   onToggle,
 }: {
   task: TaskRow
   done?: boolean
   overdue?: boolean
+  figure: string
+  last?: boolean
   onToggle: () => void
 }) {
   return (
-    // The row reads check → what → where → when: entity chips sit inline
-    // after the content; the date holds the right lane alone.
-    <li className="flex h-10 items-center gap-3 px-4">
+    // The row reads check → what → where → who → when; the date holds the
+    // right lane alone.
+    <LedgerRow last={last}>
       <input
         type="checkbox"
-        className="accent-primary"
+        className="focus-ring size-3.5 shrink-0 appearance-none border border-hairline bg-paper checked:border-primary checked:bg-primary"
         checked={!!done}
         onChange={onToggle}
         aria-label={done ? 'Reopen task' : 'Complete task'}
       />
-      <span className={cn('truncate text-ui', done && 'line-through')}>
+      <span
+        className={cn(
+          'min-w-0 truncate text-ui',
+          done && 'text-graphite line-through',
+        )}
+      >
         {t.content}
       </span>
       {t.entities.map((e) => {
         const path = entityPath(e.kind, e.id)
-        const Icon = ENTITY_ICONS[e.kind] ?? Building2
-        const chip = (
-          <>
-            <Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
-            {e.name}
-          </>
-        )
-        // Kinds without a record page (organizations) stay plain chips —
-        // a wrong-kind route is worse than no link.
+        // Kinds without a record page (organizations) stay plain — a
+        // wrong-kind route is worse than no link.
         return path ? (
           <Link
             key={e.id}
             to={path}
-            className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-micro font-medium focus-ring hover:bg-selected"
+            className="focus-ring shrink-0 truncate mono text-micro text-graphite hover:text-foreground"
           >
-            {chip}
+            {e.name}
           </Link>
         ) : (
           <span
             key={e.id}
-            className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-micro font-medium text-muted-foreground"
+            className="shrink-0 truncate mono text-micro text-graphite"
           >
-            {chip}
+            {e.name}
           </span>
         )
       })}
-      <span className="ml-auto flex shrink-0 items-baseline gap-3">
-        <span className="text-label text-muted-foreground">
-          {t.assigneeName}
-        </span>
-        {t.dueDate ? (
-          <span
-            className={cn(
-              'tabular text-label',
-              overdue ? 'text-destructive' : 'text-muted-foreground',
-            )}
-          >
-            {t.dueDate}
-          </span>
-        ) : null}
+      <span className="flex-1" />
+      <span className="shrink-0 mono text-micro text-graphite">
+        {t.assigneeName}
       </span>
-    </li>
+      <LedgerFigure wide tone={overdue ? 'bad' : done ? 'muted' : undefined}>
+        {figure}
+      </LedgerFigure>
+    </LedgerRow>
   )
-}
-
-const ENTITY_ICONS: Record<string, typeof Users> = {
-  person: Users,
-  company: Building2,
-  deal: Kanban,
 }
 
 function entityPath(kind: string, id: string): string | null {
