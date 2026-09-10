@@ -10,9 +10,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
+import { DitherMark, InitialsMark } from './record/record-parts'
+import { badgeStyle, optionColor } from '#/lib/attributes/colors'
 import { updateRecord } from '#/lib/server-fns'
 import { fmtMoney } from '#/lib/portfolio/format'
+import { localToday } from '#/lib/tasks/parse-due'
 import { cn } from '#/lib/utils'
+
+/** Cards shown per column before the dashed "+N more" row. */
+const COLUMN_LIMIT = 8
 
 /**
  * The pipeline board — one column per stage, native HTML5 drag between
@@ -43,6 +49,7 @@ export function DealBoard({
   refNames,
   valueCurrency = 'USD',
   medianDaysInStage = {},
+  daysInStage = {},
 }: {
   deals: Array<BoardDeal>
   stages: Array<BoardStage>
@@ -51,9 +58,14 @@ export function DealBoard({
   valueCurrency?: string
   /** Median days live deals have sat in each stage (funnel stats). */
   medianDaysInStage?: Record<string, number | undefined>
+  /** Days each deal has sat in its current stage, by deal id (funnel stats). */
+  daysInStage?: Record<string, number | null | undefined>
 }) {
   const router = useRouter()
+  const today = localToday()
   const [dragOver, setDragOver] = useState<string | null>(null)
+  // Columns fold past COLUMN_LIMIT; the dashed row opens them.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   // Optimistic column assignment so the card lands before the server does.
   const [moved, setMoved] = useState<Record<string, string>>({})
   // A drop onto Passed/Lost pauses here for the post-mortem reason.
@@ -110,12 +122,19 @@ export function DealBoard({
     void commitMove(dealId, stageId)
   }
 
-  function companyName(d: BoardDeal): string {
-    const id = d.values.company as string | undefined
-    if (!id) return ''
+  function nameOf(id: unknown): string {
+    if (typeof id !== 'string' || !id) return ''
     const hit = refNames[id]
     if (!hit) return ''
     return typeof hit === 'string' ? hit : hit.name
+  }
+
+  function daysUntil(iso: string): number {
+    return Math.round(
+      (new Date(`${iso}T00:00:00Z`).getTime() -
+        new Date(`${today}T00:00:00Z`).getTime()) /
+        86_400_000,
+    )
   }
 
   return (
@@ -132,7 +151,7 @@ export function DealBoard({
         />
       ) : null}
       <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-4">
-        {stages.map((stage) => {
+        {stages.map((stage, stageIndex) => {
           const cards = deals.filter((d) => stageOf(d) === stage.id)
           const medianDays = medianDaysInStage[stage.id]
           // An archived stage is history: it stays on the board only while
@@ -141,16 +160,18 @@ export function DealBoard({
           // offered. Cards can still be dragged out; that's the cleanup.
           if (stage.archived && cards.length === 0) return null
           const droppable = !stage.archived
+          const shown = expanded[stage.id]
+            ? cards
+            : cards.slice(0, COLUMN_LIMIT)
+          const sum = cards.reduce(
+            (acc, d) =>
+              acc + (typeof d.values.value === 'number' ? d.values.value : 0),
+            0,
+          )
           return (
             <div
               key={stage.id}
-              className={cn(
-                'flex w-64 shrink-0 flex-col rounded-lg border bg-muted/20 transition-colors duration-150',
-                dragOver === stage.id
-                  ? 'border-primary/50 bg-selected'
-                  : 'border-border',
-                stage.archived && 'border-dashed bg-muted/40',
-              )}
+              className="flex w-56 shrink-0 flex-col gap-2"
               onDragOver={(e) => {
                 if (!droppable) {
                   e.dataTransfer.dropEffect = 'none'
@@ -168,64 +189,139 @@ export function DealBoard({
                 if (id) moveTo(id, stage.id)
               }}
             >
+              {/* The column head is a mini readout strip: badge, count, Σ,
+                  median — hairline under. */}
               <div
-                className={cn(
-                  'flex items-baseline gap-2 px-3 pt-2.5 pb-1.5',
-                  stage.archived && 'text-muted-foreground',
-                )}
+                className="flex flex-col gap-1 border-b border-hairline pb-2"
                 title={stage.archived ? 'Archived stage' : undefined}
               >
-                <span className="text-label font-semibold">{stage.label}</span>
-                {stage.archived ? (
-                  <span className="rounded-full bg-muted px-1.5 text-micro font-medium tracking-wide text-muted-foreground uppercase">
-                    archived
-                  </span>
-                ) : null}
-                <span className="tabular text-label text-muted-foreground">
-                  {cards.length}
-                </span>
-                {cards.length > 0 && medianDays !== undefined ? (
+                <div className="flex items-baseline justify-between gap-2">
                   <span
-                    className="tabular ml-auto text-label text-muted-foreground"
-                    title="Median days in this stage"
+                    className={cn(
+                      'flex h-[1.125rem] min-w-0 items-center truncate px-1.5 mono text-micro font-medium',
+                      stage.archived && 'bg-bone-deep text-graphite',
+                    )}
+                    style={
+                      stage.archived
+                        ? undefined
+                        : badgeStyle(optionColor(stage, stageIndex))
+                    }
                   >
-                    ~{Math.round(medianDays)}d
+                    {stage.label}
+                    {stage.archived ? ' · archived' : ''}
                   </span>
-                ) : null}
+                  <span className="mono text-micro text-foreground">
+                    {cards.length}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2 mono text-[0.625rem] leading-3 text-graphite">
+                  <span>
+                    Σ{' '}
+                    {sum > 0
+                      ? fmtMoney(sum, valueCurrency, { compact: true })
+                      : '—'}
+                  </span>
+                  <span>
+                    {cards.length > 0 && medianDays !== undefined
+                      ? `med ${Math.round(medianDays)}d`
+                      : ''}
+                  </span>
+                </div>
               </div>
-              <ol className="min-h-16 flex-1 space-y-1.5 overflow-y-auto px-2 pb-2">
-                {cards.map((d) => (
-                  <li
-                    key={d.id}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('text/deal-id', d.id)
-                      e.dataTransfer.effectAllowed = 'move'
-                    }}
-                  >
-                    <Link
-                      to="/deals/$dealId"
-                      params={{ dealId: d.id }}
-                      className="block rounded-md border border-border bg-background px-3 py-2 shadow-xs focus-ring transition-colors duration-150 hover:border-input"
+              <ol className="flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto">
+                {shown.map((d) => {
+                  const days = daysInStage[d.id]
+                  const late =
+                    days !== null &&
+                    days !== undefined &&
+                    medianDays !== undefined &&
+                    medianDays > 0 &&
+                    days > 2 * medianDays
+                  const close =
+                    typeof d.values.close_date === 'string'
+                      ? d.values.close_date
+                      : null
+                  const owner = nameOf(d.values.owner)
+                  const company = nameOf(d.values.company)
+                  return (
+                    <li
+                      key={d.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/deal-id', d.id)
+                        e.dataTransfer.effectAllowed = 'move'
+                      }}
                     >
-                      <span className="block truncate text-ui font-medium">
-                        {d.name}
-                      </span>
-                      <span className="mt-0.5 flex items-baseline justify-between gap-2">
-                        <span className="truncate text-label text-muted-foreground">
-                          {companyName(d)}
-                        </span>
-                        {typeof d.values.value === 'number' ? (
-                          <span className="tabular shrink-0 text-label text-muted-foreground">
-                            {fmtMoney(d.values.value, valueCurrency, {
-                              compact: true,
-                            })}
+                      <Link
+                        to="/deals/$dealId"
+                        params={{ dealId: d.id }}
+                        className="focus-ring flex flex-col gap-2 rounded-md border border-rule bg-paper p-2.5 transition-colors duration-150 hover:border-hairline"
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <DitherMark size={14} />
+                          <span className="truncate text-ui leading-4 font-medium">
+                            {d.name}
                           </span>
-                        ) : null}
-                      </span>
-                    </Link>
+                        </span>
+                        <span className="flex items-baseline justify-between gap-2 mono text-micro">
+                          <span className="min-w-0 truncate text-graphite">
+                            {[
+                              company,
+                              typeof d.values.value === 'number'
+                                ? fmtMoney(d.values.value, valueCurrency, {
+                                    compact: true,
+                                  })
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || '—'}
+                          </span>
+                          {days !== null && days !== undefined ? (
+                            <span
+                              className={cn(
+                                'shrink-0',
+                                late ? 'text-destructive' : 'text-foreground',
+                              )}
+                            >
+                              {Math.round(days)}d
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="flex items-center justify-between gap-2 mono text-[0.625rem] leading-3 text-graphite">
+                          <span className="truncate">
+                            {close
+                              ? `close ${close.slice(5)} · ${daysUntil(close) < 0 ? '−' : ''}${Math.abs(daysUntil(close))}d`
+                              : 'close —'}
+                          </span>
+                          {owner ? (
+                            <InitialsMark name={owner} size="xs" />
+                          ) : null}
+                        </span>
+                      </Link>
+                    </li>
+                  )
+                })}
+                {cards.length > shown.length ? (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpanded((m) => ({ ...m, [stage.id]: true }))
+                      }
+                      className="focus-ring flex h-7 w-full items-center border border-dashed border-rule px-2.5 mono text-micro text-graphite transition-colors hover:border-hairline hover:text-foreground"
+                    >
+                      + {cards.length - shown.length} more
+                    </button>
                   </li>
-                ))}
+                ) : null}
+                {dragOver === stage.id ? (
+                  <li
+                    aria-hidden
+                    className="flex h-18 items-center justify-center border border-dashed border-primary bg-selected mono text-micro text-primary"
+                  >
+                    drop → {stage.label}
+                  </li>
+                ) : null}
               </ol>
             </div>
           )
@@ -272,7 +368,7 @@ export function CloseReasonDialog({
           }}
         >
           <textarea
-            className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-ui focus-ring placeholder:text-muted-foreground"
+            className="focus-ring min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-ui placeholder:text-muted-foreground"
             placeholder={
               stageLabel === 'Passed'
                 ? 'Too early for our check size; team question on GTM…'

@@ -127,7 +127,7 @@ function PersonRecordPage() {
             </Button>
           </>
         }
-        mark={<InitialsMark name={person.name} large />}
+        mark={<InitialsMark name={person.name} size="lg" />}
         name={person.name}
         readouts={[
           {

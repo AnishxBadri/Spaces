@@ -323,36 +323,32 @@ export function initialsOf(name: string): string {
 export function InitialsMark({
   name,
   outline,
-  large,
+  size = 'sm',
   className,
 }: {
   name: string
   outline?: boolean
-  /** 28px for a record header; 22px in lists. */
-  large?: boolean
+  /** xs 16px (board cards), sm 22px (lists), lg 28px (record header). */
+  size?: 'xs' | 'sm' | 'lg'
   className?: string
 }) {
-  // Size and colour are kept on separate elements: tailwind-merge cannot
-  // tell a custom text size from a custom text colour and drops one.
   return (
     <span
       aria-hidden
       className={cn(
-        'flex shrink-0 items-center justify-center',
-        large ? 'size-7' : 'size-[1.375rem]',
-        outline ? 'border border-hairline bg-paper' : 'bg-hairline',
+        'flex shrink-0 items-center justify-center mono',
+        size === 'xs'
+          ? 'size-4 text-[0.5rem] leading-[0.625rem]'
+          : size === 'lg'
+            ? 'size-7 text-label leading-4'
+            : 'size-[1.375rem] text-[0.625rem] leading-3',
+        outline
+          ? 'border border-hairline bg-paper text-foreground'
+          : 'bg-hairline text-paper',
         className,
       )}
     >
-      <span
-        className={cn(
-          'mono',
-          large ? 'text-label leading-4' : 'text-[0.625rem] leading-3',
-        )}
-        style={{ color: outline ? 'var(--foreground)' : 'var(--paper)' }}
-      >
-        {initialsOf(name)}
-      </span>
+      {initialsOf(name)}
     </span>
   )
 }

@@ -335,9 +335,12 @@ function DealsPage() {
           />
         ) : view === 'board' ? (
           <>
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="mb-4 flex h-9 items-center justify-between gap-3 border-b border-rule">
               <ViewToggle view={view} onChange={switchView} />
-              <TerminalSplit rows={deals.rows} />
+              <span className="flex items-center gap-4 mono text-micro text-graphite">
+                <TerminalSplit rows={deals.rows} />
+                <span>drag to move</span>
+              </span>
             </div>
             <DealBoard
               deals={deals.rows}
@@ -350,6 +353,9 @@ function DealsPage() {
                 )?.code ?? 'USD'
               }
               medianDaysInStage={funnel.medianDaysInStage}
+              daysInStage={Object.fromEntries(
+                funnel.daysInStage.map((d) => [d.id, d.days]),
+              )}
             />
           </>
         ) : (
@@ -392,7 +398,7 @@ function DealsPage() {
                     aria-pressed={groupFilter === g}
                     onClick={() => setGroupFilter(groupFilter === g ? null : g)}
                     className={cn(
-                      'focus-ring flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-label font-medium whitespace-nowrap transition-colors duration-150 ease-out-quart',
+                      'focus-ring flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-label font-medium whitespace-nowrap transition-colors duration-150 ease-out-quart',
                       groupFilter === g
                         ? 'border-primary/40 bg-selected text-foreground'
                         : 'border-border text-muted-foreground hover:border-input hover:text-foreground',
@@ -489,7 +495,7 @@ function StageChip({
       onClick={onToggle}
       title={option.archived ? 'Archived option' : undefined}
       className={cn(
-        'focus-ring h-7 shrink-0 rounded-full border px-2.5 text-label whitespace-nowrap transition-colors duration-150 ease-out-quart',
+        'focus-ring h-7 shrink-0 rounded-md border px-2.5 text-label whitespace-nowrap transition-colors duration-150 ease-out-quart',
         pressed
           ? 'border-primary/40 bg-selected font-medium text-foreground'
           : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -512,7 +518,7 @@ function TerminalSplit({ rows }: { rows: Array<DealRow> }) {
     if (s === 'invested' || s === 'passed' || s === 'lost') counts[s] += 1
   }
   return (
-    <span className="tabular text-label text-muted-foreground">
+    <span className="mono text-micro text-graphite">
       {rows.length} deals · {counts.invested} invested · {counts.passed} passed
       · {counts.lost} lost
     </span>
@@ -530,7 +536,7 @@ function ViewToggle({
     <div
       role="group"
       aria-label="View"
-      className="flex items-center rounded-md border border-border p-0.5"
+      className="flex items-center rounded-md border border-hairline"
     >
       {(
         [
@@ -544,10 +550,10 @@ function ViewToggle({
           aria-pressed={view === v}
           onClick={() => onChange(v)}
           className={cn(
-            'focus-ring flex h-6 items-center gap-1 rounded px-2 text-label transition-colors duration-150',
+            'focus-ring-inset flex h-7 items-center gap-1 px-2.5 text-label transition-colors duration-150',
             view === v
-              ? 'bg-selected font-medium text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'bg-hairline font-medium text-paper'
+              : 'text-foreground hover:bg-bone',
           )}
         >
           <Icon className="size-3.5" strokeWidth={2} />
