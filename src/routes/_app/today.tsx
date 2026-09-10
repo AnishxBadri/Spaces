@@ -1,7 +1,14 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { Sunrise, TriangleAlert } from 'lucide-react'
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
+import { Sunrise } from 'lucide-react'
+import { toast } from 'sonner'
 import { badgeStyle, optionColor } from '#/lib/attributes/colors'
 import { GettingStarted } from '#/components/getting-started'
+import {
+  LedgerFigure,
+  LedgerRow,
+  LedgerSection,
+  ReferenceBar,
+} from '#/components/ledger-section'
 import { KeyHint, PageHeader, ReadoutStrip } from '#/components/page-header'
 import { TaskComposer } from '#/components/task-composer'
 import { Button } from '#/components/ui/button'
@@ -13,8 +20,9 @@ import {
   listHoldings,
   listRegistry,
   listTasks,
+  setTaskDone,
 } from '#/lib/server-fns'
-import { fmtDate, fmtMoney, fmtMultiple } from '#/lib/portfolio/format'
+import { fmtMoney, fmtMultiple } from '#/lib/portfolio/format'
 import { localToday } from '#/lib/tasks/parse-due'
 
 /**
@@ -101,7 +109,56 @@ function countWord(n: number): React.ReactNode {
   return <span className="mono">{n}</span>
 }
 
+/** Whole days between two ISO dates, b − a. */
+function daysBetween(a: string, b: string): number {
+  return Math.round(
+    (new Date(`${b}T00:00:00Z`).getTime() -
+      new Date(`${a}T00:00:00Z`).getTime()) /
+      86_400_000,
+  )
+}
+
+/** The when-lane of a due row: −2d, today, or the ISO date. */
+function dueFigure(due: string, today: string): string {
+  const d = daysBetween(today, due)
+  if (d === 0) return 'today'
+  if (d < 0) return `−${-d}d`
+  return due
+}
+
+/** The ledger's time lane, date-only so server and client agree. */
+function whenLabel(atIso: string, today: string): string {
+  const day = atIso.slice(0, 10)
+  const d = daysBetween(day, today)
+  if (d === 0) return 'today'
+  if (d === 1) return 'yest'
+  return day.slice(5)
+}
+
+/** Two-letter type code for a ledger entry, from the verb's subject. */
+function verbCode(verb: string): string {
+  const [subject, action] = verb.split('.')
+  const CODES: Record<string, string> = {
+    mark: 'MK',
+    investment: 'IN',
+    round: 'RD',
+    holding: 'HL',
+    deal: 'DL',
+    company: 'CO',
+    person: 'PE',
+    note: 'NT',
+    document: 'FI',
+    space: 'SP',
+    term: 'TM',
+    mandate: 'MD',
+    task: 'TK',
+    interaction: 'IX',
+  }
+  return CODES[subject] ?? (action ? subject : verb).slice(0, 2).toUpperCase()
+}
+
 function TodayPage() {
+  const router = useRouter()
   const {
     tasks,
     holdings,
@@ -185,6 +242,22 @@ function TodayPage() {
 
   const weekday = WEEKDAY[new Date(`${today}T00:00:00Z`).getUTCDay()]
 
+  async function complete(id: string) {
+    try {
+      await setTaskDone({ data: { id, done: true } })
+      void router.invalidate()
+    } catch {
+      toast.error('Could not update the task')
+    }
+  }
+
+  const idleScale = Math.max(1, ...idleDeals.map((d) => d.days ?? 0))
+  const median = (stage: string): number | null =>
+    funnel.medianDaysInStage[stage] ?? null
+
+  const ledger = activity.slice(0, 8)
+  const totalValue = holdings.rollup.unrealized + holdings.rollup.realized
+
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
@@ -241,206 +314,290 @@ function TodayPage() {
         ]}
       />
 
-      <div className="mx-auto w-full max-w-column px-8 py-6">
-        <GettingStarted progress={progress} />
+      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+        {/* The spine: what needs you, as ledgers. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-10 px-8 pt-6 pb-10">
+          <GettingStarted progress={progress} />
 
-        {holdings.holdings.length > 0 ? (
-          <div className="mt-6 flex flex-wrap items-center gap-x-10 gap-y-2 rounded-lg border border-border px-4 py-3">
-            <Stat
-              label="Invested"
-              value={fmtMoney(
-                holdings.rollup.costBasis,
-                holdings.baseCurrency,
-                {
-                  compact: true,
-                },
-              )}
-            />
-            <Stat
-              label="Value"
-              value={fmtMoney(
-                holdings.rollup.unrealized + holdings.rollup.realized,
-                holdings.baseCurrency,
-                { compact: true },
-              )}
-            />
-            <Stat label="MOIC" value={fmtMultiple(holdings.rollup.moic)} />
-            <Link
-              to="/portfolio"
-              className="focus-ring ml-auto rounded text-label text-muted-foreground hover:text-foreground"
+          {nothingNeedsYou ? (
+            <div className="flex flex-col items-center py-10 text-center">
+              <Sunrise
+                className="size-8 text-muted-foreground"
+                strokeWidth={1.5}
+              />
+              <p className="mt-3 text-ui text-muted-foreground">
+                Nothing overdue, nothing stale, nothing idle. The map could
+                always be deeper — go file a memo.
+              </p>
+            </div>
+          ) : null}
+
+          {dueTasks.length > 0 ? (
+            <LedgerSection
+              label="Due"
+              count={
+                overdue > 0
+                  ? `${dueTasks.length} · ${overdue} overdue`
+                  : `${dueTasks.length}`
+              }
+              link={
+                <Link to="/tasks" className="focus-ring hover:text-foreground">
+                  all tasks ›
+                </Link>
+              }
             >
-              Portfolio →
-            </Link>
-          </div>
-        ) : null}
-
-        {nothingNeedsYou ? (
-          <div className="mt-10 flex flex-col items-center py-10 text-center">
-            <Sunrise
-              className="size-8 text-muted-foreground"
-              strokeWidth={1.5}
-            />
-            <p className="mt-3 text-ui text-muted-foreground">
-              Nothing overdue, nothing stale, nothing idle. The map could always
-              be deeper — go file a memo.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-8 space-y-8">
-            {dueTasks.length > 0 ? (
-              <Attention title={`Due — ${dueTasks.length}`}>
-                {dueTasks.map((t) => (
-                  <li key={t.id} className="flex h-10 items-center gap-3 px-4">
+              {dueTasks.map((t) => {
+                const late = !!t.dueDate && t.dueDate < today
+                return (
+                  <LedgerRow key={t.id}>
+                    <input
+                      type="checkbox"
+                      className="focus-ring size-3.5 shrink-0 appearance-none border border-hairline bg-paper checked:bg-primary"
+                      checked={false}
+                      onChange={() => void complete(t.id)}
+                      aria-label="Complete task"
+                    />
                     <span className="min-w-0 truncate text-ui">
                       {t.content}
                     </span>
                     {t.entities[0] ? (
-                      <span className="shrink-0 truncate text-label text-muted-foreground">
+                      <span className="shrink-0 truncate mono text-micro text-graphite">
                         {t.entities[0].name}
                       </span>
                     ) : null}
-                    <span
-                      className={
-                        t.dueDate && t.dueDate < today
-                          ? 'tabular ml-auto shrink-0 text-label text-destructive'
-                          : 'tabular ml-auto shrink-0 text-label text-muted-foreground'
-                      }
-                    >
-                      {fmtDate(t.dueDate)}
+                    <span className="flex-1" />
+                    <span className="shrink-0 mono text-micro text-graphite">
+                      {t.assigneeName}
                     </span>
-                  </li>
-                ))}
-                {/* Footer row on the second neutral — a quiet exit, not a row. */}
-                <li className="flex h-8 items-center bg-sidebar px-4">
-                  <Link
-                    to="/tasks"
-                    className="focus-ring rounded text-label text-muted-foreground hover:text-foreground"
-                  >
-                    All tasks →
-                  </Link>
-                </li>
-              </Attention>
-            ) : null}
+                    <LedgerFigure tone={late ? 'bad' : undefined}>
+                      {t.dueDate ? dueFigure(t.dueDate, today) : '—'}
+                    </LedgerFigure>
+                  </LedgerRow>
+                )
+              })}
+              <LedgerRow last>
+                <TaskComposer
+                  trigger={
+                    <button
+                      type="button"
+                      className="focus-ring-inset flex h-full w-full items-center gap-3 text-left"
+                    >
+                      <span className="mono text-micro text-primary">+</span>
+                      <span className="min-w-0 truncate text-ui text-graphite">
+                        Add a task… natural dates work: “fri”, “in 2w”, “next
+                        month”
+                      </span>
+                      <span className="flex-1" />
+                      <KeyHint>T</KeyHint>
+                    </button>
+                  }
+                />
+              </LedgerRow>
+            </LedgerSection>
+          ) : null}
 
-            {idleDeals.length > 0 ? (
-              <Attention title={`Idle deals — ${idleDeals.length}`}>
-                {idleDeals.map((d) => (
-                  <li key={d.id}>
+          {idleDeals.length > 0 ? (
+            <LedgerSection
+              label="Idle in stage"
+              count={`${idleDeals.length} · over ${IDLE_DEAL_DAYS}d, from the stage log`}
+              link={
+                <Link to="/deals" className="focus-ring hover:text-foreground">
+                  board ›
+                </Link>
+              }
+            >
+              {idleDeals.map((d, i) => {
+                const days = Math.round(d.days ?? 0)
+                const med = median(d.stage)
+                const past = med !== null && med > 0 && days > 2 * med
+                return (
+                  <LedgerRow key={d.id} last={i === idleDeals.length - 1}>
                     <Link
                       to="/deals/$dealId"
                       params={{ dealId: d.id }}
-                      className="focus-ring flex h-10 items-center gap-3 px-4 hover:bg-accent"
+                      className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 hover:bg-bone"
                     >
-                      <span className="min-w-0 truncate text-ui font-medium">
+                      <span className="w-65 shrink-0 truncate text-ui font-medium">
                         {d.name}
                       </span>
-                      <span
-                        className="shrink-0 rounded px-2 py-0.5 text-label font-medium"
-                        style={stageBadge(d.stage)}
-                      >
-                        {stageLabel(d.stage)}
+                      <span className="flex w-[6.875rem] shrink-0">
+                        <span
+                          className="flex h-[1.125rem] items-center px-1.5 mono text-micro font-medium"
+                          style={stageBadge(d.stage)}
+                        >
+                          {stageLabel(d.stage)}
+                        </span>
                       </span>
-                      <span className="tabular ml-auto shrink-0 text-label text-destructive">
-                        {Math.round(d.days ?? 0)}d in stage
+                      <ReferenceBar
+                        value={days}
+                        median={med}
+                        scale={idleScale}
+                      />
+                      <span className="mono text-micro text-graphite">
+                        {med === null ? 'no median' : `med ${med}d`}
                       </span>
+                      <span className="flex-1" />
+                      <LedgerFigure tone={past ? 'bad' : undefined}>
+                        {days}d
+                      </LedgerFigure>
                     </Link>
-                  </li>
-                ))}
-              </Attention>
-            ) : null}
+                  </LedgerRow>
+                )
+              })}
+            </LedgerSection>
+          ) : null}
 
-            {staleHoldings.length > 0 ? (
-              <Attention title={`Stale marks — ${staleHoldings.length}`}>
-                {staleHoldings.map((h) => (
-                  <li key={h.id}>
+          {staleHoldings.length > 0 ? (
+            <LedgerSection
+              label="Stale marks"
+              count={`${staleHoldings.length} · no mark in ${STALE_MARK_DAYS}d`}
+              link={
+                <Link
+                  to="/portfolio"
+                  className="focus-ring hover:text-foreground"
+                >
+                  portfolio ›
+                </Link>
+              }
+            >
+              {staleHoldings.map((h, i) => {
+                const m = h.metrics.ok ? h.metrics.metrics : null
+                const last = m?.lastMarkDate ?? null
+                return (
+                  <LedgerRow key={h.id} last={i === staleHoldings.length - 1}>
                     <Link
                       to="/portfolio/$holdingId"
                       params={{ holdingId: h.id }}
-                      className="focus-ring flex h-10 items-center gap-3 px-4 hover:bg-accent"
+                      className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 hover:bg-bone"
                     >
-                      <span className="min-w-0 truncate text-ui font-medium">
+                      <span className="w-65 shrink-0 truncate text-ui font-medium">
                         {h.companyName}
                       </span>
-                      <span className="ml-auto shrink-0 text-label text-muted-foreground">
-                        {h.metrics.ok && h.metrics.metrics.lastMarkDate
-                          ? `marked ${fmtDate(h.metrics.metrics.lastMarkDate)}`
+                      <span className="min-w-0 truncate mono text-micro text-graphite">
+                        {last && m
+                          ? `last mark ${last} · ${fmtMoney(m.unrealized, m.currency, { compact: true })}`
                           : 'never marked'}
                       </span>
+                      <span className="flex-1" />
+                      <span className="mono text-micro text-primary">
+                        record mark ›
+                      </span>
+                      <LedgerFigure tone="bad">
+                        {last ? `${daysBetween(last, today)}d` : '—'}
+                      </LedgerFigure>
                     </Link>
+                  </LedgerRow>
+                )
+              })}
+            </LedgerSection>
+          ) : null}
+        </div>
+
+        {/* The rail: bone, what the instrument reads at rest. */}
+        <aside className="flex w-full shrink-0 flex-col border-t border-hairline bg-bone xl:w-100 xl:border-t-0 xl:border-l">
+          {holdings.holdings.length > 0 ? (
+            <section className="flex flex-col border-b border-hairline px-6 py-5">
+              <div className="flex items-baseline justify-between pb-2.5">
+                <h2 className="label-caps text-graphite">Portfolio</h2>
+                <span className="mono text-micro text-graphite">
+                  {holdings.baseCurrency} · {holdings.holdings.length} holding
+                  {holdings.holdings.length === 1 ? '' : 's'}
+                </span>
+              </div>
+              <RailReadout
+                label="Invested"
+                value={fmtMoney(
+                  holdings.rollup.costBasis,
+                  holdings.baseCurrency,
+                )}
+              />
+              <RailReadout
+                label="Value"
+                value={fmtMoney(totalValue, holdings.baseCurrency)}
+              />
+              <RailReadout
+                label="MOIC"
+                value={fmtMultiple(holdings.rollup.moic)}
+              />
+              {missingRates > 0 ? (
+                <div className="flex h-row items-center justify-between border-t border-rule">
+                  <span className="label-caps text-[0.625rem] leading-3 font-normal text-warning">
+                    {missingRates} holding{missingRates === 1 ? '' : 's'}{' '}
+                    unpriced
+                  </span>
+                  <Link
+                    to="/settings"
+                    className="focus-ring mono text-micro text-primary hover:underline"
+                  >
+                    add FX rate ›
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex h-row items-center justify-between border-t border-rule">
+                  <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
+                    All priced
+                  </span>
+                  <Link
+                    to="/portfolio"
+                    className="focus-ring mono text-micro text-foreground hover:underline"
+                  >
+                    portfolio ›
+                  </Link>
+                </div>
+              )}
+            </section>
+          ) : null}
+
+          {activity.length > 0 ? (
+            <section className="flex flex-col px-6 py-5">
+              <div className="flex items-baseline justify-between pb-2.5">
+                <h2 className="label-caps text-graphite">Ledger</h2>
+                <span className="mono text-micro text-graphite">
+                  {activity.length} entries
+                </span>
+              </div>
+              <ol>
+                {ledger.map((a) => (
+                  <li
+                    key={a.id}
+                    className="flex items-start gap-3 border-t border-rule py-2"
+                  >
+                    <span className="w-11 shrink-0 mono text-micro text-graphite">
+                      {whenLabel(a.at, today)}
+                    </span>
+                    <span className="w-5 shrink-0 mono text-[0.625rem] leading-3 font-medium">
+                      {verbCode(a.verb)}
+                    </span>
+                    <span className="min-w-0 text-label leading-[1.0625rem]">
+                      <span className="font-medium">{a.actorName}</span>{' '}
+                      {a.verb.replace(/[._]/g, ' ')}
+                      {a.subjectName ? ` · ${a.subjectName}` : ''}
+                    </span>
                   </li>
                 ))}
-              </Attention>
-            ) : null}
-
-            {missingRates > 0 ? (
-              // A warning line, not a card — this is a data-quality nag, not a
-              // work queue like the sections above it.
-              <Link
-                to="/settings"
-                className="focus-ring flex w-fit items-center gap-1.5 rounded text-label text-destructive hover:opacity-80"
-              >
-                <TriangleAlert className="size-3" strokeWidth={2} />
-                {missingRates} holding{missingRates === 1 ? '' : 's'} excluded
-                from portfolio totals — add rates in Settings →
-              </Link>
-            ) : null}
-          </div>
-        )}
-
-        {activity.length > 0 ? (
-          <section className="mt-10">
-            <h2 className="mb-2 text-label font-semibold tracking-wide text-muted-foreground uppercase">
-              Recent activity
-            </h2>
-            <ol className="space-y-1">
-              {activity.map((a) => (
-                <li key={a.id} className="flex h-7 items-center gap-2 text-ui">
-                  <span className="font-medium">{a.actorName}</span>
-                  <span className="text-muted-foreground">
-                    {a.verb.replace(/[._]/g, ' ')}
+              </ol>
+              {activity.length > ledger.length ? (
+                <div className="flex items-center justify-between border-t border-rule pt-2.5">
+                  <span className="mono text-micro text-graphite">
+                    + {activity.length - ledger.length} more
                   </span>
-                  {a.subjectName ? (
-                    <span className="truncate">{a.subjectName}</span>
-                  ) : null}
-                  <span className="tabular ml-auto shrink-0 text-label text-muted-foreground">
-                    {fmtDate(a.at.slice(0, 10))}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </section>
-        ) : null}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+        </aside>
       </div>
     </div>
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function RailReadout({ label, value }: { label: string; value: string }) {
   return (
-    <span className="flex flex-col gap-0.5">
-      <span className="text-micro font-medium tracking-wide text-muted-foreground uppercase">
+    <div className="flex h-row items-center justify-between border-t border-rule">
+      <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
         {label}
       </span>
-      <span className="tabular text-title font-semibold">{value}</span>
-    </span>
-  )
-}
-
-function Attention({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <section>
-      <h2 className="mb-2 text-label font-semibold tracking-wide text-muted-foreground uppercase">
-        {title}
-      </h2>
-      <ol className="divide-y divide-border rounded-lg border border-border">
-        {children}
-      </ol>
-    </section>
+      <span className="mono text-ui font-medium">{value}</span>
+    </div>
   )
 }
