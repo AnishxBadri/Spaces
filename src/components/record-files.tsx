@@ -3,10 +3,7 @@ import {
   Download,
   Eye,
   File as FileIcon,
-  FileSpreadsheet,
-  FileText,
   Loader2,
-  Presentation,
   Trash2,
   Upload,
 } from 'lucide-react'
@@ -41,21 +38,6 @@ import { cn } from '#/lib/utils'
  */
 
 type Documents = Awaited<ReturnType<typeof listRecordDocuments>>
-
-const dateFmt = new Intl.DateTimeFormat('en', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-})
-
-const KIND_ICONS: Record<string, typeof FileIcon> = {
-  deck: Presentation,
-  cap_table: FileSpreadsheet,
-  memo: FileText,
-  dd: FileText,
-  legal: FileText,
-  article: FileText,
-}
 
 /** In-flight uploads, shown alongside the filed rows. */
 type Pending = {
@@ -119,26 +101,22 @@ export function RecordFiles({
         setDragging(false)
         void handleFiles(e.dataTransfer.files)
       }}
-      className={cn(
-        'mt-4 rounded-md transition-colors',
-        // Flat at rest: the ring only appears because the user is dragging.
-        dragging && 'ring-2 ring-ring ring-offset-2 ring-offset-background',
-      )}
+      className="flex flex-col"
     >
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
+      <div className="flex h-8 items-center justify-between border-t border-rule">
+        <p className="mono text-micro text-graphite">
           {documents.length === 0
-            ? 'Decks, memos, cap tables — drop them here.'
-            : `${documents.length} file${documents.length === 1 ? '' : 's'}`}
+            ? 'decks, memos, cap tables — drop them here'
+            : `${documents.length} file${documents.length === 1 ? '' : 's'} · ${formatBytes(documents.reduce((n, d) => n + (d.sizeBytes ?? 0), 0))}`}
         </p>
-        <Button
-          size="xs"
-          variant="outline"
+        <button
+          type="button"
           onClick={() => inputRef.current?.click()}
+          className="focus-ring flex items-center gap-1 mono text-micro text-primary hover:underline"
         >
           <Upload className="size-3" strokeWidth={2} />
-          Upload
-        </Button>
+          upload
+        </button>
         <input
           ref={inputRef}
           type="file"
@@ -151,38 +129,31 @@ export function RecordFiles({
         />
       </div>
 
-      {documents.length === 0 && pending.length === 0 ? (
-        <div className="mt-3 rounded-md border border-dashed border-border px-4 py-8 text-center">
-          <p className="text-ui text-muted-foreground">
-            No files yet. Drag one in, or use Upload.
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            PDF, DOCX, PPTX and XLSX get their text extracted and searched.
-          </p>
-        </div>
-      ) : (
-        <ul className="mt-3 divide-y divide-border border-y border-border">
+      {documents.length > 0 || pending.length > 0 ? (
+        <ul className="flex flex-col">
           {pending.map((p) => (
             <li
               key={p.key}
-              className="flex items-center gap-3 px-1 py-2.5 text-ui"
+              className="flex h-9 items-center gap-2.5 border-t border-rule text-ui"
             >
-              {p.error ? (
-                <FileIcon
-                  className="size-4 text-destructive"
-                  strokeWidth={1.75}
-                />
-              ) : (
-                <Loader2
-                  className="size-4 animate-spin text-muted-foreground motion-reduce:animate-none"
-                  strokeWidth={1.75}
-                />
-              )}
+              <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper">
+                {p.error ? (
+                  <FileIcon
+                    className="size-3 text-destructive"
+                    strokeWidth={1.75}
+                  />
+                ) : (
+                  <Loader2
+                    className="size-3 animate-spin text-graphite motion-reduce:animate-none"
+                    strokeWidth={1.75}
+                  />
+                )}
+              </span>
               <span className="min-w-0 flex-1 truncate">{p.name}</span>
               <span
                 className={cn(
-                  'text-xs',
-                  p.error ? 'text-destructive' : 'text-muted-foreground',
+                  'mono text-micro',
+                  p.error ? 'text-destructive' : 'text-graphite',
                 )}
               >
                 {p.error ?? PHASE_LABELS[p.phase]}
@@ -197,7 +168,29 @@ export function RecordFiles({
             />
           ))}
         </ul>
-      )}
+      ) : null}
+
+      {/* The dropzone: dashed hairline at rest, pine dashed on the selection
+          wash while a drag is over it. Click opens the picker. */}
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className={cn(
+          'focus-ring mt-2 flex h-18 w-full flex-col items-center justify-center gap-1 border border-dashed transition-colors',
+          dragging
+            ? 'border-primary bg-selected text-primary'
+            : 'border-hairline bg-paper text-foreground hover:bg-bone',
+        )}
+      >
+        <span className="text-ui">
+          {dragging ? 'Release to attach' : 'Drop files, or click'}
+        </span>
+        <span className="mono text-[0.625rem] leading-3 text-graphite">
+          {dragging
+            ? 'they stay on this server'
+            : 'stays on this server · PDF, DOCX, PPTX, XLSX get their text extracted'}
+        </span>
+      </button>
 
       <DocumentPreview
         doc={previewing}
@@ -216,7 +209,6 @@ function DocumentRow({
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
-  const Icon = KIND_ICONS[doc.kind] ?? FileIcon
 
   async function download() {
     try {
@@ -240,35 +232,32 @@ function DocumentRow({
     }
   }
 
+  const code = KIND_CODES[doc.kind] ?? extCode(doc.filename)
+
   return (
-    <li className="group flex items-start gap-3 px-1 py-2.5 text-ui">
-      <Icon
-        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-        strokeWidth={1.75}
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onPreview}
-            title={`Preview ${doc.filename}`}
-            className="min-w-0 truncate rounded text-left font-medium focus-ring hover:underline"
-          >
-            {doc.filename}
-          </button>
-          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-            {DOCUMENT_KIND_LABELS[doc.kind]}
-          </span>
-        </div>
-        <p className="tabular mt-0.5 text-xs text-muted-foreground">
+    <li className="group flex min-h-9 items-center gap-2.5 border-t border-rule py-1 text-ui">
+      <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper mono text-[0.5rem] leading-[0.625rem] text-foreground">
+        {code}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <button
+          type="button"
+          onClick={onPreview}
+          title={`Preview ${doc.filename}`}
+          className="focus-ring min-w-0 truncate text-left leading-4 hover:underline"
+        >
+          {doc.filename}
+        </button>
+        <span className="truncate mono text-[0.625rem] leading-3 text-graphite">
           {[
+            DOCUMENT_KIND_LABELS[doc.kind].toLowerCase(),
             formatBytes(doc.sizeBytes),
+            doc.createdAt.slice(5, 10),
             doc.uploadedByName,
-            dateFmt.format(new Date(doc.createdAt)),
           ]
             .filter(Boolean)
             .join(' · ')}
-        </p>
+        </span>
         <ExtractionNote doc={doc} />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
@@ -277,6 +266,7 @@ function DocumentRow({
           variant="ghost"
           aria-label={`Preview ${doc.filename}`}
           onClick={onPreview}
+          className="text-graphite opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
         >
           <Eye />
         </Button>
@@ -285,6 +275,7 @@ function DocumentRow({
           variant="ghost"
           aria-label={`Download ${doc.filename}`}
           onClick={download}
+          className="text-graphite"
         >
           <Download />
         </Button>
@@ -294,13 +285,27 @@ function DocumentRow({
           disabled={busy}
           aria-label={`Delete ${doc.filename}`}
           onClick={remove}
-          className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
+          className="text-graphite opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
         >
           <Trash2 />
         </Button>
       </div>
     </li>
   )
+}
+
+/** The three-letter tile: the kind when it says something, else the extension. */
+const KIND_CODES: Record<string, string> = {
+  deck: 'DCK',
+  cap_table: 'CAP',
+  memo: 'MEM',
+  dd: 'DD',
+  legal: 'LGL',
+}
+
+function extCode(filename: string): string {
+  const ext = filename.split('.').pop()?.toUpperCase() ?? ''
+  return ext.length > 0 && ext.length <= 4 ? ext.slice(0, 3) : 'FILE'
 }
 
 /**
@@ -311,20 +316,22 @@ function DocumentRow({
 function ExtractionNote({ doc }: { doc: Documents[number] }) {
   if (doc.extractionStatus === 'pending') {
     return (
-      <p className="mt-1 text-xs text-muted-foreground">Extracting text…</p>
+      <p className="mono text-[0.625rem] leading-3 text-graphite">
+        extracting text…
+      </p>
     )
   }
   if (doc.extractionStatus === 'failed') {
     return (
-      <p className="mt-1 text-xs text-destructive">
-        Text extraction failed — {doc.extractionError}
+      <p className="mono text-[0.625rem] leading-3 text-destructive">
+        text extraction failed — {doc.extractionError}
       </p>
     )
   }
   if (doc.extractionStatus === 'unsupported') {
     return (
-      <p className="mt-1 text-xs text-muted-foreground">
-        {doc.extractionError ?? 'No extractable text'}
+      <p className="mono text-[0.625rem] leading-3 text-graphite">
+        {doc.extractionError ?? 'no extractable text'}
       </p>
     )
   }

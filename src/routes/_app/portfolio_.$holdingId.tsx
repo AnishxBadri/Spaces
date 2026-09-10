@@ -1,7 +1,16 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { LedgerRow, LedgerSection } from '#/components/ledger-section'
+import {
+  DitherMark,
+  RailEmpty,
+  RailRow,
+  RailSection,
+  RecordBody,
+  RecordHeader,
+} from '#/components/record/record-parts'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -21,13 +30,7 @@ import {
   addRound,
   getHolding,
 } from '#/lib/server-fns'
-import {
-  fmtDate,
-  fmtMoney,
-  fmtMultiple,
-  fmtPct,
-  fmtXirr,
-} from '#/lib/portfolio/format'
+import { fmtMoney, fmtMultiple, fmtPct, fmtXirr } from '#/lib/portfolio/format'
 
 export const Route = createFileRoute('/_app/portfolio_/$holdingId')({
   loader: async ({ params }) => getHolding({ data: { id: params.holdingId } }),
@@ -40,144 +43,152 @@ function HoldingPage() {
   const h = Route.useLoaderData()
   const m = h.metrics.ok ? h.metrics.metrics : null
 
+  const missing =
+    h.metrics.ok === false
+      ? [...new Set(h.metrics.missingRates.map((r) => r.currency))]
+      : []
+
   return (
-    <div className="px-6 py-8 md:px-10">
-      <Link
-        to="/portfolio"
-        className="mb-4 inline-flex items-center gap-1.5 text-ui text-muted-foreground focus-ring transition-colors duration-150 hover:text-foreground"
+    <div className="flex min-h-full flex-col">
+      <RecordHeader
+        crumb={
+          <>
+            <Link to="/portfolio" className="focus-ring hover:text-foreground">
+              Portfolio
+            </Link>
+            {' / '}
+            {h.id.slice(0, 8)}
+            {' / holding since '}
+            {h.openedAt.slice(0, 10)}
+            {m?.writtenOff ? ' · written off' : ''}
+          </>
+        }
+        actions={
+          <Button variant="outline" asChild>
+            <Link
+              to="/companies/$companyId"
+              params={{ companyId: h.companyId }}
+            >
+              Company record ›
+            </Link>
+          </Button>
+        }
+        mark={<DitherMark />}
+        name={h.companyName}
+        badges={
+          missing.length > 0 ? (
+            <span className="flex h-5 shrink-0 items-center bg-[var(--badge-amber)] px-1.5 mono text-micro font-medium text-[var(--badge-amber-ink)]">
+              unpriced · {missing.join(', ')}
+            </span>
+          ) : null
+        }
+        readouts={
+          m
+            ? [
+                { label: 'Invested', value: fmtMoney(m.costBasis, m.currency) },
+                {
+                  label: m.lastMarkDate
+                    ? `Value · marked ${m.lastMarkDate}`
+                    : 'Value · at cost, never marked',
+                  value: fmtMoney(m.unrealized, m.currency),
+                },
+                { label: 'Realized', value: fmtMoney(m.realized, m.currency) },
+                { label: 'MOIC', value: fmtMultiple(m.moic) },
+                { label: 'XIRR', value: fmtXirr(m.grossXirr) },
+              ]
+            : [
+                {
+                  label: 'Metrics',
+                  value: `need fx for ${missing.join(', ')}`,
+                  tone: 'bad',
+                },
+              ]
+        }
+      />
+
+      <RecordBody
+        rail={
+          <RailSection label="Ownership">
+            <OwnershipBlock ownership={h.ownership} />
+          </RailSection>
+        }
       >
-        <ArrowLeft className="size-4" strokeWidth={2} />
-        Portfolio
-      </Link>
+        {missing.length > 0 ? (
+          <p className="mono text-micro text-destructive">
+            metrics need fx rates for {missing.join(', ')} —{' '}
+            <Link to="/settings" className="focus-ring underline">
+              add them in Settings
+            </Link>
+          </p>
+        ) : null}
 
-      <div className="mb-1 flex items-baseline justify-between gap-4">
-        <h1 className="text-title font-semibold">{h.companyName}</h1>
-        <Link
-          to="/companies/$companyId"
-          params={{ companyId: h.companyId }}
-          className="text-ui text-muted-foreground focus-ring transition-colors duration-150 hover:text-foreground"
-        >
-          Company record →
-        </Link>
-      </div>
-      <p className="mb-6 text-ui text-muted-foreground">
-        Holding since {fmtDate(h.openedAt)}
-        {m?.writtenOff ? ' · written off' : ''}
-      </p>
-
-      {h.metrics.ok === false ? (
-        <p className="mb-6 text-ui text-destructive">
-          Metrics need fx rates for:{' '}
-          {[...new Set(h.metrics.missingRates.map((r) => r.currency))].join(
-            ', ',
-          )}{' '}
-          (Settings → FX rates)
-        </p>
-      ) : null}
-
-      {m ? (
-        <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Stat label="Invested" value={fmtMoney(m.costBasis, m.currency)} />
-          <Stat
-            label="Current value"
-            value={fmtMoney(m.unrealized, m.currency)}
-            hint={
-              m.lastMarkDate
-                ? `marked ${fmtDate(m.lastMarkDate)}`
-                : 'at cost — never marked'
-            }
-          />
-          <Stat label="Realized" value={fmtMoney(m.realized, m.currency)} />
-          <Stat
-            label="MOIC · XIRR"
-            value={`${fmtMultiple(m.moic)} · ${fmtXirr(m.grossXirr)}`}
-          />
-        </div>
-      ) : null}
-
-      <OwnershipBlock ownership={h.ownership} />
-
-      <EventSection
-        title="Checks"
-        empty="No checks recorded."
-        add={<AddInvestmentDialog companyId={h.companyId} />}
-        rows={h.investments.map((i) => ({
-          id: String(i.id),
-          date: String(i.date),
-          label: `${fmtMoney(Number(i.amount), String(i.currency))} · ${String(
-            i.instrument,
-          ).replace(/_/g, ' ')}${i.vehicle ? ` · ${String(i.vehicle)}` : ''}`,
-          detail:
-            i.shares != null
-              ? `${Number(i.shares).toLocaleString()} shares`
-              : i.cap != null
-                ? `cap ${fmtMoney(Number(i.cap), String(i.currency), { compact: true })}`
+        <EventSection
+          title="Checks"
+          empty="No checks recorded."
+          add={<AddInvestmentDialog companyId={h.companyId} />}
+          rows={h.investments.map((i) => ({
+            id: String(i.id),
+            date: String(i.date),
+            kind: 'invest',
+            label: `${String(i.instrument).replace(/_/g, ' ')}${i.vehicle ? ` · ${String(i.vehicle)}` : ''}`,
+            amount: fmtMoney(Number(i.amount), String(i.currency)),
+            detail:
+              i.shares != null
+                ? `${Number(i.shares).toLocaleString()} shares`
+                : i.cap != null
+                  ? `cap ${fmtMoney(Number(i.cap), String(i.currency), { compact: true })}`
+                  : '',
+          }))}
+        />
+        <EventSection
+          title="Rounds"
+          empty="No rounds recorded — add them to power the ownership ledger."
+          add={<AddRoundDialog companyId={h.companyId} />}
+          rows={h.rounds.map((r) => ({
+            id: String(r.id),
+            date: String(r.date),
+            kind: 'round',
+            label: String(r.kind),
+            amount:
+              r.raised != null
+                ? `raised ${fmtMoney(Number(r.raised), String(r.currency ?? 'USD'), { compact: true })}`
                 : '',
-        }))}
-      />
-      <EventSection
-        title="Rounds"
-        empty="No rounds recorded — add them to power the ownership ledger."
-        add={<AddRoundDialog companyId={h.companyId} />}
-        rows={h.rounds.map((r) => ({
-          id: String(r.id),
-          date: String(r.date),
-          label: `${String(r.kind)}${
-            r.raised != null
-              ? ` · raised ${fmtMoney(Number(r.raised), String(r.currency ?? 'USD'), { compact: true })}`
-              : ''
-          }`,
-          detail:
-            r.sharesOutstanding != null
-              ? `${Number(r.sharesOutstanding).toLocaleString()} FD shares`
-              : '',
-        }))}
-      />
-      <EventSection
-        title="Marks"
-        empty="Never marked — value shows at cost, staleness on purpose."
-        add={<AddMarkDialog holdingId={h.id} />}
-        rows={h.marks.map((r) => ({
-          id: String(r.id),
-          date: String(r.date),
-          label: fmtMoney(Number(r.fairValue), String(r.currency)),
-          detail: String(r.basis).replace(/_/g, ' '),
-        }))}
-      />
-      <EventSection
-        title="Distributions"
-        empty="Nothing realized yet."
-        add={<AddDistributionDialog holdingId={h.id} />}
-        rows={h.distributions.map((r) => ({
-          id: String(r.id),
-          date: String(r.date),
-          label: `${fmtMoney(Number(r.amount), String(r.currency))} · ${String(r.kind)}`,
-          detail:
-            r.sharesSold != null
-              ? `${Number(r.sharesSold).toLocaleString()} shares sold`
-              : '',
-        }))}
-      />
-    </div>
-  )
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-}: {
-  label: string
-  value: string
-  hint?: string
-}) {
-  return (
-    <div className="rounded-lg border border-border px-4 py-3">
-      <div className="text-label text-muted-foreground">{label}</div>
-      <div className="tabular mt-1 text-ui font-medium">{value}</div>
-      {hint ? (
-        <div className="mt-0.5 text-label text-muted-foreground">{hint}</div>
-      ) : null}
+            detail:
+              r.sharesOutstanding != null
+                ? `${Number(r.sharesOutstanding).toLocaleString()} FD shares`
+                : '',
+          }))}
+        />
+        <EventSection
+          title="Marks"
+          empty="Never marked — value shows at cost, staleness on purpose."
+          add={<AddMarkDialog holdingId={h.id} />}
+          rows={h.marks.map((r) => ({
+            id: String(r.id),
+            date: String(r.date),
+            kind: 'mark',
+            label: String(r.basis).replace(/_/g, ' '),
+            amount: fmtMoney(Number(r.fairValue), String(r.currency)),
+            detail: '',
+          }))}
+        />
+        <EventSection
+          title="Distributions"
+          empty="Nothing realized yet."
+          add={<AddDistributionDialog holdingId={h.id} />}
+          rows={h.distributions.map((r) => ({
+            id: String(r.id),
+            date: String(r.date),
+            kind: 'distrib',
+            label: String(r.kind),
+            amount: `+${fmtMoney(Number(r.amount), String(r.currency))}`,
+            detail:
+              r.sharesSold != null
+                ? `${Number(r.sharesSold).toLocaleString()} shares sold`
+                : '',
+          }))}
+        />
+      </RecordBody>
     </div>
   )
 }
@@ -185,46 +196,47 @@ function Stat({
 function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
   if (ownership.kind === 'cost_basis_only') {
     return (
-      <p className="mb-8 text-ui text-muted-foreground">
-        Ownership: cost basis only — unconverted instrument, a percentage would
-        be a guess.
-      </p>
+      <RailEmpty>
+        Cost basis only — unconverted instrument, a percentage would be a guess.
+      </RailEmpty>
     )
   }
   if (ownership.kind === 'implied') {
     return (
-      <p className="mb-8 text-ui">
-        Implied ownership{' '}
-        <span className="tabular font-medium">~{fmtPct(ownership.pct)}</span>
-        <span className="text-muted-foreground">
-          {' '}
-          — post-money SAFE, locked at signing
-        </span>
-      </p>
+      <>
+        <RailRow label="Implied" value={`~${fmtPct(ownership.pct)}`} />
+        <RailEmpty>Post-money SAFE, locked at signing.</RailEmpty>
+      </>
     )
   }
   return (
-    <div className="mb-8">
-      <h2 className="mb-2 text-ui font-semibold">Ownership</h2>
-      <ol className="space-y-1">
-        {ownership.history.map((p) => (
-          <li key={p.date} className="flex items-baseline gap-3 text-ui">
-            <span className="tabular w-24 shrink-0 text-muted-foreground">
-              {fmtDate(p.date)}
-            </span>
-            <span className="min-w-24">{p.roundKind}</span>
-            <span className="tabular font-medium">{fmtPct(p.pct)}</span>
-            <span className="text-label text-muted-foreground">
-              {p.ourShares.toLocaleString()} /{' '}
-              {p.sharesOutstanding.toLocaleString()} FD
-            </span>
-          </li>
-        ))}
-      </ol>
-    </div>
+    <ol>
+      {ownership.history.map((p) => (
+        <li
+          key={p.date}
+          className="flex h-row items-center gap-3 border-t border-rule"
+        >
+          <span className="w-20 shrink-0 mono text-micro text-graphite">
+            {p.date}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-ui">{p.roundKind}</span>
+          <span className="mono text-micro text-graphite">
+            {p.ourShares.toLocaleString()} /{' '}
+            {p.sharesOutstanding.toLocaleString()}
+          </span>
+          <span className="w-14 shrink-0 numeric text-ui font-medium">
+            {fmtPct(p.pct)}
+          </span>
+        </li>
+      ))}
+    </ol>
   )
 }
-
+/**
+ * One append-only ledger per event kind: date, kind, entry, amount, detail.
+ * No edit or delete affordance is drawn — the correction policy is an open
+ * decision, and a wrong entry is answered by a new one.
+ */
 function EventSection({
   title,
   empty,
@@ -234,34 +246,43 @@ function EventSection({
   title: string
   empty: string
   add: React.ReactNode
-  rows: Array<{ id: string; date: string; label: string; detail: string }>
+  rows: Array<{
+    id: string
+    date: string
+    kind: string
+    label: string
+    amount: string
+    detail: string
+  }>
 }) {
   return (
-    <section className="mb-8">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-ui font-semibold">{title}</h2>
-        {add}
-      </div>
+    <LedgerSection
+      label={title}
+      count={`${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}`}
+      link={add}
+    >
       {rows.length === 0 ? (
-        <p className="text-ui text-muted-foreground">{empty}</p>
+        <li className="py-2 text-label text-graphite">{empty}</li>
       ) : (
-        <ol className="divide-y divide-border rounded-lg border border-border">
-          {rows.map((r) => (
-            <li key={r.id} className="flex items-baseline gap-3 px-4 py-2.5">
-              <span className="tabular w-24 shrink-0 text-label text-muted-foreground">
-                {fmtDate(r.date)}
+        rows.map((r, i) => (
+          <LedgerRow key={r.id} last={i === rows.length - 1}>
+            <span className="w-24 shrink-0 mono text-micro text-graphite">
+              {r.date.slice(0, 10)}
+            </span>
+            <span className="w-16 shrink-0 mono text-micro font-medium uppercase">
+              {r.kind}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-ui">{r.label}</span>
+            {r.detail ? (
+              <span className="shrink-0 mono text-micro text-graphite">
+                {r.detail}
               </span>
-              <span className="text-ui">{r.label}</span>
-              {r.detail ? (
-                <span className="ml-auto text-label text-muted-foreground">
-                  {r.detail}
-                </span>
-              ) : null}
-            </li>
-          ))}
-        </ol>
+            ) : null}
+            <span className="w-32 shrink-0 numeric text-ui">{r.amount}</span>
+          </LedgerRow>
+        ))
       )}
-    </section>
+    </LedgerSection>
   )
 }
 
@@ -297,10 +318,14 @@ function AddTrigger({
   // Spreads DialogTrigger's asChild-injected props (onClick, aria-*)
   // through to the real button — without this the dialog never opens.
   return (
-    <Button size="sm" variant="outline" {...props}>
-      <Plus className="size-4" strokeWidth={2} />
-      {label}
-    </Button>
+    <button
+      type="button"
+      className="focus-ring flex items-center gap-1 mono text-micro text-primary hover:underline"
+      {...props}
+    >
+      <Plus className="size-3" strokeWidth={2} />
+      {label.toLowerCase()}
+    </button>
   )
 }
 
@@ -401,7 +426,7 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
           <Field id="inv-instrument" label="Instrument">
             <select
               id="inv-instrument"
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui focus-ring"
+              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui"
               value={form.instrument}
               onChange={(e) =>
                 setForm((s) => ({ ...s, instrument: e.target.value }))
@@ -660,7 +685,7 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
           <Field id="mk-basis" label="Basis">
             <select
               id="mk-basis"
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui focus-ring"
+              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui"
               value={form.basis}
               onChange={(e) =>
                 setForm((s) => ({ ...s, basis: e.target.value }))
@@ -737,7 +762,7 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
           <Field id="ds-kind" label="Kind">
             <select
               id="ds-kind"
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui focus-ring"
+              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui"
               value={form.kind}
               onChange={(e) => setForm((s) => ({ ...s, kind: e.target.value }))}
             >
