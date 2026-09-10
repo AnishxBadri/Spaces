@@ -33,7 +33,7 @@ function AppShell() {
   return (
     <div className="flex min-h-dvh bg-background">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-60 border-r border-sidebar-border md:block">
+      <aside className="fixed inset-y-0 left-0 hidden w-58 border-r border-sidebar-border md:block">
         <AppSidebar
           user={session.user}
           workspaceName={workspace?.name ?? null}
@@ -49,7 +49,7 @@ function AppShell() {
           aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
           aria-expanded={mobileNavOpen}
           onClick={() => setMobileNavOpen((v) => !v)}
-          className="-ml-1 flex size-8 items-center justify-center rounded-md text-muted-foreground focus-ring hover:bg-accent"
+          className="focus-ring -ml-1 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
         >
           {mobileNavOpen ? (
             <X className="size-4.5" strokeWidth={1.75} />
@@ -68,7 +68,7 @@ function AppShell() {
             onClick={() => setMobileNavOpen(false)}
             aria-hidden
           />
-          <div className="absolute inset-y-0 top-12 left-0 w-60 border-r border-sidebar-border shadow-lg">
+          <div className="absolute inset-y-0 top-12 left-0 w-58 border-r border-sidebar-border shadow-[3px_0_0_0_var(--hairline)]">
             <AppSidebar
               hideWordmark
               user={session.user}

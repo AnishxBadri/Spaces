@@ -109,7 +109,7 @@ function TodayPage() {
     <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-page font-semibold tracking-tight">Today</h1>
+          <h1 className="title-serif">Today</h1>
           <p className="mt-1 text-ui text-muted-foreground">
             What needs your attention — nothing here means go read something.
           </p>
@@ -138,7 +138,7 @@ function TodayPage() {
           <Stat label="MOIC" value={fmtMultiple(holdings.rollup.moic)} />
           <Link
             to="/portfolio"
-            className="ml-auto rounded text-label text-muted-foreground focus-ring hover:text-foreground"
+            className="focus-ring ml-auto rounded text-label text-muted-foreground hover:text-foreground"
           >
             Portfolio →
           </Link>
@@ -180,7 +180,7 @@ function TodayPage() {
               <li className="flex h-8 items-center bg-sidebar px-4">
                 <Link
                   to="/tasks"
-                  className="rounded text-label text-muted-foreground focus-ring hover:text-foreground"
+                  className="focus-ring rounded text-label text-muted-foreground hover:text-foreground"
                 >
                   All tasks →
                 </Link>
@@ -195,7 +195,7 @@ function TodayPage() {
                   <Link
                     to="/deals/$dealId"
                     params={{ dealId: d.id }}
-                    className="flex h-10 items-center gap-3 px-4 focus-ring hover:bg-accent"
+                    className="focus-ring flex h-10 items-center gap-3 px-4 hover:bg-accent"
                   >
                     <span className="min-w-0 truncate text-ui font-medium">
                       {d.name}
@@ -222,7 +222,7 @@ function TodayPage() {
                   <Link
                     to="/portfolio/$holdingId"
                     params={{ holdingId: h.id }}
-                    className="flex h-10 items-center gap-3 px-4 focus-ring hover:bg-accent"
+                    className="focus-ring flex h-10 items-center gap-3 px-4 hover:bg-accent"
                   >
                     <span className="min-w-0 truncate text-ui font-medium">
                       {h.companyName}
@@ -243,7 +243,7 @@ function TodayPage() {
             // work queue like the sections above it.
             <Link
               to="/settings"
-              className="flex w-fit items-center gap-1.5 rounded text-label text-destructive focus-ring hover:opacity-80"
+              className="focus-ring flex w-fit items-center gap-1.5 rounded text-label text-destructive hover:opacity-80"
             >
               <TriangleAlert className="size-3" strokeWidth={2} />
               {missingRates} holding{missingRates === 1 ? '' : 's'} excluded

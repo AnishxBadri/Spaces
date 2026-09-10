@@ -106,7 +106,7 @@ export function OptionChip({
       }
       title={state.archived ? 'Archived option' : undefined}
       className={cn(
-        'truncate rounded-full px-2 py-0.5 text-label font-medium',
+        'truncate px-1.5 py-0.5 mono text-micro font-medium',
         state.archived && 'bg-muted text-muted-foreground',
         className,
       )}
@@ -175,7 +175,7 @@ export function ValueEditor({
           aria-label={def.name}
           onClick={() => onSave(!value)}
           className={cn(
-            'flex size-4 items-center justify-center rounded border focus-ring transition-colors duration-150 ease-out-quart',
+            'focus-ring flex size-4 items-center justify-center rounded border transition-colors duration-150 ease-out-quart',
             value
               ? 'border-primary bg-primary text-primary-foreground'
               : 'border-input hover:border-ring',
@@ -201,7 +201,7 @@ export function ValueEditor({
               aria-checked={current === n}
               aria-label={`${n} of ${max}`}
               onClick={() => onSave(current === n ? null : n)}
-              className="rounded focus-ring"
+              className="focus-ring rounded"
             >
               <Star
                 className={cn(
@@ -273,7 +273,7 @@ function DateCellEditor({ def, value, onSave }: Props) {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           if (e.key === 'Escape') setEditing(false)
         }}
-        className="h-full w-full min-w-0 rounded bg-transparent px-1 text-ui focus-ring-inset"
+        className="focus-ring-inset h-full w-full min-w-0 rounded bg-transparent px-1 text-ui"
       />
     )
   }
@@ -284,7 +284,7 @@ function DateCellEditor({ def, value, onSave }: Props) {
       aria-label={def.name}
       onClick={() => setEditing(true)}
       className={cn(
-        'h-full w-full rounded px-1 text-ui focus-ring-inset',
+        'focus-ring-inset h-full w-full rounded px-1 text-ui',
         stored ? 'numeric' : 'text-left text-muted-foreground',
       )}
     >
@@ -352,10 +352,10 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
         'w-full min-w-0 bg-transparent text-ui',
         (def.type === 'number' || def.type === 'currency') && 'numeric',
         variant === 'field'
-          ? 'h-8 rounded-md border border-input px-2.5 shadow-xs focus-ring'
+          ? 'focus-ring h-8 rounded-md border border-rule px-2.5'
           : // Inset inside a cell: an offset ring would be clipped by the
             // table's scroll container and overlap the neighbouring column.
-            'h-full rounded px-1 focus-ring-inset',
+            'focus-ring-inset h-full rounded px-1',
       )}
     />
   )
@@ -411,8 +411,8 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
         className={cn(
           'flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'h-8 w-full rounded-md border border-input px-2.5 shadow-xs focus-ring'
-            : 'h-full w-full rounded px-1 focus-ring-inset',
+            ? 'focus-ring h-8 w-full rounded-md border border-rule px-2.5'
+            : 'focus-ring-inset h-full w-full rounded px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
@@ -422,7 +422,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
             selected.map((id) => (
               <span
                 key={id}
-                className="flex items-center gap-1 truncate rounded-full bg-muted px-2 py-0.5 text-label font-medium"
+                className="flex items-center gap-1 truncate border border-rule bg-paper px-1.5 py-0.5 text-label font-medium"
               >
                 <Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
                 {refName(refNames, id)}
@@ -493,8 +493,8 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
         className={cn(
           'flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'h-8 w-full rounded-md border border-input px-2.5 shadow-xs focus-ring'
-            : 'h-full w-full rounded px-1 focus-ring-inset',
+            ? 'focus-ring h-8 w-full rounded-md border border-rule px-2.5'
+            : 'focus-ring-inset h-full w-full rounded px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-ui">
@@ -558,8 +558,8 @@ function OptionPicker({
         className={cn(
           'flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'h-8 w-full rounded-md border border-input px-2.5 shadow-xs focus-ring'
-            : 'h-full w-full rounded px-1 focus-ring-inset',
+            ? 'focus-ring h-8 w-full rounded-md border border-rule px-2.5'
+            : 'focus-ring-inset h-full w-full rounded px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">

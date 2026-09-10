@@ -73,7 +73,7 @@ function SettingsPage() {
   return (
     <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
       <header>
-        <h1 className="text-page font-semibold tracking-tight">Settings</h1>
+        <h1 className="title-serif">Settings</h1>
         <p className="mt-1 text-ui text-muted-foreground">
           Workspace, members, and objects. Structural edits are admin-only.
         </p>
@@ -239,7 +239,7 @@ function MembersSection({
             </span>
             {isAdmin && m.id !== me.id ? (
               <DropdownMenu>
-                <DropdownMenuTrigger className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground capitalize focus-ring hover:bg-accent hover:text-foreground">
+                <DropdownMenuTrigger className="focus-ring rounded-md px-2 py-1 text-xs font-medium text-muted-foreground capitalize hover:bg-accent hover:text-foreground">
                   {m.role}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
@@ -303,7 +303,7 @@ function MembersSection({
               onChange={(e) =>
                 setInviteRole(e.target.value as 'member' | 'admin')
               }
-              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs focus-ring"
+              className="focus-ring h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
             >
               <option value="member">Member</option>
               <option value="admin">Admin</option>
@@ -352,7 +352,7 @@ function MembersSection({
                     {new Date(inv.expiresAt).toLocaleDateString()}
                   </span>
                   <button
-                    className="rounded px-1.5 py-0.5 focus-ring hover:bg-accent hover:text-foreground"
+                    className="focus-ring rounded px-1.5 py-0.5 hover:bg-accent hover:text-foreground"
                     onClick={() =>
                       act(
                         () => revokeInvite({ data: { id: inv.id } }),
@@ -449,7 +449,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
                         )
                       }
                       className={cn(
-                        'rounded-full px-2 py-0.5 text-xs capitalize focus-ring',
+                        'focus-ring rounded-full px-2 py-0.5 text-xs capitalize',
                         on
                           ? 'bg-selected font-medium text-foreground'
                           : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -469,7 +469,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
                     t.archived ? 'Template restored' : 'Template archived',
                   )
                 }
-                className="rounded px-1.5 py-0.5 text-xs text-muted-foreground focus-ring hover:bg-accent hover:text-foreground"
+                className="focus-ring rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
               >
                 {t.archived ? 'Restore' : 'Archive'}
               </button>
@@ -697,7 +697,7 @@ function ObjectsSection({
               <Link
                 to="/settings/objects/$objectSlug"
                 params={{ objectSlug: o.slug }}
-                className="flex items-center gap-3 px-4 py-3 focus-ring-inset transition-colors duration-150 ease-out-quart hover:bg-accent"
+                className="focus-ring-inset flex items-center gap-3 px-4 py-3 transition-colors duration-150 ease-out-quart hover:bg-accent"
               >
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
                   <Icon

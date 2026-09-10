@@ -219,19 +219,16 @@ function ViewChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium focus-ring transition-colors duration-150 ease-out-quart',
+        'focus-ring-inset flex h-9 items-center gap-1.5 border-b-2 px-3 label-caps transition-colors duration-150 ease-out-quart',
         active
-          ? 'border-primary bg-selected text-foreground'
-          : 'border-border text-muted-foreground hover:border-input hover:text-foreground',
+          ? 'border-primary text-foreground'
+          : 'border-transparent text-graphite hover:text-foreground',
       )}
       title={shared ? 'Shared view' : undefined}
     >
       {label}
       {dirty ? (
-        <span
-          aria-label="unsaved changes"
-          className="size-1.5 rounded-full bg-primary"
-        />
+        <span aria-label="unsaved changes" className="size-1.5 bg-primary" />
       ) : null}
     </button>
   )
@@ -295,7 +292,7 @@ function FilterPopover({
                       value: undefined,
                     })
                   }}
-                  className="h-8 max-w-40 rounded-md border border-input bg-transparent px-2 text-ui shadow-xs focus-ring"
+                  className="focus-ring h-8 max-w-40 rounded-md border border-input bg-transparent px-2 text-ui shadow-xs"
                 >
                   {registry.map((d) => (
                     <option key={d.slug} value={d.slug}>
@@ -309,7 +306,7 @@ function FilterPopover({
                   onChange={(e) =>
                     update(i, { op: e.target.value as ConditionOp })
                   }
-                  className="h-8 rounded-md border border-input bg-transparent px-2 text-ui shadow-xs focus-ring"
+                  className="focus-ring h-8 rounded-md border border-input bg-transparent px-2 text-ui shadow-xs"
                 >
                   {ops.map((op) => (
                     <option key={op} value={op}>
@@ -333,7 +330,7 @@ function FilterPopover({
                   type="button"
                   aria-label="Remove condition"
                   onClick={() => onChange(conditions.filter((_, j) => j !== i))}
-                  className="flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground focus-ring hover:bg-accent hover:text-foreground"
+                  className="focus-ring flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
                   <X className="size-3.5" strokeWidth={2} />
                 </button>
@@ -523,7 +520,7 @@ function SaveViewForm({
             aria-checked={visibility === v}
             onClick={() => setVisibility(v)}
             className={cn(
-              'h-full rounded px-2.5 text-ui font-medium capitalize focus-ring transition-colors duration-150 ease-out-quart',
+              'focus-ring h-full rounded px-2.5 text-ui font-medium capitalize transition-colors duration-150 ease-out-quart',
               visibility === v
                 ? 'bg-selected text-foreground'
                 : 'text-muted-foreground hover:text-foreground',

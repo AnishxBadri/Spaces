@@ -100,9 +100,7 @@ function AdminStep({ onDone }: { onDone: () => void }) {
 
   return (
     <>
-      <h1 className="mt-6 text-page font-semibold tracking-tight">
-        Create the admin account
-      </h1>
+      <h1 className="mt-6 title-serif">Create the admin account</h1>
       <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
         This deployment is yours. Signup closes permanently after this account
         exists — everyone else joins by invitation.
@@ -207,9 +205,7 @@ function DemoStep() {
 
   return (
     <>
-      <h1 className="mt-6 text-page font-semibold tracking-tight">
-        Start with demo data?
-      </h1>
+      <h1 className="mt-6 title-serif">Start with demo data?</h1>
       <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
         A worked example in data-center cooling — a small space tree, three
         companies, a memo, and a glossary. Obviously fictional, and safe to

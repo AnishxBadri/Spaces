@@ -30,7 +30,7 @@ export const RecordLinkCell = createLink(function RecordLinkAnchor({
     <a
       {...props}
       className={cn(
-        'flex h-full min-w-0 items-center gap-2 rounded px-1 font-medium focus-ring-inset hover:underline',
+        'focus-ring-inset flex h-full min-w-0 items-center gap-2 px-1 font-medium hover:underline',
         className,
       )}
     >
@@ -43,8 +43,8 @@ export const RecordLinkCell = createLink(function RecordLinkAnchor({
 /** Square icon badge — companies, deals, anything with a mark rather than a face. */
 export function IconBadge({ icon: Icon }: { icon: LucideIcon }) {
   return (
-    <span className="flex size-5 shrink-0 items-center justify-center rounded bg-muted">
-      <Icon className="size-3 text-muted-foreground" strokeWidth={1.75} />
+    <span className="flex size-[1.125rem] shrink-0 items-center justify-center border border-hairline bg-paper">
+      <Icon className="size-2.5 text-foreground" strokeWidth={1.75} />
     </span>
   )
 }
@@ -54,7 +54,7 @@ export function InitialBadge({ name }: { name: string }) {
   return (
     <span
       aria-hidden
-      className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-micro font-semibold text-muted-foreground"
+      className="flex size-[1.125rem] shrink-0 items-center justify-center bg-foreground mono text-[0.5625rem] font-medium text-background"
     >
       {name.charAt(0).toUpperCase()}
     </span>
@@ -72,7 +72,7 @@ export const ChipLink = createLink(function ChipAnchor({
     <a
       {...props}
       className={cn(
-        'flex min-w-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-label font-medium focus-ring transition-colors duration-150 ease-out-quart hover:bg-selected',
+        'focus-ring flex min-w-0 items-center gap-1 border border-rule bg-paper px-1.5 py-0.5 text-label font-medium transition-colors duration-150 ease-out-quart hover:border-hairline',
         className,
       )}
     >

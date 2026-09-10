@@ -52,7 +52,7 @@ export function RecordTable<T>({
   const rows = table.getRowModel().rows
 
   return (
-    <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-auto rounded-lg border border-border">
+    <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-auto">
       <table
         aria-label={label}
         className="w-full border-collapse text-ui"
@@ -60,7 +60,7 @@ export function RecordTable<T>({
       >
         <thead className="sticky top-0 z-10 bg-background">
           {table.getHeaderGroups().map((hg) => (
-            <tr key={hg.id} className="border-b border-border">
+            <tr key={hg.id} className="border-b border-hairline">
               {hg.headers.map((header) => (
                 <HeaderCell
                   key={header.id}
@@ -81,14 +81,14 @@ export function RecordTable<T>({
           {rows.map((row) => (
             <tr
               key={row.id}
-              className="group h-row border-b border-border/60 transition-colors duration-150 ease-out-quart last:border-b-0 hover:bg-row-hover"
+              className="group h-row border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-row-hover"
             >
               {row.getVisibleCells().map((cell) => (
                 <td
                   key={cell.id}
                   style={{ width: cell.column.getSize() }}
                   className={cn(
-                    'border-r border-border/40 px-1 align-middle last:border-r-0',
+                    'px-1 align-middle',
                     cell.column.id === stickyColumnId &&
                       // Opaque at rest and on hover: a translucent tint here
                       // would let the scrolled-under columns bleed through.
@@ -151,7 +151,7 @@ function HeaderCell<T>({
             : 'none'
       }
       className={cn(
-        'relative h-row border-r border-border/60 px-2 text-left align-middle font-medium text-muted-foreground last:border-r-0',
+        'relative h-8 px-2 text-left align-middle label-caps text-graphite',
         sticky && 'sticky left-0 z-20 bg-background',
       )}
     >
@@ -160,16 +160,19 @@ function HeaderCell<T>({
           type="button"
           onClick={column.getToggleSortingHandler()}
           title={`Sort by ${title}`}
-          className="group/sort flex w-full items-center gap-1 truncate rounded text-left focus-ring transition-colors duration-150 ease-out-quart hover:text-foreground"
+          className="group/sort focus-ring flex w-full items-center gap-1 truncate rounded text-left transition-colors duration-150 ease-out-quart hover:text-foreground"
         >
           <span className="truncate">
             {flexRender(column.columnDef.header, header.getContext())}
           </span>
           {sorted === 'asc' ? (
-            <ArrowUp className="size-3 shrink-0 text-primary" strokeWidth={2} />
+            <ArrowUp
+              className="size-3 shrink-0 text-foreground"
+              strokeWidth={2}
+            />
           ) : sorted === 'desc' ? (
             <ArrowDown
-              className="size-3 shrink-0 text-primary"
+              className="size-3 shrink-0 text-foreground"
               strokeWidth={2}
             />
           ) : (
@@ -207,7 +210,7 @@ function HeaderCell<T>({
               nudge(RESIZE_STEP)
             }
           }}
-          className="absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none focus-ring-inset transition-colors duration-150 ease-out-quart select-none hover:bg-primary"
+          className="focus-ring-inset absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none transition-colors duration-150 ease-out-quart select-none hover:bg-primary"
         />
       ) : null}
     </th>
@@ -322,7 +325,7 @@ export function AddColumnButton() {
       type="button"
       aria-label="Add column"
       title="Add column"
-      className="flex size-6 items-center justify-center rounded text-muted-foreground focus-ring transition-colors duration-150 ease-out-quart hover:bg-accent hover:text-foreground"
+      className="focus-ring flex size-6 items-center justify-center rounded text-muted-foreground transition-colors duration-150 ease-out-quart hover:bg-accent hover:text-foreground"
     >
       <Plus className="size-3.5" strokeWidth={2} />
     </button>
@@ -342,8 +345,8 @@ export function PageHeader({
   return (
     <header className="flex items-start justify-between gap-4">
       <div>
-        <h1 className="text-page font-semibold tracking-tight">{title}</h1>
-        <p className="mt-1 max-w-prose text-ui text-muted-foreground">
+        <h1 className="title-serif">{title}</h1>
+        <p className="mt-1.5 max-w-prose mono text-label text-graphite">
           {description}
         </p>
       </div>
