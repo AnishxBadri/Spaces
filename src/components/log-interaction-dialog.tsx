@@ -16,6 +16,7 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { logInteraction, searchEntities } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
+import { useHotkey } from '#/lib/use-hotkey'
 
 /**
  * Manual interaction logging — the calendar primitive, hand-fed. Twenty
@@ -42,15 +43,19 @@ export function LogInteractionDialog({
   seed,
   onLogged,
   trigger,
+  hotkey,
 }: {
   /** the record the dialog was opened from — pre-added as an attendee */
   seed: Attendee
   onLogged?: () => void
   /** custom trigger element — must forward props (plain DOM elements do) */
   trigger?: React.ReactNode
+  /** bare key that opens the dialog from the page — printed in the trigger */
+  hotkey?: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  useHotkey(hotkey, () => setOpen(true))
   const [kind, setKind] = useState<'meeting' | 'call'>('meeting')
   const [subject, setSubject] = useState('')
   const [occurredAt, setOccurredAt] = useState(localNow)
@@ -112,7 +117,7 @@ export function LogInteractionDialog({
                 aria-pressed={kind === k}
                 onClick={() => setKind(k)}
                 className={cn(
-                  'flex-1 rounded px-2 py-1 text-xs font-medium capitalize focus-ring transition-colors',
+                  'focus-ring flex-1 rounded px-2 py-1 text-xs font-medium capitalize transition-colors',
                   kind === k
                     ? 'bg-selected text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
@@ -211,7 +216,7 @@ function AttendeePicker({
                   onClick={() =>
                     onChange(attendees.filter((x) => x.id !== a.id))
                   }
-                  className="rounded-full text-muted-foreground focus-ring hover:text-foreground"
+                  className="focus-ring rounded-full text-muted-foreground hover:text-foreground"
                 >
                   <X className="size-2.5" strokeWidth={2} />
                 </button>
@@ -239,7 +244,7 @@ function AttendeePicker({
                     onChange([...attendees, r])
                     setQuery('')
                   }}
-                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-ui focus-ring hover:bg-accent"
+                  className="focus-ring flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-ui hover:bg-accent"
                 >
                   <Icon
                     className="size-3.5 text-muted-foreground"

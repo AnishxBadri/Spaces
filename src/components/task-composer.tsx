@@ -14,6 +14,7 @@ import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { createTask, listUsers, searchEntities } from '#/lib/server-fns'
 import { localToday, parseDue } from '#/lib/tasks/parse-due'
+import { useHotkey } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
 /**
@@ -67,24 +68,7 @@ export function TaskComposer({
   const [error, setError] = useState<string | null>(null)
   const today = localToday()
 
-  useEffect(() => {
-    if (!hotkey) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key !== hotkey || e.metaKey || e.ctrlKey || e.altKey) return
-      const t = e.target as HTMLElement | null
-      if (
-        t &&
-        (t.isContentEditable ||
-          ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) ||
-          t.closest('[role="dialog"]'))
-      )
-        return
-      e.preventDefault()
-      setOpen(true)
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [hotkey])
+  useHotkey(hotkey, () => setOpen(true))
 
   async function save() {
     if (!content.trim()) {

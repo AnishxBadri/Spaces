@@ -5,16 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import {
-  ArrowLeft,
-  Building2,
-  FileText,
-  Globe,
-  Layers,
-  MessageSquare,
-  Plus,
-  X,
-} from 'lucide-react'
+import { Globe, Layers, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { SaveAsTemplateAction } from '#/components/templates'
@@ -23,7 +14,20 @@ import { Input } from '#/components/ui/input'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
 import { RailField } from '#/components/attributes/rail-field'
-import { optionLabel } from '#/components/attributes/value-editor'
+import { KeyHint } from '#/components/page-header'
+import {
+  DitherMark,
+  InitialsMark,
+  PropertyCell,
+  PropertyGrid,
+  RailEmpty,
+  RailItem,
+  RailSection,
+  RecordBody,
+  RecordHeader,
+  RecordSection,
+} from '#/components/record/record-parts'
+import { OptionChip, optionLabel } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordFiles } from '#/components/record-files'
@@ -43,7 +47,6 @@ import {
   updateRecord,
   saveRecordAsTemplate,
 } from '#/lib/server-fns'
-import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/companies_/$companyId')({
   loader: async ({ params }) => {
@@ -97,7 +100,6 @@ function CompanyRecordPage() {
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'activity' | 'notes' | 'files'>('activity')
 
   const noteMentions = company.mentionedIn.filter((m) => m.kind === 'note')
   const domains = company.aliases.filter((a) => a.kind === 'domain')
@@ -121,63 +123,230 @@ function CompanyRecordPage() {
     }
   }
 
+  const fundingDef = registry.find((d) => d.slug === 'funding_stage')
+  const fundingStage =
+    fundingDef && company.values.funding_stage
+      ? optionLabel(fundingDef as RegistryEntry, company.values.funding_stage)
+      : null
+  const location =
+    typeof company.values.location === 'string' ? company.values.location : null
+  const foundedRaw: unknown = company.values.founded_year
+  const founded =
+    foundedRaw === null || foundedRaw === undefined ? null : String(foundedRaw)
+
   return (
-    <div className="px-6 py-8 md:px-10">
-      <Link
-        to="/companies"
-        className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground focus-ring hover:text-foreground"
+    <div className="flex min-h-full flex-col">
+      <RecordHeader
+        crumb={
+          <>
+            <Link to="/companies" className="focus-ring hover:text-foreground">
+              Companies
+            </Link>
+            {' / '}
+            {company.id.slice(0, 8)}
+            {domains[0] ? ` / ${domains[0].valueNorm}` : ''}
+          </>
+        }
+        actions={
+          <>
+            <LogInteractionDialog
+              seed={{ id: company.id, name: company.name, kind: 'company' }}
+              hotkey="l"
+              trigger={
+                <Button variant="outline">
+                  Log interaction
+                  <KeyHint>L</KeyHint>
+                </Button>
+              }
+            />
+            <Button variant="outline" onClick={newNoteAboutThis}>
+              Note about this
+            </Button>
+            <SaveAsTemplateAction
+              entityLabel="company"
+              onSave={async (name) => {
+                await saveRecordAsTemplate({
+                  data: { recordId: company.id, name },
+                })
+              }}
+            />
+          </>
+        }
+        mark={<DitherMark />}
+        name={company.name}
+        badges={
+          nameAliases.length > 0 ? (
+            <span className="min-w-0 truncate mono text-micro text-graphite">
+              also {nameAliases.map((a) => a.value).join(' · ')}
+            </span>
+          ) : null
+        }
+        readouts={[
+          { label: 'Deals', value: `${deals.length}` },
+          {
+            label: 'Stage',
+            value: fundingStage ?? '—',
+            kind: 'text',
+            tone: fundingStage ? undefined : 'muted',
+          },
+          {
+            label: 'Location',
+            value: location ?? '—',
+            kind: 'text',
+            tone: location ? undefined : 'muted',
+          },
+          {
+            label: 'Founded',
+            value: founded ?? '—',
+            tone: founded ? undefined : 'muted',
+          },
+          { label: 'Spaces', value: `${company.spaces.length}` },
+        ]}
+      />
+
+      <RecordBody
+        rail={
+          <>
+            <RailSection
+              label="Deals"
+              meta={
+                <>
+                  <span>{deals.length}</span>
+                  <CreateDealDialog
+                    registry={dealRegistry as Array<RegistryEntry>}
+                    presetCompany={{ id: company.id, name: company.name }}
+                    triggerLabel="New"
+                  />
+                </>
+              }
+            >
+              {deals.length === 0 ? (
+                <RailEmpty>No deals yet — watching only.</RailEmpty>
+              ) : (
+                deals.map((d) => (
+                  <RailItem key={d.id}>
+                    <Link
+                      to="/deals/$dealId"
+                      params={{ dealId: d.id }}
+                      className="focus-ring min-w-0 flex-1 truncate hover:underline"
+                    >
+                      {d.name}
+                    </Link>
+                    {d.stage && stageDef ? (
+                      <OptionChip
+                        def={stageDef as RegistryEntry}
+                        id={d.stage}
+                        className="shrink-0"
+                      />
+                    ) : null}
+                  </RailItem>
+                ))
+              )}
+            </RailSection>
+
+            <RailSection label="Spaces" meta={`${company.spaces.length}`}>
+              {company.spaces.map((s) => (
+                <RailItem key={s.id} className="group">
+                  <Layers
+                    className="size-3.5 shrink-0 text-graphite"
+                    strokeWidth={1.75}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                  <button
+                    aria-label={`Remove from ${s.name}`}
+                    onClick={async () => {
+                      await untagFromSpace({
+                        data: { entityId: company.id, spaceId: s.id },
+                      })
+                      void router.invalidate()
+                    }}
+                    className="focus-ring hidden size-5 items-center justify-center text-graphite group-hover:flex hover:text-foreground focus-visible:flex"
+                  >
+                    <X className="size-3" strokeWidth={2} />
+                  </button>
+                </RailItem>
+              ))}
+              {untaggedSpaces.length > 0 ? (
+                <select
+                  aria-label="Tag into space"
+                  value=""
+                  onChange={async (e) => {
+                    if (!e.target.value) return
+                    await tagIntoSpace({
+                      data: { entityId: company.id, spaceId: e.target.value },
+                    })
+                    void router.invalidate()
+                  }}
+                  className="focus-ring mt-1 h-7 w-full border border-rule bg-paper px-2 text-label text-graphite"
+                >
+                  <option value="">+ Tag into space…</option>
+                  {untaggedSpaces.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {' '.repeat(s.depth * 2)}
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </RailSection>
+
+            <RailSection label="People" meta={`${company.people.length}`}>
+              {company.people.length === 0 ? (
+                <RailEmpty>
+                  No contacts yet — link people from their records.
+                </RailEmpty>
+              ) : (
+                company.people.map((p) => (
+                  <RailItem key={p.id}>
+                    <InitialsMark name={p.name} outline />
+                    <Link
+                      to="/people/$personId"
+                      params={{ personId: p.id }}
+                      className="focus-ring min-w-0 flex-1 truncate hover:underline"
+                    >
+                      {p.name}
+                    </Link>
+                  </RailItem>
+                ))
+              )}
+            </RailSection>
+
+            <RailSection
+              label="Mentioned in"
+              meta={`${company.mentionedIn.length}`}
+            >
+              {company.mentionedIn.length === 0 ? (
+                <RailEmpty>Nowhere yet.</RailEmpty>
+              ) : (
+                company.mentionedIn.map((m) => (
+                  <RailItem key={m.fromId}>
+                    {m.kind === 'note' ? (
+                      <Link
+                        to="/notes/$noteId"
+                        params={{ noteId: m.fromId }}
+                        className="focus-ring min-w-0 truncate hover:underline"
+                      >
+                        {m.name}
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 truncate text-graphite">
+                        {m.name}
+                      </span>
+                    )}
+                  </RailItem>
+                ))
+              )}
+            </RailSection>
+
+            <TasksRail
+              entityId={company.id}
+              entityName={company.name}
+              entityKind="company"
+            />
+          </>
+        }
       >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-        Companies
-      </Link>
-
-      <header className="mt-5 flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-          <Building2
-            className="size-4.5 text-muted-foreground"
-            strokeWidth={1.75}
-          />
-        </span>
-        <div className="min-w-0">
-          <h1 className="truncate text-page font-semibold tracking-tight">
-            {company.name}
-          </h1>
-          {nameAliases.length > 0 ? (
-            <p className="truncate text-xs text-muted-foreground">
-              also seen as {nameAliases.map((a) => a.value).join(', ')}
-            </p>
-          ) : null}
-        </div>
-        {/* Header actions — the record's verbs live top-right, same as the
-            deal page. Save-as-template is meta, so it stays quiet at the end. */}
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <LogInteractionDialog
-            seed={{ id: company.id, name: company.name, kind: 'company' }}
-            trigger={
-              <Button size="sm" variant="outline">
-                <MessageSquare className="size-3.5" strokeWidth={1.75} />
-                Log interaction
-              </Button>
-            }
-          />
-          <Button size="sm" variant="outline" onClick={newNoteAboutThis}>
-            <Plus className="size-3.5" strokeWidth={2} />
-            Note about this
-          </Button>
-          <SaveAsTemplateAction
-            entityLabel="company"
-            onSave={async (name) => {
-              await saveRecordAsTemplate({
-                data: { recordId: company.id, name },
-              })
-            }}
-          />
-        </div>
-      </header>
-
-      <div className="mt-8 grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
-        {/* Left: registry-generated attribute rail */}
-        <aside className="space-y-4">
+        <PropertyGrid>
           {registry.map((def) => (
             <RailField
               key={def.slug}
@@ -194,246 +363,89 @@ function CompanyRecordPage() {
               }}
             />
           ))}
-
           <DomainsField companyId={company.id} domains={domains} />
+          <PropertyCell label="">
+            <AttributeCreateDialog
+              objectKind="company"
+              onCreated={() => router.invalidate()}
+              trigger={
+                <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
+                  + add attribute
+                </button>
+              }
+            />
+          </PropertyCell>
+        </PropertyGrid>
 
-          <AttributeCreateDialog
-            objectKind="company"
-            onCreated={() => router.invalidate()}
+        <RecordSection
+          label="Notes"
+          meta={`${noteMentions.length} note${noteMentions.length === 1 ? '' : 's'}`}
+          action={
+            <button
+              type="button"
+              onClick={newNoteAboutThis}
+              className="focus-ring text-primary hover:underline"
+            >
+              note about this ›
+            </button>
+          }
+        >
+          {noteMentions.length === 0 ? (
+            <p className="border-t border-rule py-2 text-label text-graphite">
+              No notes mention {company.name} yet. Write one — it links itself
+              here.
+            </p>
+          ) : (
+            <ol>
+              {noteMentions.map((m) => (
+                <li key={m.fromId} className="border-t border-rule">
+                  <Link
+                    to="/notes/$noteId"
+                    params={{ noteId: m.fromId }}
+                    className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
+                  >
+                    <span className="font-serif text-[0.9375rem] font-medium">
+                      {m.name}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          )}
+        </RecordSection>
+
+        <RecordSection
+          rule
+          label="Ledger"
+          meta={`${timeline.length} entr${timeline.length === 1 ? 'y' : 'ies'}`}
+        >
+          <LogInteractionDialog
+            seed={{ id: company.id, name: company.name, kind: 'company' }}
             trigger={
-              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground focus-ring hover:text-foreground">
-                <Plus className="size-3" strokeWidth={2} />
-                Add attribute
+              <button className="focus-ring-inset flex h-row w-full items-center gap-3 border-t border-b border-rule text-left">
+                <span className="mono text-micro text-primary">+</span>
+                <span className="min-w-0 truncate text-ui text-graphite">
+                  Log a call, meeting, or note…
+                </span>
+                <span className="flex-1" />
+                <KeyHint>L</KeyHint>
               </button>
             }
           />
-          <TasksRail
-            entityId={company.id}
-            entityName={company.name}
-            entityKind="company"
+          <RecordTimeline
+            items={timeline}
+            registry={registry as Array<RegistryEntry>}
           />
-        </aside>
+        </RecordSection>
 
-        {/* Center: tabs */}
-        <section className="min-w-0">
-          <div className="flex items-center justify-between border-b border-border">
-            <div role="tablist" className="flex gap-1">
-              {(['activity', 'notes', 'files'] as const).map((t) => (
-                <button
-                  key={t}
-                  role="tab"
-                  aria-selected={tab === t}
-                  onClick={() => setTab(t)}
-                  className={cn(
-                    'relative rounded-t-md px-3 pb-2.5 text-ui font-medium text-muted-foreground capitalize focus-ring transition-colors hover:text-foreground',
-                    tab === t &&
-                      'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
-                  )}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {tab === 'activity' ? (
-            <>
-              <LogInteractionDialog
-                seed={{ id: company.id, name: company.name, kind: 'company' }}
-                trigger={
-                  <button className="mt-4 flex h-9 w-full items-center gap-2 rounded-md border border-input px-3 text-left text-ui text-muted-foreground focus-ring transition-colors duration-150 ease-out-quart hover:border-border hover:bg-accent">
-                    <MessageSquare
-                      className="size-3.5 shrink-0"
-                      strokeWidth={1.75}
-                    />
-                    Log a call, meeting, or note…
-                  </button>
-                }
-              />
-              <RecordTimeline
-                items={timeline}
-                registry={registry as Array<RegistryEntry>}
-              />
-            </>
-          ) : tab === 'files' ? (
-            <RecordFiles entityId={company.id} documents={documents} />
-          ) : (
-            <ul className="mt-4 space-y-1">
-              {noteMentions.length === 0 ? (
-                <p className="text-ui text-muted-foreground">
-                  No notes mention {company.name} yet. Write one — it links
-                  itself here.
-                </p>
-              ) : (
-                noteMentions.map((m) => (
-                  <li key={m.fromId}>
-                    <Link
-                      to="/notes/$noteId"
-                      params={{ noteId: m.fromId }}
-                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-ui focus-ring hover:bg-accent"
-                    >
-                      <FileText
-                        className="size-4 text-muted-foreground"
-                        strokeWidth={1.75}
-                      />
-                      <span className="font-medium">{m.name}</span>
-                    </Link>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
-        </section>
-
-        {/* Right: related */}
-        <aside className="space-y-6">
-          <div>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-medium text-muted-foreground">
-                Deals
-              </h2>
-              <CreateDealDialog
-                registry={dealRegistry as Array<RegistryEntry>}
-                presetCompany={{ id: company.id, name: company.name }}
-                triggerLabel="New"
-              />
-            </div>
-            {deals.length === 0 ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                No deals yet — watching only.
-              </p>
-            ) : (
-              <ul className="mt-2 space-y-1">
-                {deals.map((d) => (
-                  <li key={d.id}>
-                    <Link
-                      to="/deals/$dealId"
-                      params={{ dealId: d.id }}
-                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-ui focus-ring hover:bg-accent"
-                    >
-                      <span className="min-w-0 flex-1 truncate">{d.name}</span>
-                      {d.stage && stageDef ? (
-                        <span className="rounded-full bg-selected px-2 py-0.5 text-xs font-medium">
-                          {optionLabel(stageDef as RegistryEntry, d.stage)}
-                        </span>
-                      ) : null}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div>
-            <h2 className="text-xs font-medium text-muted-foreground">
-              Spaces
-            </h2>
-            <ul className="mt-2 space-y-1">
-              {company.spaces.map((s) => (
-                <li
-                  key={s.id}
-                  className="group flex h-7 items-center gap-2 rounded-md px-1.5 text-ui hover:bg-accent"
-                >
-                  <Layers
-                    className="size-3.5 shrink-0 text-muted-foreground"
-                    strokeWidth={1.75}
-                  />
-                  <span className="min-w-0 flex-1 truncate">{s.name}</span>
-                  <button
-                    aria-label={`Remove from ${s.name}`}
-                    onClick={async () => {
-                      await untagFromSpace({
-                        data: { entityId: company.id, spaceId: s.id },
-                      })
-                      void router.invalidate()
-                    }}
-                    className="hidden size-5 items-center justify-center rounded text-muted-foreground focus-ring group-hover:flex hover:text-foreground focus-visible:flex"
-                  >
-                    <X className="size-3" strokeWidth={2} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {untaggedSpaces.length > 0 ? (
-              <select
-                aria-label="Tag into space"
-                value=""
-                onChange={async (e) => {
-                  if (!e.target.value) return
-                  await tagIntoSpace({
-                    data: { entityId: company.id, spaceId: e.target.value },
-                  })
-                  void router.invalidate()
-                }}
-                className="mt-2 h-7 w-full rounded-md border border-input bg-transparent px-2 text-xs text-muted-foreground focus-ring"
-              >
-                <option value="">+ Tag into space…</option>
-                {untaggedSpaces.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {' '.repeat(s.depth * 2)}
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-          </div>
-
-          <div>
-            <h2 className="text-xs font-medium text-muted-foreground">
-              People
-            </h2>
-            {company.people.length === 0 ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                No contacts yet — link people from their records.
-              </p>
-            ) : (
-              <ul className="mt-2 space-y-1">
-                {company.people.map((p) => (
-                  <li key={p.id}>
-                    <Link
-                      to="/people/$personId"
-                      params={{ personId: p.id }}
-                      className="flex h-7 items-center gap-2 rounded-md px-1.5 text-ui focus-ring hover:bg-accent"
-                    >
-                      <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-muted text-micro font-semibold text-muted-foreground">
-                        {p.name.charAt(0).toUpperCase()}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div>
-            <h2 className="text-xs font-medium text-muted-foreground">
-              Mentioned in
-            </h2>
-            {company.mentionedIn.length === 0 ? (
-              <p className="mt-2 text-xs text-muted-foreground">Nowhere yet.</p>
-            ) : (
-              <ul className="mt-2 space-y-1">
-                {company.mentionedIn.map((m) => (
-                  <li key={m.fromId} className="truncate text-ui">
-                    {m.kind === 'note' ? (
-                      <Link
-                        to="/notes/$noteId"
-                        params={{ noteId: m.fromId }}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        {m.name}
-                      </Link>
-                    ) : (
-                      <span className="text-muted-foreground">{m.name}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </aside>
-      </div>
+        <RecordSection
+          rule
+          label="Files"
+          meta={`${documents.length} file${documents.length === 1 ? '' : 's'}`}
+        >
+          <RecordFiles entityId={company.id} documents={documents} />
+        </RecordSection>
+      </RecordBody>
     </div>
   )
 }
@@ -473,38 +485,33 @@ function DomainsField({
   }
 
   return (
-    <div className="space-y-1">
-      <span className="text-xs font-medium text-muted-foreground">Domains</span>
-      <ul className="space-y-1">
+    <PropertyCell label="Domains">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         {domains.map((d) => (
-          <li key={d.id} className="flex h-7 items-center gap-2 text-ui">
-            <Globe
-              className="size-3.5 text-muted-foreground"
-              strokeWidth={1.75}
-            />
+          <span key={d.id} className="flex items-center gap-1 mono text-label">
+            <Globe className="size-3 text-graphite" strokeWidth={1.75} />
             {d.valueNorm}
-          </li>
+          </span>
         ))}
-      </ul>
-      {adding ? (
-        <Input
-          autoFocus
-          value={draft}
-          placeholder="acme.com"
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={add}
-          onKeyDown={(e) => e.key === 'Enter' && add()}
-          className="h-7 text-xs"
-        />
-      ) : (
-        <button
-          onClick={() => setAdding(true)}
-          className="flex items-center gap-1 rounded-md text-xs text-muted-foreground focus-ring hover:text-foreground"
-        >
-          <Plus className="size-3" strokeWidth={2} />
-          Add domain
-        </button>
-      )}
-    </div>
+        {adding ? (
+          <Input
+            autoFocus
+            value={draft}
+            placeholder="acme.com"
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={add}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+            className="h-6 w-40 mono text-label"
+          />
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            className="focus-ring mono text-micro text-graphite hover:text-foreground"
+          >
+            + domain
+          </button>
+        )}
+      </div>
+    </PropertyCell>
   )
 }

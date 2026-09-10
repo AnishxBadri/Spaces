@@ -6,11 +6,21 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { ArrowLeft, FileText, Layers, Link2, Plus, X } from 'lucide-react'
+import { Layers, Link2, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import { RailField } from '#/components/attributes/rail-field'
+import {
+  PropertyCell,
+  PropertyGrid,
+  RailEmpty,
+  RailItem,
+  RailSection,
+  RecordBody,
+  RecordHeader,
+  RecordSection,
+} from '#/components/record/record-parts'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
@@ -28,8 +38,6 @@ import {
   untagFromSpace,
   updateRecord,
 } from '#/lib/server-fns'
-import { cn } from '#/lib/utils'
-import { formatDate } from '#/lib/format'
 
 /**
  * The registry-generated record page for a custom object (spec §9). Same
@@ -66,7 +74,6 @@ function ObjectRecordPage() {
     Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'activity' | 'notes' | 'files'>('activity')
   const Icon = objectIcon(record.object)
   const noteMentions = record.mentionedIn.filter((m) => m.kind === 'note')
   const untaggedSpaces = allSpaces.filter(
@@ -92,21 +99,35 @@ function ObjectRecordPage() {
   }
 
   return (
-    <div className="px-6 py-8 md:px-10">
-      <Link
-        to="/o/$objectSlug"
-        params={{ objectSlug: record.object.slug }}
-        className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground focus-ring hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-        {record.object.plural}
-      </Link>
-
-      <header className="mt-5 flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-          <Icon className="size-4.5 text-muted-foreground" strokeWidth={1.75} />
-        </span>
-        <div className="min-w-0 flex-1">
+    <div className="flex min-h-full flex-col">
+      <RecordHeader
+        crumb={
+          <>
+            <Link
+              to="/o/$objectSlug"
+              params={{ objectSlug: record.object.slug }}
+              className="focus-ring hover:text-foreground"
+            >
+              {record.object.plural}
+            </Link>
+            {' / '}
+            {record.id.slice(0, 8)}
+            {' / added '}
+            {record.createdAt.slice(0, 10)}
+            {record.createdByName ? ` · ${record.createdByName}` : ''}
+          </>
+        }
+        actions={
+          <Button variant="outline" onClick={newNoteAboutThis}>
+            Note about this
+          </Button>
+        }
+        mark={
+          <span className="flex size-7 shrink-0 items-center justify-center border border-hairline bg-paper">
+            <Icon className="size-3.5 text-foreground" strokeWidth={1.75} />
+          </span>
+        }
+        name={
           <RecordName
             name={record.name}
             onSave={async (name) => {
@@ -114,22 +135,151 @@ function ObjectRecordPage() {
               void router.invalidate()
             }}
           />
-          <p className="truncate text-xs text-muted-foreground">
-            {record.object.singular} · added {formatDate(record.createdAt)}
-            {record.createdByName ? ` by ${record.createdByName}` : ''}
-          </p>
-        </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <Button size="sm" variant="outline" onClick={newNoteAboutThis}>
-            <Plus className="size-3.5" strokeWidth={2} />
-            Note about this
-          </Button>
-        </div>
-      </header>
+        }
+        readouts={[
+          { label: 'Object', value: record.object.singular, kind: 'text' },
+          { label: 'Spaces', value: `${record.spaces.length}` },
+          { label: 'Referenced by', value: `${record.referencedBy.length}` },
+          { label: 'Mentions', value: `${record.mentionedIn.length}` },
+        ]}
+      />
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
-        {/* Left: registry-generated rail */}
-        <aside className="space-y-4">
+      <RecordBody
+        rail={
+          <>
+            <RailSection label="Spaces" meta={`${record.spaces.length}`}>
+              {record.spaces.map((s) => (
+                <RailItem key={s.id} className="group">
+                  <Layers
+                    className="size-3.5 shrink-0 text-graphite"
+                    strokeWidth={1.75}
+                  />
+                  <Link
+                    to="/spaces/$spaceId"
+                    params={{ spaceId: s.id }}
+                    className="focus-ring min-w-0 flex-1 truncate hover:underline"
+                  >
+                    {s.name}
+                  </Link>
+                  <button
+                    aria-label={`Remove from ${s.name}`}
+                    onClick={async () => {
+                      await untagFromSpace({
+                        data: { entityId: record.id, spaceId: s.id },
+                      })
+                      void router.invalidate()
+                    }}
+                    className="focus-ring hidden size-5 items-center justify-center text-graphite group-hover:flex hover:text-foreground focus-visible:flex"
+                  >
+                    <X className="size-3" strokeWidth={2} />
+                  </button>
+                </RailItem>
+              ))}
+              {untaggedSpaces.length > 0 ? (
+                <select
+                  aria-label="Tag into space"
+                  value=""
+                  onChange={async (e) => {
+                    if (!e.target.value) return
+                    await tagIntoSpace({
+                      data: { entityId: record.id, spaceId: e.target.value },
+                    })
+                    void router.invalidate()
+                  }}
+                  className="focus-ring mt-1 h-7 w-full border border-rule bg-paper px-2 text-label text-graphite"
+                >
+                  <option value="">+ Tag into space…</option>
+                  {untaggedSpaces.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {' '.repeat(s.depth * 2)}
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </RailSection>
+
+            <RailSection
+              label="Referenced by"
+              meta={`${record.referencedBy.length}`}
+            >
+              {record.referencedBy.length === 0 ? (
+                <RailEmpty>No record points here yet.</RailEmpty>
+              ) : (
+                record.referencedBy.map((r) => {
+                  const href = recordPath({
+                    kind: r.kind,
+                    id: r.fromId,
+                    objectSlug: r.objectSlug,
+                  })
+                  const body = (
+                    <>
+                      <Link2
+                        className="size-3.5 shrink-0 text-graphite"
+                        strokeWidth={1.75}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                      <span className="mono text-micro text-graphite">
+                        {r.objectSingular ?? r.kind}
+                      </span>
+                    </>
+                  )
+                  return (
+                    <RailItem key={`${r.fromId}:${r.attrSlug}`}>
+                      {href ? (
+                        <Link
+                          to={href}
+                          className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 hover:underline"
+                        >
+                          {body}
+                        </Link>
+                      ) : (
+                        <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                          {body}
+                        </span>
+                      )}
+                    </RailItem>
+                  )
+                })
+              )}
+            </RailSection>
+
+            <RailSection
+              label="Mentioned in"
+              meta={`${record.mentionedIn.length}`}
+            >
+              {record.mentionedIn.length === 0 ? (
+                <RailEmpty>Nowhere yet.</RailEmpty>
+              ) : (
+                record.mentionedIn.map((m) => {
+                  const href = recordPath({
+                    kind: m.kind,
+                    id: m.fromId,
+                    objectSlug: m.objectSlug,
+                  })
+                  return (
+                    <RailItem key={m.fromId}>
+                      {href ? (
+                        <Link
+                          to={href}
+                          className="focus-ring min-w-0 truncate hover:underline"
+                        >
+                          {m.name}
+                        </Link>
+                      ) : (
+                        <span className="min-w-0 truncate text-graphite">
+                          {m.name}
+                        </span>
+                      )}
+                    </RailItem>
+                  )
+                })
+              )}
+            </RailSection>
+          </>
+        }
+      >
+        <PropertyGrid>
           {registry.map((def) => (
             <RailField
               key={def.slug}
@@ -147,227 +297,81 @@ function ObjectRecordPage() {
               }}
             />
           ))}
-          <AttributeDialog
-            mode="create"
-            objectId={record.object.id}
-            objectLabel={record.object.singular}
-            onSaved={() => router.invalidate()}
-            trigger={
-              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground focus-ring hover:text-foreground">
-                <Plus className="size-3" strokeWidth={2} />
-                Add attribute
-              </button>
-            }
-          />
-        </aside>
-
-        {/* Center: tabs */}
-        <section className="min-w-0">
-          <div className="flex items-center justify-between border-b border-border">
-            <div role="tablist" className="flex gap-1">
-              {(['activity', 'notes', 'files'] as const).map((t) => (
-                <button
-                  key={t}
-                  role="tab"
-                  aria-selected={tab === t}
-                  onClick={() => setTab(t)}
-                  className={cn(
-                    'relative rounded-t-md px-3 pb-2.5 text-ui font-medium text-muted-foreground capitalize focus-ring transition-colors hover:text-foreground',
-                    tab === t &&
-                      'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
-                  )}
-                >
-                  {t}
+          <PropertyCell label="">
+            <AttributeDialog
+              mode="create"
+              objectId={record.object.id}
+              objectLabel={record.object.singular}
+              onSaved={() => router.invalidate()}
+              trigger={
+                <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
+                  + add attribute
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {tab === 'activity' ? (
-            <RecordTimeline
-              items={timeline}
-              registry={registry as Array<RegistryEntry>}
+              }
             />
-          ) : tab === 'files' ? (
-            <RecordFiles entityId={record.id} documents={documents} />
-          ) : (
-            <ul className="mt-4 space-y-1">
-              {noteMentions.length === 0 ? (
-                <p className="text-ui text-muted-foreground">
-                  No notes mention {record.name} yet. Write one — it links
-                  itself here.
-                </p>
-              ) : (
-                noteMentions.map((m) => (
-                  <li key={m.fromId}>
-                    <Link
-                      to="/notes/$noteId"
-                      params={{ noteId: m.fromId }}
-                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-ui focus-ring hover:bg-accent"
-                    >
-                      <FileText
-                        className="size-4 text-muted-foreground"
-                        strokeWidth={1.75}
-                      />
-                      <span className="font-medium">{m.name}</span>
-                    </Link>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
-        </section>
+          </PropertyCell>
+        </PropertyGrid>
 
-        {/* Right: related */}
-        <aside className="space-y-6">
-          <div>
-            <h2 className="text-xs font-medium text-muted-foreground">
-              Spaces
-            </h2>
-            <ul className="mt-2 space-y-1">
-              {record.spaces.map((s) => (
-                <li
-                  key={s.id}
-                  className="group flex h-7 items-center gap-2 rounded-md px-1.5 text-ui hover:bg-accent"
-                >
-                  <Layers
-                    className="size-3.5 shrink-0 text-muted-foreground"
-                    strokeWidth={1.75}
-                  />
+        <RecordSection
+          label="Notes"
+          meta={`${noteMentions.length} note${noteMentions.length === 1 ? '' : 's'}`}
+          action={
+            <button
+              type="button"
+              onClick={newNoteAboutThis}
+              className="focus-ring text-primary hover:underline"
+            >
+              note about this ›
+            </button>
+          }
+        >
+          {noteMentions.length === 0 ? (
+            <p className="border-t border-rule py-2 text-label text-graphite">
+              No notes mention {record.name} yet. Write one — it links itself
+              here.
+            </p>
+          ) : (
+            <ol>
+              {noteMentions.map((m) => (
+                <li key={m.fromId} className="border-t border-rule">
                   <Link
-                    to="/spaces/$spaceId"
-                    params={{ spaceId: s.id }}
-                    className="min-w-0 flex-1 truncate focus-ring"
+                    to="/notes/$noteId"
+                    params={{ noteId: m.fromId }}
+                    className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
                   >
-                    {s.name}
+                    <span className="font-serif text-[0.9375rem] font-medium">
+                      {m.name}
+                    </span>
                   </Link>
-                  <button
-                    aria-label={`Remove from ${s.name}`}
-                    onClick={async () => {
-                      await untagFromSpace({
-                        data: { entityId: record.id, spaceId: s.id },
-                      })
-                      void router.invalidate()
-                    }}
-                    className="hidden size-5 items-center justify-center rounded text-muted-foreground focus-ring group-hover:flex hover:text-foreground focus-visible:flex"
-                  >
-                    <X className="size-3" strokeWidth={2} />
-                  </button>
                 </li>
               ))}
-            </ul>
-            {untaggedSpaces.length > 0 ? (
-              <select
-                aria-label="Tag into space"
-                value=""
-                onChange={async (e) => {
-                  if (!e.target.value) return
-                  await tagIntoSpace({
-                    data: { entityId: record.id, spaceId: e.target.value },
-                  })
-                  void router.invalidate()
-                }}
-                className="mt-2 h-7 w-full rounded-md border border-input bg-transparent px-2 text-xs text-muted-foreground focus-ring"
-              >
-                <option value="">+ Tag into space…</option>
-                {untaggedSpaces.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {' '.repeat(s.depth * 2)}
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-          </div>
+            </ol>
+          )}
+        </RecordSection>
 
-          <div>
-            <h2 className="text-xs font-medium text-muted-foreground">
-              Referenced by
-            </h2>
-            {record.referencedBy.length === 0 ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                No record points here yet.
-              </p>
-            ) : (
-              <ul className="mt-2 space-y-1">
-                {record.referencedBy.map((r) => {
-                  const href = recordPath({
-                    kind: r.kind,
-                    id: r.fromId,
-                    objectSlug: r.objectSlug,
-                  })
-                  const body = (
-                    <>
-                      <Link2
-                        className="size-3.5 shrink-0 text-muted-foreground"
-                        strokeWidth={1.75}
-                      />
-                      <span className="min-w-0 flex-1 truncate">{r.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {r.objectSingular ?? r.kind}
-                      </span>
-                    </>
-                  )
-                  return (
-                    <li key={`${r.fromId}:${r.attrSlug}`}>
-                      {href ? (
-                        <Link
-                          to={href}
-                          className="flex h-7 items-center gap-2 rounded-md px-1.5 text-ui focus-ring hover:bg-accent"
-                        >
-                          {body}
-                        </Link>
-                      ) : (
-                        <span className="flex h-7 items-center gap-2 px-1.5 text-ui">
-                          {body}
-                        </span>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
+        <RecordSection
+          rule
+          label="Ledger"
+          meta={`${timeline.length} entr${timeline.length === 1 ? 'y' : 'ies'}`}
+        >
+          <RecordTimeline
+            items={timeline}
+            registry={registry as Array<RegistryEntry>}
+          />
+        </RecordSection>
 
-          <div>
-            <h2 className="text-xs font-medium text-muted-foreground">
-              Mentioned in
-            </h2>
-            {record.mentionedIn.length === 0 ? (
-              <p className="mt-2 text-xs text-muted-foreground">Nowhere yet.</p>
-            ) : (
-              <ul className="mt-2 space-y-1">
-                {record.mentionedIn.map((m) => {
-                  const href = recordPath({
-                    kind: m.kind,
-                    id: m.fromId,
-                    objectSlug: m.objectSlug,
-                  })
-                  return (
-                    <li key={m.fromId} className="truncate text-ui">
-                      {href ? (
-                        <Link
-                          to={href}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          {m.name}
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">{m.name}</span>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
-        </aside>
-      </div>
+        <RecordSection
+          rule
+          label="Files"
+          meta={`${documents.length} file${documents.length === 1 ? '' : 's'}`}
+        >
+          <RecordFiles entityId={record.id} documents={documents} />
+        </RecordSection>
+      </RecordBody>
     </div>
   )
 }
 
-/** The display name, editable in place — it is canonical_name, core-owned. */
 function RecordName({
   name,
   onSave,
@@ -399,7 +403,7 @@ function RecordName({
           ;(e.target as HTMLInputElement).blur()
         }
       }}
-      className="block w-full truncate rounded bg-transparent text-page font-semibold tracking-tight focus-ring"
+      className="focus-ring block w-full truncate bg-transparent title-serif"
     />
   )
 }

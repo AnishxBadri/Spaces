@@ -4,11 +4,12 @@ import { AttributeDialog } from './attribute-dialog'
 import type { EditableAttribute } from './attribute-dialog'
 import { ValueEditor } from './value-editor'
 import type { RefNames, RegistryEntry } from './value-editor'
+import { PropertyCell } from '#/components/record/record-parts'
 
 /**
- * One labelled attribute in a record rail. A rejected write (a required
- * attribute cleared, an invalid value) is shown inline under the field
- * and the editor remounts to the stored value — not a toast-and-revert
+ * One labelled attribute in a record's property grid. A rejected write (a
+ * required attribute cleared, an invalid value) is shown inline under the
+ * field and the editor remounts to the stored value — not a toast-and-revert
  * the reader has to reconcile across the screen. The server's message is
  * `slug: detail`; the slug is redundant next to the label, so it's cut.
  */
@@ -35,23 +36,37 @@ export function RailField({
   const [editing, setEditing] = useState(false)
 
   return (
-    <div className="group/rail space-y-1">
-      <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-        <span className="min-w-0 truncate" title={def.description ?? undefined}>
-          {def.name}
-        </span>
-        {attr ? (
-          <button
-            type="button"
-            aria-label={`Edit attribute ${def.name}`}
-            title="Edit attribute"
-            onClick={() => setEditing(true)}
-            className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 focus-ring transition-opacity duration-150 group-hover/rail:opacity-100 hover:text-foreground focus-visible:opacity-100"
+    <PropertyCell
+      className="group/rail"
+      label={
+        <>
+          <span
+            className="min-w-0 truncate"
+            title={def.description ?? undefined}
           >
-            <Pencil className="size-3" strokeWidth={1.75} />
-          </button>
-        ) : null}
-      </span>
+            {def.name}
+          </span>
+          {attr ? (
+            <button
+              type="button"
+              aria-label={`Edit attribute ${def.name}`}
+              title="Edit attribute"
+              onClick={() => setEditing(true)}
+              className="focus-ring flex size-4 shrink-0 items-center justify-center text-graphite opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 hover:text-foreground focus-visible:opacity-100"
+            >
+              <Pencil className="size-2.5" strokeWidth={1.75} />
+            </button>
+          ) : null}
+        </>
+      }
+      below={
+        error ? (
+          <p role="alert" className="pt-1 text-label text-destructive">
+            {error}
+          </p>
+        ) : null
+      }
+    >
       {attr ? (
         <AttributeDialog
           mode="edit"
@@ -79,11 +94,6 @@ export function RailField({
           )
         }}
       />
-      {error ? (
-        <p role="alert" className="text-xs text-destructive">
-          {error}
-        </p>
-      ) : null}
-    </div>
+    </PropertyCell>
   )
 }

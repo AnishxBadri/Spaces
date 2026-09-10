@@ -5,17 +5,8 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import {
-  ArrowLeft,
-  Building2,
-  ChevronDown,
-  Compass,
-  FileText,
-  Kanban,
-  MessageSquare,
-  Plus,
-} from 'lucide-react'
-import { useState } from 'react'
+import { Compass } from 'lucide-react'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { RailField } from '#/components/attributes/rail-field'
 import { OptionChip } from '#/components/attributes/value-editor'
@@ -24,8 +15,23 @@ import { AttributeCreateDialog } from '#/components/attributes/attribute-create-
 import { TasksRail } from '#/components/tasks-rail'
 import { CloseReasonDialog } from '#/components/deal-board'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import { KeyHint } from '#/components/page-header'
+import {
+  DitherMark,
+  InitialsMark,
+  PropertyCell,
+  RailEmpty,
+  RailItem,
+  RailSection,
+  RecordBody,
+  RecordHeader,
+  RecordSection,
+  PropertyGrid,
+  StageStepper,
+} from '#/components/record/record-parts'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
+import { TaskComposer } from '#/components/task-composer'
 import { Button } from '#/components/ui/button'
 import {
   DropdownMenu,
@@ -34,6 +40,9 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { optionColor } from '#/lib/attributes/colors'
+import { fmtMoney } from '#/lib/portfolio/format'
+import { localToday } from '#/lib/tasks/parse-due'
+import { useHotkey } from '#/lib/use-hotkey'
 import {
   createNote,
   getDeal,
@@ -42,7 +51,6 @@ import {
   listRegistry,
   updateRecord,
 } from '#/lib/server-fns'
-import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/deals_/$dealId')({
   loader: async ({ params }) => {
@@ -67,7 +75,11 @@ function DealRecordPage() {
   const { deal, registry, timeline, documents } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'activity' | 'notes' | 'files'>('activity')
+  const [moveOpen, setMoveOpen] = useState(false)
+  useHotkey(
+    'm',
+    useCallback(() => setMoveOpen(true), []),
+  )
   // Same post-mortem gate the board's drag path has — Passed/Lost pause here.
   const [closing, setClosing] = useState<{
     stageId: string
@@ -94,6 +106,50 @@ function DealRecordPage() {
   // Move-stage never offers a retired stage; the header chip still shows one.
   const liveStages = stageOptions.filter((o) => !o.archived)
 
+  // The readouts: our check, the company, the owner, the close, and days in
+  // the current stage — the last from the stage log, never stored.
+  const today = localToday()
+  const valueCode =
+    (
+      registry.find((d) => d.slug === 'value')?.options as
+        { code?: string } | undefined
+    )?.code ?? 'USD'
+  const rawValue = deal.values.value
+  const ourCheck =
+    typeof rawValue === 'number'
+      ? rawValue
+      : typeof rawValue === 'string' && rawValue !== ''
+        ? Number(rawValue)
+        : null
+  const ownerId = deal.values.owner as string | undefined
+  const ownerName = ownerId ? deal.userNames[ownerId] : undefined
+  const closeDate =
+    typeof deal.values.close_date === 'string' ? deal.values.close_date : null
+  const daysUntil = (iso: string) =>
+    Math.round(
+      (new Date(`${iso}T00:00:00Z`).getTime() -
+        new Date(`${today}T00:00:00Z`).getTime()) /
+        86_400_000,
+    )
+  const stageEntered =
+    timeline.find(
+      (i) => i.type === 'attrs' && i.changes.some((c) => c.slug === 'stage'),
+    )?.at ?? deal.createdAt
+  const daysInStage = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(stageEntered).getTime()) / 86_400_000),
+  )
+  const peopleIds = Array.isArray(deal.values.people)
+    ? (deal.values.people as Array<string>)
+    : []
+  const people = peopleIds.flatMap((id) => {
+    // refNames' Record index type hides misses — annotate the lookup honestly.
+    const ref = (deal.refNames as Record<string, { name: string } | undefined>)[
+      id
+    ]
+    return ref ? [{ id, name: ref.name }] : []
+  })
+
   async function save(patch: Record<string, unknown>) {
     try {
       await updateRecord({ data: { id: deal.id, patch } })
@@ -116,7 +172,7 @@ function DealRecordPage() {
   }
 
   return (
-    <div className="px-6 py-8 md:px-10">
+    <div className="flex min-h-full flex-col">
       {closing ? (
         <CloseReasonDialog
           dealName={deal.name}
@@ -131,41 +187,88 @@ function DealRecordPage() {
           }}
         />
       ) : null}
-      <Link
-        to="/deals"
-        className="flex w-fit items-center gap-1.5 rounded-md text-ui text-muted-foreground focus-ring hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-        Deals
-      </Link>
 
-      <header className="mt-5 flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-          <Kanban
-            className="size-4.5 text-muted-foreground"
-            strokeWidth={1.75}
-          />
-        </span>
-        <div className="min-w-0">
-          <h1 className="truncate text-page font-semibold tracking-tight">
-            {deal.name}
-          </h1>
-          <span className="flex items-center gap-2">
-            {companyId ? (
-              <Link
-                to="/companies/$companyId"
-                params={{ companyId }}
-                className="flex w-fit items-center gap-1 text-ui text-muted-foreground hover:text-foreground"
-              >
-                <Building2 className="size-3" strokeWidth={1.75} />
-                {companyRef?.name ?? 'Company'}
-              </Link>
+      <RecordHeader
+        crumb={
+          <>
+            <Link to="/deals" className="focus-ring hover:text-foreground">
+              Deals
+            </Link>
+            {' / '}
+            {deal.id.slice(0, 8)}
+            {' / opened '}
+            {deal.createdAt.slice(0, 10)}
+          </>
+        }
+        actions={
+          <>
+            <LogInteractionDialog
+              seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
+              hotkey="l"
+              trigger={
+                <Button variant="outline">
+                  Log interaction
+                  <KeyHint>L</KeyHint>
+                </Button>
+              }
+            />
+            <TaskComposer
+              presetEntity={{ id: deal.id, name: deal.name, kind: 'deal' }}
+              hotkey="t"
+              trigger={
+                <Button variant="outline">
+                  Task
+                  <KeyHint>T</KeyHint>
+                </Button>
+              }
+            />
+            {liveStages.length > 0 ? (
+              <DropdownMenu open={moveOpen} onOpenChange={setMoveOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button>
+                    Move stage
+                    <KeyHint>M</KeyHint>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {liveStages.map((o, i) => (
+                    <DropdownMenuItem
+                      key={o.id}
+                      disabled={o.id === deal.values.stage}
+                      onSelect={() => {
+                        if (o.id === 'passed' || o.id === 'lost') {
+                          setClosing({ stageId: o.id, stageLabel: o.label })
+                          return
+                        }
+                        void save({ stage: o.id })
+                      }}
+                    >
+                      <span className="w-4 mono text-micro text-graphite">
+                        {i + 1}
+                      </span>
+                      <span
+                        className="size-2"
+                        style={{
+                          backgroundColor: `var(--badge-${optionColor(o, stageOptions.indexOf(o))}-ink)`,
+                        }}
+                      />
+                      {o.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : null}
+          </>
+        }
+        mark={<DitherMark />}
+        name={deal.name}
+        badges={
+          <>
             {stageOption && stageDef ? (
               <OptionChip
                 def={stageDef}
                 id={stageOption.id}
-                className="text-xs"
+                className="h-5 shrink-0 py-0 leading-5"
               />
             ) : null}
             {deal.outsideMandate ? (
@@ -173,64 +276,105 @@ function DealRecordPage() {
               // quiet: same-hue tint, no red.
               <Link
                 to="/mandate"
-                className="flex items-center gap-1 rounded-full bg-[var(--badge-amber)] px-2 py-0.5 text-xs font-medium text-[var(--badge-amber-ink)] hover:opacity-80"
+                className="focus-ring flex h-5 shrink-0 items-center gap-1 bg-[var(--badge-amber)] px-1.5 mono text-micro font-medium text-[var(--badge-amber-ink)] hover:opacity-80"
                 title="This company's stage is outside the mandate's stages. Click to review the mandate."
               >
                 <Compass className="size-3" strokeWidth={2} />
                 Outside mandate
               </Link>
             ) : null}
-          </span>
-        </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <LogInteractionDialog
-            seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
-            trigger={
-              <Button size="sm" variant="outline">
-                <MessageSquare className="size-3.5" strokeWidth={1.75} />
-                Log interaction
-              </Button>
-            }
-          />
-          {liveStages.length > 0 ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm">
-                  Move stage
-                  <ChevronDown className="size-3.5" strokeWidth={2} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {liveStages.map((o) => (
-                  <DropdownMenuItem
-                    key={o.id}
-                    disabled={o.id === deal.values.stage}
-                    onSelect={() => {
-                      if (o.id === 'passed' || o.id === 'lost') {
-                        setClosing({ stageId: o.id, stageLabel: o.label })
-                        return
-                      }
-                      void save({ stage: o.id })
-                    }}
-                  >
-                    <span
-                      className="size-2 rounded-full"
-                      style={{
-                        backgroundColor: `var(--badge-${optionColor(o, stageOptions.indexOf(o))}-ink)`,
-                      }}
-                    />
-                    {o.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-        </div>
-      </header>
+          </>
+        }
+        readouts={[
+          {
+            label: 'Our check',
+            value:
+              ourCheck !== null && Number.isFinite(ourCheck)
+                ? fmtMoney(ourCheck, valueCode)
+                : '—',
+            tone: ourCheck === null ? 'muted' : undefined,
+          },
+          {
+            label: 'Company',
+            value: companyId ? (
+              <Link
+                to="/companies/$companyId"
+                params={{ companyId }}
+                className="focus-ring hover:underline"
+              >
+                {companyRef?.name ?? 'Company'}
+              </Link>
+            ) : (
+              '—'
+            ),
+            kind: 'text',
+            tone: companyId ? undefined : 'muted',
+          },
+          {
+            label: 'Owner',
+            value: ownerName ?? '—',
+            kind: 'text',
+            tone: ownerName ? undefined : 'muted',
+          },
+          {
+            label: 'Close',
+            value: closeDate
+              ? `${closeDate} ${daysUntil(closeDate) < 0 ? '−' : ''}${Math.abs(daysUntil(closeDate))}d`
+              : '—',
+            tone: closeDate
+              ? daysUntil(closeDate) < 0
+                ? 'bad'
+                : undefined
+              : 'muted',
+          },
+          { label: 'Days in stage', value: `${daysInStage}` },
+        ]}
+      />
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-[240px_minmax(0,1fr)]">
-        {/* Left: registry rail */}
-        <aside className="space-y-4">
+      <RecordBody
+        rail={
+          <>
+            <RailSection
+              label="Pipeline"
+              meta={
+                stageOption
+                  ? `${Math.max(1, liveStages.findIndex((o) => o.id === stageOption.id) + 1)} of ${liveStages.length}`
+                  : undefined
+              }
+            >
+              <StageStepper
+                stages={liveStages}
+                currentId={stageOption?.id ?? null}
+                days={daysInStage}
+              />
+            </RailSection>
+            <TasksRail
+              entityId={deal.id}
+              entityName={deal.name}
+              entityKind="deal"
+            />
+            <RailSection label="People" meta={`${people.length}`}>
+              {people.length === 0 ? (
+                <RailEmpty>No one linked yet — set People above.</RailEmpty>
+              ) : (
+                people.map((p) => (
+                  <RailItem key={p.id}>
+                    <InitialsMark name={p.name} />
+                    <Link
+                      to="/people/$personId"
+                      params={{ personId: p.id }}
+                      className="focus-ring min-w-0 truncate hover:underline"
+                    >
+                      {p.name}
+                    </Link>
+                  </RailItem>
+                ))
+              )}
+            </RailSection>
+          </>
+        }
+      >
+        <PropertyGrid>
           {registry.map((def) => (
             <RailField
               key={def.slug}
@@ -248,100 +392,88 @@ function DealRecordPage() {
               }}
             />
           ))}
-          <AttributeCreateDialog
-            objectKind="deal"
-            onCreated={() => router.invalidate()}
+          <PropertyCell label="">
+            <AttributeCreateDialog
+              objectKind="deal"
+              onCreated={() => router.invalidate()}
+              trigger={
+                <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
+                  + add attribute
+                </button>
+              }
+            />
+          </PropertyCell>
+        </PropertyGrid>
+
+        <RecordSection
+          label="Notes"
+          meta={`${noteMentions.length} note${noteMentions.length === 1 ? '' : 's'}`}
+          action={
+            <button
+              type="button"
+              onClick={newNoteAboutThis}
+              className="focus-ring text-primary hover:underline"
+            >
+              note about this ›
+            </button>
+          }
+        >
+          {noteMentions.length === 0 ? (
+            <p className="border-t border-rule py-2 text-label text-graphite">
+              No notes mention this deal yet — diligence notes land here.
+            </p>
+          ) : (
+            <ol>
+              {noteMentions.map((m) => (
+                <li key={m.fromId} className="border-t border-rule">
+                  <Link
+                    to="/notes/$noteId"
+                    params={{ noteId: m.fromId }}
+                    className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
+                  >
+                    <span className="font-serif text-[0.9375rem] font-medium">
+                      {m.name}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          )}
+        </RecordSection>
+
+        <RecordSection
+          rule
+          label="Ledger"
+          meta={`${timeline.length} entr${timeline.length === 1 ? 'y' : 'ies'}`}
+        >
+          <LogInteractionDialog
+            seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
             trigger={
-              <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground focus-ring hover:text-foreground">
-                <Plus className="size-3" strokeWidth={2} />
-                Add attribute
+              <button className="focus-ring-inset flex h-row w-full items-center gap-3 border-t border-b border-rule text-left">
+                <span className="mono text-micro text-primary">+</span>
+                <span className="min-w-0 truncate text-ui text-graphite">
+                  Log a call, meeting, or note…
+                </span>
+                <span className="flex-1" />
+                <KeyHint>L</KeyHint>
               </button>
             }
           />
-          <TasksRail
-            entityId={deal.id}
-            entityName={deal.name}
-            entityKind="deal"
+          <RecordTimeline
+            items={timeline}
+            registry={registry as Array<RegistryEntry>}
+            refNames={refNames}
           />
-        </aside>
+        </RecordSection>
 
-        {/* Center: tabs */}
-        <section className="min-w-0">
-          <div className="flex items-center justify-between border-b border-border">
-            <div role="tablist" className="flex gap-1">
-              {(['activity', 'notes', 'files'] as const).map((t) => (
-                <button
-                  key={t}
-                  role="tab"
-                  aria-selected={tab === t}
-                  onClick={() => setTab(t)}
-                  className={cn(
-                    'relative rounded-t-md px-3 pb-2.5 text-ui font-medium text-muted-foreground capitalize focus-ring transition-colors hover:text-foreground',
-                    tab === t &&
-                      'text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary',
-                  )}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Button size="xs" variant="outline" onClick={newNoteAboutThis}>
-                <Plus className="size-3" strokeWidth={2} />
-                Note about this
-              </Button>
-            </div>
-          </div>
-
-          {tab === 'activity' ? (
-            <>
-              <LogInteractionDialog
-                seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
-                trigger={
-                  <button className="mt-4 flex h-9 w-full items-center gap-2 rounded-md border border-input px-3 text-left text-ui text-muted-foreground focus-ring transition-colors duration-150 ease-out-quart hover:border-border hover:bg-accent">
-                    <MessageSquare
-                      className="size-3.5 shrink-0"
-                      strokeWidth={1.75}
-                    />
-                    Log a call, meeting, or note…
-                  </button>
-                }
-              />
-              <RecordTimeline
-                items={timeline}
-                registry={registry as Array<RegistryEntry>}
-                refNames={refNames}
-              />
-            </>
-          ) : tab === 'files' ? (
-            <RecordFiles entityId={deal.id} documents={documents} />
-          ) : (
-            <ul className="mt-4 space-y-1">
-              {noteMentions.length === 0 ? (
-                <p className="text-ui text-muted-foreground">
-                  No notes mention this deal yet — diligence notes land here.
-                </p>
-              ) : (
-                noteMentions.map((m) => (
-                  <li key={m.fromId}>
-                    <Link
-                      to="/notes/$noteId"
-                      params={{ noteId: m.fromId }}
-                      className="flex h-9 items-center gap-2.5 rounded-md px-2 text-ui focus-ring hover:bg-accent"
-                    >
-                      <FileText
-                        className="size-4 text-muted-foreground"
-                        strokeWidth={1.75}
-                      />
-                      <span className="font-medium">{m.name}</span>
-                    </Link>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
-        </section>
-      </div>
+        <RecordSection
+          rule
+          label="Files"
+          meta={`${documents.length} file${documents.length === 1 ? '' : 's'}`}
+        >
+          <RecordFiles entityId={deal.id} documents={documents} />
+        </RecordSection>
+      </RecordBody>
     </div>
   )
 }

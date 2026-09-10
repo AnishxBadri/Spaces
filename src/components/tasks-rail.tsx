@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { TaskComposer } from './task-composer'
+import { RailEmpty, RailSection } from './record/record-parts'
 import { listEntityTasks, setTaskDone } from '#/lib/server-fns'
-import { fmtDate } from '#/lib/portfolio/format'
 import { localToday } from '#/lib/tasks/parse-due'
+import { cn } from '#/lib/utils'
 
 type RailTask = {
   id: string
@@ -63,29 +63,35 @@ export function TasksRail({
   const today = localToday()
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">Tasks</span>
-        <TaskComposer
-          presetEntity={{ id: entityId, name: entityName, kind: entityKind }}
-          onCreated={load}
-          trigger={
-            <button className="flex items-center gap-1 rounded-md text-xs text-muted-foreground focus-ring hover:text-foreground">
-              <Plus className="size-3" strokeWidth={2} />
-              Add
-            </button>
-          }
-        />
-      </div>
+    <RailSection
+      label="Tasks"
+      meta={
+        <>
+          {tasks ? <span>{tasks.length} open</span> : null}
+          <TaskComposer
+            presetEntity={{ id: entityId, name: entityName, kind: entityKind }}
+            onCreated={load}
+            trigger={
+              <button className="focus-ring mono text-micro text-primary hover:underline">
+                + add
+              </button>
+            }
+          />
+        </>
+      }
+    >
       {tasks === null ? null : tasks.length === 0 ? (
-        <p className="text-xs text-muted-foreground">None open.</p>
+        <RailEmpty>None open.</RailEmpty>
       ) : (
-        <ol className="space-y-1">
+        <ol>
           {tasks.map((t) => (
-            <li key={t.id} className="flex items-baseline gap-2">
+            <li
+              key={t.id}
+              className="flex h-row items-center gap-3 border-t border-rule"
+            >
               <input
                 type="checkbox"
-                className="translate-y-0.5 accent-primary"
+                className="focus-ring size-3.5 shrink-0 appearance-none border border-hairline bg-paper checked:bg-primary"
                 checked={false}
                 onChange={() => complete(t.id)}
                 aria-label={`Complete: ${t.content}`}
@@ -95,19 +101,18 @@ export function TasksRail({
               </span>
               {t.dueDate ? (
                 <span
-                  className={
-                    t.dueDate < today
-                      ? 'text-label text-destructive'
-                      : 'text-label text-muted-foreground'
-                  }
+                  className={cn(
+                    'shrink-0 mono text-micro',
+                    t.dueDate < today ? 'text-destructive' : 'text-graphite',
+                  )}
                 >
-                  {fmtDate(t.dueDate)}
+                  {t.dueDate}
                 </span>
               ) : null}
             </li>
           ))}
         </ol>
       )}
-    </div>
+    </RailSection>
   )
 }
