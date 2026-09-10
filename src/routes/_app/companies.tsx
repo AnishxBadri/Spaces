@@ -26,11 +26,11 @@ import {
 } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
+import { DitherMark } from '#/components/record/record-parts'
 import { TemplatePicker } from '#/components/templates'
 import {
   ChipLink,
   DateCell,
-  IconBadge,
   MetaCell,
   RecordLinkCell,
 } from '#/components/table/cells'
@@ -141,7 +141,7 @@ function CompaniesPage() {
             to="/companies/$companyId"
             params={{ companyId: info.row.original.id }}
             name={String(info.getValue())}
-            badge={<IconBadge icon={Building2} />}
+            badge={<DitherMark size={18} />}
           />
         ),
       }),
