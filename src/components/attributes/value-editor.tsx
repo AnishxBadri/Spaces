@@ -1,4 +1,4 @@
-import { Boxes, Building2, Check, ChevronDown, Star, User } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   DropdownMenu,
@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
+import { DitherMark, InitialsMark } from '#/components/record/record-parts'
 import { badgeStyle, optionColor } from '#/lib/attributes/colors'
 import { liveOptions, optionState } from '#/lib/attributes/options'
 import { formatDate, formatNumber } from '#/lib/format'
@@ -145,8 +146,25 @@ export function ValueEditor({
           refNames={refNames}
         />
       )
-    case 'select':
     case 'status':
+      // Never edited in a cell: the stage log needs a reason, so M opens
+      // Move stage on the record. Here it only reads.
+      return (
+        <span
+          className={cn(
+            'flex min-w-0 items-center',
+            variant === 'field' ? 'h-8 px-2' : 'h-full px-1',
+          )}
+          title="Move stage from the record (M)"
+        >
+          {value == null || value === '' ? (
+            <span className="text-ui text-graphite">—</span>
+          ) : (
+            <OptionChip def={def} id={value} />
+          )}
+        </span>
+      )
+    case 'select':
       return (
         <OptionPicker
           def={def}
@@ -175,45 +193,56 @@ export function ValueEditor({
           aria-label={def.name}
           onClick={() => onSave(!value)}
           className={cn(
-            'focus-ring flex size-4 items-center justify-center rounded border transition-colors duration-150 ease-out-quart',
+            'focus-ring flex size-3.5 items-center justify-center border transition-colors duration-150 ease-out-quart',
+            variant === 'field' && 'ml-2',
             value
               ? 'border-primary bg-primary text-primary-foreground'
-              : 'border-input hover:border-ring',
+              : 'border-hairline bg-paper',
           )}
         >
-          {value ? <Check className="size-3" strokeWidth={3} /> : null}
+          {value ? <Check className="size-2.5" strokeWidth={3} /> : null}
         </button>
       )
     case 'rating': {
       const max = def.options?.max ?? 5
       const current = typeof value === 'number' ? value : 0
       return (
+        // Squares, not stars: ink for the rating, outlined for the rest,
+        // pine while a hover previews.
         <div
-          className="flex items-center gap-0.5"
+          className={cn(
+            'flex items-center gap-2',
+            variant === 'field' && 'h-8 px-2',
+          )}
           role="radiogroup"
           aria-label={def.name}
         >
-          {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              type="button"
-              role="radio"
-              aria-checked={current === n}
-              aria-label={`${n} of ${max}`}
-              onClick={() => onSave(current === n ? null : n)}
-              className="focus-ring rounded"
-            >
-              <Star
-                className={cn(
-                  'size-3.5',
-                  n <= current
-                    ? 'fill-primary text-primary'
-                    : 'text-border hover:text-muted-foreground',
-                )}
-                strokeWidth={1.75}
-              />
-            </button>
-          ))}
+          <span className="flex items-center gap-0.5">
+            {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={current === n}
+                aria-label={`${n} of ${max}`}
+                onClick={() => onSave(current === n ? null : n)}
+                className="focus-ring flex size-3 items-center justify-center"
+              >
+                <span
+                  className={cn(
+                    'block size-2 transition-colors duration-150',
+                    n <= current
+                      ? 'bg-hairline'
+                      : 'border border-hairline bg-paper',
+                    'hover:border-primary hover:bg-primary',
+                  )}
+                />
+              </button>
+            ))}
+          </span>
+          <span className="mono text-micro text-graphite">
+            {current > 0 ? `${current}/${max}` : '—'}
+          </span>
         </div>
       )
     }
@@ -352,7 +381,9 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
         'w-full min-w-0 bg-transparent text-ui',
         (def.type === 'number' || def.type === 'currency') && 'numeric',
         variant === 'field'
-          ? 'focus-ring h-8 rounded-md border border-rule px-2.5'
+          ? // At rest it reads as a value; the rule appears on hover, the
+            // reticle on focus. ↵ commits, esc reverts.
+            'focus-ring h-8 rounded-md border border-transparent px-2 transition-colors hover:border-rule focus:border-rule'
           : // Inset inside a cell: an offset ring would be clipped by the
             // table's scroll container and overlap the neighbouring column.
             'focus-ring-inset h-full rounded px-1',
@@ -397,40 +428,41 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
     }
   }, [query, targetKind, targetObjectId])
 
-  const Icon = targetObjectId
-    ? Boxes
-    : targetKind === 'person'
-      ? User
-      : Building2
   const targetLabel = targetObjectId ? 'records' : targetKind
+  const mark = (name: string) =>
+    targetKind === 'person' && !targetObjectId ? (
+      <InitialsMark name={name} size="xs" outline />
+    ) : (
+      <DitherMark size={12} />
+    )
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={def.name}
         className={cn(
-          'flex min-w-0 items-center gap-1 text-left',
+          'group/pick flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'focus-ring h-8 w-full rounded-md border border-rule px-2.5'
+            ? 'focus-ring h-8 w-full rounded-md border border-transparent px-2 transition-colors hover:border-rule data-[state=open]:border-rule'
             : 'focus-ring-inset h-full w-full rounded px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
           {selected.length === 0 ? (
-            <span className="text-ui text-muted-foreground">—</span>
+            <span className="text-ui text-graphite">—</span>
           ) : (
             selected.map((id) => (
               <span
                 key={id}
-                className="flex items-center gap-1 truncate border border-rule bg-paper px-1.5 py-0.5 text-label font-medium"
+                className="flex h-5 items-center gap-1.5 truncate border border-rule bg-paper px-1.5 text-label font-medium"
               >
-                <Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
+                {mark(refName(refNames, id))}
                 {refName(refNames, id)}
               </span>
             ))
           )}
         </span>
-        <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+        <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         <div className="p-1.5">
@@ -455,10 +487,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
               setQuery('')
             }}
           >
-            <Icon
-              className="size-3.5 text-muted-foreground"
-              strokeWidth={1.75}
-            />
+            {mark(r.name)}
             {r.name}
           </DropdownMenuItem>
         ))}
@@ -491,25 +520,23 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
       <DropdownMenuTrigger
         aria-label={def.name}
         className={cn(
-          'flex min-w-0 items-center gap-1 text-left',
+          'group/pick flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'focus-ring h-8 w-full rounded-md border border-rule px-2.5'
+            ? 'focus-ring h-8 w-full rounded-md border border-transparent px-2 transition-colors hover:border-rule data-[state=open]:border-rule'
             : 'focus-ring-inset h-full w-full rounded px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-ui">
           {selected ? (
             <>
-              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-foreground text-micro font-semibold text-background">
-                {refName(refNames, selected).charAt(0).toUpperCase()}
-              </span>
+              <InitialsMark name={refName(refNames, selected)} size="xs" />
               <span className="truncate">{refName(refNames, selected)}</span>
             </>
           ) : (
-            <span className="text-muted-foreground">—</span>
+            <span className="text-graphite">—</span>
           )}
         </span>
-        <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+        <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {users.map((u) => (
@@ -556,20 +583,20 @@ function OptionPicker({
       <DropdownMenuTrigger
         aria-label={def.name}
         className={cn(
-          'flex min-w-0 items-center gap-1 text-left',
+          'group/pick flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
-            ? 'focus-ring h-8 w-full rounded-md border border-rule px-2.5'
+            ? 'focus-ring h-8 w-full rounded-md border border-transparent px-2 transition-colors hover:border-rule data-[state=open]:border-rule'
             : 'focus-ring-inset h-full w-full rounded px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
           {selected.length === 0 ? (
-            <span className="text-ui text-muted-foreground">—</span>
+            <span className="text-ui text-graphite">—</span>
           ) : (
             selected.map((id) => <OptionChip key={id} def={def} id={id} />)
           )}
         </span>
-        <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+        <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
         {multi

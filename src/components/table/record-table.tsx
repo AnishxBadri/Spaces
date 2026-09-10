@@ -1,19 +1,15 @@
 import { flexRender } from '@tanstack/react-table'
 import type { Header, Table } from '@tanstack/react-table'
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronsUpDown,
-  Columns3,
-  Plus,
-} from 'lucide-react'
+import { ChevronsUpDown, Columns3, Plus } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '#/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
@@ -102,6 +98,27 @@ export function RecordTable<T>({
             </tr>
           ))}
         </tbody>
+        {rows.length > 0 ? (
+          // The foot: how much of the ledger is on the page, and where it ends.
+          <tfoot>
+            <tr className="h-8 border-t border-hairline">
+              <td
+                colSpan={
+                  table.getVisibleLeafColumns().length + (addColumn ? 1 : 0)
+                }
+                className="px-2 align-middle"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="label-caps font-normal text-graphite">
+                    {rows.length} of{' '}
+                    {table.getPreFilteredRowModel().rows.length}
+                  </span>
+                  <span className="mono text-micro text-graphite">end</span>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        ) : null}
       </table>
 
       {rows.length === 0 ? (
@@ -155,36 +172,68 @@ function HeaderCell<T>({
         sticky && 'sticky left-0 z-20 bg-background',
       )}
     >
-      {column.getCanSort() ? (
-        <button
-          type="button"
-          onClick={column.getToggleSortingHandler()}
-          title={`Sort by ${title}`}
-          className="group/sort focus-ring flex w-full items-center gap-1 truncate rounded text-left transition-colors duration-150 ease-out-quart hover:text-foreground"
-        >
-          <span className="truncate">
-            {flexRender(column.columnDef.header, header.getContext())}
-          </span>
-          {sorted === 'asc' ? (
-            <ArrowUp
-              className="size-3 shrink-0 text-foreground"
-              strokeWidth={2}
-            />
-          ) : sorted === 'desc' ? (
-            <ArrowDown
-              className="size-3 shrink-0 text-foreground"
-              strokeWidth={2}
-            />
-          ) : (
-            // The affordance only appears when the header is reachable, so an
-            // unsorted table stays quiet but never hides that it can sort.
+      {column.getCanSort() || column.getCanHide() ? (
+        // Header cells are buttons: the menu carries sort both ways and hide.
+        // The sort direction reads as a mono arrow after the label; the
+        // chevron only appears on hover, so a resting header stays quiet.
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            title={`${title} column`}
+            className={cn(
+              'group/sort focus-ring-inset -mx-2 flex h-8 w-[calc(100%+1rem)] items-center gap-1.5 truncate px-2 text-left transition-colors duration-150 ease-out-quart hover:bg-bone data-[state=open]:bg-bone',
+              sorted && 'text-foreground',
+            )}
+          >
+            <span className="truncate">
+              {flexRender(column.columnDef.header, header.getContext())}
+            </span>
+            {sorted === 'asc' ? (
+              <span className="shrink-0 mono text-micro font-normal tracking-normal">
+                ↑
+              </span>
+            ) : sorted === 'desc' ? (
+              <span className="shrink-0 mono text-micro font-normal tracking-normal">
+                ↓
+              </span>
+            ) : null}
             <ChevronsUpDown
-              className="size-3 shrink-0 opacity-0 transition-opacity duration-150 ease-out-quart group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100"
+              className="ml-auto size-3 shrink-0 opacity-0 transition-opacity duration-150 ease-out-quart group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100 group-data-[state=open]/sort:opacity-100"
               strokeWidth={2}
               aria-hidden
             />
-          )}
-        </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-50">
+            {column.getCanSort() ? (
+              <>
+                <DropdownMenuItem onSelect={() => column.toggleSorting(false)}>
+                  Sort A → Z
+                  <span className="ml-auto mono text-micro text-graphite">
+                    ↑
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => column.toggleSorting(true)}>
+                  Sort Z → A
+                  <span className="ml-auto mono text-micro text-graphite">
+                    ↓
+                  </span>
+                </DropdownMenuItem>
+                {sorted ? (
+                  <DropdownMenuItem onSelect={() => column.clearSorting()}>
+                    Clear sort
+                  </DropdownMenuItem>
+                ) : null}
+              </>
+            ) : null}
+            {column.getCanSort() && column.getCanHide() ? (
+              <DropdownMenuSeparator />
+            ) : null}
+            {column.getCanHide() ? (
+              <DropdownMenuItem onSelect={() => column.toggleVisibility(false)}>
+                Hide column
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
       ) : (
         <span className="block truncate">
           {flexRender(column.columnDef.header, header.getContext())}
@@ -275,10 +324,24 @@ export function TableToolbar<T>({
               ) : null}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
-            <DropdownMenuLabel className="text-label text-muted-foreground">
-              Show columns
-            </DropdownMenuLabel>
+          <DropdownMenuContent
+            align="end"
+            className="max-h-80 w-60 overflow-y-auto p-0"
+          >
+            <div className="flex h-8 items-center justify-between border-b border-rule px-2.5">
+              <DropdownMenuLabel className="p-0 label-caps text-[0.625rem] font-normal text-foreground">
+                Columns · {hideable.length - hiddenCount} of {hideable.length}
+              </DropdownMenuLabel>
+              {hiddenCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => table.resetColumnVisibility()}
+                  className="focus-ring mono text-[0.625rem] leading-3 text-graphite hover:text-foreground"
+                >
+                  reset
+                </button>
+              ) : null}
+            </div>
             {hideable.map((c) => (
               <DropdownMenuCheckboxItem
                 key={c.id}
