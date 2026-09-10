@@ -1,7 +1,9 @@
 import { useRouter } from '@tanstack/react-router'
-import { Building2, Kanban, Phone, Plus, Users, X } from 'lucide-react'
+import { Phone, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { KeyHint } from '#/components/page-header'
+import { DitherMark, InitialsMark } from '#/components/record/record-parts'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -25,12 +27,6 @@ import { useHotkey } from '#/lib/use-hotkey'
  */
 
 type Attendee = { id: string; name: string; kind: string }
-
-const KIND_ICONS: Record<string, typeof Users> = {
-  person: Users,
-  company: Building2,
-  deal: Kanban,
-}
 
 function localNow(): string {
   const d = new Date()
@@ -101,52 +97,67 @@ export function LogInteractionDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-[35rem]">
         <DialogHeader>
-          <DialogTitle>Log an interaction</DialogTitle>
-          <DialogDescription>
-            It lands on the timeline of everyone involved.
-          </DialogDescription>
+          <DialogTitle>Log interaction</DialogTitle>
+          <DialogDescription>{seed.name}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <div className="flex rounded-md border border-border p-0.5">
-            {(['meeting', 'call'] as const).map((k) => (
+        <form
+          onSubmit={onSubmit}
+          className="space-y-4"
+          noValidate
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+              e.preventDefault()
+              e.currentTarget.requestSubmit()
+            }
+          }}
+        >
+          {/* Segmented type: ink for the chosen one, a digit in each. */}
+          <div className="flex w-fit border border-hairline">
+            {(['call', 'meeting'] as const).map((k, i) => (
               <button
                 key={k}
                 type="button"
                 aria-pressed={kind === k}
                 onClick={() => setKind(k)}
                 className={cn(
-                  'focus-ring flex-1 rounded px-2 py-1 text-xs font-medium capitalize transition-colors',
+                  'focus-ring-inset flex h-7 items-center gap-2 px-3 text-label font-medium capitalize transition-colors',
+                  i > 0 && 'border-l border-hairline',
                   kind === k
-                    ? 'bg-selected text-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
+                    ? 'bg-hairline text-paper'
+                    : 'text-foreground hover:bg-bone',
                 )}
               >
                 {k}
+                <span className="mono text-micro font-normal opacity-70">
+                  {i + 1}
+                </span>
               </button>
             ))}
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="int-subject">About</Label>
-            <Input
-              id="int-subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              autoFocus
-              placeholder="Series B intro"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="int-when">When</Label>
-            <Input
-              id="int-when"
-              type="datetime-local"
-              value={occurredAt}
-              onChange={(e) => setOccurredAt(e.target.value)}
-            />
+          <div className="grid grid-cols-[minmax(0,1fr)_12rem] gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="int-subject">About</Label>
+              <Input
+                id="int-subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                autoFocus
+                placeholder="Series B intro"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="int-when">When</Label>
+              <Input
+                id="int-when"
+                type="datetime-local"
+                className="mono"
+                value={occurredAt}
+                onChange={(e) => setOccurredAt(e.target.value)}
+              />
+            </div>
           </div>
 
           <AttendeePicker attendees={attendees} onChange={setAttendees} />
@@ -157,9 +168,19 @@ export function LogInteractionDialog({
             </p>
           ) : null}
 
-          <DialogFooter>
+          <DialogFooter
+            note={`lands in ${attendees.length} ledger${attendees.length === 1 ? '' : 's'}`}
+          >
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Logging…' : 'Log it'}
+              {pending ? 'Logging…' : `Log ${kind}`}
+              <KeyHint>⌘↵</KeyHint>
             </Button>
           </DialogFooter>
         </form>
@@ -199,31 +220,30 @@ function AttendeePicker({
   return (
     <div className="space-y-1.5">
       <Label htmlFor="int-attendees">Who was involved</Label>
-      <div className="flex flex-wrap gap-1">
-        {attendees.map((a) => {
-          const Icon = KIND_ICONS[a.kind] ?? Users
-          return (
-            <span
-              key={a.id}
-              className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium"
-            >
-              <Icon className="size-2.5" strokeWidth={1.75} />
-              {a.name}
-              {attendees.length > 1 ? (
-                <button
-                  type="button"
-                  aria-label={`Remove ${a.name}`}
-                  onClick={() =>
-                    onChange(attendees.filter((x) => x.id !== a.id))
-                  }
-                  className="focus-ring rounded-full text-muted-foreground hover:text-foreground"
-                >
-                  <X className="size-2.5" strokeWidth={2} />
-                </button>
-              ) : null}
-            </span>
-          )
-        })}
+      <div className="flex flex-wrap gap-1.5">
+        {attendees.map((a) => (
+          <span
+            key={a.id}
+            className="flex h-6 items-center gap-1.5 border border-rule bg-paper px-2 text-label"
+          >
+            {a.kind === 'person' ? (
+              <InitialsMark name={a.name} size="xs" />
+            ) : (
+              <DitherMark size={12} />
+            )}
+            {a.name}
+            {attendees.length > 1 ? (
+              <button
+                type="button"
+                aria-label={`Remove ${a.name}`}
+                onClick={() => onChange(attendees.filter((x) => x.id !== a.id))}
+                className="focus-ring text-graphite hover:text-foreground"
+              >
+                <X className="size-2.5" strokeWidth={2} />
+              </button>
+            ) : null}
+          </span>
+        ))}
       </div>
       <Input
         id="int-attendees"
@@ -233,31 +253,29 @@ function AttendeePicker({
         className="h-8 text-ui"
       />
       {results.length > 0 ? (
-        <ul className="max-h-40 overflow-y-auto rounded-md border border-border">
-          {results.map((r) => {
-            const Icon = KIND_ICONS[r.kind] ?? Users
-            return (
-              <li key={r.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange([...attendees, r])
-                    setQuery('')
-                  }}
-                  className="focus-ring flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-ui hover:bg-accent"
-                >
-                  <Icon
-                    className="size-3.5 text-muted-foreground"
-                    strokeWidth={1.75}
-                  />
-                  {r.name}
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {r.kind}
-                  </span>
-                </button>
-              </li>
-            )
-          })}
+        <ul className="max-h-40 overflow-y-auto border border-hairline bg-paper shadow-[2px_2px_0_0_var(--hairline)]">
+          {results.map((r) => (
+            <li key={r.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange([...attendees, r])
+                  setQuery('')
+                }}
+                className="focus-ring-inset flex h-8 w-full items-center gap-2.5 px-2.5 text-left text-ui hover:bg-bone"
+              >
+                {r.kind === 'person' ? (
+                  <InitialsMark name={r.name} size="xs" outline />
+                ) : (
+                  <DitherMark size={14} />
+                )}
+                {r.name}
+                <span className="ml-auto mono text-micro text-graphite">
+                  {r.kind}
+                </span>
+              </button>
+            </li>
+          ))}
         </ul>
       ) : null}
       <p className="text-xs text-muted-foreground">

@@ -1,6 +1,7 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { KeyHint } from './page-header'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -332,6 +333,163 @@ export function DealBoard({
 }
 
 /**
+ * Move stage (Overlays sheet): every live stage as a numbered row — square
+ * badge, a mono note (current · days, → next, asks for a reason), the digit
+ * that picks it. Digits pick, ↵ confirms; Passed and Lost open the reason
+ * field, which lands on the record as close_reason. The picked row is the
+ * selection wash, the current one bone — never a pine bar.
+ */
+export function MoveStageDialog({
+  dealName,
+  stages,
+  currentId,
+  daysInStage,
+  onCancel,
+  onMove,
+}: {
+  dealName: string
+  stages: Array<BoardStage>
+  currentId: string | null
+  daysInStage?: number | null
+  onCancel: () => void
+  onMove: (stageId: string, reason?: string) => void
+}) {
+  const currentIndex = stages.findIndex((s) => s.id === currentId)
+  const [picked, setPicked] = useState<string | null>(null)
+  const [reason, setReason] = useState('')
+  const pickedStage = stages.find((s) => s.id === picked) ?? null
+  const asksReason = picked === 'passed' || picked === 'lost'
+  const canMove = pickedStage !== null && picked !== currentId
+
+  function confirm() {
+    if (!pickedStage || !canMove) return
+    onMove(pickedStage.id, asksReason ? reason.trim() || undefined : undefined)
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null
+      const typing = t && ['INPUT', 'TEXTAREA'].includes(t.tagName)
+      if (e.key === 'Enter' && !typing) {
+        e.preventDefault()
+        confirm()
+        return
+      }
+      if (typing) return
+      const n = Number(e.key)
+      if (Number.isInteger(n) && n >= 1 && n <= stages.length) {
+        e.preventDefault()
+        setPicked(stages[n - 1].id)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  })
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onCancel()}>
+      <DialogContent className="sm:max-w-[30rem]">
+        <DialogHeader>
+          <DialogTitle>Move stage</DialogTitle>
+          <DialogDescription>{dealName}</DialogDescription>
+        </DialogHeader>
+        <ol className="-mx-3 -mt-3 flex flex-col">
+          {stages.map((stage, i) => {
+            const isCurrent = stage.id === currentId
+            const isNext = i === currentIndex + 1
+            const isPicked = stage.id === picked
+            return (
+              <li key={stage.id}>
+                <button
+                  type="button"
+                  onClick={() => setPicked(stage.id)}
+                  aria-pressed={isPicked}
+                  className={cn(
+                    'focus-ring-inset flex h-8 w-full items-center justify-between gap-3 px-3 text-left transition-colors',
+                    isPicked
+                      ? 'bg-selected'
+                      : isCurrent
+                        ? 'bg-bone'
+                        : 'hover:bg-bone',
+                  )}
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <span
+                      className="flex h-5 shrink-0 items-center px-1.5 mono text-micro font-medium"
+                      style={badgeStyle(optionColor(stage, i))}
+                    >
+                      {stage.label}
+                    </span>
+                    <span
+                      className={cn(
+                        'truncate mono text-micro',
+                        isNext ? 'text-primary' : 'text-graphite',
+                        isCurrent && 'text-foreground',
+                      )}
+                    >
+                      {isCurrent
+                        ? daysInStage === null || daysInStage === undefined
+                          ? 'current'
+                          : `current · ${daysInStage}d`
+                        : isNext
+                          ? '→ next'
+                          : stage.id === 'passed' || stage.id === 'lost'
+                            ? 'asks for a reason'
+                            : ''}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      'mono text-micro',
+                      isPicked ? 'text-foreground' : 'text-graphite',
+                    )}
+                  >
+                    {i + 1}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+        {asksReason ? (
+          <div className="mt-3 flex flex-col gap-1.5 border-t border-rule pt-3">
+            <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
+              Reason · goes to the ledger
+            </span>
+            <textarea
+              className="focus-ring min-h-14 w-full rounded-md border border-rule bg-transparent px-2.5 py-2 font-serif text-[0.9375rem] leading-[1.4375rem] placeholder:text-graphite"
+              placeholder={
+                picked === 'passed'
+                  ? 'Too early for our check size; team question on GTM…'
+                  : 'Round was preempted; lost on speed…'
+              }
+              value={reason}
+              autoFocus
+              onChange={(e) => setReason(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault()
+                  confirm()
+                }
+              }}
+            />
+          </div>
+        ) : null}
+        <DialogFooter note={`1–${stages.length} pick · ↵ confirm`}>
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" disabled={!canMove} onClick={confirm}>
+            {pickedStage ? `Move to ${pickedStage.label}` : 'Move'}
+            <KeyHint>↵</KeyHint>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
  * The post-mortem prompt — fired when a deal drops onto Passed or Lost.
  * Skippable on purpose: capture-while-fresh beats forced friction, and the
  * close_reason attribute stays editable on the record afterwards.
@@ -385,17 +543,17 @@ export function CloseReasonDialog({
               }
             }}
           />
-          <DialogFooter className="mt-3">
+          <DialogFooter note="goes to the ledger as close reason">
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
+              variant="outline"
               onClick={() => onSave(undefined)}
             >
               Skip
             </Button>
-            <Button type="submit" size="sm">
+            <Button type="submit">
               Save reason
+              <KeyHint>⌘↵</KeyHint>
             </Button>
           </DialogFooter>
         </form>

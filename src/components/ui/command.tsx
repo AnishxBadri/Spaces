@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
-import { SearchIcon } from 'lucide-react'
 
 import { cn } from '#/lib/utils.ts'
 import {
@@ -54,15 +53,10 @@ function CommandDialog({
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
       <DialogContent
-        className={cn('overflow-hidden p-0', className)}
+        className={cn('overflow-hidden p-0 sm:max-w-[40rem]', className)}
         showCloseButton={showCloseButton}
       >
-        <Command
-          shouldFilter={shouldFilter}
-          className="**:data-[slot=command-input-wrapper]:h-12 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
-        >
-          {children}
-        </Command>
+        <Command shouldFilter={shouldFilter}>{children}</Command>
       </DialogContent>
     </Dialog>
   )
@@ -73,19 +67,26 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
+    // The prompt: a pine › then the query, keys on the right. 48px, hairline
+    // under (the palette's head).
     <div
       data-slot="command-input-wrapper"
-      className="flex h-9 items-center gap-2 border-b px-3"
+      className="flex h-12 items-center gap-3 border-b border-hairline px-4"
     >
-      <SearchIcon className="size-4 shrink-0 opacity-50" />
+      <span aria-hidden className="mono text-ui text-primary">
+        ›
+      </span>
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          'flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-12 w-full min-w-0 bg-transparent text-title outline-hidden placeholder:text-graphite disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
         {...props}
       />
+      <span className="hidden shrink-0 mono text-micro text-graphite sm:inline">
+        ↑↓ move · ↵ open
+      </span>
     </div>
   )
 }
@@ -98,7 +99,7 @@ function CommandList({
     <CommandPrimitive.List
       data-slot="command-list"
       className={cn(
-        'max-h-[300px] scroll-py-1 overflow-x-hidden overflow-y-auto',
+        'max-h-[360px] scroll-py-1.5 overflow-x-hidden overflow-y-auto p-1.5',
         className,
       )}
       {...props}
@@ -112,7 +113,7 @@ function CommandEmpty({
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
-      className="py-6 text-center text-sm"
+      className="px-2.5 py-5 text-label text-graphite"
       {...props}
     />
   )
@@ -126,7 +127,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        'overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground',
+        'overflow-hidden text-foreground [&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:h-6 [&_[cmdk-group-heading]]:items-center [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:label-caps [&_[cmdk-group-heading]]:text-[0.625rem] [&_[cmdk-group-heading]]:font-normal [&_[cmdk-group-heading]]:text-graphite [&_[cmdk-group]:not([hidden])_~&]:pt-2',
         className,
       )}
       {...props}
@@ -141,7 +142,7 @@ function CommandSeparator({
   return (
     <CommandPrimitive.Separator
       data-slot="command-separator"
-      className={cn('-mx-1 h-px bg-border', className)}
+      className={cn('my-1.5 h-px bg-rule', className)}
       {...props}
     />
   )
@@ -155,7 +156,8 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-none px-2 py-1.5 text-ui outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        // Highlighted option = bone (No-Bar Rule); the ↵ hint shows on it.
+        "relative flex min-h-8 cursor-default items-center gap-2.5 rounded-none px-2.5 py-1.5 text-ui outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-bone [&_[data-hint]]:invisible data-[selected=true]:[&_[data-hint]]:visible [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg:not([class*='text-'])]:text-graphite",
         className,
       )}
       {...props}
@@ -170,10 +172,7 @@ function CommandShortcut({
   return (
     <span
       data-slot="command-shortcut"
-      className={cn(
-        'ml-auto text-xs tracking-widest text-muted-foreground',
-        className,
-      )}
+      className={cn('ml-auto mono text-micro text-graphite', className)}
       {...props}
     />
   )

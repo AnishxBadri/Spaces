@@ -13,7 +13,7 @@ import { OptionChip } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
-import { CloseReasonDialog } from '#/components/deal-board'
+import { MoveStageDialog } from '#/components/deal-board'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { KeyHint } from '#/components/page-header'
 import {
@@ -33,13 +33,6 @@ import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { TaskComposer } from '#/components/task-composer'
 import { Button } from '#/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '#/components/ui/dropdown-menu'
-import { optionColor } from '#/lib/attributes/colors'
 import { fmtMoney } from '#/lib/portfolio/format'
 import { localToday } from '#/lib/tasks/parse-due'
 import { useHotkey } from '#/lib/use-hotkey'
@@ -80,11 +73,6 @@ function DealRecordPage() {
     'm',
     useCallback(() => setMoveOpen(true), []),
   )
-  // Same post-mortem gate the board's drag path has — Passed/Lost pause here.
-  const [closing, setClosing] = useState<{
-    stageId: string
-    stageLabel: string
-  } | null>(null)
 
   const refNames = {
     ...deal.refNames,
@@ -173,17 +161,21 @@ function DealRecordPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      {closing ? (
-        <CloseReasonDialog
+      {moveOpen && liveStages.length > 0 ? (
+        // Same post-mortem gate the board's drag path has — Passed/Lost ask
+        // for a reason inside the dialog.
+        <MoveStageDialog
           dealName={deal.name}
-          stageLabel={closing.stageLabel}
-          onCancel={() => setClosing(null)}
-          onSave={(reason) => {
+          stages={liveStages}
+          currentId={stageOption?.id ?? null}
+          daysInStage={daysInStage}
+          onCancel={() => setMoveOpen(false)}
+          onMove={(stageId, reason) => {
             void save({
-              stage: closing.stageId,
+              stage: stageId,
               ...(reason ? { close_reason: reason } : {}),
             })
-            setClosing(null)
+            setMoveOpen(false)
           }}
         />
       ) : null}
@@ -223,40 +215,10 @@ function DealRecordPage() {
               }
             />
             {liveStages.length > 0 ? (
-              <DropdownMenu open={moveOpen} onOpenChange={setMoveOpen}>
-                <DropdownMenuTrigger asChild>
-                  <Button>
-                    Move stage
-                    <KeyHint>M</KeyHint>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {liveStages.map((o, i) => (
-                    <DropdownMenuItem
-                      key={o.id}
-                      disabled={o.id === deal.values.stage}
-                      onSelect={() => {
-                        if (o.id === 'passed' || o.id === 'lost') {
-                          setClosing({ stageId: o.id, stageLabel: o.label })
-                          return
-                        }
-                        void save({ stage: o.id })
-                      }}
-                    >
-                      <span className="w-4 mono text-micro text-graphite">
-                        {i + 1}
-                      </span>
-                      <span
-                        className="size-2"
-                        style={{
-                          backgroundColor: `var(--badge-${optionColor(o, stageOptions.indexOf(o))}-ink)`,
-                        }}
-                      />
-                      {o.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button onClick={() => setMoveOpen(true)}>
+                Move stage
+                <KeyHint>M</KeyHint>
+              </Button>
             ) : null}
           </>
         }

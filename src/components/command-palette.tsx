@@ -158,9 +158,10 @@ export function CommandPalette({
       title="Command palette"
       description="Search and navigate from the keyboard"
       shouldFilter={false}
+      showCloseButton={false}
     >
       <CommandInput
-        placeholder="Search companies, notes, decks…"
+        placeholder="Search or jump to…"
         value={query}
         onValueChange={setQuery}
       />
@@ -174,7 +175,7 @@ export function CommandPalette({
                   : `Nothing matches “${query.trim()}”.`}
               </CommandEmpty>
             ) : (
-              <CommandGroup heading="Results">
+              <CommandGroup heading={`Results · ${hits.length}`}>
                 {hits.map((hit) => {
                   const Icon = KIND_ICONS[hit.kind] ?? FileText
                   const href = hrefFor(hit)
@@ -197,7 +198,7 @@ export function CommandPalette({
                           </span>
                           {/* Where the match came from, because "why is this
                               here" is the first question a fuzzy hit raises. */}
-                          <span className="shrink-0 text-xs text-muted-foreground">
+                          <span className="shrink-0 mono text-micro text-graphite">
                             {hit.kind === 'document' && hit.parent
                               ? `in ${hit.parent.name}`
                               : hit.matchedIn === 'name'
@@ -206,10 +207,13 @@ export function CommandPalette({
                           </span>
                         </span>
                         {hit.snippet ? (
-                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                          <span className="mt-0.5 block truncate text-label text-graphite">
                             <Highlighted text={hit.snippet} />
                           </span>
                         ) : null}
+                      </span>
+                      <span data-hint className="mono text-micro text-graphite">
+                        ↵
                       </span>
                     </CommandItem>
                   )
@@ -227,13 +231,25 @@ export function CommandPalette({
                   value={item.to}
                   onSelect={() => go(item.to)}
                 >
-                  <item.icon className="size-4" strokeWidth={1.75} />
+                  <item.icon className="size-3.5" strokeWidth={1.75} />
                   {item.label}
+                  <span
+                    data-hint
+                    className="ml-auto mono text-micro text-graphite"
+                  >
+                    ↵
+                  </span>
                 </CommandItem>
               ))}
               <CommandItem value="/settings" onSelect={() => go('/settings')}>
-                <Settings className="size-4" strokeWidth={1.75} />
+                <Settings className="size-3.5" strokeWidth={1.75} />
                 Settings
+                <span
+                  data-hint
+                  className="ml-auto mono text-micro text-graphite"
+                >
+                  ↵
+                </span>
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
@@ -246,13 +262,23 @@ export function CommandPalette({
                   void navigate({ to: '/login' })
                 }}
               >
-                <LogOut className="size-4" strokeWidth={1.75} />
+                <LogOut className="size-3.5" strokeWidth={1.75} />
                 Sign out
               </CommandItem>
             </CommandGroup>
           </>
         )}
       </CommandList>
+      <div className="flex h-8 items-center justify-between border-t border-rule bg-bone px-4 mono text-micro text-graphite">
+        <span>
+          {searchMode
+            ? searching
+              ? 'searching…'
+              : `${hits.length} result${hits.length === 1 ? '' : 's'}`
+            : 'type to search everything'}
+        </span>
+        <span>esc</span>
+      </div>
     </CommandDialog>
   )
 }

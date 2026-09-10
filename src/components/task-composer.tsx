@@ -5,13 +5,7 @@ import { toast } from 'sonner'
 import { KeyHint } from './page-header'
 import { DitherMark, InitialsMark } from './record/record-parts'
 import { Button } from './ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from './ui/dialog'
 import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { createTask, listUsers, searchEntities } from '#/lib/server-fns'
@@ -225,55 +219,68 @@ export function TaskComposer({
           </Button>
         )}
       </DialogTrigger>
-      {/* gap-0 kills DialogContent's default grid gap — with p-0 overridden,
-          that gap reads as phantom bands around the input. py-3.5 centers the
-          title on the close button's fixed top-4 line. */}
-      <DialogContent className="top-[20%] translate-y-0 gap-0 p-0 sm:max-w-2xl">
-        <DialogHeader className="border-b border-border px-4 py-3.5">
-          <DialogTitle className="text-ui font-medium">Create task</DialogTitle>
-        </DialogHeader>
+      {/* Quick task: no title bar — the input is the title. 48px prompt row
+          with a pine +, chips under it, a bone foot. */}
+      <DialogContent className="top-[20%] translate-y-0 p-0 sm:max-w-[32.5rem]">
+        <DialogTitle className="sr-only">Create task</DialogTitle>
         <form
           onSubmit={(e) => {
             e.preventDefault()
             void save()
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.shiftKey) {
+              e.preventDefault()
+              void save(true)
+            }
+          }}
         >
-          <input
-            className="w-full bg-transparent px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
-            placeholder="Chase the data room, revisit after their round closes…"
-            value={content}
-            autoFocus
-            onChange={(e) => setContent(e.target.value)}
-          />
+          <div className="flex h-12 items-center gap-2.5 border-b border-hairline pr-14 pl-5">
+            <span className="mono text-ui text-primary">+</span>
+            <input
+              className="focus-ring h-full min-w-0 flex-1 bg-transparent text-body placeholder:text-graphite"
+              placeholder="Chase the data room, revisit after their round closes…"
+              aria-label="New task"
+              value={content}
+              autoFocus
+              onChange={(e) => setContent(e.target.value)}
+            />
+          </div>
           {error ? (
-            <p role="alert" className="px-4 pb-2 text-ui text-destructive">
+            <p role="alert" className="px-5 pt-3 text-label text-destructive">
               {error}
             </p>
           ) : null}
-          <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2 px-5 py-4">
             {chips}
-            <div className="ml-auto flex items-center gap-3">
-              <label className="flex cursor-pointer items-center gap-1.5 mono text-micro text-graphite">
-                <input
-                  type="checkbox"
-                  className="focus-ring size-3.5 appearance-none border border-hairline bg-paper checked:bg-primary"
-                  checked={createMore}
-                  onChange={(e) => setCreateMore(e.target.checked)}
-                />
-                create more
-              </label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => onOpenChange(false)}
+          </div>
+          <div className="flex min-h-11 items-center gap-4 border-t border-rule bg-bone px-5 py-2">
+            <label className="flex cursor-pointer items-center gap-2 mono text-micro text-graphite">
+              <span
+                aria-hidden
+                className={cn(
+                  'flex h-3 w-6 border border-hairline bg-paper',
+                  createMore && 'justify-end',
+                )}
               >
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" disabled={pending}>
-                {pending ? 'Saving…' : 'Save'}
-              </Button>
-            </div>
+                <span className="size-2.5 bg-hairline" />
+              </span>
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={createMore}
+                onChange={(e) => setCreateMore(e.target.checked)}
+              />
+              create more
+            </label>
+            <span className="flex-1" />
+            <span className="hidden mono text-micro text-graphite sm:inline">
+              ↵ add · ⇧↵ add & keep open
+            </span>
+            <Button type="submit" size="sm" disabled={pending}>
+              {pending ? 'Saving…' : 'Add task'}
+              <KeyHint>↵</KeyHint>
+            </Button>
           </div>
         </form>
       </DialogContent>
@@ -369,7 +376,7 @@ function DuePill({
             <button
               key={label}
               type="button"
-              className="focus-ring rounded-md border border-border px-2 py-1 text-label text-muted-foreground hover:text-foreground"
+              className="focus-ring h-6 border border-rule bg-paper px-2 mono text-micro text-graphite hover:border-hairline hover:text-foreground"
               onClick={() => pick(value)}
             >
               {label}
