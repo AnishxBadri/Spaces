@@ -32,10 +32,10 @@ import {
 } from '#/components/table/cells'
 import {
   AddColumnButton,
-  PageHeader,
   RecordTable,
   TableToolbar,
 } from '#/components/table/record-table'
+import { PageHeader } from '#/components/page-header'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
@@ -230,7 +230,7 @@ function PeoplePage() {
   })
 
   return (
-    <div className="flex h-full flex-col px-6 py-8 md:px-10">
+    <div className="flex h-full flex-col">
       <PageHeader
         title="People"
         description="Founders, operators, co-investors — deduped by email, linked to their companies."
@@ -241,62 +241,63 @@ function PeoplePage() {
           />
         }
       />
-
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="No people yet"
-          body="Add someone by name and email. Email is identity — the same person arriving from two directions becomes one record."
-          action={
-            <CreatePersonDialog
-              companies={companies}
-              registry={registry as Array<RegistryEntry>}
-            />
-          }
-          hint="Gmail and calendar sync will create these automatically later — through the same dedupe gate."
-        />
-      ) : (
-        <>
-          <TableToolbar
-            table={table}
-            filter={globalFilter}
-            onFilterChange={setGlobalFilter}
-            filterPlaceholder="Filter by name, email, company…"
-            filterLabel="Filter people"
-            noun={{ one: 'person', many: 'people' }}
-            total={rows.length}
-            shown={table.getRowModel().rows.length}
-          >
-            <ViewBar
-              objectId={objectId}
-              registry={registry as Array<RegistryEntry>}
-              views={views}
-              activeId={activeId ?? null}
-              snapshot={vs.snapshot}
-              onApply={(v) => {
-                vs.apply(v)
-                selectView(v?.id ?? null)
-              }}
-              selectView={selectView}
-              onFilterChange={vs.setConditions}
-              onSaved={() => router.invalidate()}
-              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
-            />
-          </TableToolbar>
-          <RecordTable
-            table={table}
-            label="People"
-            stickyColumnId="name"
-            addColumn={
-              <AttributeCreateDialog
-                objectKind="person"
-                onCreated={() => router.invalidate()}
-                trigger={<AddColumnButton />}
+      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
+        {rows.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No people yet"
+            body="Add someone by name and email. Email is identity — the same person arriving from two directions becomes one record."
+            action={
+              <CreatePersonDialog
+                companies={companies}
+                registry={registry as Array<RegistryEntry>}
               />
             }
+            hint="Gmail and calendar sync will create these automatically later — through the same dedupe gate."
           />
-        </>
-      )}
+        ) : (
+          <>
+            <TableToolbar
+              table={table}
+              filter={globalFilter}
+              onFilterChange={setGlobalFilter}
+              filterPlaceholder="Filter by name, email, company…"
+              filterLabel="Filter people"
+              noun={{ one: 'person', many: 'people' }}
+              total={rows.length}
+              shown={table.getRowModel().rows.length}
+            >
+              <ViewBar
+                objectId={objectId}
+                registry={registry as Array<RegistryEntry>}
+                views={views}
+                activeId={activeId ?? null}
+                snapshot={vs.snapshot}
+                onApply={(v) => {
+                  vs.apply(v)
+                  selectView(v?.id ?? null)
+                }}
+                selectView={selectView}
+                onFilterChange={vs.setConditions}
+                onSaved={() => router.invalidate()}
+                canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+              />
+            </TableToolbar>
+            <RecordTable
+              table={table}
+              label="People"
+              stickyColumnId="name"
+              addColumn={
+                <AttributeCreateDialog
+                  objectKind="person"
+                  onCreated={() => router.invalidate()}
+                  trigger={<AddColumnButton />}
+                />
+              }
+            />
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -415,7 +416,7 @@ function CreatePersonDialog({
               id="person-company"
               name="company"
               defaultValue=""
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-body shadow-xs focus-ring transition-colors duration-150 ease-out-quart"
+              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-body shadow-xs transition-colors duration-150 ease-out-quart"
             >
               <option value="">None</option>
               {companies.map((c) => (

@@ -36,10 +36,10 @@ import {
 } from '#/components/table/cells'
 import {
   AddColumnButton,
-  PageHeader,
   RecordTable,
   TableToolbar,
 } from '#/components/table/record-table'
+import { PageHeader } from '#/components/page-header'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
@@ -237,7 +237,7 @@ function CompaniesPage() {
   })
 
   return (
-    <div className="flex h-full flex-col px-6 py-8 md:px-10">
+    <div className="flex h-full flex-col">
       <PageHeader
         title="Companies"
         description="Every company you track — deduped by domain, tagged into spaces."
@@ -245,70 +245,76 @@ function CompaniesPage() {
           <CreateCompanyDialog registry={registry as Array<RegistryEntry>} />
         }
       />
-
-      {openDuplicates > 0 ? (
-        <Link
-          to="/dedupe"
-          className="mt-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-ui focus-ring transition-colors duration-150 ease-out-quart hover:bg-accent"
-        >
-          <Copy className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
-          <span className="tabular font-medium">{openDuplicates}</span>
-          possible duplicate{openDuplicates === 1 ? '' : 's'} to review
-          <span className="ml-auto text-muted-foreground">Review →</span>
-        </Link>
-      ) : null}
-
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={Building2}
-          title="No companies yet"
-          body="Add one by name or domain. The domain is identity — the same company arriving twice becomes one record, not two."
-          action={
-            <CreateCompanyDialog registry={registry as Array<RegistryEntry>} />
-          }
-        />
-      ) : (
-        <>
-          <TableToolbar
-            table={table}
-            filter={globalFilter}
-            onFilterChange={setGlobalFilter}
-            filterPlaceholder="Filter by name, domain, space…"
-            filterLabel="Filter companies"
-            noun={{ one: 'company', many: 'companies' }}
-            total={rows.length}
-            shown={table.getRowModel().rows.length}
+      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
+        {openDuplicates > 0 ? (
+          <Link
+            to="/dedupe"
+            className="focus-ring mt-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-ui transition-colors duration-150 ease-out-quart hover:bg-accent"
           >
-            <ViewBar
-              objectId={objectId}
-              registry={registry as Array<RegistryEntry>}
-              views={views}
-              activeId={activeId ?? null}
-              snapshot={vs.snapshot}
-              onApply={(v) => {
-                vs.apply(v)
-                selectView(v?.id ?? null)
-              }}
-              selectView={selectView}
-              onFilterChange={vs.setConditions}
-              onSaved={() => router.invalidate()}
-              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+            <Copy
+              className="size-3.5 text-muted-foreground"
+              strokeWidth={1.75}
             />
-          </TableToolbar>
-          <RecordTable
-            table={table}
-            label="Companies"
-            stickyColumnId="name"
-            addColumn={
-              <AttributeCreateDialog
-                objectKind="company"
-                onCreated={() => router.invalidate()}
-                trigger={<AddColumnButton />}
+            <span className="tabular font-medium">{openDuplicates}</span>
+            possible duplicate{openDuplicates === 1 ? '' : 's'} to review
+            <span className="ml-auto text-muted-foreground">Review →</span>
+          </Link>
+        ) : null}
+
+        {rows.length === 0 ? (
+          <EmptyState
+            icon={Building2}
+            title="No companies yet"
+            body="Add one by name or domain. The domain is identity — the same company arriving twice becomes one record, not two."
+            action={
+              <CreateCompanyDialog
+                registry={registry as Array<RegistryEntry>}
               />
             }
           />
-        </>
-      )}
+        ) : (
+          <>
+            <TableToolbar
+              table={table}
+              filter={globalFilter}
+              onFilterChange={setGlobalFilter}
+              filterPlaceholder="Filter by name, domain, space…"
+              filterLabel="Filter companies"
+              noun={{ one: 'company', many: 'companies' }}
+              total={rows.length}
+              shown={table.getRowModel().rows.length}
+            >
+              <ViewBar
+                objectId={objectId}
+                registry={registry as Array<RegistryEntry>}
+                views={views}
+                activeId={activeId ?? null}
+                snapshot={vs.snapshot}
+                onApply={(v) => {
+                  vs.apply(v)
+                  selectView(v?.id ?? null)
+                }}
+                selectView={selectView}
+                onFilterChange={vs.setConditions}
+                onSaved={() => router.invalidate()}
+                canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+              />
+            </TableToolbar>
+            <RecordTable
+              table={table}
+              label="Companies"
+              stickyColumnId="name"
+              addColumn={
+                <AttributeCreateDialog
+                  objectKind="company"
+                  onCreated={() => router.invalidate()}
+                  trigger={<AddColumnButton />}
+                />
+              }
+            />
+          </>
+        )}
+      </div>
     </div>
   )
 }

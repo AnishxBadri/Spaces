@@ -1,0 +1,128 @@
+import { Link } from '@tanstack/react-router'
+import type { ReactNode } from 'react'
+import { cn } from '#/lib/utils'
+
+/**
+ * P1 — Page header (Instrument, 2026-09-10). Serif title, or a sentence when
+ * the page has a state to report; one mono line of what the instrument
+ * measured (above as an eyebrow, or below as a readout); actions right,
+ * each carrying its key hint inside the button. Hairline under, 32px
+ * inset, 28px above — the header owns its own anatomy so every field
+ * starts on the same line.
+ */
+export function PageHeader({
+  eyebrow,
+  title,
+  description,
+  action,
+  className,
+}: {
+  /** Mono caps line above the title — "Today · Wednesday · 2026-09-10". */
+  eyebrow?: ReactNode
+  title: ReactNode
+  /** Mono readout under the title — counts, last touch. Never prose. */
+  description?: ReactNode
+  action?: ReactNode
+  className?: string
+}) {
+  return (
+    <header
+      className={cn(
+        'flex shrink-0 items-end justify-between gap-4 border-b border-hairline px-8 pt-7 pb-4',
+        className,
+      )}
+    >
+      <div className="flex min-w-0 flex-col gap-1.5">
+        {eyebrow ? (
+          <div className="mono text-micro leading-[0.875rem] tracking-[0.08em] text-graphite uppercase">
+            {eyebrow}
+          </div>
+        ) : null}
+        <h1 className="title-serif">{title}</h1>
+        {description ? (
+          <div className="flex flex-wrap items-baseline gap-x-5 mono text-label text-graphite">
+            {description}
+          </div>
+        ) : null}
+      </div>
+      {action ? (
+        <div className="flex shrink-0 items-center gap-2">{action}</div>
+      ) : null}
+    </header>
+  )
+}
+
+/** A key hint inside a button — mono, never a chip. */
+export function KeyHint({ children }: { children: ReactNode }) {
+  return <kbd className="mono text-micro opacity-85">{children}</kbd>
+}
+
+export type ReadoutTone = 'bad' | 'warn'
+
+export type ReadoutCell = {
+  label: ReactNode
+  value: number | string
+  /** Colour only when the number is nonzero and means trouble. */
+  tone?: ReadoutTone
+  to?: string
+}
+
+/**
+ * Readout strip: cells split by rules, hairline under. Label is caps mono
+ * 10px; value is mono 20/500. A zero reads in graphite — nothing to see —
+ * and colour appears only when the value is nonzero and bad.
+ */
+export function ReadoutStrip({
+  cells,
+  className,
+}: {
+  cells: Array<ReadoutCell>
+  className?: string
+}) {
+  return (
+    <div
+      className={cn('flex h-16 shrink-0 border-b border-hairline', className)}
+    >
+      {cells.map((cell, i) => {
+        const zero = cell.value === 0 || cell.value === '0'
+        const colour = zero
+          ? 'text-graphite'
+          : cell.tone === 'bad'
+            ? 'text-destructive'
+            : cell.tone === 'warn'
+              ? 'text-warning'
+              : 'text-foreground'
+        const inner = (
+          <>
+            <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
+              {cell.label}
+            </span>
+            <span className={cn('mono text-xl leading-6 font-medium', colour)}>
+              {cell.value}
+            </span>
+          </>
+        )
+        const cls = cn(
+          'flex min-w-0 flex-1 flex-col justify-center gap-0.5 border-r border-rule px-6 last:border-r-0',
+          i === 0 && 'pl-8',
+        )
+        return cell.to ? (
+          <Link
+            key={i}
+            to={cell.to}
+            className={cn(
+              cls,
+              'focus-ring-inset transition-colors hover:bg-bone',
+            )}
+          >
+            {inner}
+          </Link>
+        ) : (
+          <div key={i} className={cls}>
+            {inner}
+          </div>
+        )
+      })}
+    </div>
+  )
+}

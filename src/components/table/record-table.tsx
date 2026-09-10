@@ -331,26 +331,3 @@ export function AddColumnButton() {
     </button>
   )
 }
-
-/** Page title + one line of what the surface is for + its primary action. */
-export function PageHeader({
-  title,
-  description,
-  action,
-}: {
-  title: string
-  description: string
-  action?: ReactNode
-}) {
-  return (
-    <header className="flex items-start justify-between gap-4">
-      <div>
-        <h1 className="title-serif">{title}</h1>
-        <p className="mt-1.5 max-w-prose mono text-label text-graphite">
-          {description}
-        </p>
-      </div>
-      {action}
-    </header>
-  )
-}

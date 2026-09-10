@@ -11,11 +11,8 @@ import { Briefcase } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { EmptyState } from '#/components/empty-state'
 import { IconBadge, RecordLinkCell } from '#/components/table/cells'
-import {
-  PageHeader,
-  RecordTable,
-  TableToolbar,
-} from '#/components/table/record-table'
+import { RecordTable, TableToolbar } from '#/components/table/record-table'
+import { PageHeader } from '#/components/page-header'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { listHoldings } from '#/lib/server-fns'
 import {
@@ -187,65 +184,66 @@ function PortfolioPage() {
   const rollup = data.rollup
 
   return (
-    <div className="flex h-full flex-col px-6 py-8 md:px-10">
+    <div className="flex h-full flex-col">
       <PageHeader
         title="Portfolio"
         description="Every holding computed live from its event ledger — checks, marks, distributions. Staleness is visible on purpose."
       />
-
-      {data.holdings.length === 0 ? (
-        <EmptyState
-          icon={Briefcase}
-          title="No holdings yet"
-          body="A holding is born when a deal reaches Invested — or record a check directly from a company page. Existing positions arrive via the bootstrap import."
-        />
-      ) : (
-        <>
-          <div className="mb-4 flex flex-wrap items-baseline gap-x-8 gap-y-2">
-            <RollupStat
-              label="Invested"
-              value={fmtMoney(rollup.costBasis, data.baseCurrency, {
-                compact: true,
-              })}
-            />
-            <RollupStat
-              label="Current value"
-              value={fmtMoney(rollup.unrealized, data.baseCurrency, {
-                compact: true,
-              })}
-            />
-            <RollupStat
-              label="Realized"
-              value={fmtMoney(rollup.realized, data.baseCurrency, {
-                compact: true,
-              })}
-            />
-            <RollupStat label="MOIC" value={fmtMultiple(rollup.moic)} />
-            {rollup.excludedForMissingRates.length > 0 ? (
-              <span className="text-ui text-destructive">
-                {rollup.excludedForMissingRates.length} holding
-                {rollup.excludedForMissingRates.length === 1 ? '' : 's'}{' '}
-                excluded from totals — fx rates missing (Settings → FX rates)
-              </span>
-            ) : null}
-          </div>
-          <TableToolbar
-            table={table}
-            filter={globalFilter}
-            onFilterChange={setGlobalFilter}
-            filterPlaceholder="Filter by company…"
-            filterLabel="Filter holdings"
-            noun={{ one: 'holding', many: 'holdings' }}
-            total={data.holdings.length}
-            shown={table.getRowModel().rows.length}
+      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
+        {data.holdings.length === 0 ? (
+          <EmptyState
+            icon={Briefcase}
+            title="No holdings yet"
+            body="A holding is born when a deal reaches Invested — or record a check directly from a company page. Existing positions arrive via the bootstrap import."
           />
-          <RecordTable
-            table={table}
-            label="Portfolio"
-            stickyColumnId="company"
-          />
-        </>
-      )}
+        ) : (
+          <>
+            <div className="mb-4 flex flex-wrap items-baseline gap-x-8 gap-y-2">
+              <RollupStat
+                label="Invested"
+                value={fmtMoney(rollup.costBasis, data.baseCurrency, {
+                  compact: true,
+                })}
+              />
+              <RollupStat
+                label="Current value"
+                value={fmtMoney(rollup.unrealized, data.baseCurrency, {
+                  compact: true,
+                })}
+              />
+              <RollupStat
+                label="Realized"
+                value={fmtMoney(rollup.realized, data.baseCurrency, {
+                  compact: true,
+                })}
+              />
+              <RollupStat label="MOIC" value={fmtMultiple(rollup.moic)} />
+              {rollup.excludedForMissingRates.length > 0 ? (
+                <span className="text-ui text-destructive">
+                  {rollup.excludedForMissingRates.length} holding
+                  {rollup.excludedForMissingRates.length === 1 ? '' : 's'}{' '}
+                  excluded from totals — fx rates missing (Settings → FX rates)
+                </span>
+              ) : null}
+            </div>
+            <TableToolbar
+              table={table}
+              filter={globalFilter}
+              onFilterChange={setGlobalFilter}
+              filterPlaceholder="Filter by company…"
+              filterLabel="Filter holdings"
+              noun={{ one: 'holding', many: 'holdings' }}
+              total={data.holdings.length}
+              shown={table.getRowModel().rows.length}
+            />
+            <RecordTable
+              table={table}
+              label="Portfolio"
+              stickyColumnId="company"
+            />
+          </>
+        )}
+      </div>
     </div>
   )
 }

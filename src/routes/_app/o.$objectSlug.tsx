@@ -34,10 +34,10 @@ import {
 } from '#/components/table/cells'
 import {
   AddColumnButton,
-  PageHeader,
   RecordTable,
   TableToolbar,
 } from '#/components/table/record-table'
+import { PageHeader } from '#/components/page-header'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
@@ -243,68 +243,69 @@ function ObjectListPage() {
   }
 
   return (
-    <div className="flex h-full flex-col px-6 py-8 md:px-10">
+    <div className="flex h-full flex-col">
       <PageHeader
         title={object.plural}
         description={`Every ${noun.one} you keep — your own object, your own attributes.`}
         action={createDialog}
       />
-
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={Icon}
-          title={`No ${noun.many} yet`}
-          body={
-            registry.length === 0
-              ? `Give ${object.plural} some attributes first, then add the first ${noun.one}.`
-              : `Add the first ${noun.one}. It gets every attribute on ${object.plural}, its own page, and a place in the research graph.`
-          }
-          action={createDialog}
-        />
-      ) : (
-        <>
-          <TableToolbar
-            table={table}
-            filter={globalFilter}
-            onFilterChange={setGlobalFilter}
-            filterPlaceholder={`Filter ${noun.many}…`}
-            filterLabel={`Filter ${noun.many}`}
-            noun={noun}
-            total={rows.length}
-            shown={table.getRowModel().rows.length}
-          >
-            <ViewBar
-              objectId={object.id}
-              registry={registry as Array<RegistryEntry>}
-              views={views}
-              activeId={activeId ?? null}
-              snapshot={vs.snapshot}
-              onApply={(v) => {
-                vs.apply(v)
-                selectView(v?.id ?? null)
-              }}
-              selectView={selectView}
-              onFilterChange={vs.setConditions}
-              onSaved={() => router.invalidate()}
-              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
-            />
-          </TableToolbar>
-          <RecordTable
-            table={table}
-            label={object.plural}
-            stickyColumnId="name"
-            addColumn={
-              <AttributeDialog
-                mode="create"
-                objectId={object.id}
-                objectLabel={object.singular}
-                onSaved={() => router.invalidate()}
-                trigger={<AddColumnButton />}
-              />
+      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
+        {rows.length === 0 ? (
+          <EmptyState
+            icon={Icon}
+            title={`No ${noun.many} yet`}
+            body={
+              registry.length === 0
+                ? `Give ${object.plural} some attributes first, then add the first ${noun.one}.`
+                : `Add the first ${noun.one}. It gets every attribute on ${object.plural}, its own page, and a place in the research graph.`
             }
+            action={createDialog}
           />
-        </>
-      )}
+        ) : (
+          <>
+            <TableToolbar
+              table={table}
+              filter={globalFilter}
+              onFilterChange={setGlobalFilter}
+              filterPlaceholder={`Filter ${noun.many}…`}
+              filterLabel={`Filter ${noun.many}`}
+              noun={noun}
+              total={rows.length}
+              shown={table.getRowModel().rows.length}
+            >
+              <ViewBar
+                objectId={object.id}
+                registry={registry as Array<RegistryEntry>}
+                views={views}
+                activeId={activeId ?? null}
+                snapshot={vs.snapshot}
+                onApply={(v) => {
+                  vs.apply(v)
+                  selectView(v?.id ?? null)
+                }}
+                selectView={selectView}
+                onFilterChange={vs.setConditions}
+                onSaved={() => router.invalidate()}
+                canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+              />
+            </TableToolbar>
+            <RecordTable
+              table={table}
+              label={object.plural}
+              stickyColumnId="name"
+              addColumn={
+                <AttributeDialog
+                  mode="create"
+                  objectId={object.id}
+                  objectLabel={object.singular}
+                  onSaved={() => router.invalidate()}
+                  trigger={<AddColumnButton />}
+                />
+              }
+            />
+          </>
+        )}
+      </div>
     </div>
   )
 }

@@ -42,11 +42,15 @@ export function TaskComposer({
   trigger,
   presetEntity,
   onCreated,
+  hotkey,
 }: {
   trigger?: React.ReactNode
   /** Record page rails pass their record — pre-linked, removable. */
   presetEntity?: LinkedRecord
   onCreated?: () => void
+  /** A bare key that opens the composer from anywhere on the page — the
+   *  key hint printed in the trigger must be true. Ignored while typing. */
+  hotkey?: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -62,6 +66,25 @@ export function TaskComposer({
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const today = localToday()
+
+  useEffect(() => {
+    if (!hotkey) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== hotkey || e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target as HTMLElement | null
+      if (
+        t &&
+        (t.isContentEditable ||
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) ||
+          t.closest('[role="dialog"]'))
+      )
+        return
+      e.preventDefault()
+      setOpen(true)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [hotkey])
 
   async function save() {
     if (!content.trim()) {
@@ -220,7 +243,7 @@ function DuePill({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" className="rounded-md focus-ring">
+        <button type="button" className="focus-ring rounded-md">
           <Pill icon={Calendar} active={due !== null}>
             {dueLabel(due, today)}
           </Pill>
@@ -262,7 +285,7 @@ function DuePill({
             <button
               key={label}
               type="button"
-              className="rounded-md border border-border px-2 py-1 text-label text-muted-foreground focus-ring hover:text-foreground"
+              className="focus-ring rounded-md border border-border px-2 py-1 text-label text-muted-foreground hover:text-foreground"
               onClick={() => pick(value)}
             >
               {label}
@@ -300,7 +323,7 @@ function AssigneePill({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" className="rounded-md focus-ring">
+        <button type="button" className="focus-ring rounded-md">
           <Pill icon={AtSign} active={assignee !== null}>
             {assignee ? assignee.name : 'Assigned to you'}
           </Pill>
@@ -316,7 +339,7 @@ function AssigneePill({
             <button
               key={u.id}
               type="button"
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-ui focus-ring hover:bg-accent"
+              className="focus-ring flex w-full items-center rounded-md px-2 py-1.5 text-ui hover:bg-accent"
               onClick={() => {
                 onChange(u)
                 setOpen(false)
@@ -374,7 +397,7 @@ function RecordsPill({
           <button
             type="button"
             aria-label={`Unlink ${r.name}`}
-            className="rounded text-muted-foreground focus-ring hover:text-foreground"
+            className="focus-ring rounded text-muted-foreground hover:text-foreground"
             onClick={() => onChange(records.filter((x) => x.id !== r.id))}
           >
             <X className="size-3" strokeWidth={2} />
@@ -383,7 +406,7 @@ function RecordsPill({
       ))}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" className="rounded-md focus-ring">
+          <button type="button" className="focus-ring rounded-md">
             <Pill icon={Link2}>
               {records.length === 0 ? 'Add record' : 'Add'}
             </Pill>
@@ -403,7 +426,7 @@ function RecordsPill({
                 <button
                   key={r.id}
                   type="button"
-                  className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-ui focus-ring hover:bg-accent"
+                  className="focus-ring flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-ui hover:bg-accent"
                   onClick={() => {
                     onChange([...records, r])
                     setQ('')

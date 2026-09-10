@@ -28,10 +28,10 @@ import { TemplatePicker } from '#/components/templates'
 import { IconBadge, RecordLinkCell } from '#/components/table/cells'
 import {
   AddColumnButton,
-  PageHeader,
   RecordTable,
   TableToolbar,
 } from '#/components/table/record-table'
+import { PageHeader } from '#/components/page-header'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
@@ -315,7 +315,7 @@ function DealsPage() {
   })
 
   return (
-    <div className="flex h-full flex-col px-6 py-8 md:px-10">
+    <div className="flex h-full flex-col">
       <PageHeader
         title="Deals"
         description="One record per opportunity — born at Pre-lead, closed as Invested, Passed, or Lost. History is the point."
@@ -323,151 +323,152 @@ function DealsPage() {
           <CreateDealDialog registry={registry as Array<RegistryEntry>} />
         }
       />
-
-      {deals.rows.length === 0 ? (
-        <EmptyState
-          icon={Handshake}
-          title="No deals yet"
-          body="A deal starts when something arrives — a deck, an intro, a founder email. Create one against a company and triage it from Pre-lead."
-          action={
-            <CreateDealDialog registry={registry as Array<RegistryEntry>} />
-          }
-        />
-      ) : view === 'board' ? (
-        <>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <ViewToggle view={view} onChange={switchView} />
-            <TerminalSplit rows={deals.rows} />
-          </div>
-          <DealBoard
-            deals={deals.rows}
-            stages={stageOptions}
-            refNames={refNames}
-            valueCurrency={
-              (
-                registry.find((d) => d.slug === 'value')?.options as
-                  { code?: string } | undefined
-              )?.code ?? 'USD'
+      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
+        {deals.rows.length === 0 ? (
+          <EmptyState
+            icon={Handshake}
+            title="No deals yet"
+            body="A deal starts when something arrives — a deck, an intro, a founder email. Create one against a company and triage it from Pre-lead."
+            action={
+              <CreateDealDialog registry={registry as Array<RegistryEntry>} />
             }
-            medianDaysInStage={funnel.medianDaysInStage}
           />
-        </>
-      ) : (
-        <>
-          <TableToolbar
-            table={table}
-            filter={globalFilter}
-            onFilterChange={setGlobalFilter}
-            filterPlaceholder="Filter by deal or company…"
-            filterLabel="Filter deals"
-            noun={{ one: 'deal', many: 'deals' }}
-            total={deals.rows.length}
-            shown={table.getRowModel().rows.length}
-          >
-            <ViewToggle view={view} onChange={switchView} />
-            <ViewBar
-              objectId={objectId}
-              registry={registry as Array<RegistryEntry>}
-              views={views}
-              activeId={activeId ?? null}
-              snapshot={vs.snapshot}
-              onApply={(v) => {
-                vs.apply(v)
-                selectView(v?.id ?? null)
-              }}
-              selectView={selectView}
-              onFilterChange={vs.setConditions}
-              onSaved={() => router.invalidate()}
-              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
-            />
-            <div
-              className="flex items-center gap-1"
-              role="group"
-              aria-label="Stage group"
-            >
-              {(['active', 'parked', 'closed'] as const).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  aria-pressed={groupFilter === g}
-                  onClick={() => setGroupFilter(groupFilter === g ? null : g)}
-                  className={cn(
-                    'flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-label font-medium whitespace-nowrap focus-ring transition-colors duration-150 ease-out-quart',
-                    groupFilter === g
-                      ? 'border-primary/40 bg-selected text-foreground'
-                      : 'border-border text-muted-foreground hover:border-input hover:text-foreground',
-                  )}
-                >
-                  {GROUP_LABELS[g]}
-                  <span className="tabular">{groupCounts[g]}</span>
-                </button>
-              ))}
+        ) : view === 'board' ? (
+          <>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <ViewToggle view={view} onChange={switchView} />
+              <TerminalSplit rows={deals.rows} />
             </div>
-            {groupFilter ? (
+            <DealBoard
+              deals={deals.rows}
+              stages={stageOptions}
+              refNames={refNames}
+              valueCurrency={
+                (
+                  registry.find((d) => d.slug === 'value')?.options as
+                    { code?: string } | undefined
+                )?.code ?? 'USD'
+              }
+              medianDaysInStage={funnel.medianDaysInStage}
+            />
+          </>
+        ) : (
+          <>
+            <TableToolbar
+              table={table}
+              filter={globalFilter}
+              onFilterChange={setGlobalFilter}
+              filterPlaceholder="Filter by deal or company…"
+              filterLabel="Filter deals"
+              noun={{ one: 'deal', many: 'deals' }}
+              total={deals.rows.length}
+              shown={table.getRowModel().rows.length}
+            >
+              <ViewToggle view={view} onChange={switchView} />
+              <ViewBar
+                objectId={objectId}
+                registry={registry as Array<RegistryEntry>}
+                views={views}
+                activeId={activeId ?? null}
+                snapshot={vs.snapshot}
+                onApply={(v) => {
+                  vs.apply(v)
+                  selectView(v?.id ?? null)
+                }}
+                selectView={selectView}
+                onFilterChange={vs.setConditions}
+                onSaved={() => router.invalidate()}
+                canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+              />
               <div
                 className="flex items-center gap-1"
                 role="group"
-                aria-label={`${GROUP_LABELS[groupFilter]} stages`}
+                aria-label="Stage group"
               >
-                {stageOptions
-                  .filter((o) => (o.group ?? 'active') === groupFilter)
-                  .filter((o) => !o.archived)
-                  .map((o) => (
-                    <StageChip
-                      key={o.id}
-                      option={o}
-                      pressed={stageFilter === o.id}
-                      onToggle={() =>
-                        setStageFilter(stageFilter === o.id ? null : o.id)
-                      }
-                    />
-                  ))}
-                {/* Filtering is reading history, so retired stages stay
+                {(['active', 'parked', 'closed'] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    aria-pressed={groupFilter === g}
+                    onClick={() => setGroupFilter(groupFilter === g ? null : g)}
+                    className={cn(
+                      'focus-ring flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-label font-medium whitespace-nowrap transition-colors duration-150 ease-out-quart',
+                      groupFilter === g
+                        ? 'border-primary/40 bg-selected text-foreground'
+                        : 'border-border text-muted-foreground hover:border-input hover:text-foreground',
+                    )}
+                  >
+                    {GROUP_LABELS[g]}
+                    <span className="tabular">{groupCounts[g]}</span>
+                  </button>
+                ))}
+              </div>
+              {groupFilter ? (
+                <div
+                  className="flex items-center gap-1"
+                  role="group"
+                  aria-label={`${GROUP_LABELS[groupFilter]} stages`}
+                >
+                  {stageOptions
+                    .filter((o) => (o.group ?? 'active') === groupFilter)
+                    .filter((o) => !o.archived)
+                    .map((o) => (
+                      <StageChip
+                        key={o.id}
+                        option={o}
+                        pressed={stageFilter === o.id}
+                        onToggle={() =>
+                          setStageFilter(stageFilter === o.id ? null : o.id)
+                        }
+                      />
+                    ))}
+                  {/* Filtering is reading history, so retired stages stay
                     filterable behind a divider — that's how the records
                     still parked on one get found and retagged (spec §3). */}
-                {stageOptions.some(
-                  (o) => o.archived && (o.group ?? 'active') === groupFilter,
-                ) ? (
-                  <>
-                    <span
-                      role="separator"
-                      aria-orientation="vertical"
-                      className="mx-1 flex h-4 items-center self-center border-l border-border pl-2 text-micro font-medium tracking-wide text-muted-foreground uppercase"
-                    >
-                      Archived
-                    </span>
-                    {stageOptions
-                      .filter((o) => (o.group ?? 'active') === groupFilter)
-                      .filter((o) => o.archived)
-                      .map((o) => (
-                        <StageChip
-                          key={o.id}
-                          option={o}
-                          pressed={stageFilter === o.id}
-                          onToggle={() =>
-                            setStageFilter(stageFilter === o.id ? null : o.id)
-                          }
-                        />
-                      ))}
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-          </TableToolbar>
-          <RecordTable
-            table={table}
-            label="Deals"
-            stickyColumnId="name"
-            addColumn={
-              <AttributeCreateDialog
-                objectKind="deal"
-                onCreated={() => router.invalidate()}
-                trigger={<AddColumnButton />}
-              />
-            }
-          />
-        </>
-      )}
+                  {stageOptions.some(
+                    (o) => o.archived && (o.group ?? 'active') === groupFilter,
+                  ) ? (
+                    <>
+                      <span
+                        role="separator"
+                        aria-orientation="vertical"
+                        className="mx-1 flex h-4 items-center self-center border-l border-border pl-2 text-micro font-medium tracking-wide text-muted-foreground uppercase"
+                      >
+                        Archived
+                      </span>
+                      {stageOptions
+                        .filter((o) => (o.group ?? 'active') === groupFilter)
+                        .filter((o) => o.archived)
+                        .map((o) => (
+                          <StageChip
+                            key={o.id}
+                            option={o}
+                            pressed={stageFilter === o.id}
+                            onToggle={() =>
+                              setStageFilter(stageFilter === o.id ? null : o.id)
+                            }
+                          />
+                        ))}
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </TableToolbar>
+            <RecordTable
+              table={table}
+              label="Deals"
+              stickyColumnId="name"
+              addColumn={
+                <AttributeCreateDialog
+                  objectKind="deal"
+                  onCreated={() => router.invalidate()}
+                  trigger={<AddColumnButton />}
+                />
+              }
+            />
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -488,7 +489,7 @@ function StageChip({
       onClick={onToggle}
       title={option.archived ? 'Archived option' : undefined}
       className={cn(
-        'h-7 shrink-0 rounded-full border px-2.5 text-label whitespace-nowrap focus-ring transition-colors duration-150 ease-out-quart',
+        'focus-ring h-7 shrink-0 rounded-full border px-2.5 text-label whitespace-nowrap transition-colors duration-150 ease-out-quart',
         pressed
           ? 'border-primary/40 bg-selected font-medium text-foreground'
           : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -543,7 +544,7 @@ function ViewToggle({
           aria-pressed={view === v}
           onClick={() => onChange(v)}
           className={cn(
-            'flex h-6 items-center gap-1 rounded px-2 text-label focus-ring transition-colors duration-150',
+            'focus-ring flex h-6 items-center gap-1 rounded px-2 text-label transition-colors duration-150',
             view === v
               ? 'bg-selected font-medium text-foreground'
               : 'text-muted-foreground hover:text-foreground',
