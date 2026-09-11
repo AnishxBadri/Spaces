@@ -162,6 +162,13 @@
       "when": 1788956898667,
       "tag": "0022_views",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789119025129,
+      "tag": "0023_drop_lists",
+      "breakpoints": true
     }
   ]
 }

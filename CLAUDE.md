@@ -40,10 +40,13 @@ Postgres.
 - New system attribute → add to `SYSTEM_ATTRIBUTES` in
   `src/lib/attributes/registry.ts`; `pnpm db:migrate:run` reseeds
   insert-if-absent
-- New table referencing entities → add it to the merge executor
-  (`src/lib/entities/merge.ts`) repoint sections **and** its snapshot. This
-  was the worst bug of a review cycle; there is no unmerge executor — the
-  snapshot convention is the only contract.
+- New column referencing an entity → add an entry to `ENTITY_REFS`
+  (`src/db/entity-refs.ts`) declaring both the merge strategy and the
+  context role; `entity-refs.test.ts` diffs the list against drizzle's FK
+  metadata and fails naming the column otherwise. A `custom` merge strategy
+  still needs its section in `src/lib/entities/merge.ts` **and** its
+  snapshot. This was the worst bug of a review cycle; there is no unmerge
+  executor — the snapshot convention is the only contract.
 
 ## Backend paradigm (Effect ratchet — CONTEXT.md "Backend paradigm" is the contract)
 

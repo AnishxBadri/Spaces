@@ -218,6 +218,138 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
     expect(own.outcome).toBe('already_own')
   })
 
+  it('generic strategies: repoint-or-drop collides on composite and id PKs, repoint is plain', async () => {
+    const { resolveEntity } = await import('./resolve')
+    const { mergeEntities } = await import('./merge')
+    const { db } = await import('#/db')
+    const { entity, entitySpace, mergeEvent, signal, space } =
+      await import('#/db/schema')
+    const { task, taskEntity } = await import('#/db/schema/tasks')
+    const { user } = await import('#/db/schema/auth')
+    const { and, eq, inArray } = await import('drizzle-orm')
+
+    const tag = randomUUID().slice(0, 8)
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    expect(actor).toBeTruthy()
+
+    const winner = await resolveEntity({
+      kind: 'company',
+      name: `MergeCo ${tag} W`,
+      keys: { domain: `mergeco-w-${tag}.com` },
+      source: 'manual',
+    })
+    const loser = await resolveEntity({
+      kind: 'company',
+      name: `MergeCo ${tag} L`,
+      keys: { domain: `mergeco-l-${tag}.com` },
+      source: 'manual',
+    })
+
+    // Composite-PK collision: both tagged in the same space.
+    const [spc] = await db
+      .insert(entity)
+      .values({ kind: 'space', canonicalName: `TestSpace ${tag}` })
+      .returning({ id: entity.id })
+    await db.insert(space).values({
+      entityId: spc.id,
+      slug: `testspace_${tag}`,
+      path: `testspace_${tag}`,
+    })
+    await db.insert(entitySpace).values([
+      { entityId: winner.entityId, spaceId: spc.id, source: 'manual' },
+      { entityId: loser.entityId, spaceId: spc.id, source: 'manual' },
+    ])
+
+    // Id-PK collision (shared task) + plain repoint (loser-only task).
+    const [shared] = await db
+      .insert(task)
+      .values({
+        content: `shared ${tag}`,
+        assigneeId: actor.id,
+        createdBy: actor.id,
+      })
+      .returning({ id: task.id })
+    const [loserOnly] = await db
+      .insert(task)
+      .values({
+        content: `loser ${tag}`,
+        assigneeId: actor.id,
+        createdBy: actor.id,
+      })
+      .returning({ id: task.id })
+    await db.insert(taskEntity).values([
+      { taskId: shared.id, entityId: winner.entityId },
+      { taskId: shared.id, entityId: loser.entityId },
+      { taskId: loserOnly.id, entityId: loser.entityId },
+    ])
+
+    // Plain repoint.
+    const [sig] = await db
+      .insert(signal)
+      .values({ entityId: loser.entityId, source: 'test', payload: { tag } })
+      .returning({ id: signal.id })
+
+    try {
+      const { mergeEventId } = await mergeEntities({
+        winnerId: winner.entityId,
+        loserId: loser.entityId,
+        mergedBy: actor.id,
+      })
+
+      // Space: one row, the winner's.
+      const tags = await db
+        .select()
+        .from(entitySpace)
+        .where(eq(entitySpace.spaceId, spc.id))
+      expect(tags.map((t) => t.entityId)).toEqual([winner.entityId])
+
+      // Tasks: shared task links the winner once; loser-only task moved.
+      const sharedLinks = await db
+        .select()
+        .from(taskEntity)
+        .where(eq(taskEntity.taskId, shared.id))
+      expect(sharedLinks.map((t) => t.entityId)).toEqual([winner.entityId])
+      const moved = await db
+        .select()
+        .from(taskEntity)
+        .where(
+          and(
+            eq(taskEntity.taskId, loserOnly.id),
+            eq(taskEntity.entityId, winner.entityId),
+          ),
+        )
+      expect(moved.length).toBe(1)
+
+      // Signal followed the record.
+      const [s] = await db
+        .select({ entityId: signal.entityId })
+        .from(signal)
+        .where(eq(signal.id, sig.id))
+      expect(s.entityId).toBe(winner.entityId)
+
+      // Snapshot says what happened, labelled by table.
+      const [event] = await db
+        .select({ snapshot: mergeEvent.snapshot })
+        .from(mergeEvent)
+        .where(eq(mergeEvent.id, mergeEventId))
+      const snap = event.snapshot as Array<{ table: string; action: string }>
+      const of = (table: string) =>
+        snap
+          .filter((e) => e.table === table)
+          .map((e) => e.action)
+          .sort()
+      expect(of('entity_space')).toEqual(['dropped'])
+      expect(of('task_entity')).toEqual(['dropped', 'repointed'])
+      expect(of('signal')).toEqual(['repointed'])
+    } finally {
+      await db.delete(signal).where(eq(signal.id, sig.id))
+      await db
+        .delete(taskEntity)
+        .where(inArray(taskEntity.taskId, [shared.id, loserOnly.id]))
+      await db.delete(task).where(inArray(task.id, [shared.id, loserOnly.id]))
+    }
+  })
+
   it('refuses cross-kind and self merges', async () => {
     const { resolveEntity } = await import('./resolve')
     const { mergeEntities } = await import('./merge')

@@ -1,28 +1,19 @@
-import { and, eq, or } from 'drizzle-orm'
+import { and, eq, getTableColumns, or, sql } from 'drizzle-orm'
+import { getTableConfig } from 'drizzle-orm/pg-core'
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core'
 import { db } from '#/db'
+import { ENTITY_REFS } from '#/db/entity-refs'
+import type { EntityRef } from '#/db/entity-refs'
 import {
   attributeEvent,
   duplicateCandidate,
   entity,
   entityAlias,
-  entitySpace,
-  enrichmentRecord,
-  interactionEntity,
   link,
-  listEntry,
   mergeEvent,
-  signal,
 } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
-import {
-  distribution,
-  holding,
-  investment,
-  mark,
-  round,
-  roundCoInvestor,
-} from '#/db/schema/portfolio'
-import { taskEntity } from '#/db/schema/tasks'
+import { distribution, holding, investment, mark } from '#/db/schema/portfolio'
 
 /**
  * Merge executor, per CONTEXT.md: repoint at write time, resolve nothing at
@@ -40,6 +31,8 @@ type SnapshotEntry = {
   pk: Record<string, unknown>
   old: Record<string, unknown>
 }
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 const MERGEABLE = new Set(['company', 'person', 'organization'])
 
@@ -72,6 +65,87 @@ async function logMergeEvent(
     pk: { id: ev.id },
     old: {},
   })
+}
+
+/**
+ * Custom merge sections implemented below, by the handler name the registry
+ * declares. Checked at import so a registry entry naming a handler nobody
+ * wrote fails the first test that loads this module.
+ */
+const CUSTOM_HANDLERS = new Set([
+  'aliases',
+  'redirect',
+  'links',
+  'holdings',
+  'candidates',
+])
+for (const ref of ENTITY_REFS) {
+  if (ref.merge.kind === 'custom' && !CUSTOM_HANDLERS.has(ref.merge.handler))
+    throw new Error(
+      `ENTITY_REFS ${ref.key}: custom merge handler '${ref.merge.handler}' has no section in merge.ts`,
+    )
+}
+
+/** TS property name for a column (snapshots use property names, not SQL). */
+function propertyKey(table: PgTable, column: PgColumn): string {
+  const hit = Object.entries(
+    getTableColumns(table) as Record<string, PgColumn>,
+  ).find(([, c]) => c.name === column.name)
+  if (!hit) throw new Error(`column ${column.name} not on table`)
+  return hit[0]
+}
+
+/**
+ * The generic strategies. `repoint` is a plain update. `repoint-or-drop`
+ * first checks whether the winner already holds the row's unique partner
+ * (same space, same interaction, same task, same round) and drops the
+ * loser's row instead of colliding. Composite primary keys are addressed by
+ * their column values, so this works for id-less join tables too.
+ */
+async function repointGeneric(
+  tx: Tx,
+  ref: EntityRef,
+  loserId: string,
+  winnerId: string,
+  snapshot: Array<SnapshotEntry>,
+): Promise<void> {
+  const cfg = getTableConfig(ref.table)
+  const pkCols =
+    cfg.primaryKeys[0]?.columns ?? cfg.columns.filter((c) => c.primary)
+  const keyOf = (c: PgColumn) => propertyKey(ref.table, c)
+  const colKey = keyOf(ref.column)
+  const rows = await tx.select().from(ref.table).where(eq(ref.column, loserId))
+  for (const row of rows) {
+    const pk = Object.fromEntries(pkCols.map((c) => [keyOf(c), row[keyOf(c)]]))
+    const rowWhere = and(...pkCols.map((c) => eq(c, row[keyOf(c)])))
+    let collides = false
+    if (ref.merge.kind === 'repoint-or-drop') {
+      const partner = ref.merge.uniqueWith.map((c) => eq(c, row[keyOf(c)]))
+      collides =
+        (
+          await tx
+            .select({ one: sql`1` })
+            .from(ref.table)
+            .where(and(eq(ref.column, winnerId), ...partner))
+            .limit(1)
+        ).length > 0
+    }
+    if (collides) {
+      snapshot.push({ table: cfg.name, action: 'dropped', pk, old: row })
+      await tx.delete(ref.table).where(rowWhere)
+    } else {
+      snapshot.push({
+        table: cfg.name,
+        action: 'repointed',
+        pk,
+        old: { [colKey]: loserId },
+      })
+      await tx
+        .update(ref.table)
+        .set({ [colKey]: winnerId })
+        .where(rowWhere)
+    }
+  }
 }
 
 export async function mergeEntities(opts: {
@@ -178,162 +252,10 @@ export async function mergeEntities(opts: {
       }
     }
 
-    // --- space tags: composite PK (entity_id, space_id) -------------------
-    const loserTags = await tx
-      .select()
-      .from(entitySpace)
-      .where(eq(entitySpace.entityId, loserId))
-    for (const t of loserTags) {
-      snapshot.push({
-        table: 'entity_space',
-        action: 'repointed',
-        pk: { entityId: loserId, spaceId: t.spaceId },
-        old: t,
-      })
-      await tx
-        .delete(entitySpace)
-        .where(
-          and(
-            eq(entitySpace.entityId, loserId),
-            eq(entitySpace.spaceId, t.spaceId),
-          ),
-        )
-      await tx
-        .insert(entitySpace)
-        .values({ ...t, entityId: winnerId })
-        .onConflictDoNothing()
-    }
-
-    // --- interactions: composite PK --------------------------------------
-    const loserInteractions = await tx
-      .select()
-      .from(interactionEntity)
-      .where(eq(interactionEntity.entityId, loserId))
-    for (const ie of loserInteractions) {
-      snapshot.push({
-        table: 'interaction_entity',
-        action: 'repointed',
-        pk: { interactionId: ie.interactionId, entityId: loserId },
-        old: ie,
-      })
-      await tx
-        .delete(interactionEntity)
-        .where(
-          and(
-            eq(interactionEntity.interactionId, ie.interactionId),
-            eq(interactionEntity.entityId, loserId),
-          ),
-        )
-      await tx
-        .insert(interactionEntity)
-        .values({ ...ie, entityId: winnerId })
-        .onConflictDoNothing()
-    }
-
-    // --- signals + enrichment: plain FK repoints --------------------------
-    for (const s of await tx
-      .select({ id: signal.id })
-      .from(signal)
-      .where(eq(signal.entityId, loserId))) {
-      snapshot.push({
-        table: 'signal',
-        action: 'repointed',
-        pk: { id: s.id },
-        old: { entityId: loserId },
-      })
-    }
-    await tx
-      .update(signal)
-      .set({ entityId: winnerId })
-      .where(eq(signal.entityId, loserId))
-
-    for (const r of await tx
-      .select({ id: enrichmentRecord.id })
-      .from(enrichmentRecord)
-      .where(eq(enrichmentRecord.entityId, loserId))) {
-      snapshot.push({
-        table: 'enrichment_record',
-        action: 'repointed',
-        pk: { id: r.id },
-        old: { entityId: loserId },
-      })
-    }
-    await tx
-      .update(enrichmentRecord)
-      .set({ entityId: winnerId })
-      .where(eq(enrichmentRecord.entityId, loserId))
-
-    // --- activity: subject + object repoints ------------------------------
-    for (const a of await tx
-      .select({ id: activity.id })
-      .from(activity)
-      .where(eq(activity.subjectEntityId, loserId))) {
-      snapshot.push({
-        table: 'activity.subject',
-        action: 'repointed',
-        pk: { id: a.id },
-        old: { subjectEntityId: loserId },
-      })
-    }
-    await tx
-      .update(activity)
-      .set({ subjectEntityId: winnerId })
-      .where(eq(activity.subjectEntityId, loserId))
-    for (const a of await tx
-      .select({ id: activity.id })
-      .from(activity)
-      .where(eq(activity.objectEntityId, loserId))) {
-      snapshot.push({
-        table: 'activity.object',
-        action: 'repointed',
-        pk: { id: a.id },
-        old: { objectEntityId: loserId },
-      })
-    }
-    await tx
-      .update(activity)
-      .set({ objectEntityId: winnerId })
-      .where(eq(activity.objectEntityId, loserId))
-
-    // --- list entries: one entry per (list, entity) -----------------------
-    const loserEntries = await tx
-      .select()
-      .from(listEntry)
-      .where(eq(listEntry.entityId, loserId))
-    for (const le of loserEntries) {
-      const collision = (
-        await tx
-          .select({ id: listEntry.id })
-          .from(listEntry)
-          .where(
-            and(
-              eq(listEntry.listId, le.listId),
-              eq(listEntry.entityId, winnerId),
-            ),
-          )
-      ).at(0)
-      if (collision) {
-        // Winner already sits in this list — membership is once per record,
-        // so keep the winner's entry, snapshot the loser's, drop it.
-        snapshot.push({
-          table: 'list_entry',
-          action: 'dropped',
-          pk: { id: le.id },
-          old: { entry: le },
-        })
-        await tx.delete(listEntry).where(eq(listEntry.id, le.id))
-      } else {
-        snapshot.push({
-          table: 'list_entry',
-          action: 'repointed',
-          pk: { id: le.id },
-          old: { entityId: loserId },
-        })
-        await tx
-          .update(listEntry)
-          .set({ entityId: winnerId })
-          .where(eq(listEntry.id, le.id))
-      }
+    // --- every generic edge column: one loop over the registry ------------
+    for (const ref of ENTITY_REFS) {
+      if (ref.merge.kind === 'repoint' || ref.merge.kind === 'repoint-or-drop')
+        await repointGeneric(tx, ref, loserId, winnerId, snapshot)
     }
 
     // --- attribute values: winner keeps, loser fills the gaps -------------
@@ -436,23 +358,6 @@ export async function mergeEntities(opts: {
       }
     }
 
-    // --- attribute history follows the record ------------------------------
-    for (const ev of await tx
-      .select({ id: attributeEvent.id })
-      .from(attributeEvent)
-      .where(eq(attributeEvent.entityId, loserId))) {
-      snapshot.push({
-        table: 'attribute_event',
-        action: 'repointed',
-        pk: { id: ev.id },
-        old: { entityId: loserId },
-      })
-    }
-    await tx
-      .update(attributeEvent)
-      .set({ entityId: winnerId })
-      .where(eq(attributeEvent.entityId, loserId))
-
     // --- portfolio: holdings collapse onto the winner ---------------------
     // One holding per company is doctrine; when both sides hold, the
     // loser's events move onto the winner's holding and the loser holding
@@ -510,85 +415,6 @@ export async function mergeEntities(opts: {
           .update(holding)
           .set({ companyId: winnerId })
           .where(eq(holding.id, loserHolding.id))
-      }
-    }
-
-    // --- rounds: plain company_id repoint ---------------------------------
-    for (const r of await tx
-      .select({ id: round.id })
-      .from(round)
-      .where(eq(round.companyId, loserId))) {
-      snapshot.push({
-        table: 'round',
-        action: 'repointed',
-        pk: { id: r.id },
-        old: { companyId: loserId },
-      })
-    }
-    await tx
-      .update(round)
-      .set({ companyId: winnerId })
-      .where(eq(round.companyId, loserId))
-
-    // --- co-investors + task links: repoint, drop unique-pair dupes -------
-    for (const ci of await tx
-      .select({ id: roundCoInvestor.id, roundId: roundCoInvestor.roundId })
-      .from(roundCoInvestor)
-      .where(eq(roundCoInvestor.investorEntityId, loserId))) {
-      const dupe = (
-        await tx
-          .select({ id: roundCoInvestor.id })
-          .from(roundCoInvestor)
-          .where(
-            and(
-              eq(roundCoInvestor.roundId, ci.roundId),
-              eq(roundCoInvestor.investorEntityId, winnerId),
-            ),
-          )
-      ).at(0)
-      snapshot.push({
-        table: 'round_co_investor',
-        action: dupe ? 'dropped' : 'repointed',
-        pk: { id: ci.id },
-        old: { investorEntityId: loserId },
-      })
-      if (dupe) {
-        await tx.delete(roundCoInvestor).where(eq(roundCoInvestor.id, ci.id))
-      } else {
-        await tx
-          .update(roundCoInvestor)
-          .set({ investorEntityId: winnerId })
-          .where(eq(roundCoInvestor.id, ci.id))
-      }
-    }
-    for (const te of await tx
-      .select({ id: taskEntity.id, taskId: taskEntity.taskId })
-      .from(taskEntity)
-      .where(eq(taskEntity.entityId, loserId))) {
-      const dupe = (
-        await tx
-          .select({ id: taskEntity.id })
-          .from(taskEntity)
-          .where(
-            and(
-              eq(taskEntity.taskId, te.taskId),
-              eq(taskEntity.entityId, winnerId),
-            ),
-          )
-      ).at(0)
-      snapshot.push({
-        table: 'task_entity',
-        action: dupe ? 'dropped' : 'repointed',
-        pk: { id: te.id },
-        old: { entityId: loserId },
-      })
-      if (dupe) {
-        await tx.delete(taskEntity).where(eq(taskEntity.id, te.id))
-      } else {
-        await tx
-          .update(taskEntity)
-          .set({ entityId: winnerId })
-          .where(eq(taskEntity.id, te.id))
       }
     }
 

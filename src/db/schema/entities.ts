@@ -164,7 +164,7 @@ export const duplicateCandidate = pgTable(
 /**
  * Merge audit + unmerge capability. Snapshot records every repointed row
  * ({table, pk, old_value}), moved aliases, side-table conflicts, and
- * list_entry collisions. Captured at merge time or never.
+ * unique-pair collisions. Captured at merge time or never.
  */
 export const mergeEvent = pgTable('merge_event', {
   id: uuid('id').primaryKey().defaultRandom(),
