@@ -8,6 +8,7 @@ import {
   FileText,
   Kanban,
   Layers,
+  Keyboard,
   LogOut,
   Settings,
   Sunrise,
@@ -44,15 +45,18 @@ import { cn } from '#/lib/utils'
 export const NAV_ITEMS = [
   // Today first and login lands there (2026-08-08): the attention page is
   // the notification channel in a self-hosted product.
-  { to: '/today', label: 'Today', icon: Sunrise },
-  { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { to: '/spaces', label: 'Spaces', icon: Layers },
-  { to: '/notes', label: 'Notes', icon: FileText },
-  { to: '/companies', label: 'Companies', icon: Building2 },
-  { to: '/people', label: 'People', icon: Users },
-  { to: '/deals', label: 'Deals', icon: Kanban },
-  { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
-  { to: '/mandate', label: 'Mandate', icon: Compass },
+  // `key` is the G-chord printed in the row's right lane; the shell binds
+  // it (useHotkeys) and the keyboard sheet lists it. Portfolio takes F
+  // (fund) because People has P.
+  { to: '/today', label: 'Today', icon: Sunrise, key: 'G T' },
+  { to: '/tasks', label: 'Tasks', icon: CheckSquare, key: 'G K' },
+  { to: '/spaces', label: 'Spaces', icon: Layers, key: 'G S' },
+  { to: '/notes', label: 'Notes', icon: FileText, key: 'G N' },
+  { to: '/companies', label: 'Companies', icon: Building2, key: 'G C' },
+  { to: '/people', label: 'People', icon: Users, key: 'G P' },
+  { to: '/deals', label: 'Deals', icon: Kanban, key: 'G D' },
+  { to: '/portfolio', label: 'Portfolio', icon: Briefcase, key: 'G F' },
+  { to: '/mandate', label: 'Mandate', icon: Compass, key: 'G M' },
 ] as const
 
 const WORK = NAV_ITEMS.slice(0, 4)
@@ -71,6 +75,7 @@ export function AppSidebar({
   hideWordmark = false,
   collapsed = false,
   onToggleCollapsed,
+  onOpenKeyboard,
 }: {
   user: { name: string; email: string }
   /** The workspace singleton's name — the deployment's identity. */
@@ -85,6 +90,8 @@ export function AppSidebar({
   collapsed?: boolean
   /** Present on the desktop chassis only; the drawer never collapses. */
   onToggleCollapsed?: () => void
+  /** Opens the keyboard sheet (also on `?`). */
+  onOpenKeyboard?: () => void
 }) {
   const navigate = useNavigate()
 
@@ -101,6 +108,7 @@ export function AppSidebar({
         objects={objects}
         onOpenCommand={onOpenCommand}
         onExpand={onToggleCollapsed}
+        onKeyboard={onOpenKeyboard}
         onSignOut={signOut}
       />
     )
@@ -166,6 +174,7 @@ export function AppSidebar({
                 key={item.to}
                 to={item.to}
                 icon={item.icon}
+                hint={item.key}
                 onClick={onNavigate}
               >
                 {item.label}
@@ -179,6 +188,7 @@ export function AppSidebar({
                 key={item.to}
                 to={item.to}
                 icon={item.icon}
+                hint={item.key}
                 onClick={onNavigate}
               >
                 {item.label}
@@ -203,6 +213,7 @@ export function AppSidebar({
                 key={item.to}
                 to={item.to}
                 icon={item.icon}
+                hint={item.key}
                 onClick={onNavigate}
               >
                 {item.label}
@@ -241,6 +252,7 @@ export function AppSidebar({
           <AccountMenu
             email={user.email}
             onNavigate={onNavigate}
+            onKeyboard={onOpenKeyboard}
             onSignOut={signOut}
           />
         </DropdownMenu>
@@ -256,10 +268,12 @@ export function AppSidebar({
 function AccountMenu({
   email,
   onNavigate,
+  onKeyboard,
   onSignOut,
 }: {
   email: string
   onNavigate?: () => void
+  onKeyboard?: () => void
   onSignOut: () => void
 }) {
   const navigate = useNavigate()
@@ -284,6 +298,13 @@ function AccountMenu({
         Settings
         <span className="ml-auto mono text-micro text-graphite">G ,</span>
       </DropdownMenuItem>
+      {onKeyboard ? (
+        <DropdownMenuItem onSelect={onKeyboard}>
+          <Keyboard className="size-4" />
+          Keyboard
+          <span className="ml-auto mono text-micro text-graphite">?</span>
+        </DropdownMenuItem>
+      ) : null}
       <DropdownMenuItem onSelect={onSignOut}>
         <LogOut className="size-4" />
         Sign out
@@ -304,6 +325,7 @@ function CollapsedSidebar({
   objects,
   onOpenCommand,
   onExpand,
+  onKeyboard,
   onSignOut,
 }: {
   user: { name: string; email: string }
@@ -311,6 +333,7 @@ function CollapsedSidebar({
   objects: Array<{ slug: string; plural: string; icon: string | null }>
   onOpenCommand: () => void
   onExpand?: () => void
+  onKeyboard?: () => void
   onSignOut: () => void
 }) {
   return (
@@ -382,7 +405,11 @@ function CollapsedSidebar({
               </span>
             </DropdownMenuTrigger>
           </IconTip>
-          <AccountMenu email={user.email} onSignOut={onSignOut} />
+          <AccountMenu
+            email={user.email}
+            onKeyboard={onKeyboard}
+            onSignOut={onSignOut}
+          />
         </DropdownMenu>
       </div>
     </div>
@@ -470,12 +497,15 @@ function NavLink({
   to,
   params,
   icon: Icon,
+  hint,
   onClick,
   children,
 }: {
   to: string
   params?: Record<string, string>
   icon: LucideIcon
+  /** The chord printed in the right lane — graphite, ink on the current page. */
+  hint?: string
   onClick?: () => void
   children: React.ReactNode
 }) {
@@ -495,7 +525,12 @@ function NavLink({
       }}
     >
       <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
-      <span className="truncate">{children}</span>
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {hint ? (
+        <span className="shrink-0 mono text-micro text-graphite [a[aria-current=page]_&]:text-foreground">
+          {hint}
+        </span>
+      ) : null}
     </Link>
   )
 }

@@ -6,13 +6,14 @@ import {
 } from '@tanstack/react-router'
 import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
-import { AppSidebar } from '#/components/app-sidebar'
+import { AppSidebar, NAV_ITEMS } from '#/components/app-sidebar'
+import { KeyboardHelp } from '#/components/keyboard-help'
 import { CommandPalette } from '#/components/command-palette'
 import { Wordmark } from '#/components/wordmark'
 import { Toaster } from '#/components/ui/sonner'
 import { setChassisCollapsed, useChassisCollapsed } from '#/lib/chassis-store'
 import { getSession, getWorkspace, listObjects } from '#/lib/server-fns'
-import { useHotkey } from '#/lib/use-hotkey'
+import { useHotkeys } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
 /** Authenticated shell: fixed sidebar, fluid content, Cmd-K everywhere. */
@@ -38,10 +39,18 @@ function AppShell() {
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const collapsed = useChassisCollapsed()
+  const [keyboardOpen, setKeyboardOpen] = useState(false)
   const navigate = useNavigate()
-  // The keys printed on the chassis: ⌘\ folds it, G , opens Settings.
-  useHotkey('mod+\\', () => setChassisCollapsed(!collapsed))
-  useHotkey('g ,', () => void navigate({ to: '/settings' }))
+  // The keys printed on the chassis: G-chords go, ⌘\ folds it, ? explains.
+  useHotkeys([
+    ...NAV_ITEMS.map((item): [string, () => void] => [
+      item.key.toLowerCase(),
+      () => void navigate({ to: item.to }),
+    ]),
+    ['g ,', () => void navigate({ to: '/settings' })],
+    ['mod+\\', () => setChassisCollapsed(!collapsed)],
+    ['?', () => setKeyboardOpen(true)],
+  ])
 
   return (
     <div className="flex min-h-dvh bg-background">
@@ -60,6 +69,7 @@ function AppShell() {
           onOpenCommand={() => setCommandOpen(true)}
           collapsed={collapsed}
           onToggleCollapsed={() => setChassisCollapsed(!collapsed)}
+          onOpenKeyboard={() => setKeyboardOpen(true)}
         />
       </aside>
 
@@ -108,13 +118,14 @@ function AppShell() {
       <main
         className={cn(
           'min-w-0 flex-1 pt-12 md:pt-0',
-          collapsed ? 'md:pl-14' : 'md:pl-60',
+          collapsed ? 'md:pl-12' : 'md:pl-58',
         )}
       >
         <Outlet />
       </main>
 
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+      <KeyboardHelp open={keyboardOpen} onOpenChange={setKeyboardOpen} />
       <Toaster position="bottom-right" />
     </div>
   )
