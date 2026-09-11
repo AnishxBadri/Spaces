@@ -1,0 +1,90 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`assembleProgram > assembles the record for two users, deterministically 1`] = `
+[
+  {
+    "hop": 0,
+    "kind": "attribute",
+    "ref": "attr:CO:alias.domain",
+    "score": 1,
+    "text": "domain: ctxco-TAG.com",
+  },
+  {
+    "hop": 0,
+    "kind": "attribute",
+    "ref": "attr:CO:funding_stage",
+    "score": 1,
+    "text": "Funding stage: Seed",
+  },
+  {
+    "hop": 0,
+    "kind": "attribute",
+    "ref": "attr:CO:location",
+    "score": 1,
+    "text": "Location: Bengaluru",
+  },
+  {
+    "hop": 0,
+    "kind": "event",
+    "ref": "event:UUID",
+    "score": 0.6122,
+    "text": "Funding stage: — → seed (Anish, 2026-08-29)",
+  },
+  {
+    "hop": 1,
+    "kind": "memo",
+    "ref": "memo:MEMO",
+    "score": 0.5199,
+    "text": "Memo: Thesis fit",
+  },
+  {
+    "hop": 1,
+    "kind": "memo",
+    "ref": "memo:SPACE_MEMO",
+    "score": 0.4159,
+    "text": "Memo: Why cooling",
+  },
+  {
+    "hop": 1,
+    "kind": "doc_chunk",
+    "ref": "doc:DECK#0",
+    "score": 0.36,
+    "text": "seed-deck.pdf [deck] p.1: Problem: edge DCs run hot.",
+  },
+  {
+    "hop": 1,
+    "kind": "note",
+    "ref": "note:NOTE",
+    "score": 0.2722,
+    "text": "Note: Call notes",
+  },
+  {
+    "hop": 1,
+    "kind": "interaction",
+    "ref": "interaction:CALL",
+    "score": 0.2205,
+    "text": "call on 2026-08-29: Intro call",
+  },
+  {
+    "hop": 1,
+    "kind": "task",
+    "ref": "task:TASK",
+    "score": 0.1706,
+    "text": "Task (open, due 2026-10-15): revisit TAG",
+  },
+  {
+    "hop": 1,
+    "kind": "doc_chunk",
+    "ref": "doc:DECK#1",
+    "score": 0.36,
+    "text": "seed-deck.pdf [deck] p.2: Team: Priya Rao, ex-Tata Power.",
+  },
+  {
+    "hop": 1,
+    "kind": "doc_chunk",
+    "ref": "doc:DECK#2",
+    "score": 0.36,
+    "text": "seed-deck.pdf [deck] p.3: Pilot: 40% PUE improvement.",
+  },
+]
+`;
