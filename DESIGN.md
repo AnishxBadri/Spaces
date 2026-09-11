@@ -2,262 +2,265 @@
 name: DealOS
 description: Self-hosted deal-management OS for angel and private-capital investing
 colors:
+  paper: '#ffffff'
+  bone: '#f4f3ef'
+  bone-deep: '#e9e7e1'
+  hairline: '#1c1c1a'
+  rule: '#d6d4cd'
+  graphite: '#5c5b56'
+  ink: 'oklch(0.24 0.012 155)'
   pine: 'oklch(0.55 0.14 155)'
   pine-hover: 'oklch(0.5 0.14 155)'
   selected-wash: 'oklch(0.962 0.022 155)'
-  ground: 'oklch(1 0 0)'
-  ink: 'oklch(0.24 0.012 155)'
-  muted-ink: 'oklch(0.49 0.016 155)'
-  panel: 'oklch(0.976 0.003 155)'
-  border: 'oklch(0.92 0.005 155)'
-  input-border: 'oklch(0.885 0.006 155)'
-  row-hover: 'oklch(0.977 0.003 155)'
   destructive-crimson: 'oklch(0.48 0.17 12)'
   success-teal: 'oklch(0.55 0.09 190)'
   warning-amber: 'oklch(0.7 0.13 75)'
   info-blue: 'oklch(0.55 0.1 240)'
 typography:
   display:
-    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
-    fontSize: '1.625rem'
+    fontFamily: 'Source Serif 4 Variable, Georgia, serif'
+    fontSize: '1.75rem'
     fontWeight: 600
     lineHeight: '2rem'
-    letterSpacing: '-0.025em'
-  headline:
-    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
-    fontSize: '1.375rem'
+    letterSpacing: '-0.01em'
+  section:
+    fontFamily: 'Source Serif 4 Variable, Georgia, serif'
+    fontSize: '1.125rem'
     fontWeight: 600
-    lineHeight: '1.75rem'
-    letterSpacing: '-0.025em'
+    lineHeight: '1.375rem'
+  prose:
+    fontFamily: 'Source Serif 4 Variable, Georgia, serif'
+    fontSize: '1.0625rem'
+    fontWeight: 400
+    lineHeight: '1.6875rem'
   title:
     fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
     fontSize: '0.9375rem'
-    fontWeight: 600
+    fontWeight: 500
     lineHeight: '1.375rem'
-  body:
-    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
-    fontSize: '0.875rem'
-    fontWeight: 400
-    lineHeight: '1.25rem'
   ui:
     fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
     fontSize: '0.8125rem'
     fontWeight: 400
     lineHeight: '1.25rem'
-  label:
-    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
-    fontSize: '0.75rem'
+  readout:
+    fontFamily: 'JetBrains Mono Variable, ui-monospace, monospace'
+    fontSize: '1.25rem'
     fontWeight: 500
+    lineHeight: '1.5rem'
+  numeral:
+    fontFamily: 'JetBrains Mono Variable, ui-monospace, monospace'
+    fontSize: '0.8125rem'
+    fontWeight: 400
     lineHeight: '1rem'
-  micro:
-    fontFamily: 'Inter Variable, ui-sans-serif, system-ui, sans-serif'
+  label:
+    fontFamily: 'JetBrains Mono Variable, ui-monospace, monospace'
     fontSize: '0.6875rem'
     fontWeight: 500
     lineHeight: '1rem'
-  prose:
-    fontFamily: 'Source Serif 4 Variable, Georgia, serif'
-    fontSize: '1.0625rem'
-    fontWeight: 400
-    lineHeight: 1.65
+    letterSpacing: '0.08em'
 rounded:
-  sm: '4px'
-  md: '6px'
-  lg: '8px'
-  xl: '12px'
+  none: '0px'
+  control: '2px'
 spacing:
   row: '2.25rem'
 components:
   button-primary:
     backgroundColor: '{colors.pine}'
     textColor: '#ffffff'
-    rounded: '{rounded.md}'
-    padding: '8px 16px'
-    height: '36px'
+    rounded: '{rounded.control}'
+    padding: '0 12px'
+    height: '32px'
   button-primary-hover:
     backgroundColor: '{colors.pine-hover}'
   button-outline:
-    backgroundColor: '{colors.ground}'
+    backgroundColor: '{colors.paper}'
     textColor: '{colors.ink}'
-    rounded: '{rounded.md}'
-    padding: '6px 12px'
+    borderColor: '{colors.hairline}'
+    rounded: '{rounded.control}'
+    padding: '0 12px'
     height: '32px'
   button-ghost:
     backgroundColor: 'transparent'
     textColor: '{colors.ink}'
-    rounded: '{rounded.md}'
+    rounded: '{rounded.control}'
     height: '32px'
   input:
     backgroundColor: 'transparent'
     textColor: '{colors.ink}'
-    rounded: '{rounded.md}'
-    padding: '4px 12px'
-    height: '36px'
+    borderColor: '{colors.rule}'
+    rounded: '{rounded.control}'
+    padding: '0 10px'
+    height: '32px'
 ---
 
 # Design System: DealOS
 
 ## 1. Overview
 
-**Creative North Star: "The Analyst's Desk"**
+**Creative North Star: "Instrument" — a measuring instrument for capital, printed
+output.**
 
-A serious instrument for someone who reads for a living: a clean desk, good light, a ledger
-on one side and a well-set book on the other. The interface is precise, calm, and fast —
-density done the Attio way, speed felt the Linear way, and character carried entirely by
-one deep pine-green accent and the typography, never by the surface. The tool
-disappears; the research remains.
+The interface is a bench instrument that measures a fund and prints what it found:
+paper for the data field, bone for the chassis, one ink for structure, one LED for the
+action. Everything the instrument measured — money, counts, dates, durations, IDs,
+domains — is set in mono, because a reading is a reading. Everything a human wrote —
+a company's name, a page title, a thesis — is set in serif, because a person named it.
+The sans carries the interface between them. Density done the Attio way, speed felt the
+Linear way, character carried by type and material, never by the surface.
 
-This system explicitly rejects enterprise CRM chrome (Salesforce/HubSpot dashboards-first
-sprawl), the generic SaaS template look (shadcn defaults, gradient heroes, purple accents,
-identical card grids), and the dark terminal aesthetic (monospace-everything, neon on black).
-Familiarity is earned through craft — typography, spacing, alignment — not through decoration.
+Instrument (2026-09-10) replaces "The Analyst's Desk" (2026-07 → 09). What it kept: the
+white ground, the one pine voice, the contrast floor, the ledger register. What it
+changed: the second neutral is bone, structure is 1px ink rather than a pale border,
+numbers and labels moved to mono, titles moved to serif, radius fell to 0 and 2px,
+focus became a reticle, and dither became the only texture. The Paper canvas
+(`spaces`, pages `v2 · Foundations / Components / Patterns / Surfaces`) is the drafting
+table; this repo is truth.
+
+This system explicitly rejects enterprise CRM chrome, the generic SaaS template look
+(shadcn defaults, gradient heroes, purple accents, identical card grids), and the dark
+terminal aesthetic. Mono here is a voice for readings, not a costume for the whole app.
 
 **Key Characteristics:**
 
-- Pure white ground; color appears only where it carries meaning
-- Two registers, one system: ledger for data, page for prose
-- Keyboard-first; latency is a design defect
-- Dense tables that stay calm — whitespace spent deliberately, not scattered
-- WCAG AA is a floor, not a target: body text ≥4.5:1, always
+- Paper data field, bone chassis, ink structure, one pine LED
+- Three type voices — serif where a human wrote it, sans for the interface, mono for
+  everything measured
+- Keyboard-first; every key that works is printed inside the control it triggers
+- Nothing blurs, nothing rounds past 2px, nothing is a pill
+- WCAG AA is a floor, not a target: body text ≥ 4.5:1, always
 
-## 2. Colors
+## 2. Colour
 
-Restrained strategy: pure neutrals carry the entire surface; one deep pine green speaks
-rarely and therefore clearly. Every value below is live in `src/styles.css` — this section
-describes; the CSS decides.
+Two untinted neutrals, one ink, one LED. Semantic colour only where it encodes state.
+Badges are a tint plus same-hue ink, square. Every value is live in `src/styles.css` —
+this section describes; the CSS decides.
 
-### Primary
+### Materials
 
-- **Pine** (oklch(0.55 0.14 155) ≈ #00884b): primary actions, current selection, focus
-  rings. Third primary, by owner decision (2026-08): Ochre Gold fell to contrast physics
-  (2026-07), Vermilion to preference for a quieter, capital-coded voice. Costs accepted
-  knowingly: green is fintech's most-owned hue, and the success semantic had to move off
-  green so an action and a state never share a hue. What green gives back: at
-  contrast-passing lightness it holds less chroma than vermilion, so the one loud voice
-  in the system is naturally more restrained — a sturdier, instrument-like read.
-  Lightness is pinned by contrast: 0.55 measures 4.52:1 with white text (measured via
-  proper OKLCH→sRGB conversion, never eyeballed). Hover deepens to oklch(0.5 0.14 155),
-  5.51:1; the selection wash is a pale same-hue tint, oklch(0.962 0.022 155), 14.8:1
-  under ink.
+| token       | value                  | role                                       |
+| ----------- | ---------------------- | ------------------------------------------ |
+| `paper`     | `#FFFFFF`              | the data field — tables, records, dialogs  |
+| `bone`      | `#F4F3EF`              | the chassis — sidebar, rails, dialog feet  |
+| `bone-deep` | `#E9E7E1`              | pressed, disabled, archived rows           |
+| `rule`      | `#D6D4CD`              | inner rules — rows, cells, inputs          |
+| `hairline`  | `#1C1C1A`              | 1px structure — sections, sheets, the edge |
+| `graphite`  | `#5C5B56`              | the second text colour, 5.9:1 on paper     |
+| `ink`       | `oklch(0.24 .012 155)` | text, 13:1 on paper                        |
+| `pine`      | `oklch(0.55 .14 155)`  | the LED — primary action, live segments    |
 
-### Neutral
+The neutrals are hex on purpose: they are the physical materials of the bench, not
+points on the brand hue. Ink keeps its whisper of 155° so text and pine belong to each
+other. Row hover is opaque bone, never a translucent tint (a tint over a sticky column
+lets the scrolled-under columns bleed through).
 
-- **Pure White** (oklch(1 0 0)): the body background. Literal white, no hidden tint —
-  the mood lives in the pine and the type, never in a tinted surface.
-- **Ink** (oklch(0.24 0.012 155)): body text, ~13:1 against white.
-- **Muted Ink** (oklch(0.49 0.016 155)): secondary text, ≥4.5:1 — the Linear-gray
-  temptation is bounded by contrast, not taste. No sub-100% opacity variants of it, ever;
-  that is how the floor gets quietly broken.
-- **Panel Neutral** (oklch(0.976 0.003 155)): second neutral layer for sidebar, toolbars,
-  and rails. Borders at oklch(0.92 0.005 155), inputs slightly darker.
-- All neutrals carry a whisper of the primary hue (~155°) at near-zero chroma, so grays
-  feel of-the-brand without reading tinted.
+### Pine
+
+`oklch(0.55 0.14 155)` ≈ `#00884b`. Primary action, the active tab's 2px underline, the
+filled segments of a stage stepper, sparkline end-dots, the `+` that starts a composer.
+Third primary, by owner decision (2026-08): Ochre Gold fell to contrast physics
+(2026-07), Vermilion to preference for a quieter, capital-coded voice. Lightness is
+pinned by contrast — 0.55 measures 4.52:1 under white text, by proper OKLCH→sRGB
+conversion, never eyeballed. Hover deepens to `oklch(0.5 0.14 155)`, 5.51:1. The
+selection wash is a pale same-hue tint, `oklch(0.962 0.022 155)`, 14.8:1 under ink.
 
 ### Semantic
 
-- **Destructive** is deep crimson (oklch(0.48 0.17 12)) — chosen under the vermilion
-  primary to keep delete unmistakable from act, kept under pine because it still reads
-  unambiguously destructive against everything else.
-- **Success moved to teal** (oklch(0.55 0.09 190), 2026-08): pine owns green now, and a
-  success _state_ sharing the action hue would blur two meanings — the Meaning Rule
-  applied to the system itself. Warning oklch(0.7 0.13 75) · info oklch(0.55 0.1 240).
-  Standardized once, used identically everywhere. Stage and status colors are data, not
-  decoration.
+- **Destructive** — deep crimson `oklch(0.48 0.17 12)`: delete, overdue, past 2× median.
+- **Warning** — amber `oklch(0.7 0.13 75)`: unpriced, missing FX; as a row wash it uses
+  the amber badge tint with amber ink.
+- **Success** — teal `oklch(0.55 0.09 190)`, moved off green (2026-08) because pine owns
+  green and a state must never share the action's hue.
+- **Info** — `oklch(0.55 0.1 240)`.
+
+A readout is coloured only when its value is nonzero and bad; a zero reads in graphite.
 
 ### Badge palette
 
-Twelve hues (slate → cyan around the wheel) for select/status options, every one built
-the same way: a pale tint at L 0.955 and same-hue ink at L 0.45, chroma fitted to the
-largest the sRGB gamut allows at that lightness. Fixing lightness across all twelve is
-what makes them read as one system rather than a bag of colours, and it means no hue can
-quietly fall below the contrast floor — the worst pair measures 6.26:1, the best 7.02:1.
-Options get a hue auto-assigned; users can override per option in settings.
+Twelve hues (slate → cyan) for select, status and stage options, every one a pale tint
+at L 0.955 with same-hue ink at L 0.45, chroma fitted to the largest the sRGB gamut
+allows. The worst pair measures 6.26:1, the best 7.02:1. Badges are square, 18–20px
+tall, mono 11 medium. Options get a hue auto-assigned; users can override per option.
 
-### Named Rules
+## 3. Type — three voices
 
-**The Two-Tier Rule** (2026-07 — supersedes the Ten Percent Rule). Badges may take any of
-twelve hues, so rarity can no longer be what marks the primary out. Instead: **the primary
-is the only fully saturated fill on a surface; option badges are always a pale tint with
-same-hue ink.** Action and data therefore never compete, however many badge colours are
-in play.
+**Serif** where a human wrote it · **Sans** for the interface · **Mono** for everything
+the instrument measured. Inter Variable (`cv11` + `ss01`), Source Serif 4 Variable and
+JetBrains Mono Variable, all self-hosted via Fontsource — no font CDN calls from a
+privacy product.
 
-**The Meaning Rule.** Color only ever encodes information: action, selection, state, stage,
-status. If a color choice can't name what it encodes, it is forbidden.
+| voice | step              | size / leading | role                                           |
+| ----- | ----------------- | -------------- | ---------------------------------------------- |
+| serif | display · 600     | 28 / 32        | page titles, record names, the Today sentence  |
+| serif | section · 600     | 18 / 22–24     | dialog titles, settings sections, empty states |
+| serif | prose · 400       | 17 / 27        | note bodies, theses, reasons                   |
+| sans  | title · 500       | 15 / 22        | a name inside a readout cell                   |
+| sans  | ui · 400 / 500    | 13 / 20        | rows, forms, buttons, the workhorse            |
+| sans  | body · 400        | 14 / 20        | composer inputs, running UI text               |
+| mono  | readout · 500     | 18–20 / 22–24  | the readout strip                              |
+| mono  | numeral · 400     | 13 / 16        | money, counts, dates, IDs, domains in rows     |
+| mono  | label · 500 caps  | 11 / 14, .08em | column labels, section labels, field labels    |
+| mono  | field label · 400 | 10 / 12 caps   | labels inside cells and readouts               |
+| mono  | key hint · 400    | 11 / 14        | `⌘K G T ↵ ⇧↵ M esc` — inside the control       |
 
-**The Focus Rule.** One treatment everywhere: the `focus-ring` utility — a 2px outline at
-full `--ring` (the primary, 4.52:1 on white), 1px offset, drawn only on `:focus-visible`;
-`focus-ring-inset` for cells and rows inside scroll containers, where an offset ring would
-be clipped. Translucent rings are banned — both of the old competing treatments sat under
-the 3:1 non-text floor (WCAG 2.2 SC 1.4.11). Outline, not box-shadow: costs no layout,
-needs no offset colour plumbed through.
+Utilities: `title-serif`, `label-caps`, `mono`, `numeric` (tabular + right-aligned in
+one class), `tabular` (figures inline in a sentence). The sans scale steps stay named
+(`text-micro … text-display`); if a size isn't on the list it does not go in the app.
 
-## 3. Typography
+## 4. Material and scale
 
-**UI/Data Font:** **Inter Variable** (`cv11` + `ss01` enabled; tabular numerals on demand).
-**Prose Font:** **Source Serif 4 Variable.**
-Both self-hosted via Fontsource — no font CDN calls from a privacy product.
+Structure is 1px ink. Inner rules are 1px rule. Nothing blurs.
 
-**Character:** Two registers, one system. A single sans carries every interface surface —
-tables, labels, buttons, attributes, navigation — in a tight scale (fixed rem, never
-fluid). A text serif appears only where the user reads: note bodies, memos, the mandate.
-Data reads like a ledger; prose reads like a page.
+- **Rules.** Hairline for sections and the chassis edge; rule for rows, cells and
+  inputs; 2px pine for the active tab underline; 2px ink for the reticle.
+- **Depth.** Card · 0 (rule border). Popover · 2 (`shadow-[2px_2px_0_0_var(--hairline)]`).
+  Dialog · 3 (`shadow-[3px_3px_0_0_var(--hairline)]`). Toast · ink. Every lifted sheet is
+  paper with a 1px ink edge and a hard offset shadow. No blur, ever.
+- **Spacing.** 4 8 12 16 24 32; the page gutter is 32.
+- **Heights.** Row 36 · control 32 · small 26 · badge 20 · nav row 30 · header row 48 ·
+  readout strip 56–64 · dialog head 44 · dialog foot 52.
+- **Radius.** 0 on chassis, cards, badges, dialogs, sheets. 2px on controls and inputs.
+  No 4, 6, 8, 12. No pills. No circles — initials sit in ink squares.
+- **Texture.** Dither, 1-bit, Bayer 4×4 at 2px cells, pine or ink. See the Dither Rule.
 
-### The named scale
+## The seven rules
 
-Seven steps, each mapping to one role. **If a size isn't on this list it does not go in
-the app** — no `text-[15px]` arbitraries.
+**The Meaning Rule.** Colour only encodes: action, selection, state, stage, status. If a
+colour can't name what it encodes, it is forbidden. Kept from 2026-07.
 
-| step           | size | role                                           |
-| -------------- | ---- | ---------------------------------------------- |
-| `text-micro`   | 11px | timestamps, chip counts, avatar initials       |
-| `text-label`   | 12px | field labels, metadata                         |
-| `text-ui`      | 13px | the table + form workhorse                     |
-| `text-body`    | 14px | default running text in UI (the body baseline) |
-| `text-title`   | 15px | section headers, panel titles                  |
-| `text-page`    | 22px | page titles                                    |
-| `text-display` | 26px | record names                                   |
+**The Two-Tier Rule.** Pine is the only fully saturated fill on a surface. Badges are a
+pale tint with same-hue ink, square. Kept from 2026-07; radius dropped.
 
-The prose register opts out of the scale: note bodies render serif at 17px, line-height
-1.65 (`.prose-note`), headings inside prose stay sans.
+**The Numeral Rule.** Every measured thing is mono: money, counts, dates, durations, IDs,
+domains, column labels. Prose and names never are. New, 2026-09-10.
 
-### Named Rules
+**The Reticle Rule.** Focus is four 2px ink crop marks 3px outside the control
+(`focus-ring`), inset inside scroll containers (`focus-ring-inset`). Never pine, never a
+ring. Replaces the Focus Rule.
 
-**The Two Registers Rule.** Serif appears only in prose bodies the user reads and writes.
-Never in buttons, labels, tables, navigation, or data. Sans everywhere else. No exceptions.
+**The Dither Rule.** Dither is 1-bit, pine or ink, Bayer 4×4 at 2px cells. Never under
+text, never animated, never a third colour. It lives in empty states, chart fills,
+fallback marks, thumbnails and loading. New, 2026-09-10.
 
-**The Tabular Rule.** Every number that can be compared to a number above or below it is set
-in tabular figures, right-aligned. Currency, ownership %, valuations, dates in tables.
-Made structural, not remembered: the `.numeric` utility is tabular + right-aligned in one
-class, so the two halves cannot drift apart; `.tabular` alone is for figures inline in a
-sentence or chip ("12 of 40"), where right-alignment would be wrong.
+**The Contrast Floor.** Body ≥ 4.5:1, graphite 5.9:1, no sub-100% opacity text. Kept.
+Key hints on pine are the one exception, at 85% and still ≥ 4.5:1.
 
-### Rhythm
+**The No-Bar Rule.** Pine never appears as an edge bar. Current page = paper + rule +
+weight. Selected row = wash + check. Highlighted option = bone. Winner = ink vs graphite.
+Pine is left for the primary action, the active tab underline and end-dots. New,
+2026-09-10.
 
-- **Row height:** one token, `--row-h: 2.25rem`, shared by table headers and body rows so
-  a sticky header sits flush against the first row. Exposed as `spacing-row`.
-- **Radius:** `--radius: 0.375rem` — crisper than shadcn's 10px default; this is a tool,
-  not a toy.
-- Row hover is an _opaque_ neutral (`--row-hover`), never a translucent tint: a
-  translucent hover on a sticky column lets the columns scrolling underneath bleed
-  through it.
-
-## 4. Elevation
-
-Flat at rest. Depth is conveyed by borders and the panel-neutral layer, not shadows. Shadows
-exist only as a response to state — an open dropdown, a dragged kanban card, a command
-palette — and vanish at rest. In practice the code uses Tailwind's stock shadows and only
-on lifted surfaces (`shadow-xs` on triggers, `shadow-md`/`shadow-lg` on popovers and
-dialogs); no custom shadow tokens have been needed, and none should be minted until a
-surface demands one.
-
-**The Flat-at-Rest Rule.** A resting surface never casts a shadow. If an element is
-elevated, the user did something to lift it.
+Two older rules survive underneath them: **The Tabular Rule** (comparable figures are
+tabular and right-aligned — `.numeric` makes the two halves one class) and **The Two
+Registers Rule**, now the three voices above.
 
 ## 5. Components
 
 Refined and restrained: every interactive element ships with default, hover,
-focus-visible, active, and disabled states; empty states teach; skeletons over spinners.
-Documented from the shipped code (2026-08, post-sweep) — one focus treatment, named type
-steps, and the motion doctrine below apply to every component without exception.
+focus-visible, active and disabled states; empty states teach; loading is a density
+ramp, never a shimmer. Documented from the shipped code (2026-09-10, the Instrument
+port) — the reticle, the three voices and the motion doctrine apply to every component
+without exception.
 
 ### Motion
 
@@ -278,9 +281,29 @@ entire app. Principles, after Rauno Freiberg's interface guidelines:
 - **Interruptible, never blocking. No load choreography** — pages appear settled.
 - **Pressed states are physical.** Buttons compress to `scale(0.97)` on press. No bounce,
   no springs — tool, not toy.
+- **Dither never moves.** A density ramp is a still picture of "filling in".
 
 **The Compositor Rule.** If a motion can't be expressed in transform + opacity, it
 doesn't ship.
+
+### The Page Shell (2026-09, revised 2026-09-10)
+
+**Two page modes, no ladder.** Every route's outermost container is exactly one of two
+recipes — a page that wants a third width doesn't get one, it picks a mode:
+
+- **Field** — `flex min-h-full flex-col`, edge to edge. The `PageHeader` or
+  `RecordHeader` runs the full width with its hairline; the body insets 32px
+  (`px-8`). This is now every list, board, record, Today, Tasks, Dedupe and Settings
+  page: the hairline under the header is what ties the field to the chassis, and it
+  must reach the edge. Settings caps its body at 900px inside the field.
+- **Column** — `mx-auto w-full max-w-column px-6 py-8 md:px-10`. One centered width
+  (`--container-column`, 800px — chosen by side-by-side eye test: 768 ideal for prose,
+  896 wanted by Settings' tables, 800 serves both) for the reading surfaces that have
+  no header strip: Spaces, Notes, Mandate. Navigating between column pages never moves
+  the content's left edge.
+
+Prose bodies (note editor, mandate empty state) keep their own `72ch` measure inside
+their shell — a typographic constraint, not a layout tier.
 
 ### Interaction Engineering (2026-09, after Emil Kowalski)
 
@@ -291,7 +314,8 @@ load-bearing rules promoted here:
 - **The No-Shift Rule.** Dynamic content never moves its neighbors: fixed
   dimensions on async slots, tabular figures on changing numbers, and **weight
   never changes with state** — hover/selected speak through color and the wash,
-  not font-weight. (Nav items are medium always, per §Navigation.)
+  not font-weight. (The current nav page is the one exception: paper + rule +
+  medium, per the No-Bar Rule.)
 - **Name your transitions.** `transition: all` is banned — list the properties.
 - **Hover is an enhancement.** Nothing requires hover to function; Tailwind v4
   already gates `hover:` behind `(hover: hover)` — never undo it. Controls take
@@ -299,7 +323,9 @@ load-bearing rules promoted here:
   zoom) and hit areas reach 44px even when the visual is smaller.
 - **Keyboard parity.** Tab reaches only visible elements (`inert` the hidden),
   keyboard focus scrolls into view, Enter submits forms, Cmd/Ctrl+Enter submits
-  textareas, icon-only buttons carry `aria-label`.
+  textareas and dialogs, icon-only buttons carry `aria-label`. Bare-key
+  shortcuts (`useHotkey`: T task, L log, M move stage) are ignored while typing
+  and inside dialogs, and every one is printed inside the control it triggers.
 - **The z-index scale.** dropdown 100 · sticky 150 · modal 200 · tooltip 300 ·
   toast 400. No other values; prefer `isolation: isolate` over climbing.
 - **Virtualize past ~200 rows.** The ledger stays dense by drawing less, not
@@ -307,113 +333,162 @@ load-bearing rules promoted here:
 
 ### Buttons
 
-- **Shape:** crisp corners (6px radius), heights 24 / 32 / 36 / 40px (`xs / sm / default / lg`).
-- **Primary:** the only saturated fill on any surface — Pine on white text
-  (oklch(0.55 0.14 155), 4.52:1), hover deepens to pine-hover, press compresses to 0.97.
-- **Outline:** white ground, 1px border, `shadow-xs`, hover tints to the accent neutral.
-- **Ghost:** transparent until hover; used for in-context quiet actions.
+- **Shape:** 2px radius, heights 26 / 32 (`sm / default`); the `xs` 24px step is for
+  icon-only.
+- **Primary:** the only saturated fill on any surface — pine under white text, hover
+  deepens to pine-hover, press compresses to 0.97. It carries its key hint inside:
+  `<kbd class="mono text-micro opacity-85">⌘↵</kbd>`.
+- **Outline:** paper, 1px hairline, hover tints to bone. No shadow.
+- **Ghost:** transparent until hover; for in-context quiet actions.
 - **Destructive:** crimson fill, white text — never adjacent to a primary without space.
-- **Focus:** the app-wide `focus-ring` outline; the shadcn translucent ring was
-  deliberately replaced and must not return with re-vendored primitives.
+- **Focus:** the reticle. Never a ring.
 
 ### Inputs / Fields
 
-- **Style:** transparent background, 1px `input-border` stroke, 6px radius, 36px height,
-  `shadow-xs`; selection highlight uses the primary.
-- **Focus:** `focus-ring` outline plus the border shifting to the ring color.
-- **Placeholders:** full-strength Muted Ink — never a sub-100% opacity.
-- **Invalid:** border and ring shift to destructive.
-- **Date fields:** native control in forms; in table cells a date renders as formatted
-  text until clicked (the native `mm/dd/yyyy` skeleton breaks the em-dash empty-cell
-  convention).
+- **Style:** transparent background, 1px rule, 2px radius, 32px height. No shadow.
+- **Focus:** the reticle, drawn on the input's own background (inputs can't host
+  `::after`).
+- **Labels:** the `Label` atom is a 10px caps mono field label in graphite.
+- **Placeholders:** full-strength graphite — never a sub-100% opacity.
+- **Invalid:** border shifts to destructive; a required-and-empty field gets an amber
+  square, not a red border.
+- **Date fields:** native control in forms; in table cells a date renders as ISO text
+  until clicked.
+
+### Page header + readout strip (P1)
+
+`PageHeader`: serif title (or a sentence when the page has a state to report — "Seven
+things need you. Two are late."), a mono eyebrow above or a mono readout line below,
+actions right with key hints inside the buttons, hairline under, 32px inset, 28px above.
+`ReadoutStrip`: cells split by rules on a hairline, caps mono label, mono 20/500 value,
+colour only when nonzero and bad.
+
+### Ledger section + attention row (P2 · P3)
+
+`LedgerSection`: caps label + mono count left, one mono link right, hairline under the
+head, 36px rows on rules, the last row may be a composer (`+ Add a task…  T`). Every row
+ends on a fixed mono lane (`LedgerFigure`, 64 or 80px, right-aligned). A number is never
+shown alone when a median exists: `ReferenceBar` draws the value in ink, the median as a
+graphite tick, the track as rule — 1-bit, no colour.
 
 ### The Record Table (signature)
 
 The hardest-working surface; spreadsheet-grade or the audience leaves.
 
-- **Rows:** one `--row-h` (36px) shared by header and body — the sticky header sits
-  flush; borders at 60% border color between rows, none after the last.
-- **Header:** sticky, white, `text-ui` medium; resizable and hideable columns.
-- **Hover:** the _opaque_ `row-hover` neutral (translucency bleeds under sticky columns).
-- **Cells:** `text-ui` (13px); editors are borderless until hover ('cell' variant);
-  comparable numbers set `.numeric`; empty cells render an em dash.
-- **Focus inside the scroll container:** `focus-ring-inset`, never the offset ring.
+- **Rows:** one `--row-h` (36px) shared by header and body; rules between rows.
+- **Header:** 32px, sticky, paper, caps mono labels in graphite. Header cells are
+  buttons: the menu carries Sort A→Z / Z→A, Clear, Hide; the sort direction reads as a
+  mono arrow after the label; the chevron appears on hover. Hairline under the head.
+- **Cells:** `text-ui`; measured columns `.numeric`; empty cells render an em dash in
+  graphite. Editors open in place: ↵ commits, esc reverts. Status is never cell-edited —
+  it reads a badge, and M opens Move stage on the record so the reason gets logged.
+- **Foot:** 32px on a hairline — `N OF M` caps left, `end` right.
+- **Focus inside the scroll container:** `focus-ring-inset`, never the offset marks.
+- **Columns popover:** paper sheet, 2px shadow, caps head `COLUMNS · 7 OF 19` + reset,
+  square checkbox rows in bone when highlighted.
 
 ### Typed Value Editors (signature)
 
-One implementation shared by table cells, record rails, and create dialogs — `variant`
-only changes chrome ('cell' is borderless-until-hover; 'field' looks like a form input).
-Selects/statuses/multi-selects render option badges; ratings render primary-filled stars;
-checkboxes are 16px squares that fill with the primary when checked. Create-dialog layout
-is type-driven: half-width fields in a two-column grid, long-form (`description`)
-spanning both — the registry generates the form, so the span rule survives any custom
-attribute.
+One implementation shared by table cells, record property grids and create dialogs —
+`variant` only changes chrome. `field` rests as a value (rule on hover, reticle on
+focus); `cell` is borderless inside the row. Selects and multi-selects render square
+option badges; the actor picker an ink initials square; references a 1-bit mark;
+ratings are ink squares with a mono `n/max`; checkboxes are 14px squares that fill
+with pine. Pickers are paper sheets with the 2px shadow and highlight in bone.
 
 ### Option Badges
 
-Pills carrying select/status/stage values: pale tint background + same-hue ink from the
-twelve-hue palette, `text-label` (12px) medium, full radius. Data colors, never
-decoration; the Two-Tier Rule guarantees they never compete with the primary.
+Square chips carrying select / status / stage values: pale tint background + same-hue
+ink from the twelve-hue palette, mono 11 medium, 18–20px tall, 6px inset. Data colours,
+never decoration; the Two-Tier Rule guarantees they never compete with pine.
 
-### Navigation
+### Navigation — the chassis
 
-Fixed 240px sidebar on the panel neutral; items are 32px rows, `text-ui` medium, Muted
-Ink at rest → ink on hover with the accent tint → the selection wash + ink when active
-(`aria-current="page"`). The workspace name (or wordmark) heads it; Cmd-K search sits
-directly beneath. Collapses to a drawer under a 48px top bar on mobile.
+232px of bone with a hairline right edge. Three groups: the work (Today, Tasks, Spaces,
+Notes), the objects (Companies, People, Deals, then customs), capital (Portfolio,
+Mandate). Rows are 30px with a 14px mark slot so every label sits on one lane. Current
+page = paper + rule border + medium weight — never a pine bar. Settings and the user
+(ink initials square) are pinned to the foot. Collapses to a drawer under a 48px top bar
+on mobile.
 
-### Record Pages (header actions · composer)
+### Record Pages (P7)
 
-- **The Header Actions Rule (2026-09).** A record's verbs live top-right of its header,
-  never in the tab bar: outline `sm` (32px) buttons for the common verbs (Log
-  interaction, Note about this), the primary fill reserved for the record's one
-  state-changing verb (Move stage on deals). Meta actions (Save as template) trail last
-  and stay quiet. The tab bar is for switching views only — the deal, company, and
-  person pages all follow this; a new record page must too.
-- **The Composer Bar.** Adding to a stream never starts from a corner button: a
-  full-width fake-input bar (36px, input border, muted hint text) sits above the stream
-  and opens the real dialog. It states what it accepts in the hint ("Log a call,
-  meeting, or note…" / "chase data room Friday"). One pattern on the activity tabs and
-  the tasks page; reuse it anywhere else a list accepts entries.
-- **The Timeline Lane.** Activity timelines use a fixed 24px icon lane — verb-mapped
-  icons in muted circles, the selection wash + pine only for attribute changes — with a
-  1px connector thread between entries. Entries align on the lane however their bodies
-  wrap; note bodies inside a timeline keep the prose register.
+`RecordHeader`: mono caps breadcrumb (`DEALS / 7C335C4A / OPENED 2026-07-29`), actions
+with key hints (Log interaction L · Task T · Move stage M), a 28px mark (1-bit dither
+tile, or ink initials for a person) beside the serif name and a square badge, then a
+56px readout strip of the numbers that matter. Body left: the property grid (three
+columns, hairline top and bottom, rules inside, 96px caps labels), then Notes, Ledger
+and Files as sections. Rail right on bone (360px): the stage stepper (one 8px segment
+per live stage, pine to the current one, hairline after), tasks, people. The rail is
+sticky; the body scrolls. Deals, companies, people, custom records and holdings share
+the parts.
 
-### Overlays (Dialogs · Menus · Tooltips)
+- **The Ledger.** Three lanes on rules — mono `MM-DD HH:MM`, mono caps type
+  (`CALL · STAGE · FILE · EDIT · BORN`), sans body. Attribute bursts expand in place.
+- **The Composer Row.** Adding to a stream never starts from a corner button: a 36px
+  row with a pine `+`, graphite hint text and the key that opens the real dialog
+  (`+ Log a call, meeting, or note…  L`). The Tasks page grows it into the bone
+  composer band (P6): paper input, square chips, create-more switch, `Add task ↵`.
 
-- **Dialogs:** centered, max-height 85vh with internal scroll, 8px radius, `shadow-lg`,
-  1px border; enter 180ms fade+zoom-in-95, exit 120ms. Wide (672px) when a form has >4
-  fields, narrow (384–448px) otherwise. A modal must be argued for — previews and
-  create-forms qualify; navigation does not.
-- **Menus/dropdowns:** popover white, 1px border, `shadow-md`, origin-aware 150/100ms,
-  items 32px with the accent hover tint.
-- **Tooltips:** inverted (ink background, background text), `text-label`, 120/80ms.
-- **Toasts:** sonner, bottom-right, self-contained motion.
+### The Board (P4)
 
-### Empty States (teaching)
+224px columns whose head is a mini readout strip — square stage badge, count, Σ,
+median — on a hairline. Paper cards on rule borders: 1-bit mark + name, `company ·
+check` mono with days in stage (crimson past 2× median), `close MM-DD · Nd` with the
+owner's initials. A dashed `+ N more` folds long columns; a pine dashed `drop →
+Stage` box appears while dragging over a column.
 
-Centered, max 24rem: an icon in a 44px muted rounded square, `text-title` semibold
-headline, two sentences of Muted Ink body that explain what the surface will do, then the
-create action — and, where relevant, a quiet hint line about what automation will fill
-this later. A table should almost never be empty at all (demo seed exists for that).
+### Overlays (P8)
+
+- **Dialogs:** paper sheet, 1px ink, 3px hard shadow, 0 radius. 44px head — serif
+  title 18/600, mono context beside it, `esc` in the right lane, hairline under. 20px
+  body. 52px bone foot — mono note left ("what will happen · counts"), buttons right,
+  the primary carrying ⌘↵. The first field takes the reticle on open. Wide (560px)
+  for forms, 420–480 otherwise; the quick task has no title bar — the input is the
+  title. A modal must be argued for.
+- **Menus / pickers:** paper, 1px ink, 2px hard shadow, 28px rows, highlighted row in
+  bone, 150/100ms.
+- **Command palette:** 640px; a pine `›` prompt, `↑↓ move · ↵ open` on the right, caps
+  group labels, 32px rows, the `↵` hint on the highlighted row, a 32px bone foot.
+- **Tooltips:** inverted (ink background, paper text), `text-label`, 120/80ms.
+- **Toasts:** sonner, bottom-right, ink.
+
+### Empty States (P5)
+
+Centered, max 24rem: a 160×120 dither block (a pine density ramp with a paper sheet
+set in), a serif sentence 20/600, one sans line in graphite, the primary action with
+its key. A table should almost never be empty at all (demo seed exists for that).
+
+### Settings
+
+The section pattern: serif title 18, one sans sentence, a mono crumb (`SETTINGS /
+CAPITAL`) right, hairline under; then 48px rows on rules with the control on the right.
+Tables inside settings use the ledger primitives unchanged — the FX rates ledger is the
+example, and its foot says what the model does: rates are append-only, a new date
+supersedes, nothing edits.
 
 ## 6. Do's and Don'ts
 
 ### Do:
 
-- **Do** keep the ground pure white (oklch(1 0 0)) and let pine + typography carry all character.
-- **Do** hold body text at ≥4.5:1 contrast — muted gray "for elegance" is the first failure mode of this aesthetic lane.
-- **Do** set every comparable number in tabular figures, right-aligned.
-- **Do** give every interactive element a visible focus state — keyboard is the primary input.
-- **Do** use density confidently in tables; calm comes from alignment and rhythm, not sparseness.
+- **Do** keep the data field paper and the chassis bone; let ink, pine and type carry
+  all character.
+- **Do** set every measured thing in mono, and every comparable figure `.numeric`.
+- **Do** hold body text at ≥ 4.5:1 — graphite is the only second text colour.
+- **Do** print every working key inside the control it triggers.
+- **Do** use density confidently in the ledger; calm comes from rules and rhythm, not
+  sparseness.
 
 ### Don't:
 
-- **Don't** ship anything that reads as "Salesforce/HubSpot CRM" — enterprise chrome, dashboards-first, configuration sprawl.
-- **Don't** ship the "generic SaaS template" look — shadcn-default styling, gradient heroes, identical card grids, default purple accents.
-- **Don't** drift into the "dark terminal aesthetic" — dark-only, monospace-everything, neon accents. (A proper dark theme is a feature; terminal cosplay is a ban.)
-- **Don't** use serif type in any UI control, label, table, or navigation — prose bodies only.
-- **Don't** use color decoratively. No gradient text, no side-stripe borders (`border-left` > 1px as accent), no glassmorphism.
-- **Don't** animate for decoration. Motion conveys state; no entrance choreography, nothing over 250ms.
-- **Don't** reach for a modal first. Inline and progressive disclosure are the defaults; modals are the exception that must be argued for.
+- **Don't** draw a pine bar on any edge — the No-Bar Rule. Current, selected and
+  highlighted have their own treatments.
+- **Don't** blur a shadow, round past 2px, or make a pill or a circle.
+- **Don't** put dither under text, animate it, or give it a third colour.
+- **Don't** set a name or a sentence in mono, or a number in sans.
+- **Don't** use color decoratively. No gradient text, no side-stripe borders, no
+  glassmorphism.
+- **Don't** animate for decoration. Motion conveys state; no entrance choreography,
+  nothing over 250ms.
+- **Don't** reach for a modal first. Inline and progressive disclosure are the defaults;
+  modals are the exception that must be argued for.
