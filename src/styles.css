@@ -334,6 +334,47 @@
   }
 }
 
+/* The marks on a wrapper when a child input has focus — for composers whose
+   input is borderless inside a bordered row, so the reticle frames the row
+   the user sees, not the invisible input box. */
+@utility focus-ring-within {
+  --reticle-ink: linear-gradient(var(--ring), var(--ring));
+
+  &:not(.absolute):not(.fixed):not(.sticky) {
+    position: relative;
+  }
+
+  &:has(:focus-visible)::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    pointer-events: none;
+    background-image:
+      var(--reticle-ink), var(--reticle-ink), var(--reticle-ink),
+      var(--reticle-ink), var(--reticle-ink), var(--reticle-ink),
+      var(--reticle-ink), var(--reticle-ink);
+    background-repeat: no-repeat;
+    background-position:
+      left top,
+      left top,
+      right top,
+      right top,
+      left bottom,
+      left bottom,
+      right bottom,
+      right bottom;
+    background-size:
+      8px 2px,
+      2px 8px,
+      8px 2px,
+      2px 8px,
+      8px 2px,
+      2px 8px,
+      8px 2px,
+      2px 8px;
+  }
+}
+
 /* Same marks drawn inset at the corners — for cells and rows, where an
    outside mark would be clipped by the scroll container. */
 @utility focus-ring-inset {

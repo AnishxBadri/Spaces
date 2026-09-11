@@ -155,10 +155,10 @@ export function TaskComposer({
           void save()
         }}
       >
-        <div className="flex h-9 items-center gap-2.5 rounded-md border border-hairline bg-paper px-3">
+        <div className="focus-ring-within flex h-9 items-center gap-2.5 rounded-md border border-hairline bg-paper px-3">
           <span className="mono text-ui text-primary">+</span>
           <input
-            className="focus-ring h-full min-w-0 flex-1 bg-transparent text-body placeholder:text-graphite"
+            className="h-full min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-graphite"
             placeholder="Add a task — “chase data room Friday”, “revisit after their raise”…"
             aria-label="New task"
             value={content}
@@ -237,8 +237,12 @@ export function TaskComposer({
         >
           <div className="flex h-12 items-center gap-2.5 border-b border-hairline pr-14 pl-5">
             <span className="mono text-ui text-primary">+</span>
+            {/* The input is the title: no reticle here — the caret in a
+                sheet that just opened is the focus, and marks at the
+                corners of a borderless full-width box read as a frame
+                around the head. */}
             <input
-              className="focus-ring h-full min-w-0 flex-1 bg-transparent text-body placeholder:text-graphite"
+              className="h-full min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-graphite"
               placeholder="Chase the data room, revisit after their round closes…"
               aria-label="New task"
               value={content}
