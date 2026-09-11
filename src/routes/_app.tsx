@@ -1,4 +1,9 @@
-import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
+import {
+  Outlet,
+  createFileRoute,
+  redirect,
+  useNavigate,
+} from '@tanstack/react-router'
 import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { AppSidebar } from '#/components/app-sidebar'
@@ -7,6 +12,7 @@ import { Wordmark } from '#/components/wordmark'
 import { Toaster } from '#/components/ui/sonner'
 import { setChassisCollapsed, useChassisCollapsed } from '#/lib/chassis-store'
 import { getSession, getWorkspace, listObjects } from '#/lib/server-fns'
+import { useHotkey } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
 /** Authenticated shell: fixed sidebar, fluid content, Cmd-K everywhere. */
@@ -32,6 +38,10 @@ function AppShell() {
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const collapsed = useChassisCollapsed()
+  const navigate = useNavigate()
+  // The keys printed on the chassis: ⌘\ folds it, G , opens Settings.
+  useHotkey('mod+\\', () => setChassisCollapsed(!collapsed))
+  useHotkey('g ,', () => void navigate({ to: '/settings' }))
 
   return (
     <div className="flex min-h-dvh bg-background">

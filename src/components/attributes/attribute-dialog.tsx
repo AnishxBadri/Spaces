@@ -2,7 +2,6 @@ import {
   AtSign,
   Calendar,
   Check,
-  ChevronDown,
   Coins,
   Globe,
   Hash,
@@ -12,7 +11,6 @@ import {
   List,
   ListChecks,
   Phone,
-  Plus,
   SquareCheck,
   Star,
   Type,
@@ -21,21 +19,14 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '#/components/ui/command'
+import { Command as CommandPrimitive } from 'cmdk'
+import { CommandEmpty, CommandItem } from '#/components/ui/command'
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
-  DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '#/components/ui/dialog'
@@ -43,11 +34,6 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { ConfirmDialog } from '#/components/ui/confirm-dialog'
 import { KeyHint } from '#/components/page-header'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '#/components/ui/popover'
 import { optionColor } from '#/lib/attributes/colors'
 import { deriveOptionIds } from '#/lib/attributes/options'
 import { createAttribute, listObjects, updateAttribute } from '#/lib/server-fns'
@@ -123,6 +109,34 @@ const TYPES: Array<TypeMeta> = [
   },
 ]
 
+/** The mono glyph in the type pane's 14px lane — a reading, not an icon. */
+const TYPE_GLYPHS: Record<string, string> = {
+  text: 'Aa',
+  number: '#',
+  currency: '$',
+  date: '▦',
+  checkbox: '☐',
+  select: '◫',
+  multi_select: '◫◫',
+  status: '→',
+  url: '@',
+  email: '@',
+  phone: '@',
+  domain: '@',
+  rating: '■□',
+  record_reference: '⇢',
+  actor_reference: '◉',
+}
+
+/** Mirrors the server's derivation (lib/attributes/create.ts) so the frozen
+ *  slug can be shown before it exists; the server still owns the `_2`. */
+const slugPreview = (name: string) =>
+  name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+
 /** System objects map to a core kind; customs are addressed by object id. */
 const CORE_BY_SLUG: Partial<Record<string, ObjectKind>> = {
   companies: 'company',
@@ -162,6 +176,7 @@ const OPTION_TYPES = new Set(['select', 'multi_select', 'status'])
 export type EditableAttribute = {
   id: string
   name: string
+  slug?: string
   description?: string | null
   type: string
   options: unknown
@@ -202,6 +217,10 @@ type Props = {
   objectId?: string
   /** singular noun for copy ("every company"); defaults from objectKind */
   objectLabel?: string
+  /** plural noun for the head's mono context ("on Companies") */
+  objectPlural?: string
+  /** live attribute count — the head reads `19 → 20` on create */
+  attributeCount?: number
   onSaved: () => void
   trigger?: ReactNode
   open?: boolean
@@ -212,7 +231,16 @@ type Props = {
 )
 
 export function AttributeDialog(props: Props) {
-  const { objectKind, objectId, objectLabel, onSaved, trigger, mode } = props
+  const {
+    objectKind,
+    objectId,
+    objectLabel,
+    objectPlural,
+    attributeCount,
+    onSaved,
+    trigger,
+    mode,
+  } = props
   const [selfOpen, setSelfOpen] = useState(false)
   const open = props.open ?? selfOpen
   const setOpen = props.onOpenChange ?? setSelfOpen
@@ -220,7 +248,9 @@ export function AttributeDialog(props: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      {/* Two panes on one sheet (Overlays · Flows): the type list left with
+          its › search, the form right, a 44px head and a 52px bone foot. */}
+      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-[41.25rem]">
         {/* Remount per open so a cancelled draft never leaks into the next. */}
         {open ? (
           <AttributeForm
@@ -228,6 +258,8 @@ export function AttributeDialog(props: Props) {
             objectKind={objectKind}
             objectId={objectId}
             objectLabel={objectLabel ?? objectKind ?? 'record'}
+            objectPlural={objectPlural}
+            attributeCount={attributeCount}
             mode={mode}
             attr={props.attr}
             onDone={(saved) => {
@@ -245,6 +277,8 @@ function AttributeForm({
   objectKind,
   objectId,
   objectLabel,
+  objectPlural,
+  attributeCount,
   mode,
   attr,
   onDone,
@@ -252,6 +286,8 @@ function AttributeForm({
   objectKind?: ObjectKind
   objectId?: string
   objectLabel: string
+  objectPlural?: string
+  attributeCount?: number
   mode: 'create' | 'edit'
   attr?: EditableAttribute
   onDone: (saved: boolean) => void
@@ -691,6 +727,13 @@ function AttributeForm({
     )
   })()
 
+  const plural = objectPlural ?? `${objectLabel}s`
+  const context =
+    mode === 'create' && attributeCount !== undefined
+      ? `on ${plural} · ${attributeCount} → ${attributeCount + 1}`
+      : `on ${plural}`
+  const slug = mode === 'edit' ? (attr?.slug ?? '') : slugPreview(name)
+
   return (
     <form
       noValidate
@@ -704,100 +747,92 @@ function AttributeForm({
           void submit()
         }
       }}
-      className="space-y-5"
+      className="flex min-h-0 flex-1 flex-col"
     >
-      <DialogHeader>
+      {/* 44px head: serif title, mono context; esc is the sheet's own. */}
+      <div className="flex h-11 shrink-0 items-baseline gap-3 border-b border-hairline px-5 pt-[0.6875rem] pr-14">
         <DialogTitle>
           {mode === 'create' ? 'New attribute' : `Edit ${attr?.name}`}
         </DialogTitle>
-        <DialogDescription>
-          {mode === 'create'
-            ? `Your own field on every ${objectLabel.toLowerCase()} — it becomes a column and a record field.`
-            : 'Type is fixed; everything else is yours to change.'}
-        </DialogDescription>
-      </DialogHeader>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Type" htmlFor="attr-type">
-          {mode === 'create' ? (
-            <TypePicker value={meta} onPick={pickType} />
-          ) : (
-            <span className="flex h-8 items-center gap-2 text-ui">
-              <meta.icon className="size-4 text-graphite" strokeWidth={1.75} />
-              {meta.label}
-            </span>
-          )}
-        </Field>
-        <Field label="Name" htmlFor="attr-name">
-          <Input
-            ref={nameRef}
-            id="attr-name"
-            value={name}
-            autoFocus={mode === 'edit'}
-            spellCheck={false}
-            autoComplete="off"
-            placeholder={
-              type === 'rating'
-                ? 'Founder quality'
-                : `A ${meta.label.toLowerCase()} field`
-            }
-            onChange={(e) => setName(e.target.value)}
-          />
-        </Field>
-        <Field
-          label="Description"
-          htmlFor="attr-description"
-          className="sm:col-span-2"
-          optional
-        >
-          <Input
-            id="attr-description"
-            value={description}
-            spellCheck={false}
-            autoComplete="off"
-            placeholder="What this field means, for whoever fills it in"
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </Field>
+        <DialogDescription>{context}</DialogDescription>
       </div>
 
-      {slot ? (
-        <div className="grid gap-4 border-t border-rule pt-5 sm:grid-cols-2">
-          {slot}
-        </div>
-      ) : null}
+      <div className="flex min-h-0 flex-1">
+        <TypePane value={type} fixed={mode === 'edit'} onPick={pickType} />
 
-      <div className="grid gap-4 border-t border-rule pt-5 sm:grid-cols-2">
-        <Field label="Default" htmlFor="attr-default" optional>
-          {defaultWidget}
-        </Field>
-        {type !== 'checkbox' ? (
-          <div className="flex items-end">
-            <CheckRow
-              id="attr-required"
-              checked={required}
-              onChange={setRequired}
-              label="Required"
-              hint="Once set, it can't be cleared"
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 py-4">
+          <Field label="Name" htmlFor="attr-name">
+            <Input
+              ref={nameRef}
+              id="attr-name"
+              value={name}
+              autoFocus
+              spellCheck={false}
+              autoComplete="off"
+              placeholder={
+                type === 'rating'
+                  ? 'Founder quality'
+                  : `A ${meta.label.toLowerCase()} field`
+              }
+              onChange={(e) => setName(e.target.value)}
             />
-          </div>
-        ) : null}
-      </div>
+            <p className="mono text-[0.625rem] leading-3 text-graphite">
+              slug {slug || '…'} ·{' '}
+              {mode === 'create' ? 'frozen after create' : 'frozen'}
+            </p>
+          </Field>
+          <Field label="Description" htmlFor="attr-description" optional>
+            <Input
+              id="attr-description"
+              value={description}
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="What this field means, for whoever fills it in"
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </Field>
 
-      {error ? (
-        <p
-          role="alert"
-          className="flex items-center gap-2 text-ui text-destructive"
-        >
-          <span aria-hidden className="size-2 shrink-0 bg-destructive" />
-          {error}
-        </p>
-      ) : null}
+          {slot}
+
+          <div className="flex items-end gap-5">
+            <Field
+              label="Default"
+              htmlFor="attr-default"
+              optional
+              className="min-w-0 flex-1"
+            >
+              {defaultWidget}
+            </Field>
+            {type !== 'checkbox' ? (
+              <div className="shrink-0">
+                <CheckRow
+                  id="attr-required"
+                  checked={required}
+                  onChange={setRequired}
+                  label="Required"
+                  hint="Once set, it can't be cleared"
+                />
+              </div>
+            ) : null}
+          </div>
+
+          {error ? (
+            <p
+              role="alert"
+              className="flex items-center gap-2 text-ui text-destructive"
+            >
+              <span aria-hidden className="size-2 shrink-0 bg-destructive" />
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </div>
 
       <DialogFooter
+        className="mx-0 mt-0 mb-0"
         note={
           mode === 'create'
-            ? `a column on every ${objectLabel.toLowerCase()} · a field on each record`
+            ? `appears as a column on every ${objectLabel.toLowerCase()}, empty`
             : 'type is fixed · values are kept'
         }
       >
@@ -806,12 +841,7 @@ function AttributeForm({
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" disabled={pending} title="⌘↵">
-          {mode === 'create' ? (
-            <Plus className="size-4" strokeWidth={2} />
-          ) : (
-            <Check className="size-4" strokeWidth={2} />
-          )}
+        <Button type="submit" disabled={pending}>
           {pending
             ? mode === 'create'
               ? 'Creating…'
@@ -847,61 +877,76 @@ function AttributeForm({
   )
 }
 
-function TypePicker({
+/**
+ * The type pane: a 236px column on a rule with the › search on top and one
+ * 26px row per type — mono glyph in a 14px lane, the label, a mono note
+ * where one is needed. The chosen row sits on bone. In edit mode the type
+ * is fixed: the list stays, greyed, as the record of what this is.
+ */
+function TypePane({
   value,
+  fixed,
   onPick,
 }: {
-  value: TypeMeta
+  value: string
+  fixed: boolean
   onPick: (id: string) => void
 }) {
-  const [open, setOpen] = useState(false)
   return (
-    // Modal: the parent Dialog locks scrolling for everything outside
-    // itself, and this popover portals outside it — without its own lock,
-    // wheel events over the list are swallowed and it can't scroll.
-    <Popover open={open} onOpenChange={setOpen} modal>
-      <PopoverTrigger
-        id="attr-type"
-        autoFocus
-        aria-label="Type"
-        className="focus-ring flex h-8 w-full items-center gap-2 rounded-md border border-rule bg-transparent px-2.5 text-left text-ui"
-      >
-        <value.icon className="size-4 text-graphite" strokeWidth={1.75} />
-        <span className="flex-1">{value.label}</span>
-        <ChevronDown className="size-3.5 text-graphite" />
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-0">
-        <Command>
-          <CommandInput placeholder="Search types…" autoFocus />
-          <CommandList className="max-h-64">
-            <CommandEmpty>No type matches.</CommandEmpty>
-            <CommandGroup>
-              {TYPES.map((t) => (
-                <CommandItem
-                  key={t.id}
-                  value={`${t.label} ${t.keywords ?? ''}`}
-                  onSelect={() => {
-                    onPick(t.id)
-                    setOpen(false)
-                  }}
-                >
-                  <t.icon className="size-4" strokeWidth={1.75} />
-                  <span className="flex-1">
-                    {t.label}
-                    <span className="ml-2 text-label text-graphite">
-                      {t.hint}
-                    </span>
-                  </span>
-                  {t.id === value.id ? (
-                    <Check className="size-3.5" strokeWidth={2} />
-                  ) : null}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <CommandPrimitive
+      label="Type"
+      value={value}
+      className="flex w-59 shrink-0 flex-col border-r border-rule"
+    >
+      <div className="flex h-8 shrink-0 items-center gap-2 border-b border-rule px-3">
+        <span aria-hidden className="mono text-micro text-primary">
+          ›
+        </span>
+        <CommandPrimitive.Input
+          placeholder="Search types…"
+          disabled={fixed}
+          aria-label="Search types"
+          className="h-full min-w-0 flex-1 bg-transparent text-ui outline-none placeholder:text-graphite disabled:text-graphite"
+        />
+      </div>
+      <CommandPrimitive.List className="min-h-0 flex-1 overflow-y-auto p-1">
+        <CommandEmpty>No type matches.</CommandEmpty>
+        {TYPES.map((t) => {
+          const on = t.id === value
+          return (
+            <CommandItem
+              key={t.id}
+              value={t.id}
+              keywords={[t.label, t.hint, t.keywords ?? '']}
+              disabled={fixed && !on}
+              onSelect={() => {
+                if (!fixed) onPick(t.id)
+              }}
+              className={cn(
+                'h-[1.625rem] min-h-0 gap-2 px-2 py-0',
+                on && 'bg-bone font-medium',
+              )}
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  'w-3.5 shrink-0 mono text-micro',
+                  on ? 'text-foreground' : 'text-graphite',
+                )}
+              >
+                {TYPE_GLYPHS[t.id] ?? '·'}
+              </span>
+              <span className="truncate">{t.label}</span>
+              {t.id === 'status' ? (
+                <span className="mono text-[0.625rem] leading-3 text-graphite">
+                  1 per object
+                </span>
+              ) : null}
+            </CommandItem>
+          )
+        })}
+      </CommandPrimitive.List>
+    </CommandPrimitive>
   )
 }
 

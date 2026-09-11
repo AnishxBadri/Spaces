@@ -121,6 +121,8 @@ function ObjectAttributesPage() {
               mode="create"
               objectId={object.id}
               objectLabel={object.singular}
+              objectPlural={object.plural}
+              attributeCount={live}
               open={creating}
               onOpenChange={setCreating}
               onSaved={() => router.invalidate()}

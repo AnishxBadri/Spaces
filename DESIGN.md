@@ -408,12 +408,13 @@ never decoration; the Two-Tier Rule guarantees they never compete with pine.
 232px of bone with a hairline right edge. Three groups: the work (Today, Tasks, Spaces,
 Notes), the objects (Companies, People, Deals, then customs), capital (Portfolio,
 Mandate). Rows are 30px with a 14px mark slot so every label sits on one lane. Current
-page = paper + rule border + medium weight — never a pine bar. Settings and the user
-(ink initials square) are pinned to the foot. The account menu opens to the right of the
-chassis and holds Collapse sidebar and Sign out; collapsed, the chassis is 48px of marks
-only: the mark on a hairline, `⌘K` on a rule, 36px rows with a 24px rule between groups,
-the current page in a 36×32 paper box, names on hover as ink tooltips, and the account
-menu expands it again. Width snaps (never animates) and the preference is per browser.
+page = paper + rule border + medium weight — never a pine bar. The head row ends on a
+mono `«` that folds the chassis (`⌘\`). The foot is one account row (ink initials
+square, name, email); its menu opens to the right of the chassis — never up into the
+corner — and holds Settings (`G ,`) and Sign out. Collapsed, the chassis is 48px of
+marks only: the mark on a hairline (which expands it again), `⌘K` on a rule, 36px rows
+with a 24px rule between groups, the current page in a 36×32 paper box, names on hover
+as ink tooltips. Width snaps (never animates) and the preference is per browser.
 Collapses to a drawer under a 48px top bar on mobile.
 
 ### Record Pages (P7)
@@ -445,6 +446,12 @@ Stage` box appears while dragging over a column.
 
 ### Overlays (P8)
 
+- **The attribute sheet:** 660px, two panes under the 44px head (`New attribute` ·
+  mono `on Companies · 19 → 20`): a 236px type pane on a rule with the pine `›` search
+  and 26px rows (mono glyph lane, label, the chosen row on bone), the form right (name
+  with its frozen mono slug beneath, description, the per-type slot, default and
+  required on one line), the bone foot saying where it lands. In edit mode the pane
+  stays, greyed — the type is the record of what this is.
 - **Dialogs:** paper sheet, 1px ink, 3px hard shadow, 0 radius. 44px head — serif
   title 18/600, mono context beside it, `esc` in the right lane, hairline under. 20px
   body. 52px bone foot — mono note left ("what will happen · counts"), buttons right,

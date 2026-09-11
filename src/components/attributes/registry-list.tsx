@@ -443,6 +443,7 @@ function AttributeRow({
         attr={attr}
         objectId={object.id}
         objectLabel={object.singular}
+        objectPlural={object.plural}
         open={editing}
         onOpenChange={setEditing}
         onSaved={() => router.invalidate()}

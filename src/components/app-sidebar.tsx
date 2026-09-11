@@ -9,8 +9,6 @@ import {
   Kanban,
   Layers,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
   Settings,
   Sunrise,
   Users,
@@ -38,10 +36,10 @@ import { cn } from '#/lib/utils'
  * Current page = paper + rule border + medium weight — never a pine bar
  * (the No-Bar Rule). Settings and the user are pinned to the foot.
  *
- * Collapsed (`collapsed`), it is 48px of marks only: the current page is a
- * paper box, names come back as ink tooltips. The account menu — opening to
- * the right of the chassis — holds collapse/expand and sign out; there is
- * no separate control for either.
+ * The head row ends on a mono `«` that folds the chassis (⌘\); collapsed,
+ * it is 48px of marks only — the current page a paper box, names as ink
+ * tooltips, the mark at the top the way back out. The foot is one account
+ * row whose menu opens to the right and holds Settings (G ,) and Sign out.
  */
 export const NAV_ITEMS = [
   // Today first and login lands there (2026-08-08): the attention page is
@@ -126,11 +124,25 @@ export function AppSidebar({
             >
               <Wordmark />
             </Link>
-            {workspaceName ? (
-              <span className="truncate mono text-micro text-graphite">
-                {workspaceName}
-              </span>
-            ) : null}
+            <span className="flex min-w-0 items-center gap-2">
+              {workspaceName ? (
+                <span className="truncate mono text-micro text-graphite">
+                  {workspaceName}
+                </span>
+              ) : null}
+              {onToggleCollapsed ? (
+                <IconTip label="Collapse sidebar · ⌘\\">
+                  <button
+                    type="button"
+                    onClick={onToggleCollapsed}
+                    aria-label="Collapse sidebar"
+                    className="focus-ring -mr-1 flex size-6 shrink-0 items-center justify-center rounded-md mono text-label text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
+                  >
+                    «
+                  </button>
+                </IconTip>
+              ) : null}
+            </span>
           </div>
         )}
 
@@ -201,22 +213,6 @@ export function AppSidebar({
       </div>
 
       <div className="border-t border-rule">
-        <Link
-          to="/settings"
-          onClick={onNavigate}
-          className={cn(
-            'flex h-[1.875rem] items-center justify-between px-5 text-ui text-foreground transition-colors',
-            'hover:bg-bone-deep',
-            'focus-ring-inset',
-          )}
-          activeProps={{
-            className: 'font-medium',
-            'aria-current': 'page',
-          }}
-        >
-          Settings
-        </Link>
-
         <DropdownMenu>
           <DropdownMenuTrigger
             className={cn(
@@ -244,8 +240,7 @@ export function AppSidebar({
           </DropdownMenuTrigger>
           <AccountMenu
             email={user.email}
-            collapsed={false}
-            onToggleCollapsed={onToggleCollapsed}
+            onNavigate={onNavigate}
             onSignOut={signOut}
           />
         </DropdownMenu>
@@ -256,20 +251,18 @@ export function AppSidebar({
 
 /**
  * The account menu opens to the right of the chassis, never up into the
- * screen corner. It holds everything about the session: collapse or expand
- * the chassis, sign out.
+ * screen corner. It holds everything about the session: Settings, sign out.
  */
 function AccountMenu({
   email,
-  collapsed,
-  onToggleCollapsed,
+  onNavigate,
   onSignOut,
 }: {
   email: string
-  collapsed: boolean
-  onToggleCollapsed?: () => void
+  onNavigate?: () => void
   onSignOut: () => void
 }) {
+  const navigate = useNavigate()
   return (
     <DropdownMenuContent
       side="right"
@@ -281,16 +274,16 @@ function AccountMenu({
         Signed in as {email}
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
-      {onToggleCollapsed ? (
-        <DropdownMenuItem onSelect={onToggleCollapsed}>
-          {collapsed ? (
-            <PanelLeftOpen className="size-4" />
-          ) : (
-            <PanelLeftClose className="size-4" />
-          )}
-          {collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        </DropdownMenuItem>
-      ) : null}
+      <DropdownMenuItem
+        onSelect={() => {
+          onNavigate?.()
+          void navigate({ to: '/settings' })
+        }}
+      >
+        <Settings className="size-4" />
+        Settings
+        <span className="ml-auto mono text-micro text-graphite">G ,</span>
+      </DropdownMenuItem>
       <DropdownMenuItem onSelect={onSignOut}>
         <LogOut className="size-4" />
         Sign out
@@ -323,13 +316,18 @@ function CollapsedSidebar({
   return (
     <div className="flex h-full flex-col justify-between bg-sidebar">
       <div className="flex flex-col items-center">
-        <Link
-          to="/spaces"
-          className="focus-ring-inset flex h-12 w-12 items-center justify-center border-b border-hairline"
-          aria-label={workspaceName ? `${workspaceName} home` : 'DealOS home'}
+        <IconTip
+          label={`Expand sidebar · ⌘\\${workspaceName ? ` · ${workspaceName}` : ''}`}
         >
-          <Mark className="text-foreground" />
-        </Link>
+          <button
+            type="button"
+            onClick={onExpand}
+            aria-label="Expand sidebar"
+            className="focus-ring-inset flex h-12 w-12 items-center justify-center border-b border-hairline transition-colors hover:bg-bone-deep"
+          >
+            <Mark className="text-foreground" />
+          </button>
+        </IconTip>
         <IconTip label="Search or jump to…">
           <button
             type="button"
@@ -373,18 +371,6 @@ function CollapsedSidebar({
       </div>
 
       <div className="flex flex-col items-center">
-        <IconTip label="Settings">
-          <Link
-            to="/settings"
-            aria-label="Settings"
-            className="group focus-ring-inset flex h-9 w-12 items-center justify-center border-t border-rule"
-            activeProps={{ 'aria-current': 'page' }}
-          >
-            <span className="flex h-8 w-9 items-center justify-center rounded-md border border-transparent transition-colors group-hover:bg-bone-deep group-aria-[current=page]:border-rule group-aria-[current=page]:bg-paper group-aria-[current=page]:group-hover:bg-paper">
-              <Settings className="size-3.5 shrink-0" strokeWidth={1.75} />
-            </span>
-          </Link>
-        </IconTip>
         <DropdownMenu>
           <IconTip label={user.name}>
             <DropdownMenuTrigger
@@ -396,12 +382,7 @@ function CollapsedSidebar({
               </span>
             </DropdownMenuTrigger>
           </IconTip>
-          <AccountMenu
-            email={user.email}
-            collapsed
-            onToggleCollapsed={onExpand}
-            onSignOut={onSignOut}
-          />
+          <AccountMenu email={user.email} onSignOut={onSignOut} />
         </DropdownMenu>
       </div>
     </div>
