@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { Check, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
@@ -15,7 +15,8 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import { suggestPlural } from '#/lib/object-nouns'
+import { KeyHint } from '#/components/page-header'
+import { slugifyNoun, suggestPlural } from '#/lib/object-nouns'
 import { OBJECT_ICONS, OBJECT_ICON_NAMES } from '#/lib/object-icons'
 import { createObject, updateObject } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -166,7 +167,7 @@ function ObjectForm(
       </DialogHeader>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="obj-singular">Singular</Label>
           <Input
             id="obj-singular"
@@ -181,8 +182,13 @@ function ObjectForm(
             }}
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="obj-plural">Plural</Label>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="obj-plural">
+            Plural
+            {!pluralTouched && plural ? (
+              <span className="ml-2 font-normal text-graphite">guessed</span>
+            ) : null}
+          </Label>
           <Input
             id="obj-plural"
             value={plural}
@@ -197,8 +203,9 @@ function ObjectForm(
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <span className="text-ui font-medium">Icon</span>
+      <div className="flex flex-col gap-1.5">
+        <Label>Icon · 1-bit</Label>
+        {/* Square tiles on a rule; the chosen one is ink with a paper mark. */}
         <div
           role="radiogroup"
           aria-label="Icon"
@@ -217,45 +224,68 @@ function ObjectForm(
                 title={name}
                 onClick={() => setIcon(name)}
                 className={cn(
-                  'flex size-9 touch-manipulation items-center justify-center rounded-md border focus-ring transition-colors duration-150 ease-out-quart',
+                  'focus-ring flex size-8 touch-manipulation items-center justify-center border transition-colors duration-150 ease-out-quart',
                   on
-                    ? 'border-primary bg-selected text-foreground'
-                    : 'border-input text-muted-foreground hover:text-foreground',
+                    ? 'border-hairline bg-hairline text-paper'
+                    : 'border-rule text-foreground hover:border-hairline',
                 )}
               >
-                <Icon className="size-4" strokeWidth={1.75} />
+                <Icon className="size-3.5" strokeWidth={1.75} />
               </button>
             )
           })}
         </div>
       </div>
 
+      {/* The slug is derived and frozen — shown, never edited. */}
+      <div className="flex flex-col gap-1 border border-rule bg-bone px-3 py-2.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
+            Slug
+          </span>
+          <span className="mono text-[0.625rem] leading-3 text-graphite">
+            {existing ? 'frozen' : 'derived · frozen after create'}
+          </span>
+        </div>
+        <span className="truncate mono text-ui">
+          /o/{existing ? existing.plural : slugifyNoun(plural) || '…'}
+          {' · '}/o/{existing ? existing.plural : slugifyNoun(plural) || '…'}
+          /&lt;id&gt;
+        </span>
+      </div>
+
       {error ? (
-        <p role="alert" className="text-ui text-destructive">
+        <p
+          role="alert"
+          className="flex items-center gap-2 text-ui text-destructive"
+        >
+          <span aria-hidden className="size-2 shrink-0 bg-destructive" />
           {error}
         </p>
       ) : null}
 
-      <DialogFooter>
+      <DialogFooter
+        note={
+          props.mode === 'create'
+            ? 'archive, never delete'
+            : 'the web address stays what it was'
+        }
+      >
         <DialogClose asChild>
-          <Button type="button" variant="ghost">
+          <Button type="button" variant="outline">
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" disabled={pending} title="⌘↵">
+        <Button type="submit" disabled={pending}>
           {props.mode === 'create' ? (
             <Plus className="size-4" strokeWidth={2} />
-          ) : (
-            <Check className="size-4" strokeWidth={2} />
-          )}
+          ) : null}
           {pending
             ? 'Saving…'
             : props.mode === 'create'
               ? 'Create object'
               : 'Save'}
-          <kbd className="ml-1 rounded border border-primary-foreground/30 px-1 text-micro font-normal opacity-80">
-            ⌘↵
-          </kbd>
+          <KeyHint>⌘↵</KeyHint>
         </Button>
       </DialogFooter>
     </form>

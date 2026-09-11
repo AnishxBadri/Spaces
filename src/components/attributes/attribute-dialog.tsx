@@ -41,6 +41,8 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { ConfirmDialog } from '#/components/ui/confirm-dialog'
+import { KeyHint } from '#/components/page-header'
 import {
   Popover,
   PopoverContent,
@@ -74,6 +76,10 @@ type TypeMeta = {
   icon: typeof Type
   keywords?: string
 }
+
+/** The one select chrome in the dialog: 32px, rule border, 2px radius. */
+const SELECT =
+  'focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui'
 
 const TYPES: Array<TypeMeta> = [
   { id: 'text', label: 'Text', hint: 'A line of text', icon: Type },
@@ -483,7 +489,7 @@ function AttributeForm({
               id="attr-precision"
               value={precision}
               onChange={(e) => setPrecision(Number(e.target.value))}
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui shadow-xs focus-ring"
+              className={SELECT}
             >
               {[0, 1, 2, 3, 4].map((p) => (
                 <option key={p} value={p}>
@@ -500,7 +506,7 @@ function AttributeForm({
               id="attr-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui shadow-xs focus-ring"
+              className={SELECT}
             >
               {[...new Set([code, ...CURRENCIES])].map((c) => (
                 <option key={c} value={c}>
@@ -509,7 +515,7 @@ function AttributeForm({
               ))}
             </select>
             {mode === 'edit' && code !== (stored.code ?? 'USD') ? (
-              <p className="text-label text-muted-foreground">
+              <p className="text-label text-graphite">
                 Changes how every stored amount reads. Nothing is converted.
               </p>
             ) : null}
@@ -522,7 +528,7 @@ function AttributeForm({
               id="attr-max"
               value={max}
               onChange={(e) => setMax(Number(e.target.value))}
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui shadow-xs focus-ring"
+              className={SELECT}
             >
               {[3, 4, 5, 6, 7, 8, 9, 10].map((m) => (
                 <option key={m} value={m}>
@@ -531,7 +537,7 @@ function AttributeForm({
               ))}
             </select>
             {mode === 'edit' && max < (stored.max ?? 5) ? (
-              <p className="text-label text-muted-foreground">
+              <p className="text-label text-graphite">
                 Lowering is refused while any record rates above {max}.
               </p>
             ) : null}
@@ -541,8 +547,8 @@ function AttributeForm({
       case 'multi_select':
       case 'status':
         return (
-          <div className="space-y-1.5 sm:col-span-2">
-            <span className="text-ui font-medium">Options</span>
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label>Options · {drafts.length}</Label>
             <OptionListEditor
               type={type}
               drafts={drafts}
@@ -552,7 +558,7 @@ function AttributeForm({
         )
       case 'record_reference':
         return mode === 'edit' ? (
-          <p className="text-ui text-muted-foreground sm:col-span-2">
+          <p className="text-ui text-graphite sm:col-span-2">
             Points at{' '}
             <span className="text-foreground">
               {stored.targetKind
@@ -571,7 +577,7 @@ function AttributeForm({
                 id="attr-target"
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui shadow-xs focus-ring"
+                className={SELECT}
               >
                 <option value="">Pick an object…</option>
                 {objects.map((o) => (
@@ -598,7 +604,7 @@ function AttributeForm({
   const defaultWidget = (() => {
     if (type === 'record_reference' && !target)
       return (
-        <p className="text-label text-muted-foreground">
+        <p className="text-label text-graphite">
           Pick what it points at first.
         </p>
       )
@@ -635,7 +641,7 @@ function AttributeForm({
               id="attr-default"
               value={isDuration(dflt) ? dflt : 'P7D'}
               onChange={(e) => setDflt(e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui shadow-xs focus-ring"
+              className={SELECT}
             >
               {RELATIVE_PRESETS.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -716,11 +722,8 @@ function AttributeForm({
           {mode === 'create' ? (
             <TypePicker value={meta} onPick={pickType} />
           ) : (
-            <span className="flex h-9 items-center gap-2 text-ui">
-              <meta.icon
-                className="size-4 text-muted-foreground"
-                strokeWidth={1.75}
-              />
+            <span className="flex h-8 items-center gap-2 text-ui">
+              <meta.icon className="size-4 text-graphite" strokeWidth={1.75} />
               {meta.label}
             </span>
           )}
@@ -759,12 +762,12 @@ function AttributeForm({
       </div>
 
       {slot ? (
-        <div className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
+        <div className="grid gap-4 border-t border-rule pt-5 sm:grid-cols-2">
           {slot}
         </div>
       ) : null}
 
-      <div className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
+      <div className="grid gap-4 border-t border-rule pt-5 sm:grid-cols-2">
         <Field label="Default" htmlFor="attr-default" optional>
           {defaultWidget}
         </Field>
@@ -782,14 +785,24 @@ function AttributeForm({
       </div>
 
       {error ? (
-        <p role="alert" className="text-ui text-destructive">
+        <p
+          role="alert"
+          className="flex items-center gap-2 text-ui text-destructive"
+        >
+          <span aria-hidden className="size-2 shrink-0 bg-destructive" />
           {error}
         </p>
       ) : null}
 
-      <DialogFooter className="items-center">
+      <DialogFooter
+        note={
+          mode === 'create'
+            ? `a column on every ${objectLabel.toLowerCase()} · a field on each record`
+            : 'type is fixed · values are kept'
+        }
+      >
         <DialogClose asChild>
-          <Button type="button" variant="ghost">
+          <Button type="button" variant="outline">
             Cancel
           </Button>
         </DialogClose>
@@ -806,51 +819,30 @@ function AttributeForm({
             : mode === 'create'
               ? 'Create attribute'
               : 'Save'}
-          <kbd className="ml-1 rounded border border-primary-foreground/30 px-1 text-micro font-normal opacity-80">
-            ⌘↵
-          </kbd>
+          <KeyHint>⌘↵</KeyHint>
         </Button>
       </DialogFooter>
 
       {/* Currency relabel confirmation — the one config edit that changes
           how every stored value reads. */}
-      <Dialog
+      <ConfirmDialog
         open={pendingCode !== null}
         onOpenChange={(o) => {
           if (!o) setPendingCode(null)
         }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              Show {name.trim() || attr?.name} in {pendingCode}?
-            </DialogTitle>
-            <DialogDescription>
-              This changes how all existing values display — every amount
-              already stored will read as {pendingCode}. Nothing is converted.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setPendingCode(null)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                const c = pendingCode
-                setPendingCode(null)
-                if (c) void submit(c)
-              }}
-            >
-              Change to {pendingCode}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        options={{
+          kind: 'primary',
+          title: `Show ${name.trim() || attr?.name} in ${pendingCode ?? ''}?`,
+          body: `Every amount already stored will read as ${pendingCode ?? ''}. Nothing is converted.`,
+          action: `Change to ${pendingCode ?? ''}`,
+          keep: 'Cancel',
+        }}
+        onConfirm={() => {
+          const c = pendingCode
+          setPendingCode(null)
+          if (c) void submit(c)
+        }}
+      />
     </form>
   )
 }
@@ -872,14 +864,11 @@ function TypePicker({
         id="attr-type"
         autoFocus
         aria-label="Type"
-        className="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 text-left text-ui shadow-xs focus-ring"
+        className="focus-ring flex h-8 w-full items-center gap-2 rounded-md border border-rule bg-transparent px-2.5 text-left text-ui"
       >
-        <value.icon
-          className="size-4 text-muted-foreground"
-          strokeWidth={1.75}
-        />
+        <value.icon className="size-4 text-graphite" strokeWidth={1.75} />
         <span className="flex-1">{value.label}</span>
-        <ChevronDown className="size-3.5 text-muted-foreground" />
+        <ChevronDown className="size-3.5 text-graphite" />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-0">
         <Command>
@@ -899,7 +888,7 @@ function TypePicker({
                   <t.icon className="size-4" strokeWidth={1.75} />
                   <span className="flex-1">
                     {t.label}
-                    <span className="ml-2 text-label text-muted-foreground">
+                    <span className="ml-2 text-label text-graphite">
                       {t.hint}
                     </span>
                   </span>
@@ -930,13 +919,11 @@ function Field({
   children: ReactNode
 }) {
   return (
-    <div className={cn('space-y-1.5', className)}>
+    <div className={cn('flex flex-col gap-1.5', className)}>
       <Label htmlFor={htmlFor}>
         {label}
         {optional ? (
-          <span className="ml-1 font-normal text-muted-foreground">
-            optional
-          </span>
+          <span className="ml-2 font-normal text-graphite">optional</span>
         ) : null}
       </Label>
       {children}
@@ -944,7 +931,9 @@ function Field({
   )
 }
 
-/** A checkbox whose whole row is the hit area — no dead zone between box and text. */
+/** A checkbox whose whole row is the hit area — no dead zone between box
+ *  and text. The box is a 14px square that fills with pine (never a
+ *  native rounded control). */
 function CheckRow({
   id,
   checked,
@@ -959,24 +948,32 @@ function CheckRow({
   hint?: string
 }) {
   return (
-    <label
-      htmlFor={id}
-      className="flex min-h-9 cursor-pointer touch-manipulation items-start gap-2.5 rounded-md py-1.5"
-    >
-      <input
+    <div className="flex min-h-8 items-start gap-2.5 py-1.5">
+      <button
         id={id}
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 size-4 shrink-0 accent-primary focus-ring"
-      />
-      <span className="flex flex-col">
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={cn(
+          'focus-ring mt-0.5 flex size-3.5 shrink-0 touch-manipulation items-center justify-center border transition-colors duration-150 ease-out-quart',
+          checked
+            ? 'border-primary bg-primary text-primary-foreground'
+            : 'border-hairline bg-paper hover:bg-bone',
+        )}
+      >
+        {checked ? <Check className="size-2.5" strokeWidth={3} /> : null}
+      </button>
+      <label
+        htmlFor={id}
+        className="flex cursor-pointer flex-col"
+        onClick={() => onChange(!checked)}
+      >
         <span className="text-ui">{label}</span>
-        {hint ? (
-          <span className="text-label text-muted-foreground">{hint}</span>
-        ) : null}
-      </span>
-    </label>
+        {hint ? <span className="text-label text-graphite">{hint}</span> : null}
+      </label>
+    </div>
   )
 }
 
@@ -992,7 +989,7 @@ function Segmented({
   return (
     <div
       role="radiogroup"
-      className="flex h-9 w-fit items-center gap-0.5 rounded-md border border-input p-0.5"
+      className="flex h-8 w-fit items-center border border-hairline"
     >
       {options.map((o) => (
         <button
@@ -1002,10 +999,10 @@ function Segmented({
           aria-checked={value === o.id}
           onClick={() => onChange(o.id)}
           className={cn(
-            'h-full rounded px-2.5 text-ui font-medium focus-ring transition-colors duration-150 ease-out-quart',
+            'focus-ring-inset h-full px-2.5 text-ui font-medium transition-colors duration-150 ease-out-quart',
             value === o.id
-              ? 'bg-selected text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'bg-hairline text-paper'
+              : 'text-graphite hover:bg-bone hover:text-foreground',
           )}
         >
           {o.label}

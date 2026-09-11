@@ -1,7 +1,8 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { z } from 'zod'
-import { Wordmark } from '#/components/wordmark'
+import { AuthShell, FieldHint, FormError } from '#/components/auth-shell'
+import { KeyHint } from '#/components/page-header'
 import { PasswordInput } from '#/components/password-input'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -36,16 +37,15 @@ function JoinPage() {
 
   if (!preview.valid) {
     return (
-      <Shell>
-        <h1 className="mt-6 text-page font-semibold tracking-tight">
-          This invitation isn’t valid
-        </h1>
-        <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
-          The link may have expired, been revoked, or already been used —
-          invitations work exactly once. Ask the person who invited you for a
-          fresh one.
+      <AuthShell
+        eyebrow="Invitation"
+        title="This invitation isn’t valid"
+        blurb="The link may have expired, been revoked, or already been used — invitations work exactly once. Ask the person who invited you for a fresh one."
+      >
+        <p className="mono text-micro text-graphite">
+          one link · one account · never reused
         </p>
-      </Shell>
+      </AuthShell>
     )
   }
 
@@ -74,30 +74,31 @@ function JoinPage() {
   }
 
   return (
-    <Shell>
-      <h1 className="mt-6 text-page font-semibold tracking-tight">
-        {preview.workspaceName
+    <AuthShell
+      eyebrow={`Invitation${preview.role === 'admin' ? ' · admin' : ''}`}
+      title={
+        preview.workspaceName
           ? `Join ${preview.workspaceName}`
-          : 'Join this workspace'}
-      </h1>
-      <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
-        You’ve been invited{preview.role === 'admin' ? ' as an admin' : ''}.
-        Create your account to get in.
-      </p>
-
-      <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
-        <div className="space-y-1.5">
+          : 'Join this workspace'
+      }
+      blurb="You’ve been invited. Create your account to get in."
+    >
+      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="name">Your name</Label>
           <Input id="name" name="name" autoComplete="name" required autoFocus />
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">Email</Label>
           {preview.email ? (
             <>
-              <Input id="email" value={preview.email} disabled />
-              <p className="text-xs text-muted-foreground">
-                This invitation is locked to this address.
-              </p>
+              <Input
+                id="email"
+                value={preview.email}
+                disabled
+                className="mono"
+              />
+              <FieldHint>This invitation is locked to this address.</FieldHint>
             </>
           ) : (
             <Input
@@ -110,7 +111,7 @@ function JoinPage() {
             />
           )}
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="password">Password</Label>
           <PasswordInput
             id="password"
@@ -118,30 +119,18 @@ function JoinPage() {
             autoComplete="new-password"
             required
             minLength={12}
+            aria-describedby="password-hint"
           />
+          <FieldHint id="password-hint">At least 12 characters.</FieldHint>
         </div>
 
-        {error ? (
-          <p role="alert" className="text-ui text-destructive">
-            {error}
-          </p>
-        ) : null}
+        {error ? <FormError>{error}</FormError> : null}
 
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? 'Joining…' : 'Join workspace'}
+          <KeyHint>↵</KeyHint>
         </Button>
       </form>
-    </Shell>
-  )
-}
-
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="flex min-h-dvh flex-col items-center bg-background px-6">
-      <div className="w-full max-w-[400px] pt-[18vh] pb-16">
-        <Wordmark />
-        {children}
-      </div>
-    </main>
+    </AuthShell>
   )
 }

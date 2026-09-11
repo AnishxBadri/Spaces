@@ -1,6 +1,7 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Wordmark } from '#/components/wordmark'
+import { AuthShell, FormError } from '#/components/auth-shell'
+import { KeyHint } from '#/components/page-header'
 import { PasswordInput } from '#/components/password-input'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -45,49 +46,41 @@ function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col items-center bg-background px-6">
-      <div className="w-full max-w-[360px] pt-[22vh]">
-        <Wordmark />
-        <h1 className="mt-8 title-serif">Sign in</h1>
+    <AuthShell
+      eyebrow="Sign in"
+      title="Welcome back"
+      foot="No account? Ask your admin for an invitation."
+    >
+      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            autoFocus
+            placeholder="you@fund.com"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="password">Password</Label>
+          <PasswordInput
+            id="password"
+            name="password"
+            autoComplete="current-password"
+            required
+          />
+        </div>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              autoFocus
-              placeholder="you@fund.com"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <PasswordInput
-              id="password"
-              name="password"
-              autoComplete="current-password"
-              required
-            />
-          </div>
+        {error ? <FormError>{error}</FormError> : null}
 
-          {error ? (
-            <p role="alert" className="text-ui text-destructive">
-              {error}
-            </p>
-          ) : null}
-
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? 'Signing in…' : 'Sign in'}
-          </Button>
-        </form>
-
-        <p className="mt-6 text-ui text-muted-foreground">
-          No account? Ask your admin for an invitation.
-        </p>
-      </div>
-    </main>
+        <Button type="submit" className="w-full" disabled={pending}>
+          {pending ? 'Signing in…' : 'Sign in'}
+          <KeyHint>↵</KeyHint>
+        </Button>
+      </form>
+    </AuthShell>
   )
 }

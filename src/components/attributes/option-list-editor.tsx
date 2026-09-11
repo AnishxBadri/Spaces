@@ -1,11 +1,3 @@
-import {
-  Archive,
-  ArchiveRestore,
-  Check,
-  GripVertical,
-  Plus,
-  X,
-} from 'lucide-react'
 import { useRef, useState } from 'react'
 import {
   DropdownMenu,
@@ -13,8 +5,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
-import { Button } from '#/components/ui/button'
-import { Input } from '#/components/ui/input'
 import {
   BADGE_COLORS,
   badgeStyle,
@@ -24,10 +14,13 @@ import type { BadgeColor } from '#/lib/attributes/colors'
 import { cn } from '#/lib/utils'
 
 /**
- * The inline options editor (spec §7): colour dot + label rows, drag to
- * reorder, Enter appends — the composer-bar pattern, so building a list is
- * typing, not clicking. Existing options archive rather than delete (§3);
- * only rows that never saved can be removed.
+ * The inline options editor (spec §7; Overlays · Flows "New attribute"):
+ * a rule-bordered box of 30px rows — ⋮⋮ grip, a 14px square swatch, the
+ * label, the status group — with a composer as the last row. Enter appends,
+ * Backspace on an empty unsaved row drops it, Alt+↑↓ reorder, a pasted
+ * list becomes rows. Saved options archive rather than delete (§3): they
+ * stay struck in graphite with a mono `restore`; only never-saved rows can
+ * be removed. Hue is auto-assigned; the swatch overrides it.
  */
 
 export type OptionGroup = 'active' | 'parked' | 'closed'
@@ -58,6 +51,16 @@ function move<T>(list: Array<T>, from: number, to: number): Array<T> {
   return next
 }
 
+/** A pasted list: one option per line, or comma-separated on one line. */
+function splitPasted(text: string): Array<string> {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  const parts = lines.length > 1 ? lines : text.split(',')
+  return parts.map((p) => p.trim()).filter(Boolean)
+}
+
 export function OptionListEditor({
   type,
   drafts,
@@ -78,12 +81,33 @@ export function OptionListEditor({
   const update = (i: number, patch: Partial<OptionDraft>) =>
     onChange(drafts.map((d, j) => (j === i ? { ...d, ...patch } : d)))
 
-  const insertAfter = (i: number) => {
-    const row = newDraft(drafts.length, isStatus ? 'active' : undefined)
+  const insertAfter = (i: number, labels: Array<string> = ['']) => {
+    const rows = labels.map((label, k) => ({
+      ...newDraft(drafts.length + k, isStatus ? 'active' : undefined),
+      label,
+    }))
     const next = [...drafts]
-    next.splice(i + 1, 0, row)
+    next.splice(i + 1, 0, ...rows)
     onChange(next)
-    focus(row.key)
+    const last = rows.at(-1)
+    if (last) focus(last.key)
+  }
+
+  /** A pasted list lands in one change: this row takes the first line,
+   *  the rest become rows after it. */
+  const pasteInto = (i: number, parts: Array<string>) => {
+    const [first = '', ...rest] = parts
+    const rows = rest.map((label, k) => ({
+      ...newDraft(drafts.length + k, isStatus ? 'active' : undefined),
+      label,
+    }))
+    const next = drafts.map((d, j) =>
+      j === i ? { ...d, label: (d.label + first).trim() } : d,
+    )
+    next.splice(i + 1, 0, ...rows)
+    onChange(next)
+    const last = rows.at(-1)
+    if (last) focus(last.key)
   }
 
   const removeAt = (i: number) => {
@@ -93,9 +117,15 @@ export function OptionListEditor({
     if (prev) focus(prev.key)
   }
 
+  const saved = drafts.some((d) => d.id)
+
   return (
-    <div className="space-y-1.5">
-      <ul className="space-y-1" role="list" aria-label="Options">
+    <div className="flex flex-col gap-1.5">
+      <ul
+        className="flex flex-col border border-rule"
+        role="list"
+        aria-label="Options"
+      >
         {drafts.map((o, i) => (
           <li
             key={o.key}
@@ -123,24 +153,23 @@ export function OptionListEditor({
               setOver(null)
             }}
             className={cn(
-              'flex items-center gap-1.5 rounded-md transition-[background-color,opacity] duration-150 ease-out-quart',
+              'flex h-[1.875rem] items-center gap-2 border-b border-rule px-2 transition-[background-color,opacity] duration-150 ease-out-quart',
               dragging === i && 'opacity-50',
-              over === i && dragging !== i && 'bg-accent',
-              o.archived && 'text-muted-foreground opacity-60',
+              over === i && dragging !== i && 'bg-bone',
             )}
           >
             <span
               aria-hidden
-              className="flex size-6 shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground active:cursor-grabbing"
+              className="shrink-0 cursor-grab touch-none mono text-micro text-rule active:cursor-grabbing"
             >
-              <GripVertical className="size-3.5" strokeWidth={1.75} />
+              ⋮⋮
             </span>
             <ColorPicker
               value={o.color}
               label={o.label || `Option ${i + 1}`}
               onPick={(color) => update(i, { color })}
             />
-            <Input
+            <input
               ref={(el) => {
                 if (el) inputs.current.set(o.key, el)
                 else inputs.current.delete(o.key)
@@ -151,6 +180,12 @@ export function OptionListEditor({
               spellCheck={false}
               autoComplete="off"
               onChange={(e) => update(i, { label: e.target.value })}
+              onPaste={(e) => {
+                const parts = splitPasted(e.clipboardData.getData('text'))
+                if (parts.length < 2) return
+                e.preventDefault()
+                pasteInto(i, parts)
+              }}
               onKeyDown={(e) => {
                 // Enter appends (never submits from inside the list);
                 // Backspace on an empty unsaved row drops it; Alt+arrows
@@ -169,7 +204,10 @@ export function OptionListEditor({
                   onChange(move(drafts, i, i + 1))
                 }
               }}
-              className="h-8 flex-1 text-ui"
+              className={cn(
+                'focus-ring-inset h-full min-w-0 flex-1 bg-transparent text-ui outline-none placeholder:text-graphite',
+                o.archived && 'text-graphite line-through',
+              )}
             />
             {isStatus ? (
               <select
@@ -178,57 +216,62 @@ export function OptionListEditor({
                 onChange={(e) =>
                   update(i, { group: e.target.value as OptionGroup })
                 }
-                className="h-8 rounded-md border border-input bg-transparent px-2 text-ui shadow-xs focus-ring"
+                className="focus-ring h-6 shrink-0 border border-rule bg-transparent px-1.5 mono text-micro text-graphite"
               >
-                <option value="active">Active</option>
-                <option value="parked">Parked</option>
-                <option value="closed">Closed</option>
+                <option value="active">active</option>
+                <option value="parked">parked</option>
+                <option value="closed">closed</option>
               </select>
             ) : null}
+            {o.archived ? (
+              <span className="shrink-0 mono text-[0.625rem] leading-3 text-graphite">
+                archived
+              </span>
+            ) : null}
             {o.id ? (
-              <IconBtn
-                label={
-                  o.archived
-                    ? `Restore ${o.label || 'option'}`
-                    : `Archive ${o.label || 'option'}`
-                }
+              <button
+                type="button"
                 onClick={() => update(i, { archived: !o.archived })}
+                className="focus-ring shrink-0 mono text-micro text-graphite transition-colors hover:text-foreground"
               >
-                {o.archived ? (
-                  <ArchiveRestore className="size-3.5" strokeWidth={1.75} />
-                ) : (
-                  <Archive className="size-3.5" strokeWidth={1.75} />
-                )}
-              </IconBtn>
+                {o.archived ? 'restore' : 'archive'}
+              </button>
             ) : (
-              <IconBtn label="Remove option" onClick={() => removeAt(i)}>
-                <X className="size-3.5" strokeWidth={2} />
-              </IconBtn>
+              <button
+                type="button"
+                aria-label="Remove option"
+                onClick={() => removeAt(i)}
+                className="focus-ring flex size-5 shrink-0 items-center justify-center mono text-label text-graphite transition-colors hover:text-foreground"
+              >
+                ×
+              </button>
             )}
           </li>
         ))}
+        {/* The composer row: adding is typing, not clicking. */}
+        <li>
+          <button
+            type="button"
+            onClick={() => insertAfter(drafts.length - 1)}
+            className="focus-ring-inset flex h-[1.875rem] w-full items-center gap-2 px-2 text-left transition-colors hover:bg-bone"
+          >
+            <span className="mono text-micro text-primary">+</span>
+            <span className="text-ui text-graphite">
+              Add option… or paste a list
+            </span>
+          </button>
+        </li>
       </ul>
-      <div className="flex items-center gap-2 pl-7.5">
-        <Button
-          type="button"
-          size="xs"
-          variant="outline"
-          onClick={() => insertAfter(drafts.length - 1)}
-        >
-          <Plus className="size-3" strokeWidth={2} />
-          Add option
-        </Button>
-        <span className="text-label text-muted-foreground">
-          Enter adds the next one · drag or Alt+↑↓ to reorder
-          {drafts.some((d) => d.id)
-            ? ' · saved options archive, never delete'
-            : ''}
-        </span>
-      </div>
+      <p className="mono text-[0.625rem] leading-3 text-graphite">
+        ↵ adds the next · drag ⋮⋮ or ⌥↑↓ to reorder · hue auto-assigned, click
+        the swatch to override
+        {saved ? ' · saved options archive, never delete' : ''}
+      </p>
     </div>
   )
 }
 
+/** A 24px mark button for editor rows: graphite until hover, bone behind. */
 export function IconBtn({
   label,
   disabled,
@@ -247,7 +290,7 @@ export function IconBtn({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="flex size-6.5 shrink-0 touch-manipulation items-center justify-center rounded text-muted-foreground focus-ring transition-colors duration-150 ease-out-quart hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+      className="focus-ring flex size-6 shrink-0 touch-manipulation items-center justify-center rounded-md text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground disabled:pointer-events-none disabled:text-rule"
     >
       {children}
     </button>
@@ -255,9 +298,9 @@ export function IconBtn({
 }
 
 /**
- * Swatch picker for one option's badge colour. A fixed grid of the shipped
- * palette rather than a colour input: every swatch is already known to clear
- * AA against its own ink, which an arbitrary hex cannot promise.
+ * Swatch picker for one option's badge colour: a fixed grid of the shipped
+ * palette as 16px squares rather than a colour input — every swatch already
+ * clears AA against its own ink, which an arbitrary hex cannot promise.
  */
 export function ColorPicker({
   value,
@@ -274,20 +317,15 @@ export function ColorPicker({
         type="button"
         aria-label={`Colour for ${label}`}
         title={`Colour: ${value}`}
-        className="size-6 shrink-0 rounded-full border border-border focus-ring transition-colors duration-150 ease-out-quart hover:border-input"
+        className="focus-ring size-3.5 shrink-0 transition-[outline-color] duration-150 ease-out-quart hover:outline hover:outline-1 hover:outline-hairline"
         style={{ backgroundColor: `var(--badge-${value})` }}
-      >
-        <span
-          className="mx-auto block size-2.5 rounded-full"
-          style={{ backgroundColor: `var(--badge-${value}-ink)` }}
-        />
-      </DropdownMenuTrigger>
+      />
       <DropdownMenuContent align="start" className="w-auto p-2">
         {/* Menu items rather than plain buttons: a raw <button> inside Radix
             content leaves the popover open after a pick, so choosing a colour
             silently traps the next click. Items also get roving arrow-key
             focus, which a grid of buttons would not. */}
-        <div className="grid grid-cols-6 gap-1.5">
+        <div className="grid grid-cols-6 gap-1">
           {BADGE_COLORS.map((c) => (
             <DropdownMenuItem
               key={c}
@@ -296,14 +334,10 @@ export function ColorPicker({
               onSelect={() => onPick(c)}
               style={badgeStyle(c)}
               className={cn(
-                'flex size-7 items-center justify-center rounded-full border p-0 focus-ring transition-colors duration-150 ease-out-quart',
-                c === value ? 'border-foreground' : 'border-transparent',
+                'focus-ring size-5 rounded-none p-0 transition-[outline-color] duration-150 ease-out-quart',
+                c === value && 'outline outline-1 outline-hairline',
               )}
-            >
-              {c === value ? (
-                <Check className="size-3" strokeWidth={3} />
-              ) : null}
-            </DropdownMenuItem>
+            />
           ))}
         </div>
       </DropdownMenuContent>

@@ -174,16 +174,18 @@ function MarketsCreator() {
   }
 
   return (
-    <div className="mx-auto mt-14 max-w-md">
-      <h2 className="text-title font-semibold tracking-tight">
-        What markets do you look at?
-      </h2>
-      <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
-        Each one becomes a space — a node in your market map. Memos file into
-        them, companies get tagged into them, and your glossary grows inside
-        them. Rename, nest, or delete freely later.
-      </p>
-      <form onSubmit={onSubmit} className="mt-5 space-y-3" noValidate>
+    <div className="flex max-w-100 flex-col gap-5">
+      <div className="flex flex-col gap-2">
+        <h2 className="font-serif text-xl leading-6 font-semibold">
+          What markets do you look at?
+        </h2>
+        <p className="text-ui leading-5 text-graphite">
+          Each one becomes a space — a node in your market map. Memos file into
+          them, companies get tagged into them, and your glossary grows inside
+          them. Rename, nest, or delete freely later.
+        </p>
+      </div>
+      <form onSubmit={onSubmit} className="flex flex-col gap-3" noValidate>
         {names.map((n, i) => (
           <Input
             key={i}
@@ -199,13 +201,21 @@ function MarketsCreator() {
           />
         ))}
         {error ? (
-          <p role="alert" className="text-ui text-destructive">
+          <p
+            role="alert"
+            className="flex items-center gap-2 text-ui text-destructive"
+          >
+            <span aria-hidden className="size-2 shrink-0 bg-destructive" />
             {error}
           </p>
         ) : null}
         <Button type="submit" disabled={pending} className="w-full">
           {pending ? 'Creating…' : 'Create my map'}
+          <KeyHint>↵</KeyHint>
         </Button>
+        <p className="mono text-micro text-graphite">
+          three to start · blanks are skipped · duplicates fold into one
+        </p>
       </form>
     </div>
   )

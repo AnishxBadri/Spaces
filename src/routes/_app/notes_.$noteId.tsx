@@ -4,7 +4,7 @@ import {
   Link,
   useRouter,
 } from '@tanstack/react-router'
-import { ArrowLeft, Globe, Layers, Lock, X } from 'lucide-react'
+import { ArrowLeft, Globe, Layers, Lock } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -295,16 +295,17 @@ function SpaceFiling({
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5">
+      {/* Square chips, like the subspace chips on a space page. */}
       {filed.map((s) => (
         <span
           key={s.id}
-          className="group flex h-6 items-center gap-1 rounded-full border border-border pr-1 pl-2 text-xs font-medium text-muted-foreground"
+          className="flex h-6 items-center gap-1.5 border border-rule bg-paper pr-1.5 pl-2 text-label font-medium"
         >
-          <Layers className="size-3 shrink-0" strokeWidth={1.75} />
+          <Layers className="size-2.5 shrink-0" strokeWidth={1.75} />
           <Link
             to="/spaces/$spaceId"
             params={{ spaceId: s.id }}
-            className="focus-ring rounded hover:text-foreground"
+            className="focus-ring hover:underline"
           >
             {s.name}
           </Link>
@@ -316,9 +317,9 @@ function SpaceFiling({
                 untagFromSpace({ data: { entityId: noteId, spaceId: s.id } }),
               )
             }
-            className="focus-ring flex size-4 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+            className="focus-ring mono text-micro text-graphite hover:text-foreground"
           >
-            <X className="size-2.5" strokeWidth={2.5} />
+            ×
           </button>
         </span>
       ))}
@@ -336,7 +337,7 @@ function SpaceFiling({
               tagIntoSpace({ data: { entityId: noteId, spaceId } }),
             )
           }}
-          className="focus-ring h-6 rounded-full border border-dashed border-border bg-transparent px-2 text-xs text-muted-foreground outline-none hover:border-input hover:text-foreground"
+          className="focus-ring h-6 border border-dashed border-rule bg-transparent px-2 text-label text-graphite transition-colors outline-none hover:border-hairline hover:text-foreground"
         >
           <option value="">+ File in space…</option>
           {unfiled.map((s) => (

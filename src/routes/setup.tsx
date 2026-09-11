@@ -1,6 +1,7 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Wordmark } from '#/components/wordmark'
+import { AuthShell, FieldHint, FormError } from '#/components/auth-shell'
+import { KeyHint } from '#/components/page-header'
 import { PasswordInput } from '#/components/password-input'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -42,18 +43,7 @@ export const Route = createFileRoute('/setup')({
 function SetupWizard() {
   const { initialStep } = Route.useRouteContext()
   const [step, setStep] = useState<1 | 2>(initialStep)
-
-  return (
-    <main className="flex min-h-dvh flex-col items-center bg-background px-6">
-      <div className="w-full max-w-[400px] pt-[18vh] pb-16">
-        <Wordmark />
-        <p className="tabular mt-3 text-xs font-medium text-muted-foreground">
-          Step {step} of 2
-        </p>
-        {step === 1 ? <AdminStep onDone={() => setStep(2)} /> : <DemoStep />}
-      </div>
-    </main>
-  )
+  return step === 1 ? <AdminStep onDone={() => setStep(2)} /> : <DemoStep />
 }
 
 function AdminStep({ onDone }: { onDone: () => void }) {
@@ -99,15 +89,14 @@ function AdminStep({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <>
-      <h1 className="mt-6 title-serif">Create the admin account</h1>
-      <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
-        This deployment is yours. Signup closes permanently after this account
-        exists — everyone else joins by invitation.
-      </p>
-
-      <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
-        <div className="space-y-1.5">
+    <AuthShell
+      eyebrow="Setup · step 1 of 2"
+      title="Create the admin account"
+      blurb="This deployment is yours. Signup closes permanently after this account exists — everyone else joins by invitation."
+      foot="self-hosted · nothing here leaves this server"
+    >
+      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="token">Setup token</Label>
           <Input
             id="token"
@@ -117,13 +106,14 @@ function AdminStep({ onDone }: { onDone: () => void }) {
             autoFocus
             placeholder="Printed in the server logs"
             aria-describedby="token-hint"
+            className="mono"
           />
-          <p id="token-hint" className="text-xs text-muted-foreground">
+          <FieldHint id="token-hint">
             One-time code from the terminal or container logs — proof you run
             this server.
-          </p>
+          </FieldHint>
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="workspace">Workspace name</Label>
           <Input
             id="workspace"
@@ -132,15 +122,15 @@ function AdminStep({ onDone }: { onDone: () => void }) {
             placeholder="Priya Mehta, or Meridian Ventures"
             aria-describedby="workspace-hint"
           />
-          <p id="workspace-hint" className="text-xs text-muted-foreground">
+          <FieldHint id="workspace-hint">
             Your name if you invest solo, your fund’s if you don’t.
-          </p>
+          </FieldHint>
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="name">Your name</Label>
           <Input id="name" name="name" autoComplete="name" required />
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">Email</Label>
           <Input
             id="email"
@@ -151,7 +141,7 @@ function AdminStep({ onDone }: { onDone: () => void }) {
             placeholder="you@fund.com"
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="password">Password</Label>
           <PasswordInput
             id="password"
@@ -161,22 +151,19 @@ function AdminStep({ onDone }: { onDone: () => void }) {
             minLength={12}
             aria-describedby="password-hint"
           />
-          <p id="password-hint" className="text-xs text-muted-foreground">
+          <FieldHint id="password-hint">
             At least 12 characters. This protects deal terms and cap tables.
-          </p>
+          </FieldHint>
         </div>
 
-        {error ? (
-          <p role="alert" className="text-ui text-destructive">
-            {error}
-          </p>
-        ) : null}
+        {error ? <FormError>{error}</FormError> : null}
 
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? 'Creating…' : 'Create account'}
+          <KeyHint>↵</KeyHint>
         </Button>
       </form>
-    </>
+    </AuthShell>
   )
 }
 
@@ -204,32 +191,27 @@ function DemoStep() {
   }
 
   return (
-    <>
-      <h1 className="mt-6 title-serif">Start with demo data?</h1>
-      <p className="mt-1.5 text-ui leading-relaxed text-muted-foreground">
-        A worked example in data-center cooling — a small space tree, three
-        companies, a memo, and a glossary. Obviously fictional, and safe to
-        delete once you have seen how the pieces connect.
-      </p>
-
-      {error ? (
-        <p role="alert" className="mt-4 text-ui text-destructive">
-          {error}
-        </p>
-      ) : null}
-
-      <div className="mt-6 flex gap-2">
-        <Button className="flex-1" disabled={pending} onClick={withDemo}>
-          {pending ? 'Loading…' : 'Load demo data'}
-        </Button>
-        <Button
-          variant="ghost"
-          disabled={pending}
-          onClick={() => navigate({ to: '/spaces' })}
-        >
-          Start empty
-        </Button>
+    <AuthShell
+      eyebrow="Setup · step 2 of 2"
+      title="Start with demo data?"
+      blurb="A worked example in data-center cooling — a small space tree, three companies, a memo, and a glossary. Obviously fictional, and safe to delete once you have seen how the pieces connect."
+      foot="3 companies · 1 memo · 1 space tree · deletable"
+    >
+      <div className="flex flex-col gap-4">
+        {error ? <FormError>{error}</FormError> : null}
+        <div className="flex gap-2">
+          <Button className="flex-1" disabled={pending} onClick={withDemo}>
+            {pending ? 'Loading…' : 'Load demo data'}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={pending}
+            onClick={() => navigate({ to: '/spaces' })}
+          >
+            Start empty
+          </Button>
+        </div>
       </div>
-    </>
+    </AuthShell>
   )
 }
