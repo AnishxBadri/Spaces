@@ -461,6 +461,14 @@ Stage` box appears while dragging over a column.
 - **Tooltips:** inverted (ink background, paper text), `text-label`, 120/80ms.
 - **Toasts:** sonner, bottom-right, ink.
 
+### The Auth Sheet
+
+Login, setup and join share one anatomy (`AuthShell`): a 400px column on paper, the
+mark, a mono caps eyebrow naming the step (`SIGN IN`, `SETUP · STEP 1 OF 2`,
+`INVITATION · ADMIN`), a serif title, one sans sentence, a hairline, the form, a mono
+foot. The primary prints `↵`; errors are a crimson square and one sentence. No card,
+no centering flourish — a page head printed at the top of an empty field.
+
 ### Empty States (P5)
 
 Centered, max 24rem: a 160×120 dither block (a pine density ramp with a paper sheet
