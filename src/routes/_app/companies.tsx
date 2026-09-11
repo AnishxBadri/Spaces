@@ -249,15 +249,12 @@ function CompaniesPage() {
         {openDuplicates > 0 ? (
           <Link
             to="/dedupe"
-            className="focus-ring mt-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-ui transition-colors duration-150 ease-out-quart hover:bg-accent"
+            className="focus-ring mt-4 flex items-center gap-2 rounded-md border border-rule bg-bone px-3 py-2 text-ui transition-colors duration-150 ease-out-quart hover:bg-bone"
           >
-            <Copy
-              className="size-3.5 text-muted-foreground"
-              strokeWidth={1.75}
-            />
+            <Copy className="size-3.5 text-graphite" strokeWidth={1.75} />
             <span className="tabular font-medium">{openDuplicates}</span>
             possible duplicate{openDuplicates === 1 ? '' : 's'} to review
-            <span className="ml-auto text-muted-foreground">Review →</span>
+            <span className="ml-auto text-graphite">Review →</span>
           </Link>
         ) : null}
 

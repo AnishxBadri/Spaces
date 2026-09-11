@@ -108,7 +108,7 @@ export function OptionChip({
       title={state.archived ? 'Archived option' : undefined}
       className={cn(
         'truncate px-1.5 py-0.5 mono text-micro font-medium',
-        state.archived && 'bg-muted text-muted-foreground',
+        state.archived && 'bg-bone text-graphite',
         className,
       )}
     >
@@ -302,7 +302,7 @@ function DateCellEditor({ def, value, onSave }: Props) {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           if (e.key === 'Escape') setEditing(false)
         }}
-        className="focus-ring-inset h-full w-full min-w-0 rounded bg-transparent px-1 text-ui"
+        className="focus-ring-inset h-full w-full min-w-0 rounded-md bg-transparent px-1 text-ui"
       />
     )
   }
@@ -313,8 +313,8 @@ function DateCellEditor({ def, value, onSave }: Props) {
       aria-label={def.name}
       onClick={() => setEditing(true)}
       className={cn(
-        'focus-ring-inset h-full w-full rounded px-1 text-ui',
-        stored ? 'numeric' : 'text-left text-muted-foreground',
+        'focus-ring-inset h-full w-full rounded-md px-1 text-ui',
+        stored ? 'numeric' : 'text-left text-graphite',
       )}
     >
       {stored ? formatDate(stored) : '—'}
@@ -386,7 +386,7 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
             'focus-ring h-8 rounded-md border border-transparent px-2 transition-colors hover:border-rule focus:border-rule'
           : // Inset inside a cell: an offset ring would be clipped by the
             // table's scroll container and overlap the neighbouring column.
-            'focus-ring-inset h-full rounded px-1',
+            'focus-ring-inset h-full rounded-md px-1',
       )}
     />
   )
@@ -444,7 +444,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
           'group/pick flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
             ? 'focus-ring h-8 w-full rounded-md border border-transparent px-2 transition-colors hover:border-rule data-[state=open]:border-rule'
-            : 'focus-ring-inset h-full w-full rounded px-1',
+            : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
@@ -495,7 +495,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
           <DropdownMenuItem
             onSelect={() => onSave(null)}
             className={cn(
-              'text-muted-foreground',
+              'text-graphite',
               def.options?.required && !multi && 'hidden',
             )}
           >
@@ -523,7 +523,7 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
           'group/pick flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
             ? 'focus-ring h-8 w-full rounded-md border border-transparent px-2 transition-colors hover:border-rule data-[state=open]:border-rule'
-            : 'focus-ring-inset h-full w-full rounded px-1',
+            : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-ui">
@@ -547,7 +547,7 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
         {selected ? (
           <DropdownMenuItem
             onSelect={() => onSave(null)}
-            className="text-muted-foreground"
+            className="text-graphite"
           >
             Clear
           </DropdownMenuItem>
@@ -586,7 +586,7 @@ function OptionPicker({
           'group/pick flex min-w-0 items-center gap-1 text-left',
           variant === 'field'
             ? 'focus-ring h-8 w-full rounded-md border border-transparent px-2 transition-colors hover:border-rule data-[state=open]:border-rule'
-            : 'focus-ring-inset h-full w-full rounded px-1',
+            : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
@@ -638,7 +638,7 @@ function OptionPicker({
                 <DropdownMenuItem
                   key="__clear"
                   onSelect={() => onSave(null)}
-                  className="text-muted-foreground"
+                  className="text-graphite"
                 >
                   Clear
                 </DropdownMenuItem>

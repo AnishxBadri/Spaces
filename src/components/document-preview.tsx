@@ -106,7 +106,7 @@ function PreviewBody({ doc }: { doc: Doc }) {
 
   return (
     <>
-      <DialogHeader className="shrink-0 border-b border-border py-3 pr-12 pl-4">
+      <DialogHeader className="shrink-0 border-b border-rule py-3 pr-12 pl-4">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <DialogTitle className="truncate text-title">
@@ -128,7 +128,7 @@ function PreviewBody({ doc }: { doc: Doc }) {
         </div>
       </DialogHeader>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-muted/40">
+      <div className="min-h-0 flex-1 overflow-auto bg-bone">
         {format === 'pdf' ? (
           <PdfPreview doc={doc} />
         ) : asImage ? (
@@ -146,11 +146,8 @@ function Notice({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="flex max-w-sm flex-col items-center text-center">
-        <FileWarning
-          className="mb-3 size-5 text-muted-foreground"
-          strokeWidth={1.75}
-        />
-        <p className="text-ui text-muted-foreground">{children}</p>
+        <FileWarning className="mb-3 size-5 text-graphite" strokeWidth={1.75} />
+        <p className="text-ui text-graphite">{children}</p>
       </div>
     </div>
   )
@@ -158,7 +155,7 @@ function Notice({ children }: { children: React.ReactNode }) {
 
 function Spinner({ label }: { label: string }) {
   return (
-    <div className="flex h-full items-center justify-center gap-2 text-ui text-muted-foreground">
+    <div className="flex h-full items-center justify-center gap-2 text-ui text-graphite">
       <Loader2
         className="size-4 animate-spin motion-reduce:animate-none"
         strokeWidth={1.75}
@@ -289,11 +286,11 @@ function PdfPreview({ doc }: { doc: Doc }) {
         <canvas
           ref={canvasRef}
           aria-label={`${doc.filename}, page ${page}`}
-          className="mx-auto rounded-sm border border-border bg-white shadow-sm"
+          className="mx-auto rounded-none border border-rule bg-white"
         />
       </div>
       {pages > 1 ? (
-        <div className="flex shrink-0 items-center justify-center gap-3 border-t border-border bg-background px-4 py-2">
+        <div className="flex shrink-0 items-center justify-center gap-3 border-t border-rule bg-background px-4 py-2">
           <Button
             size="icon-xs"
             variant="ghost"
@@ -303,7 +300,7 @@ function PdfPreview({ doc }: { doc: Doc }) {
           >
             <ChevronLeft />
           </Button>
-          <span className="tabular text-label text-muted-foreground">
+          <span className="tabular text-label text-graphite">
             Page {page} of {pages}
           </span>
           <Button
@@ -341,7 +338,7 @@ function ImagePreview({ doc, type }: { doc: Doc; type: string }) {
       <img
         src={url}
         alt={doc.filename}
-        className="max-h-full max-w-full rounded-sm border border-border bg-white object-contain"
+        className="max-h-full max-w-full rounded-none border border-rule bg-white object-contain"
       />
     </div>
   )
@@ -416,26 +413,23 @@ function SheetPreview({ text }: { text: string }) {
       {sheets.map((sheet, i) => (
         <section key={i}>
           {sheet.title ? (
-            <h3 className="mb-1.5 text-label font-medium text-muted-foreground">
+            <h3 className="mb-1.5 text-label font-medium text-graphite">
               {sheet.title}
             </h3>
           ) : null}
-          <div className="overflow-x-auto rounded-md border border-border bg-background">
+          <div className="overflow-x-auto rounded-md border border-rule bg-background">
             <table className="w-full border-collapse text-ui">
               <tbody>
                 {sheet.rows.map((row, r) => (
-                  <tr
-                    key={r}
-                    className="border-b border-border/60 last:border-b-0"
-                  >
+                  <tr key={r} className="border-b border-rule last:border-b-0">
                     {row.map((cell, c) => (
                       <td
                         key={c}
                         className={cn(
-                          'border-r border-border/40 px-2 py-1 last:border-r-0',
+                          'border-r border-rule px-2 py-1 last:border-r-0',
                           // A leading header row is the near-universal shape
                           // of an exported sheet.
-                          r === 0 && 'bg-muted/50 font-medium',
+                          r === 0 && 'bg-bone font-medium',
                           // Numbers align as numbers — the Tabular Rule holds
                           // inside a preview too.
                           /^[-+]?[\d,.]+%?$/.test(cell.trim()) &&

@@ -91,7 +91,7 @@ export function MetaCell({
   children: ReactNode
 }) {
   return (
-    <span className="flex items-center gap-1.5 truncate px-1 text-muted-foreground">
+    <span className="flex items-center gap-1.5 truncate px-1 text-graphite">
       <Icon className="size-3 shrink-0" strokeWidth={1.75} />
       <span className="truncate">{children}</span>
     </span>
@@ -112,7 +112,7 @@ export function DateCell({
   const text = formatDate(value)
   if (!text) return null
   return (
-    <span className={cn('block px-1 numeric text-muted-foreground', className)}>
+    <span className={cn('block px-1 numeric text-graphite', className)}>
       {text}
     </span>
   )

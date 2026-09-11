@@ -128,7 +128,7 @@ export function RecordTable<T>({
         // Pinned to the left of the scroll viewport: centring it on the table's
         // full width would park the message off-screen once the grid is wider
         // than the pane and the user has scrolled.
-        <p className="sticky left-0 w-full px-3 py-6 text-center text-ui text-muted-foreground">
+        <p className="sticky left-0 w-full px-3 py-6 text-center text-ui text-graphite">
           Nothing matches that filter.
         </p>
       ) : null}
@@ -321,7 +321,7 @@ export function TableToolbar<T>({
               <Columns3 className="size-3.5" strokeWidth={1.75} />
               Columns
               {hiddenCount > 0 ? (
-                <span className="tabular text-muted-foreground">
+                <span className="tabular text-graphite">
                   {hideable.length - hiddenCount}/{hideable.length}
                 </span>
               ) : null}
@@ -361,7 +361,7 @@ export function TableToolbar<T>({
 
         {/* A bare "3" reads as an unlabelled artefact; the count says what it
             counts, and only says "of N" once a filter is actually hiding rows. */}
-        <output className="ml-auto text-label whitespace-nowrap text-muted-foreground">
+        <output className="ml-auto text-label whitespace-nowrap text-graphite">
           <span className="tabular">{shown}</span>
           {shown === total ? null : (
             <>
@@ -391,7 +391,7 @@ export function AddColumnButton() {
       type="button"
       aria-label="Add column"
       title="Add column"
-      className="focus-ring flex size-6 items-center justify-center rounded text-muted-foreground transition-colors duration-150 ease-out-quart hover:bg-accent hover:text-foreground"
+      className="focus-ring flex size-6 items-center justify-center rounded-md text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground"
     >
       <Plus className="size-3.5" strokeWidth={2} />
     </button>

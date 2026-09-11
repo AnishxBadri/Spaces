@@ -188,7 +188,7 @@ export function CommandPalette({
                       className="items-start gap-2.5"
                     >
                       <Icon
-                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        className="mt-0.5 size-4 shrink-0 text-graphite"
                         strokeWidth={1.75}
                       />
                       <span className="min-w-0 flex-1">

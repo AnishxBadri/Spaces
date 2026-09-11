@@ -526,7 +526,7 @@ export function CloseReasonDialog({
           }}
         >
           <textarea
-            className="focus-ring min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-ui placeholder:text-muted-foreground"
+            className="focus-ring min-h-24 w-full rounded-md border border-rule bg-transparent px-3 py-2 text-ui placeholder:text-graphite"
             placeholder={
               stageLabel === 'Passed'
                 ? 'Too early for our check size; team question on GTM…'

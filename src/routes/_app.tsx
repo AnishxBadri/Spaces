@@ -54,13 +54,13 @@ function AppShell() {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="fixed inset-x-0 top-0 z-sticky flex h-12 items-center gap-3 border-b border-border bg-background px-4 md:hidden">
+      <header className="fixed inset-x-0 top-0 z-sticky flex h-12 items-center gap-3 border-b border-rule bg-background px-4 md:hidden">
         <button
           type="button"
           aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
           aria-expanded={mobileNavOpen}
           onClick={() => setMobileNavOpen((v) => !v)}
-          className="focus-ring -ml-1 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+          className="focus-ring -ml-1 flex size-8 items-center justify-center rounded-md text-graphite hover:bg-bone"
         >
           {mobileNavOpen ? (
             <X className="size-4.5" strokeWidth={1.75} />

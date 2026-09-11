@@ -401,7 +401,7 @@ function DealsPage() {
                       'focus-ring flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-label font-medium whitespace-nowrap transition-colors duration-150 ease-out-quart',
                       groupFilter === g
                         ? 'border-primary/40 bg-selected text-foreground'
-                        : 'border-border text-muted-foreground hover:border-input hover:text-foreground',
+                        : 'border-rule text-graphite hover:border-hairline hover:text-foreground',
                     )}
                   >
                     {GROUP_LABELS[g]}
@@ -438,7 +438,7 @@ function DealsPage() {
                       <span
                         role="separator"
                         aria-orientation="vertical"
-                        className="mx-1 flex h-4 items-center self-center border-l border-border pl-2 text-micro font-medium tracking-wide text-muted-foreground uppercase"
+                        className="mx-1 flex h-4 items-center self-center border-l border-rule pl-2 text-micro font-medium tracking-wide text-graphite uppercase"
                       >
                         Archived
                       </span>
@@ -498,7 +498,7 @@ function StageChip({
         'focus-ring h-7 shrink-0 rounded-md border px-2.5 text-label whitespace-nowrap transition-colors duration-150 ease-out-quart',
         pressed
           ? 'border-primary/40 bg-selected font-medium text-foreground'
-          : 'border-transparent text-muted-foreground hover:text-foreground',
+          : 'border-transparent text-graphite hover:text-foreground',
         option.archived && !pressed && 'opacity-70',
       )}
     >

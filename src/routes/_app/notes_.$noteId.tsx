@@ -101,14 +101,14 @@ function NotePage() {
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-hairline px-8">
         <Link
           to="/notes"
-          className="focus-ring flex items-center gap-1.5 rounded-md text-ui text-muted-foreground hover:text-foreground"
+          className="focus-ring flex items-center gap-1.5 rounded-md text-ui text-graphite hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" strokeWidth={1.75} />
           Notes
         </Link>
         <span className="flex items-center gap-3">
           <span
-            className="text-xs text-muted-foreground"
+            className="text-label text-graphite"
             role="status"
             aria-live="polite"
           >
@@ -171,8 +171,8 @@ function NotePage() {
         </div>
 
         {initial.backlinks.length > 0 ? (
-          <aside className="mt-12 border-t border-border pt-5">
-            <h2 className="text-xs font-medium text-muted-foreground">
+          <aside className="mt-12 border-t border-rule pt-5">
+            <h2 className="text-label font-medium text-graphite">
               Linked from
             </h2>
             <ul className="mt-2 space-y-1">
@@ -190,7 +190,7 @@ function NotePage() {
                           : KIND_ROUTES[b.kind]
                       }
                       params={b.kind === 'note' ? { noteId: b.fromId } : {}}
-                      className="flex items-center gap-2 rounded-md px-1 py-0.5 text-ui text-muted-foreground hover:text-foreground"
+                      className="flex items-center gap-2 rounded-md px-1 py-0.5 text-ui text-graphite hover:text-foreground"
                     >
                       {Icon ? (
                         <Icon className="size-3.5" strokeWidth={1.75} />
@@ -251,7 +251,7 @@ function VisibilityToggle({
       type="button"
       onClick={toggle}
       disabled={pending}
-      className="focus-ring flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+      className="focus-ring flex items-center gap-1 rounded-md px-1.5 py-0.5 text-label font-medium text-graphite hover:bg-bone hover:text-foreground"
       title={
         isPrivate
           ? 'Private — only you. Click to share with the workspace.'

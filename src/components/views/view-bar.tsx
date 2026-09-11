@@ -263,16 +263,14 @@ function FilterPopover({
           <Filter className="size-3" strokeWidth={2} />
           Filter
           {conditions.length > 0 ? (
-            <span className="tabular text-muted-foreground">
-              {conditions.length}
-            </span>
+            <span className="tabular text-graphite">{conditions.length}</span>
           ) : null}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[28rem] p-3">
         <div className="space-y-2">
           {conditions.length === 0 ? (
-            <p className="text-ui text-muted-foreground">
+            <p className="text-ui text-graphite">
               No conditions. Every record shows.
             </p>
           ) : null}
@@ -292,7 +290,7 @@ function FilterPopover({
                       value: undefined,
                     })
                   }}
-                  className="focus-ring h-8 max-w-40 rounded-md border border-input bg-transparent px-2 text-ui shadow-xs"
+                  className="focus-ring h-8 max-w-40 rounded-md border border-rule bg-transparent px-2 text-ui"
                 >
                   {registry.map((d) => (
                     <option key={d.slug} value={d.slug}>
@@ -306,7 +304,7 @@ function FilterPopover({
                   onChange={(e) =>
                     update(i, { op: e.target.value as ConditionOp })
                   }
-                  className="focus-ring h-8 rounded-md border border-input bg-transparent px-2 text-ui shadow-xs"
+                  className="focus-ring h-8 rounded-md border border-rule bg-transparent px-2 text-ui"
                 >
                   {ops.map((op) => (
                     <option key={op} value={op}>
@@ -330,7 +328,7 @@ function FilterPopover({
                   type="button"
                   aria-label="Remove condition"
                   onClick={() => onChange(conditions.filter((_, j) => j !== i))}
-                  className="focus-ring flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                  className="focus-ring flex size-7 shrink-0 items-center justify-center rounded-md text-graphite hover:bg-bone hover:text-foreground"
                 >
                   <X className="size-3.5" strokeWidth={2} />
                 </button>
@@ -510,7 +508,7 @@ function SaveViewForm({
       <div
         role="radiogroup"
         aria-label="Visibility"
-        className="flex h-9 w-fit items-center gap-0.5 rounded-md border border-input p-0.5"
+        className="flex h-8 w-fit items-center border border-hairline"
       >
         {(['private', 'shared'] as const).map((v) => (
           <button
@@ -520,10 +518,10 @@ function SaveViewForm({
             aria-checked={visibility === v}
             onClick={() => setVisibility(v)}
             className={cn(
-              'focus-ring h-full rounded px-2.5 text-ui font-medium capitalize transition-colors duration-150 ease-out-quart',
+              'focus-ring-inset h-full px-2.5 text-ui font-medium capitalize transition-colors duration-150 ease-out-quart',
               visibility === v
-                ? 'bg-selected text-foreground'
-                : 'text-muted-foreground hover:text-foreground',
+                ? 'bg-hairline text-paper'
+                : 'text-graphite hover:bg-bone hover:text-foreground',
             )}
           >
             {v}

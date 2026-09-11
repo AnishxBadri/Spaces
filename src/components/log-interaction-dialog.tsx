@@ -278,7 +278,7 @@ function AttendeePicker({
           ))}
         </ul>
       ) : null}
-      <p className="text-xs text-muted-foreground">
+      <p className="text-label text-graphite">
         <Plus className="mr-0.5 inline size-3" strokeWidth={2} />
         You're included automatically via the log entry.
       </p>

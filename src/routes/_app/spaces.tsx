@@ -285,7 +285,7 @@ function CreateSpaceDialog({
         </DialogHeader>
         <div className="flex items-center justify-between gap-2">
           {scaffold ? (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-label text-graphite">
               Scaffold:{' '}
               <span className="font-medium text-foreground">
                 {scaffold.name}
@@ -293,14 +293,14 @@ function CreateSpaceDialog({
               <button
                 type="button"
                 onClick={() => setScaffold(null)}
-                className="focus-ring rounded text-muted-foreground hover:text-foreground"
+                className="focus-ring rounded-md text-graphite hover:text-foreground"
                 aria-label="Clear scaffold"
               >
                 ×
               </button>
             </span>
           ) : (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-label text-graphite">
               Optionally stamp a saved market-breakdown pattern.
             </span>
           )}
@@ -327,7 +327,7 @@ function CreateSpaceDialog({
               id="space-parent"
               name="parent"
               defaultValue=""
-              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+              className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
             >
               <option value="">None — top level</option>
               {spaces.map((s) => (

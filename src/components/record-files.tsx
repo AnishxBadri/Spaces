@@ -344,9 +344,7 @@ function ExtractionNote({ doc }: { doc: Documents[number] }) {
   }
   if (doc.snippet) {
     return (
-      <p className="mt-1 truncate text-xs text-muted-foreground">
-        {doc.snippet}
-      </p>
+      <p className="mt-1 truncate text-label text-graphite">{doc.snippet}</p>
     )
   }
   return null

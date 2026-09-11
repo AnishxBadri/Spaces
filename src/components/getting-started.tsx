@@ -70,19 +70,19 @@ export function GettingStarted({ progress }: { progress: OnboardingProgress }) {
   return (
     <section
       aria-label="Getting started"
-      className="mt-6 rounded-lg border border-border bg-muted/30 p-4"
+      className="mt-6 rounded-none border border-rule bg-bone p-4"
     >
       <div className="flex items-baseline justify-between">
         <h2 className="text-ui font-semibold">
           Getting started
-          <span className="tabular ml-2 font-normal text-muted-foreground">
+          <span className="tabular ml-2 font-normal text-graphite">
             {done}/{STEPS.length}
           </span>
         </h2>
         <button
           type="button"
           aria-label="Dismiss getting started"
-          className="rounded text-muted-foreground focus-ring hover:text-foreground"
+          className="focus-ring rounded-md text-graphite hover:text-foreground"
           onClick={() => {
             localStorage.setItem(DISMISS_KEY, '1')
             setVisible(false)
@@ -99,16 +99,16 @@ export function GettingStarted({ progress }: { progress: OnboardingProgress }) {
               <Link
                 to={s.to}
                 className={cn(
-                  'group flex items-baseline gap-2.5 rounded-md px-2 py-1.5 focus-ring hover:bg-accent',
+                  'group focus-ring flex items-baseline gap-2.5 rounded-md px-2 py-1.5 hover:bg-bone',
                   isDone && 'opacity-60',
                 )}
               >
                 <span
                   className={cn(
-                    'flex size-4 shrink-0 translate-y-0.5 items-center justify-center rounded-full border',
+                    'flex size-4 shrink-0 translate-y-0.5 items-center justify-center rounded-none border',
                     isDone
                       ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-muted-foreground/40',
+                      : 'border-hairline bg-paper',
                   )}
                 >
                   {isDone ? <Check className="size-3" strokeWidth={3} /> : null}
@@ -121,9 +121,7 @@ export function GettingStarted({ progress }: { progress: OnboardingProgress }) {
                 >
                   {s.label}
                 </span>
-                <span className="text-label text-muted-foreground">
-                  {s.detail}
-                </span>
+                <span className="text-label text-graphite">{s.detail}</span>
               </Link>
             </li>
           )

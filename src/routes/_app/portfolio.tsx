@@ -87,7 +87,7 @@ function PortfolioPage() {
         size: 140,
         cell: (info) => {
           const m = metricsOf(info.row.original)
-          if (!m) return <span className="text-muted-foreground">—</span>
+          if (!m) return <span className="text-graphite">—</span>
           return (
             <span className="tabular">
               {fmtMoney(m.unrealized, m.currency, { compact: true })}
@@ -101,7 +101,7 @@ function PortfolioPage() {
         size: 120,
         cell: (info) => {
           const m = metricsOf(info.row.original)
-          if (!m) return <span className="text-muted-foreground">—</span>
+          if (!m) return <span className="text-graphite">—</span>
           return (
             <span className="tabular">
               {m.realized > 0
@@ -148,7 +148,7 @@ function PortfolioPage() {
           const m = metricsOf(info.row.original)
           const d = m?.lastMarkDate ?? null
           return (
-            <span className={d ? 'tabular' : 'text-muted-foreground'}>
+            <span className={d ? 'tabular' : 'text-graphite'}>
               {m?.writtenOff ? 'written off' : fmtDate(d)}
             </span>
           )
@@ -251,7 +251,7 @@ function PortfolioPage() {
 function RollupStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-label text-muted-foreground">{label}</span>
+      <span className="text-label text-graphite">{label}</span>
       <span className="tabular text-ui font-medium">{value}</span>
     </div>
   )

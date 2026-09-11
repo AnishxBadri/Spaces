@@ -426,7 +426,7 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
           <Field id="inv-instrument" label="Instrument">
             <select
               id="inv-instrument"
-              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui"
+              className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
               value={form.instrument}
               onChange={(e) =>
                 setForm((s) => ({ ...s, instrument: e.target.value }))
@@ -685,7 +685,7 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
           <Field id="mk-basis" label="Basis">
             <select
               id="mk-basis"
-              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui"
+              className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
               value={form.basis}
               onChange={(e) =>
                 setForm((s) => ({ ...s, basis: e.target.value }))
@@ -762,7 +762,7 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
           <Field id="ds-kind" label="Kind">
             <select
               id="ds-kind"
-              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-ui"
+              className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
               value={form.kind}
               onChange={(e) => setForm((s) => ({ ...s, kind: e.target.value }))}
             >
@@ -815,7 +815,7 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
               </Field>
             </>
           ) : (
-            <p className="col-span-2 self-center text-ui text-muted-foreground">
+            <p className="col-span-2 self-center text-ui text-graphite">
               Marks the position to zero. The history — and the lesson — stays.
             </p>
           )}

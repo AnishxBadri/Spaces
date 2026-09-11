@@ -356,8 +356,8 @@ function DuePill({
         </form>
         <p
           className={cn(
-            'mt-1 px-1 text-xs',
-            text && !parsed ? 'text-destructive' : 'text-muted-foreground',
+            'mt-1 px-1 text-label',
+            text && !parsed ? 'text-destructive' : 'text-graphite',
           )}
         >
           {text
@@ -385,7 +385,7 @@ function DuePill({
         </div>
         <input
           type="date"
-          className="mt-2 w-full rounded-md border border-border bg-transparent px-2 py-1 text-label"
+          className="mt-2 w-full rounded-md border border-rule bg-transparent px-2 py-1 text-label"
           value={due ?? ''}
           onChange={(e) => pick(e.target.value || null)}
           aria-label="Pick a date"
@@ -429,15 +429,13 @@ function AssigneePill({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-1">
         {users.length === 0 ? (
-          <p className="px-2 py-1.5 text-label text-muted-foreground">
-            Loading…
-          </p>
+          <p className="px-2 py-1.5 text-label text-graphite">Loading…</p>
         ) : (
           users.map((u) => (
             <button
               key={u.id}
               type="button"
-              className="focus-ring flex w-full items-center rounded-md px-2 py-1.5 text-ui hover:bg-accent"
+              className="focus-ring flex w-full items-center rounded-md px-2 py-1.5 text-ui hover:bg-bone"
               onClick={() => {
                 onChange(u)
                 setOpen(false)
@@ -523,7 +521,7 @@ function RecordsPill({
                 <button
                   key={r.id}
                   type="button"
-                  className="focus-ring flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-ui hover:bg-accent"
+                  className="focus-ring flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-ui hover:bg-bone"
                   onClick={() => {
                     onChange([...records, r])
                     setQ('')
@@ -531,9 +529,7 @@ function RecordsPill({
                   }}
                 >
                   {r.name}
-                  <span className="text-label text-muted-foreground">
-                    {r.kind}
-                  </span>
+                  <span className="text-label text-graphite">{r.kind}</span>
                 </button>
               ))}
           </div>

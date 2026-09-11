@@ -212,8 +212,8 @@ function TodayPage() {
     // A retired stage reads as history here too: no hue, muted ink.
     if (idx >= 0 && stageOptions[idx].archived)
       return {
-        backgroundColor: 'var(--muted)',
-        color: 'var(--muted-foreground)',
+        backgroundColor: 'var(--bone)',
+        color: 'var(--graphite)',
       }
     return badgeStyle(
       optionColor(idx >= 0 ? stageOptions[idx] : undefined, Math.max(idx, 0)),
@@ -321,11 +321,8 @@ function TodayPage() {
 
           {nothingNeedsYou ? (
             <div className="flex flex-col items-center py-10 text-center">
-              <Sunrise
-                className="size-8 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <p className="mt-3 text-ui text-muted-foreground">
+              <Sunrise className="size-8 text-graphite" strokeWidth={1.5} />
+              <p className="mt-3 text-ui text-graphite">
                 Nothing overdue, nothing stale, nothing idle. The map could
                 always be deeper — go file a memo.
               </p>
