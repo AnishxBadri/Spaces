@@ -95,11 +95,13 @@ function NotePage() {
   }, [])
 
   return (
-    <div className="mx-auto max-w-[72ch] px-6 py-8 md:px-10">
-      <div className="flex items-center justify-between">
+    <div className="flex min-h-full flex-col">
+      {/* The head runs the full field on a hairline; the sheet below keeps
+          its 72ch measure at the gutter. */}
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-hairline px-8">
         <Link
           to="/notes"
-          className="flex items-center gap-1.5 rounded-md text-ui text-muted-foreground focus-ring hover:text-foreground"
+          className="focus-ring flex items-center gap-1.5 rounded-md text-ui text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" strokeWidth={1.75} />
           Notes
@@ -136,68 +138,72 @@ function NotePage() {
         </span>
       </div>
 
-      <input
-        value={title}
-        onChange={(e) => {
-          setTitle(e.target.value)
-          titleRef.current = e.target.value
-          scheduleSave()
-        }}
-        placeholder="Untitled"
-        aria-label="Note title"
-        className="mt-6 w-full bg-transparent text-display font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
-      />
+      <div className="max-w-[72ch] px-8 pt-6 pb-8">
+        <input
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value)
+            titleRef.current = e.target.value
+            scheduleSave()
+          }}
+          placeholder="Untitled"
+          aria-label="Note title"
+          className="w-full bg-transparent title-serif outline-none placeholder:text-graphite"
+        />
 
-      <SpaceFiling
-        noteId={initial.id}
-        filed={initial.spaces}
-        allSpaces={allSpaces}
-      />
+        <SpaceFiling
+          noteId={initial.id}
+          filed={initial.spaces}
+          allSpaces={allSpaces}
+        />
 
-      <div className="prose-note mt-4">
-        <ClientOnly fallback={<div className="min-h-40" />}>
-          <NoteEditor
-            initialContent={initial.bodyJson}
-            terms={terms}
-            onChange={(editor) => {
-              latest.current = editor
-              scheduleSave()
-            }}
-          />
-        </ClientOnly>
+        <div className="prose-note mt-4">
+          <ClientOnly fallback={<div className="min-h-40" />}>
+            <NoteEditor
+              initialContent={initial.bodyJson}
+              terms={terms}
+              onChange={(editor) => {
+                latest.current = editor
+                scheduleSave()
+              }}
+            />
+          </ClientOnly>
+        </div>
+
+        {initial.backlinks.length > 0 ? (
+          <aside className="mt-12 border-t border-border pt-5">
+            <h2 className="text-xs font-medium text-muted-foreground">
+              Linked from
+            </h2>
+            <ul className="mt-2 space-y-1">
+              {initial.backlinks.map((b) => {
+                // KIND_ICONS' Record index type hides misses — widen honestly.
+                const Icon = (
+                  KIND_ICONS as Record<string, LucideIcon | undefined>
+                )[b.kind]
+                return (
+                  <li key={b.fromId}>
+                    <Link
+                      to={
+                        b.kind === 'note'
+                          ? '/notes/$noteId'
+                          : KIND_ROUTES[b.kind]
+                      }
+                      params={b.kind === 'note' ? { noteId: b.fromId } : {}}
+                      className="flex items-center gap-2 rounded-md px-1 py-0.5 text-ui text-muted-foreground hover:text-foreground"
+                    >
+                      {Icon ? (
+                        <Icon className="size-3.5" strokeWidth={1.75} />
+                      ) : null}
+                      {b.name}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </aside>
+        ) : null}
       </div>
-
-      {initial.backlinks.length > 0 ? (
-        <aside className="mt-12 border-t border-border pt-5">
-          <h2 className="text-xs font-medium text-muted-foreground">
-            Linked from
-          </h2>
-          <ul className="mt-2 space-y-1">
-            {initial.backlinks.map((b) => {
-              // KIND_ICONS' Record index type hides misses — widen honestly.
-              const Icon = (
-                KIND_ICONS as Record<string, LucideIcon | undefined>
-              )[b.kind]
-              return (
-                <li key={b.fromId}>
-                  <Link
-                    to={
-                      b.kind === 'note' ? '/notes/$noteId' : KIND_ROUTES[b.kind]
-                    }
-                    params={b.kind === 'note' ? { noteId: b.fromId } : {}}
-                    className="flex items-center gap-2 rounded-md px-1 py-0.5 text-ui text-muted-foreground hover:text-foreground"
-                  >
-                    {Icon ? (
-                      <Icon className="size-3.5" strokeWidth={1.75} />
-                    ) : null}
-                    {b.name}
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </aside>
-      ) : null}
     </div>
   )
 }
@@ -245,7 +251,7 @@ function VisibilityToggle({
       type="button"
       onClick={toggle}
       disabled={pending}
-      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground focus-ring hover:bg-accent hover:text-foreground"
+      className="focus-ring flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
       title={
         isPrivate
           ? 'Private — only you. Click to share with the workspace.'
@@ -298,7 +304,7 @@ function SpaceFiling({
           <Link
             to="/spaces/$spaceId"
             params={{ spaceId: s.id }}
-            className="rounded focus-ring hover:text-foreground"
+            className="focus-ring rounded hover:text-foreground"
           >
             {s.name}
           </Link>
@@ -310,7 +316,7 @@ function SpaceFiling({
                 untagFromSpace({ data: { entityId: noteId, spaceId: s.id } }),
               )
             }
-            className="flex size-4 items-center justify-center rounded-full text-muted-foreground focus-ring hover:text-foreground"
+            className="focus-ring flex size-4 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
           >
             <X className="size-2.5" strokeWidth={2.5} />
           </button>
@@ -330,7 +336,7 @@ function SpaceFiling({
               tagIntoSpace({ data: { entityId: noteId, spaceId } }),
             )
           }}
-          className="h-6 rounded-full border border-dashed border-border bg-transparent px-2 text-xs text-muted-foreground focus-ring outline-none hover:border-input hover:text-foreground"
+          className="focus-ring h-6 rounded-full border border-dashed border-border bg-transparent px-2 text-xs text-muted-foreground outline-none hover:border-input hover:text-foreground"
         >
           <option value="">+ File in space…</option>
           {unfiled.map((s) => (

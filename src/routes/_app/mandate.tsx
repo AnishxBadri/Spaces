@@ -1,5 +1,4 @@
 import { ClientOnly, createFileRoute, useRouter } from '@tanstack/react-router'
-import { Check, Compass, Plus, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -7,8 +6,9 @@ import {
   extractMentionIds,
   NoteEditor,
 } from '#/components/editor/note-editor'
+import { EmptyState } from '#/components/empty-state'
+import { PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
-import { Input } from '#/components/ui/input'
 import { badgeStyle, optionColor } from '#/lib/attributes/colors'
 import {
   createMandate,
@@ -21,10 +21,10 @@ import {
 import { cn } from '#/lib/utils'
 
 /**
- * The Mandate — the fund's one "why we invest" destination. Prose strategy
- * (a real note, serif register) with a small facts rail: stages, geos,
- * check size. Facts mostly display; the one live consumer is the
- * outside-mandate hint on deal records.
+ * The Mandate — the fund's one "why we invest" destination. A facts grid
+ * (stages, geographies, check size) on rules under the header, then the
+ * prose strategy as a real note in the serif register. Facts mostly
+ * display; the one live consumer is the outside-mandate hint on deals.
  */
 export const Route = createFileRoute('/_app/mandate')({
   loader: async () => {
@@ -50,72 +50,133 @@ type StageOption = {
   archived?: boolean
 }
 
+type SaveState = 'idle' | 'dirty' | 'saving' | 'saved'
+
 function MandatePage() {
   const { mandate, note, stageOptions } = Route.useLoaderData()
   const router = useRouter()
   const [creating, setCreating] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [savedAt, setSavedAt] = useState<string | null>(null)
 
   if (!mandate) {
     return (
-      <div className="mx-auto max-w-[72ch] px-6 py-16 md:px-10">
-        <Compass
-          className="size-8 text-muted-foreground"
-          strokeWidth={1.25}
-          aria-hidden
+      <div className="flex min-h-full flex-col">
+        <PageHeader title="Mandate" description={<span>not written</span>} />
+        <EmptyState
+          title="State your mandate"
+          body="Where you invest, at what stage, at what check size, and why. Deals outside it get a quiet flag, never a block — edge cases are the job."
+          action={
+            <Button
+              disabled={creating}
+              onClick={async () => {
+                setCreating(true)
+                try {
+                  await createMandate()
+                  void router.invalidate()
+                } catch {
+                  toast.error('Could not create the mandate')
+                  setCreating(false)
+                }
+              }}
+            >
+              {creating ? 'Creating…' : 'Write the mandate'}
+            </Button>
+          }
         />
-        <h1 className="mt-4 text-display font-semibold tracking-tight">
-          State your mandate
-        </h1>
-        <p className="mt-3 max-w-[52ch] font-serif text-[17px] leading-relaxed text-muted-foreground">
-          The mandate is what an LP would read in your deck: where you invest,
-          at what stage, at what check size, and why. It isn’t a market claim —
-          it’s the standing strategy those claims serve. Deals that fall outside
-          it get a quiet flag, never a block; edge cases are the job.
-        </p>
-        <Button
-          className="mt-6"
-          disabled={creating}
-          onClick={async () => {
-            setCreating(true)
-            try {
-              await createMandate()
-              void router.invalidate()
-            } catch {
-              toast.error('Could not create the mandate')
-              setCreating(false)
-            }
-          }}
-        >
-          {creating ? 'Creating…' : 'Write the mandate'}
-        </Button>
       </div>
     )
   }
 
-  return (
-    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
-      <header className="flex items-center gap-2">
-        <Compass
-          className="size-5 text-muted-foreground"
-          strokeWidth={1.5}
-          aria-hidden
-        />
-        <h1 className="text-page font-semibold tracking-tight">Mandate</h1>
-      </header>
+  const activeStages = mandate.stages.length
+  const status =
+    saveState === 'saving'
+      ? 'saving…'
+      : saveState === 'dirty'
+        ? 'unsaved'
+        : saveState === 'saved' && savedAt
+          ? `saved · ${savedAt}`
+          : ''
 
-      <div className="mt-6 grid gap-10 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <FactsRail mandate={mandate} stageOptions={stageOptions} />
-        <MandateProse noteId={note.id} note={note} />
+  return (
+    <div className="flex min-h-full flex-col">
+      <PageHeader
+        title="Mandate"
+        description={
+          <>
+            <span>updated {note.updatedAt.slice(0, 10)}</span>
+            <span>
+              {activeStages} stage{activeStages === 1 ? '' : 's'} ·{' '}
+              {mandate.geos.length} geo{mandate.geos.length === 1 ? '' : 's'}
+            </span>
+          </>
+        }
+        action={
+          <span
+            className="mono text-micro text-graphite"
+            role="status"
+            aria-live="polite"
+          >
+            {status}
+          </span>
+        }
+      />
+
+      <FactsGrid mandate={mandate} stageOptions={stageOptions} />
+
+      <div className="px-8 pt-6 pb-8">
+        <MandateProse
+          noteId={note.id}
+          note={note}
+          onState={(s) => {
+            setSaveState(s)
+            if (s === 'saved') setSavedAt(new Date().toTimeString().slice(0, 5))
+          }}
+        />
       </div>
     </div>
   )
 }
 
-// ---------- facts rail ----------
+// ---------- facts grid ----------
 
 type Mandate = NonNullable<Awaited<ReturnType<typeof getMandate>>>
 
-function FactsRail({
+/** One row of the grid: 96px caps label, values, a mono note on the right. */
+function FactRow({
+  label,
+  note,
+  last,
+  children,
+}: {
+  label: string
+  note?: string
+  last?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      className={cn(
+        'flex min-h-11 items-center gap-3 py-2',
+        !last && 'border-b border-rule',
+      )}
+    >
+      <div className="w-24 shrink-0 label-caps text-[0.625rem] leading-3 font-normal text-graphite">
+        {label}
+      </div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        {children}
+      </div>
+      {note ? (
+        <div className="shrink-0 mono text-micro text-graphite max-md:hidden">
+          {note}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function FactsGrid({
   mandate,
   stageOptions,
 }: {
@@ -133,129 +194,134 @@ function FactsRail({
     }
   }
 
+  // Archived stages leave the picker (spec §3: writes never assert them)
+  // but a mandate that already names one keeps it, greyed.
+  const stages = stageOptions.filter(
+    (opt) => !opt.archived || mandate.stages.includes(opt.id),
+  )
+
   return (
-    <aside className="space-y-6">
-      <section>
-        <h2 className="text-label font-medium text-muted-foreground">Stages</h2>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {/* Archived stages leave the picker (spec §3: writes never assert
-              them) but a mandate that already names one keeps it, greyed. */}
-          {stageOptions
-            .filter((opt) => !opt.archived || mandate.stages.includes(opt.id))
-            .map((opt) => {
-              const active = mandate.stages.includes(opt.id)
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() =>
-                    save({
-                      stages: active
-                        ? mandate.stages.filter((s) => s !== opt.id)
-                        : [...mandate.stages, opt.id],
-                    })
-                  }
-                  className={cn(
-                    'flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium focus-ring transition-colors',
-                    active
-                      ? ''
-                      : 'border border-border text-muted-foreground hover:border-input hover:text-foreground',
-                  )}
-                  style={active ? badgeStyle(optionColor(opt, 0)) : undefined}
-                >
-                  {active ? (
-                    <Check className="size-3" strokeWidth={2.5} />
-                  ) : null}
-                  {opt.label}
-                </button>
-              )
-            })}
-        </div>
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          Company stages you invest at. Powers the outside-mandate hint on
-          deals.
-        </p>
-      </section>
+    <div className="flex shrink-0 flex-col border-b border-hairline px-8">
+      <FactRow
+        label="Stages"
+        note={`${mandate.stages.length} of ${stages.length} · click toggles`}
+      >
+        {stages.map((opt) => {
+          const active = mandate.stages.includes(opt.id)
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() =>
+                save({
+                  stages: active
+                    ? mandate.stages.filter((s) => s !== opt.id)
+                    : [...mandate.stages, opt.id],
+                })
+              }
+              className={cn(
+                'focus-ring flex h-5 items-center px-1.5 mono text-micro font-medium transition-colors',
+                !active &&
+                  'border border-dashed border-rule font-normal text-graphite hover:border-hairline hover:text-foreground',
+              )}
+              style={active ? badgeStyle(optionColor(opt, 0)) : undefined}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </FactRow>
 
-      <GeoEditor geos={mandate.geos} onSave={(geos) => save({ geos })} />
+      <FactRow label="Geographies">
+        <GeoChips geos={mandate.geos} onSave={(geos) => save({ geos })} />
+      </FactRow>
 
-      <CheckSizeEditor
-        checkMin={mandate.checkMin}
-        checkMax={mandate.checkMax}
-        currency={mandate.currency}
-        onSave={(patch) => save(patch)}
-      />
-    </aside>
+      <FactRow label="Check size" note="whole units · flags, never blocks" last>
+        <CheckSizeInputs
+          checkMin={mandate.checkMin}
+          checkMax={mandate.checkMax}
+          currency={mandate.currency}
+          onSave={(patch) => save(patch)}
+        />
+      </FactRow>
+    </div>
   )
 }
 
-function GeoEditor({
+function GeoChips({
   geos,
   onSave,
 }: {
   geos: Array<string>
   onSave: (geos: Array<string>) => void
 }) {
+  const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
 
   function add() {
     const v = draft.trim()
-    if (!v) return
-    if (geos.some((g) => g.toLowerCase() === v.toLowerCase())) {
-      setDraft('')
-      return
-    }
-    onSave([...geos, v])
     setDraft('')
+    setAdding(false)
+    if (!v) return
+    if (geos.some((g) => g.toLowerCase() === v.toLowerCase())) return
+    onSave([...geos, v])
   }
 
   return (
-    <section>
-      <h2 className="text-label font-medium text-muted-foreground">
-        Geographies
-      </h2>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {geos.map((g) => (
-          <span
-            key={g}
-            className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+    <>
+      {geos.map((g) => (
+        <span
+          key={g}
+          className="flex h-[1.375rem] items-center gap-2 border border-rule bg-paper px-2 text-label font-medium"
+        >
+          {g}
+          <button
+            type="button"
+            aria-label={`Remove ${g}`}
+            onClick={() => onSave(geos.filter((x) => x !== g))}
+            className="focus-ring mono text-micro text-graphite hover:text-foreground"
           >
-            {g}
-            <button
-              type="button"
-              aria-label={`Remove ${g}`}
-              onClick={() => onSave(geos.filter((x) => x !== g))}
-              className="rounded-full text-muted-foreground focus-ring hover:text-foreground"
-            >
-              <X className="size-3" strokeWidth={2} />
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="mt-2 flex gap-1.5">
-        <Input
+            ×
+          </button>
+        </span>
+      ))}
+      {adding ? (
+        <input
+          autoFocus
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onBlur={add}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
               add()
             }
+            if (e.key === 'Escape') {
+              setDraft('')
+              setAdding(false)
+            }
           }}
           placeholder="India, US…"
-          className="h-8 text-ui"
           aria-label="Add geography"
+          className="focus-ring h-[1.375rem] w-44 border border-rule bg-transparent px-2 text-label outline-none placeholder:text-graphite"
         />
-        <Button size="sm" variant="outline" onClick={add}>
-          <Plus className="size-3" strokeWidth={2} />
-        </Button>
-      </div>
-    </section>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="focus-ring flex h-[1.375rem] items-center gap-1.5 border border-dashed border-rule px-2 text-label text-graphite transition-colors hover:border-hairline hover:text-foreground"
+        >
+          <span className="mono text-primary">+</span>
+          Add a geography…
+          <kbd className="mono text-micro">↵</kbd>
+        </button>
+      )}
+    </>
   )
 }
 
-function CheckSizeEditor({
+function CheckSizeInputs({
   checkMin,
   checkMax,
   currency,
@@ -286,59 +352,53 @@ function CheckSizeEditor({
     })
   }
 
+  const input =
+    'focus-ring h-[1.625rem] rounded-md border border-rule bg-transparent px-2 mono text-ui outline-none placeholder:text-graphite'
+
   return (
-    <section>
-      <h2 className="text-label font-medium text-muted-foreground">
-        Check size
-      </h2>
-      <div className="mt-2 flex items-center gap-1.5">
-        <Input
-          value={cur}
-          onChange={(e) => setCur(e.target.value.toUpperCase())}
-          onBlur={commit}
-          placeholder="USD"
-          className="h-8 w-16 numeric text-ui"
-          aria-label="Currency"
-        />
-        <Input
-          value={min}
-          onChange={(e) => setMin(e.target.value)}
-          onBlur={commit}
-          placeholder="Min"
-          inputMode="numeric"
-          className="h-8 numeric text-ui"
-          aria-label="Minimum check"
-        />
-        <span className="text-xs text-muted-foreground">–</span>
-        <Input
-          value={max}
-          onChange={(e) => setMax(e.target.value)}
-          onBlur={commit}
-          placeholder="Max"
-          inputMode="numeric"
-          className="h-8 numeric text-ui"
-          aria-label="Maximum check"
-        />
-      </div>
-      <p className="mt-1.5 text-xs text-muted-foreground">
-        Whole units. Portfolio construction belongs in the prose.
-      </p>
-    </section>
+    <>
+      <input
+        value={cur}
+        onChange={(e) => setCur(e.target.value.toUpperCase())}
+        onBlur={commit}
+        placeholder="USD"
+        aria-label="Currency"
+        className={cn(input, 'w-14')}
+      />
+      <input
+        value={min}
+        onChange={(e) => setMin(e.target.value)}
+        onBlur={commit}
+        placeholder="Min"
+        inputMode="numeric"
+        aria-label="Minimum check"
+        className={cn(input, 'w-30 text-right')}
+      />
+      <span className="mono text-label text-graphite">–</span>
+      <input
+        value={max}
+        onChange={(e) => setMax(e.target.value)}
+        onBlur={commit}
+        placeholder="Max"
+        inputMode="numeric"
+        aria-label="Maximum check"
+        className={cn(input, 'w-30 text-right')}
+      />
+    </>
   )
 }
 
 // ---------- prose ----------
 
-type SaveState = 'idle' | 'dirty' | 'saving' | 'saved'
-
 function MandateProse({
   noteId,
   note,
+  onState,
 }: {
   noteId: string
   note: { bodyJson: unknown; title: string }
+  onState: (state: SaveState) => void
 }) {
-  const [saveState, setSaveState] = useState<SaveState>('idle')
   const latest = useRef<{
     document: unknown
     blocksToMarkdownLossy: () => Promise<string>
@@ -348,7 +408,7 @@ function MandateProse({
   const flush = useCallback(async () => {
     const snapshot = latest.current
     if (!snapshot) return
-    setSaveState('saving')
+    onState('saving')
     try {
       const doc = snapshot.document
       const lossyMd = await snapshot.blocksToMarkdownLossy()
@@ -363,19 +423,19 @@ function MandateProse({
           },
         },
       })
-      setSaveState('saved')
+      onState('saved')
     } catch {
-      setSaveState('dirty')
+      onState('dirty')
     }
-  }, [noteId, note.title])
+  }, [noteId, note.title, onState])
 
   const scheduleSave = useCallback(() => {
-    setSaveState('dirty')
+    onState('dirty')
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => {
       void flush()
     }, 800)
-  }, [flush])
+  }, [flush, onState])
 
   useEffect(() => {
     return () => {
@@ -383,34 +443,19 @@ function MandateProse({
     }
   }, [])
 
+  // The measure: prose caps at 640px, left-aligned at the gutter — the
+  // sheet comes out of the instrument at the margin, never centered.
   return (
-    <div>
-      <div className="flex h-5 items-center justify-end">
-        <span
-          className="text-xs text-muted-foreground"
-          role="status"
-          aria-live="polite"
-        >
-          {saveState === 'saving'
-            ? 'Saving…'
-            : saveState === 'saved'
-              ? 'Saved'
-              : saveState === 'dirty'
-                ? 'Unsaved changes'
-                : ''}
-        </span>
-      </div>
-      <div className="prose-note">
-        <ClientOnly fallback={<div className="min-h-40" />}>
-          <NoteEditor
-            initialContent={note.bodyJson}
-            onChange={(editor) => {
-              latest.current = editor
-              scheduleSave()
-            }}
-          />
-        </ClientOnly>
-      </div>
+    <div className="prose-note max-w-160">
+      <ClientOnly fallback={<div className="min-h-40" />}>
+        <NoteEditor
+          initialContent={note.bodyJson}
+          onChange={(editor) => {
+            latest.current = editor
+            scheduleSave()
+          }}
+        />
+      </ClientOnly>
     </div>
   )
 }

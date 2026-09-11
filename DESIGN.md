@@ -286,24 +286,22 @@ entire app. Principles, after Rauno Freiberg's interface guidelines:
 **The Compositor Rule.** If a motion can't be expressed in transform + opacity, it
 doesn't ship.
 
-### The Page Shell (2026-09, revised 2026-09-10)
+### The Page Shell (2026-09, one mode since 2026-09-11)
 
-**Two page modes, no ladder.** Every route's outermost container is exactly one of two
-recipes — a page that wants a third width doesn't get one, it picks a mode:
+**One page mode, Field.** Every route's outermost container is
+`flex min-h-full flex-col`, edge to edge: the `PageHeader` or `RecordHeader` runs the
+full width with its hairline (the hairline is what ties the page to the chassis, so it
+must reach the edge), and the body insets 32px (`px-8`). Content starts at the same
+left edge on every page; navigating never moves it.
 
-- **Field** — `flex min-h-full flex-col`, edge to edge. The `PageHeader` or
-  `RecordHeader` runs the full width with its hairline; the body insets 32px
-  (`px-8`). This is now every list, board, record, Today, Tasks, Dedupe and Settings
-  page: the hairline under the header is what ties the field to the chassis, and it
-  must reach the edge. Settings caps its body at 900px inside the field.
-- **Column** — `mx-auto w-full max-w-column px-6 py-8 md:px-10`. One centered width
-  (`--container-column`, 800px — chosen by side-by-side eye test: 768 ideal for prose,
-  896 wanted by Settings' tables, 800 serves both) for the reading surfaces that have
-  no header strip: Spaces, Notes, Mandate. Navigating between column pages never moves
-  the content's left edge.
+Prose caps its measure, it does not center. A memo, a thesis, the mandate, the note
+editor and a glossary definition sit left at the gutter under `max-w-160` (640px, or
+the editor's own `72ch`); the space to the right is margin — the sheet comes out of the
+instrument at the left edge. Settings and Dedupe cap wide bodies at 880px the same way.
 
-Prose bodies (note editor, mandate empty state) keep their own `72ch` measure inside
-their shell — a typographic constraint, not a layout tier.
+The old **Column** mode (800px centered, no head strip; 2026-09 → 2026-09-11) is gone:
+its pages had become ledgers, its hairline never reached the chassis, and its left edge
+jumped ~200px against every Field page. `--container-column` was retired with it.
 
 ### Interaction Engineering (2026-09, after Emil Kowalski)
 

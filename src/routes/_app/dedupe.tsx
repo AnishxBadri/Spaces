@@ -3,6 +3,7 @@ import { Check, Copy, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { EmptyState } from '#/components/empty-state'
+import { PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import {
   dismissDuplicate,
@@ -33,14 +34,17 @@ function DedupePage() {
   const pairs = Route.useLoaderData()
 
   return (
-    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
-      <header>
-        <h1 className="title-serif">Possible duplicates</h1>
-        <p className="mt-1.5 mono text-label text-graphite">
-          {pairs.length} open · you make the call · dismissed pairs never come
-          back
-        </p>
-      </header>
+    <div className="flex min-h-full flex-col">
+      <PageHeader
+        title="Possible duplicates"
+        description={
+          <>
+            <span>{pairs.length} open</span>
+            <span>you make the call</span>
+            <span>dismissed pairs never come back</span>
+          </>
+        }
+      />
 
       {pairs.length === 0 ? (
         <EmptyState
@@ -49,7 +53,7 @@ function DedupePage() {
           body="No open duplicate suggestions. New ones appear here when two records claim the same domain or their names look alike."
         />
       ) : (
-        <ul className="mt-6 flex flex-col gap-6">
+        <ul className="flex max-w-220 flex-col gap-6 px-8 pt-6 pb-8">
           {pairs.map((pair, i) => (
             <PairCard
               key={pair.id}

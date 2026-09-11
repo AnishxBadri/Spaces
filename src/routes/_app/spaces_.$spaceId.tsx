@@ -4,22 +4,20 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import {
-  ArrowLeft,
-  Boxes,
-  Building2,
-  ChevronRight,
-  FileText,
-  Layers,
-  PenLine,
-  Plus,
-} from 'lucide-react'
+import { Boxes, FileText, Layers, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Button } from '#/components/ui/button'
-import { Input } from '#/components/ui/input'
+import {
+  LedgerFigure,
+  LedgerRow,
+  LedgerSection,
+} from '#/components/ledger-section'
+import { KeyHint } from '#/components/page-header'
+import { DitherMark } from '#/components/record/record-parts'
 import { SpaceGlossary } from '#/components/space-glossary'
 import { SaveAsTemplateAction } from '#/components/templates'
+import { Button } from '#/components/ui/button'
+import { Input } from '#/components/ui/input'
 import {
   createNote,
   createSpace,
@@ -27,10 +25,13 @@ import {
   listTerms,
   saveSpaceAsTemplate,
 } from '#/lib/server-fns'
+import { useHotkey } from '#/lib/use-hotkey'
+import { cn } from '#/lib/utils'
 
 /**
- * A space is something you read, not something you administer: one
- * scrollable page — memo up top, then what's tracked and what's written.
+ * A space is something you read, not something you administer: one page
+ * in the record register — crumb, name, subspaces in the head; then what
+ * is filed here, what is tracked, the glossary, and what refers to it.
  */
 export const Route = createFileRoute('/_app/spaces_/$spaceId')({
   loader: async ({ params }) => {
@@ -41,11 +42,6 @@ export const Route = createFileRoute('/_app/spaces_/$spaceId')({
     return { spc, terms }
   },
   component: SpacePage,
-})
-
-const dateFmt = new Intl.DateTimeFormat('en', {
-  day: '2-digit',
-  month: 'short',
 })
 
 function SpacePage() {
@@ -76,241 +72,255 @@ function SpacePage() {
       toast.error(err instanceof Error ? err.message : 'Could not create note')
     }
   }
+  useHotkey('n', () => void newNoteHere())
+
+  const rowLink =
+    'focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 transition-colors hover:bg-bone'
 
   return (
-    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
-      {/* Breadcrumb */}
-      <nav
-        aria-label="Breadcrumb"
-        className="flex items-center gap-1 text-ui text-muted-foreground"
-      >
-        <Link
-          to="/spaces"
-          className="flex items-center gap-1.5 rounded-md focus-ring hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-          Spaces
-        </Link>
-        {spc.ancestors.map((a) => (
-          <span key={a.id} className="flex items-center gap-1">
-            <ChevronRight
-              className="size-3 text-muted-foreground"
-              strokeWidth={2}
-            />
+    <div className="flex min-h-full flex-col">
+      <header className="flex shrink-0 flex-col gap-3.5 border-b border-hairline px-8 pt-5 pb-4">
+        <div className="flex items-center justify-between gap-4">
+          <nav
+            aria-label="Breadcrumb"
+            className="flex min-w-0 items-center gap-2 mono text-micro leading-[0.875rem] tracking-[0.08em] text-graphite uppercase"
+          >
             <Link
-              to="/spaces/$spaceId"
-              params={{ spaceId: a.id }}
-              className="rounded-md focus-ring hover:text-foreground"
+              to="/spaces"
+              className="focus-ring shrink-0 transition-colors hover:text-foreground"
             >
-              {a.name}
+              Spaces
             </Link>
-          </span>
-        ))}
-      </nav>
-
-      <header className="mt-5 flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-            <Layers
-              className="size-4.5 text-muted-foreground"
-              strokeWidth={1.75}
+            {spc.ancestors.map((a) => (
+              <span key={a.id} className="flex min-w-0 items-center gap-2">
+                <span className="text-rule">/</span>
+                <Link
+                  to="/spaces/$spaceId"
+                  params={{ spaceId: a.id }}
+                  className="focus-ring truncate transition-colors hover:text-foreground"
+                >
+                  {a.name}
+                </Link>
+              </span>
+            ))}
+            <span className="text-rule">/</span>
+            <span className="truncate font-medium text-foreground">
+              {spc.name}
+            </span>
+            <span className="text-rule max-md:hidden">·</span>
+            <span className="shrink-0 tracking-normal normal-case max-md:hidden">
+              {spc.children.length} subspace
+              {spc.children.length === 1 ? '' : 's'} · {spc.companies.length}{' '}
+              compan
+              {spc.companies.length === 1 ? 'y' : 'ies'} · {spc.filed.length}{' '}
+              filed
+            </span>
+          </nav>
+          <div className="flex shrink-0 items-center gap-2">
+            <SaveAsTemplateAction
+              entityLabel="space"
+              defaultName={`${spc.name} breakdown`}
+              onSave={async (name) => {
+                await saveSpaceAsTemplate({ data: { spaceId: spc.id, name } })
+              }}
+              trigger={<Button variant="outline">Save as template</Button>}
             />
-          </span>
-          <h1 className="text-page font-semibold tracking-tight">{spc.name}</h1>
+            <Button variant="outline" onClick={newNoteHere}>
+              Note here
+              <KeyHint>N</KeyHint>
+            </Button>
+          </div>
         </div>
-        <span className="flex items-center gap-2">
-          <SaveAsTemplateAction
-            entityLabel="space"
-            defaultName={`${spc.name} breakdown`}
-            onSave={async (name) => {
-              await saveSpaceAsTemplate({ data: { spaceId: spc.id, name } })
-            }}
-          />
-          <Button size="xs" variant="outline" onClick={newNoteHere}>
-            <Plus className="size-3" strokeWidth={2} />
-            Note here
-          </Button>
-        </span>
+
+        <div className="flex min-w-0 items-center gap-3">
+          {/* The space mark: a paper tile on a hairline, never a circle. */}
+          <span
+            aria-hidden
+            className="flex size-7 shrink-0 items-center justify-center border border-hairline bg-paper"
+          >
+            <Layers className="size-3.5" strokeWidth={1.75} />
+          </span>
+          <h1 className="min-w-0 truncate title-serif">{spc.name}</h1>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {spc.children.map((c) => (
+            <Link
+              key={c.id}
+              to="/spaces/$spaceId"
+              params={{ spaceId: c.id }}
+              className="focus-ring flex h-6 items-center gap-1.5 border border-rule bg-paper px-2 text-label font-medium transition-colors hover:border-hairline"
+            >
+              <Layers className="size-2.5" strokeWidth={1.75} />
+              {c.name}
+            </Link>
+          ))}
+          <NewSubspace parentId={spc.id} />
+        </div>
       </header>
 
-      {/* Subspaces */}
-      <div className="mt-4 flex flex-wrap items-center gap-1.5">
-        {spc.children.map((c) => (
-          <Link
-            key={c.id}
-            to="/spaces/$spaceId"
-            params={{ spaceId: c.id }}
-            className="flex h-6 items-center gap-1 rounded-full border border-border px-2.5 text-xs font-medium text-muted-foreground focus-ring hover:border-input hover:text-foreground"
-          >
-            <Layers className="size-3" strokeWidth={1.75} />
-            {c.name}
-          </Link>
-        ))}
-        <NewSubspace parentId={spc.id} />
-      </div>
-
-      {/* What I think here — the prose filed against this space. */}
-      <section className="mt-8 space-y-3">
-        {spc.filed.map((f) => (
-          <Link
-            key={f.id}
-            to="/notes/$noteId"
-            params={{ noteId: f.id }}
-            className="block rounded-lg border border-border p-4 focus-ring hover:border-input"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="min-w-0 truncate text-title font-semibold">
-                {f.title || `${spc.name} ${f.kind}`}
-              </h2>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                updated {dateFmt.format(new Date(f.updatedAt))}
-              </span>
-            </div>
-            {f.snippet ? (
-              <p className="mt-2 font-serif text-title leading-relaxed text-muted-foreground">
-                {f.snippet}
-                {f.snippet.length >= 400 ? '…' : ''}
-              </p>
-            ) : (
-              <p className="mt-2 text-ui text-muted-foreground">
-                Empty so far — open it and set down what you know.
-              </p>
-            )}
-          </Link>
-        ))}
-
-        <button
-          onClick={writeMemo}
-          className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border p-4 text-left focus-ring hover:border-input"
+      <div className="flex flex-col gap-6 px-8 pt-6 pb-8">
+        {/* What I think here — the prose filed against this space. */}
+        <LedgerSection
+          label="Filed here"
+          count={`${spc.filed.length} memo${spc.filed.length === 1 ? '' : 's'}`}
+          link={
+            <Link to="/notes" className="focus-ring text-primary">
+              all notes ›
+            </Link>
+          }
         >
-          <PenLine
-            className="size-4 shrink-0 text-muted-foreground"
-            strokeWidth={1.75}
-          />
-          <span>
-            <span className="block text-ui font-medium">
-              {spc.filed.length === 0 ? 'Write the memo' : 'File another'}
-            </span>
-            <span className="block text-xs text-muted-foreground">
-              {spc.filed.length === 0
-                ? 'What this space is, why it matters, what would make it investible.'
-                : 'A second memo, a market map, a teardown — as many as you want.'}
-            </span>
-          </span>
-        </button>
-      </section>
+          {spc.filed.map((f) => (
+            <li key={f.id} className="border-b border-rule">
+              <Link
+                to="/notes/$noteId"
+                params={{ noteId: f.id }}
+                className="focus-ring-inset flex flex-col gap-2 py-4 transition-colors hover:bg-bone"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="min-w-0 truncate text-title font-medium">
+                    {f.title || `${spc.name} ${f.kind}`}
+                  </h3>
+                  <span className="shrink-0 mono text-label text-graphite">
+                    {f.kind} · updated {f.updatedAt.slice(5, 10)}
+                  </span>
+                </div>
+                {f.snippet ? (
+                  <p className="text-prose max-w-160 font-serif leading-[1.6875rem] text-graphite">
+                    {f.snippet}
+                    {f.snippet.length >= 400 ? '…' : ''}
+                  </p>
+                ) : (
+                  <p className="text-ui text-graphite">
+                    Empty so far — open it and set down what you know.
+                  </p>
+                )}
+              </Link>
+            </li>
+          ))}
+          <LedgerRow>
+            <button
+              type="button"
+              onClick={writeMemo}
+              className={cn(rowLink, 'text-left')}
+            >
+              <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
+                +
+              </span>
+              <span className="min-w-0 flex-1 truncate text-ui text-graphite">
+                {spc.filed.length === 0
+                  ? 'Write the memo — what this space is, why it matters, what would make it investible'
+                  : 'File another — a market map, a teardown, a second memo'}
+              </span>
+              <span className="shrink-0 text-graphite">
+                <KeyHint>N</KeyHint>
+              </span>
+            </button>
+          </LedgerRow>
+        </LedgerSection>
 
-      {/* Tracked companies */}
-      <section className="mt-10">
-        <h2 className="text-xs font-medium text-muted-foreground">
-          Companies · {spc.companies.length}
-        </h2>
-        {spc.companies.length === 0 ? (
-          <p className="mt-2 text-ui text-muted-foreground">
-            Nothing tracked here yet — tag companies into this space from their
-            record page.
-          </p>
-        ) : (
-          <ul className="-mx-2 mt-2">
-            {spc.companies.map((c) => (
-              <li key={c.id}>
+        {/* Tracked companies */}
+        <LedgerSection
+          label="Companies"
+          count={`${spc.companies.length} · tagged from their records`}
+        >
+          {spc.companies.length === 0 ? (
+            <LedgerRow>
+              <span className="text-ui text-graphite">
+                Nothing tracked here yet — tag companies into this space from
+                their record page.
+              </span>
+            </LedgerRow>
+          ) : (
+            spc.companies.map((c) => (
+              <LedgerRow key={c.id}>
                 <Link
                   to="/companies/$companyId"
                   params={{ companyId: c.id }}
-                  className="flex h-9 items-center gap-3 rounded-md px-2 text-ui focus-ring hover:bg-accent"
+                  className={rowLink}
                 >
-                  <Building2
-                    className="size-4 shrink-0 text-muted-foreground"
-                    strokeWidth={1.75}
-                  />
-                  <span className="min-w-0 flex-1 truncate font-medium">
+                  <DitherMark size={14} />
+                  <span className="min-w-0 flex-1 truncate text-ui font-medium">
                     {c.name}
                   </span>
                   {c.stage ? (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    <span className="flex h-5 shrink-0 items-center bg-bone px-1.5 mono text-micro font-medium">
                       {c.stage}
                     </span>
                   ) : null}
-                  {c.geo ? (
-                    <span className="text-xs text-muted-foreground">
-                      {c.geo}
-                    </span>
-                  ) : null}
+                  <span className="w-24 shrink-0 truncate text-right mono text-label text-graphite">
+                    {c.geo ?? ''}
+                  </span>
                 </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+              </LedgerRow>
+            ))
+          )}
+        </LedgerSection>
 
-      {spc.records.length > 0 ? (
-        <section className="mt-10">
-          <h2 className="text-xs font-medium text-muted-foreground">
-            Records · {spc.records.length}
-          </h2>
-          <ul className="-mx-2 mt-2">
+        {spc.records.length > 0 ? (
+          <LedgerSection label="Records" count={spc.records.length}>
             {spc.records.map((r) => (
-              <li key={r.id}>
+              <LedgerRow key={r.id}>
                 <Link
                   to="/o/$objectSlug/$recordId"
                   params={{ objectSlug: r.objectSlug, recordId: r.id }}
-                  className="flex h-9 items-center gap-3 rounded-md px-2 text-ui focus-ring hover:bg-accent"
+                  className={rowLink}
                 >
                   <Boxes
-                    className="size-4 shrink-0 text-muted-foreground"
+                    className="size-3.5 shrink-0 text-foreground"
                     strokeWidth={1.75}
                   />
-                  <span className="min-w-0 flex-1 truncate font-medium">
+                  <span className="min-w-0 flex-1 truncate text-ui font-medium">
                     {r.name}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="shrink-0 mono text-label text-graphite">
                     {r.objectPlural}
                   </span>
                 </Link>
-              </li>
+              </LedgerRow>
             ))}
-          </ul>
-        </section>
-      ) : null}
+          </LedgerSection>
+        ) : null}
 
-      <SpaceGlossary spaceId={spc.id} spaceName={spc.name} terms={terms} />
+        <SpaceGlossary spaceId={spc.id} spaceName={spc.name} terms={terms} />
 
-      {/* Referenced: notes whose body mentions this space, but which live
-          somewhere else. Filed notes are above and never repeat here. */}
-      <section className="mt-10">
-        <h2 className="text-xs font-medium text-muted-foreground">
-          Referenced · {spc.notes.length}
-        </h2>
-        {spc.notes.length === 0 ? (
-          <p className="mt-2 text-ui text-muted-foreground">
-            Nothing yet. Notes that @mention {spc.name} without being filed here
-            collect in this list.
-          </p>
-        ) : (
-          <ul className="-mx-2 mt-2">
-            {spc.notes.map((n) => (
-              <li key={n.id}>
+        {/* Referenced: notes whose body mentions this space, but which live
+            somewhere else. Filed notes are above and never repeat here. */}
+        <LedgerSection
+          label="Referenced"
+          count={`${spc.notes.length} · @mention this space, filed elsewhere`}
+        >
+          {spc.notes.length === 0 ? (
+            <LedgerRow>
+              <span className="text-ui text-graphite">
+                Nothing yet. Notes that @mention {spc.name} without being filed
+                here collect in this list.
+              </span>
+            </LedgerRow>
+          ) : (
+            spc.notes.map((n) => (
+              <LedgerRow key={n.id}>
                 <Link
                   to="/notes/$noteId"
                   params={{ noteId: n.id }}
-                  className="flex h-9 items-center gap-3 rounded-md px-2 text-ui focus-ring hover:bg-accent"
+                  className={rowLink}
                 >
                   <FileText
-                    className="size-4 shrink-0 text-muted-foreground"
+                    className="size-3.5 shrink-0 text-foreground"
                     strokeWidth={1.75}
                   />
-                  <span className="min-w-0 flex-1 truncate font-medium">
+                  <span className="min-w-0 flex-1 truncate text-ui font-medium">
                     {n.title}
                   </span>
-                  <span className="tabular text-xs text-muted-foreground">
-                    {dateFmt.format(new Date(n.updatedAt))}
-                  </span>
+                  <LedgerFigure tone="muted">
+                    {n.updatedAt.slice(5, 10)}
+                  </LedgerFigure>
                 </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+              </LedgerRow>
+            ))
+          )}
+        </LedgerSection>
+      </div>
     </div>
   )
 }
@@ -334,17 +344,19 @@ function NewSubspace({ parentId }: { parentId: string }) {
       autoFocus
       value={draft}
       placeholder="Subspace name"
+      aria-label="Subspace name"
       onChange={(e) => setDraft(e.target.value)}
       onBlur={create}
       onKeyDown={(e) => e.key === 'Enter' && create()}
-      className="h-6 w-44 rounded-full px-2.5 text-xs"
+      className="h-6 w-44 px-2 text-label"
     />
   ) : (
     <button
+      type="button"
       onClick={() => setEditing(true)}
-      className="flex h-6 items-center gap-1 rounded-full border border-dashed border-border px-2.5 text-xs text-muted-foreground focus-ring hover:border-input hover:text-foreground"
+      className="focus-ring flex h-6 items-center gap-1.5 border border-dashed border-rule px-2 text-label text-graphite transition-colors hover:border-hairline hover:text-foreground"
     >
-      <Plus className="size-3" strokeWidth={2} />
+      <Plus className="size-2.5 text-primary" strokeWidth={2.5} />
       Subspace
     </button>
   )

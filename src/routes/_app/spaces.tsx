@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { ChevronRight, Plus } from 'lucide-react'
+import { Layers, Plus } from 'lucide-react'
 import { useState } from 'react'
+import { LedgerRow, LedgerSection } from '#/components/ledger-section'
+import { KeyHint, PageHeader } from '#/components/page-header'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
@@ -10,12 +12,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { applySpaceTemplate, createSpace, listSpaces } from '#/lib/server-fns'
-import { cn } from '#/lib/utils'
+import { useHotkey } from '#/lib/use-hotkey'
 
 export const Route = createFileRoute('/_app/spaces')({
   loader: () => listSpaces(),
@@ -26,48 +27,100 @@ type SpaceRow = Awaited<ReturnType<typeof listSpaces>>[number]
 
 function SpacesPage() {
   const spaces = Route.useLoaderData()
+  const [open, setOpen] = useState(false)
+  useHotkey('s', () => setOpen(true))
+
+  const nested = spaces.filter((s) => s.depth > 0).length
+  const subCount = (id: string) =>
+    spaces.filter((s) => s.parentId === id).length
 
   return (
-    <div className="mx-auto w-full max-w-column px-6 py-8 md:px-10">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-page font-semibold tracking-tight">Spaces</h1>
-          <p className="mt-1 text-ui text-muted-foreground">
-            The shared map of markets you work — taxonomy first, deals later.
-          </p>
-        </div>
-        {/* Always available — the first-run creator below only makes bare
-            top-level spaces; scaffold stamping and nesting live here. */}
-        <CreateSpaceDialog spaces={spaces} />
-      </header>
+    <div className="flex min-h-full flex-col">
+      <PageHeader
+        title="Spaces"
+        description={
+          <>
+            <span>
+              {spaces.length} space{spaces.length === 1 ? '' : 's'}
+            </span>
+            <span>{nested} nested</span>
+          </>
+        }
+        action={
+          /* Always available — the first-run creator below only makes bare
+             top-level spaces; scaffold stamping and nesting live here. */
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="size-4" strokeWidth={2} />
+            New space
+            <KeyHint>S</KeyHint>
+          </Button>
+        }
+      />
 
-      {spaces.length === 0 ? (
-        <MarketsCreator />
-      ) : (
-        <ul className="-mx-2 mt-6">
-          {spaces.map((s) => (
-            <li key={s.id}>
-              <Link
-                to="/spaces/$spaceId"
-                params={{ spaceId: s.id }}
-                className={cn(
-                  'group flex h-9 items-center gap-2 rounded-md px-2 text-ui focus-ring hover:bg-accent',
-                )}
-                style={{ paddingLeft: `${8 + s.depth * 20}px` }}
+      <div className="px-8 pt-6 pb-8">
+        {spaces.length === 0 ? (
+          <MarketsCreator />
+        ) : (
+          <LedgerSection
+            label="Market map"
+            count={`${spaces.length} · ${nested} nested`}
+          >
+            {spaces.map((s) => {
+              const subs = subCount(s.id)
+              return (
+                <LedgerRow key={s.id}>
+                  <Link
+                    to="/spaces/$spaceId"
+                    params={{ spaceId: s.id }}
+                    className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 transition-colors hover:bg-bone"
+                    style={{ paddingLeft: `${s.depth * 24}px` }}
+                  >
+                    {s.depth > 0 ? (
+                      <span className="w-3.5 shrink-0 text-center mono text-label text-graphite">
+                        ›
+                      </span>
+                    ) : (
+                      <Layers
+                        className="size-3.5 shrink-0 text-foreground"
+                        strokeWidth={1.75}
+                      />
+                    )}
+                    <span className="shrink-0 text-ui font-medium">
+                      {s.name}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate mono text-label text-graphite">
+                      {s.slug}
+                    </span>
+                    <span className="w-30 shrink-0 text-right mono text-label text-graphite">
+                      {subs > 0 ? `${subs} sub` : '—'}
+                    </span>
+                  </Link>
+                </LedgerRow>
+              )
+            })}
+            {/* The composer row: adding never starts from a corner button. */}
+            <LedgerRow>
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 text-left transition-colors hover:bg-bone"
               >
-                {s.depth > 0 ? (
-                  <ChevronRight
-                    className="size-3 shrink-0 text-muted-foreground"
-                    strokeWidth={2}
-                  />
-                ) : null}
-                <span className="font-medium">{s.name}</span>
-                <span className="text-xs text-muted-foreground">{s.slug}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+                <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
+                  +
+                </span>
+                <span className="min-w-0 flex-1 truncate text-ui text-graphite">
+                  New space… nest it under a parent, or stamp a saved breakdown
+                </span>
+                <span className="shrink-0 text-graphite">
+                  <KeyHint>S</KeyHint>
+                </span>
+              </button>
+            </LedgerRow>
+          </LedgerSection>
+        )}
+      </div>
+
+      <CreateSpaceDialog spaces={spaces} open={open} onOpenChange={setOpen} />
     </div>
   )
 }
@@ -158,9 +211,16 @@ function MarketsCreator() {
   )
 }
 
-function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
+function CreateSpaceDialog({
+  spaces,
+  open,
+  onOpenChange,
+}: {
+  spaces: Array<SpaceRow>
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [scaffold, setScaffold] = useState<{ id: string; name: string } | null>(
@@ -194,7 +254,7 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
           data: { name, parentId: parentId || undefined },
         })
       }
-      setOpen(false)
+      onOpenChange(false)
       setScaffold(null)
       void router.invalidate()
     } catch {
@@ -205,13 +265,7 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4" strokeWidth={2} />
-          New space
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>New space</DialogTitle>
@@ -229,7 +283,7 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
               <button
                 type="button"
                 onClick={() => setScaffold(null)}
-                className="rounded text-muted-foreground focus-ring hover:text-foreground"
+                className="focus-ring rounded text-muted-foreground hover:text-foreground"
                 aria-label="Clear scaffold"
               >
                 ×
@@ -263,7 +317,7 @@ function CreateSpaceDialog({ spaces }: { spaces: Array<SpaceRow> }) {
               id="space-parent"
               name="parent"
               defaultValue=""
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs focus-ring"
+              className="focus-ring h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
             >
               <option value="">None — top level</option>
               {spaces.map((s) => (

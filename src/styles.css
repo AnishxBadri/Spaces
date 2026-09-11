@@ -196,18 +196,6 @@
   --text-display: 1.625rem;
   --text-display--line-height: 2rem;
 
-  /**
-   * The Page Shell (DESIGN.md §Layout, 2026-09). Two page modes only:
-   * `column` — one centered width for every reading/admin surface — and
-   * `bleed` — edge-to-edge for the ledger (tables, board, records). One
-   * width, not a ladder: page-to-page navigation must never move the
-   * content's left edge. Chosen at 800px by side-by-side eye test
-   * (768 ideal for prose, 896 wanted by Settings' tables; 800 serves both).
-   * Prose bodies keep their own 72ch measure — a typographic constraint,
-   * not a layout tier.
-   */
-  --container-column: 50rem;
-
   /* Motion — DESIGN.md: 150–250ms, ease-out, state-conveying only. */
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 
