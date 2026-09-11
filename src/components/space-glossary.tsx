@@ -3,6 +3,7 @@ import { BookOpen, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
+import { useConfirm } from './ui/confirm-dialog'
 import { Input } from './ui/input'
 import type { listTerms } from '#/lib/server-fns'
 import { createTerm, deleteTerm, updateTerm } from '#/lib/server-fns'
@@ -73,6 +74,7 @@ export function SpaceGlossary({
 
 function TermRow({ term }: { term: Term }) {
   const router = useRouter()
+  const { confirm, confirmDialog } = useConfirm()
   const [editing, setEditing] = useState(false)
 
   if (editing) {
@@ -101,7 +103,7 @@ function TermRow({ term }: { term: Term }) {
         <dt className="flex flex-wrap items-baseline gap-2">
           <button
             onClick={() => setEditing(true)}
-            className="rounded text-ui font-medium focus-ring hover:underline"
+            className="focus-ring rounded text-ui font-medium hover:underline"
           >
             {term.name}
           </button>
@@ -113,7 +115,7 @@ function TermRow({ term }: { term: Term }) {
           {/* Global terms appear in every space; say so, or editing one from
               here looks like it only changed this space. */}
           {term.spaceId === null ? (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            <span className="bg-bone px-1.5 label-caps text-[0.625rem] leading-[0.875rem] text-graphite">
               global
             </span>
           ) : null}
@@ -125,7 +127,12 @@ function TermRow({ term }: { term: Term }) {
       <button
         aria-label={`Delete ${term.name}`}
         onClick={async () => {
-          if (!window.confirm(`Delete the term “${term.name}”?`)) return
+          const ok = await confirm({
+            title: `Delete “${term.name}”?`,
+            body: 'The term and its aliases leave the glossary. Notes that use it keep their text.',
+            action: 'Delete',
+          })
+          if (!ok) return
           try {
             await deleteTerm({ data: { id: term.id } })
             void router.invalidate()
@@ -133,10 +140,11 @@ function TermRow({ term }: { term: Term }) {
             toast.error(err instanceof Error ? err.message : 'Could not delete')
           }
         }}
-        className="hidden size-5 shrink-0 items-center justify-center rounded text-muted-foreground focus-ring group-hover:flex hover:text-destructive focus-visible:flex"
+        className="focus-ring hidden size-5 shrink-0 items-center justify-center rounded-md text-muted-foreground group-hover:flex hover:text-destructive focus-visible:flex"
       >
         <X className="size-3" strokeWidth={2} />
       </button>
+      {confirmDialog}
     </div>
   )
 }
@@ -216,7 +224,7 @@ function TermForm({
           }
         }}
         placeholder="What it means here — the definition someone new to this space needs."
-        className="w-full rounded-md border border-input bg-transparent px-2.5 py-1.5 font-serif text-body leading-relaxed focus-ring outline-none placeholder:text-muted-foreground"
+        className="focus-ring w-full rounded-md border border-input bg-transparent px-2.5 py-1.5 font-serif text-body leading-relaxed outline-none placeholder:text-muted-foreground"
       />
       <div className="flex justify-end gap-2">
         <Button size="xs" variant="ghost" type="button" onClick={onCancel}>

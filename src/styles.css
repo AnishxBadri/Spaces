@@ -149,6 +149,14 @@
   /* Row rhythm — the ledger's baseline. Header and body rows share a height so
      a sticky header sits flush against the first row. */
   --row-h: 2.25rem;
+
+  /* The z-index scale (DESIGN.md, Interaction Engineering): five values, no
+     others. Anything that needs local ordering isolates instead of climbing. */
+  --z-dropdown: 100;
+  --z-sticky: 150;
+  --z-modal: 200;
+  --z-tooltip: 300;
+  --z-toast: 400;
 }
 
 @theme inline {
@@ -423,6 +431,24 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+/* The z-index scale as utilities — z-index is not a Tailwind theme namespace,
+   so the five names are spelled out here. */
+@utility z-dropdown {
+  z-index: var(--z-dropdown);
+}
+@utility z-sticky {
+  z-index: var(--z-sticky);
+}
+@utility z-modal {
+  z-index: var(--z-modal);
+}
+@utility z-tooltip {
+  z-index: var(--z-tooltip);
+}
+@utility z-toast {
+  z-index: var(--z-toast);
 }
 
 @layer base {

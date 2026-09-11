@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
+import { useConfirm } from './ui/confirm-dialog'
 import { DocumentPreview } from './document-preview'
 import {
   DOCUMENT_KIND_LABELS,
@@ -209,6 +210,7 @@ function DocumentRow({
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
 
   async function download() {
     try {
@@ -220,8 +222,12 @@ function DocumentRow({
   }
 
   async function remove() {
-    if (!window.confirm(`Delete ${doc.filename}? This cannot be undone.`))
-      return
+    const ok = await confirm({
+      title: `Delete ${doc.filename}?`,
+      body: 'It leaves this record and the server. This cannot be undone.',
+      action: 'Delete',
+    })
+    if (!ok) return
     setBusy(true)
     try {
       await deleteDocument({ data: { id: doc.id } })
@@ -290,6 +296,7 @@ function DocumentRow({
           <Trash2 />
         </Button>
       </div>
+      {confirmDialog}
     </li>
   )
 }

@@ -38,7 +38,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        'fixed inset-0 z-50 bg-black/50 ease-out-quart data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:duration-[180ms] data-[state=open]:fade-in-0',
+        'fixed inset-0 z-modal bg-black/50 ease-out-quart data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:duration-[180ms] data-[state=open]:fade-in-0',
         className,
       )}
       {...props}
@@ -63,7 +63,7 @@ function DialogContent({
           // P8 — overlay anatomy: paper sheet, 1px ink, 3px hard shadow. The
           // 20px body padding is the sheet's; DialogHeader and DialogFooter
           // break out of it to run edge to edge.
-          'fixed top-[50%] left-[50%] z-50 flex w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-none border border-hairline bg-background p-5 shadow-[3px_3px_0_0_var(--hairline)] ease-out-quart outline-none data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:duration-[180ms] data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+          'fixed top-[50%] left-[50%] z-modal flex w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col rounded-none border border-hairline bg-background p-5 shadow-[3px_3px_0_0_var(--hairline)] ease-out-quart outline-none data-[state=closed]:animate-out data-[state=closed]:duration-[120ms] data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:duration-[180ms] data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
           className,
         )}
         {...props}

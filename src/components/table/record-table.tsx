@@ -47,8 +47,11 @@ export function RecordTable<T>({
 }) {
   const rows = table.getRowModel().rows
 
+  // `isolate`: the sticky head and pinned column order themselves with small
+  // local z values inside one stacking context, so the page's five-step scale
+  // never has to climb (DESIGN.md z-index scale).
   return (
-    <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-auto">
+    <div className="isolate mt-3 flex min-h-0 flex-1 flex-col overflow-auto">
       <table
         aria-label={label}
         className="w-full border-collapse text-ui"

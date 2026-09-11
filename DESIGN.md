@@ -327,7 +327,9 @@ load-bearing rules promoted here:
   shortcuts (`useHotkey`: T task, L log, M move stage) are ignored while typing
   and inside dialogs, and every one is printed inside the control it triggers.
 - **The z-index scale.** dropdown 100 · sticky 150 · modal 200 · tooltip 300 ·
-  toast 400. No other values; prefer `isolation: isolate` over climbing.
+  toast 400 — the utilities `z-dropdown … z-toast`, no other values; prefer
+  `isolation: isolate` over climbing (the record table isolates its sticky head and
+  pinned column). Sonner takes the toast layer as an inline style.
 - **Virtualize past ~200 rows.** The ledger stays dense by drawing less, not
   by paginating.
 
@@ -408,8 +410,11 @@ never decoration; the Two-Tier Rule guarantees they never compete with pine.
 Notes), the objects (Companies, People, Deals, then customs), capital (Portfolio,
 Mandate). Rows are 30px with a 14px mark slot so every label sits on one lane. Current
 page = paper + rule border + medium weight — never a pine bar. Settings and the user
-(ink initials square) are pinned to the foot. Collapses to a drawer under a 48px top bar
-on mobile.
+(ink initials square) are pinned to the foot, with a mono `‹` row above them that
+collapses the chassis to 48px of marks only: the mark on a hairline, `⌘K` on a rule, 36px
+rows with a 24px rule between groups, the current page in a 36×32 paper box, names on
+hover as ink tooltips, `›` to expand. Width snaps (never animates) and the preference is
+per browser. Collapses to a drawer under a 48px top bar on mobile.
 
 ### Record Pages (P7)
 
@@ -446,6 +451,11 @@ Stage` box appears while dragging over a column.
   the primary carrying ⌘↵. The first field takes the reticle on open. Wide (560px)
   for forms, 420–480 otherwise; the quick task has no title bar — the input is the
   title. A modal must be argued for.
+- **Confirm:** 440px, no title bar — an 8px crimson square beside the serif question,
+  one sans sentence saying what happens and what does not, an optional rule-bordered
+  ledger of what is affected (name left, mono meta right), then the bone foot: Keep
+  takes focus, the destructive button carries ⌘↵. `useConfirm()` replaces
+  `window.confirm` everywhere; a confirm exists to be read, never to be clicked through.
 - **Menus / pickers:** paper, 1px ink, 2px hard shadow, 28px rows, highlighted row in
   bone, 150/100ms.
 - **Command palette:** 640px; a pine `›` prompt, `↑↓ move · ↵ open` on the right, caps

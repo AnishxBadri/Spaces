@@ -9,6 +9,7 @@ import {
   Kanban,
   Layers,
   LogOut,
+  Settings,
   Sunrise,
   Users,
 } from 'lucide-react'
@@ -22,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { authClient } from '#/lib/auth-client'
 import { objectIcon } from '#/lib/object-icons'
 import { cn } from '#/lib/utils'
@@ -33,6 +35,9 @@ import { cn } from '#/lib/utils'
  * Rows are 30px with a 14px mark slot so every label sits on one lane.
  * Current page = paper + rule border + medium weight — never a pine bar
  * (the No-Bar Rule). Settings and the user are pinned to the foot.
+ *
+ * Collapsed (`collapsed`), it is 48px of marks only: the current page is a
+ * paper box, names come back as ink tooltips, `›` at the foot expands it.
  */
 export const NAV_ITEMS = [
   // Today first and login lands there (2026-08-08): the attention page is
@@ -62,6 +67,8 @@ export function AppSidebar({
   onOpenCommand,
   onNavigate,
   hideWordmark = false,
+  collapsed = false,
+  onToggleCollapsed,
 }: {
   user: { name: string; email: string }
   /** The workspace singleton's name — the deployment's identity. */
@@ -72,12 +79,29 @@ export function AppSidebar({
   onNavigate?: () => void
   /** Drawer usage — the mobile top bar already shows the wordmark. */
   hideWordmark?: boolean
+  /** The 48px marks-only chassis. */
+  collapsed?: boolean
+  /** Present on the desktop chassis only; the drawer never collapses. */
+  onToggleCollapsed?: () => void
 }) {
   const navigate = useNavigate()
 
   async function signOut() {
     await authClient.signOut()
     void navigate({ to: '/login' })
+  }
+
+  if (collapsed) {
+    return (
+      <CollapsedSidebar
+        user={user}
+        workspaceName={workspaceName}
+        objects={objects}
+        onOpenCommand={onOpenCommand}
+        onExpand={onToggleCollapsed}
+        onSignOut={signOut}
+      />
+    )
   }
 
   return (
@@ -173,11 +197,22 @@ export function AppSidebar({
       </div>
 
       <div className="border-t border-rule">
+        {onToggleCollapsed ? (
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-label="Collapse navigation"
+            className="focus-ring-inset flex h-9 w-full items-center justify-end px-5 mono text-micro text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
+          >
+            ‹
+          </button>
+        ) : null}
         <Link
           to="/settings"
           onClick={onNavigate}
           className={cn(
             'flex h-[1.875rem] items-center justify-between px-5 text-ui text-foreground transition-colors',
+            onToggleCollapsed && 'border-t border-rule',
             'hover:bg-bone-deep',
             'focus-ring-inset',
           )}
@@ -227,6 +262,178 @@ export function AppSidebar({
         </DropdownMenu>
       </div>
     </div>
+  )
+}
+
+/**
+ * The collapsed chassis (Rails sheet, "chassis · collapsed 48"): a 48px cell
+ * with the mark on a hairline, ⌘K on a rule, 36px rows of 14px marks with a
+ * 24px rule between groups, the current page in a 36×32 paper box; the foot
+ * is Settings, `›`, and the ink initials square.
+ */
+function CollapsedSidebar({
+  user,
+  workspaceName,
+  objects,
+  onOpenCommand,
+  onExpand,
+  onSignOut,
+}: {
+  user: { name: string; email: string }
+  workspaceName?: string | null
+  objects: Array<{ slug: string; plural: string; icon: string | null }>
+  onOpenCommand: () => void
+  onExpand?: () => void
+  onSignOut: () => void
+}) {
+  return (
+    <div className="flex h-full flex-col justify-between bg-sidebar">
+      <div className="flex flex-col items-center">
+        <Link
+          to="/spaces"
+          className="focus-ring-inset flex h-12 w-12 items-center justify-center border-b border-hairline"
+          aria-label={workspaceName ? `${workspaceName} home` : 'DealOS home'}
+        >
+          <Mark className="text-foreground" />
+        </Link>
+        <IconTip label="Search or jump to…">
+          <button
+            type="button"
+            onClick={onOpenCommand}
+            aria-label="Search or jump to"
+            className="focus-ring-inset flex h-10 w-12 items-center justify-center border-b border-rule mono text-micro text-graphite transition-colors hover:text-foreground"
+          >
+            {isMac ? '⌘K' : 'Ctrl K'}
+          </button>
+        </IconTip>
+
+        <nav className="flex flex-col items-center pt-1.5" aria-label="Primary">
+          {WORK.map((item) => (
+            <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+              {item.label}
+            </CollapsedNavLink>
+          ))}
+          <GroupRule />
+          {OBJECTS.map((item) => (
+            <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+              {item.label}
+            </CollapsedNavLink>
+          ))}
+          {objects.map((o) => (
+            <CollapsedNavLink
+              key={`o:${o.slug}`}
+              to="/o/$objectSlug"
+              params={{ objectSlug: o.slug }}
+              icon={objectIcon(o)}
+            >
+              {o.plural}
+            </CollapsedNavLink>
+          ))}
+          <GroupRule />
+          {CAPITAL.map((item) => (
+            <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+              {item.label}
+            </CollapsedNavLink>
+          ))}
+        </nav>
+      </div>
+
+      <div className="flex flex-col items-center">
+        <IconTip label="Settings">
+          <Link
+            to="/settings"
+            aria-label="Settings"
+            className="group focus-ring-inset flex h-9 w-12 items-center justify-center border-t border-rule"
+            activeProps={{ 'aria-current': 'page' }}
+          >
+            <span className="flex h-8 w-9 items-center justify-center rounded-md border border-transparent transition-colors group-hover:bg-bone-deep group-aria-[current=page]:border-rule group-aria-[current=page]:bg-paper group-aria-[current=page]:group-hover:bg-paper">
+              <Settings className="size-3.5 shrink-0" strokeWidth={1.75} />
+            </span>
+          </Link>
+        </IconTip>
+        <IconTip label="Expand navigation">
+          <button
+            type="button"
+            onClick={onExpand}
+            aria-label="Expand navigation"
+            className="focus-ring-inset flex h-9 w-12 items-center justify-center border-t border-rule mono text-micro text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
+          >
+            ›
+          </button>
+        </IconTip>
+        <DropdownMenu>
+          <IconTip label={user.name}>
+            <DropdownMenuTrigger
+              aria-label={`Account — ${user.name}`}
+              className="focus-ring-inset flex h-12 w-12 items-center justify-center border-t border-rule transition-colors hover:bg-bone-deep"
+            >
+              <span className="flex size-[1.375rem] shrink-0 items-center justify-center bg-foreground mono text-[0.5625rem] leading-3 font-medium text-background">
+                {initials(user.name)}
+              </span>
+            </DropdownMenuTrigger>
+          </IconTip>
+          <DropdownMenuContent side="right" align="end" className="w-56">
+            <DropdownMenuLabel className="mono text-micro text-graphite">
+              Signed in as {user.email}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onSignOut} variant="destructive">
+              <LogOut className="size-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  )
+}
+
+function GroupRule() {
+  return <span aria-hidden className="my-0 block h-px w-6 bg-rule" />
+}
+
+/** Name on hover, to the right, in ink — for the marks-only chassis. */
+function IconTip({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+function CollapsedNavLink({
+  to,
+  params,
+  icon: Icon,
+  children,
+}: {
+  to: string
+  params?: Record<string, string>
+  icon: LucideIcon
+  children: string
+}) {
+  return (
+    <IconTip label={children}>
+      <Link
+        to={to}
+        params={params}
+        aria-label={children}
+        className="group focus-ring-inset flex h-9 w-12 items-center justify-center"
+        activeProps={{ 'aria-current': 'page' }}
+      >
+        {/* Current page = a paper box on a rule (No-Bar Rule), 36×32. */}
+        <span className="flex h-8 w-9 items-center justify-center rounded-md border border-transparent transition-colors group-hover:bg-bone-deep group-aria-[current=page]:border-rule group-aria-[current=page]:bg-paper group-aria-[current=page]:group-hover:bg-paper">
+          <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
+        </span>
+      </Link>
+    </IconTip>
   )
 }
 

@@ -5,7 +5,9 @@ import { AppSidebar } from '#/components/app-sidebar'
 import { CommandPalette } from '#/components/command-palette'
 import { Wordmark } from '#/components/wordmark'
 import { Toaster } from '#/components/ui/sonner'
+import { setChassisCollapsed, useChassisCollapsed } from '#/lib/chassis-store'
 import { getSession, getWorkspace, listObjects } from '#/lib/server-fns'
+import { cn } from '#/lib/utils'
 
 /** Authenticated shell: fixed sidebar, fluid content, Cmd-K everywhere. */
 export const Route = createFileRoute('/_app')({
@@ -29,21 +31,30 @@ function AppShell() {
   const { workspace, objects } = Route.useLoaderData()
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const collapsed = useChassisCollapsed()
 
   return (
     <div className="flex min-h-dvh bg-background">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-58 border-r border-sidebar-border md:block">
+      {/* Width snaps, never animates: width is not a compositor property. */}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 hidden border-r border-sidebar-border md:block',
+          collapsed ? 'w-12' : 'w-58',
+        )}
+      >
         <AppSidebar
           user={session.user}
           workspaceName={workspace?.name ?? null}
           objects={objects}
           onOpenCommand={() => setCommandOpen(true)}
+          collapsed={collapsed}
+          onToggleCollapsed={() => setChassisCollapsed(!collapsed)}
         />
       </aside>
 
       {/* Mobile top bar */}
-      <header className="fixed inset-x-0 top-0 z-30 flex h-12 items-center gap-3 border-b border-border bg-background px-4 md:hidden">
+      <header className="fixed inset-x-0 top-0 z-sticky flex h-12 items-center gap-3 border-b border-border bg-background px-4 md:hidden">
         <button
           type="button"
           aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
@@ -62,7 +73,7 @@ function AppShell() {
 
       {/* Mobile nav drawer */}
       {mobileNavOpen ? (
-        <div className="fixed inset-0 z-20 md:hidden">
+        <div className="fixed inset-0 z-dropdown md:hidden">
           <div
             className="absolute inset-0 bg-foreground/20"
             onClick={() => setMobileNavOpen(false)}
@@ -84,7 +95,12 @@ function AppShell() {
         </div>
       ) : null}
 
-      <main className="min-w-0 flex-1 pt-12 md:pt-0 md:pl-60">
+      <main
+        className={cn(
+          'min-w-0 flex-1 pt-12 md:pt-0',
+          collapsed ? 'md:pl-14' : 'md:pl-60',
+        )}
+      >
         <Outlet />
       </main>
 
