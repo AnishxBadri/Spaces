@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { Archive, ArchiveRestore, Pencil, Plus } from 'lucide-react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import { ObjectDialog } from '#/components/objects/object-dialog'
 import { RegistryList } from '#/components/attributes/registry-list'
-import { PageHeader } from '#/components/page-header'
+import { KeyHint, PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import {
   getObject,
@@ -12,6 +13,7 @@ import {
   listRegistry,
   updateObject,
 } from '#/lib/server-fns'
+import { useHotkey } from '#/lib/use-hotkey'
 
 /**
  * One object's attributes (spec §7, §9): the registry as a settings page,
@@ -37,6 +39,9 @@ function ObjectAttributesPage() {
   const { object, registry, isAdmin } = Route.useLoaderData()
   const router = useRouter()
   const live = registry.filter((a) => !a.archived).length
+  const archivedCount = registry.length - live
+  const [creating, setCreating] = useState(false)
+  useHotkey('a', () => setCreating(true))
 
   return (
     <div className="flex min-h-full flex-col">
@@ -58,6 +63,7 @@ function ObjectAttributesPage() {
               {object.singular.toLowerCase()}
             </span>
             <span>types are fixed · rename, reorder, archive</span>
+            {archivedCount > 0 ? <span>{archivedCount} archived</span> : null}
             {isAdmin ? null : <span>reshaping is admin-only</span>}
           </>
         }
@@ -106,17 +112,18 @@ function ObjectAttributesPage() {
                 </Button>
               </>
             ) : null}
+            <Button onClick={() => setCreating(true)}>
+              <Plus className="size-4" strokeWidth={2} />
+              New attribute
+              <KeyHint>A</KeyHint>
+            </Button>
             <AttributeDialog
               mode="create"
               objectId={object.id}
               objectLabel={object.singular}
+              open={creating}
+              onOpenChange={setCreating}
               onSaved={() => router.invalidate()}
-              trigger={
-                <Button size="sm">
-                  <Plus className="size-4" strokeWidth={2} />
-                  New attribute
-                </Button>
-              }
             />
           </>
         }
