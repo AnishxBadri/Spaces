@@ -151,10 +151,12 @@
   --row-h: 2.25rem;
 
   /* The z-index scale (DESIGN.md, Interaction Engineering): five values, no
-     others. Anything that needs local ordering isolates instead of climbing. */
-  --z-dropdown: 100;
+     others. Anything that needs local ordering isolates instead of climbing.
+     Menus sit above modals: a picker opened from inside a dialog must float
+     over the sheet that opened it. */
   --z-sticky: 150;
   --z-modal: 200;
+  --z-dropdown: 250;
   --z-tooltip: 300;
   --z-toast: 400;
 }

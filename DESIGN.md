@@ -324,8 +324,9 @@ load-bearing rules promoted here:
   textareas and dialogs, icon-only buttons carry `aria-label`. Bare-key
   shortcuts (`useHotkey`: T task, L log, M move stage) are ignored while typing
   and inside dialogs, and every one is printed inside the control it triggers.
-- **The z-index scale.** dropdown 100 · sticky 150 · modal 200 · tooltip 300 ·
-  toast 400 — the utilities `z-dropdown … z-toast`, no other values; prefer
+- **The z-index scale.** sticky 150 · modal 200 · dropdown 250 · tooltip 300 ·
+  toast 400 — the utilities `z-sticky … z-toast`, no other values; menus sit above
+  modals because a picker opened from inside a dialog floats over it; prefer
   `isolation: isolate` over climbing (the record table isolates its sticky head and
   pinned column). Sonner takes the toast layer as an inline style.
 - **Virtualize past ~200 rows.** The ledger stays dense by drawing less, not
@@ -408,11 +409,12 @@ never decoration; the Two-Tier Rule guarantees they never compete with pine.
 Notes), the objects (Companies, People, Deals, then customs), capital (Portfolio,
 Mandate). Rows are 30px with a 14px mark slot so every label sits on one lane. Current
 page = paper + rule border + medium weight — never a pine bar. Settings and the user
-(ink initials square) are pinned to the foot, with a mono `‹` row above them that
-collapses the chassis to 48px of marks only: the mark on a hairline, `⌘K` on a rule, 36px
-rows with a 24px rule between groups, the current page in a 36×32 paper box, names on
-hover as ink tooltips, `›` to expand. Width snaps (never animates) and the preference is
-per browser. Collapses to a drawer under a 48px top bar on mobile.
+(ink initials square) are pinned to the foot. The account menu opens to the right of the
+chassis and holds Collapse sidebar and Sign out; collapsed, the chassis is 48px of marks
+only: the mark on a hairline, `⌘K` on a rule, 36px rows with a 24px rule between groups,
+the current page in a 36×32 paper box, names on hover as ink tooltips, and the account
+menu expands it again. Width snaps (never animates) and the preference is per browser.
+Collapses to a drawer under a 48px top bar on mobile.
 
 ### Record Pages (P7)
 

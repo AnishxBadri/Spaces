@@ -9,6 +9,8 @@ import {
   Kanban,
   Layers,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Sunrise,
   Users,
@@ -37,7 +39,9 @@ import { cn } from '#/lib/utils'
  * (the No-Bar Rule). Settings and the user are pinned to the foot.
  *
  * Collapsed (`collapsed`), it is 48px of marks only: the current page is a
- * paper box, names come back as ink tooltips, `›` at the foot expands it.
+ * paper box, names come back as ink tooltips. The account menu — opening to
+ * the right of the chassis — holds collapse/expand and sign out; there is
+ * no separate control for either.
  */
 export const NAV_ITEMS = [
   // Today first and login lands there (2026-08-08): the attention page is
@@ -197,22 +201,11 @@ export function AppSidebar({
       </div>
 
       <div className="border-t border-rule">
-        {onToggleCollapsed ? (
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            aria-label="Collapse navigation"
-            className="focus-ring-inset flex h-9 w-full items-center justify-end px-5 mono text-micro text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
-          >
-            ‹
-          </button>
-        ) : null}
         <Link
           to="/settings"
           onClick={onNavigate}
           className={cn(
             'flex h-[1.875rem] items-center justify-between px-5 text-ui text-foreground transition-colors',
-            onToggleCollapsed && 'border-t border-rule',
             'hover:bg-bone-deep',
             'focus-ring-inset',
           )}
@@ -249,19 +242,60 @@ export function AppSidebar({
               strokeWidth={1.75}
             />
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-56">
-            <DropdownMenuLabel className="mono text-micro text-graphite">
-              Signed in as {user.email}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={signOut} variant="destructive">
-              <LogOut className="size-4" />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+          <AccountMenu
+            email={user.email}
+            collapsed={false}
+            onToggleCollapsed={onToggleCollapsed}
+            onSignOut={signOut}
+          />
         </DropdownMenu>
       </div>
     </div>
+  )
+}
+
+/**
+ * The account menu opens to the right of the chassis, never up into the
+ * screen corner. It holds everything about the session: collapse or expand
+ * the chassis, sign out.
+ */
+function AccountMenu({
+  email,
+  collapsed,
+  onToggleCollapsed,
+  onSignOut,
+}: {
+  email: string
+  collapsed: boolean
+  onToggleCollapsed?: () => void
+  onSignOut: () => void
+}) {
+  return (
+    <DropdownMenuContent
+      side="right"
+      align="end"
+      sideOffset={8}
+      className="w-56"
+    >
+      <DropdownMenuLabel className="mono text-micro text-graphite">
+        Signed in as {email}
+      </DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      {onToggleCollapsed ? (
+        <DropdownMenuItem onSelect={onToggleCollapsed}>
+          {collapsed ? (
+            <PanelLeftOpen className="size-4" />
+          ) : (
+            <PanelLeftClose className="size-4" />
+          )}
+          {collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        </DropdownMenuItem>
+      ) : null}
+      <DropdownMenuItem onSelect={onSignOut}>
+        <LogOut className="size-4" />
+        Sign out
+      </DropdownMenuItem>
+    </DropdownMenuContent>
   )
 }
 
@@ -351,16 +385,6 @@ function CollapsedSidebar({
             </span>
           </Link>
         </IconTip>
-        <IconTip label="Expand navigation">
-          <button
-            type="button"
-            onClick={onExpand}
-            aria-label="Expand navigation"
-            className="focus-ring-inset flex h-9 w-12 items-center justify-center border-t border-rule mono text-micro text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
-          >
-            ›
-          </button>
-        </IconTip>
         <DropdownMenu>
           <IconTip label={user.name}>
             <DropdownMenuTrigger
@@ -372,16 +396,12 @@ function CollapsedSidebar({
               </span>
             </DropdownMenuTrigger>
           </IconTip>
-          <DropdownMenuContent side="right" align="end" className="w-56">
-            <DropdownMenuLabel className="mono text-micro text-graphite">
-              Signed in as {user.email}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onSignOut} variant="destructive">
-              <LogOut className="size-4" />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+          <AccountMenu
+            email={user.email}
+            collapsed
+            onToggleCollapsed={onExpand}
+            onSignOut={onSignOut}
+          />
         </DropdownMenu>
       </div>
     </div>
