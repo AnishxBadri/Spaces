@@ -467,6 +467,10 @@ Stage` box appears while dragging over a column.
   bone, 150/100ms.
 - **Command palette:** 640px; a pine `›` prompt, `↑↓ move · ↵ open` on the right, caps
   group labels, 32px rows, the `↵` hint on the highlighted row, a 32px bone foot.
+- **The keyboard sheet:** `?` opens it (the account menu lists it). Two columns of 26px
+  rows on rules — Go, Create, On a deal, In a sheet — with 18px keycaps (hairline, 2px
+  foot, mono 10). Only keys that work are printed. Every nav row prints its G-chord in
+  its right lane; chords wait 800ms and every key is off while typing.
 - **Tooltips:** inverted (ink background, paper text), `text-label`, 120/80ms.
 - **Toasts:** sonner, bottom-right, ink.
 
