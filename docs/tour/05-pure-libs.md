@@ -1,4 +1,4 @@
-# Chapter 5 — pure libraries: portfolio math, storage, vault, extraction
+# Chapter 5 — pure libraries: portfolio math, context, storage, vault, extraction
 
 These are the unit-tested libraries with no database access (storage and
 vault touch the filesystem and DB at their edges but keep their logic
@@ -218,6 +218,61 @@ null; null means the feature is hidden, not broken). `resolveSecret`
 currently has zero callers: it is the plumbing waiting for the BYOK AI
 phase.
 
+## `context/` — the context assembler
+
+The AI substrate's first contract (`docs/spec-ai-substrate.md` §1), built
+with no model and no key: everything AI-visible about a record, rendered to
+plain text and ranked. Four of its five files are pure and belong in this
+chapter; the fifth touches the database and is called out at the end.
+
+`types.ts` is the contract itself. A `ContextItem` is
+`{ ref, kind, text, entityIds, at }` — nine kinds (`attribute`, `note`,
+`memo`, `doc_chunk`, `event`, `interaction`, `task`, `mandate`,
+`glossary`), a `hop` of 0 / 1 / 2 / `standing`, and an `edge` naming how a
+hop ≥ 1 item was reached. The spec listed seven kinds; `interaction` and
+`task` were added (2026-09-09) because both are citation targets and
+neither is an entity. No drizzle imports here, so the ranker, the registry
+in `db/entity-refs.ts`, and the client can all depend on it.
+
+`ref.ts` is the citation grammar — `attr:<entityId>:<slug>`,
+`note:<entityId>`, `doc:<entityId>#<idx>`, `event:<id>`, and so on — with
+one builder and one parser so nothing formats a ref by hand. Documents cite
+a chunk **index**, not a chunk uuid, so re-chunking a document doesn't
+invalidate citations. Entity ids inside refs may be merged losers;
+resolvers follow `merged_into_id` at read time.
+
+`render.ts` turns a value into the one line a model sees. It takes a
+`NameLookup` for record and actor references rather than querying, which is
+what keeps it pure — and what makes the same renderer usable by a non-AI
+"everything about this record" panel.
+
+`rank.ts` is the ranker: candidates in, ranked and trimmed items out.
+Score is multiplicative and three-factored — `hop × edge × kind prior ×
+recency` — with `DEFAULT_WEIGHTS` holding every constant in one place
+(hop 1 / 0.6 / 0.3; `references` and `tagged_in` are the strongest edges;
+attributes the strongest prior). When the task carries text, a lexical lane
+(`ts_rank`, supplied per candidate) is fused by reciprocal rank fusion, the
+same trick `server/search.ts` uses and the seam an embedding lane will join.
+Standing sources (mandate, glossary) take a reserved slice of the budget
+instead of competing with the graph; hop-0 attributes are taken first; one
+chunk per document lands before any document's second. **`asOf` is an
+input, not a clock** — the same candidates always produce the same output,
+which is why "what would the analyzer see for this company" is a snapshot
+fixture.
+
+`assemble.ts` is the impure half — Effect-first, the db walk. It follows a
+merge redirect from the seed, then fetches outward in hop order: attributes
+(through the attribute registry) and aliases, `attribute_event` history, the
+portfolio ledger, links in both directions, notes and memos, document
+chunks, spaces up the tree, interactions and tasks, and finally the standing
+sources. `canRead` is applied **in SQL** — a teammate's private note never
+reaches the ranker — and before returning, every item is re-checked against
+note visibility; a hit there raises `ContextLeak`, because it means a fetch
+lost its filter. Two open seams: it hand-walks its tables rather than
+iterating the `context` roles declared in `db/entity-refs.ts` (so a new edge
+table can still go missing), and nothing imports it yet — the first consumer
+is a `getContext` server function through `effectFn()`.
+
 ## `format.ts` and `utils.ts`
 
 `lib/format.ts`: one module-level `Intl.DateTimeFormat` and one
@@ -234,3 +289,7 @@ is internally comparable. `utils.ts` is the standard shadcn `cn` helper.
   drivers and the preview path.
 - Never touch the hand-rolled compact money formatter without re-reading
   the hydration trap.
+- The ranker has no clock and no database: `asOf` and the lexical ranks are
+  inputs. Keep it that way, or the snapshots stop meaning anything.
+- Nothing leaves the context layer that `canRead` would refuse — enforced
+  twice, in the SQL and again on the way out.

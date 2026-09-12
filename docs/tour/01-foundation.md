@@ -159,25 +159,44 @@ Doctrine: side tables carry structure, never identity.
 - **`term`**: glossary. name, `aliases text[]`, `definitionMd`, scoped to a
   `spaceId` (or null for global vocabulary).
 
-### `attributes.ts` — the registry
+### `objects.ts` and `attributes.ts` — the two registries
 
-`attribute` is one registry row per attribute: objectKind (company, person,
-deal only), slug, name, type (the fixed 15-type menu), `options jsonb`
-(per-type config, shapes documented in the file), `isSystem`
-(non-deletable, archivable, options stay editable), sortOrder. Values do
-not live here; they live in `entity.values`.
+`object` (migration 0016) is the object registry: slug, singular/plural
+nouns, `isSystem`. Three seeded system rows — companies, people, deals —
+sit in the same table future custom objects will, the system-attribute
+pattern one level up. Slugs are plural because custom-object slugs derive
+from the plural noun.
+
+`attribute` is one registry row per attribute: `objectId` (FK into
+`object`; the old object_kind enum died in 0017), slug, name, type (the
+fixed 15-type menu), `options jsonb` (per-type config, shapes documented
+in the file), `isSystem` (non-deletable, archivable, options stay
+editable), sortOrder. Values do not live here; they live in
+`entity.values`. Entities of object kinds carry `entity.object_id` too;
+research kinds (space/note/document/term) leave it null, and the kind enum
+gained a `custom` member that nothing sets yet.
 
 `attributeEvent` is the per-field history: one row per changed attribute,
 written in the same transaction as the value write, with `from`/`to` jsonb.
 Deal stage history is just `attr_slug = 'stage'`; the funnel analytics in
 chapter 4 derive entirely from this table.
 
-### `lists.ts`
+### `views.ts`
 
-An Attio-style list/entry model (`list`, `listAttribute`, `listEntry` with
-its own values jsonb, `listEntryEvent`). Present since migration 0001 but
-the product went deals-as-objects instead; lists are deferred. Know it
-exists mainly because the merge executor has to handle it.
+`view` is a saved way of looking at one object's records: `filter` (an
+array of `{slug, op, value?}` conditions), `sort`, `columns` (TanStack's
+visibility state), `extra` for surface-specific state (the deals stage
+chips), and `visibility` private/shared. Keyed on `object_id`, so custom
+objects get views for free.
+
+It replaced an Attio-style list/entry model (`list`, `listAttribute`,
+`listEntry` with its own values jsonb, `listEntryEvent`) that shipped in
+migration 0001 and never got used: the product went deals-as-objects, and
+the membership-vs-instance question closed the other way — **lists are
+views, records are unique** (CONTEXT.md, 2026-09-07). A view holds no
+values; anything worth saying about a record is an attribute on the
+record, where history, provenance and the context assembler can see it.
+Migration 0023 dropped the four tables.
 
 ### `interactions.ts`
 
@@ -330,8 +349,10 @@ migration moving note filing into `entity_space`, 0009 search (generated
 tsv column, name trigram), 0010 dropping Thesis (the instructive
 enum-narrowing pattern: data deletes first, then recreate the enum), 0011
 workspace + invites, 0012 mandate, 0013 templates, 0014 the whole portfolio
-engine, 0015 tasks. Always hand-inspect generated SQL; 0008 and 0010 are
-the precedents for why.
+engine, 0015 tasks, 0016+0017 the object registry (additive migration with
+hand-written seed + backfill, then a finalize that drops the old enum — the
+two-step shape dodges drizzle-kit's interactive rename prompt). Always
+hand-inspect generated SQL; 0008 and 0010 are the precedents for why.
 
 ## Invariants to carry forward
 

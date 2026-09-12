@@ -198,15 +198,30 @@ fetches; invites load only for admins. Five sections:
    by example from real records.
 4. FX rates: base currency plus a sparse manual rate table. A missing rate is
    surfaced, never guessed; upserting a correction recomputes metrics.
-5. Objects: the three attribute registries, tabbed. Inline rename, reorder,
-   archive/restore per attribute; `OptionsEditor` for select/multi-select/
-   status types. Existing options are renameable but never removable
+5. Objects: the object registry index — every object, system and custom,
+   with its live-attribute count and a New object dialog. Each one's
+   attributes live on their own route (`/settings/objects/$objectSlug`):
+   inline rename, reorder, archive/restore per attribute; `OptionsEditor`
+   for select/multi-select/status types. Existing options are renameable but never removable
    (`settings.tsx:1029-1031`); status options carry the
    `group: active | parked | closed` field that the deals page, the board,
    and Today all depend on. The color picker is limited to the shipped
    AA-safe palette, and the swatches must be `DropdownMenuItem`s rather than
    raw buttons or the Radix popover stays open and eats the next click
    (`settings.tsx:1101-1104`).
+
+**`/o/$objectSlug`** is the same recipe generated once for every custom
+object: `getObject(slug)` + `listRegistry({objectId})` +
+`listObjectRecords({objectId})`, identity column plus the registry columns,
+and the create dialog built from the registry. Adding an object adds no
+route. Its records live at `/o/$objectSlug/$recordId`.
+
+All four record list pages (companies, people, deals, custom objects) carry
+the **view bar** (`components/views/view-bar.tsx`):
+chips for the saved views, a filter popover, save/update/delete, and
+`?view=` in the URL so a view is linkable. Filter, sort, column visibility
+and page extra belong to the view; column widths stay in localStorage,
+since they're about the screen and not the view.
 
 ## Detail pages — the `x_.$xId` convention
 

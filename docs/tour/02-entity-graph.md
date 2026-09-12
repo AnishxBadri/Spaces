@@ -111,10 +111,14 @@ identity rules as everything else, or it is not a demo of this product").
 
 ## `merge.ts` — the merge executor
 
-The most dangerous file in the repo, per CLAUDE.md: every new table that
-references entities must be added to its repoint sections **and** its
-snapshot, or unmerge becomes impossible for that table. Missing this was
-the worst bug of a review cycle.
+The most dangerous file in the repo, per CLAUDE.md: a table that references
+entities and never reaches the repoint sections leaves rows pointing at a
+merged-away id, and its snapshot gap makes unmerge impossible for that
+table. Missing one was the worst bug of a review cycle — which is why the
+hand-written list is gone. `ENTITY_REFS` (`src/db/entity-refs.ts`) is now
+the one list of entity-referencing columns, this file loops over it for
+every generic repoint, and `entity-refs.test.ts` diffs the list against
+drizzle's FK metadata so a new column can't skip it.
 
 Doctrine from the header: repoint at write time, resolve nothing at read
 time. The loser survives as a redirect (`merged_into_id`); every moved or
@@ -128,48 +132,57 @@ snapshot is a flat ordered array of
 `{table, action: repointed|dropped|field_filled|field_conflict, pk, old}`.
 There is no unmerge executor; the snapshot is the raw material for one.
 
+Each `ENTITY_REFS` entry declares one of four merge strategies:
+`repoint` (plain `update set col = winner where col = loser`),
+`repoint-or-drop` (same, but the row would collide with a unique index the
+winner already satisfies — same space, same interaction, same task, same
+round — so the loser's row is snapshotted and dropped), `custom` (a
+hand-written section here, named by handler so the two stay findable), or
+`none` with the invariant that makes skipping safe. The five custom
+handlers are checked **at import**: a registry entry naming a handler
+nobody wrote throws the first time this module loads.
+
 The sections, in execution order (worth reading with the file open, because
 the ordering itself is load-bearing):
 
 1. **Guards**: no self-merge, both sides exist, neither already merged,
    same kind, kind is mergeable.
-2. **Aliases**: loser aliases the winner already has are snapshotted and
-   dropped; the rest repoint with `source: 'merge'`.
-3. **Links**: every link touching the loser is deleted and re-inserted with
-   substituted endpoints (`onConflictDoNothing` absorbs duplicates;
-   self-links are not re-inserted). Before this runs, the code captures
-   `inboundRefs`, the loser's inbound `references` links. Step 10 needs
-   them, and they must be read **before** the link table is rewritten. If
-   you reorder these sections, step 10 breaks silently.
-4. **Space tags** and 5. **interaction attendees**: delete + re-insert
-   under the winner, duplicates absorbed.
-5. **Signals, enrichment records**, 7. **activity** (both subject and
-   object roles): plain FK repoints, snapshotted.
-6. **List entries**: if the winner already has an entry in the same list,
-   the loser's entry plus its full event history is snapshotted and
-   dropped (no attempt to merge histories); otherwise repoint.
-7. **Attribute values**: winner's `entity.values` wins field by field.
+2. **Aliases** (custom): loser aliases the winner already has are
+   snapshotted and dropped; the rest repoint with `source: 'merge'`.
+3. **Links** (custom): every link touching the loser is deleted and
+   re-inserted with substituted endpoints (`onConflictDoNothing` absorbs
+   duplicates; self-links are not re-inserted). Before this runs, the code
+   captures `inboundRefs`, the loser's inbound `references` links. Step 5
+   needs them, and they must be read **before** the link table is
+   rewritten. If you reorder these sections, step 5 breaks silently.
+4. **Every generic edge column: one loop over `ENTITY_REFS`** — space tags,
+   interaction attendees, task links, signals, enrichment records, activity
+   in both roles, `attribute_event` history, rounds, round co-investors and
+   the investments booked against a deal.
+   Composite-PK join tables are addressed by their column values, so the
+   id-less ones work too, and each repoint or drop lands in the snapshot
+   under the entry's `key` (`<table>.<role>`).
+5. **Attribute values**: winner's `entity.values` wins field by field.
    Loser value fills a winner null (`field_filled`); a genuine conflict is
    recorded (`field_conflict`) and the loser's value is discarded, no user
-   prompt. The snapshot keeps both sides.
-8. **Referrers' record-reference values**: for each captured inbound
+   prompt. The snapshot keeps both sides. Value rewrites emit an
+   `attribute_event` with actor `system`, door `merge`, so the timeline
+   never shows them as a teammate's edit.
+6. **Referrers' record-reference values**: for each captured inbound
    `references` link, rewrite the referring entity's `values[attrSlug]`,
    scalar or array, with a Set dedupe (a deal referencing both loser and
    winner in a multi-reference collapses to one).
-9. **attribute_event** history repoints: history follows the record.
-10. **Portfolio holdings**: one holding per company. If both sides have
-    one, every investment/mark/distribution repoints onto the winner's
-    holding and the loser's holding row is deleted (snapshotted);
-    otherwise the holding's companyId repoints.
-11. **Rounds**, 14. **round co-investors and task links**: repoints with
-    duplicate-drop where a unique pair already exists.
-12. **Other open duplicate candidates** touching the loser: dropped, and
-    re-filed against the winner (suggestions transfer to the survivor).
-13. The triggering candidate flips to `merged`.
-14. **Redirect + chain flatten**: set the loser's `mergedIntoId`, and
-    repoint every entity whose `mergedIntoId` pointed at the loser. This is
-    what keeps `canonicalId()` a single hop.
-15. Insert the `merge_event` and an `activity` row (`entity.merged`).
+7. **Portfolio holdings** (custom): one holding per company. If both sides
+   have one, every investment/mark/distribution repoints onto the winner's
+   holding and the loser's holding row is deleted (snapshotted); otherwise
+   the holding's companyId repoints.
+8. **Other open duplicate candidates** (custom) touching the loser:
+   dropped, and re-filed against the winner (suggestions transfer to the
+   survivor). The triggering candidate flips to `merged`.
+9. **Redirect + chain flatten** (custom): set the loser's `mergedIntoId`,
+   and repoint every entity whose `mergedIntoId` pointed at the loser. This
+   is what keeps `canonicalId()` a single hop.
+10. Insert the `merge_event` and an `activity` row (`entity.merged`).
 
 One caller: `mergeDuplicate` in `server/dedupe.ts`.
 
@@ -184,11 +197,10 @@ end to end), and that `addIdentityAlias` on the stale loser id answers
 ## `test-helpers.ts`
 
 `cleanupTestEntities(patterns)` deletes test entities and their dependents
-in FK-safe order. Trap: its deletion list is a third shadow of the
-merge-executor table list (repoint sections, snapshot, cleanup). A new
-entity-referencing table needs a line here too, or cleanup starts failing
-on FK violations. It currently skips portfolio and task tables because no
-test creates them.
+in FK-safe order. Trap: its deletion list is the one shadow of the table
+list that `ENTITY_REFS` doesn't cover — a new entity-referencing table
+needs a line here too, or cleanup starts failing on FK violations. It
+currently skips portfolio and task tables because no test creates them.
 
 ## What to hold onto
 
@@ -197,8 +209,9 @@ test creates them.
 - `entity.values` jsonb is authoritative; `link(references)` rows are a
   derived index of it. Chapter 3's `setValues` rebuilds them; merge
   rewrites both.
-- Three shadow lists must stay in sync when a table gains an entity FK:
-  merge repoints, merge snapshot, test cleanup.
+- A column that gains an entity FK goes in `ENTITY_REFS` first (merge
+  strategy + context role) — the diff test names it otherwise. Beyond that
+  registry, only `test-helpers.ts` cleanup still needs a hand-written line.
 - The dedupe inbox is fed from two directions: fuzzy name sweeps at create
   time, and identity-key collisions during enrichment. Humans resolve both;
   code never merges on its own.

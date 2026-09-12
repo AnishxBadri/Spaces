@@ -91,7 +91,12 @@ it streams.
 
 ### attributes.ts
 
-`listRegistry` (per kind, optionally archived). `createAttribute` is
+`listRegistry` (per kind, optionally archived) is the first handler run
+through the Effect seam: its body is an `Effect.fn` program executed via
+`effectFn()` from `server/effect.ts`, with auth left outside the program in
+promise-land. That adapter is the whole Effect↔TanStack boundary (CLAUDE.md
+"Backend paradigm") — new server code composes Effect programs and crosses
+here; Effect never reaches React. `createAttribute` is
 member-writable (additive); the user-creatable type list excludes
 record/actor references and status, which stay system-only.
 `updateAttribute` is the one **admin** gate in the content layer: renames,
@@ -224,6 +229,20 @@ rows it owns; compute wanted vs current sets, delete the stale, insert the
 missing. Backlinks track the document body exactly, idempotently, without
 touching manual links.
 
+### objects.ts
+
+The object registry's server half (spec §9 — the two-tier model). Reads:
+`listObjects` (system rows first regardless of creation order, each with a
+live-attribute count — archived attributes sit in the settings page's own
+collapsed section and shouldn't inflate it) and `getObject` by slug.
+Writes: `createObject` and `updateObject` are **admin**, on the same
+reasoning as `updateAttribute` — reshaping the workspace's vocabulary.
+`listObjectRecords` / `getObjectRecord` / `createObjectRecord` are the
+generic record surface the `/o/$objectSlug` routes use, so a custom object
+needs no code of its own. Effect-first throughout: tagged errors
+(`ObjectNotFound`, `ObjectQueryFailed`), programs in `Effect.fn`, crossing
+back through `effectFn()`.
+
 ### people.ts
 
 Mirror of companies: `resolveEntity` on create (email as optional
@@ -333,6 +352,17 @@ under ten minutes. A form save touching six fields renders as one entry.
 Nothing is stored; condensing happens on every read. `getWorkspaceActivity`
 is the Today page's feed: the last 15 activity rows with actor and subject
 resolved.
+
+### views.ts
+
+Saved views (SPA-14), thin handlers over programs in `lib/views/store.ts`.
+`listViews` takes a kind **or** an objectId (custom objects have no kind)
+and returns shared views plus the caller's private ones. `saveView`
+inserts or updates; `deleteView` removes. The permission rule lives in the
+program, not the handler: anyone may create a view, private or shared, and
+only its author or an admin may change or delete one. Views reference the
+object row, never an entity — which is how they stay out of the merge
+executor entirely.
 
 ## The auth-gate census
 

@@ -56,8 +56,8 @@ Each chapter is self-contained, but they build on each other in this order:
    path. One file per domain under `src/lib/server/`, the auth model, and the
    `server-fns.ts` barrel trap.
 5. **[05-pure-libs.md](05-pure-libs.md)** — the unit-tested logic with no db:
-   portfolio math (XIRR, ownership tiers), storage drivers, the vault,
-   document extraction, formatting.
+   portfolio math (XIRR, ownership tiers), the context assembler's ranker,
+   storage drivers, the vault, document extraction, formatting.
 6. **[06-routes.md](06-routes.md)** — every URL, its loader, its search-param
    state, and which server functions it calls.
 7. **[07-components.md](07-components.md)** — the record table, the editor,
@@ -75,9 +75,12 @@ the full reasoning.
 1. **One entity graph.** Everything linkable is a row in `entity(id, kind)`
    with a side table per kind; relationships are rows in one `link` table;
    space membership is `entity_space`. Deals are objects, not list entries.
-2. **Attributes grow, objects don't.** Users define attributes from a fixed
-   type menu; they never define new object types. All values live in one
-   jsonb column, validated by one Zod validator per type.
+2. **Attributes grow; objects grow in a second tier.** Users define
+   attributes from a fixed type menu. Custom objects (reversed 2026-09-02)
+   join the same `object` registry as attribute bags — full engine, none of
+   the identity/dedupe/merge/enrichment machinery the three core objects
+   get. All values live in one jsonb column, validated by one Zod validator
+   per type.
 3. **Spaces are a tree.** ltree mono-hierarchy for filing, many-to-many
    tagging for everything cross-cutting. Deliberately a taxonomy, not an
    ontology.
@@ -101,8 +104,11 @@ the full reasoning.
   `src/lib/server/shared.ts`.
 - **Never `Intl.NumberFormat` compact notation.** Node and Chrome disagree,
   which breaks hydration. `fmtMoney` in `src/lib/format.ts` hand-rolls it.
-- **New table referencing entities** → add it to the merge executor
-  (`src/lib/entities/merge.ts`), both the repoint section and the snapshot.
+- **New column referencing an entity** → add an entry to `ENTITY_REFS`
+  (`src/db/entity-refs.ts`) declaring its merge strategy and its context
+  role; `entity-refs.test.ts` diffs the list against drizzle's FK metadata
+  and fails naming the column otherwise. A `custom` strategy also needs its
+  section in `src/lib/entities/merge.ts` **and** its snapshot.
 - **Route changed** → `pnpm generate-routes`. **Schema changed** →
   `pnpm db:generate --name <x>`, then read the generated SQL yourself.
 - Tests are colocated (`*.test.ts`) and the suite needs the dev Postgres up.

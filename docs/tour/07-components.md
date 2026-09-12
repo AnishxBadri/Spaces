@@ -38,7 +38,11 @@ and sort affordances drift, and consolidation is the fix. It is purely
 presentational over a TanStack `Table<T>`: it does not build columns, own
 sort state, or know about the registry. In scope: show/hide/resize
 columns, single sort, sticky header, sticky first column, row-to-record.
-Deliberately absent: saved views, bulk edit, CSV, virtualization.
+Saved views live one level up in `components/views/` (SPA-14): `view-bar.tsx`
+is chips for the saved views plus a filter popover and save/update/delete,
+`use-view-state.ts` is the page-side half that applies `?view=` and hands the
+bar a snapshot to compare. Deliberately absent from the table itself: bulk
+edit, CSV, virtualization.
 
 Column building lives in the routes: fixed identity columns plus one
 column per registry attribute whose cell is a `ValueEditor
@@ -55,10 +59,11 @@ in as children on a second row. `AddColumnButton` is just the trigger for
 `AttributeCreateDialog`.
 
 **`use-table-prefs.ts`** persists column visibility and sizing to
-localStorage per surface, deliberately browser-local (shared saved views
-are deferred). The lazy initializer guards for SSR, and write failures are
-swallowed: column widths are not worth an error toast. Sorting is
-session-only.
+localStorage per surface. Since views shipped, the split is: a view owns
+filter, sort, which columns show and page extra (server-side, shareable);
+local prefs own column **widths**, which are about your screen, not the
+view. The lazy initializer guards for SSR, and write failures are
+swallowed: column widths are not worth an error toast.
 
 **`cells.tsx`**: the four shared cell shapes. `RecordLinkCell` and
 `ChipLink` are built with TanStack Router's `createLink` over a plain

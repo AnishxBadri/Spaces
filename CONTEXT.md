@@ -621,6 +621,29 @@ stays in the schema but is **not the deal mechanism** and is deferred from MVP. 
 watchlists/portfolio views later need membership-with-context, lists are there; deals no
 longer wait on a list engine, and kanban falls out of the Deal stage attribute.
 
+**Lists are views; records are unique (decided 2026-09-07).** This closes the
+membership-vs-instance question the Attio study left open. Attio entries are
+_instances_ — the same record can sit in one list twice with independent
+stages, and an entry carries its own attribute values. We reject both halves:
+
+- A record is one row per real-world thing, kept unique by `resolveEntity` and
+  the dedupe inbox. Nothing — a list included — may create a second row for the
+  same thing. `list_entry` gets a unique index on (list, entity) when built.
+- A list is a **view**: a saved filter over one object's records with its own
+  columns, sort, and grouping. It holds no values. Membership is a fact, once.
+- Anything worth saying about a record is an attribute **on the record**
+  ("priority for Fund II" is a select on Company, shown in the Fund II view),
+  where history, provenance, and the AI assembler can see it. There is no
+  second value store. `list_attribute` and `list_entry_event` are therefore
+  dead weight — drop them when the list engine is actually built.
+- Pipelines stay objects: a deal is a record; a second pipeline is a second
+  object with its own status attribute, and the board generalizes to any
+  status attribute rather than to entries.
+
+What "lists" then need to become is a **views** design — saved filters plus
+column layout per object, shared or private — which is cheaper than an entry
+engine and covers the watchlist case.
+
 ### Templates (decided 2026-08)
 
 One mechanism, three kinds — standardized _capture_, never automation.
@@ -679,8 +702,9 @@ activity(id, actor_id, verb, subject_entity_id, object_entity_id, meta jsonb, at
 
 One denormalized table written by every producer: stage change, note added, document filed,
 email synced, evidence attached, tag applied. Timeline reads dominate writes — do not UNION
-five tables at query time. `list_entry_event` stays alongside it as the typed attribute-change
-log that feeds stage analytics.
+five tables at query time. `attribute_event` is the typed attribute-change log that feeds
+stage analytics (`list_entry_event` was dropped 2026-09-09 with the entry-owned value store —
+see "Lists — deferred").
 
 ### Entity resolution & merge
 
@@ -1018,6 +1042,18 @@ and the worker. Two small baselines to add when the first push-style integration
 (`/api/webhooks/:provider`, signature-verified) and the dedupe-inbox pattern
 generalized into a reusable **review inbox** for assistant/AI suggestions.
 
+**One registry of entity-referencing tables (noted 2026-09-07).** The graph
+is one `link` table in the story but six edge tables in the schema
+(`link`, `entity_space`, `interaction_entity`, `task_entity`,
+`round_co_investor`, `list_entry`, plus every side table keyed on an
+entity). That fan-out is the root of the worst review-cycle bug — the merge
+executor forgetting a table — and the future context assembler has the
+identical failure mode: a new edge table ships and "everything about this
+record" silently misses it. Before the assembler is built, factor one
+code-level list of entity-referencing tables that both the merge executor
+and the assembler iterate, with a test that diffs the list against the
+drizzle schema so a new table cannot be added without joining it.
+
 ### The integration map (deliberated 2026-09-02, "future" branch)
 
 By data type, not vendor — every category classifies into the existing
@@ -1075,6 +1111,25 @@ suggestions). No category needs a new lane; that's the design check.
 11. **Outbound** — MCP server (AI agents), generic webhooks/API (n8n
     automation), digest delivery channel (Monday brief → Slack/Telegram/
     email; pull-based doctrine, delivered somewhere).
+12. **Feeds (RSS/Atom)** — deliberated 2026-09-02 on the "future" branch,
+    recorded 2026-09-07. A feed poller capability: `feed(url, scope,
+cadence, muted)` + `feed_item(feed_id, guid, url, title, summary,
+published_at)`, one pg-boss recurring job, dedupe by guid/URL. No
+    credentials — the one capability with no vault dependency; dormant
+    until the first feed URL. What makes it CRM-grade: each item runs a
+    deterministic match pass against the graph (company domains in links,
+    alias/name matches in text) and lands as a `signal` on the matched
+    record; an optional classify-lane pass is the AI upgrade, gated on the
+    AI capability. Unmatched items still flow to the digest — sourcing
+    signal lives in companies you don't have records for yet. Feeds attach
+    at three scopes: global (TechCrunch, a sector newsletter), per space (a
+    hydrogen blog on the hydrogen space), per entity (a portfolio company's
+    press page; Google Alerts ship as RSS, so name-monitoring is free). The
+    digest is the consumer, not part of the capability. Newsletters arrive
+    by email, so the forwarding mailbox doubles as newsletter ingestion
+    later, same signal store — another reason forwarding goes first.
+    Exa/news-API monitoring is the paid research-lane cousin; RSS is the
+    free tier of the same category.
 
 Sequencing instinct (revised 2026-09-02): email forwarding + link ingestion
 first (inbound arrival, cheap, feed everything), enrichment second,

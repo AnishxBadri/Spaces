@@ -222,9 +222,12 @@ the study's Attio attributes-settings page, minus Permissions/Templates).
 - **AI autofill family** — lands with BYOK AI phase under the suggestion
   doctrine (never silent, manual trigger, research-graph context). The Attio
   UI study confirmed even they don't auto-compute.
-- **Lists/entries** — deferred (CONTEXT). Probe note for the future: Attio
-  entries are _instances_ (same record twice in one list, independent
-  stages); if watchlists ever land, decide membership-vs-instance then.
+- **Lists/entries** — deferred (CONTEXT). The membership-vs-instance
+  question is **closed (2026-09-07): lists are views, records are unique.**
+  Attio entries are _instances_ (same record twice in one list, independent
+  stages, entry-owned values); we reject that — a list is a saved filter
+  with columns and no values of its own, and anything worth saying about a
+  record is an attribute on the record. See CONTEXT.md "Lists — deferred".
 - **timestamp, structured location, attribute descriptions as prompt
   context** — expansion path order unchanged.
 - **Temporal value store** — rejected above; recorded so it isn't

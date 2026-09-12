@@ -91,10 +91,16 @@ free-mail domains never make companies); fuzzy names only _suggest_ into a dedup
 inbox. **Merge** repoints at write with a full snapshot (unmerge-able), never resolves
 at read.
 
-## 5. Object model — the attribute engine _(shipped; expansion path decided)_
+## 5. Object model — the attribute engine _(shipped; two-tier expansion underway)_
 
 **Companies, People, Deals** are objects with a registry; notes/spaces/terms are
 deliberately _not_ object-modeled (they're the research layer that links in).
+Since 2026-09 the registry is two-tier (CONTEXT.md "Two-tier object model",
+spec in `docs/spec-attribute-engine.md`): an `object` table holds the three
+core objects as seeded system rows, attributes key on `object_id`, and
+user-created custom objects will join the same table as attribute bags —
+full engine, none of the identity/dedupe/merge/enrichment machinery. The
+schema half shipped (SPA-5); dialogs and `/o/` routes are in flight.
 
 - All values — system and custom — live in `entity.values` jsonb keyed by slug. One
   write path (`setValues`, row-locked), one Zod-per-type validator, one renderer; the
@@ -109,8 +115,9 @@ deliberately _not_ object-modeled (they're the research layer that links in).
 - **Expansion path**: attribute _descriptions_ → timestamp → structured location →
   (deliberately last) formula. Headline: **AI-autofill attributes** (classify /
   summarize / prompt-completion) with the BYOK phase — fed by the research graph,
-  provenance-tracked, suggestion-only. Custom _objects_ stay out; a universal fourth
-  object ships as a system release.
+  provenance-tracked, suggestion-only. Custom _objects_ are in (reversed
+  2026-09-02) as the attribute-bag tier; a custom object that proves universal
+  still gets promoted to a system object in a release.
 
 ## 6. Research model _(shipped)_
 
@@ -170,7 +177,7 @@ record, or space — no builder UI):
 
 Application is manual plus a `suggest_on` context hint. Config, not entities.
 
-## 10. The financial engine _(phase 15 — the next build)_
+## 10. The financial engine _(shipped — phase 15)_
 
 The layer that turns the CRM into fund management. Design rule #1, confirmed
 independently by ILPA's reporting canon: **everything is an append-only dated event;
@@ -249,15 +256,30 @@ BYOK down to local Ollama for confidential decks.
 
 ## 12. Roadmap (current sequence)
 
-Shipped through phase 14: object model & tables · interactions · documents · search ·
-glossary/seeds · auth+onboarding · mandate · templates · S3 driver · design-debt pass.
+Shipped through phase 15: object model & tables · interactions · documents · search ·
+glossary/seeds · auth+onboarding · mandate · templates · S3 driver · design-debt pass ·
+the portfolio layer (§10).
 
-- **15 — Portfolio layer** (§10; the financial engine)
-- **16 — Ship polish** _(deferred; scope TBD — rename to Angle, test-db harness, CI,
+Since then, two tracks have run in parallel (2026-09):
+
+- **Attribute-engine expansion** — the two-tier object registry, per-object
+  attribute settings, defaults, config-mutability guards, archived-option
+  surfaces, custom objects with their `/o/` routes, views replacing lists, and
+  `ENTITY_REFS` as the one registry of entity-referencing columns.
+- **The Instrument design port** — v2 replaces v1 outright across every
+  surface (`DESIGN.md`, `docs/instrument-port-brief.md`).
+
+Next:
+
+- **AI substrate** (`docs/spec-ai-substrate.md` §8 build order): the context
+  assembler landed step 1 (pure, no model, no key); then the registry →
+  JSON-schema compiler, provider adapters + lane routing over the BYOK vault,
+  the MCP server, and a run log when the first multi-step feature wants one.
+- **Ship polish** _(deferred; scope TBD — rename to Angle, test-db harness, CI,
   GHCR images, install docs — decided when a release is in sight)_
 - **Post-v1 backlog**: dark theme · MIS + runway lens · scorecards · meeting-prep
   briefs, pass-letter drafting, deck-reader autofill (BYOK AI) · MCP server (last) ·
-  integrations: Calendar → Gmail (forward-only) → Apollo/Exa enrichment
+  integrations: Calendar → Gmail (forward-only) → Apollo/Exa enrichment · RSS feeds
 - **Hostability contracts** (locked, implemented at ship): root-entrypoint `/data`
   ownership repair · either-process-dies-container-dies · TLS always via proxy ·
   DB-checking healthcheck · both-or-neither backup · frozen required-env set
@@ -267,7 +289,7 @@ glossary/seeds · auth+onboarding · mandate · templates · S3 driver · design
 An angel or two-partner fund gets, in one self-hosted box: their market map and
 research compounding (spaces/notes/glossary), a spreadsheet-grade CRM that already
 speaks investing (deals born from decks, mandate screening, pass-vs-lost memory),
-and — after phase 15 — the honest financial core (what did I invest, what do I own,
+and — since phase 15 — the honest financial core (what did I invest, what do I own,
 what is it worth, what has it returned) computed from an event ledger an auditor
 would recognize the shape of, without the fund-admin apparatus none of them need.
 The fenced tier is the moat _against_ scope creep: TagHash-class fund administration

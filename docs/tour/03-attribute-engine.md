@@ -12,7 +12,12 @@ Fifteen types: text, number, currency, date, checkbox, select,
 multi_select, status, domain, email, url, phone, rating, record_reference,
 actor_reference. `ObjectKind` is company | person | deal only, narrower
 than entity kinds: notes, spaces, and terms are deliberately not
-object-modeled.
+object-modeled. `CORE_OBJECTS` maps each kind to its seeded object-registry
+row (slug/singular/plural); registry reads key on `object_id`, and
+`objects.ts` does the kind → id resolution with a process-lifetime cache.
+That module is also the repo's first Effect code: `Effect.fn` with tagged
+errors, plus an `objectIdForKindAsync` promise seam for call sites the
+ratchet hasn't converted yet.
 
 `valueValidator(def)` returns a Zod schema for a single value. The
 interesting cases:
@@ -90,11 +95,12 @@ identical value writes zero events.
 
 ## `seed.ts` and `colors.ts`
 
-`seedSystemAttributes()` runs on every boot from `db/migrate.ts`:
-select by (objectKind, slug), skip if present, insert with
+`seedSystemAttributes()` runs on every boot from `db/migrate.ts`: first the
+three system object rows (insert-if-absent by slug), then attributes —
+select by (objectId, slug), skip if present, insert with
 `sortOrder: (i+1)*10` (gaps of 10 leave room for user attributes between).
-New system attributes in a release appear on upgrade without stomping
-edits.
+New system objects and attributes in a release appear on upgrade without
+stomping edits.
 
 `colors.ts` names the twelve badge colors; `styles.css` owns the values as
 CSS variables. CSS variables rather than Tailwind classes because the color
