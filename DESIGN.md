@@ -286,6 +286,14 @@ entire app. Principles, after Rauno Freiberg's interface guidelines:
 **The Compositor Rule.** If a motion can't be expressed in transform + opacity, it
 doesn't ship.
 
+The canvas sheet **Micro-interactions** (`v2 · Components`, 2026-09-11) draws each
+interaction frame by frame with its contract as a mono line: button press, ledger row
+states, overlay enter/exit, composer add, field edit, drag reorder, toast and loading,
+chassis fold, tabs, badge toggle. Four specifics on that sheet are proposed, not yet in
+code: a composer's new row lands on a bone wash that fades in 250ms; a rejected cell
+write snaps back and reads crimson in place for 2s; toasts rise 8px as they fade in; a
+pending button drops its key hint with the label swap.
+
 ### The Page Shell (2026-09, one mode since 2026-09-11)
 
 **One page mode, Field.** Every route's outermost container is
@@ -348,7 +356,11 @@ load-bearing rules promoted here:
 
 - **Style:** transparent background, 1px rule, 2px radius, 32px height. No shadow.
 - **Focus:** the reticle, drawn on the input's own background (inputs can't host
-  `::after`).
+  `::after`). Two exceptions, decided 2026-09-11: a title-style input (the borderless,
+  full-width input that _is_ the head of a sheet, as in the quick task) draws no marks —
+  the caret in a fresh sheet is the focus, and corner marks on that box read as a frame
+  around the head; a borderless input inside a bordered composer row draws the marks on
+  the row (`focus-ring-within`), never on the invisible input box.
 - **Labels:** the `Label` atom is a 10px caps mono field label in graphite.
 - **Placeholders:** full-strength graphite — never a sub-100% opacity.
 - **Invalid:** border shifts to destructive; a required-and-empty field gets an amber
@@ -367,7 +379,12 @@ colour only when nonzero and bad.
 ### Ledger section + attention row (P2 · P3)
 
 `LedgerSection`: caps label + mono count left, one mono link right, hairline under the
-head, 36px rows on rules, the last row may be a composer (`+ Add a task…  T`). Every row
+head, 36px rows on rules, the last row may be a composer (`+ Add a task…  T`). Notes
+splits its ledger by ISO week (THIS WEEK · `W37`, then EARLIER); Spaces is one ledger of
+the market-map tree with `›` at a 24px indent per depth; the Mandate's facts are a
+one-column property grid under the head (stages as badges with the unselected ones
+dashed, geographies as square chips with an inline add, the check size as mono inputs)
+above the prose. Every row
 ends on a fixed mono lane (`LedgerFigure`, 64 or 80px, right-aligned). A number is never
 shown alone when a median exists: `ReferenceBar` draws the value in ink, the median as a
 graphite tick, the track as rule — 1-bit, no colour.
@@ -458,6 +475,16 @@ Stage` box appears while dragging over a column.
   the primary carrying ⌘↵. The first field takes the reticle on open. Wide (560px)
   for forms, 420–480 otherwise; the quick task has no title bar — the input is the
   title. A modal must be argued for.
+- **The options editor** (inside the attribute sheet): a rule-bordered box of 30px rows
+  — `⋮⋮` grip, a 14px square swatch, the borderless label, a mono status group — with a
+  composer as the last row (`+ Add option… or paste a list`; a pasted list becomes
+  rows). Saved options archive, struck in graphite with a mono `restore`; only unsaved
+  rows can be removed. Hue is auto-assigned; the swatch opens a grid of square swatches,
+  never circles.
+- **The object sheet:** singular and plural side by side, the plural marked `guessed` in
+  mono until touched; a 1-bit icon grid of 32px tiles, the chosen one ink; the derived
+  slug shown frozen in a bone box (`/o/funds · /o/funds/<id>`); the foot says records are
+  born with a required name and objects archive, never delete.
 - **Confirm:** 440px, no title bar — an 8px crimson square beside the serif question,
   one sans sentence saying what happens and what does not, an optional rule-bordered
   ledger of what is affected (name left, mono meta right), then the bone foot: Keep
@@ -495,6 +522,16 @@ CAPITAL`) right, hairline under; then 48px rows on rules with the control on the
 Tables inside settings use the ledger primitives unchanged — the FX rates ledger is the
 example, and its foot says what the model does: rates are append-only, a new date
 supersedes, nothing edits.
+
+An object's attributes are a settings ledger too (2026-09-11): a caps column head on a
+hairline — ATTRIBUTE · TYPE · CONSTRAINTS · ORIGIN · ORDER · EDIT — with the lanes shared
+by head and rows so they stay one grid; rows on rules with a `⋮⋮` grip lane, the name
+with its description under it, the raw type slug in mono, a mono constraints lane
+(option count, target, currency, out of n, required, default), a caps origin tag (system
+on bone, custom on the selection wash), and always-visible `↑ ↓ ✎ archive` marks in
+graphite. Select rows carry their square option badges beneath, archived options struck
+on bone. The foot says what the order feeds. Archived attributes fold into a collapsed
+ARCHIVED section with a Restore button and no grip. `A` opens New attribute.
 
 ## 6. Do's and Don'ts
 

@@ -28,6 +28,11 @@ pnpm worker                                       # background worker
    eliminated 2026-09; don't reintroduce one). Where drizzle's `const [row] =`
    destructure lies about presence, use the `.at(0)` pattern instead of
    deleting the guard.
+5. No v1 design tokens in `src/**/*.tsx` (swept 2026-09-11). This must print
+   nothing (zsh: keep the quotes on `--include`):
+   `grep -rnP 'text-muted-foreground|border-border\b|border-input\b|bg-accent\b|bg-muted\b|shadow-xs|text-xs\b|text-sm\b|rounded-(full|lg|sm)|rounded(?![-\w])|dark:' src --include='*.tsx'`
+   The Instrument vocabulary is `text-graphite`, `border-rule`, `bg-bone`,
+   `text-label`, `rounded-md` (2px) / `rounded-none`.
 
 Pre-commit hooks (lefthook) run prettier + eslint on staged files; pre-push
 runs tsc. CI (`.github/workflows/ci.yml`) runs all four gates against a real
