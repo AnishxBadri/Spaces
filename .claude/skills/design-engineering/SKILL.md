@@ -3,12 +3,12 @@ name: design-engineering
 description: Design engineering principles for polished, accessible UI — Emil Kowalski's practices adapted to this codebase. Use when building or reviewing UI components, forms, animations, touch interactions, keyboard navigation, or performance-sensitive views. Triggers on: UI polish, input fields, form validation, button states, touch devices, mobile UX, accessibility, a11y, keyboard navigation, aria labels, layout shift, z-index, animations, transitions, easing, hover effects, tap targets, iOS Safari, prefers-reduced-motion, scrollbars, virtualization.
 ---
 
-# Design Engineering (Emil Kowalski, adapted for dealos)
+# Design Engineering (Emil Kowalski, adapted for Spaces)
 
 Engineering-grade rules for interaction quality. **DESIGN.md is the tiebreaker** —
 where this skill and DESIGN.md disagree, DESIGN.md wins.
 
-## Dealos overrides — do NOT apply these upstream rules here
+## Spaces overrides — do NOT apply these upstream rules here
 
 1. **Borders stay borders.** Upstream says "shadows instead of borders"
    (`box-shadow: 0 0 0 1px`). The Analyst's Desk is deliberately a crisp

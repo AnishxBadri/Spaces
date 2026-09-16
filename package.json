@@ -1,5 +1,5 @@
 {
-  "name": "dealos",
+  "name": "spaces",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,6 +10,7 @@
     "dev": "vite dev --port 3000",
     "worker": "dotenv -e .env.local -- tsx src/worker/index.ts",
     "db:migrate:run": "dotenv -e .env.local -- tsx src/db/migrate.ts",
+    "db:seed": "dotenv -e .env.local -- tsx src/db/seed.ts",
     "generate-routes": "tsr generate",
     "build": "vite build",
     "preview": "vite preview",

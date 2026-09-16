@@ -89,6 +89,7 @@ export const Route = createFileRoute('/_app/companies')({
 type Row = Awaited<ReturnType<typeof listCompaniesTable>>[number]
 
 const col = createColumnHelper<Row>()
+// FROZEN: renaming resets saved column layouts with no recovery path.
 const PREFS_KEY = 'dealos.companies-table.v1'
 
 function CompaniesPage() {

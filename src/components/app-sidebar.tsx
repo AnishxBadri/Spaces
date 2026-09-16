@@ -127,7 +127,7 @@ export function AppSidebar({
               className="focus-ring"
               // Accessible name must contain the visible text (WCAG 2.5.3).
               aria-label={
-                workspaceName ? `${workspaceName} home` : 'DealOS home'
+                workspaceName ? `${workspaceName} home` : 'Spaces home'
               }
             >
               <Wordmark />

@@ -1,14 +1,14 @@
-name: dealos
+name: spaces
 # Production self-host: `docker compose up` works first try.
 # Two containers, two volumes. Full env surface documented in CONTEXT.md.
 services:
   app:
     build: .
-    # image: ghcr.io/OWNER/dealos:TAG   # once images are published, pin a tag
+    # image: ghcr.io/OWNER/spaces:TAG   # once images are published, pin a tag
     ports:
       - '3000:3000'
     environment:
-      DATABASE_URL: postgresql://dealos:${POSTGRES_PASSWORD:-dealos}@db:5432/dealos
+      DATABASE_URL: postgresql://${POSTGRES_USER:-spaces}:${POSTGRES_PASSWORD:-spaces}@db:5432/${POSTGRES_DB:-spaces}
       APP_URL: ${APP_URL:-http://localhost:3000}
       # Optional — auto-generated to /data/secret.key if absent.
       # MASTER_KEY:
@@ -25,17 +25,17 @@ services:
   db:
     image: pgvector/pgvector:pg17
     environment:
-      POSTGRES_USER: dealos
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dealos}
-      POSTGRES_DB: dealos
+      POSTGRES_USER: ${POSTGRES_USER:-spaces}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spaces}
+      POSTGRES_DB: ${POSTGRES_DB:-spaces}
     volumes:
-      - dealos_pgdata:/var/lib/postgresql/data
+      - spaces_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U dealos -d dealos']
+      test: ['CMD-SHELL', 'pg_isready -U spaces -d spaces']
       interval: 5s
       timeout: 3s
       retries: 10
     restart: unless-stopped
 
 volumes:
-  dealos_pgdata:
+  spaces_pgdata:

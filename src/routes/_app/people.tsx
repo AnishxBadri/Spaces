@@ -84,6 +84,7 @@ export const Route = createFileRoute('/_app/people')({
 type Row = Awaited<ReturnType<typeof listPeopleTable>>[number]
 
 const col = createColumnHelper<Row>()
+// FROZEN: renaming resets saved column layouts with no recovery path.
 const PREFS_KEY = 'dealos.people-table.v1'
 
 function PeoplePage() {

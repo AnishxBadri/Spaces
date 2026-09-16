@@ -12,18 +12,18 @@ jobs:
       db:
         image: pgvector/pgvector:pg17
         env:
-          POSTGRES_USER: dealos
-          POSTGRES_PASSWORD: dealos
-          POSTGRES_DB: dealos
+          POSTGRES_USER: spaces
+          POSTGRES_PASSWORD: spaces
+          POSTGRES_DB: spaces
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U dealos -d dealos"
+          --health-cmd "pg_isready -U spaces -d spaces"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
     env:
-      DATABASE_URL: postgres://dealos:dealos@localhost:5432/dealos
+      DATABASE_URL: postgres://spaces:spaces@localhost:5432/spaces
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

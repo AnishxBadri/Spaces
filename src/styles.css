@@ -11,7 +11,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /**
- * DealOS tokens — DESIGN.md ("The Analyst's Desk") made concrete.
+ * Spaces tokens — DESIGN.md ("The Analyst's Desk") made concrete.
  * Pure white ground; character lives in Pine and type, never the surface.
  * The primary appears only as: primary action, current selection, focus.
  * All neutrals carry a whisper of the primary hue (~155°) at near-zero

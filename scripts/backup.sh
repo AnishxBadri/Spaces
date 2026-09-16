@@ -9,7 +9,7 @@
 # Usage:  ./scripts/backup.sh [output-dir]     (default: ./backups)
 # Cron:   0 3 * * *  cd /path/to/app && ./scripts/backup.sh
 #
-# Restore: docker compose exec -T db psql -U dealos dealos < dump.sql
+# Restore: docker compose exec -T db psql -U spaces spaces < dump.sql
 #          tar xzf blobs.tgz
 # Rollback after a bad upgrade is THIS, never an older image on a newer
 # schema — migrations are forward-only.
@@ -28,7 +28,7 @@ cleanup_on_fail() {
 }
 trap cleanup_on_fail INT TERM
 
-if ! docker compose exec -T db pg_dump -U dealos dealos > "$OUT/dump.sql"; then
+if ! docker compose exec -T db pg_dump -U spaces spaces > "$OUT/dump.sql"; then
   cleanup_on_fail
 fi
 

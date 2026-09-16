@@ -101,6 +101,7 @@ function ObjectListPage() {
   const router = useRouter()
   const navigate = useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
+  // FROZEN: renaming resets saved column layouts with no recovery path.
   const prefs = useTablePrefs(`dealos.o-${object.slug}-table.v1`)
   const { view: activeId } = Route.useSearch()
   const vs = useViewState({

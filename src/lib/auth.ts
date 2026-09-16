@@ -17,6 +17,8 @@ import { loadMasterKey } from '#/lib/vault/key'
 function authSecret(): string {
   if (process.env.BETTER_AUTH_SECRET) return process.env.BETTER_AUTH_SECRET
   return Buffer.from(
+    // FROZEN: this HKDF info label is a key-derivation input — renaming it
+    // re-derives the session secret and signs every user out.
     hkdfSync('sha256', loadMasterKey(), '', 'dealos:better-auth-secret', 32),
   ).toString('base64')
 }

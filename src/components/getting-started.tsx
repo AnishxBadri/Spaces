@@ -11,6 +11,7 @@ export type OnboardingProgress = {
   invitedPartner: boolean
 }
 
+// FROZEN: renaming re-shows the welcome banner for existing users.
 const DISMISS_KEY = 'dealos.getting-started.dismissed'
 
 const STEPS: Array<{

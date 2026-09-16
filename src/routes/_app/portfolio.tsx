@@ -31,6 +31,7 @@ export const Route = createFileRoute('/_app/portfolio')({
 type HoldingRow = Awaited<ReturnType<typeof listHoldings>>['holdings'][number]
 
 const col = createColumnHelper<HoldingRow>()
+// FROZEN: renaming resets saved column layouts with no recovery path.
 const PREFS_KEY = 'dealos.portfolio-table.v1'
 
 function metricsOf(r: HoldingRow) {

@@ -92,6 +92,7 @@ type DealRow = {
 }
 
 const col = createColumnHelper<DealRow>()
+// FROZEN: renaming resets saved column layouts with no recovery path.
 const PREFS_KEY = 'dealos.deals-table.v1'
 
 /**
@@ -174,6 +175,7 @@ function DealsPage() {
   // View toggle — read post-mount so SSR and client agree on first paint.
   const [view, setView] = useState<'table' | 'board'>('table')
   useEffect(() => {
+    // FROZEN: renaming resets saved view preference with no recovery path.
     if (localStorage.getItem('dealos.deals-view') === 'board') setView('board')
   }, [])
   function switchView(v: 'table' | 'board') {
