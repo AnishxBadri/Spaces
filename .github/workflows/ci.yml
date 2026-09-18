@@ -49,6 +49,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Also the build guard (SPA-152). The image stopped building the day
+      # lefthook arrived — `prepare` needs git, alpine has none — and nothing
+      # in CI noticed. This step is that alarm; it runs on a checkout whose
+      # .git is excluded by .dockerignore, which is exactly the failing case.
+      # No push: proving it builds is the whole job.
       - name: Build the runtime image
         run: docker build -t spaces:ci .
 
@@ -106,7 +111,7 @@ jobs:
           sudo chown 4242:4242 okdata/blobs/0/0
           START=$(date +%s%3N)
           docker run -d --name nochown --network "$NET" \
-            -e DATABASE_URL=postgresql://dealos:dealos@db:5432/dealos \
+            -e DATABASE_URL=postgresql://spaces:spaces@db:5432/spaces \
             -e MASTER_KEY="$MASTER_KEY" -e ROLE=web \
             -v "$PWD/okdata:/data" spaces:ci
           for _ in $(seq 1 60); do
@@ -150,7 +155,7 @@ jobs:
           # correctly owned: boots
           sudo mkdir -p gooddata && sudo chown 1000:1000 gooddata
           docker run -d --name unpriv --user 1000:1000 --network "$NET" \
-            -e DATABASE_URL=postgresql://dealos:dealos@db:5432/dealos \
+            -e DATABASE_URL=postgresql://spaces:spaces@db:5432/spaces \
             -e MASTER_KEY="$MASTER_KEY" -v "$PWD/gooddata:/data" spaces:ci
           for _ in $(seq 1 60); do
             docker logs unpriv 2>&1 | grep -q 'Listening' && break; sleep 2
@@ -166,7 +171,7 @@ jobs:
           run_sup() {
             docker rm -f sup >/dev/null 2>&1 || true
             docker run -d --name sup --network "$NET" \
-              -e DATABASE_URL=postgresql://dealos:dealos@db:5432/dealos \
+              -e DATABASE_URL=postgresql://spaces:spaces@db:5432/spaces \
               -e MASTER_KEY="$MASTER_KEY" -v "$PWD/supdata:/data" spaces:ci
             for _ in $(seq 1 60); do
               docker exec sup pgrep -f '[w]orker/index.ts' >/dev/null 2>&1 && return 0

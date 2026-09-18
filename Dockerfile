@@ -5,7 +5,15 @@ FROM node:22-alpine AS build
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+# --ignore-scripts, both install stages. The root `prepare` is `lefthook
+# install`, which needs a git binary and a .git directory; alpine ships
+# neither and .dockerignore keeps .git out of the context — so without this
+# flag the image simply does not build. Git hooks are a developer-checkout
+# concern and have no business inside the image. No dependency here needs a
+# postinstall either: the two that carry native code (esbuild, lightningcss,
+# the `pnpm.onlyBuiltDependencies` allowlist) ship prebuilt per-platform
+# packages that pnpm links without running anything.
+RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
 RUN pnpm build
 
@@ -13,7 +21,7 @@ FROM node:22-alpine AS prod-deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 FROM node:22-alpine
 WORKDIR /app
