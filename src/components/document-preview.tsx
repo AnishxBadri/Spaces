@@ -290,7 +290,7 @@ function PdfPreview({ doc }: { doc: Doc }) {
         />
       </div>
       {pages > 1 ? (
-        <div className="flex shrink-0 items-center justify-center gap-3 border-t border-rule bg-background px-4 py-2">
+        <div className="flex shrink-0 items-center justify-center gap-3 border-t border-rule bg-paper px-4 py-2">
           <Button
             size="icon-xs"
             variant="ghost"
@@ -417,7 +417,7 @@ function SheetPreview({ text }: { text: string }) {
               {sheet.title}
             </h3>
           ) : null}
-          <div className="overflow-x-auto rounded-md border border-rule bg-background">
+          <div className="overflow-x-auto rounded-md border border-rule bg-paper">
             <table className="w-full border-collapse text-ui">
               <tbody>
                 {sheet.rows.map((row, r) => (

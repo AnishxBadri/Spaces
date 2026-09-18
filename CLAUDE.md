@@ -47,20 +47,20 @@ pnpm worker                                       # background worker
    eliminated 2026-09; don't reintroduce one). Where drizzle's `const [row] =`
    destructure lies about presence, use the `.at(0)` pattern instead of
    deleting the guard.
-5. No v1 design tokens in `src/**/*.tsx` (swept 2026-09-11). This prints one known
-   false positive today — the prose word "rounded" in a code comment at
-   `src/components/attributes/attribute-dialog.tsx:981`, caught by the bare-`rounded`
-   alternative — and must print nothing else. Roadmap `design-1` replaces the grep
-   with lint rules (zsh: keep the quotes on `--include`):
-   `grep -rnP 'text-muted-foreground|border-border\b|border-input\b|bg-accent\b|bg-muted\b|shadow-xs|text-xs\b|text-sm\b|rounded-(full|lg|sm)|rounded(?![-\w])|dark:' src --include='*.tsx'`
-   The Instrument vocabulary is `text-graphite`, `border-rule`, `bg-bone`,
-   `text-label`, `rounded-md` (2px) / `rounded-none`.
+5. No v1 design tokens — **`pnpm lint` covers it**, there is no separate gate
+   and no grep any more (2026-09-18). `instrument/no-v1-tokens`
+   (`eslint-rules/no-v1-tokens.js`) reads className literals and `cn()`/`cva()`
+   string arguments in `src/**/*.tsx` and names the Instrument replacement in
+   the message, so gate 4 and the pre-commit hook enforce it for free; the dead
+   `--color-*` exports are held out of the `@theme` block by
+   `src/lib/design-tokens.test.ts` under gate 2. The Instrument vocabulary is
+   `text-graphite`, `border-rule`, `bg-bone`, `bg-paper`, `text-label`,
+   `rounded-md` (2px) / `rounded-none`.
 
 Pre-commit hooks (lefthook) run prettier + eslint on staged files; pre-push
-runs tsc. CI (`.github/workflows/ci.yml`) runs gates 1–4 — prettier, eslint, tsc,
-vitest — against a real Postgres. **Gate 5 is not in CI**: no step runs the token
-grep, so it is a local-and-review gate only. Roadmap `mono-6` is the slice that
-would add it, after `design-1` replaces the grep with lint rules.
+runs tsc. CI (`.github/workflows/ci.yml`) runs prettier, eslint, tsc and vitest
+against a real Postgres — and since gate 5 is an eslint rule, CI enforces all
+five.
 
 ## After specific change kinds
 
