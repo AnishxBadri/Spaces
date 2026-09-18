@@ -215,7 +215,7 @@ export function DealBoard({
                     {cards.length}
                   </span>
                 </div>
-                <div className="flex justify-between gap-2 mono text-[0.625rem] leading-3 text-graphite">
+                <div className="flex justify-between gap-2 mono text-field text-graphite">
                   <span>
                     Σ{' '}
                     {sum > 0
@@ -288,7 +288,7 @@ export function DealBoard({
                             </span>
                           ) : null}
                         </span>
-                        <span className="flex items-center justify-between gap-2 mono text-[0.625rem] leading-3 text-graphite">
+                        <span className="flex items-center justify-between gap-2 mono text-field text-graphite">
                           <span className="truncate">
                             {close
                               ? `close ${close.slice(5)} · ${daysUntil(close) < 0 ? '−' : ''}${Math.abs(daysUntil(close))}d`
@@ -454,11 +454,11 @@ export function MoveStageDialog({
         </ol>
         {asksReason ? (
           <div className="mt-3 flex flex-col gap-1.5 border-t border-rule pt-3">
-            <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
+            <span className="field-label text-graphite">
               Reason · goes to the ledger
             </span>
             <textarea
-              className="focus-ring min-h-14 w-full rounded-md border border-rule bg-transparent px-2.5 py-2 font-serif text-[0.9375rem] leading-[1.4375rem] placeholder:text-graphite"
+              className="focus-ring min-h-14 w-full rounded-md border border-rule bg-transparent px-2.5 py-2 font-serif text-title leading-5.75 placeholder:text-graphite"
               placeholder={
                 picked === 'passed'
                   ? 'Too early for our check size; team question on GTM…'

@@ -130,7 +130,7 @@ function PairCard({
   return (
     <li className="flex flex-col border border-hairline bg-paper shadow-[3px_3px_0_0_var(--hairline)]">
       <div className="flex min-h-11 items-baseline gap-3 border-b border-hairline px-5 py-2.5">
-        <h2 className="font-serif text-lg leading-[1.375rem] font-semibold">
+        <h2 className="font-serif text-lg leading-5.5 font-semibold">
           Same {pair.a.kind === 'person' ? 'person' : 'company'}?
         </h2>
         <span className="mono text-micro text-graphite">
@@ -139,7 +139,7 @@ function PairCard({
       </div>
       <div className="flex flex-col overflow-x-auto">
         <div className="flex h-10 border-b border-hairline">
-          <div className="flex w-35 shrink-0 items-center px-5 label-caps text-[0.625rem] leading-3 font-normal text-graphite">
+          <div className="flex w-35 shrink-0 items-center px-5 field-label text-graphite">
             field
           </div>
           {(['a', 'b'] as const).map((k) => {
@@ -164,7 +164,7 @@ function PairCard({
                 >
                   {on ? <Check className="size-2.5" strokeWidth={2.5} /> : null}
                 </span>
-                <span className="label-caps text-[0.625rem] leading-3 font-normal text-foreground">
+                <span className="field-label text-foreground">
                   {on ? 'Keep' : 'Merge in'} · {k.toUpperCase()}
                 </span>
               </button>
@@ -173,7 +173,7 @@ function PairCard({
         </div>
         {rows.map((row) => (
           <div key={row.label} className="flex min-h-9 border-b border-rule">
-            <div className="flex w-35 shrink-0 items-center px-5 label-caps text-[0.625rem] leading-3 font-normal text-graphite">
+            <div className="flex w-35 shrink-0 items-center px-5 field-label text-graphite">
               {row.label}
             </div>
             {([pair.a, pair.b] as const).map((side, si) => {

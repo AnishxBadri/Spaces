@@ -759,7 +759,7 @@ function AttributeForm({
               }
               onChange={(e) => setName(e.target.value)}
             />
-            <p className="mono text-[0.625rem] leading-3 text-graphite">
+            <p className="mono text-field text-graphite">
               slug {slug || '…'} ·{' '}
               {mode === 'create' ? 'frozen after create' : 'frozen'}
             </p>
@@ -921,7 +921,7 @@ function TypePane({
               </span>
               <span className="truncate">{t.label}</span>
               {t.id === 'status' ? (
-                <span className="mono text-[0.625rem] leading-3 text-graphite">
+                <span className="mono text-field text-graphite">
                   1 per object
                 </span>
               ) : null}

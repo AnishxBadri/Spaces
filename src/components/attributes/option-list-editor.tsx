@@ -232,7 +232,7 @@ export function OptionListEditor({
               </select>
             ) : null}
             {o.archived ? (
-              <span className="shrink-0 mono text-[0.625rem] leading-3 text-graphite">
+              <span className="shrink-0 mono text-field text-graphite">
                 archived
               </span>
             ) : null}
@@ -270,7 +270,7 @@ export function OptionListEditor({
           </button>
         </li>
       </ul>
-      <p className="mono text-[0.625rem] leading-3 text-graphite">
+      <p className="mono text-field text-graphite">
         ↵ adds the next · drag ⋮⋮ or ⌥↑↓ to reorder · hue auto-assigned, click
         the swatch to override
         {saved ? ' · saved options archive, never delete' : ''}

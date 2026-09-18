@@ -70,7 +70,7 @@ export function ConfirmDialog({
             <DialogTitle>{options.title}</DialogTitle>
           </div>
           {options.body ? (
-            <DialogDescription className="font-sans text-ui leading-[1.1875rem] text-foreground">
+            <DialogDescription className="font-sans text-ui leading-4.75 text-foreground">
               {options.body}
             </DialogDescription>
           ) : null}

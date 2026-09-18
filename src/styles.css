@@ -175,6 +175,9 @@
    * shouts. Each step maps to one role in the hierarchy; if a size isn't on
    * this list it does not go in the app.
    *
+   *   field   10px  Label — DESIGN.md §3's sixth mono step, "field label ·
+   *                 400 · 10/12 caps": labels inside cells and readouts.
+   *                 Usually wanted whole — see the `field-label` utility.
    *   micro   11px  Label — timestamps, chip counts, avatar initials
    *   label   12px  Label — field labels, metadata
    *   ui      13px  Body/UI — the table + form workhorse
@@ -183,6 +186,8 @@
    *   page    22px  Headline — page titles
    *   display 26px  Headline — record names
    */
+  --text-field: 0.625rem;
+  --text-field--line-height: 0.75rem;
   --text-micro: 0.6875rem;
   --text-micro--line-height: 1rem;
   --text-label: 0.75rem;
@@ -419,6 +424,23 @@
   font-size: 0.6875rem;
   line-height: 1rem;
   font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/**
+ * DESIGN.md §3's sixth mono step, whole: "field label · 400 · 10/12 caps —
+ * labels inside cells and readouts". `label-caps` is its 11/14 500 sibling;
+ * this is the smaller, lighter one that sits inside a cell or a readout.
+ * Twenty-one call sites wanted the entire stack, so it is a utility rather
+ * than `mono text-field` plus three more classes; where only the step is
+ * wanted (a figure, not a label) use `text-field` on its own.
+ */
+@utility field-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-field);
+  line-height: var(--text-field--line-height);
+  font-weight: 400;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }

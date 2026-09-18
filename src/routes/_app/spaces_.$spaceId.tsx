@@ -338,7 +338,7 @@ function SpacePage() {
                   </span>
                 </div>
                 {f.snippet ? (
-                  <p className="text-prose max-w-160 font-serif leading-[1.6875rem] text-graphite">
+                  <p className="text-prose max-w-160 font-serif leading-6.75 text-graphite">
                     {f.snippet}
                     {f.snippet.length >= 400 ? '…' : ''}
                   </p>

@@ -25,7 +25,7 @@ export function AuthShell({
       <div className="flex w-full max-w-100 flex-col pt-[16vh] pb-16">
         <Wordmark />
         <div className="mt-8 flex flex-col gap-1.5 border-b border-hairline pb-4">
-          <div className="mono text-micro leading-[0.875rem] tracking-[0.08em] text-graphite uppercase">
+          <div className="mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
             {eyebrow}
           </div>
           <h1 className="title-serif">{title}</h1>

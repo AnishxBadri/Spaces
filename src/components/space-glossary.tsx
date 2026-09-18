@@ -114,7 +114,7 @@ function TermRow({ term }: { term: Term }) {
         {/* Global terms appear in every space; say so, or editing one from
             here looks like it only changed this space. */}
         {term.spaceId === null ? (
-          <span className="bg-bone px-1.5 label-caps text-[0.625rem] leading-[0.875rem] text-graphite">
+          <span className="bg-bone px-1.5 field-label leading-3.5 font-medium text-graphite">
             global
           </span>
         ) : null}
@@ -142,7 +142,7 @@ function TermRow({ term }: { term: Term }) {
           <X className="size-3" strokeWidth={2} />
         </button>
       </div>
-      <p className="max-w-160 font-serif text-title leading-[1.375rem] text-graphite">
+      <p className="max-w-160 font-serif text-title text-graphite">
         {term.definitionMd || 'No definition yet.'}
       </p>
       {confirmDialog}
@@ -225,7 +225,7 @@ function TermForm({
         }}
         placeholder="What it means here — the definition someone new to this space needs."
         aria-label="Definition"
-        className="focus-ring w-full rounded-md border border-rule bg-transparent px-2.5 py-1.5 font-serif text-title leading-[1.375rem] outline-none placeholder:text-graphite"
+        className="focus-ring w-full rounded-md border border-rule bg-transparent px-2.5 py-1.5 font-serif text-title outline-none placeholder:text-graphite"
       />
       <div className="flex items-center justify-end gap-2">
         <span className="mr-auto mono text-micro text-graphite">

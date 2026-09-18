@@ -34,7 +34,7 @@ export function PageHeader({
     >
       <div className="flex min-w-0 flex-col gap-1.5">
         {eyebrow ? (
-          <div className="mono text-micro leading-[0.875rem] tracking-[0.08em] text-graphite uppercase">
+          <div className="mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
             {eyebrow}
           </div>
         ) : null}
@@ -94,9 +94,7 @@ export function ReadoutStrip({
               : 'text-foreground'
         const inner = (
           <>
-            <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
-              {cell.label}
-            </span>
+            <span className="field-label text-graphite">{cell.label}</span>
             <span className={cn('mono text-xl leading-6 font-medium', colour)}>
               {cell.value}
             </span>

@@ -332,14 +332,14 @@ export function TableToolbar<T>({
             className="max-h-80 w-60 overflow-y-auto p-0"
           >
             <div className="flex h-8 items-center justify-between border-b border-rule px-2.5">
-              <DropdownMenuLabel className="p-0 label-caps text-[0.625rem] font-normal text-foreground">
+              <DropdownMenuLabel className="p-0 field-label leading-4 text-foreground">
                 Columns · {hideable.length - hiddenCount} of {hideable.length}
               </DropdownMenuLabel>
               {hiddenCount > 0 ? (
                 <button
                   type="button"
                   onClick={() => table.resetColumnVisibility()}
-                  className="focus-ring mono text-[0.625rem] leading-3 text-graphite hover:text-foreground"
+                  className="focus-ring mono text-field text-graphite hover:text-foreground"
                 >
                   reset
                 </button>

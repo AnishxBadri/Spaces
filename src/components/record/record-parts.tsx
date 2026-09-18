@@ -36,7 +36,7 @@ export function RecordHeader({
   return (
     <header className="flex shrink-0 flex-col gap-3.5 border-b border-hairline px-8 pt-5">
       <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 truncate mono text-micro leading-[0.875rem] tracking-[0.08em] text-graphite uppercase">
+        <div className="min-w-0 truncate mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
           {crumb}
         </div>
         {actions ? (
@@ -55,15 +55,13 @@ export function RecordHeader({
               key={i}
               className="flex shrink-0 flex-col justify-center gap-0.5 border-r border-rule px-6 first:pl-0 last:border-r-0"
             >
-              <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
-                {r.label}
-              </span>
+              <span className="field-label text-graphite">{r.label}</span>
               <span
                 className={cn(
                   'truncate font-medium',
                   r.kind === 'text'
-                    ? 'text-title leading-[1.125rem]'
-                    : 'mono text-lg leading-[1.375rem]',
+                    ? 'text-title leading-4.5'
+                    : 'mono text-lg leading-5.5',
                   r.tone === 'muted'
                     ? 'text-graphite'
                     : r.tone === 'bad'
@@ -176,7 +174,7 @@ export function PropertyCell({
       )}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex w-24 shrink-0 items-center gap-1 label-caps text-[0.625rem] leading-3 font-normal text-graphite">
+        <div className="flex w-24 shrink-0 items-center gap-1 field-label text-graphite">
           {label}
         </div>
         <div className="min-w-0 flex-1">{children}</div>
@@ -235,9 +233,7 @@ export function RailRow({
         className,
       )}
     >
-      <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
-        {label}
-      </span>
+      <span className="field-label text-graphite">{label}</span>
       <span className="min-w-0 truncate mono text-ui font-medium">{value}</span>
     </div>
   )
@@ -294,7 +290,7 @@ export function StageStepper({
           />
         ))}
       </div>
-      <div className="flex justify-between gap-3 mono text-[0.625rem] leading-3">
+      <div className="flex justify-between gap-3 mono text-field">
         <span className="text-graphite">{first?.label}</span>
         <span className="font-medium text-foreground">
           {current
@@ -338,10 +334,13 @@ export function InitialsMark({
       className={cn(
         'flex shrink-0 items-center justify-center mono',
         size === 'xs'
-          ? 'size-4 text-[0.5rem] leading-[0.625rem]'
+          ? /* Optical sizing, not a type step: initials in a 16px square.
+               The named steps start at 10px (field) and overflow it. */
+            // eslint-disable-next-line instrument/no-v1-tokens
+            'size-4 text-[0.5rem] leading-[0.625rem]'
           : size === 'lg'
             ? 'size-7 text-label leading-4'
-            : 'size-[1.375rem] text-[0.625rem] leading-3',
+            : 'size-[1.375rem] text-field',
         outline
           ? 'border border-hairline bg-paper text-foreground'
           : 'bg-hairline text-paper',

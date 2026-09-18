@@ -186,7 +186,7 @@ export function RecordFiles({
         <span className="text-ui">
           {dragging ? 'Release to attach' : 'Drop files, or click'}
         </span>
-        <span className="mono text-[0.625rem] leading-3 text-graphite">
+        <span className="mono text-field text-graphite">
           {dragging
             ? 'they stay on this server'
             : 'stays on this server · PDF, DOCX, PPTX, XLSX get their text extracted'}
@@ -242,7 +242,13 @@ function DocumentRow({
 
   return (
     <li className="group flex min-h-9 items-center gap-2.5 border-t border-rule py-1 text-ui">
-      <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper mono text-[0.5rem] leading-[0.625rem] text-foreground">
+      <span
+        /* Optical sizing, not a type step: a three-letter kind code has to sit
+           inside a 22px square, and the smallest named step (field, 10px)
+           overflows it. DESIGN.md §3's list is for type; this is a glyph. */
+        // eslint-disable-next-line instrument/no-v1-tokens
+        className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper mono text-[0.5rem] leading-[0.625rem] text-foreground"
+      >
         {code}
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
@@ -254,7 +260,7 @@ function DocumentRow({
         >
           {doc.filename}
         </button>
-        <span className="truncate mono text-[0.625rem] leading-3 text-graphite">
+        <span className="truncate mono text-field text-graphite">
           {[
             DOCUMENT_KIND_LABELS[doc.kind].toLowerCase(),
             formatBytes(doc.sizeBytes),
@@ -322,22 +328,18 @@ function extCode(filename: string): string {
  */
 function ExtractionNote({ doc }: { doc: Documents[number] }) {
   if (doc.extractionStatus === 'pending') {
-    return (
-      <p className="mono text-[0.625rem] leading-3 text-graphite">
-        extracting text…
-      </p>
-    )
+    return <p className="mono text-field text-graphite">extracting text…</p>
   }
   if (doc.extractionStatus === 'failed') {
     return (
-      <p className="mono text-[0.625rem] leading-3 text-destructive">
+      <p className="mono text-field text-destructive">
         text extraction failed — {doc.extractionError}
       </p>
     )
   }
   if (doc.extractionStatus === 'unsupported') {
     return (
-      <p className="mono text-[0.625rem] leading-3 text-graphite">
+      <p className="mono text-field text-graphite">
         {doc.extractionError ?? 'no extractable text'}
       </p>
     )
