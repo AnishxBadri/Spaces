@@ -10,7 +10,6 @@ import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { RailField } from '#/components/attributes/rail-field'
 import { OptionChip } from '#/components/attributes/value-editor'
-import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
 import { MoveStageDialog } from '#/components/deal-board'
@@ -36,6 +35,7 @@ import { Button } from '#/components/ui/button'
 import { fmtMoney } from '#/lib/portfolio/format'
 import { localToday } from '#/lib/tasks/parse-due'
 import { useHotkey } from '#/lib/use-hotkey'
+import { jsonString } from '#/lib/json'
 import {
   createNote,
   getDeal,
@@ -80,16 +80,15 @@ function DealRecordPage() {
       Object.entries(deal.userNames).map(([id, name]) => [id, { name }]),
     ),
   }
-  const companyId = deal.values.company as string | undefined
+  const companyId = jsonString(deal.values.company)
   // refNames' Record index type hides misses — annotate the lookup honestly.
   const companyRef: { name: string } | undefined = companyId
     ? deal.refNames[companyId]
     : undefined
   const noteMentions = deal.mentionedIn.filter((m) => m.kind === 'note')
 
-  const stageDef = registry.find((d) => d.slug === 'stage') as
-    RegistryEntry | undefined
-  const stageOptions = stageDef?.options?.options ?? []
+  const stageDef = registry.find((d) => d.slug === 'stage')
+  const stageOptions = stageDef?.options.options ?? []
   const stageOption = stageOptions.find((o) => o.id === deal.values.stage)
   // Move-stage never offers a retired stage; the header chip still shows one.
   const liveStages = stageOptions.filter((o) => !o.archived)
@@ -98,10 +97,7 @@ function DealRecordPage() {
   // the current stage — the last from the stage log, never stored.
   const today = localToday()
   const valueCode =
-    (
-      registry.find((d) => d.slug === 'value')?.options as
-        { code?: string } | undefined
-    )?.code ?? 'USD'
+    registry.find((d) => d.slug === 'value')?.options.code ?? 'USD'
   const rawValue = deal.values.value
   const ourCheck =
     typeof rawValue === 'number'
@@ -109,7 +105,7 @@ function DealRecordPage() {
       : typeof rawValue === 'string' && rawValue !== ''
         ? Number(rawValue)
         : null
-  const ownerId = deal.values.owner as string | undefined
+  const ownerId = jsonString(deal.values.owner)
   const ownerName = ownerId ? deal.userNames[ownerId] : undefined
   const closeDate =
     typeof deal.values.close_date === 'string' ? deal.values.close_date : null
@@ -128,15 +124,14 @@ function DealRecordPage() {
     Math.floor((Date.now() - new Date(stageEntered).getTime()) / 86_400_000),
   )
   const peopleIds = Array.isArray(deal.values.people)
-    ? (deal.values.people as Array<string>)
+    ? deal.values.people.map(String)
     : []
-  const people = peopleIds.flatMap((id) => {
-    // refNames' Record index type hides misses — annotate the lookup honestly.
-    const ref = (deal.refNames as Record<string, { name: string } | undefined>)[
-      id
-    ]
-    return ref ? [{ id, name: ref.name }] : []
-  })
+  // refNames' Record index type hides misses; hasOwn is the honest test.
+  const people = peopleIds.flatMap((id) =>
+    Object.hasOwn(deal.refNames, id)
+      ? [{ id, name: deal.refNames[id].name }]
+      : [],
+  )
 
   async function save(patch: Record<string, unknown>) {
     try {
@@ -340,7 +335,7 @@ function DealRecordPage() {
           {registry.map((def) => (
             <RailField
               key={def.slug}
-              def={def as RegistryEntry}
+              def={def}
               attr={def}
               objectLabel={'deal'}
               onAttributeSaved={() => router.invalidate()}
@@ -423,7 +418,7 @@ function DealRecordPage() {
           />
           <RecordTimeline
             items={timeline}
-            registry={registry as Array<RegistryEntry>}
+            registry={registry}
             refNames={refNames}
           />
         </RecordSection>

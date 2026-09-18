@@ -25,7 +25,7 @@ export type Candidate = ContextItem & {
   /** Edge the walk took to reach this item (hop ≥ 1). */
   edge?: ContextEdge
   /** 1-based rank in the lexical lane, when the task carried text. */
-  lexicalRank?: number
+  lexicalRank?: number | undefined
 }
 
 export type Weights = {

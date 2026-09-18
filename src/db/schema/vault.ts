@@ -9,6 +9,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { user } from './auth'
+import type { Json } from '#/lib/json'
 
 const bytea = customType<{ data: Buffer }>({
   dataType() {
@@ -29,6 +30,9 @@ export const credentialKind = pgEnum('credential_kind', [
   'enrichment',
   'search',
 ])
+/** Non-secret provider config: base URL for Ollama, model mapping, etc. */
+export type CredentialMeta = { [k: string]: Json }
+
 export const credentialStatus = pgEnum('credential_status', [
   'active',
   'invalid',
@@ -45,7 +49,7 @@ export const credential = pgTable(
     kind: credentialKind('kind').notNull(),
     secretEnc: bytea('secret_enc').notNull(),
     // Non-secret config: base URL for Ollama, model mapping, etc.
-    meta: jsonb('meta').notNull().default({}),
+    meta: jsonb('meta').$type<CredentialMeta>().notNull().default({}),
     status: credentialStatus('status').notNull().default('active'),
     createdBy: text('created_by')
       .notNull()

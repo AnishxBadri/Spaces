@@ -240,7 +240,7 @@ function TaskItem({
   done?: boolean
   overdue?: boolean
   figure: string
-  last?: boolean
+  last?: boolean | undefined
   onToggle: () => void
 }) {
   return (

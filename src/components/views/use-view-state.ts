@@ -32,9 +32,16 @@ export function useViewState<TExtra extends ViewExtra>({
     () => views.find((v) => v.id === activeId) ?? null,
     [views, activeId],
   )
-  const fromView = (v: ViewRow | null) => ({
+  const fromView = (
+    v: ViewRow | null,
+  ): {
+    conditions: Array<Condition>
+    sorting: SortingState
+    extra: TExtra
+  } => ({
     conditions: v?.filter ?? [],
-    sorting: (v?.sort ? [v.sort] : []) as SortingState,
+    sorting: v?.sort ? [v.sort] : [],
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- a view stores page extra as loose scalars; only the page knows its own TExtra
     extra: { ...defaultExtra, ...((v?.extra ?? {}) as Partial<TExtra>) },
   })
 

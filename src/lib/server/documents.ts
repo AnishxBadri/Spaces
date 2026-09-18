@@ -35,9 +35,11 @@ export const prepareDocumentUpload = createServerFn({ method: 'POST' })
     // Content-addressed: the same deck sent to both partners is one blob.
     // Already stored ⇒ skip the transfer entirely.
     if (await store.exists(data.sha)) {
+      const noUpload: { url: string | null; headers: Record<string, string> } =
+        { url: null, headers: {} }
       return {
-        uploadUrl: null as string | null,
-        uploadHeaders: {},
+        uploadUrl: noUpload.url,
+        uploadHeaders: noUpload.headers,
         alreadyStored: true,
       }
     }
@@ -219,9 +221,11 @@ export const getDocumentDownloadUrl = createServerFn({ method: 'POST' })
     ).at(0)
     if (!row?.blobSha) throw new Error('This document has no stored file')
     return {
-      url: await storage().getDownloadUrl(row.blobSha, 300, {
-        filename: row.filename ?? undefined,
-      }),
+      url: await storage().getDownloadUrl(
+        row.blobSha,
+        300,
+        row.filename === null ? {} : { filename: row.filename },
+      ),
     }
   })
 

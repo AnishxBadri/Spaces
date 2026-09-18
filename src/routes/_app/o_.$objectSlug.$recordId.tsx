@@ -21,7 +21,6 @@ import {
   RecordHeader,
   RecordSection,
 } from '#/components/record/record-parts'
-import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { Button } from '#/components/ui/button'
@@ -283,7 +282,7 @@ function ObjectRecordPage() {
           {registry.map((def) => (
             <RailField
               key={def.slug}
-              def={def as RegistryEntry}
+              def={def}
               attr={def}
               objectLabel={record.object.singular}
               onAttributeSaved={() => router.invalidate()}
@@ -354,10 +353,7 @@ function ObjectRecordPage() {
           label="Ledger"
           meta={`${timeline.length} entr${timeline.length === 1 ? 'y' : 'ies'}`}
         >
-          <RecordTimeline
-            items={timeline}
-            registry={registry as Array<RegistryEntry>}
-          />
+          <RecordTimeline items={timeline} registry={registry} />
         </RecordSection>
 
         <RecordSection
@@ -397,9 +393,11 @@ function RecordName({
           })
       }}
       onKeyDown={(e) => {
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
         if (e.key === 'Escape') {
           setDraft(name)
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
           ;(e.target as HTMLInputElement).blur()
         }
       }}

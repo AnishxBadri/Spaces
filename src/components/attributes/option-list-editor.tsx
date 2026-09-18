@@ -25,6 +25,13 @@ import { cn } from '#/lib/utils'
 
 export type OptionGroup = 'active' | 'parked' | 'closed'
 
+export const OPTION_GROUPS: Array<OptionGroup> = ['active', 'parked', 'closed']
+
+/** A `<select>`'s string back to a status group, or null if it names none. */
+export function toOptionGroup(v: string): OptionGroup | null {
+  return OPTION_GROUPS.find((g) => g === v) ?? null
+}
+
 export type OptionDraft = {
   /** stable client key — new rows have no id yet */
   key: string
@@ -213,9 +220,10 @@ export function OptionListEditor({
               <select
                 value={o.group ?? 'active'}
                 aria-label={`Group for ${o.label || `option ${i + 1}`}`}
-                onChange={(e) =>
-                  update(i, { group: e.target.value as OptionGroup })
-                }
+                onChange={(e) => {
+                  const group = toOptionGroup(e.target.value)
+                  if (group) update(i, { group })
+                }}
                 className="focus-ring h-6 shrink-0 border border-rule bg-transparent px-1.5 mono text-micro text-graphite"
               >
                 <option value="active">active</option>

@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '#/db'
 import { attribute, objectDef } from '#/db/schema'
-import { CORE_OBJECTS, SYSTEM_ATTRIBUTES } from './registry'
+import { CORE_OBJECTS, OBJECT_KINDS, SYSTEM_ATTRIBUTES } from './registry'
 import type { ObjectKind } from './registry'
 
 /**
@@ -13,7 +13,7 @@ import type { ObjectKind } from './registry'
 export async function seedSystemAttributes() {
   const objectIds = new Map<ObjectKind, string>()
   let insertedObjects = 0
-  for (const kind of Object.keys(CORE_OBJECTS) as Array<ObjectKind>) {
+  for (const kind of OBJECT_KINDS) {
     const def = CORE_OBJECTS[kind]
     const existing = (
       await db
@@ -42,9 +42,7 @@ export async function seedSystemAttributes() {
     console.log(`[attributes] seeded ${insertedObjects} system objects`)
 
   let inserted = 0
-  for (const objectKind of Object.keys(
-    SYSTEM_ATTRIBUTES,
-  ) as Array<ObjectKind>) {
+  for (const objectKind of OBJECT_KINDS) {
     const objectId = objectIds.get(objectKind)!
     const defs = SYSTEM_ATTRIBUTES[objectKind]
     for (let i = 0; i < defs.length; i++) {

@@ -5,6 +5,7 @@ import { attribute, entity } from '#/db/schema'
 import { nextBadgeColor } from './colors'
 import { validateDefault } from './defaults'
 import type { BadgeColor } from './colors'
+import type { Json } from '#/lib/json'
 import type { AttributeOptions, AttributeType, SelectOption } from './registry'
 
 /**
@@ -43,12 +44,12 @@ export class AttributeQueryFailed extends Schema.TaggedError<AttributeQueryFaile
 
 export type OptionEdit = {
   /** absent id = new option (id derived from label) */
-  id?: string
+  id?: string | undefined
   label: string
-  group?: SelectOption['group']
-  color?: BadgeColor
+  group?: SelectOption['group'] | undefined
+  color?: BadgeColor | undefined
   /** true retires the option; false or absent restores it */
-  archived?: boolean
+  archived?: boolean | undefined
 }
 
 /**
@@ -58,31 +59,31 @@ export type OptionEdit = {
  */
 export type AttributeConfigPatch = {
   /** currency — pure relabel, nothing converts */
-  code?: string
+  code?: string | undefined
   /** rating — raise freely; lowering is checked against stored values */
-  max?: number
+  max?: number | undefined
   /** number — display-only */
-  precision?: number
+  precision?: number | undefined
   /**
    * spec §4 — static value in the write shape, `'current-user'`, or an
    * ISO-8601 duration for dates; null clears. Validated here, at config
    * time, never at record creation.
    */
-  default?: unknown
+  default?: Json | undefined
 }
 
 export type UpdateAttributePatch = {
   id: string
-  name?: string
+  name?: string | undefined
   /** null clears */
-  description?: string | null
+  description?: string | null | undefined
   /** can't-clear (spec §5); freely toggleable — it never rewrites data */
-  required?: boolean
-  archived?: boolean
-  move?: 'up' | 'down'
+  required?: boolean | undefined
+  archived?: boolean | undefined
+  move?: 'up' | 'down' | undefined
   /** select/multi_select/status option list */
-  options?: Array<OptionEdit>
-  config?: AttributeConfigPatch
+  options?: Array<OptionEdit> | undefined
+  config?: AttributeConfigPatch | undefined
 }
 
 export type UpdateAttributeError =
@@ -176,7 +177,7 @@ const mergeOptions = Effect.fn('mergeOptions')(function* (
 
 /** The §3 table, one branch per row. Returns the merged options blob. */
 const applyConfig = Effect.fn('applyConfig')(function* (
-  attr: { type: string; objectId: string; slug: string },
+  attr: { type: AttributeType; objectId: string; slug: string },
   current: AttributeOptions,
   patch: AttributeConfigPatch,
 ): Effect.fn.Return<
@@ -224,7 +225,7 @@ const applyConfig = Effect.fn('applyConfig')(function* (
       // Validated against the options as they'll be after this save, so a
       // default can't point at an option the same edit removed.
       const problem = validateDefault(
-        { type: attr.type as AttributeType, options: next },
+        { type: attr.type, options: next },
         patch.default,
       )
       if (problem)
@@ -253,7 +254,7 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
         id: patch.id,
         message: 'Attribute not found',
       })
-    const current = attr.options as AttributeOptions
+    const current = attr.options
 
     let next = current
     if (patch.options)

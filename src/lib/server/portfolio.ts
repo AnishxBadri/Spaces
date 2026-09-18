@@ -32,8 +32,8 @@ async function baseCurrency(): Promise<string> {
   const ws = (
     await db.select({ settings: workspace.settings }).from(workspace)
   ).at(0)
-  const base = (ws?.settings as Record<string, unknown> | null)?.base_currency
-  return typeof base === 'string' && base.length === 3 ? base : 'USD'
+  const base = ws?.settings.base_currency
+  return base !== undefined && base.length === 3 ? base : 'USD'
 }
 
 async function loadFxRates(): Promise<Array<FxRate>> {

@@ -33,6 +33,27 @@ Pre-commit hooks (lefthook) run prettier + eslint on staged files; pre-push
 runs tsc. CI (`.github/workflows/ci.yml`) runs all four gates against a real
 Postgres.
 
+## Principles (no principle without an enforcer)
+
+- A type is a claim the compiler checked, not one the author asserted
+  (`@typescript-eslint/consistent-type-assertions: never`).
+- Data crossing a boundary gets its type once — at the column or at a decode
+  (`jsonb().$type<…>()` on all 18 columns; `src/lib/json.ts`).
+- `undefined` is a type, not a state: optional means the caller may omit it
+  (`exactOptionalPropertyTypes`).
+- Attribute values have one write path, which validates, logs, and links
+  (`no-restricted-syntax` on `entity.values`; `src/lib/attributes/values.ts`).
+- Portfolio history is append-only; a correction is a compensating event
+  (_review_ — D12, `docs/decisions-2026-09.md`).
+- Effect never crosses into React; the seam is `effectFn()`
+  (`no-restricted-imports` on `effect` in `src/routes/**`, `src/components/**`).
+
+`noUncheckedIndexedAccess` stays **off**, decided 2026-09-18 (SPA-151): 371
+errors, 62% of them in test files and `src/lib/seeds/dev.ts`, where manufactured
+`!` and `?.` buy nothing — production already carries the `.at(0)` convention
+from gate 4. Revisit when project 2's test-database slices rewrite the tests
+anyway. Don't re-litigate it from the flag list.
+
 ## After specific change kinds
 
 - Routes changed → `pnpm generate-routes`

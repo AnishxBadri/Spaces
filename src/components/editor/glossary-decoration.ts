@@ -89,6 +89,7 @@ export function createGlossaryExtension(terms: Array<GlossaryTerm>) {
           },
           props: {
             decorations(state) {
+              // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- ProseMirror plugin state is untyped at the key; this plugin only ever stores a DecorationSet
               return glossaryPluginKey.getState(state) as DecorationSet
             },
           },

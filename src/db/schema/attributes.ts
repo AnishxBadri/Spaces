@@ -15,6 +15,8 @@ import {
 import { entity } from './entities'
 import { objectDef } from './objects'
 import { user } from './auth'
+import type { Json } from '#/lib/json'
+import type { AttributeOptions } from '#/lib/attributes/registry'
 
 /**
  * The attribute engine (CONTEXT.md "Attribute engine"). Every object — core
@@ -61,7 +63,7 @@ export const attribute = pgTable(
      * record_reference → {targetKind, multi, required};
      * currency → {code}; rating → {max}.
      */
-    options: jsonb('options').notNull().default({}),
+    options: jsonb('options').$type<AttributeOptions>().notNull().default({}),
     // System attrs ship with the product: non-deletable, archivable only.
     // Their *options* stay editable — structure fixed, content free.
     isSystem: boolean('is_system').notNull().default(false),
@@ -117,8 +119,8 @@ export const attributeEvent = pgTable(
       .notNull()
       .references(() => entity.id),
     attrSlug: text('attr_slug').notNull(),
-    from: jsonb('from'),
-    to: jsonb('to'),
+    from: jsonb('from').$type<Json>(),
+    to: jsonb('to').$type<Json>(),
     actorType: actorType('actor_type').notNull(),
     actorId: text('actor_id').references(() => user.id),
     source: attributeEventSource('source').notNull().default('direct'),
@@ -127,7 +129,7 @@ export const attributeEvent = pgTable(
     suggestionId: uuid('suggestion_id'),
     // Citation refs — spec-ai-substrate `ContextItem.ref` ids, or an
     // enrichment_record id. Array of strings; null when there's no receipt.
-    refs: jsonb('refs'),
+    refs: jsonb('refs').$type<Array<string>>(),
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

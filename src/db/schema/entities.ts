@@ -14,6 +14,31 @@ import {
 import { sql } from 'drizzle-orm'
 import { user } from './auth'
 import { objectDef } from './objects'
+import type { Json } from '#/lib/json'
+
+/**
+ * Attribute values (system + custom), keyed by attribute slug. The registry
+ * (attribute table) defines each slug's shape; validation happens at write
+ * (src/lib/attributes/values.ts), so the column claims only what the
+ * serializer guarantees.
+ */
+export type EntityValues = { [slug: string]: Json }
+
+/** Why the sweep paired two entities — a shared alias, a name similarity. */
+export type DuplicateReason = Record<string, string>
+
+/**
+ * One row the merge executor moved, dropped, filled, or inserted. The
+ * snapshot convention is the only unmerge contract (CLAUDE.md), so the
+ * shape is declared here, beside the column, not in the executor.
+ */
+export type MergeSnapshotEntry = {
+  table: string
+  action:
+    'repointed' | 'dropped' | 'field_filled' | 'field_conflict' | 'inserted'
+  pk: Record<string, unknown>
+  old: Record<string, unknown>
+}
 
 /**
  * Polymorphic entity core. Everything linkable is an entity: one mention
@@ -58,7 +83,7 @@ export const entity = pgTable(
     mergedIntoId: uuid('merged_into_id'),
     // Attribute values (system + custom), keyed by attribute slug. The
     // registry (attribute table) defines shape; validation happens at write.
-    values: jsonb('values').notNull().default({}),
+    values: jsonb('values').$type<EntityValues>().notNull().default({}),
     source: entitySource('source').notNull().default('manual'),
     createdBy: text('created_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -145,7 +170,7 @@ export const duplicateCandidate = pgTable(
       .notNull()
       .references(() => entity.id),
     score: real('score').notNull(),
-    reason: jsonb('reason').notNull(),
+    reason: jsonb('reason').$type<DuplicateReason>().notNull(),
     status: duplicateStatus('status').notNull().default('open'),
     resolvedBy: text('resolved_by').references(() => user.id),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
@@ -180,7 +205,7 @@ export const mergeEvent = pgTable('merge_event', {
   mergedAt: timestamp('merged_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
-  snapshot: jsonb('snapshot').notNull(),
+  snapshot: jsonb('snapshot').$type<Array<MergeSnapshotEntry>>().notNull(),
   unmergedAt: timestamp('unmerged_at', { withTimezone: true }),
 })
 

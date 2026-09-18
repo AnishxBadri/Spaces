@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
 import { afterAll, describe, expect, expectTypeOf, it } from 'vitest'
 import { cleanupTestEntities } from '../entities/test-helpers'
-import type { UpdateAttributePatch } from './update'
+import type { AttributeConfigPatch, UpdateAttributePatch } from './update'
 
 // ---------------------------------------------------------------------------
 // Type-level: the §3 immutables are absent from the patch, not rejected.
@@ -121,7 +121,7 @@ async function readOptions(id: string) {
       .from(attribute)
       .where(eq(attribute.id, id))
   ).at(0)
-  return (row?.options ?? {}) as Record<string, unknown>
+  return row?.options ?? {}
 }
 
 describe.skipIf(!hasDb)('updateAttributeProgram', () => {
@@ -210,10 +210,7 @@ describe.skipIf(!hasDb)('updateAttributeProgram', () => {
         ],
       }),
     )
-    const options = (await readOptions(attr.id)).options as Array<{
-      id: string
-      group?: string
-    }>
+    const options = (await readOptions(attr.id)).options ?? []
     expect(options.find((o) => o.id === 'open')?.group).toBe('parked')
   })
 
@@ -274,10 +271,7 @@ describe.skipIf(!hasDb)('updateAttributeProgram', () => {
         ],
       }),
     )
-    const archived = (await readOptions(attr.id)).options as Array<{
-      id: string
-      archived?: boolean
-    }>
+    const archived = (await readOptions(attr.id)).options ?? []
     expect(archived.find((o) => o.id === 'stale')?.archived).toBe(true)
     expect(archived.find((o) => o.id === 'open')?.archived).toBeUndefined()
 
@@ -288,7 +282,7 @@ describe.skipIf(!hasDb)('updateAttributeProgram', () => {
         .from(entity)
         .where(eq(entity.id, co.entityId))
     ).at(0)
-    expect((held?.values as Record<string, unknown>)[attr.slug]).toBe('stale')
+    expect(held?.values[attr.slug]).toBe('stale')
 
     // A fresh write asserting it is rejected; moving off it works.
     const other = await resolveEntity({
@@ -319,10 +313,7 @@ describe.skipIf(!hasDb)('updateAttributeProgram', () => {
         ],
       }),
     )
-    const restored = (await readOptions(attr.id)).options as Array<{
-      id: string
-      archived?: boolean
-    }>
+    const restored = (await readOptions(attr.id)).options ?? []
     expect(restored.find((o) => o.id === 'stale')?.archived).toBeUndefined()
     await setValues({
       entityId: other.entityId,
@@ -348,13 +339,18 @@ describe.skipIf(!hasDb)('updateAttributeProgram', () => {
       targetKind: 'person',
       multi: false,
     })
-    // The only way past the type system is a cast; the program still has no
-    // branch that writes these keys, so the row comes back unchanged.
+    // Keys the patch type does not declare: a variable, not a literal, so
+    // excess-property checking lets them through to the program — which has
+    // no branch that writes them, so the row comes back unchanged.
+    const rogue: AttributeConfigPatch & {
+      targetKind: string
+      multi: boolean
+    } = { targetKind: 'company', multi: true }
     await Effect.runPromise(
       updateAttributeProgram({
         id: attr.id,
         name: `Upd ref ${tag} renamed`,
-        config: { targetKind: 'company', multi: true } as never,
+        config: rogue,
       }),
     )
     const options = await readOptions(attr.id)

@@ -13,8 +13,8 @@ import {
 } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from '../entities/resolve'
+import { jsonString } from '#/lib/json'
 import { lastTouchedMap, requireUser } from './shared'
-import type { Json } from './shared'
 
 export const listCompanies = createServerFn().handler(async () => {
   await requireUser()
@@ -67,8 +67,8 @@ export const createCompany = createServerFn({ method: 'POST' })
     const u = await requireUser()
     const result = await resolveEntity({
       kind: 'company',
-      name: data.name || undefined,
-      keys: data.domain ? { domain: data.domain } : undefined,
+      ...(data.name ? { name: data.name } : {}),
+      ...(data.domain ? { keys: { domain: data.domain } } : {}),
       source: 'manual',
       createdBy: u.id,
       values: data.values,
@@ -136,7 +136,7 @@ export const listCompaniesTable = createServerFn().handler(async () => {
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
-    values: (r.values ?? {}) as Record<string, Json>,
+    values: r.values,
     domains: domainsBy.get(r.id) ?? [],
     spaces: spacesBy.get(r.id) ?? [],
     lastTouched: touched[r.id] ?? null,
@@ -208,9 +208,7 @@ export const getCompany = createServerFn()
     const people = peopleRows.map((p) => ({
       id: p.id,
       name: p.name,
-      headline:
-        (((p.values ?? {}) as Record<string, unknown>).job_title as
-          string | undefined) ?? null,
+      headline: jsonString(p.values.job_title),
     }))
 
     // Notes (and anything else) that mention this company.
@@ -242,7 +240,7 @@ export const getCompany = createServerFn()
       source: head.source,
       mergedIntoId: head.mergedIntoId,
       createdAt: head.createdAt.toISOString(),
-      values: (head.values ?? {}) as Record<string, Json>,
+      values: head.values,
       aliases,
       spaces,
       people,
@@ -292,9 +290,8 @@ export const updateRecord = createServerFn({ method: 'POST' })
             .from(entity)
             .where(eq(entity.id, data.id))
         ).at(0)
-        const companyId = (row?.values as Record<string, unknown> | null)
-          ?.company
-        if (row?.kind === 'deal' && typeof companyId === 'string') {
+        const companyId = row ? jsonString(row.values.company) : null
+        if (row?.kind === 'deal' && companyId !== null) {
           const { birthHolding } = await import('./shared')
           await birthHolding({ companyId, actorId: u.id })
         }

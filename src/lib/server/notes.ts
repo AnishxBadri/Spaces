@@ -5,7 +5,8 @@ import { db } from '#/db'
 import { entity, entitySpace, link, note, space } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
 import { canRead, requireUser } from './shared'
-import type { Json } from './shared'
+import type { NoteBody } from '#/db/schema/kinds'
+import { jsonValue } from '#/lib/json'
 
 export const createNote = createServerFn({ method: 'POST' })
   .validator(
@@ -36,7 +37,7 @@ export const createNote = createServerFn({ method: 'POST' })
         .values({ kind: 'note', canonicalName: 'Untitled', createdBy: u.id })
         .returning({ id: entity.id })
 
-      const bodyJson = about
+      const bodyJson: NoteBody | null = about
         ? [
             {
               type: 'paragraph',
@@ -149,9 +150,6 @@ export const getNote = createServerFn()
     ).at(0)
     // "Not found" on purpose — a 403 would confirm a private note exists.
     if (!row || !canRead(u, row)) throw new Error('Note not found')
-    // jsonb comes back as unknown; it's a BlockNote document array.
-    const bodyJson = row.bodyJson as Array<Json> | null
-
     // Backlinks: anything whose content mentions this note.
     const backlinks = await db
       .select({
@@ -174,7 +172,7 @@ export const getNote = createServerFn()
     return {
       id: row.id,
       title: row.title,
-      bodyJson,
+      bodyJson: row.bodyJson,
       updatedAt: row.updatedAt.toISOString(),
       backlinks,
       spaces,
@@ -222,7 +220,7 @@ const saveNoteInput = z.object({
   /** Body fields absent = title-only save; body stays untouched. */
   body: z
     .object({
-      bodyJson: z.unknown(),
+      bodyJson: z.array(jsonValue),
       bodyMd: z.string().max(500_000),
       /** entity ids mentioned in the doc — extracted client-side from JSON */
       mentionIds: z.array(z.string().uuid()).max(500),

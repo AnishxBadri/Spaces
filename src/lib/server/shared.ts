@@ -5,8 +5,7 @@ import { db } from '#/db'
 import { entity, interaction, interactionEntity, space } from '#/db/schema'
 
 /** Closed JSON type — Start's serializer rejects `unknown`. */
-export type Json =
-  string | number | boolean | null | Array<Json> | { [k: string]: Json }
+export type { Json } from '#/lib/json'
 
 export async function requireUser() {
   const session = await auth.api.getSession({
@@ -117,7 +116,7 @@ export async function createSpaceRow(
 export async function birthHolding(opts: {
   companyId: string
   actorId: string
-  openedAt?: string
+  openedAt?: string | undefined
 }): Promise<{ id: string; created: boolean }> {
   const { holding } = await import('#/db/schema/portfolio')
   const { activity } = await import('#/db/schema/activity')

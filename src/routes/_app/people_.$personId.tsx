@@ -25,7 +25,6 @@ import {
   RecordHeader,
   RecordSection,
 } from '#/components/record/record-parts'
-import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
@@ -259,7 +258,7 @@ function PersonRecordPage() {
           {registry.map((def) => (
             <RailField
               key={def.slug}
-              def={def as RegistryEntry}
+              def={def}
               attr={def}
               objectLabel={'person'}
               onAttributeSaved={() => router.invalidate()}
@@ -355,10 +354,7 @@ function PersonRecordPage() {
               </button>
             }
           />
-          <RecordTimeline
-            items={timeline}
-            registry={registry as Array<RegistryEntry>}
-          />
+          <RecordTimeline items={timeline} registry={registry} />
         </RecordSection>
 
         <RecordSection

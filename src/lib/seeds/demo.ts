@@ -11,6 +11,7 @@ import {
   term,
 } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
+import type { EntityValues } from '#/db/schema/entities'
 import { resolveEntity } from '#/lib/entities/resolve'
 
 /**
@@ -32,7 +33,12 @@ const SPACE_TREE = [
   { slug: 'immersion', name: 'Immersion cooling', parent: 'cooling' },
 ]
 
-const COMPANIES = [
+const COMPANIES: Array<{
+  name: string
+  domain: string
+  space: string
+  values: EntityValues
+}> = [
   {
     name: 'Submer',
     domain: 'submer.com',

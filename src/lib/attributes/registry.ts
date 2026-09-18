@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { BadgeColor } from './colors'
+import type { Json } from '#/lib/json'
 
 /**
  * The attribute type menu — fixed in code; users define attributes, never
@@ -8,6 +9,9 @@ import type { BadgeColor } from './colors'
  */
 
 export type ObjectKind = 'company' | 'person' | 'deal'
+
+/** The three core kinds, as a list — iteration order for the seeder. */
+export const OBJECT_KINDS: Array<ObjectKind> = ['company', 'person', 'deal']
 
 /**
  * The seeded system rows of the object registry (one registry, system
@@ -21,6 +25,13 @@ export const CORE_OBJECTS: Record<
   company: { slug: 'companies', singular: 'Company', plural: 'Companies' },
   person: { slug: 'people', singular: 'Person', plural: 'People' },
   deal: { slug: 'deals', singular: 'Deal', plural: 'Deals' },
+}
+
+/** entity.kind is the wider enum; this is the core-object narrowing. */
+export function toObjectKind(kind: string): ObjectKind | null {
+  return kind === 'company' || kind === 'person' || kind === 'deal'
+    ? kind
+    : null
 }
 
 export type AttributeType =
@@ -71,7 +82,7 @@ export type AttributeOptions = {
    * creation path, fills blanks only. Validated at attribute save
    * (`validateDefault`), resolved at record birth (`resolveDefault`).
    */
-  default?: unknown
+  default?: Json
 }
 
 export type AttributeDef = {
@@ -103,14 +114,19 @@ export function valueValidator(
   held?: unknown,
 ) {
   const options = def.options.options ?? []
-  const optionIds = options.map((o) => o.id) as [string, ...Array<string>]
   const heldIds = new Set(
     Array.isArray(held) ? held.map(String) : held == null ? [] : [String(held)],
   )
+  // Not z.enum: that wants a non-empty literal tuple, which an option list
+  // read out of the registry can never be without an assertion.
   const liveOption = () =>
-    z.enum(optionIds).superRefine((id, ctx) => {
+    z.string().superRefine((id, ctx) => {
       const opt = options.find((o) => o.id === id)
-      if (opt?.archived && !heldIds.has(id))
+      if (!opt) {
+        ctx.addIssue({ code: 'custom', message: 'Not one of the options' })
+        return
+      }
+      if (opt.archived && !heldIds.has(id))
         ctx.addIssue({
           code: 'custom',
           message: `"${opt.label}" is archived — pick a current option`,
@@ -143,9 +159,9 @@ export function valueValidator(
       return z.boolean()
     case 'select':
     case 'status':
-      return optionIds.length > 0 ? liveOption() : z.never()
+      return options.length > 0 ? liveOption() : z.never()
     case 'multi_select':
-      return optionIds.length > 0 ? z.array(liveOption()).max(50) : z.never()
+      return options.length > 0 ? z.array(liveOption()).max(50) : z.never()
     case 'record_reference':
       return def.options.multi
         ? z.array(z.string().uuid()).max(100)

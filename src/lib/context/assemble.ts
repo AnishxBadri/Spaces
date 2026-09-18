@@ -79,7 +79,7 @@ export type AssembleOptions = {
   asOf: string
   budgetChars: number
   /** Task text; enables the lexical lane and glossary matching. */
-  taskText?: string
+  taskText?: string | undefined
 }
 
 export type AssembleResult = RankResult & {
@@ -156,7 +156,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
   const noteRows = new Map<string, { visibility: string; authorId: string }>()
 
   // ---------- hop 0: attributes ----------
-  const values = (seed.values ?? {}) as Record<string, unknown>
+  const values = seed.values
   const objectId = seed.objectId
   const defs: Array<AttributeDef> = objectId
     ? (yield* query(() =>
@@ -176,7 +176,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
         slug: r.slug,
         name: r.name,
         type: r.type,
-        options: r.options as AttributeDef['options'],
+        options: r.options,
         isSystem: r.isSystem,
         archived: r.archived,
         sortOrder: r.sortOrder,

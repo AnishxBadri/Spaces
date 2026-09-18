@@ -6,8 +6,9 @@ import { user } from '#/db/schema/auth'
 import { attributeEvent, entity, link } from '#/db/schema'
 import { mandate } from '#/db/schema/workspace'
 import { activity } from '#/db/schema/activity'
+import { jsonString } from '#/lib/json'
+import type { EntityValues } from '#/db/schema/entities'
 import { requireUser } from './shared'
-import type { Json } from './shared'
 
 const createDealInput = z.object({
   companyId: z.string().uuid(),
@@ -62,6 +63,14 @@ export const createDeal = createServerFn({ method: 'POST' })
     return { id: ent.id }
   })
 
+/** One row of the deals table, values already the column's type. */
+type DealTableRow = {
+  id: string
+  name: string
+  values: EntityValues
+  createdAt: string
+}
+
 /**
  * Deal rows with referenced records resolved for display: values hold
  * uuids; the table wants names. One pass over reference links.
@@ -79,17 +88,10 @@ export const listDealsTable = createServerFn().handler(async () => {
     .where(and(eq(entity.kind, 'deal'), isNull(entity.mergedIntoId)))
     .orderBy(desc(entity.createdAt))
 
-  if (rows.length === 0)
-    return {
-      rows: [] as Array<{
-        id: string
-        name: string
-        values: Record<string, Json>
-        createdAt: string
-      }>,
-      refNames: {},
-      userNames: {},
-    }
+  if (rows.length === 0) {
+    const empty: Array<DealTableRow> = []
+    return { rows: empty, refNames: {}, userNames: {} }
+  }
   const dealIds = rows.map((r) => r.id)
   const refs = await db
     .select({
@@ -114,7 +116,7 @@ export const listDealsTable = createServerFn().handler(async () => {
     rows: rows.map((r) => ({
       id: r.id,
       name: r.name,
-      values: (r.values ?? {}) as Record<string, Json>,
+      values: r.values,
       createdAt: r.createdAt.toISOString(),
     })),
     refNames: Object.fromEntries(refNames),
@@ -148,8 +150,7 @@ export const listCompanyDeals = createServerFn()
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
-      stage: ((r.values ?? {}) as Record<string, unknown>).stage as
-        string | undefined,
+      stage: jsonString(r.values.stage),
     }))
   })
 
@@ -200,8 +201,8 @@ export const getDeal = createServerFn()
     // record only — where the invest/pass judgment happens. A hint, never a
     // block; null when there is no mandate, no stages, or no company stage.
     let outsideMandate: boolean | null = null
-    const values = (head.values ?? {}) as Record<string, Json>
-    const companyId = values.company as string | undefined
+    const values = head.values
+    const companyId = jsonString(values.company)
     if (companyId) {
       const m = (
         await db
@@ -216,9 +217,8 @@ export const getDeal = createServerFn()
             .from(entity)
             .where(eq(entity.id, companyId))
         ).at(0)
-        const stage = (comp?.values as Record<string, unknown> | null)
-          ?.funding_stage as string | undefined
-        if (stage) outsideMandate = !m.stages.includes(stage)
+        const stage = comp ? jsonString(comp.values.funding_stage) : null
+        if (stage !== null) outsideMandate = !m.stages.includes(stage)
       }
     }
 
@@ -276,7 +276,7 @@ export const dealFunnelStats = createServerFn().handler(async () => {
   // the current stage (events are newest-first, so first hit wins).
   const enteredAt = new Map<string, number>()
   for (const d of deals) {
-    const stage = (d.values as Record<string, unknown> | null)?.stage
+    const stage = d.values.stage ?? null
     const hit = events.find((e) => e.entityId === d.id && e.to === stage)
     if (hit) enteredAt.set(d.id, hit.at.getTime())
   }
@@ -285,9 +285,7 @@ export const dealFunnelStats = createServerFn().handler(async () => {
   const daysByStage = new Map<string, Array<number>>()
   const countByStage = new Map<string, number>()
   for (const d of deals) {
-    const stage = String(
-      (d.values as Record<string, unknown> | null)?.stage ?? '',
-    )
+    const stage = String(d.values.stage ?? '')
     if (!stage) continue
     countByStage.set(stage, (countByStage.get(stage) ?? 0) + 1)
     const entered = enteredAt.get(d.id)
@@ -311,9 +309,7 @@ export const dealFunnelStats = createServerFn().handler(async () => {
       return {
         id: d.id,
         name: d.name,
-        stage: String(
-          (d.values as Record<string, unknown> | null)?.stage ?? '',
-        ),
+        stage: String(d.values.stage ?? ''),
         days: entered === undefined ? null : (now - entered) / 86_400_000,
       }
     })

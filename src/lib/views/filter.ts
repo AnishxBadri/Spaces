@@ -14,11 +14,41 @@ export type ConditionValue = string | number | boolean | null | Array<string>
 export type Condition = {
   slug: string
   op: ConditionOp
-  value?: ConditionValue
+  value?: ConditionValue | undefined
 }
+
+/** TanStack's single sort, as a view stores it. */
+export type ViewSort = { id: string; desc: boolean } | null
 
 /** Page-specific view state; scalars only so it crosses the server seam. */
 export type ViewExtra = Record<string, string | number | boolean | null>
+
+const OPS: Array<ConditionOp> = [
+  'is',
+  'is_not',
+  'contains',
+  'empty',
+  'not_empty',
+  'gt',
+  'lt',
+]
+
+/** A `<select>`'s string back to an op, or null if it names none. */
+export function toConditionOp(v: string): ConditionOp | null {
+  return OPS.find((op) => op === v) ?? null
+}
+
+/** An editor's value narrowed to what a condition may compare against. */
+export function toConditionValue(v: unknown): ConditionValue {
+  if (
+    v === null ||
+    typeof v === 'string' ||
+    typeof v === 'number' ||
+    typeof v === 'boolean'
+  )
+    return v
+  return Array.isArray(v) ? v.map(String) : null
+}
 
 export const OP_LABELS: Record<ConditionOp, string> = {
   is: 'is',

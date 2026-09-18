@@ -10,7 +10,7 @@ import { ENTITY_REFS } from './entity-refs'
  * single-column PK is excluded — that row *is* the entity.
  */
 function entityRefColumnsFromSchema(): Set<string> {
-  const tables = (Object.values(schema) as Array<unknown>).filter(
+  const tables = Object.values<unknown>(schema).filter(
     (t): t is PgTable => t instanceof PgTable,
   )
   const entityName = getTableConfig(schema.entity).name

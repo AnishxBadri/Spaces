@@ -50,8 +50,9 @@ export class S3Storage implements Storage {
 
   constructor() {
     this.bucket = required('S3_BUCKET')
+    const endpoint = process.env.S3_ENDPOINT
     this.client = new S3Client({
-      endpoint: process.env.S3_ENDPOINT || undefined,
+      ...(endpoint ? { endpoint } : {}),
       region: process.env.S3_REGION ?? 'us-east-1',
       forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
       credentials: {
@@ -90,7 +91,7 @@ export class S3Storage implements Storage {
   async getDownloadUrl(
     key: string,
     ttlSeconds: number,
-    opts?: { filename?: string },
+    opts?: { filename?: string | undefined },
   ) {
     const safeName = (opts?.filename ?? key).replace(/[^\w.\- ()]/g, '_')
     return getSignedUrl(

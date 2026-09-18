@@ -5,8 +5,8 @@ import { db } from '#/db'
 import { entity, entityAlias, link, person } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from '../entities/resolve'
+import { jsonString } from '#/lib/json'
 import { lastTouchedMap, requireUser } from './shared'
-import type { Json } from './shared'
 
 export const listPeople = createServerFn().handler(async () => {
   await requireUser()
@@ -49,9 +49,7 @@ export const listPeople = createServerFn().handler(async () => {
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
-    headline:
-      ((r.values as Record<string, unknown> | null)?.job_title as
-        string | undefined) ?? null,
+    headline: jsonString(r.values.job_title),
     email: emailBy.get(r.id) ?? null,
     company: companyBy.get(r.id) ?? null,
     createdAt: r.createdAt.toISOString(),
@@ -101,7 +99,7 @@ export const listPeopleTable = createServerFn().handler(async () => {
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
-    values: (r.values ?? {}) as Record<string, Json>,
+    values: r.values,
     emails: emailsBy.get(r.id) ?? [],
     company: companyBy.get(r.id) ?? null,
     lastTouched: touched[r.id] ?? null,
@@ -224,7 +222,7 @@ export const getPerson = createServerFn()
       id: head.id,
       name: head.name,
       mergedIntoId: head.mergedIntoId,
-      values: (head.values ?? {}) as Record<string, Json>,
+      values: head.values,
       emails: aliases.filter((a) => a.kind === 'email'),
       linkedins: aliases.filter((a) => a.kind === 'linkedin'),
       companies,

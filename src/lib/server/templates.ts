@@ -5,6 +5,7 @@ import { db } from '#/db'
 import { entity, note, space, term } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
 import { template } from '#/db/schema/templates'
+import { toObjectKind } from '../attributes/registry'
 import { canRead, requireUser } from './shared'
 import type { Json } from './shared'
 
@@ -48,7 +49,7 @@ export const listTemplates = createServerFn()
       kind: t.kind,
       objectKind: t.objectKind,
       name: t.name,
-      body: t.body as Json,
+      body: t.body,
       suggestOn: t.suggestOn,
       archived: t.archived,
     }))
@@ -85,17 +86,25 @@ export const updateTemplate = createServerFn({ method: 'POST' })
  * entity on every instantiation — ghost backlinks from documents that
  * merely share a shape.
  */
-function stripMentions(node: unknown): unknown {
+function stripMentions(node: Json): Json {
   if (Array.isArray(node)) return node.map(stripMentions)
-  if (!node || typeof node !== 'object') return node
-  const n = node as Record<string, unknown>
-  if (n.type === 'mention') {
-    const props = n.props as { label?: string } | undefined
-    return { type: 'text', text: props?.label ?? '', styles: {} }
+  if (node === null || typeof node !== 'object') return node
+  if (node.type === 'mention') {
+    const props = node.props
+    const label =
+      props !== null && typeof props === 'object' && !Array.isArray(props)
+        ? props.label
+        : undefined
+    return {
+      type: 'text',
+      text: typeof label === 'string' ? label : '',
+      styles: {},
+    }
   }
-  const out: Record<string, unknown> = { ...n }
-  if (Array.isArray(n.content)) out.content = n.content.map(stripMentions)
-  if (Array.isArray(n.children)) out.children = n.children.map(stripMentions)
+  const out: { [k: string]: Json } = { ...node }
+  if (Array.isArray(node.content)) out.content = node.content.map(stripMentions)
+  if (Array.isArray(node.children))
+    out.children = node.children.map(stripMentions)
   return out
 }
 
@@ -153,7 +162,7 @@ export const createNoteFromTemplate = createServerFn({ method: 'POST' })
         entityId: ent.id,
         authorId: u.id,
         title: t.name,
-        bodyJson: t.body,
+        bodyJson: Array.isArray(t.body) ? t.body : [],
         bodyMd: '',
       })
       await tx.insert(activity).values({
@@ -189,16 +198,16 @@ export const saveRecordAsTemplate = createServerFn({ method: 'POST' })
       throw new Error('Record not found')
     }
     const { getRegistry } = await import('../attributes/values')
-    const registry = await getRegistry(
-      row.kind as 'company' | 'person' | 'deal',
-    )
+    const core = toObjectKind(row.kind)
+    if (!core) throw new Error('Record not found')
+    const registry = await getRegistry(core)
     const templatable = new Map(
       registry
         .filter((d) => !NON_TEMPLATABLE_TYPES.has(d.type) && !d.archived)
         .map((d) => [d.slug, d]),
     )
     const values = Object.fromEntries(
-      Object.entries((row.values ?? {}) as Record<string, Json>).filter(
+      Object.entries(row.values).filter(
         ([slug, v]) => templatable.has(slug) && v !== null,
       ),
     )
@@ -224,6 +233,27 @@ export const saveRecordAsTemplate = createServerFn({ method: 'POST' })
 type SpaceManifest = {
   terms: Array<{ name: string; definition: string }>
   children: Array<{ name: string } & SpaceManifest>
+}
+
+/** One stored space-template body, read back — a decode, not an assertion. */
+function toSpaceManifest(body: Json): SpaceManifest {
+  if (body === null || typeof body !== 'object' || Array.isArray(body))
+    return { terms: [], children: [] }
+  const named = (v: Json): string =>
+    v !== null && typeof v === 'object' && !Array.isArray(v)
+      ? String(v.name ?? '')
+      : ''
+  const terms = Array.isArray(body.terms)
+    ? body.terms.flatMap((t) =>
+        t !== null && typeof t === 'object' && !Array.isArray(t)
+          ? [{ name: named(t), definition: String(t.definition ?? '') }]
+          : [],
+      )
+    : []
+  const children = Array.isArray(body.children)
+    ? body.children.map((c) => ({ ...toSpaceManifest(c), name: named(c) }))
+    : []
+  return { terms, children }
 }
 
 export const saveSpaceAsTemplate = createServerFn({ method: 'POST' })
@@ -301,7 +331,7 @@ export const applySpaceTemplate = createServerFn({ method: 'POST' })
         )
     ).at(0)
     if (!t) throw new Error('Template not found')
-    const manifest = t.body as SpaceManifest
+    const manifest = toSpaceManifest(t.body)
 
     const { createSpaceRow } = await import('./shared')
 

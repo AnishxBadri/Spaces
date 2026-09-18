@@ -248,21 +248,7 @@ function AttributeRow({
     }
   }
 
-  const stored = (attr.options ?? {}) as {
-    options?: Array<{
-      id: string
-      label: string
-      group?: string
-      color?: string
-      archived?: boolean
-    }>
-    code?: string
-    max?: number
-    precision?: number
-    targetKind?: string
-    required?: boolean
-    default?: unknown
-  }
+  const stored = attr.options
   const options = stored.options ?? []
   const hasOptions = ['select', 'multi_select', 'status'].includes(attr.type)
   const constraints = [
@@ -502,9 +488,11 @@ function InlineName({
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => draft.trim() && draft !== name && onSave(draft.trim())}
       onKeyDown={(e) => {
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
         if (e.key === 'Escape') {
           setDraft(name)
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
           ;(e.target as HTMLInputElement).blur()
         }
       }}

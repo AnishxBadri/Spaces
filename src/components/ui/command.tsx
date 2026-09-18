@@ -44,7 +44,7 @@ function CommandDialog({
   description?: string
   className?: string
   showCloseButton?: boolean
-  shouldFilter?: boolean
+  shouldFilter?: boolean | undefined
 }) {
   return (
     <Dialog {...props}>
@@ -56,7 +56,9 @@ function CommandDialog({
         className={cn('overflow-hidden p-0 sm:max-w-[40rem]', className)}
         showCloseButton={showCloseButton}
       >
-        <Command shouldFilter={shouldFilter}>{children}</Command>
+        <Command {...(shouldFilter === undefined ? {} : { shouldFilter })}>
+          {children}
+        </Command>
       </DialogContent>
     </Dialog>
   )

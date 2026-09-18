@@ -106,6 +106,27 @@ export default [
       ],
     },
   },
+  // The cast ratchet (SPA-151): a type is a claim the compiler checked, not
+  // one the author asserted. Data crossing a boundary gets its type once —
+  // at the jsonb column's $type<>() or at a decode — and never again
+  // downstream. The residual DOM/React/third-party-generic casts each carry
+  // a per-line disable with a reason, so `grep -c` sees the count and it
+  // only goes down. no-unsafe-* stays off: drizzle's inferred types trip it
+  // too often to be signal.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/consistent-type-assertions': [
+        'error',
+        { assertionStyle: 'never' },
+      ],
+      '@typescript-eslint/no-unnecessary-condition': 'error',
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        { considerDefaultExhaustiveForUnions: true },
+      ],
+    },
+  },
   // Guard against accidental full-table update/delete (portfolio event
   // tables are append-only by design).
   {

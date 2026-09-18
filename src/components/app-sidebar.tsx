@@ -79,11 +79,11 @@ export function AppSidebar({
 }: {
   user: { name: string; email: string }
   /** The workspace singleton's name — the deployment's identity. */
-  workspaceName?: string | null
+  workspaceName?: string | null | undefined
   /** Custom objects (spec §9) — they join the nav right after Deals. */
   objects?: Array<{ slug: string; plural: string; icon: string | null }>
   onOpenCommand: () => void
-  onNavigate?: () => void
+  onNavigate?: (() => void) | undefined
   /** Drawer usage — the mobile top bar already shows the wordmark. */
   hideWordmark?: boolean
   /** The 48px marks-only chassis. */
@@ -272,8 +272,8 @@ function AccountMenu({
   onSignOut,
 }: {
   email: string
-  onNavigate?: () => void
-  onKeyboard?: () => void
+  onNavigate?: (() => void) | undefined
+  onKeyboard?: (() => void) | undefined
   onSignOut: () => void
 }) {
   const navigate = useNavigate()
@@ -329,11 +329,11 @@ function CollapsedSidebar({
   onSignOut,
 }: {
   user: { name: string; email: string }
-  workspaceName?: string | null
+  workspaceName?: string | null | undefined
   objects: Array<{ slug: string; plural: string; icon: string | null }>
   onOpenCommand: () => void
-  onExpand?: () => void
-  onKeyboard?: () => void
+  onExpand?: (() => void) | undefined
+  onKeyboard?: (() => void) | undefined
   onSignOut: () => void
 }) {
   return (
@@ -443,7 +443,7 @@ function CollapsedNavLink({
   children,
 }: {
   to: string
-  params?: Record<string, string>
+  params?: Record<string, string> | undefined
   icon: LucideIcon
   children: string
 }) {
@@ -451,7 +451,7 @@ function CollapsedNavLink({
     <IconTip label={children}>
       <Link
         to={to}
-        params={params}
+        {...(params ? { params } : {})}
         aria-label={children}
         className="group focus-ring-inset flex h-9 w-12 items-center justify-center"
         activeProps={{ 'aria-current': 'page' }}
@@ -502,18 +502,18 @@ function NavLink({
   children,
 }: {
   to: string
-  params?: Record<string, string>
+  params?: Record<string, string> | undefined
   icon: LucideIcon
   /** The chord printed in the right lane — graphite, ink on the current page. */
-  hint?: string
-  onClick?: () => void
+  hint?: string | undefined
+  onClick?: (() => void) | undefined
   children: React.ReactNode
 }) {
   return (
     <Link
       to={to}
-      params={params}
-      onClick={onClick}
+      {...(params ? { params } : {})}
+      {...(onClick ? { onClick } : {})}
       className={cn(
         'flex h-[1.875rem] items-center gap-2.5 rounded-md border border-transparent px-2.5 text-ui text-foreground transition-colors',
         'hover:bg-bone-deep',

@@ -256,12 +256,12 @@ function CreateSpaceDialog({
           data: {
             templateId: scaffold.id,
             name,
-            parentId: parentId || undefined,
+            ...(parentId ? { parentId } : {}),
           },
         })
       } else {
         await createSpace({
-          data: { name, parentId: parentId || undefined },
+          data: { name, ...(parentId ? { parentId } : {}) },
         })
       }
       onOpenChange(false)

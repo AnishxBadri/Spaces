@@ -185,20 +185,7 @@ function TodayPage() {
   })
 
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
-  const stageOptions =
-    (
-      stageDef?.options as
-        | {
-            options?: Array<{
-              id: string
-              label: string
-              group?: string
-              color?: string
-              archived?: boolean
-            }>
-          }
-        | undefined
-    )?.options ?? []
+  const stageOptions = stageDef?.options.options ?? []
   const activeStages = new Set(
     stageOptions
       .filter((o) => (o.group ?? 'active') === 'active')

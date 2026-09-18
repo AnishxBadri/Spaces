@@ -14,8 +14,8 @@ export type RecordReadout = {
   label: ReactNode
   value: ReactNode
   /** Names are sans; everything measured is mono (the default). */
-  kind?: 'mono' | 'text'
-  tone?: 'muted' | 'bad'
+  kind?: 'mono' | 'text' | undefined
+  tone?: 'muted' | 'bad' | undefined
 }
 
 export function RecordHeader({

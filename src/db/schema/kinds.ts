@@ -17,6 +17,10 @@ import { sql } from 'drizzle-orm'
 import { ltree, tsvector } from './helpers'
 import { entity } from './entities'
 import { user } from './auth'
+import type { Json } from '#/lib/json'
+
+/** A BlockNote document — an array of blocks. Null until the note has one. */
+export type NoteBody = Array<Json>
 
 /**
  * Per-kind side tables. Identity values (domain, email, linkedin, cin) live
@@ -120,7 +124,7 @@ export const note = pgTable('note', {
     .primaryKey()
     .references(() => entity.id),
   title: text('title').notNull().default(''),
-  bodyJson: jsonb('body_json'),
+  bodyJson: jsonb('body_json').$type<NoteBody>(),
   bodyMd: text('body_md').notNull().default(''),
   kind: noteKind('kind').notNull().default('note'),
   // Generated column (migration 0009) — derived from title + body_md by

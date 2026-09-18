@@ -12,6 +12,7 @@ import {
   space,
 } from '#/db/schema'
 import { activity } from '#/db/schema/activity'
+import { jsonString } from '#/lib/json'
 import { createSpaceRow, requireUser } from './shared'
 
 // Spaces — first real write path through the entity core.
@@ -92,12 +93,12 @@ export const getSpace = createServerFn()
       .where(and(eq(entitySpace.spaceId, data.id), isNull(entity.mergedIntoId)))
       .orderBy(asc(entity.canonicalName))
     const companies = companyRows.map((c) => {
-      const v = (c.values ?? {}) as Record<string, unknown>
+      const v = c.values
       return {
         id: c.id,
         name: c.name,
-        stage: (v.funding_stage as string | undefined) ?? null,
-        geo: (v.location as string | undefined) ?? null,
+        stage: jsonString(v.funding_stage),
+        geo: jsonString(v.location),
         taggedVia: c.taggedVia,
       }
     })

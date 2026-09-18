@@ -13,6 +13,16 @@ import { localToday, parseDue } from '#/lib/tasks/parse-due'
 import { useHotkey } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
+/** The four quick-pick due dates, in the order both surfaces show them. */
+function duePresets(today: string): Array<[string, string | null]> {
+  return [
+    ['Today', today],
+    ['Tomorrow', parseDue('tomorrow', today)],
+    ['Next week', parseDue('next week', today)],
+    ['No date', null],
+  ]
+}
+
 /**
  * The task composer (CONTEXT.md 15b — Attio's create-bar as reference):
  * one line of text, pills for due date / assignee / linked records.
@@ -121,14 +131,7 @@ export function TaskComposer({
       <DuePill due={due} today={today} onChange={setDue} />
       {variant === 'band' ? (
         <>
-          {(
-            [
-              ['Today', today],
-              ['Tomorrow', parseDue('tomorrow', today)],
-              ['Next week', parseDue('next week', today)],
-              ['No date', null],
-            ] as Array<[string, string | null]>
-          ).map(([label, value]) => (
+          {duePresets(today).map(([label, value]) => (
             <button
               key={label}
               type="button"
@@ -369,14 +372,7 @@ function DuePill({
             : 'Type a date, or pick:'}
         </p>
         <div className="mt-2 flex flex-wrap gap-1">
-          {(
-            [
-              ['Today', today],
-              ['Tomorrow', parseDue('tomorrow', today)],
-              ['Next week', parseDue('next week', today)],
-              ['No date', null],
-            ] as Array<[string, string | null]>
-          ).map(([label, value]) => (
+          {duePresets(today).map(([label, value]) => (
             <button
               key={label}
               type="button"

@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { db } from '#/db'
 import { BADGE_COLORS } from '../attributes/colors'
 import { requireAdmin, requireUser } from './shared'
-import type { Json } from './shared'
+import { jsonValue } from '#/lib/json'
 
 export const listRegistry = createServerFn()
   .validator(
@@ -30,7 +30,10 @@ export const listRegistry = createServerFn()
     const { Effect } = await import('effect')
 
     const listRegistryProgram = Effect.fn('listRegistryProgram')(function* (
-      key: { kind?: 'company' | 'person' | 'deal'; objectId?: string },
+      key: {
+        kind?: 'company' | 'person' | 'deal' | undefined
+        objectId?: string | undefined
+      },
       includeArchived: boolean,
     ) {
       const objectId =
@@ -57,7 +60,7 @@ export const listRegistry = createServerFn()
         name: d.name,
         description: d.description,
         type: d.type,
-        options: d.options as Json,
+        options: d.options,
         isSystem: d.isSystem,
         archived: d.archived,
         sortOrder: d.sortOrder,
@@ -130,7 +133,7 @@ export const updateAttributeInput = z.object({
       /** number — decimals shown */
       precision: z.number().int().min(0).max(6).optional(),
       /** spec §4 default — shape checked by the program, per type */
-      default: z.unknown().optional(),
+      default: jsonValue.optional(),
     })
     .optional(),
 })
@@ -202,7 +205,7 @@ export const createAttributeInput = z.object({
       multi: z.boolean().optional(),
     })
     .optional(),
-  default: z.unknown().optional(),
+  default: jsonValue.optional(),
   required: z.boolean().optional(),
 })
 

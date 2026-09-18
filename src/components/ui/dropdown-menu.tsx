@@ -86,6 +86,7 @@ function DropdownMenuCheckboxItem({
   checked,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
+  const checkedProp = checked === undefined ? {} : { checked }
   return (
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
@@ -93,7 +94,7 @@ function DropdownMenuCheckboxItem({
         "relative flex h-7 cursor-default items-center gap-2 rounded-none py-0 pr-2 pl-7 text-ui outline-hidden select-none focus:bg-bone data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
-      checked={checked}
+      {...checkedProp}
       {...props}
     >
       {/* A square box, pine when checked — the same checkbox the cells use. */}

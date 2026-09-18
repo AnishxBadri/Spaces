@@ -22,7 +22,14 @@ import {
 } from '#/components/ui/popover'
 import { deleteView, saveView } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
-import { OP_LABELS, isUnary, opsFor, sameJson } from '#/lib/views/filter'
+import {
+  OP_LABELS,
+  isUnary,
+  opsFor,
+  sameJson,
+  toConditionOp,
+  toConditionValue,
+} from '#/lib/views/filter'
 import type {
   Condition,
   ConditionOp,
@@ -301,9 +308,10 @@ function FilterPopover({
                 <select
                   aria-label="Operator"
                   value={c.op}
-                  onChange={(e) =>
-                    update(i, { op: e.target.value as ConditionOp })
-                  }
+                  onChange={(e) => {
+                    const op = toConditionOp(e.target.value)
+                    if (op) update(i, { op })
+                  }}
                   className="focus-ring h-8 rounded-md border border-rule bg-transparent px-2 text-ui"
                 >
                   {ops.map((op) => (
@@ -405,7 +413,7 @@ function ConditionValueEditor({
       def={single}
       value={value ?? null}
       variant="field"
-      onSave={(v) => onChange(v as ConditionValue)}
+      onSave={(v) => onChange(toConditionValue(v))}
     />
   )
 }

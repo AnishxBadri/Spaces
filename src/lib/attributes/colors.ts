@@ -30,9 +30,7 @@ export const BADGE_COLORS = [
 export type BadgeColor = (typeof BADGE_COLORS)[number]
 
 export function isBadgeColor(v: unknown): v is BadgeColor {
-  return (
-    typeof v === 'string' && (BADGE_COLORS as ReadonlyArray<string>).includes(v)
-  )
+  return typeof v === 'string' && BADGE_COLORS.some((c) => c === v)
 }
 
 /**

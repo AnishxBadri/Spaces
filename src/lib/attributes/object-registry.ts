@@ -64,7 +64,7 @@ export { slugifyNoun, suggestPlural }
 export type CreateObjectInput = {
   singular: string
   plural: string
-  icon?: string | null
+  icon?: string | null | undefined
   createdBy: string
 }
 
@@ -117,10 +117,10 @@ export const createObjectProgram = Effect.fn('createObjectProgram')(function* (
 
 export type UpdateObjectInput = {
   id: string
-  singular?: string
-  plural?: string
-  icon?: string | null
-  archived?: boolean
+  singular?: string | undefined
+  plural?: string | undefined
+  icon?: string | null | undefined
+  archived?: boolean | undefined
 }
 
 export const updateObjectProgram = Effect.fn('updateObjectProgram')(function* (
@@ -163,7 +163,7 @@ export type CreateRecordInput = {
   objectId: string
   /** the display name — core-owned, required at birth (§9 birth contract) */
   name: string
-  values?: Record<string, unknown>
+  values?: Record<string, unknown> | undefined
   actor: Actor
 }
 

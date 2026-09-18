@@ -14,6 +14,7 @@ import { liveOptions, optionState } from '#/lib/attributes/options'
 import { formatDate, formatNumber } from '#/lib/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
+import type { AttributeOptions } from '#/lib/attributes/registry'
 
 /**
  * Typed attribute editors — ONE implementation shared by table cells,
@@ -26,23 +27,7 @@ export type RegistryEntry = {
   slug: string
   name: string
   type: string
-  options: {
-    options?: Array<{
-      id: string
-      label: string
-      group?: string
-      color?: string
-      archived?: boolean
-    }>
-    max?: number
-    code?: string
-    targetKind?: string
-    targetObjectId?: string
-    multi?: boolean
-    required?: boolean
-    precision?: number
-    default?: unknown
-  } | null
+  options: AttributeOptions | null
   isSystem: boolean
   description?: string | null
 }
@@ -61,9 +46,9 @@ type Props = {
   value: unknown
   onSave: (value: unknown) => void
   variant: 'cell' | 'field'
-  autoFocus?: boolean
+  autoFocus?: boolean | undefined
   /** display names for record/actor reference ids */
-  refNames?: RefNames
+  refNames?: RefNames | undefined
 }
 
 /**
@@ -299,6 +284,7 @@ function DateCellEditor({ def, value, onSave }: Props) {
           if (e.target.value !== stored) onSave(e.target.value || null)
         }}
         onKeyDown={(e) => {
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           if (e.key === 'Escape') setEditing(false)
         }}
@@ -371,9 +357,11 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
         commit()
       }}
       onKeyDown={(e) => {
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
         if (e.key === 'Escape') {
           setDraft(committed.current)
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
           ;(e.target as HTMLInputElement).blur()
         }
       }}
@@ -399,7 +387,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
   const targetObjectId = def.options?.targetObjectId
   const selected: Array<string> = multi
     ? Array.isArray(value)
-      ? (value as Array<string>)
+      ? value.map(String)
       : []
     : value == null
       ? []
@@ -417,7 +405,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
         const r = await searchEntities({
           data: targetObjectId
             ? { q: query, objectId: targetObjectId }
-            : { q: query, kinds: [targetKind as 'company'] },
+            : { q: query, kinds: [targetKind] },
         })
         if (alive) setResults(r)
       })()
@@ -567,7 +555,7 @@ function OptionPicker({
   const opts = liveOptions(def)
   const selected: Array<string> = multi
     ? Array.isArray(value)
-      ? (value as Array<string>)
+      ? value.map(String)
       : []
     : value == null
       ? []

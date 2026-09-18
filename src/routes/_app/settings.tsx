@@ -259,7 +259,7 @@ function MembersSection({
       const { url } = await createInvite({
         data: {
           role: inviteRole,
-          email: inviteEmail.trim() || undefined,
+          ...(inviteEmail.trim() ? { email: inviteEmail.trim() } : {}),
         },
       })
       setInviteUrl(url)
@@ -338,7 +338,7 @@ function MembersSection({
                     Make {m.role === 'admin' ? 'member' : 'admin'}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    variant={m.banned ? undefined : 'destructive'}
+                    {...(m.banned ? {} : { variant: 'destructive' as const })}
                     onSelect={() =>
                       act(
                         () =>
@@ -379,7 +379,7 @@ function MembersSection({
               aria-label="Invite role"
               value={inviteRole}
               onChange={(e) =>
-                setInviteRole(e.target.value as 'member' | 'admin')
+                setInviteRole(e.target.value === 'admin' ? 'admin' : 'member')
               }
               className="focus-ring h-8 rounded-md border border-rule bg-paper px-2 text-ui"
             >

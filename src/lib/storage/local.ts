@@ -108,7 +108,7 @@ export class LocalStorage implements Storage {
   async getDownloadUrl(
     key: string,
     ttlSeconds: number,
-    opts?: { filename?: string },
+    opts?: { filename?: string | undefined },
   ) {
     const exp = Date.now() + ttlSeconds * 1000
     const sig = signBlobToken(key, 'get', exp)

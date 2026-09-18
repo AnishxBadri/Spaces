@@ -124,7 +124,7 @@ function ObjectListPage() {
     void navigate({
       to: '/o/$objectSlug',
       params: { objectSlug: object.slug },
-      search: { view: id ?? undefined },
+      search: id === null ? {} : { view: id },
     })
   const Icon = objectIcon(object)
 
@@ -154,23 +154,22 @@ function ObjectListPage() {
           />
         ),
       }),
-      ...registry.map(
-        (def) =>
-          col.accessor((r) => r.values[def.slug] ?? null, {
-            id: `attr:${def.slug}`,
-            header: def.name,
-            size: def.type === 'text' ? 200 : 140,
-            sortUndefined: 'last',
-            cell: (info) => (
-              <ValueEditor
-                def={def as RegistryEntry}
-                value={info.getValue()}
-                variant="cell"
-                refNames={refNames}
-                onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
-              />
-            ),
-          }) as ColumnDef<Row, unknown>,
+      ...registry.map((def) =>
+        col.accessor((r): unknown => r.values[def.slug] ?? null, {
+          id: `attr:${def.slug}`,
+          header: def.name,
+          size: def.type === 'text' ? 200 : 140,
+          sortUndefined: 'last',
+          cell: (info) => (
+            <ValueEditor
+              def={def}
+              value={info.getValue()}
+              variant="cell"
+              refNames={refNames}
+              onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
+            />
+          ),
+        }),
       ),
       col.accessor((r) => r.spaces.map((s) => s.name).join(', '), {
         id: 'spaces',
@@ -233,7 +232,7 @@ function ObjectListPage() {
   const createDialog = (
     <CreateRecordDialog
       object={object}
-      registry={registry as Array<RegistryEntry>}
+      registry={registry}
       refNames={refNames}
     />
   )
@@ -275,7 +274,7 @@ function ObjectListPage() {
             >
               <ViewBar
                 objectId={object.id}
-                registry={registry as Array<RegistryEntry>}
+                registry={registry}
                 views={views}
                 activeId={activeId ?? null}
                 snapshot={vs.snapshot}

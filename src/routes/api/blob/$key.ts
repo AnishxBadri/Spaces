@@ -53,6 +53,7 @@ export const Route = createFileRoute('/api/blob/$key')({
         const name = safeFilename(new URL(request.url).searchParams.get('name'))
 
         return new Response(
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Node's web-stream types and the DOM's ReadableStream are structurally the same object
           Readable.toWeb(createReadStream(path)) as ReadableStream,
           {
             headers: {
@@ -79,6 +80,7 @@ export const Route = createFileRoute('/api/blob/$key')({
         try {
           await new LocalStorage().putContentAddressed(
             params.key,
+            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Node's web-stream types and the DOM's ReadableStream are structurally the same object
             Readable.fromWeb(request.body as never),
           )
         } catch (err) {
