@@ -24,7 +24,7 @@
     "check": "prettier --check .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepare": "lefthook install || true"
+    "prepare": "lefthook install"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1101.0",
