@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
-import instrument from '../../eslint-rules/no-v1-tokens.js'
+import instrument, { NAMED_STEPS } from '../../eslint-rules/no-v1-tokens.js'
 
 /**
  * SPA-16: the v1 vocabulary is out, and the thing that keeps it out is a lint
@@ -116,6 +116,94 @@ describe('instrument/no-v1-tokens', () => {
     expect(
       lint('<div className="bg-background" />', 'src/routes/__root.tsx'),
     ).toEqual([])
+  })
+})
+
+describe('arbitrary type sizes (SPA-79)', () => {
+  it('names the step when an arbitrary size spells one out', () => {
+    const messages = lint('<div className="label-caps text-[0.625rem]" />')
+    expect(messages[0]?.message).toContain('text-field')
+    expect(messages[0]?.message).toContain('spelled out by hand')
+    expect(
+      lint('<div className="font-serif text-[0.9375rem]" />')[0]?.message,
+    ).toContain('text-title')
+  })
+
+  it('names the nearest step when the size is off the list entirely', () => {
+    const messages = lint('<div className="mono text-[0.5rem]" />')
+    expect(messages[0]?.message).toContain(
+      'text-field (10px), the nearest named',
+    )
+    expect(messages[0]?.message).toContain('scoped disable')
+  })
+
+  it('rejects arbitrary line heights, pointing at the scale or the step', () => {
+    expect(
+      lint('<div className="text-ui leading-[1.125rem]" />')[0]?.message,
+    ).toContain('leading-4.5 (the 0.25rem scale)')
+    expect(
+      lint('<div className="font-serif text-title leading-[1.375rem]" />')[0]
+        ?.message,
+    ).toContain("22px is the `title` step's own leading")
+  })
+
+  it('sees through variants, and reads cn() the same way', () => {
+    expect(lint('<div className="[&_p]:text-[0.625rem]" />')).toHaveLength(1)
+    expect(lint('<div className={cn("text-[0.625rem]")} />')).toHaveLength(1)
+  })
+
+  it('leaves arbitrary colours alone — a different axis, a different slice', () => {
+    expect(
+      lint('<div className="mono text-[var(--badge-amber-ink)]" />'),
+    ).toEqual([])
+    expect(lint('<div className="bg-[var(--badge-amber)]" />')).toEqual([])
+  })
+
+  it('passes the vocabulary it is there to protect', () => {
+    expect(
+      lint(
+        '<div className="field-label mono text-field text-label leading-4 leading-3.5" />',
+      ),
+    ).toEqual([])
+  })
+})
+
+describe('the named type steps', () => {
+  const css = readFileSync(`${repoRoot}/src/styles.css`, 'utf8')
+
+  /** Every `--text-<name>` / `--text-<name>--line-height` pair in styles.css. */
+  function stepsFromStyles() {
+    const sizes = new Map<string, number>()
+    const lines = new Map<string, number>()
+    for (const [, name, kind, value] of css.matchAll(
+      /--text-([a-z]+)(--line-height)?:\s*([\d.]+)rem;/g,
+    )) {
+      ;(kind ? lines : sizes).set(name, Number(value))
+    }
+    return [...sizes]
+      .map(([name, rem]) => ({ name, rem, lineRem: lines.get(name) ?? 0 }))
+      .sort((a, b) => a.rem - b.rem)
+  }
+
+  // The rule names the nearest step in its message; if styles.css grows or
+  // loses a step and the rule's table doesn't, the message starts lying.
+  it('are the same list in styles.css and in the lint rule', () => {
+    expect(stepsFromStyles()).toEqual(NAMED_STEPS)
+  })
+
+  it('include the field step — DESIGN.md §3’s sixth mono step, 10/12', () => {
+    expect(css).toContain('--text-field: 0.625rem;')
+    expect(css).toContain('--text-field--line-height: 0.75rem;')
+  })
+
+  it('carry a field-label utility: mono, caps, tracked, 400', () => {
+    const utility = /@utility field-label \{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(utility).toContain('font-family: var(--font-mono);')
+    expect(utility).toContain('font-size: var(--text-field);')
+    expect(utility).toContain('line-height: var(--text-field--line-height);')
+    expect(utility).toContain('font-weight: 400;')
+    expect(utility).toContain('letter-spacing: 0.08em;')
+    expect(utility).toContain('text-transform: uppercase;')
   })
 })
 

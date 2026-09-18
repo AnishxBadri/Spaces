@@ -41,7 +41,7 @@ export function Wordmark({ className }: { className?: string }) {
   return (
     <span className={cn('inline-flex items-center gap-2.5', className)}>
       <Mark className="text-foreground" />
-      <span className="label-caps text-[0.75rem] text-foreground">Spaces</span>
+      <span className="label-caps text-label text-foreground">Spaces</span>
     </span>
   )
 }

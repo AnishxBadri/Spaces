@@ -347,7 +347,7 @@ function AttributeRow({
         <span className={cn(LANE.origin, 'flex')}>
           <span
             className={cn(
-              'h-4 px-1.25 label-caps text-[0.625rem] leading-4',
+              'h-4 px-1.25 field-label leading-4 font-medium',
               attr.isSystem
                 ? 'bg-bone text-graphite'
                 : 'bg-selected text-foreground',

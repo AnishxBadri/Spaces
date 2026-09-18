@@ -240,10 +240,8 @@ function ObjectForm(
       {/* The slug is derived and frozen — shown, never edited. */}
       <div className="flex flex-col gap-1 border border-rule bg-bone px-3 py-2.5">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
-            Slug
-          </span>
-          <span className="mono text-[0.625rem] leading-3 text-graphite">
+          <span className="field-label text-graphite">Slug</span>
+          <span className="mono text-field text-graphite">
             {existing ? 'frozen' : 'derived · frozen after create'}
           </span>
         </div>

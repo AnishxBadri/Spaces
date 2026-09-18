@@ -129,7 +129,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        'overflow-hidden text-foreground [&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:h-6 [&_[cmdk-group-heading]]:items-center [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:label-caps [&_[cmdk-group-heading]]:text-[0.625rem] [&_[cmdk-group-heading]]:font-normal [&_[cmdk-group-heading]]:text-graphite [&_[cmdk-group]:not([hidden])_~&]:pt-2',
+        'overflow-hidden text-foreground [&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:h-6 [&_[cmdk-group-heading]]:items-center [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:field-label [&_[cmdk-group-heading]]:leading-4 [&_[cmdk-group-heading]]:text-graphite [&_[cmdk-group]:not([hidden])_~&]:pt-2',
         className,
       )}
       {...props}

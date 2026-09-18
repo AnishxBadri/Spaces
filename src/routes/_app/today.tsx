@@ -505,7 +505,7 @@ function TodayPage() {
               />
               {missingRates > 0 ? (
                 <div className="flex h-row items-center justify-between border-t border-rule">
-                  <span className="label-caps text-[0.625rem] leading-3 font-normal text-warning">
+                  <span className="field-label text-warning">
                     {missingRates} holding{missingRates === 1 ? '' : 's'}{' '}
                     unpriced
                   </span>
@@ -518,9 +518,7 @@ function TodayPage() {
                 </div>
               ) : (
                 <div className="flex h-row items-center justify-between border-t border-rule">
-                  <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
-                    All priced
-                  </span>
+                  <span className="field-label text-graphite">All priced</span>
                   <Link
                     to="/portfolio"
                     className="focus-ring mono text-micro text-foreground hover:underline"
@@ -549,10 +547,10 @@ function TodayPage() {
                     <span className="w-11 shrink-0 mono text-micro text-graphite">
                       {whenLabel(a.at, today)}
                     </span>
-                    <span className="w-5 shrink-0 mono text-[0.625rem] leading-3 font-medium">
+                    <span className="w-5 shrink-0 mono text-field font-medium">
                       {verbCode(a.verb)}
                     </span>
-                    <span className="min-w-0 text-label leading-[1.0625rem]">
+                    <span className="min-w-0 text-label leading-4.25">
                       <span className="font-medium">{a.actorName}</span>{' '}
                       {a.verb.replace(/[._]/g, ' ')}
                       {a.subjectName ? ` · ${a.subjectName}` : ''}
@@ -578,9 +576,7 @@ function TodayPage() {
 function RailReadout({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex h-row items-center justify-between border-t border-rule">
-      <span className="label-caps text-[0.625rem] leading-3 font-normal text-graphite">
-        {label}
-      </span>
+      <span className="field-label text-graphite">{label}</span>
       <span className="mono text-ui font-medium">{value}</span>
     </div>
   )

@@ -189,23 +189,28 @@ the instrument measured. Inter Variable (`cv11` + `ss01`), Source Serif 4 Variab
 JetBrains Mono Variable, all self-hosted via Fontsource — no font CDN calls from a
 privacy product.
 
-| voice | step              | size / leading | role                                           |
-| ----- | ----------------- | -------------- | ---------------------------------------------- |
-| serif | display · 600     | 28 / 32        | page titles, record names, the Today sentence  |
-| serif | section · 600     | 18 / 22–24     | dialog titles, settings sections, empty states |
-| serif | prose · 400       | 17 / 27        | note bodies, theses, reasons                   |
-| sans  | title · 500       | 15 / 22        | a name inside a readout cell                   |
-| sans  | ui · 400 / 500    | 13 / 20        | rows, forms, buttons, the workhorse            |
-| sans  | body · 400        | 14 / 20        | composer inputs, running UI text               |
-| mono  | readout · 500     | 18–20 / 22–24  | the readout strip                              |
-| mono  | numeral · 400     | 13 / 16        | money, counts, dates, IDs, domains in rows     |
-| mono  | label · 500 caps  | 11 / 14, .08em | column labels, section labels, field labels    |
-| mono  | field label · 400 | 10 / 12 caps   | labels inside cells and readouts               |
-| mono  | key hint · 400    | 11 / 14        | `⌘K G T ↵ ⇧↵ M esc` — inside the control       |
+| voice | step              | size / leading | role                                             |
+| ----- | ----------------- | -------------- | ------------------------------------------------ |
+| serif | display · 600     | 28 / 32        | page titles, record names, the Today sentence    |
+| serif | section · 600     | 18 / 22–24     | dialog titles, settings sections, empty states   |
+| serif | prose · 400       | 17 / 27        | note bodies, theses, reasons                     |
+| sans  | title · 500       | 15 / 22        | a name inside a readout cell                     |
+| sans  | ui · 400 / 500    | 13 / 20        | rows, forms, buttons, the workhorse              |
+| sans  | body · 400        | 14 / 20        | composer inputs, running UI text                 |
+| mono  | readout · 500     | 18–20 / 22–24  | the readout strip                                |
+| mono  | numeral · 400     | 13 / 16        | money, counts, dates, IDs, domains in rows       |
+| mono  | label · 500 caps  | 11 / 14, .08em | column labels, section labels, field labels      |
+| mono  | field label · 400 | 10 / 12 caps   | labels inside cells and readouts — `field-label` |
+| mono  | key hint · 400    | 11 / 14        | `⌘K G T ↵ ⇧↵ M esc` — inside the control         |
 
-Utilities: `title-serif`, `label-caps`, `mono`, `numeric` (tabular + right-aligned in
-one class), `tabular` (figures inline in a sentence). The sans scale steps stay named
-(`text-micro … text-display`); if a size isn't on the list it does not go in the app.
+Utilities: `title-serif`, `label-caps` (the 11/14 500 label step whole), `field-label`
+(the 10/12 400 field-label step whole — mono, caps, .08em), `mono`, `numeric` (tabular +
+right-aligned in one class), `tabular` (figures inline in a sentence). The scale steps
+stay named (`text-field … text-display`, the smallest being the field step at 10/12); if
+a size isn't on the list it does not go in the app — `instrument/no-v1-tokens` rejects
+`text-[…]` and `leading-[…]` in tsx, so the only way onto the list is `src/styles.css`.
+A genuine one-off (optical sizing of initials inside a 16–22px square) takes an inline
+comment saying why and a scoped disable; there are four.
 
 **The Casing Rule** (2026-09-15). Three tiers, and the tier is decided by who is
 speaking, never by how small the text is:

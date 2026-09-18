@@ -54,6 +54,9 @@ export function InitialBadge({ name }: { name: string }) {
   return (
     <span
       aria-hidden
+      /* Optical sizing, not a type step: one initial centred in an 18px ink
+         square. The named steps start at 10px (field) and overflow it. */
+      // eslint-disable-next-line instrument/no-v1-tokens
       className="flex size-[1.125rem] shrink-0 items-center justify-center bg-foreground mono text-[0.5625rem] font-medium text-background"
     >
       {name.charAt(0).toUpperCase()}

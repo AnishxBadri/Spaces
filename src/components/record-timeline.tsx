@@ -87,9 +87,7 @@ function Row({
       <span className="w-18 shrink-0 mono text-micro font-medium text-foreground uppercase">
         {type}
       </span>
-      <div className="min-w-0 flex-1 text-ui leading-[1.125rem]">
-        {children}
-      </div>
+      <div className="min-w-0 flex-1 text-ui leading-4.5">{children}</div>
     </li>
   )
 }
@@ -219,7 +217,7 @@ function AttrBurst({
         <dl className="mt-1.5 flex flex-col gap-0.5 border-l border-rule pl-3">
           {item.changes.map((c, i) => (
             <div key={i} className="flex items-baseline gap-3">
-              <dt className="w-24 shrink-0 truncate label-caps text-[0.625rem] leading-3 font-normal text-graphite">
+              <dt className="w-24 shrink-0 truncate field-label text-graphite">
                 {bySlug.get(c.slug)?.name ?? c.slug}
               </dt>
               <dd className="min-w-0 truncate text-label">

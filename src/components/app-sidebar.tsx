@@ -233,7 +233,7 @@ export function AppSidebar({
             )}
           >
             {/* Ink square, never the primary: a mark, not a status. */}
-            <span className="flex size-[1.375rem] shrink-0 items-center justify-center bg-foreground mono text-[0.625rem] font-medium text-background">
+            <span className="flex size-[1.375rem] shrink-0 items-center justify-center bg-foreground mono text-field font-medium text-background">
               {initials(user.name)}
             </span>
             <span className="min-w-0 flex-1">
@@ -400,7 +400,12 @@ function CollapsedSidebar({
               aria-label={`Account — ${user.name}`}
               className="focus-ring-inset flex h-12 w-12 items-center justify-center border-t border-rule transition-colors hover:bg-bone-deep"
             >
-              <span className="flex size-[1.375rem] shrink-0 items-center justify-center bg-foreground mono text-[0.5625rem] leading-3 font-medium text-background">
+              <span
+                /* Optical sizing, not a type step: two initials centred in a
+                   22px ink square read wrong at the 10px field step. */
+                // eslint-disable-next-line instrument/no-v1-tokens
+                className="flex size-[1.375rem] shrink-0 items-center justify-center bg-foreground mono text-[0.5625rem] leading-3 font-medium text-background"
+              >
                 {initials(user.name)}
               </span>
             </DropdownMenuTrigger>
@@ -483,7 +488,7 @@ function NavGroup({
     <div className={cn('flex flex-col gap-0.5', label && 'pt-5')}>
       {label ? (
         <div className="flex h-6 items-center px-2.5">
-          <span className="label-caps text-[0.625rem] text-graphite">
+          <span className="field-label leading-4 font-medium text-graphite">
             {label}
           </span>
         </div>

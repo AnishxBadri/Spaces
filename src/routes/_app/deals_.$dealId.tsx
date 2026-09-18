@@ -388,7 +388,7 @@ function DealRecordPage() {
                     params={{ noteId: m.fromId }}
                     className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
                   >
-                    <span className="font-serif text-[0.9375rem] font-medium">
+                    <span className="font-serif text-title font-medium">
                       {m.name}
                     </span>
                   </Link>

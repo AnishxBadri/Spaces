@@ -160,9 +160,7 @@ function FactRow({
         !last && 'border-b border-rule',
       )}
     >
-      <div className="w-24 shrink-0 label-caps text-[0.625rem] leading-3 font-normal text-graphite">
-        {label}
-      </div>
+      <div className="w-24 shrink-0 field-label text-graphite">{label}</div>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         {children}
       </div>

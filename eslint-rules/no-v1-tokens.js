@@ -18,7 +18,38 @@
  *
  * DESIGN.md is the source for the replacements: `text-graphite`, `border-rule`,
  * `bg-bone`, `bg-paper`, `text-label`, `text-ui`, `rounded-md` / `rounded-none`.
+ *
+ * SPA-79 adds the other way the vocabulary leaks: an arbitrary type size.
+ * DESIGN.md §3 ends "if a size isn't on the list it does not go in the app",
+ * and `text-[0.625rem]` / `leading-[1.125rem]` are how the list gets bypassed —
+ * forty sites had spelled the 10px field step out by hand before it existed as
+ * a token. Both are banned, with the nearest named step in the message. Only
+ * *lengths* are banned: `text-[var(--badge-amber-ink)]` is a colour, and the
+ * two-tier colour rule is a different axis with its own slice. A genuine
+ * one-off (optical sizing of initials inside a 16–22px square) takes an inline
+ * comment saying why plus a scoped disable — the honest form of an exception.
  */
+
+/**
+ * The named type steps, in rem, smallest first. Diffed against the `--text-*`
+ * custom properties in `src/styles.css` by `design-tokens.test.ts`, so the
+ * "nearest step" in a message cannot drift from the real tokens.
+ *
+ * @type {Array<{ name: string, rem: number, lineRem: number }>}
+ */
+export const NAMED_STEPS = [
+  { name: 'field', rem: 0.625, lineRem: 0.75 },
+  { name: 'micro', rem: 0.6875, lineRem: 1 },
+  { name: 'label', rem: 0.75, lineRem: 1 },
+  { name: 'ui', rem: 0.8125, lineRem: 1.25 },
+  { name: 'body', rem: 0.875, lineRem: 1.25 },
+  { name: 'title', rem: 0.9375, lineRem: 1.375 },
+  { name: 'page', rem: 1.375, lineRem: 1.75 },
+  { name: 'display', rem: 1.625, lineRem: 2 },
+]
+
+/** Tailwind's spacing unit — the scale `leading-<number>` multiplies. */
+const SPACING_REM = 0.25
 
 /**
  * @typedef {{ re: RegExp, use: string }} Ban
@@ -196,6 +227,76 @@ export function findV1Tokens(value, isRootRoute) {
   return found
 }
 
+/** A CSS length inside arbitrary-value brackets, in rem. Null if not a length. */
+function remValue(/** @type {string} */ raw) {
+  const m = /^(\d*\.?\d+)(rem|px|em)$/.exec(raw.trim())
+  if (!m) return null
+  return m[2] === 'px' ? Number(m[1]) / 16 : Number(m[1])
+}
+
+/** px, for messages — the sizes are discussed in px and written in rem. */
+function px(/** @type {number} */ rem) {
+  return `${Math.round(rem * 16)}px`
+}
+
+/** The step closest to a size, so a message can name it. */
+function nearestStep(/** @type {number} */ rem) {
+  return NAMED_STEPS.reduce((best, step) =>
+    Math.abs(step.rem - rem) < Math.abs(best.rem - rem) ? step : best,
+  )
+}
+
+/**
+ * Every arbitrary type size in one class string (DESIGN.md §3). Exported for
+ * the fixture test.
+ *
+ * @param {string} value
+ * @returns {Array<{ index: number, length: number, token: string, fix: string }>}
+ */
+export function findArbitraryType(value) {
+  /** @type {Array<{ index: number, length: number, token: string, fix: string }>} */
+  const found = []
+  const re = /\S+/g
+  let m
+  while ((m = re.exec(value)) !== null) {
+    const raw = m[0]
+    const at = { index: m.index, length: raw.length }
+    const name = normalize(splitVariants(raw).utility)
+
+    const size = /^text-\[([^\]]+)\]$/.exec(name)
+    if (size) {
+      const rem = remValue(size[1])
+      if (rem === null) continue
+      const step = nearestStep(rem)
+      found.push({
+        ...at,
+        token: name,
+        fix:
+          step.rem === rem
+            ? `text-${step.name} — this is that step (${px(step.rem)}) spelled out by hand`
+            : `text-${step.name} (${px(step.rem)}), the nearest named step to ${px(rem)}; a genuine optical one-off takes a comment saying why and a scoped disable`,
+      })
+      continue
+    }
+
+    const line = /^leading-\[([^\]]+)\]$/.exec(name)
+    if (line) {
+      const rem = remValue(line[1])
+      if (rem === null) continue
+      const step = NAMED_STEPS.find((s) => s.lineRem === rem)
+      const units = rem / SPACING_REM
+      found.push({
+        ...at,
+        token: name,
+        fix: step
+          ? `nothing — ${px(rem)} is the \`${step.name}\` step's own leading, so text-${step.name} already carries it`
+          : `leading-${Number.isInteger(units) ? units : String(units)} (the 0.25rem scale)`,
+      })
+    }
+  }
+  return found
+}
+
 /** @type {import('eslint').Rule.RuleModule} */
 export const rule = {
   meta: {
@@ -208,6 +309,8 @@ export const rule = {
     messages: {
       v1Token:
         'v1 design token `{{token}}` — Instrument uses {{use}} (DESIGN.md "The seven rules").',
+      arbitraryType:
+        'arbitrary type size `{{token}}` — use {{fix}}. DESIGN.md §3: if a size isn’t on the list it does not go in the app.',
     },
   },
   create(context) {
@@ -227,6 +330,13 @@ export const rule = {
           node,
           messageId: 'v1Token',
           data: { token: hit.token, use: hit.use },
+        })
+      }
+      for (const hit of findArbitraryType(value)) {
+        context.report({
+          node,
+          messageId: 'arbitraryType',
+          data: { token: hit.token, fix: hit.fix },
         })
       }
     }

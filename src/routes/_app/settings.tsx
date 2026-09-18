@@ -135,7 +135,7 @@ function SettingsSection({
     <section className="flex flex-col">
       <div className="flex items-end justify-between gap-6 border-b border-hairline pb-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="font-serif text-lg leading-[1.375rem] font-semibold">
+          <h2 className="font-serif text-lg leading-5.5 font-semibold">
             {title}
           </h2>
           <p className="text-ui text-graphite">{blurb}</p>
@@ -673,7 +673,7 @@ function FxSection({
         </div>
 
         {/* The ledger head. */}
-        <div className="flex h-8 items-center border-y border-hairline label-caps text-[0.625rem] font-normal text-graphite">
+        <div className="flex h-8 items-center border-y border-hairline field-label leading-4 text-graphite">
           <span className="w-35 shrink-0">Pair</span>
           <span className="w-40 shrink-0 pr-4 text-right">Rate</span>
           <span className="w-35 shrink-0">As of</span>

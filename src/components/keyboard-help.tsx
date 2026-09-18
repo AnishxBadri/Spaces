@@ -80,9 +80,7 @@ function Group({
 }) {
   return (
     <section className={top ? 'pt-3.5' : undefined}>
-      <h3 className="pb-1.5 label-caps text-[0.625rem] leading-3 font-normal text-graphite">
-        {label}
-      </h3>
+      <h3 className="pb-1.5 field-label text-graphite">{label}</h3>
       {children}
     </section>
   )
@@ -104,7 +102,7 @@ function Row({ label, keys }: { label: string; keys: string }) {
 /** A keycap: 18px, hairline on three sides and 2px under, mono 10. */
 function Key({ children }: { children: string }) {
   return (
-    <kbd className="flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-md border border-b-2 border-hairline px-1 mono text-[0.625rem] leading-3 text-foreground">
+    <kbd className="flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-md border border-b-2 border-hairline px-1 mono text-field text-foreground">
       {children}
     </kbd>
   )
