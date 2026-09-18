@@ -19,7 +19,12 @@ FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
     DATA_DIR=/data \
-    PORT=3000
+    PORT=3000 \
+    HOME=/home/node
+
+# su-exec is how the entrypoint drops root after repairing /data (hostability
+# contract #1). ~20KB; no init system, no gosu-sized Go binary.
+RUN apk add --no-cache su-exec
 
 # Runtime needs: .output (web), src + drizzle (worker + migrations via tsx),
 # prod node_modules (pg-boss, drizzle-orm, tsx).
@@ -31,8 +36,12 @@ COPY src ./src
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && mkdir -p /data && chown -R node:node /data /app
 
-# Non-root, UID 1000.
-USER node
+# No `USER node`: the entrypoint starts as root so it can repair the ownership
+# a bind mount overlays onto /data, then re-execs itself through su-exec as
+# 1000:1000. Nothing but that first phase ever runs privileged. The build-time
+# chown above stays correct for a named volume and for `docker run` with no
+# mount, and an already-unprivileged start (`user: "1000:1000"`, rootless
+# Podman) skips the repair rather than failing.
 VOLUME /data
 EXPOSE 3000
 
