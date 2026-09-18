@@ -115,7 +115,7 @@ export function AppSidebar({
   }
 
   return (
-    <div className="flex h-full flex-col justify-between bg-sidebar">
+    <div className="flex h-full flex-col justify-between bg-bone">
       <div className="flex flex-col">
         {hideWordmark ? (
           <div className="h-2" />
@@ -337,7 +337,7 @@ function CollapsedSidebar({
   onSignOut: () => void
 }) {
   return (
-    <div className="flex h-full flex-col justify-between bg-sidebar">
+    <div className="flex h-full flex-col justify-between bg-bone">
       <div className="flex flex-col items-center">
         <IconTip
           label={`Expand sidebar · ⌘\\${workspaceName ? ` · ${workspaceName}` : ''}`}

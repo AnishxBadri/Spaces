@@ -1775,12 +1775,16 @@ lives in `src/styles.css` comments — read those before changing any colour.
 
 **Still open, in order:**
 
-- **Old focus rings** (~60 after the thesis routes went) remain outside the table
-  surfaces (record pages, spaces, notes, settings) — **5 of them in the shell**
-  (`app-sidebar.tsx`, `_app.tsx`). Slotted as phase 14, after the S3 driver. They
-  are on screen even on the polished routes. Mostly mechanical — swap to `focus-ring` and
-  delete the adjacent `outline-none`, which would otherwise cancel it — but controls
-  inside a scroll container need `focus-ring-inset`, so not a blind find-and-replace.
+- ~~**Old focus rings** (~60, 5 of them in the shell)~~ **Done — swept during the
+  Instrument port, slices 11–17 (2026-09).** The count above was already stale when it
+  was written: the shell has none, and the reticle (`focus-ring` /
+  `focus-ring-inset`) is the only focus treatment on screen. The last v1 ring in the
+  tree, `focus-visible:ring-destructive/20` on the destructive button
+  (`src/components/ui/button.tsx`), went with SPA-16 (2026-09-18) — the destructive
+  button now focuses with the reticle like every other control. The 11 remaining
+  `outline-none` occurrences are each either paired with `focus-ring` or one of the two
+  reticle exceptions DESIGN.md records at 2026-09-11. What keeps this swept is no longer
+  a grep: `instrument/no-v1-tokens` runs inside `pnpm lint` (see CLAUDE.md gate 5).
 - **`/impeccable polish`** for the surfaces above (arbitrary type sizes ride along).
 - **`/impeccable document`** to write DESIGN.md §5 (Components) — _after_ the sweep, not before.
 - **Dark theme** remains a feature, not started: the `dark` custom-variant exists but no

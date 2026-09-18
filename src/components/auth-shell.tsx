@@ -21,7 +21,7 @@ export function AuthShell({
   children: ReactNode
 }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center bg-background px-6">
+    <main className="flex min-h-dvh flex-col items-center bg-paper px-6">
       <div className="flex w-full max-w-100 flex-col pt-[16vh] pb-16">
         <Wordmark />
         <div className="mt-8 flex flex-col gap-1.5 border-b border-hairline pb-4">

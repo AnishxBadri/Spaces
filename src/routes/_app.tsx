@@ -53,12 +53,12 @@ function AppShell() {
   ])
 
   return (
-    <div className="flex min-h-dvh bg-background">
+    <div className="flex min-h-dvh bg-paper">
       {/* Desktop sidebar */}
       {/* Width snaps, never animates: width is not a compositor property. */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 hidden border-r border-sidebar-border md:block',
+          'fixed inset-y-0 left-0 hidden border-r border-hairline md:block',
           collapsed ? 'w-12' : 'w-58',
         )}
       >
@@ -74,7 +74,7 @@ function AppShell() {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="fixed inset-x-0 top-0 z-sticky flex h-12 items-center gap-3 border-b border-rule bg-background px-4 md:hidden">
+      <header className="fixed inset-x-0 top-0 z-sticky flex h-12 items-center gap-3 border-b border-rule bg-paper px-4 md:hidden">
         <button
           type="button"
           aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
@@ -99,7 +99,7 @@ function AppShell() {
             onClick={() => setMobileNavOpen(false)}
             aria-hidden
           />
-          <div className="absolute inset-y-0 top-12 left-0 w-58 border-r border-sidebar-border shadow-[3px_0_0_0_var(--hairline)]">
+          <div className="absolute inset-y-0 top-12 left-0 w-58 border-r border-hairline shadow-[3px_0_0_0_var(--hairline)]">
             <AppSidebar
               hideWordmark
               user={session.user}

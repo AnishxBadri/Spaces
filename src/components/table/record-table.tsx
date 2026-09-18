@@ -57,7 +57,7 @@ export function RecordTable<T>({
         className="w-full border-collapse text-ui"
         style={{ width: table.getTotalSize() }}
       >
-        <thead className="sticky top-0 z-10 bg-background">
+        <thead className="sticky top-0 z-10 bg-paper">
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id} className="border-b border-hairline">
               {hg.headers.map((header) => (
@@ -91,7 +91,7 @@ export function RecordTable<T>({
                     cell.column.id === stickyColumnId &&
                       // Opaque at rest and on hover: a translucent tint here
                       // would let the scrolled-under columns bleed through.
-                      'sticky left-0 z-10 bg-background transition-colors duration-150 ease-out-quart group-hover:bg-row-hover',
+                      'sticky left-0 z-10 bg-paper transition-colors duration-150 ease-out-quart group-hover:bg-row-hover',
                   )}
                 >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -172,7 +172,7 @@ function HeaderCell<T>({
       }
       className={cn(
         'relative h-8 px-2 text-left align-middle label-caps text-graphite',
-        sticky && 'sticky left-0 z-20 bg-background',
+        sticky && 'sticky left-0 z-20 bg-paper',
       )}
     >
       {column.getCanSort() || column.getCanHide() ? (
