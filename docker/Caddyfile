@@ -1,0 +1,26 @@
+# Spaces — the worked HTTPS example (CONTEXT.md hostability contract #3).
+#
+# One templated block is the entire configuration. Caddy obtains and renews
+# the certificate by itself, redirects http to https, and proxies to the app
+# container over the compose network.
+#
+# SPACES_DOMAIN comes from the environment, set in docker-compose.tls.yml.
+# Use `localhost` to exercise the same path with Caddy's internal CA.
+#
+# Caddy's reverse_proxy sets the usual forwarded headers. The app ignores
+# them on purpose — it builds every external URL from APP_URL — so set
+# APP_URL to https://<this domain> and nothing else needs configuring.
+
+{$SPACES_DOMAIN} {
+	reverse_proxy app:3000
+}
+
+# Variant: TLS is terminated further upstream (a load balancer, a corporate
+# proxy, Cloudflare in full-strict mode). Caddy then speaks plain HTTP and
+# issues no certificate. APP_URL still says https://<domain> — the scheme the
+# browser sees is what cookies and links must match, not the scheme of the
+# hop into this box.
+#
+# :80 {
+# 	reverse_proxy app:3000
+# }
