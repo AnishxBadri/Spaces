@@ -7,3 +7,6 @@ drizzle/
 src/routeTree.gen.ts
 .cta.json
 .impeccable/
+
+# vendored skills — third-party prose, not ours to reformat
+.claude/skills/
