@@ -9,6 +9,69 @@ pnpm install
 pnpm dev
 ```
 
+# Self-hosting over HTTPS
+
+The app never terminates TLS. A reverse proxy is always in front, and
+`APP_URL` is the single source of truth for scheme, cookies and every
+external link. Caddy is the worked example, shipped as an overlay:
+
+```bash
+SPACES_DOMAIN=deals.example.com \
+APP_URL=https://deals.example.com \
+docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+```
+
+Point an A/AAAA record at the box and open 80 and 443 first — 80 is not
+optional, it carries the ACME challenge and the redirect to https. Caddy
+issues and renews the certificate on its own; `docker/Caddyfile` is one
+block, plus a commented variant for operators whose TLS is already
+terminated further upstream.
+
+The overlay also stops publishing 3000 on the host. `curl http://<host>:3000`
+from outside is refused because nothing listens there, which incidentally
+closes the first-run window: between `compose up` and the creation of the
+first admin, `/setup` is reachable by anyone who can reach the port.
+
+Every boot logs the decision it made, before anything serves traffic:
+
+```
+[boot] external origin https://deals.example.com · cookies secure: yes · presign origin https://deals.example.com
+```
+
+## Trap 1 — an http APP_URL behind an https proxy
+
+This is the failure the contract exists to prevent, and it is silent.
+Reproduce it by leaving `APP_URL=http://deals.example.com` while Caddy serves
+the same host over https: the login form posts, the server answers 200 and
+sets a session cookie **without** the `Secure` flag, the browser on an https
+page drops it, and the next request is unauthenticated — so you land back on
+the login page with no error anywhere. Nothing is broken; the cookie simply
+never arrived.
+
+Set `APP_URL` to the scheme and host the **browser** sees, never the scheme
+of the hop into the box. Boot warns loudly when `APP_URL` is `http://` and
+the host is not localhost:
+
+```
+[boot] WARNING: APP_URL is http:// on a non-local host (deals.example.com). Session cookies will not be Secure. …
+```
+
+It is a warning, not a refusal — a plain-http install on a LAN is a
+legitimate configuration and keeps working.
+
+## nginx, Traefik, anything else
+
+Nothing here is Caddy-specific. An operator on another proxy needs exactly
+two things: a correct `APP_URL`, and a proxy that sets `X-Forwarded-Proto`
+for anything else downstream that cares. The app itself reads no forwarded
+headers at all — a test pins that no source file does — so a spoofed header
+cannot change a link, a cookie or a redirect. Proxy to the app container on
+port 3000 over plain HTTP and keep the host port unpublished.
+
+Blob downloads follow the same rule: presigned URLs for the local storage
+driver are built from `APP_URL`, not from the incoming request, so they come
+out `https://` and download back through the proxy.
+
 # Building For Production
 
 To build this application for production:

@@ -1,0 +1,55 @@
+# HTTPS overlay — CONTEXT.md hostability contract #3.
+#
+# The app never terminates TLS. Caddy sits in front, gets a certificate on
+# its own, and talks plain HTTP to `app` on the compose network. APP_URL is
+# the single source of truth for scheme, cookies and every external link —
+# the app reads no forwarded headers at all (pinned by a test), so getting
+# APP_URL right is the whole configuration.
+#
+#   SPACES_DOMAIN=deals.example.com \
+#   APP_URL=https://deals.example.com \
+#   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+#
+# Local smoke test with Caddy's internal CA (no public domain needed):
+#
+#   SPACES_DOMAIN=localhost APP_URL=https://localhost \
+#   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+#
+# Requirements for a real domain: an A/AAAA record pointing at this box, and
+# ports 80 and 443 open. 80 is not optional — it carries the ACME HTTP-01
+# challenge and the redirect to https.
+services:
+  app:
+    # Contract #3 and auth trap #2, in one line. With a proxy in front, 3000
+    # must not be published on the host: `curl http://<host>:3000` from
+    # outside is refused because there is nothing listening there, which also
+    # closes the first-run window where /setup is reachable by anyone who can
+    # reach the port. `!reset` replaces the base file's list instead of
+    # appending to it — a plain `ports: []` merges to no change.
+    ports: !reset []
+    expose:
+      - '3000'
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp' # HTTP/3
+    environment:
+      # Caddy substitutes {$SPACES_DOMAIN} in the Caddyfile at load time.
+      SPACES_DOMAIN: ${SPACES_DOMAIN:?set SPACES_DOMAIN to the hostname this box answers on}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and their private keys. Losing this volume means
+      # re-issuance on next boot, which rate limits will eventually refuse —
+      # back it up or accept the re-issue.
+      - spaces_caddy_data:/data
+      - spaces_caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  spaces_caddy_data:
+  spaces_caddy_config:
