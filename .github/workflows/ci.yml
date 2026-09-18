@@ -39,3 +39,161 @@ jobs:
       - run: echo "DATABASE_URL=$DATABASE_URL" > .env.local
       - run: pnpm exec tsx src/db/migrate.ts
       - run: pnpm exec vitest run
+
+  # Hostability contract #1 (CONTEXT.md): the entrypoint owns /data. A macOS
+  # bind mount rewrites ownership on the way through, so a Linux runner is the
+  # only place the trap is real. Deliberately a separate job: it builds an
+  # image and must never sit in front of the gates above.
+  hostability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the runtime image
+        run: docker build -t spaces:ci .
+
+      - name: Mis-owned ./data — repairs, drops to 1000, takes an upload
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          sudo chown 4242:4242 data
+          MASTER_KEY="$(openssl rand -base64 32)"
+          echo "MASTER_KEY=$MASTER_KEY" >> "$GITHUB_ENV"
+          export MASTER_KEY
+          cat > docker-compose.ci.yml <<'YAML'
+          services:
+            app:
+              image: spaces:ci
+              environment:
+                MASTER_KEY: ${MASTER_KEY}
+          YAML
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            up -d --wait --wait-timeout 300
+          docker compose logs app
+          # phase one ran as root and said so
+          docker compose logs app | grep -F 'owned by 4242:4242 — repairing to 1000:1000'
+          [ "$(stat -c '%u:%g' data)" = '1000:1000' ]
+          # phase two is unprivileged. Note `docker exec` itself lands as root
+          # now (the image has no USER — that is what lets phase one chown);
+          # the claim under test is that the container's own processes dropped,
+          # so read PID 1 and the process table rather than exec's identity.
+          docker compose exec -T app sh -c 'grep ^Uid: /proc/1/status'
+          docker compose exec -T app sh -c 'grep -qE "^Uid:[[:space:]]+1000[[:space:]]" /proc/1/status'
+          docker compose exec -T app ps -o user,args | tee /dev/stderr \
+            | grep -E '^node .*(server/index.mjs|worker/index.ts)'
+          # upload through the HTTP API (the local driver's presigned PUT)
+          head -c 4096 /dev/urandom > payload.bin
+          KEY="$(sha256sum payload.bin | cut -d' ' -f1)"
+          EXP="$(( ($(date +%s) + 300) * 1000 ))"
+          SIG="$(node -e 'const {createHmac}=require("crypto");const [k,v,e]=process.argv.slice(1);process.stdout.write(createHmac("sha256",Buffer.from(process.env.MASTER_KEY,"base64")).update(`blob:${v}:${k}:${e}`).digest("base64url"))' "$KEY" put "$EXP")"
+          CODE="$(curl -sS -o /dev/null -w '%{http_code}' -X PUT \
+            --data-binary @payload.bin \
+            "http://localhost:3000/api/blob/$KEY?exp=$EXP&sig=$SIG")"
+          [ "$CODE" = 201 ]
+          # the bytes landed under ./data on the host, owned by 1000
+          BLOB="data/blobs/${KEY:0:2}/$KEY"
+          sudo test -f "$BLOB"
+          [ "$(sudo stat -c '%u' "$BLOB")" = 1000 ]
+          echo "NET=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q app)")" >> "$GITHUB_ENV"
+
+      - name: Correctly-owned tree gets no recursive chown
+        run: |
+          set -euo pipefail
+          sudo mkdir -p okdata/blobs
+          sudo sh -c 'for i in $(seq 0 99); do mkdir -p okdata/blobs/$i; for j in $(seq 0 99); do : > okdata/blobs/$i/$j; done; done'
+          sudo chown -R 1000:1000 okdata
+          # a mis-owned needle: a recursive chown would silently fix it
+          sudo chown 4242:4242 okdata/blobs/0/0
+          START=$(date +%s%3N)
+          docker run -d --name nochown --network "$NET" \
+            -e DATABASE_URL=postgresql://dealos:dealos@db:5432/dealos \
+            -e MASTER_KEY="$MASTER_KEY" -e ROLE=web \
+            -v "$PWD/okdata:/data" spaces:ci
+          for _ in $(seq 1 60); do
+            docker logs nochown 2>&1 | grep -q 'no repair needed' && break; sleep 1
+          done
+          echo "ownership phase finished $(( $(date +%s%3N) - START ))ms after run"
+          docker logs nochown 2>&1 | grep -F 'ownership already 1000:1000 — no repair needed'
+          # the needle is untouched: no recursive chown walked the tree
+          [ "$(sudo stat -c '%u' okdata/blobs/0/0)" = 4242 ]
+          docker rm -f nochown
+
+      - name: Read-only /data refuses to boot, printing the fix
+        run: |
+          set -euo pipefail
+          mkdir -p rodata
+          set +e
+          OUT="$(timeout 60 docker run --rm -v "$PWD/rodata:/data:ro" spaces:ci 2>&1)"
+          CODE=$?
+          set -e
+          echo "$OUT"
+          [ "$CODE" -ne 0 ]
+          grep -F 'chown -R 1000:1000 ./data' <<<"$OUT"
+
+      - name: Already-unprivileged start (user 1000:1000)
+        run: |
+          set -euo pipefail
+          # mis-owned: exits naming the fix, not an unreadable chown error
+          sudo mkdir -p baddata && sudo chown 4242:4242 baddata
+          set +e
+          OUT="$(timeout 60 docker run --rm --user 1000:1000 -v "$PWD/baddata:/data" spaces:ci 2>&1)"
+          CODE=$?
+          set -e
+          echo "$OUT"
+          [ "$CODE" -ne 0 ]
+          grep -F 'chown -R 1000:1000 ./data' <<<"$OUT"
+          # `set -e` does not fail on a negated command, so assert explicitly
+          if grep -q 'chown:' <<<"$OUT"; then
+            echo 'leaked a raw chown error instead of the instruction' >&2
+            exit 1
+          fi
+          # correctly owned: boots
+          sudo mkdir -p gooddata && sudo chown 1000:1000 gooddata
+          docker run -d --name unpriv --user 1000:1000 --network "$NET" \
+            -e DATABASE_URL=postgresql://dealos:dealos@db:5432/dealos \
+            -e MASTER_KEY="$MASTER_KEY" -v "$PWD/gooddata:/data" spaces:ci
+          for _ in $(seq 1 60); do
+            docker logs unpriv 2>&1 | grep -q 'Listening' && break; sleep 2
+          done
+          [ "$(docker inspect -f '{{.State.Running}}' unpriv)" = true ]
+          docker exec unpriv sh -c 'grep -qE "^Uid:[[:space:]]+1000[[:space:]]" /proc/1/status'
+          docker rm -f unpriv
+
+      - name: Supervision contract survives the privilege drop
+        run: |
+          set -euo pipefail
+          sudo mkdir -p supdata && sudo chown 1000:1000 supdata
+          run_sup() {
+            docker rm -f sup >/dev/null 2>&1 || true
+            docker run -d --name sup --network "$NET" \
+              -e DATABASE_URL=postgresql://dealos:dealos@db:5432/dealos \
+              -e MASTER_KEY="$MASTER_KEY" -v "$PWD/supdata:/data" spaces:ci
+            for _ in $(seq 1 60); do
+              docker exec sup pgrep -f '[w]orker/index.ts' >/dev/null 2>&1 && return 0
+              sleep 2
+            done
+            docker logs sup; return 1
+          }
+          # worker death stops the container, non-zero
+          run_sup
+          docker exec sup sh -c 'kill "$(pgrep -f "[w]orker/index.ts" | head -1)"'
+          for _ in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Running}}' sup)" = false ] && break; sleep 1
+          done
+          docker logs sup 2>&1 | grep -F '[entrypoint] worker exited'
+          [ "$(docker inspect -f '{{.State.ExitCode}}' sup)" -ne 0 ]
+          # docker stop is still a clean, deliberate stop. `-t 30`: a full
+          # shutdown (Nitro's 5s graceful close, then pg-boss) takes about ten
+          # seconds, right on the daemon's default grace, so a bare `docker
+          # stop` races it into SIGKILL — same before this slice as after.
+          run_sup
+          docker stop -t 30 sup
+          docker logs sup 2>&1 | grep -F '[entrypoint] stopping on signal'
+          [ "$(docker inspect -f '{{.State.ExitCode}}' sup)" -eq 0 ]
+          docker rm -f sup
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v || true
+          docker rm -f sup unpriv nochown 2>/dev/null || true
