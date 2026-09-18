@@ -7,16 +7,24 @@ and lifecycle contracts.
 
 **Scope boundary (amended 2026-09-02, grilled):** two-tier object model.
 Custom _attributes_ apply to every object; custom _objects_ exist as a
-second tier — attribute bags inside the entity graph, never carrying the
-core machinery (see §10). Notes/spaces/terms stay research-layer, not
+second tier — attribute bags inside the entity graph, carrying the full
+attribute engine and, narrowed 2026-09-13, fuzzy-name dedupe,
+merge-as-target and opt-in `domain`/`linkedin` identity keys; enrichment,
+interactions and seeded attributes stay core-only (see §9).
+Notes/spaces/terms stay research-layer, not
 object-modeled.
 
 ## 1. Storage (exists, confirmed by the study)
 
 ```
-attribute(id, object_kind, slug, name, type, options jsonb,
+attribute(id, object_id → object, slug, name, description, type, options jsonb,
           is_system, archived, sort_order, created_by, created_at)
-attribute_event(id, entity_id, attr_slug, from, to, actor_id, at)
+  -- rekeyed from the object_kind enum to object_id by §9's registry migration
+  -- (shipped 2026-09, migrations 0016/0017); `description` added by 0020
+attribute_event(id, entity_id, attr_slug, from, to, actor_type, actor_id,
+          source, suggestion_id, refs, at)
+  -- typed actor + door + citation refs shipped 2026-09 (migration 0018, §4);
+  -- actor_type is NOT NULL and actor_id is set iff actor_type = 'user'
 entity.values jsonb  — all values, keyed by slug
 ```
 
@@ -269,11 +277,34 @@ object(id, slug, singular, plural, icon?, archived, created_by, created_at)
   filed notes/documents, search, activity timeline. This is the position
   Attio's customs don't have — theirs are isolated bags, ours land inside
   the research graph.
-- **Permanently excluded** (the narrowed non-goal): alias resolution,
+- ~~**Permanently excluded** (the narrowed non-goal): alias resolution,
   dedupe, merge-as-target, enrichment, interactions, identity attribute
-  types (domain/email as identity — allowed only as plain non-identity
-  fields). Merge of _core_ records that customs reference is already safe:
-  reference rewriting is link-graph-driven, kind-agnostic.
+  types.~~ **Narrowed 2026-09-13.** The owner's rule — the product does
+  not force its own taxonomy on the user (no fourth system object for
+  funds/investors; a user tags them as Companies with a `type` or builds a
+  custom "Funds" object, their call) — only holds if the custom route is
+  not crippled. Re-examined against the code: the fuzzy-name sweep is
+  pg_trgm over name aliases and kind-agnostic; the merge executor iterates
+  `ENTITY_REFS` and customs have no side tables, so merging them is the
+  _simpler_ case; the exclusion was a `MERGEABLE` set, not a capability
+  limit. The only genuinely per-object piece is which keys are identity.
+  New boundary:
+  - **Fuzzy-name dedupe: every object.** Customs join `MERGEABLE` and the
+    at-create + nightly sweeps; candidates land in the same inbox.
+  - **Merge-as-target: every object.** Generic registry path, same
+    snapshot contract.
+  - **Identity keys: opt-in per custom object.** `object.identity_keys:
+('domain' | 'linkedin')[]` declared at object creation (mutable while
+    the object has no records, frozen after — the slug rule). A declared
+    key makes the matching attribute identity-backed: writes go through
+    `addIdentityAlias`, the unique partial index applies, collisions become
+    `duplicate_candidate` rows. Email/cin stay core-only (person/company
+    doctrine — free-mail and role-prefix rules have no meaning on a bag).
+  - **Still excluded:** enrichment (the Enricher port is company/person-
+    shaped; lifts only when an enricher manifest declares a custom shape),
+    interactions, seeded attributes.
+    Merge of _core_ records that customs reference was already safe:
+    reference rewriting is link-graph-driven, kind-agnostic.
 - **UI is registry-generated or it doesn't ship:** one route pair
   (`/o/$objectSlug`, `/o/$objectSlug/$recordId`) rendering list + record
   pages from the registry. Custom objects are the proof of the
@@ -331,5 +362,8 @@ behavior N-fold — the rules must be true before they get ten tenants, and
 the registry-generated surface must exist before objects depend on it.
 
 Non-goals restated: unique constraint, formula, list engine, per-attribute
-permissions, and all core machinery on custom objects (identity, dedupe,
-merge, enrichment, interactions).
+permissions, and — ~~all core machinery on custom objects (identity, dedupe,
+merge, enrichment, interactions)~~ **narrowed 2026-09-13, see §9** — the
+machinery that stays core-only: enrichment, interactions, seeded attributes,
+and email/cin identity keys. Fuzzy dedupe, merge-as-target, and opt-in
+`domain`/`linkedin` identity keys now reach every object.

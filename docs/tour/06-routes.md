@@ -24,9 +24,10 @@ hand-written DTOs.
 **Almost no URL state.** The only `validateSearch` in the app is
 `join.tsx:18` (the invite token). "Saved views" are localStorage, not URL
 state: `useTablePrefs(PREFS_KEY)` persists column visibility and sizing under
-versioned keys (`dealos.companies-table.v1` etc.). Sorting and text filter are
-ephemeral `useState`. The deals table/board toggle is localStorage too
-(`dealos.deals-view`), and it is read post-mount in a `useEffect` so the
+versioned keys (frozen as `dealos.companies-table.v1` etc. — renaming resets
+layouts with no recovery path). Sorting and text filter are ephemeral
+`useState`. The deals table/board toggle is localStorage too (frozen as
+`dealos.deals-view`), and it is read post-mount in a `useEffect` so the
 server render and the first client paint agree (`deals.tsx:133-140`). That is
 a hydration-safety move, not laziness.
 

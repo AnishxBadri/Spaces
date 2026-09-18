@@ -1,10 +1,29 @@
 # CLAUDE.md
 
 Self-hosted deal management for angel/private-capital investing (product name:
-Spaces; code still says DealOS). This file is _mechanics only_. Decisions and
+Spaces). This file is _mechanics only_. Decisions and
 domain language live in `CONTEXT.md` (the decision record — read the relevant
 block before designing anything); synthesis in `docs/ARCHITECTURE.md`; ADRs in
 `docs/adr/`.
+
+## Where the work is (read before picking anything up)
+
+- **Linear, team `Spaces` (SPA)** is the store of record for work that is
+  scheduled: 134 issues, `SPA-16`…`SPA-150`, across projects 1–13 with 44
+  milestones and real blocking relations. An issue body is the spec; do not
+  re-derive it. Two saved views are the whole workflow: **grabbable now**
+  (`afk`, no open blockers) and **needs me** (`hitl`).
+- `docs/roadmap-2026-09.md` — all 23 projects, their order and why, the
+  milestones, and the audit findings. Structure only for 1–13, since Linear
+  holds those bodies.
+- `docs/roadmap-backlog.md` — the 98 slices of projects 14–23, in full. Not in
+  Linear on purpose: publish a project when you reach it, not before.
+- `docs/decisions-2026-09.md` — the 48 decisions, all closed. A slice labelled
+  `hitl` usually is because of one; read its decision before designing.
+- Labels that change how you work: **`migration`** means the slice runs
+  `db:generate`, and the drizzle journal is a hard serialization point — only
+  one migration-bearing issue may be in flight at a time, whatever else is
+  running. **`touches:entity-refs`** is the `ENTITY_REFS` class below.
 
 ## Dev environment
 
@@ -28,15 +47,20 @@ pnpm worker                                       # background worker
    eliminated 2026-09; don't reintroduce one). Where drizzle's `const [row] =`
    destructure lies about presence, use the `.at(0)` pattern instead of
    deleting the guard.
-5. No v1 design tokens in `src/**/*.tsx` (swept 2026-09-11). This must print
-   nothing (zsh: keep the quotes on `--include`):
+5. No v1 design tokens in `src/**/*.tsx` (swept 2026-09-11). This prints one known
+   false positive today — the prose word "rounded" in a code comment at
+   `src/components/attributes/attribute-dialog.tsx:981`, caught by the bare-`rounded`
+   alternative — and must print nothing else. Roadmap `design-1` replaces the grep
+   with lint rules (zsh: keep the quotes on `--include`):
    `grep -rnP 'text-muted-foreground|border-border\b|border-input\b|bg-accent\b|bg-muted\b|shadow-xs|text-xs\b|text-sm\b|rounded-(full|lg|sm)|rounded(?![-\w])|dark:' src --include='*.tsx'`
    The Instrument vocabulary is `text-graphite`, `border-rule`, `bg-bone`,
    `text-label`, `rounded-md` (2px) / `rounded-none`.
 
 Pre-commit hooks (lefthook) run prettier + eslint on staged files; pre-push
-runs tsc. CI (`.github/workflows/ci.yml`) runs all four gates against a real
-Postgres.
+runs tsc. CI (`.github/workflows/ci.yml`) runs gates 1–4 — prettier, eslint, tsc,
+vitest — against a real Postgres. **Gate 5 is not in CI**: no step runs the token
+grep, so it is a local-and-review gate only. Roadmap `mono-6` is the slice that
+would add it, after `design-1` replaces the grep with lint rules.
 
 ## After specific change kinds
 
@@ -58,7 +82,8 @@ Postgres.
 - **All new server code is Effect-first** (v4); existing modules convert only
   when already open for behavioral change, in the same PR. Effect never
   crosses into React — the seam is the `effectFn()` adapter (server-fns) /
-  oRPC handlers.
+  HttpApi handlers (`effect/unstable/httpapi`; decision 3 amended 2026-09-16,
+  oRPC dropped before it was ever installed).
 - Writing Effect: invoke the vendored `effect-ts` skill; it defers to
   `node_modules/effect/AGENTS.md` (version-matched guidance).
 - TanStack guidance: the installed packages ship their own `SKILL.md`
@@ -82,8 +107,14 @@ Postgres.
   server boundary; pure libs (`src/lib/portfolio/`) take numbers. Dates are
   ISO strings compared lexically.
 - The portfolio event tables (investment/mark/distribution/fx_rate) are
-  **append-only by design** — no edit/delete paths. The correction policy is
-  an open decision; don't add mutation paths casually.
+  **append-only by design** — no edit/delete paths. ~~The correction policy is
+  an open decision~~ — **decided 2026-09-18 (D12): reversal by compensating
+  event.** Each event table gains a nullable self-referencing `reverses_id`;
+  a void flow appends an exact-negative event citing the original, and a
+  batch reversal undoes a whole import. Portfolio math sums as before, the
+  timeline shows both rows, and history stays information. Still never add an
+  edit or delete path — the correction is an append like everything else.
+  See `docs/decisions-2026-09.md`.
 
 ## Browser verification (Chrome MCP)
 

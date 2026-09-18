@@ -1,5 +1,5 @@
 ---
-name: DealOS
+name: Spaces
 description: Self-hosted deal-management OS for angel and private-capital investing
 colors:
   paper: '#ffffff'
@@ -94,7 +94,7 @@ components:
     height: '32px'
 ---
 
-# Design System: DealOS
+# Design System: Spaces
 
 ## 1. Overview
 
@@ -207,6 +207,23 @@ Utilities: `title-serif`, `label-caps`, `mono`, `numeric` (tabular + right-align
 one class), `tabular` (figures inline in a sentence). The sans scale steps stay named
 (`text-micro … text-display`); if a size isn't on the list it does not go in the app.
 
+**The Casing Rule** (2026-09-15). Three tiers, and the tier is decided by who is
+speaking, never by how small the text is:
+
+- **CAPS** (`label-caps`) — structure the instrument labels: section heads, column
+  heads, tabs, field labels.
+- **Sentence case** — anything a person reads or clicks. Every control, every button,
+  every chip, every menu item, every empty-state invitation. `Add task`, `Due date`,
+  `Assign to`, `Keep open`, `+ Link record`.
+- **lowercase mono** — only what the instrument prints about _itself_: key hints
+  (`↵ add · ⇧↵ add & keep open`), units, `end`, `yest`, `dateless is legal`, `board ›`.
+
+The failure this rule was written against: the task composer's chips were controls
+dressed as annotations — `date…`, `assign to me`, `+ link record`, `create more` — sat
+in one row, same font and box, 8px from `Today` `Tomorrow` `Next week` `No date`. A
+control in lowercase mono reads as a caption of the thing beside it, not as a thing you
+can press.
+
 ## 4. Material and scale
 
 Structure is 1px ink. Inner rules are 1px rule. Nothing blurs.
@@ -294,6 +311,12 @@ code: a composer's new row lands on a bone wash that fades in 250ms; a rejected 
 write snaps back and reads crimson in place for 2s; toasts rise 8px as they fade in; a
 pending button drops its key hint with the label swap.
 
+**Row exit** (2026-09-15, in code on Tasks). A row that leaves because you acted on it
+strikes through and fades to 0 over 150ms, and the write is held until the transition
+ends — the row leaves, the list does not flinch. Opacity only; the row keeps its height
+until it unmounts, so nothing below it jumps. Anything irreversible-feeling pairs the
+exit with an undo in the toast; anything actually irreversible (delete) asks first.
+
 ### The Page Shell (2026-09, one mode since 2026-09-11)
 
 **One page mode, Field.** Every route's outermost container is
@@ -367,6 +390,12 @@ load-bearing rules promoted here:
   square, not a red border.
 - **Date fields:** native control in forms; in table cells a date renders as ISO text
   until clicked.
+- **Switches** (2026-09-15): a 24×14 square track with a 10px square knob, 2px of
+  padding, no radius. Off is a rule track on paper with a **graphite** knob; on is the
+  pine selection wash with a pine border and a **pine** knob. State must be legible
+  from one switch alone — position is not a state, it is a consequence of one, so a
+  track that only moves an ink block is a bug (it reads as a stray mark). The knob
+  travels on `translate-x`; the Compositor Rule holds inside controls too.
 
 ### Page header + readout strip (P1)
 
@@ -381,7 +410,9 @@ colour only when nonzero and bad.
 `LedgerSection`: caps label + mono count left, one mono link right, hairline under the
 head, 36px rows on rules, the last row may be a composer (`+ Add a task…  T`). Notes
 splits its ledger by ISO week (THIS WEEK · `W37`, then EARLIER); Spaces is one ledger of
-the market-map tree with `›` at a 24px indent per depth; the Mandate's facts are a
+the market-map tree with `›` at a 24px indent per depth, ending on three fixed 80px
+mono lanes (COMPANIES · MEMOS · TERMS, caps heads in the section's link slot, ink when
+nonzero, a dash when not); the Mandate's facts are a
 one-column property grid under the head (stages as badges with the unselected ones
 dashed, geographies as square chips with an inline add, the check size as mono inputs)
 above the prose. Every row
@@ -443,8 +474,17 @@ tile, or ink initials for a person) beside the serif name and a square badge, th
 columns, hairline top and bottom, rules inside, 96px caps labels), then Notes, Ledger
 and Files as sections. Rail right on bone (360px): the stage stepper (one 8px segment
 per live stage, pine to the current one, hairline after), tasks, people. The rail is
-sticky; the body scrolls. Deals, companies, people, custom records and holdings share
-the parts.
+sticky; the body scrolls. Deals, companies, people, custom records, holdings and spaces
+share the parts.
+
+- **A space (2026-09-16).** The head measures it — SUBSPACES · COMPANIES · IN PIPELINE ·
+  MEMOS · TERMS (own `+inherited`) · REFERENCED — under a crumb of ancestor links. Body:
+  FILED HERE (serif memo blocks, composer `N`), COMPANIES as the market map (1-bit mark,
+  stage badge, a mono `n deals` / `watching` lane, geo, hover `×` untags with an Undo
+  toast; the composer row is an inline name search that tags on `↵` and stays open for
+  the next), RECORDS, GLOSSARY. Rail: MAP (`↑` parent, subspaces with their telling
+  count, `+ Subspace` inline), REFERENCED (mentions filed elsewhere), Tasks. Tracking is
+  not evaluating — a company can sit here in no pipeline at all, and the lane says so.
 
 - **The Ledger.** Three lanes on rules — mono `MM-DD HH:MM`, mono caps type
   (`CALL · STAGE · FILE · EDIT · BORN`), sans body. Attribute bursts expand in place.

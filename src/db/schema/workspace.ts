@@ -17,10 +17,15 @@ import { note } from './kinds'
  * The workspace singleton — one deployment, one workspace, one row.
  *
  * This is an anchor for identity (sidebar name), the mandate, and
- * credential(scope: 'workspace'), which otherwise reference a ghost. It is
- * NOT a tenancy boundary: the hard rule (CONTEXT.md, 2026-08) is that no
- * other table ever grows a workspace_id FK — the moment one appears, the
- * no-multi-tenancy decision is being relitigated by accident. The CHECK
+ * credential(scope: 'workspace'), which otherwise reference a ghost.
+ *
+ * The old hard rule — "NOT a tenancy boundary; no other table ever grows a
+ * workspace_id FK" (CONTEXT.md, 2026-08) — was RESCINDED 2026-08-15 by the
+ * owner's multi-workspace reversal: one install holds N workspaces (books)
+ * and the user account is the only global object. This singleton is the
+ * current build state, not the target shape; the CHECK and the magic id = 1
+ * go away when multi-workspace lands (no deployments exist, no upgrade path
+ * is owed). The CHECK
  * constraint makes the singleton structural rather than remembered.
  */
 export const workspace = pgTable(

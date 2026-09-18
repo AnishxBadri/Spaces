@@ -91,9 +91,12 @@ store. Gmail/Calendar OAuth grants will live in `account_connection`
 ### `workspace.ts` — the singleton and the mandate
 
 `workspace` has `id integer PRIMARY KEY DEFAULT 1` with `CHECK (id = 1)`:
-the singleton is structural, not remembered. The comment is a governance
-rule: this is not a tenancy boundary, and no other table may ever grow a
-`workspace_id` FK. Its `settings` jsonb holds things like `base_currency`.
+the singleton is structural, not remembered. Read it as current build
+state, not as doctrine: the old governance rule — "not a tenancy boundary,
+no other table may ever grow a `workspace_id` FK" — was **rescinded
+2026-08-15** (CONTEXT.md, _Single user first, team ready_: one install
+holds N workspaces (books), and the user account is the only global
+product object). Its `settings` jsonb holds things like `base_currency`.
 
 `mandate`: one row per strategy vintage, `status active|archived`, with a
 partial unique index on status where active, so exactly one active mandate

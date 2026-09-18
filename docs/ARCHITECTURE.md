@@ -3,8 +3,8 @@
 _Written 2026-08. This is the synthesis view: what the system is, model by model, and
 what remains to build. The deep decision record (with dated reasoning and reversals)
 stays in `CONTEXT.md`; the domain vocabulary is `docs/private-capital-glossary.md`;
-the visual system is `DESIGN.md`. Product name: **Angle** (rename lands at ship-polish
-start; code says DealOS until then)._
+the visual system is `DESIGN.md`. Product name: **Spaces** (renamed from DealOS
+2026-09-16; a handful of frozen `dealos` strings remain — see CONTEXT.md header)._
 
 ## 1. What this is
 
@@ -26,14 +26,22 @@ home.
 
 ```
 Browser (React SPA) ── typed server functions ──┐
-                                                ├── Postgres 17 (data + jobs + search + vectors)
-Worker (pg-boss consumer: extraction, digests) ─┘
-                                                └── Blob store: local disk (default) | any S3 endpoint
+                                                ├── Postgres 17 (data + jobs + search + vectors + plugin schemas)
+Worker (pg-boss host · plugin LOADER · AI jobs) ─┘
+        ▲ loads                                 └── ./data: blobs (local | S3) · secret.key · plugins/ · models/
+plugins/<id>  (registry-installed, worker-only, return claims through SDK ports)
 ```
 
-Two Node processes, one database, one blob location. Production = **two containers**
+Two Node processes, one database, one `./data` directory. Production = **two containers**
 (app + Postgres); TLS via an optional Caddy overlay; ephemeral-disk platforms (Fly/
-Railway/Render) supported via `STORAGE_DRIVER=s3` + R2/B2.
+Railway/Render) supported via `STORAGE_DRIVER=s3` + R2/B2. **Plugins are not in the
+image** (decided 2026-09-13, reversing "capability model"): integrations install from
+the running app into `./data/plugins`, the worker is the only process that executes
+them, they write only through the claim-type lanes, and `./data` stays the one backup
+unit. The web process renders their manifests and never runs their code. Detail:
+`docs/spec-plugin-sdk.md`. Monorepo target (Turborepo): `apps/web · worker · site ·
+extension`, `packages/db · core · sdk · ui`, `plugins/*`; `sdk` imports nothing from
+core, `web` imports no plugin, `turbo prune --docker` builds the image from web + worker.
 
 | Layer      | Choice                              | Why (one line)                                                                                                                                |
 | ---------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -46,19 +54,31 @@ Railway/Render) supported via `STORAGE_DRIVER=s3` + R2/B2.
 | Extraction | unpdf · mammoth · fflate+OOXML      | in-process on the worker; no OCR container (BYOK vision later)                                                                                |
 | Motion/UI  | Tailwind 4 + Radix + tw-animate-css | pure-CSS motion (Freiberg timing), one focus ring, OKLCH token system ("Pine")                                                                |
 | Validation | Zod at write-path choke points      | hand-written; schema-derivation can't carry business rules                                                                                    |
+| Backend    | Effect (v4) by ratchet              | typed errors, Layers = the plugin port model and per-job least privilege, scoped resources = plugin lifecycle; never crosses into React       |
+| AI         | core substrate over AI SDK adapters | two functions (`complete`, `embed`), lanes × sensitivity routing, registry-compiled schemas, propose-only; embeddings pinned at a dimension   |
 
 Doctrines that shape everything: **append-only where history is information** ·
 **AI writes are suggestions, never silent** · **structure fixed, content free** ·
-**required env frozen at {DATABASE_URL, APP_URL}** · **no workspace_id FK, ever**.
+**required env frozen at {DATABASE_URL, APP_URL}** · **plugins feed the graph, never
+extend the product** · **core rearranges what is inside, plugins bring what is outside,
+AI proposes** · **storage source ≠ blob backend**. ("No workspace_id FK" was rescinded
+by the 2026-08-15 multi-workspace reversal; see CONTEXT.md.)
 
-## 3. Workspace model _(shipped)_
+## 3. Workspace model _(singleton shipped; multi-workspace decided 2026-08-15, unbuilt)_
 
-One deployment = one workspace = one shared dataset. **No multi-tenancy** — two funds
-run two containers.
+~~One deployment = one workspace = one shared dataset. **No multi-tenancy** — two funds
+run two containers.~~ **Superseded 2026-08-15** by the owner reversal in CONTEXT.md
+(_Single user first, team ready_): one deployment = one **organization holding N
+workspaces (books)**, the user account is the only global product object, and membership
+is per-workspace. Two unrelated funds still run two separate installs; hosted
+stranger-tenancy is recorded future intent, not built. What follows is the shipped build
+state, not the target shape.
 
 - **Singleton row** (`workspace`, CHECK id=1): name, logo, settings. Anchors the
-  mandate, workspace-scoped credentials, sidebar identity. The no-`workspace_id` rule
-  keeps tenancy from creeping in by accident.
+  mandate, workspace-scoped credentials, sidebar identity. ~~The no-`workspace_id` rule
+  keeps tenancy from creeping in by accident.~~ (Rescinded 2026-08-15 with the singleton
+  — see §2 and CONTEXT.md; the CHECK and the magic `id = 1` go away when multi-workspace
+  lands, and no upgrade path is owed because no deployments exist.)
 - **Auth**: first-run signup open only while `count(user)==0`, gated by a one-time
   setup token printed to server logs; thereafter **invites only** (hash-stored,
   single-use, 7-day, role baked in, copyable link — SMTP never required).
@@ -73,8 +93,11 @@ run two containers.
 ## 4. Entity graph _(shipped — the substrate everything sits on)_
 
 Everything linkable is an `entity(id, kind, canonical_name, …)`; kinds are **fixed in
-code**: company · person · organization · deal · space · note · document · term. One
-edge table:
+code**: company · person · deal · space · note · document · term · `custom` (the
+attribute-bag tier, differentiated by `object_id`), plus `organization` — the ghost kind
+decided-deleted 2026-09-13 (no records, no registry; co-investors become Companies with a
+`type` or a custom object — CONTEXT.md _Two-tier object model_) but still live in the enum
+until roadmap slice `clean-1` lands. One edge table:
 
 ```
 link(from_entity, to_entity, relation: mentions | tagged_in | contact_at
@@ -98,9 +121,12 @@ deliberately _not_ object-modeled (they're the research layer that links in).
 Since 2026-09 the registry is two-tier (CONTEXT.md "Two-tier object model",
 spec in `docs/spec-attribute-engine.md`): an `object` table holds the three
 core objects as seeded system rows, attributes key on `object_id`, and
-user-created custom objects will join the same table as attribute bags —
-full engine, none of the identity/dedupe/merge/enrichment machinery. The
-schema half shipped (SPA-5); dialogs and `/o/` routes are in flight.
+user-created custom objects join the same table as attribute bags — full
+attribute engine, plus (narrowed 2026-09-13) fuzzy-name dedupe,
+merge-as-target, and opt-in `domain`/`linkedin` identity keys; enrichment,
+interactions and seeded attributes stay core-only. Schema, the object and
+attribute dialogs, and the `/o/$objectSlug` route pair have all shipped;
+the opt-in identity keys (`object.identity_keys`) have not.
 
 - All values — system and custom — live in `entity.values` jsonb keyed by slug. One
   write path (`setValues`, row-locked), one Zod-per-type validator, one renderer; the
@@ -275,8 +301,14 @@ Next:
   assembler landed step 1 (pure, no model, no key); then the registry →
   JSON-schema compiler, provider adapters + lane routing over the BYOK vault,
   the MCP server, and a run log when the first multi-step feature wants one.
-- **Ship polish** _(deferred; scope TBD — rename to Angle, test-db harness, CI,
-  GHCR images, install docs — decided when a release is in sight)_
+- **Ship polish** — **no longer deferred and no longer scope-TBD as of
+  `docs/roadmap-2026-09.md` (2026-09-15)**: it is **project 1**, ahead of the monorepo
+  (the rename, an entrypoint that owns `/data`, a downgrade guard, a TLS overlay, a
+  restore that works), with the Playwright harness, image smoke, published multi-arch
+  images and the install/upgrade docs in project 16. CI has existed since 2026-09-01
+  and the test-db harness is `mono-4`/`mono-5`. _Earlier text, kept: deferred; scope
+  TBD — rename to Angle, test-db harness, CI, GHCR images, install docs — decided when
+  a release is in sight._
 - **Post-v1 backlog**: dark theme · MIS + runway lens · scorecards · meeting-prep
   briefs, pass-letter drafting, deck-reader autofill (BYOK AI) · MCP server (last) ·
   integrations: Calendar → Gmail (forward-only) → Apollo/Exa enrichment · RSS feeds

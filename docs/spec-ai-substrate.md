@@ -200,3 +200,145 @@ Non-goals: a separate AI memory store; push-triggered assistants; financial
 modelling features; direct-write AI anywhere; per-feature model pickers;
 chat UI as the primary surface (the record, the queue, and the user's own
 assistant via MCP are the surfaces).
+
+## 9. Providers and embeddings (decided 2026-09-15)
+
+The substrate lives in `packages/core/ai/`. Providers are code adapters
+behind one interface each, never plugins: dimension pinning, sensitivity
+routing, and being a dependency of core search all require the substrate to
+own them. Adding Voyage is a ~50-line PR to core.
+
+```
+ai/providers/llm/     anthropic · openai · google · ollama · openrouter   (AI SDK; vault credential → LanguageModel)
+ai/providers/embed/   openai · voyage · google · ollama · local(transformers.js, bge-*)   (→ EmbeddingModel, dims-checked)
+ai/route.ts           ai_route(lane, sensitivity) → {provider, model}; lanes: extract · classify · synthesize · embed · vision · research
+ai/complete.ts        complete(lane, items, schema?, {caller, sensitivity, budget}) → text | patch
+ai/embed.ts           embed(texts, {sensitivity}) → vectors
+workspace.embedding   { provider, model, dims, pinned_at }  + optional sensitive slot (local/Ollama, same dims)
+ai_usage              (job_run_id, lane, provider, model, tokens, caller: user|integration, at)
+credential_kind       gains `embedding`
+```
+
+- **Vision is an LLM adapter with image input**, not a separate family; it
+  is the upgrade path for `extraction_status: unsupported` and the one place
+  the AI writes to a document (`extracted_text`), because it _is_ extraction.
+- **Pin a dimension (768 default), not only a model.** nomic, bge-base and
+  OpenAI-3 with `dimensions: 768` share one column; the sensitive slot can
+  embed locally while cloud serves the rest. Models that cannot emit the pin
+  show greyed ("needs re-pin"). Re-pin = `ALTER COLUMN TYPE vector(N)`,
+  rebuild HNSW, re-embed all — explicit, one job. Rows whose
+  `embedding_model` mismatches the pin are skipped by the semantic CTE until
+  replaced, so search never mixes models mid-migration.
+- **Never forced, automatic once enabled.** No provider → no vectors, no
+  semantic CTE, lexical + trigram + graph RRF is the floor. Provider set →
+  embed on `document.extracted` (and note save, `close_reason`) with no
+  dialog; only the corpus backfill asks with a token/cost estimate. The
+  keyless question is answered: **opt-in local model downloaded to
+  `/data/models` at click time**, not bundled, not hidden.
+- Chunking per format: PDF/PPTX by page, XLSX by sheet then row blocks,
+  DOCX by heading; ~400–600 tokens, small overlap; each chunk carries page,
+  kind, the space ltree path and `sensitive` so retrieval filters before
+  scoring.
+- Sensitivity resolves record → filed spaces → storage binding → workspace
+  default; sensitive forces the local route or refuses.
+- **Gateway passthrough, not a gateway dependency.** Every provider form has
+  `baseURL` + extra headers (`credential.meta`), so an operator already
+  running Helicone / LiteLLM / Portkey / Vercel AI Gateway points a provider
+  at it. We never route through a third party by default (a confidential
+  deck's text leaving the box breaks the doctrine), and we never bundle one
+  (self-hosted Helicone is ClickHouse + Postgres + workers; we are two
+  containers). `ai_usage` + the run log are the observability a solo GP
+  needs.
+- Settings → AI (admin): Providers · Routing (lane × sensitivity grid) ·
+  Embeddings (pin, backfill, sensitive slot, test call) · Usage · Caps.
+
+## 10. The suggestion table — the one door, as a row
+
+```
+suggestion(id, entity_id, kind: attribute_patch | note | ledger_event | identity | document_kind,
+           payload jsonb, rationale, refs[] /* ContextItem refs */, run_id?,
+           proposed_by: {type: user|integration, id}, status: open | accepted | rejected,
+           decided_by, decided_at, created_at)
+```
+
+Accept applies through the existing one-write-paths (`setValues`,
+`createNote`, the ledger insert, `resolveEntity`) with the accepter as actor
+and the row as provenance. Bulk accept per column/list. The review inbox on
+Today generalizes the dedupe inbox. Ledger events proposed from documents
+(a cap-table revision → `round`/`mark`) land here and only here — the
+append-only tables never receive an AI write.
+
+## 11. Documents × the substrate
+
+Documents are the substrate's richest input and the AI never writes to
+them (vision-as-extraction excepted). Every feature is a composition of
+§1–§4 on the document pipeline's events:
+
+| trigger                                         | lane                                                                                                                          | proposes                                                              |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `document.extracted`, kind unknown              | classify                                                                                                                      | `document.kind`                                                       |
+| `document.extracted`, kind deck; or "Read deck" | extract, schema = company (+deal) from the registry, context = assembler on the filed record (space memos, glossary, mandate) | attribute patch; unknown founders as `Identity` claims → dedupe inbox |
+| kind cap_table (upload or live-file revision)   | extract, schema = round/ownership                                                                                             | `round` / `mark` events → ledger inbox                                |
+| kind dd / legal                                 | extract, per-kind schema                                                                                                      | key terms as a note suggestion on the deal                            |
+| MIS / update                                    | extract, schema = kpi_observation                                                                                             | append-only KPI events via inbox                                      |
+| "Summarize"                                     | synthesize                                                                                                                    | note suggestion, `derived_from` document                              |
+| Cmd-K                                           | embed                                                                                                                         | fourth RRF CTE                                                        |
+| `extraction_status: unsupported`                | vision                                                                                                                        | `extracted_text`                                                      |
+| glossary match in `extracted_text`              | none (deterministic)                                                                                                          | `link(document → term)`                                               |
+
+What the substrate gains from storage sources (`docs/spec-storage-sources.md`):
+volume (the whole data room), provenance as a ranking signal
+(`source_path`, binding), live-file revisions for diff-driven proposals,
+Google Docs/Sheets export text, sensitivity decided at ingest, bytes on the
+box for vision and re-embedding. What it does not gain: the folder tree as
+meaning — retrieval scopes by `entity_space` and ltree, never by path.
+
+Storage-source plugins never call `Ai`; they deliver bytes and core's
+`document.extracted` event fires core features. The only plugin kind that
+calls `Ai` is `researcher` (Exa-class), through the SDK's `Ai` port with cost
+attributed to the integration.
+
+## 12. Core feature vs plugin — the test
+
+**A plugin brings something from outside** (bytes, facts, a foreign API).
+**A feature rearranges what is already inside.** The deck reader is
+`complete('extract', assemble(document), schemaFor('company'))` →
+suggestions: zero new primitives, no vendor, no credential of its own, needs
+the registry and the inbox. It ships with the substrate, hidden until an
+LLM key exists. Same for classify, summarize, AI attributes, memo draft,
+pre-mortem, semantic search. What may legitimately be a plugin around them:
+a `researcher` enriching output with live web, or (deferred) an
+`llm-provider` kind for exotic backends. Never the feature.
+
+## 13. AI attributes (Attio parity, ours)
+
+Attio ships four manual AI attribute types (summarize, web agent, prompt
+completion, classify; text/number/currency/select outputs; manual trigger
+per cell / bulk / column; confidence + citations on the web agent only).
+Ours is **config on existing types, not new types**:
+`attribute.config.ai = { mode: classify | summarize | prompt | research, prompt, variables, lane }`.
+The 15-type menu stays frozen; custom objects get AI attributes for free
+because the registry is the output schema. Differences that should stay:
+context is the assembler (notes, decks, mandate, glossary), not the record's
+attributes alone; the write is a suggestion with "accept all", never a
+value; `rationale` + `refs` ride every lane, not just research; new select
+options proposed to the registry, never silently added; bulk = job with
+estimate + per-day cap. Trigger stays manual (pull-based doctrine; Attio
+converged on it).
+
+## 14. Build order (revised 2026-09-15)
+
+1. Registry → JSON-schema compiler (§2). The company schema is the deck
+   reader's output type.
+2. Provider adapters + routing + vault wiring (§9). **First feature: the deck
+   reader** — one extract call on an existing event, the most-wanted feature,
+   exercises schema + suggestion + identity claims at once. Manual trigger.
+3. Suggestion table + review inbox on Today (§10).
+4. Embed lane + `document_chunk` fill job + semantic CTE + note/close_reason
+   embedding (§9). Local opt-in download.
+5. Kind classify, summarize, dd/legal extract; AI attribute config (§13).
+6. Concept links (glossary matcher server-side; CONTEXT.md _Glossary_).
+7. Live-file revision → ledger proposals (needs `document_revision`).
+8. Vision lane for scanned decks.
+9. MCP server (§5). 10. Run log (§6) when the deck reader chains
+   extract → synthesize.

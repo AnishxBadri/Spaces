@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { CheckSquare } from 'lucide-react'
+import { CheckSquare, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { EmptyState } from '#/components/empty-state'
@@ -10,7 +10,9 @@ import {
 } from '#/components/ledger-section'
 import { PageHeader } from '#/components/page-header'
 import { TaskComposer } from '#/components/task-composer'
-import { listTasks, setTaskDone } from '#/lib/server-fns'
+import { Button } from '#/components/ui/button'
+import { useConfirm } from '#/components/ui/confirm-dialog'
+import { deleteTask, listTasks, setTaskDone } from '#/lib/server-fns'
 import { localToday } from '#/lib/tasks/parse-due'
 import { cn } from '#/lib/utils'
 
@@ -92,24 +94,126 @@ function groupTasks(open: Array<TaskRow>, today: string): Array<Group> {
   return groups.filter((g) => g.rows.length > 0)
 }
 
+/** The local calendar day an ISO timestamp fell on. */
+function localDay(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Done is a log, so it groups by when the work closed, not when it was
+ * due — the due date stopped mattering the moment the box was checked.
+ */
+function groupDone(done: Array<TaskRow>, today: string): Array<Group> {
+  const weekAgo = new Date(`${today}T00:00:00Z`)
+  weekAgo.setUTCDate(weekAgo.getUTCDate() - 6)
+  const since = weekAgo.toISOString().slice(0, 10)
+  const groups: Array<Group> = [
+    { key: 'done-today', title: 'Today', rows: [] },
+    {
+      key: 'done-week',
+      title: 'This week',
+      hint: `since ${since.slice(5)}`,
+      rows: [],
+    },
+    { key: 'done-earlier', title: 'Earlier', rows: [] },
+  ]
+  for (const t of done) {
+    const day = t.doneAt ? localDay(t.doneAt) : ''
+    if (day === today) groups[0].rows.push(t)
+    else if (day >= since) groups[1].rows.push(t)
+    else groups[2].rows.push(t)
+  }
+  return groups.filter((g) => g.rows.length > 0)
+}
+
+/** The when-lane for a closed task: the clock today, then the date. */
+function doneFigure(doneAt: string | null, today: string): string {
+  if (!doneAt) return '—'
+  const d = new Date(doneAt)
+  const day = localDay(doneAt)
+  if (day === today) {
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+  if (day.slice(0, 4) === today.slice(0, 4)) return day.slice(5)
+  return day
+}
+
+/** The row's exit: long enough to read the strike, short enough to ignore. */
+const EXIT_MS = 150
+
 function TasksPage() {
   const data = Route.useLoaderData()
   const router = useRouter()
   const [showDone, setShowDone] = useState(false)
+  // Rows mid-exit. The write waits for the transition so completing a task
+  // reads as the row leaving, not as the list flinching.
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
+  const { confirm, confirmDialog } = useConfirm()
   const today = localToday()
-  const groups = groupTasks(data.open, today)
 
-  async function toggle(id: string, done: boolean) {
+  // The tabs are exclusive: Done is a different list, not a disclosure on
+  // this one. Reopening the last done task takes the tab away, so the view
+  // falls back rather than stranding the page on an empty log.
+  const viewDone = showDone && data.done.length > 0
+  const openGroups = groupTasks(data.open, today)
+  const groups = viewDone ? groupDone(data.done, today) : openGroups
+
+  async function write(id: string, done: boolean) {
     try {
       await setTaskDone({ data: { id, done } })
       void router.invalidate()
     } catch {
       toast.error('Could not update the task')
+    } finally {
+      setLeaving((s) => {
+        const next = new Set(s)
+        next.delete(id)
+        return next
+      })
     }
   }
 
-  const overdue = groups.find((g) => g.key === 'overdue')?.rows.length ?? 0
-  const dueToday = groups.find((g) => g.key === 'today')?.rows.length ?? 0
+  function toggle(id: string, done: boolean) {
+    setLeaving((s) => new Set(s).add(id))
+    window.setTimeout(() => {
+      void write(id, done)
+      if (done) {
+        toast('Task done', {
+          action: { label: 'Undo', onClick: () => void write(id, false) },
+        })
+      }
+    }, EXIT_MS)
+  }
+
+  async function erase(id: string) {
+    try {
+      await deleteTask({ data: { id } })
+      void router.invalidate()
+    } catch {
+      toast.error('Could not delete the task')
+    } finally {
+      setLeaving((s) => {
+        const next = new Set(s)
+        next.delete(id)
+        return next
+      })
+    }
+  }
+
+  async function remove(t: TaskRow) {
+    const ok = await confirm({
+      title: 'Delete this task?',
+      body: `"${t.content}" leaves the workspace. This cannot be undone.`,
+      action: 'Delete',
+    })
+    if (!ok) return
+    setLeaving((s) => new Set(s).add(t.id))
+    window.setTimeout(() => void erase(t.id), EXIT_MS)
+  }
+
+  const overdue = openGroups.find((g) => g.key === 'overdue')?.rows.length ?? 0
+  const dueToday = openGroups.find((g) => g.key === 'today')?.rows.length ?? 0
   const empty = data.open.length === 0 && data.done.length === 0
 
   return (
@@ -129,10 +233,10 @@ function TasksPage() {
         action={
           data.done.length > 0 ? (
             <div className="-mb-4 flex items-center" role="group">
-              <HeaderTab active={!showDone} onClick={() => setShowDone(false)}>
+              <HeaderTab active={!viewDone} onClick={() => setShowDone(false)}>
                 Open
               </HeaderTab>
-              <HeaderTab active={showDone} onClick={() => setShowDone(true)}>
+              <HeaderTab active={viewDone} onClick={() => setShowDone(true)}>
                 Done
                 <span className="font-normal tracking-normal normal-case">
                   {data.done.length}
@@ -145,8 +249,11 @@ function TasksPage() {
 
       {/* The one way to add things, everywhere: the composer band under the
           header (P6), not a corner button. Hidden when empty — the empty
-          state carries its own composer action. */}
-      {empty ? null : <TaskComposer variant="band" />}
+          state carries its own composer action. Adding from the Done log
+          returns to Open, where the new task actually is. */}
+      {empty ? null : (
+        <TaskComposer variant="band" onCreated={() => setShowDone(false)} />
+      )}
 
       {empty ? (
         <EmptyState
@@ -159,6 +266,11 @@ function TasksPage() {
         />
       ) : (
         <div className="flex flex-col gap-8 px-8 py-6">
+          {groups.length === 0 ? (
+            <p className="text-ui text-graphite">
+              {viewDone ? 'Nothing closed yet.' : 'Nothing open. Enjoy it.'}
+            </p>
+          ) : null}
           {groups.map((g) => (
             <LedgerSection
               key={g.key}
@@ -171,31 +283,24 @@ function TasksPage() {
                 <TaskItem
                   key={t.id}
                   task={t}
-                  figure={whenFigure(t.dueDate, today, g.key)}
+                  figure={
+                    viewDone
+                      ? doneFigure(t.doneAt, today)
+                      : whenFigure(t.dueDate, today, g.key)
+                  }
+                  done={viewDone}
                   overdue={g.key === 'overdue'}
+                  leaving={leaving.has(t.id)}
                   last={i === g.rows.length - 1}
-                  onToggle={() => toggle(t.id, true)}
+                  onToggle={() => toggle(t.id, !viewDone)}
+                  onDelete={() => void remove(t)}
                 />
               ))}
             </LedgerSection>
           ))}
-
-          {showDone && data.done.length > 0 ? (
-            <LedgerSection label="Done" count={`${data.done.length}`}>
-              {data.done.map((t, i) => (
-                <TaskItem
-                  key={t.id}
-                  task={t}
-                  figure="done"
-                  done
-                  last={i === data.done.length - 1}
-                  onToggle={() => toggle(t.id, false)}
-                />
-              ))}
-            </LedgerSection>
-          ) : null}
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }
@@ -234,30 +339,42 @@ function TaskItem({
   overdue,
   figure,
   last,
+  leaving,
   onToggle,
+  onDelete,
 }: {
   task: TaskRow
   done?: boolean
   overdue?: boolean
   figure: string
   last?: boolean
+  /** Mid-exit: struck through and fading, write pending. */
+  leaving?: boolean
   onToggle: () => void
+  onDelete: () => void
 }) {
   return (
     // The row reads check → what → where → who → when; the date holds the
-    // right lane alone.
-    <LedgerRow last={last}>
+    // right lane alone. A leaving row fades on opacity only — the list
+    // keeps its height until the write lands and the row unmounts.
+    <LedgerRow
+      last={last}
+      className={cn(
+        'group transition-opacity duration-150 ease-out-quart',
+        leaving && 'pointer-events-none opacity-0',
+      )}
+    >
       <input
         type="checkbox"
         className="focus-ring size-3.5 shrink-0 appearance-none border border-hairline bg-paper checked:border-primary checked:bg-primary"
-        checked={!!done}
+        checked={!!done !== !!leaving}
         onChange={onToggle}
         aria-label={done ? 'Reopen task' : 'Complete task'}
       />
       <span
         className={cn(
-          'min-w-0 truncate text-ui',
-          done && 'text-graphite line-through',
+          'min-w-0 truncate text-ui transition-colors duration-150',
+          (done || leaving) && 'text-graphite line-through',
         )}
       >
         {t.content}
@@ -284,6 +401,15 @@ function TaskItem({
         )
       })}
       <span className="flex-1" />
+      <Button
+        size="icon-xs"
+        variant="ghost"
+        aria-label={`Delete task: ${t.content}`}
+        onClick={onDelete}
+        className="shrink-0 text-graphite opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
+      >
+        <Trash2 />
+      </Button>
       <span className="shrink-0 mono text-micro text-graphite">
         {t.assigneeName}
       </span>

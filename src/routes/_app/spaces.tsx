@@ -17,6 +17,7 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { applySpaceTemplate, createSpace, listSpaces } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
+import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/spaces')({
   loader: () => listSpaces(),
@@ -25,14 +26,30 @@ export const Route = createFileRoute('/_app/spaces')({
 
 type SpaceRow = Awaited<ReturnType<typeof listSpaces>>[number]
 
+/** The three fixed lanes every market-map row ends on. */
+const LANE = 'w-20 shrink-0 text-right'
+
+/** A count in its lane: ink when there is something, a dash when not. */
+function Lane({ n }: { n: number }) {
+  return (
+    <span
+      className={cn(
+        LANE,
+        'mono text-micro max-md:hidden',
+        n > 0 ? 'text-foreground' : 'text-graphite',
+      )}
+    >
+      {n > 0 ? n : '—'}
+    </span>
+  )
+}
+
 function SpacesPage() {
   const spaces = Route.useLoaderData()
   const [open, setOpen] = useState(false)
   useHotkey('s', () => setOpen(true))
 
   const nested = spaces.filter((s) => s.depth > 0).length
-  const subCount = (id: string) =>
-    spaces.filter((s) => s.parentId === id).length
 
   return (
     <div className="flex min-h-full flex-col">
@@ -64,42 +81,52 @@ function SpacesPage() {
           <LedgerSection
             label="Market map"
             count={`${spaces.length} · ${nested} nested`}
+            link={
+              /* Lane heads, aligned with the rows' fixed lanes. */
+              <span
+                aria-hidden
+                className="flex tracking-[0.08em] uppercase max-md:hidden"
+              >
+                <span className={LANE}>Companies</span>
+                <span className={LANE}>Memos</span>
+                <span className={LANE}>Terms</span>
+              </span>
+            }
           >
-            {spaces.map((s) => {
-              const subs = subCount(s.id)
-              return (
-                <LedgerRow key={s.id}>
-                  <Link
-                    to="/spaces/$spaceId"
-                    params={{ spaceId: s.id }}
-                    className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 transition-colors hover:bg-bone"
-                    style={{ paddingLeft: `${s.depth * 24}px` }}
-                  >
-                    {s.depth > 0 ? (
-                      <span className="w-3.5 shrink-0 text-center mono text-label text-graphite">
-                        ›
-                      </span>
-                    ) : (
-                      <Layers
-                        className="size-3.5 shrink-0 text-foreground"
-                        strokeWidth={1.75}
-                      />
+            {spaces.map((s) => (
+              <LedgerRow key={s.id}>
+                <Link
+                  to="/spaces/$spaceId"
+                  params={{ spaceId: s.id }}
+                  className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 transition-colors hover:bg-bone"
+                  style={{ paddingLeft: `${s.depth * 24}px` }}
+                >
+                  {s.depth > 0 ? (
+                    <span className="w-3.5 shrink-0 text-center mono text-label text-graphite">
+                      ›
+                    </span>
+                  ) : (
+                    <Layers
+                      className="size-3.5 shrink-0 text-foreground"
+                      strokeWidth={1.75}
+                    />
+                  )}
+                  <span
+                    className={cn(
+                      'min-w-0 flex-1 truncate text-ui',
+                      s.depth === 0 && 'font-medium',
                     )}
-                    <span className="shrink-0 text-ui font-medium">
-                      {s.name}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate mono text-label text-graphite">
-                      {s.slug}
-                    </span>
-                    <span className="w-30 shrink-0 text-right mono text-label text-graphite">
-                      {subs > 0 ? `${subs} sub` : '—'}
-                    </span>
-                  </Link>
-                </LedgerRow>
-              )
-            })}
+                  >
+                    {s.name}
+                  </span>
+                  <Lane n={s.companies} />
+                  <Lane n={s.memos} />
+                  <Lane n={s.terms} />
+                </Link>
+              </LedgerRow>
+            ))}
             {/* The composer row: adding never starts from a corner button. */}
-            <LedgerRow>
+            <LedgerRow last>
               <button
                 type="button"
                 onClick={() => setOpen(true)}

@@ -1,4 +1,4 @@
-import { useRouter } from '@tanstack/react-router'
+import { useRouteContext, useRouter } from '@tanstack/react-router'
 import { Plus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -62,16 +62,24 @@ export function TaskComposer({
   const [records, setRecords] = useState<Array<LinkedRecord>>(
     presetEntity ? [presetEntity] : [],
   )
-  const [createMore, setCreateMore] = useState(false)
+  const [keepOpen, setKeepOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const today = localToday()
+  // Who the task lands on when the pill is untouched: `assignee_id` is NOT
+  // NULL and the server defaults it to the caller, so "nobody" is not a
+  // state the pill can honestly offer.
+  const me = useRouteContext({ from: '/_app' }).session.user
 
   useHotkey(hotkey, () => setOpen(true))
 
-  /** `keep` holds the chips (date, records) for the next task — the band's
-   *  ⇧↵ and its create-more switch; the dialog's create-more keeps it open. */
-  async function save(keep = createMore) {
+  /**
+   * `keep` means the same thing in both variants: the sheet stays, the
+   * chips stay, only the text clears — so a run of tasks against one
+   * record keeps its date and its links. ⇧↵ is the one-shot version of
+   * the switch.
+   */
+  async function save(keep = keepOpen) {
     if (!content.trim()) {
       setError('Say what the task is.')
       return
@@ -89,11 +97,11 @@ export function TaskComposer({
       })
       toast('Task created')
       setContent('')
-      if (variant === 'dialog' || !keep) {
+      if (!keep) {
         setDue(null)
         if (!presetEntity) setRecords([])
+        if (variant === 'dialog') setOpen(false)
       }
-      if (variant === 'dialog' && !keep) setOpen(false)
       onCreated?.()
       void router.invalidate()
     } catch {
@@ -141,7 +149,7 @@ export function TaskComposer({
           <span aria-hidden className="mx-1 h-4 w-px bg-rule" />
         </>
       ) : null}
-      <AssigneePill assignee={assignee} onChange={setAssignee} />
+      <AssigneePill assignee={assignee} me={me} onChange={setAssignee} />
       <RecordsPill records={records} onChange={setRecords} />
     </>
   )
@@ -182,24 +190,7 @@ export function TaskComposer({
         <div className="flex flex-wrap items-center gap-2">
           {chips}
           <span className="flex-1" />
-          <button
-            type="button"
-            role="switch"
-            aria-checked={createMore}
-            onClick={() => setCreateMore((v) => !v)}
-            className="focus-ring flex items-center gap-2 mono text-micro text-graphite"
-          >
-            <span
-              aria-hidden
-              className={cn(
-                'flex h-3 w-6 border border-hairline bg-paper',
-                createMore && 'justify-end',
-              )}
-            >
-              <span className="size-2.5 bg-hairline" />
-            </span>
-            create more
-          </button>
+          <KeepOpenSwitch checked={keepOpen} onChange={setKeepOpen} />
           <Button type="submit" size="sm" disabled={pending}>
             {pending ? 'Saving…' : 'Add task'}
             <KeyHint>↵</KeyHint>
@@ -259,24 +250,7 @@ export function TaskComposer({
             {chips}
           </div>
           <div className="flex min-h-11 items-center gap-4 border-t border-rule bg-bone px-5 py-2">
-            <label className="flex cursor-pointer items-center gap-2 mono text-micro text-graphite">
-              <span
-                aria-hidden
-                className={cn(
-                  'flex h-3 w-6 border border-hairline bg-paper',
-                  createMore && 'justify-end',
-                )}
-              >
-                <span className="size-2.5 bg-hairline" />
-              </span>
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={createMore}
-                onChange={(e) => setCreateMore(e.target.checked)}
-              />
-              create more
-            </label>
+            <KeepOpenSwitch checked={keepOpen} onChange={setKeepOpen} />
             <span className="flex-1" />
             <span className="hidden mono text-micro text-graphite sm:inline">
               ↵ add · ⇧↵ add & keep open
@@ -289,6 +263,49 @@ export function TaskComposer({
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * The composer's one switch, in both variants. Off is a rule track with a
+ * graphite knob; on is the pine selection wash with a pine knob — pine is
+ * what "active" is made of everywhere else in the instrument, and state has
+ * to be readable without a second switch to compare against. The knob
+ * travels on transform, never on layout.
+ */
+function KeepOpenSwitch({
+  checked,
+  onChange,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="focus-ring flex items-center gap-2 text-label text-graphite transition-colors duration-100 hover:text-foreground"
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'flex h-3.5 w-6 items-center border p-px transition-colors duration-100 ease-out-quart',
+          checked ? 'border-primary bg-selected' : 'border-rule bg-paper',
+        )}
+      >
+        <span
+          className={cn(
+            'size-2.5 transition-transform duration-100 ease-out-quart',
+            checked
+              ? 'translate-x-2.5 bg-primary'
+              : 'translate-x-0 bg-graphite',
+          )}
+        />
+      </span>
+      Keep open
+    </button>
   )
 }
 
@@ -340,7 +357,7 @@ function DuePill({
       <PopoverTrigger asChild>
         <button type="button" className="focus-ring">
           <Pill active={due !== null}>
-            {due ? dueLabel(due, today) : 'date…'}
+            {due ? dueLabel(due, today) : 'Due date'}
           </Pill>
         </button>
       </PopoverTrigger>
@@ -399,11 +416,18 @@ function DuePill({
   )
 }
 
+/**
+ * The pill shows who the task will actually land on, never an instruction:
+ * untouched it reads `Me`, because that is what the server will do. There
+ * is no clear option — every task has an assignee by schema.
+ */
 function AssigneePill({
   assignee,
+  me,
   onChange,
 }: {
   assignee: { id: string; name: string } | null
+  me: { id: string; name: string }
   onChange: (a: { id: string; name: string } | null) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -415,37 +439,51 @@ function AssigneePill({
       .catch(() => toast.error('Could not load teammates'))
   }, [open, users.length])
 
+  const effective = assignee ?? me
+  const isMe = effective.id === me.id
+  // Me first — the common case should not need a read of the list.
+  const ordered = [
+    me,
+    ...users
+      .filter((u) => u.id !== me.id)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  ]
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" className="focus-ring">
+        <button type="button" aria-label="Assign to" className="focus-ring">
           <Pill active={assignee !== null}>
-            {assignee ? (
-              <>
-                <InitialsMark name={assignee.name} size="xs" />
-                <span className="font-sans text-label">{assignee.name}</span>
-              </>
-            ) : (
-              'assign to me'
-            )}
+            <InitialsMark name={effective.name} size="xs" />
+            <span className="font-sans text-label">
+              {isMe ? 'Me' : effective.name}
+            </span>
           </Pill>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-1">
+        <p className="px-2 pt-1 pb-1.5 label-caps text-graphite">Assign to</p>
         {users.length === 0 ? (
           <p className="px-2 py-1.5 text-label text-graphite">Loading…</p>
         ) : (
-          users.map((u) => (
+          ordered.map((u) => (
             <button
               key={u.id}
               type="button"
-              className="focus-ring flex w-full items-center rounded-md px-2 py-1.5 text-ui hover:bg-bone"
+              className={cn(
+                'focus-ring flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-ui hover:bg-bone',
+                u.id === effective.id && 'bg-selected',
+              )}
               onClick={() => {
-                onChange(u)
+                onChange(u.id === me.id ? null : u)
                 setOpen(false)
               }}
             >
+              <InitialsMark name={u.name} size="xs" />
               {u.name}
+              {u.id === me.id ? (
+                <span className="text-label text-graphite">you</span>
+              ) : null}
             </button>
           ))
         )}
@@ -508,7 +546,7 @@ function RecordsPill({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button type="button" className="focus-ring">
-            <Pill dashed>+ link record</Pill>
+            <Pill dashed>+ Link record</Pill>
           </button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-72 p-2">

@@ -1,13 +1,18 @@
-# DealOS — context
+# Spaces — context
 
 **Name re-decided 2026-08-13: Spaces** (supersedes Angle, decided 2026-08). Named for the
 product's own core concept — the user-built taxonomy is the thesis of the tool. Costs
 weighed and accepted by owner: the name collides with the spaces _feature_ (may later
 rename the feature to Markets — the onboarding block already says "markets creator"), and
 "Spaces" is externally crowded (X Spaces, DigitalOcean Spaces; weak trademark/SEO) —
-irrelevant for a self-hosted, word-of-mouth tool. The mechanical rename (repo, wordmark,
-package, image names) still lands at ship-polish start, after domain/npm diligence —
-before GHCR images bake the old name in. "DealOS" persists in code until then.
+irrelevant for a self-hosted, word-of-mouth tool. Mechanical rename landed 2026-09-16
+(ship-1 / SPA-24): wordmark, title, sidebar, package.json, compose files, Postgres
+role/database, CI, backup script all say Spaces. Three strings deliberately frozen under
+the old name: the `'dealos:better-auth-secret'` HKDF label (key-derivation input), the
+`dealos.*` localStorage prefs keys (unrecoverable layout reset), and the
+`dealos-glossary` ProseMirror plugin key (internal, harmless). `@spaces/*` are internal
+workspace names only (`"private": true`); the public npm scope/domain decision is deferred
+to whichever slice first runs `npm publish`.
 
 ## What this is
 
@@ -36,10 +41,13 @@ row that could ever be personal, from the first migration. See _Single user firs
 - ~~No no-code object builder (custom _attributes_ yes, custom _objects_ no).~~
   **Reversed 2026-09-02:** custom objects yes — but strictly as the
   **attribute-bag tier** (see "Two-tier object model" in the attribute engine
-  block and `docs/spec-attribute-engine.md`). The non-goal narrows to: custom
-  objects never get identity/dedupe/merge/enrichment/interaction machinery —
-  that stays exclusive to core objects, matching what Attio ships (verified
-  live 2026-09: their custom objects are attribute bags too).
+  block and `docs/spec-attribute-engine.md`). ~~The non-goal narrows to: custom
+  objects never get identity/dedupe/merge/enrichment/interaction machinery.~~
+  **Narrowed again 2026-09-13:** fuzzy-name dedupe, merge-as-target and opt-in
+  `domain`/`linkedin` identity keys reach every object; only enrichment,
+  interactions and seeded attributes stay core-only. Attio keeps the wider
+  exclusion (verified live 2026-09: their custom objects are attribute bags
+  too); ours no longer matches them there.
 - Not at MVP: LP reporting, portfolio MIS collection, mobile, sequences, dashboards, workflow automation.
 
 ## Why self-host wins here
@@ -66,29 +74,33 @@ AGPL-3.0. Can relicense permissively later; reverse is impossible once contribut
 
 One language, TypeScript, one codebase. Two processes (web, worker), two containers (app, db).
 
-| Layer      | Choice                                                                                                                                                |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Framework  | **TanStack Start** (TanStack Router + Vite + Nitro), React 19                                                                                         |
-| DB         | Postgres 17 + Drizzle                                                                                                                                 |
-| Extensions | `pgvector`, `pg_trgm`, `ltree`, `unaccent`                                                                                                            |
-| Data layer | TanStack Query + Start server functions — one model everywhere                                                                                        |
-| Jobs       | pg-boss, Postgres-backed, separate Node process                                                                                                       |
-| Auth       | Better Auth (`tanstackStartCookies` plugin, Postgres adapter)                                                                                         |
-| Editor     | **BlockNote** (ProseMirror/TipTap-based), Notion-grade block UX; JSON authoritative, markdown derived                                                 |
-| Grid       | TanStack Table + TanStack Virtual, DOM-based                                                                                                          |
-| UI         | shadcn/ui + Tailwind + Radix, `cmdk` for Cmd-K                                                                                                        |
-| LLM        | Vercel AI SDK, BYOK                                                                                                                                   |
-| Blobs      | local filesystem default, S3 opt-in                                                                                                                   |
-| Validation | Zod, hand-written at write-path choke points (drizzle-zod considered and skipped — schema-derived validators can't carry the per-type business rules) |
-| Tests      | Vitest + Playwright                                                                                                                                   |
-| Tooling    | pnpm, single app, no monorepo                                                                                                                         |
+| Layer      | Choice                                                                                                                                                                                                                                        |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework  | **TanStack Start** (TanStack Router + Vite + Nitro), React 19                                                                                                                                                                                 |
+| DB         | Postgres 17 + Drizzle                                                                                                                                                                                                                         |
+| Extensions | `pgvector`, `pg_trgm`, `ltree`, `unaccent`                                                                                                                                                                                                    |
+| Data layer | TanStack Query + Start server functions — one model everywhere                                                                                                                                                                                |
+| Jobs       | pg-boss, Postgres-backed, separate Node process                                                                                                                                                                                               |
+| Auth       | Better Auth (`tanstackStartCookies` plugin, Postgres adapter)                                                                                                                                                                                 |
+| Editor     | **BlockNote** (ProseMirror/TipTap-based), Notion-grade block UX; JSON authoritative, markdown derived                                                                                                                                         |
+| Grid       | TanStack Table + TanStack Virtual, DOM-based                                                                                                                                                                                                  |
+| UI         | shadcn/ui + Tailwind + Radix, `cmdk` for Cmd-K                                                                                                                                                                                                |
+| LLM        | Vercel AI SDK, BYOK                                                                                                                                                                                                                           |
+| Blobs      | local filesystem default, S3 opt-in                                                                                                                                                                                                           |
+| Validation | Zod, hand-written at write-path choke points (drizzle-zod considered and skipped — schema-derived validators can't carry the per-type business rules)                                                                                         |
+| Tests      | Vitest + Playwright                                                                                                                                                                                                                           |
+| Tooling    | pnpm; ~~single app, no monorepo~~ — **reversed 2026-09-13** by _Plugin architecture_ below: Turborepo monorepo (`apps/*` · `packages/*` · `plugins/*`). The flat tree is today's state, not the decision; roadmap `mono-1`…`mono-6` moves it. |
 
 Server functions live in `src/lib/server/`, one file per domain, re-exported through the
 `#/lib/server-fns` barrel (split 2026-08 at ~2,900 lines, before auth/mandate/templates
 each added a domain). Pin discipline (2026-08): no `latest` version specifiers — TanStack
 deps pinned to resolved versions; upgrades are deliberate events. The prod worker runs
-TypeScript via tsx (one build pipeline, accepted 2026-08); bundle it with esbuild when an
-image actually ships.
+TypeScript via tsx (one build pipeline, accepted 2026-08); bundle it when an image actually
+ships — **the bundler is open as of 2026-09-15 and it is not ~~esbuild~~**: `docs/spec-plugin-sdk.md`
+§2 (2026-09-13) says tsup, and roadmap D26-worker-bundler recommends `vite build --ssr` (no new
+dependency, the rolldown pipeline the web build already uses) and is awaiting the owner's call,
+carried by `mono-13b`. Record whichever wins here. esbuild is present only as vite's transitive
+build dependency.
 
 ### Backend paradigm (decided 2026-09-04, "future" branch deliberation)
 
@@ -104,14 +116,33 @@ relational coordinator.** Nine decisions:
    (Effect → TanStack server-fn); Effect never crosses into React.
 2. **Zod stays at the boundaries** — `valueValidator` is load-bearing;
    Effect Schema is a separate later decision, not a rider.
-3. **API layer: oRPC on Effect** (`@orpc/experimental-effect`: handlers as
-   Effect programs, Layers in context, Effect Schema accepted). One
-   procedure definition serves both audiences — typed TanStack Query hooks
-   internally, OpenAPI externally (capture, forms, webhooks, n8n crowd).
-   Risk accepted: the Effect bridge is `@beta` — version pinned, imports
-   isolated to one module. Effect HttpApi is the fallback; tRPC rejected;
-   GraphQL rejected (Twenty needs it for schema-per-workspace SaaS; our
-   registry-generated in-process UI doesn't).
+3. ~~**API layer: oRPC on Effect** (`@orpc/experimental-effect`)~~ —
+   **amended 2026-09-16 (owner): the external door is `effect/unstable/httpapi`.**
+   The original pick bought one thing: a single procedure definition serving
+   both audiences, typed TanStack Query hooks internally and OpenAPI
+   externally (capture, forms, webhooks, n8n crowd). The internal half of
+   that trade no longer exists — `createServerFn` already serves ~20 modules
+   in `src/lib/server` typed end to end, and decision 4 keeps it — so the
+   bridge was being paid for with a `@beta` dependency chosen against Effect
+   v3's service APIs while the repo runs `effect@4.0.0-rc.112`. The recorded
+   fallback ships **inside that pinned version**: `HttpApi`, `HttpApiEndpoint`,
+   `HttpApiGroup`, `HttpApiBuilder`, `HttpApiClient`, `HttpApiMiddleware`,
+   `HttpApiSecurity`, `HttpApiScalar`, `OpenApi` and `HttpApiTest`. Unstable
+   inside a package you pin beats beta in a package that moves on someone
+   else's release. `@orpc/*` was never installed, so nothing is being ripped
+   out. tRPC still rejected; GraphQL still rejected (Twenty needs it for
+   schema-per-workspace SaaS; our registry-generated in-process UI doesn't).
+   **The cost this incurs, to be paid deliberately in `api-1`:** HttpApi speaks
+   Effect Schema, so it makes half of decision 2's deferred question for the
+   external boundary. Zod stays at the server-fn boundary and in
+   `valueValidator` — which is the attribute engine's type system and is
+   needed at the external boundary the moment the capture endpoint, native
+   forms or the MCP propose tool write a record. `api-1` must lift
+   `valueValidator` into an Effect Schema refinement once, as an acceptance
+   criterion, rather than discovering the seam at the first external write.
+   `effect/unstable/rpc` sits beside httpapi if a typed-client-from-one-
+   definition surface is ever wanted internally; that, not oRPC, is the
+   native answer. Carried by roadmap slice `api-1`; closes D8.
 4. **Internal interactive path stays server-fns** — in-process, already
    typed; new operations that will ever be externally callable or want
    generated hooks are born as oRPC procedures instead. The boundary finds
@@ -125,12 +156,14 @@ relational coordinator.** Nine decisions:
    reason (precedent: Oban runs Plausible's SaaS, Solid Queue is the Rails 8
    default — DB-backed queues are the deliberate choice at SaaS scale now,
    not the toy tier).
-7. **Capability model, not a plugin system:** all code ships dormant;
-   a capability activates via key/toggle/compose-overlay (generalizes the
-   BYOK "no key = feature hidden" rule — embeddings, forwarding, enrichment,
-   feeds, AI lanes all gate this way). Dormant = zero cost. No third-party
-   runtime plugin loading ever; external extensibility is MCP + webhooks +
-   API.
+7. ~~**Capability model, not a plugin system:** all code ships dormant;
+   a capability activates via key/toggle/compose-overlay. Dormant = zero
+   cost. No third-party runtime plugin loading ever.~~ **Reversed
+   2026-09-13 — see _Plugin architecture_ below.** What survives: the
+   gating rule ("no key = feature hidden", generalized to "no row = feature
+   absent") and "external extensibility is MCP + webhooks + API" for
+   anything that is not an ingestion adapter. What changed: integrations
+   leave the image and load at runtime from a registry.
 8. **Dual-end doctrine** (self-host today, recorded SaaS intent later):
    Postgres-only mandatory dependency, scale by replicas of the same
    processes, capabilities not forks (GitLab / Plausible / 37signals-ONCE
@@ -138,6 +171,154 @@ relational coordinator.** Nine decisions:
 9. **One-write-path enforcement moves to lint** when convenient (ESLint ban
    on `db.update(entity)` outside `setValues` — Relaticle's PHPStan rule,
    our flavor).
+
+### Plugin architecture (decided 2026-09-13, reversing paradigm decision 7)
+
+_Decision summary; the contract is `docs/spec-plugin-sdk.md`, storage sources are
+`docs/spec-storage-sources.md`, the AI side is `docs/spec-ai-substrate.md` §9–14._
+
+**Why the reversal.** "Dormant compiled-in" zeroes runtime cost but not the
+other four costs a self-hoster carries for integrations they never enabled:
+image bytes (googleapis-class deps), attack surface in `node_modules`,
+migrations run on their box, and — the one that decided it — every vendor
+baked into shared enums (`entity_source`, `alias_source`,
+`interaction_source`, `document_origin` all name gmail/apollo/clip; the
+vault and `signal` tables, written under the BYOK doctrine, got it right
+with open `provider` text). A third-party plugin cannot ship a migration
+that edits a shared enum safely, so the compiled-in model blocks an
+ecosystem at the schema level, not just aesthetically.
+
+**Doctrine: plugins feed the graph; they never extend the product.** Twenty
+lets apps ship React, custom objects and serverless functions (a platform
+play). We ship ingestion adapters. A plugin returns _claims_; core routes
+them through the existing claim-type lanes with the doctrine enforced in the
+port, not trusted to the plugin. No plugin React, no plugin db handle, no
+plugin edits to `public.*`. Cost accepted: a third party cannot add a
+record-page panel or a new shape of thing — those land in core. That is the
+ratchet, not a gap.
+
+**Shape (monorepo, Turborepo):**
+
+```
+apps/web        TanStack Start — knows zero plugin code; renders from manifests
+apps/worker     pg-boss host + plugin loader — the ONLY process that executes plugin code
+apps/site       marketing/docs — never in the image
+apps/extension  MV3 capture
+packages/db     drizzle schema, public.* migrations, ENTITY_REFS
+packages/core   Effect services: ports/lanes, resolveEntity, setValues, vault, storage, ai/
+packages/sdk    @spaces/sdk — manifest + port interfaces + kind interfaces + definePlugin +
+                testing kit. Types only. Own semver. Imports nothing from core/db (turbo-enforced).
+packages/ui     tokens + components shared by web and site
+plugins/<id>    imports sdk only; builds to a single ESM bundle + manifest.json + migrations/
+registry.json   plugin index (id, version, sdk range, sha, sig, tarball url); committed,
+                copied into the image so offline installs see the list
+```
+
+**Ports = the SDK contract.** Effect service tags, one per lane, provenance
+stamped by the port from the bound `integration` row (a plugin cannot forge
+who wrote what): `Identity` (resolveEntity / addIdentityAlias) · `Facts`
+(setValues, fill-blanks, conflict → suggestion) · `Content` (document /
+interaction / signal) · `Judgment` (review inbox) · `Receipts`
+(enrichment_record) · `Ai` (lane + budget, never a model or a key) · `Read`
+(canRead as integration) · `Secrets` (vault, worker-only decrypt) · `Config`
+(manifest-typed) · `PluginDb` (drizzle scoped to `plugin_<id>` schema) ·
+`Http` (rate-limited, header-driven throttle) · `Log`. **Ports are granted
+per (integration, job), by kind** — an enricher gets `Facts`, a researcher
+does not; the Layer the loader provides is the privilege boundary, and the
+job's `R` type documents it. Kinds: `enricher` · `researcher` · `syncer` ·
+`ingress` · `importer` · `poller`. Each returns claims, never writes.
+
+**AI is substrate, not a plugin.** It sits _below_ the SDK as the `Ai`
+port: plugins consume the extract/classify/synthesize lanes, sensitivity
+routing must bind every caller, and plugins cannot depend on plugins.
+Providers are core-owned AI SDK adapters keyed from the vault. The MCP
+server is an outbound head on the substrate (spec §5's "plugin" wording
+means "the user's assistant plugs in"). A narrow `llm-provider` kind for
+exotic backends is deferred until asked for.
+
+**Runtime and hosting contracts (extend the six hostability contracts):**
+
+- The image is the immutable core; plugins live in `./data/plugins/<id>/
+<version>/` next to blobs and `secret.key`. Consequence: the existing
+  both-or-neither backup already covers plugin code and versions;
+  `lock.json` there pins `{core, plugins}` for reproducible restore.
+- Install from the running deployment, admin only, no redeploy: web
+  fetches the tarball named by the registry (or accepts an upload for
+  air-gapped boxes) → verifies sha256 + signature → unpacks → writes the
+  `integration` row → `NOTIFY plugin_changed`. Worker LISTENs, checks the
+  manifest's sdk range, runs the plugin's migrations in its own Postgres
+  schema with its own journal, builds the Layer, registers jobs and ingress.
+  Web moves bytes and writes rows; it never executes plugin code.
+  `SPACES_PLUGINS=apollo,rss` is an optional first-boot convenience that
+  runs the same installer; the required-env set stays `{DATABASE_URL,
+APP_URL}`.
+- Boot reconciles every start: row present + files present + sdk satisfied
+  → enabled; anything else → `degraded` with the reason, jobs skipped, boot
+  continues. A plugin never crashes the box. `/api/health` lists degraded
+  plugins; a worker heartbeat row makes `ROLE=worker` checkable (contract 4).
+- Core upgrade is unchanged (`backup → pull → up`); plugin bytes are
+  untouched. An sdk major bump degrades incompatible plugins with the fix
+  named from the bundled registry snapshot; core keeps a shim Layer one
+  major back. Plugin upgrade is independent (fetch → verify → own migrations
+  → swap `current`). Rollback of either = restore.
+- Trust: in-process Node has no sandbox, so v1 loads first-party signed
+  tarballs only (`--allow-unsigned` for development). Anything third-party
+  or with a foreign runtime/ToS exposure (the WhatsApp bridge) is a
+  companion container on a compose profile speaking to the webhook ingress
+  with a PAT — its weight on its own profile. Companion design deferred.
+
+**Workers and jobs.** pg-boss stays the queue (paradigm 6); the worker is a
+plain Node process whose handlers become Effect programs run by one
+`runJob` wrapper (parse → provide Layer → run → map typed failure to
+retry / fail / circuit-breaker). Every plugin invocation is a job: manual
+(declared `actions`), scheduled (`manifest.jobs[].schedule`), or
+event-triggered (`on: ['entity.created']` — Attio's enrich-on-create is
+this implicit trigger, not a different architecture). Interactive jobs get a
+priority queue and `LISTEN/NOTIFY → SSE` status; a narrow read-only `query`
+kind may use request/reply over pg-boss with a hard budget; webhook ingress
+verifies a manifest-declared signature in web, stores the raw payload,
+enqueues, and returns. Plugin failures increment `integration.error_count`
+and trip a breaker that disables the plugin, never the worker (contract 2).
+A `job_run` table (queue, integration, entity, status, timings, error)
+serves the status stream, the Integrations page, and later the AI run log.
+
+**Schema deltas this implies, before the first plugin (Apollo) lands:**
+`integration(id, capability_id, version, enabled, status, config jsonb,
+credential_id?, connection_id?, error_count, created_by)`; collapse the four
+vendor-named enums into `source_class` (`manual | integration | ai | import
+| seed | merge | extracted | inherited`) + `source_ref` (integration FK,
+null unless class = integration), one migration, one code branch in
+`resolve.ts`; typed actor on `attribute_event` per the attribute-engine
+spec points at the same row. Manifest may later _request_ a custom object
+by shape (created as an ordinary user-owned attribute-bag object on enable)
+so plugin data is graph-visible without plugin UI — copied from Twenty,
+noted, not built.
+
+**Build order:** `packages/sdk` (manifest, ports, `definePlugin`, testing
+kit) + `runJob` + loader reading a plugins dir → `integration` table +
+enum collapse → Apollo as `plugins/apollo`, loaded by path in dev through
+the same loader → registry fetch, signing, settings-UI install → plugin
+schemas with the first plugin that needs tables (RSS). Never: plugin React,
+plugin db handle, plugin DDL in `public.*`, shared-enum vendor names.
+
+### Architecture week 2026-09-13 → 15 — index
+
+Recorded across this file and three specs; the roadmap in
+`docs/ARCHITECTURE.md` §12 sequences the build.
+
+| decision                                                                                                                                       | where                                                        |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| plugins leave the image; registry-installed into `/data/plugins`; worker is the only host; SDK = ports; AI is substrate                        | _Plugin architecture_ above · `docs/spec-plugin-sdk.md`      |
+| vendor-named enums collapse into `source_class + source_ref`; `integration` table; typed actor                                                 | `docs/spec-plugin-sdk.md` §8                                 |
+| custom objects gain fuzzy dedupe + merge + opt-in identity keys; no fourth system object; `organization` ghost deleted                         | _Two-tier object model_ · `docs/spec-attribute-engine.md` §9 |
+| tasks stay a non-entity, join Cmd-K as a search lane                                                                                           | _Tasks + Today_                                              |
+| the note model: three axes, memo = flag, kinds frozen at three, `interaction.note_id`, record filing via `tagged_in` + kind toggle             | _The note model_ · _Interactions_                            |
+| documents: file into spaces, `/documents`, unfiled inbox, drop `kind: memo`, storage source ≠ blob backend, derived layers, retain per binding | _Sources are documents_ · `docs/spec-storage-sources.md`     |
+| glossary → concept node with the AI substrate                                                                                                  | _Glossary_                                                   |
+| embeddings never forced, dimension pinned at 768, local opt-in download, core-owned                                                            | _Embeddings_ · `docs/spec-ai-substrate.md` §9                |
+| vault: workspace-only keys in v1, per-user OAuth grants, providers with N plugins, admin-only install                                          | _BYOK_                                                       |
+| deck reader and every AI feature are core compositions, never plugins; gateway URL passthrough instead of Helicone                             | `docs/spec-ai-substrate.md` §11–13                           |
+| monorepo (Turborepo): apps/web · worker · site · extension; packages/db · core · sdk · ui; plugins/*; `turbo prune --docker`                   | `docs/spec-plugin-sdk.md` §2                                 |
 
 ### Why TanStack Start over Next.js
 
@@ -193,8 +374,10 @@ cheap after the grid and editor exist.
   embeddings, plain-text portability); glossary auto-link and custom mention serialization go
   through BlockNote's inline-content API instead of raw ProseMirror. If BlockNote fights the
   glossary feature hard, the escape hatch is dropping to its TipTap layer.
-- **Separate vector DB, Elasticsearch, Redis, Trigger.dev, Turborepo** — Postgres and one app
-  cover all of it at this scale.
+- **Separate vector DB, Elasticsearch, Redis, Trigger.dev** — Postgres and one app
+  cover all of it at this scale. (~~Turborepo~~ sat on this list until **2026-09-13**, when
+  _Plugin architecture_ above adopted a Turborepo monorepo; the other four are unchanged.
+  See the architecture-week index and `docs/spec-plugin-sdk.md` §2.)
 - **MinIO in default compose** — see storage below.
 
 ### Notes on specific picks
@@ -236,11 +419,19 @@ Everything linkable is an entity. One mention system, one backlink query, one se
 one attach mechanism.
 
 ```
-entity(id, kind: company|person|organization|space|note|document)
+entity(id, kind: company|person|organization|deal|space|note|document|term|custom,
+       object_id → object, canonical_name, values jsonb, merged_into_id, source)
+  -- kind list corrected 2026-09-15: `deal` (first-class 2026-07), `term`, and
+  -- `custom` (two-tier objects, 2026-09-02) were missing. `organization` is
+  -- decided-for-deletion but still live in code — see "Two-tier object model".
 
-link(from_entity_id, to_entity_id, relation, source: manual|ai|extracted,
-     created_by, created_at)
-  relation: mentions | tagged_in | contact_at | derived_from | supersedes
+link(id, from_entity_id, to_entity_id, relation, attr_slug,
+     source: manual|ai|extracted, created_by, created_at)
+  relation: mentions | tagged_in | contact_at | derived_from | supersedes | references
+  -- `references` + `attr_slug` materialize a record-reference attribute into the
+  -- graph (added 2026-07-30 with the attribute engine, migration 0005); the edge
+  -- is unique on (from, to, relation, attr_slug), and attr_slug is '' elsewhere.
+  -- See "Record-references materialize into the graph".
 ```
 
 Real FKs on both sides. Typing `[[Orbital Composites]]` in a note materializes a `link` row —
@@ -248,8 +439,13 @@ backlinks fall out for free.
 
 Core kinds are fixed in code. **Amended 2026-09-02:** user-created custom
 objects exist as a second tier — attribute-bag records inside the same entity
-graph (see "Two-tier object model" below) — but they never grow identity,
-merge, or enrichment machinery; the opinionated core stays code-owned.
+graph (see "Two-tier object model" below), sharing `kind = 'custom'` and
+differentiated by `object_id`. ~~They never grow identity, merge, or
+enrichment machinery~~ — **narrowed 2026-09-13:** fuzzy-name dedupe and
+merge-as-target now cover every object, and a custom object may opt into
+`domain`/`linkedin` identity keys at creation; enrichment, interactions and
+seeded attributes stay core-only (_Two-tier object model_ ·
+`docs/spec-attribute-engine.md` §9). The opinionated core stays code-owned.
 
 Rejected: nullable-FK-per-type (N columns and N joins per attach point), and untyped
 `(src_type, src_id)` (no referential integrity, every query hand-checks).
@@ -281,17 +477,65 @@ PDF export later), never structure. Spaces are how a user imposes hierarchy on t
 research — constraining that to one document per space is the tool telling the investor how
 to think.
 
+### The note model (settled 2026-09-14)
+
+One table, one editor, one body substrate. Three orthogonal axes, three
+mechanisms, never mixed:
+
+| axis                 | mechanism                                                                                        | values                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| **where** it's filed | `entity_space` (space) · `link(tagged_in → record)` (company / person / deal / custom / mandate) | zero or more places                     |
+| **what** genre       | `note.kind`                                                                                      | `memo · note · scratch` — three, frozen |
+| **who** can read     | `note.visibility` + `author_id`                                                                  | `shared` (default) · `private`          |
+
+- **A memo is a note with the flag up.** Same row, same edges; the kind is
+  presentation (serif, wide, pins to the top of wherever it is filed, is the
+  face of a space) and intent ("this is my view"), never structure. Promote
+  by flipping the kind. Kind never restricts filing targets — an IC memo is a
+  memo filed against a deal; a market memo is a memo filed into a space.
+- **Kinds stay at three; genres are templates.** "Teardown", "post-mortem",
+  "IC memo" are note templates that set title/structure/kind, not new kinds.
+  A fourth kind is a taxonomy leaking into structure (the sectors rule). Tags
+  encoding _where_ a note lives are rejected outright — filing already says
+  which company, a tag cannot.
+- **Gap found in code (to fix):** "Note about this" on a record writes only a
+  `mentions` link, so notes are _referenced_ to records, never _filed_; memo
+  is creatable only from a space page; the editor has no kind toggle. Fix:
+  record "Note about this" writes `link(tagged_in)` (plus the starter
+  mention), a `Note · Memo · Scratch` toggle in the editor header, "Filed
+  against" chips next to "Filed in space", and record Notes sections read
+  `tagged_in` first ("Filed here · Mentions this"), memo pinned.
+- **Meeting notes are notes:** `interaction.note_id → note` (see
+  _Interactions_). Documents are not notes (see _Sources are documents_).
+- The deal memo is optional and scales `close_reason` → note → memo, same
+  row promoted; the roadmap's memo-draft / pre-mortem / pass-letter features
+  land as memos filed against the deal.
+
 ### Per-kind side tables
 
 ```
-company(entity_id, domain, cin, founded, sector[], stage, geo)
-person(entity_id, emails[], linkedin)
-space(entity_id, parent_id, slug, name, path, is_seeded)
-note(entity_id, title, body_md, kind: note|memo|scratch, author_id, visibility)
-document(entity_id, blob_sha, filename, mime, url,
-         kind: deck|memo|dd|cap_table|legal|article,
+company(entity_id)   -- kind markers only. Attribute values live in
+person(entity_id)    -- entity.values; identity (domain/cin/emails/linkedin)
+                     -- lives in entity_alias. Corrected 2026-09-15 — the old
+                     -- sketch listed domain/cin/sector[]/emails/linkedin here,
+                     -- against "Unified storage" + "Hard exclusions" (2026-07)
+                     -- and against "Spaces vs attributes": there is no sector
+                     -- field anywhere, ever.
+space(entity_id, parent_id, slug, path, is_seeded)   -- name is entity.canonical_name
+note(entity_id, title, body_json, body_md, tsv, kind: note|memo|scratch,
+     author_id, visibility, updated_at)   -- body_json authoritative (2026-07)
+document(entity_id, blob_sha, filename, mime, url, size_bytes,
+         kind: deck|dd|cap_table|legal|article|other,
          origin: upload|gmail_attachment|url|clip,
-         extracted_text, tsv, uploaded_by)
+         extracted_text, tsv, extraction_status, extraction_error,
+         extracted_at, uploaded_by)
+  -- Corrected 2026-09-15. The shipped enum carries `other`; the 2026-09-14/15
+  -- documents decision drops `memo` (six values remain — an exported memo PDF is
+  -- `derived_from → note`) and collapses `origin` into `source_class + source_ref`
+  -- with the other vendor enums, adding source_path / external_id / external_url /
+  -- external_status / connection_id. `memo` and `origin` are still present in code
+  -- as of 2026-09-15. See "Sources are documents" below and
+  -- `docs/spec-storage-sources.md` §2, §11.
 document_chunk(document_id, idx, text, embedding vector)
 term(entity_id, name, aliases[], definition_md, space_id)
 ```
@@ -420,6 +664,24 @@ Scoped to a space — "stage" means different things in aerospace and bio. Terms
 note body (Aho-Corasick over the term set at render time), hover shows the definition. Cheap to
 build, disproportionate payoff for someone learning a new space.
 
+**Concept node (decided 2026-09-14, build with the AI substrate).** Today a
+term is a tooltip: auto-links are decorations, the graph never learns that
+PUE was mentioned. Upgrade: the same matcher runs server-side on note save
+(over `body_md`) and on the worker after document extraction, diff-syncing
+`link(note|document → term, mentions, source: extracted)` — a deliberate
+`[[PUE]]` stays `source: manual` and ranks higher. Terms get a page
+(definition · space · every note/deck that mentions it, with `ts_headline`
+snippets · companies reached through them · co-mentioned terms). Concept
+becomes the third way into the graph after space (curation) and record.
+**A concept never holds things:** no memo, no filing, no "track companies"
+affordance — the moment it can, it is a space with worse hierarchy. The
+litmus stays: could I write a memo about it and track companies in it →
+space; is it a word I want defined and traced → term. A concept can be
+promoted to a subspace when its mentions rail says so; the term stays as
+vocabulary underneath. Never the reverse. Uses: reading cold, the standing
+glossary slice in the assembler, and `get_context(term)` seeds for
+"compare every deck on stack lifetime".
+
 ### Deal — a first-class object (decided 2026-07, reversing lists-first)
 
 **One Deal = one investment opportunity (round or instrument) in one company.** Many deals
@@ -458,9 +720,16 @@ system attributes we ship, custom attributes users add. Notes, spaces, terms are
 deliberately _not_ object-modeled; they're the research layer that links in.
 
 ```
-attribute(id, object_kind: company|person|deal, slug, name, type,
-          options jsonb, is_system, archived, sort_order)
+attribute(id, object_id → object, slug, name, description, type,
+          options jsonb, is_system, archived, sort_order,
+          created_by, created_at)
 ```
+
+_Rekeyed 2026-09-02, shipped in migrations 0016/0017: the `object_kind` enum
+became a single `object_id` FK to the `object` registry — no dual keying, no
+enum branch in any registry read. `description` landed 2026-09 (migration
+0020). See "Two-tier object model" below and `docs/spec-attribute-engine.md`
+§9._
 
 - **Unified storage:** all attribute values — system and custom — live in `entity.values`
   jsonb, keyed by slug. One write path, one validator (zod per type at write time), one
@@ -496,13 +765,23 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
   records as entities carrying `object_id`, the full attribute engine, record
   references both directions, registry-generated routes. What they get free
   from the polymorphic core: spaces tagging, mentions/backlinks, notes,
-  search, activity. What they are **permanently excluded from** (the narrowed
-  non-goal): alias resolution, dedupe, merge (as merge _targets_; references
-  to merged core records rewrite via the link graph, which is kind-agnostic),
-  enrichment, interactions, seeded attributes. Attio ships the identical
-  exclusions — verified live 2026-09 (their custom objects are born with
-  record_id/created_at/created_by only; domain/email types rejected on them).
-  Full spec: `docs/spec-attribute-engine.md`.
+  search, activity. ~~What they are **permanently excluded from** (the
+  narrowed non-goal): alias resolution, dedupe, merge (as merge _targets_),
+  enrichment, interactions, seeded attributes.~~ **Narrowed 2026-09-13:**
+  fuzzy-name dedupe and merge-as-target now cover every object (both were
+  kind-agnostic in code; the exclusion was a set membership), and a custom
+  object may opt into `domain`/`linkedin` identity keys at creation.
+  Enrichment, interactions, and seeded attributes stay excluded. Driver:
+  the owner's rule that the product never forces its taxonomy — no fourth
+  system object for funds/investors; the `organization` ghost kind is **to be
+  deleted outright** (no records, no registry) — _not done as of 2026-09-15:
+  the enum value, `MERGEABLE`, `resolveEntity`, search, and the demo seed's
+  round co-investors all still use it; roadmap slice `clean-1` removes it_ —
+  and a user models co-investors
+  as Companies with a `type` or as a custom object, their call — which only
+  holds if the custom route dedupes. Attio's customs keep the old
+  exclusions; ours no longer match them here. Full spec:
+  `docs/spec-attribute-engine.md` §9.
 - **Machine-write design for the integrations phase (decided 2026-08-08; design
   only, nothing built).** The dividing line is the kind of claim, not the vendor:
   **a sourced fact may fill an empty field; anything generated, or anything
@@ -596,7 +875,9 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
   phone (phone). Emails are identity aliases, not attributes.
 - **Deal:** stage (status) · value (currency) · company (ref, required single) · people
   (ref, multi) · owner (actor) · close_date (date) · source (select: Inbound · Referral ·
-  Outbound · Event).
+  Outbound · Event) · close_reason (text — **added 2026-08-08** with the board, the
+  Passed-vs-Lost post-mortem captured at close time; see phase 15b). `referred_by`
+  (ref → person) is decided but unbuilt — _Machine-write design_, build order ①.
 - Enrichment-fed fields (employee range, ARR, funding raised) deliberately absent — empty
   boxes without a provider; they arrive with the enrichment integration as
   provenance-tracked attributes.
@@ -604,7 +885,13 @@ attribute(id, object_kind: company|person|deal, slug, name, type,
 ### Attribute change history (decided 2026-07)
 
 ```
-attribute_event(id, entity_id, attr_slug, from jsonb, to jsonb, actor_id, at)
+attribute_event(id, entity_id, attr_slug, from jsonb, to jsonb,
+                actor_type: user|integration|system, actor_id, source: direct|
+                default|suggestion|enrichment|import|merge|seed,
+                suggestion_id, refs jsonb, at)
+  -- typed actor + door + citation refs shipped 2026-09 (migration 0018,
+  -- `docs/spec-attribute-engine.md` §4): actor_type is NOT NULL and actor_id
+  -- is set iff actor_type = 'user' (check constraint).
 ```
 
 One row per attribute change, same transaction as the value write. Restores what
@@ -616,10 +903,14 @@ to the attr/value table. No write-side session tracking.
 
 ### Lists — deferred
 
-The Attio list/entry primitive (`list`, `list_attribute`, `list_entry`, `list_entry_event`)
+~~The Attio list/entry primitive (`list`, `list_attribute`, `list_entry`, `list_entry_event`)
 stays in the schema but is **not the deal mechanism** and is deferred from MVP. If
-watchlists/portfolio views later need membership-with-context, lists are there; deals no
-longer wait on a list engine, and kanban falls out of the Deal stage attribute.
+watchlists/portfolio views later need membership-with-context, lists are there~~ —
+**superseded 2026-09-11: the tables are gone.** `list_attribute` and `list_entry_event`
+were dropped 2026-09-09 (migration 0021), `list` and `list_entry` 2026-09-11 (migration
+0023), once `view` shipped (`src/db/schema/views.ts`). Deals never waited on a list
+engine, and kanban falls out of the Deal stage attribute. The heading stays for the
+pointers into it; read the decision below, not the paragraph above.
 
 **Lists are views; records are unique (decided 2026-09-07).** This closes the
 membership-vs-instance question the Attio study left open. Attio entries are
@@ -628,14 +919,16 @@ stages, and an entry carries its own attribute values. We reject both halves:
 
 - A record is one row per real-world thing, kept unique by `resolveEntity` and
   the dedupe inbox. Nothing — a list included — may create a second row for the
-  same thing. `list_entry` gets a unique index on (list, entity) when built.
+  same thing. (A view holds no membership rows at all, so the question is moot:
+  `list_entry` was dropped 2026-09-11, migration 0023.)
 - A list is a **view**: a saved filter over one object's records with its own
   columns, sort, and grouping. It holds no values. Membership is a fact, once.
 - Anything worth saying about a record is an attribute **on the record**
   ("priority for Fund II" is a select on Company, shown in the Fund II view),
   where history, provenance, and the AI assembler can see it. There is no
-  second value store. `list_attribute` and `list_entry_event` are therefore
-  dead weight — drop them when the list engine is actually built.
+  second value store. `list_attribute` and `list_entry_event` were therefore
+  dead weight — **both were dropped 2026-09-09** (migration 0021), and `list` /
+  `list_entry` followed on 2026-09-11 (migration 0023).
 - Pipelines stay objects: a deal is a record; a second pipeline is a second
   object with its own status attribute, and the board generalizes to any
   status attribute rather than to entries.
@@ -688,6 +981,18 @@ interaction_entity(interaction_id, entity_id)       -- relationship graph edge t
 signal(entity_id, source, payload jsonb, observed_at)
 enrichment_record(entity_id, provider, raw jsonb, fetched_at, credits_used)
 ```
+
+**`interaction.note_id → note` (decided 2026-09-14).** The interaction is
+the structured event (kind, occurred_at, attendees via `interaction_entity`,
+source, linked records); its body is a real note row filed against the same
+records. One editor, one mention system, one search index: mentions in
+meeting notes create links, glossary highlights, concept links, PDF export
+all apply. Call recorders (Fathom / tl;dv / Granola) write the transcript as
+a `document(derived_from → interaction)` and the summary as a suggestion
+that becomes the note body. (Checked 2026-09-15: `interaction` carries
+`subject` and no body column at all, so the unification is an additive
+`note_id` column, not a migration off an existing body.) `close_reason` stays an
+attribute.
 
 Relationship intelligence = query over `interaction_entity` weighted by recency + frequency.
 "Who knows someone at X" falls out of it. Computed live — at two mailboxes over three years
@@ -755,14 +1060,20 @@ flip `is_identity` off on one alias. Rare, manual, possible.
 **Merge = repoint at write, resolve nothing at read.** Read-time resolution (following
 `merged_into_id` in every query) infects every join in the app forever. Instead:
 
-1. Loser's referencing rows (link, interaction_entity, entity_space, list_entry, …)
-   repoint to winner; every moved row recorded in `merge_event.snapshot` as
-   `{table, pk, old_value}`.
+1. Loser's referencing rows repoint to winner — every entity-referencing column is
+   declared in `ENTITY_REFS` (`src/db/entity-refs.ts`, shipped 2026-09-11) and the
+   executor iterates it: link, entity_space, interaction_entity, task_entity,
+   round_co_investor, the portfolio tables, … Every moved row is recorded in
+   `merge_event.snapshot` as `{table, pk, old_value}`.
 2. Loser's aliases move to winner (`source: merge`), identity flags intact.
-3. Side-table fields: winner keeps its values, loser fills winner's nulls, conflicts stay
-   with winner but land in snapshot. Same never-overwrite rule as enrichment.
-4. `list_entry` collision (both in same list): keep winner's entry, snapshot loser's values
-   and entry events. One entry per (list, entity).
+3. Values (`entity.values` — side tables have carried no attribute columns since the
+   2026-07 unified-storage decision): winner keeps its values, loser fills winner's
+   nulls, conflicts stay with winner but land in snapshot. Same never-overwrite rule
+   as enrichment.
+4. ~~`list_entry` collision (both in same list): keep winner's entry, snapshot loser's
+   values and entry events. One entry per (list, entity).~~ **Moot 2026-09-11** —
+   `list` and `list_entry` were dropped (migration 0023); a view holds no membership
+   rows, so there is nothing to collide. See _Lists — deferred_.
 5. Loser row survives with `merged_into_id = winner` — stale URLs redirect. Chains flatten
    at write: merging B into C updates every `merged_into_id` pointing at B.
 6. Duplicate `link` rows (same from/to/relation) dedupe on repoint.
@@ -783,6 +1094,43 @@ No separate `source` table for URLs. A saved article is a `document` with `origi
 and readability-extracted into the same `extracted_text` / `tsv` / `document_chunk` pipeline.
 One search box covers decks, emails, notes, and saved articles together. Two tables means two
 search indexes, and you will ship one and forget the other.
+
+**The documents feature, distilled (2026-09-14/15) — the fund's object
+storage, indexed by the graph instead of by path.** Full spec:
+`docs/spec-storage-sources.md`. Decisions:
+
+- Documents file exactly like notes: `link(tagged_in → record)` and —
+  **now also** — `entity_space` into a space (doctrine said so, code only
+  wrote `tagged_in`). A document filed into a space is a _source_; this
+  closes the space-page "Sources section" open question. No visibility
+  flag on documents (workspace-visible; a private document is a future
+  decision, not a default).
+- No folders, no nesting, no drag-to-folder. Kind + filed-against + space
+  are the three axes a fund's folder tree encodes; views cover the rest. A
+  document can be filed in N places (one blob, many edges).
+- Surfaces to add: a `/documents` nav view on the record-table engine
+  (kind · filed against · space · origin · extraction · date; saved views),
+  a space Sources section, an **unfiled inbox** (arrivals with no edge,
+  badge on Today), global upload with a file-against picker, drop-a-file
+  into a note (files where the note is filed + inserts the mention), URL
+  clip.
+- `document.kind` stays a closed genre enum — seven values in the shipped
+  schema, **six after this change** (`deck · dd · cap_table · legal ·
+article · other`) — with code consumers
+  (data-room subfolder mapping, per-kind extract schema); **`memo` is
+  dropped** from it — an exported memo PDF is `derived_from → note`, the
+  kind was a naming collision. `document.origin` collapses into
+  `source_class + source_ref` with the other vendor enums; rows gain
+  `source_path`, `external_id`, `external_url`, `external_status`,
+  `connection_id`.
+- **Storage source ≠ blob backend; they coexist by role.** Drive/Box are
+  the fund's archive and collaboration surface and an arrival channel; our
+  blob + derived layers (extracted text, chunks, vectors, page images,
+  extraction cache, term links — all keyed by sha, all rebuildable) are the
+  index and the AI working set. The AI only ever reads the derived layers,
+  so bytes retention is per binding (`retain: full | text`) and the
+  copy-in objection dissolves. Drive never answers "where do our bytes
+  live"; that stays `STORAGE_DRIVER=local|s3` (locked, above).
 
 ### Investor-specific surfaces Attio does not have
 
@@ -849,8 +1197,11 @@ The UI is single-user. The schema is not. Every row that could ever be personal 
     per-workspace-encrypted. When hosting becomes real it adds: RLS (or stricter),
     an org/billing layer above workspaces, and its own security pass — a business
     decision with its own design block, not an increment.
-- **Spaces, terms, taxonomy, the mandate are global.** Never per-user. Shared vocabulary is
-  the point; a per-user taxonomy is two people building two ontologies of the same market.
+- **Spaces, terms, taxonomy, the mandate are workspace-global.** Never per-user. Shared
+  vocabulary is the point; a per-user taxonomy is two people building two ontologies of the
+  same market. (Written 2026-08, when "global" and "the workspace" were the same scope;
+  since the 2026-08-15 reversal the only _instance_-global object is the user and all four
+  of these are per-workspace. The rule that survives is "never per-user".)
 
 Retrofitting these columns after real data exists is a migration touching every table. Adding
 them now costs nothing.
@@ -901,6 +1252,17 @@ credential(id, scope: workspace|user, provider, kind: llm|enrichment|search,
   key unrecoverable — docs must say this in bold.**
 - Write-only in UI (show `sk-...4f2a`), redacted in logs, decrypt only in worker.
 - Resolution order: user key -> workspace key -> none.
+- **Decided 2026-09-14: pasted keys are workspace-scoped only in v1 UI.**
+  The `scope: user` column stays (already coded, resolution order already
+  honours it) but no UI exposes it until a real ask arrives — scheduled jobs
+  need a deterministic key, and two settings surfaces breed "enrich works
+  for you but not me" tickets. OAuth _grants_ (`account_connection`) are
+  per-user by nature: it is _their_ Gmail/Drive. The OAuth _client_ (id +
+  secret per provider) is a workspace credential. A provider (google,
+  microsoft, box) is one client under which N plugins hang, each requesting
+  incremental scopes; the OAuth dance lives in core, never in a plugin.
+  Plugin install / update / disable and workspace keys are admin-only
+  (`requireAdmin()` already gates settings, keys, members).
 - No key = feature hidden, everything else works. All integrations skippable.
 
 ### LLM
@@ -921,6 +1283,20 @@ silently garbage** — search degrades quietly rather than erroring. This bites 
   search works keyless on first boot? The stated rule is "no key = feature hidden", but dead
   search on a fresh install is a bad first impression, and self-hosters accept a fatter image.
   Ollama's `nomic-embed-text` is the upgrade path for anyone already running Ollama.
+- **Answered 2026-09-15: never forced, always automatic once enabled.** No
+  embed provider → no vectors, no semantic CTE, lexical + trigram + graph
+  RRF is the floor and is good. Provider configured (OpenAI / Voyage /
+  Google key, Ollama URL, or the **opt-in local model downloaded to
+  `/data/models` at click time — not baked into the image**) → embed on
+  `document.extracted` automatically (cents or free per deck); only the bulk
+  backfill asks with an estimate. **Pin a dimension, not just a model — 768
+  by default** — so nomic, bge-base and OpenAI-3 (`dimensions: 768`) can
+  serve one column, and a second local slot can embed _sensitive_ documents
+  while cloud serves the rest. Re-pin is the explicit nuclear path (alter
+  column, rebuild index, re-embed). Embeddings are core, not a plugin: one
+  pinned dimension, sensitivity routing, and being a dependency of core
+  search all require the substrate to own them. Detail:
+  `docs/spec-ai-substrate.md` §9.
 
 ### Enrichment
 
@@ -988,8 +1364,13 @@ don't inherit that. If bundling an object store, prefer **Garage** (single Rust 
   driver re-hashes on write and rejects a mismatch; a presigned S3 PUT cannot — bytes go
   browser→bucket and the server never sees them. Dedupe, the immutable cache header, and
   "same sha ⇒ same bytes" all lean on that check. Mitigation: require
-  `x-amz-checksum-sha256` on the presigned PUT. **Unresearched:** whether R2, B2, and
-  Garage all enforce it — research the day the driver is written, not before.
+  `x-amz-checksum-sha256` on the presigned PUT. ~~**Unresearched:** whether R2, B2, and
+  Garage all enforce it — research the day the driver is written, not before.~~
+  **Researched 2026-08 when the driver was written — see _S3 storage driver (phase 13)_
+  below:** the checksum is signed into the presigned PUT, MinIO enforces it empirically,
+  AWS verifies server-side, R2 and B2 added sha256 checksum support (2024 / July 2025),
+  Garage remains doubtful — and the extraction worker re-verifies every digest whatever
+  the driver, so a partially-compatible endpoint cannot quietly break the invariant.
 - **Workaround noted, with its caveat:** an operator can get S3 today by mounting it at
   `./data` with rclone/s3fs, since the local driver just writes to `dataDir()`. But
   `rename()` is not atomic on S3 and the local driver streams-then-renames, so that write
@@ -1002,6 +1383,14 @@ interface Storage {
   getUploadUrl(key, ttl): Promise<string>
   delete(key): Promise<void>
 }
+// Shape as first specified. AMENDED 2026-08 when the second driver landed — see
+// _S3 storage driver (phase 13)_ below. The shipped interface is:
+//   getUploadUrl(key, ttl)            -> Promise<{url, headers}>  (headers carry the
+//                                        signed x-amz-checksum-sha256; local returns {})
+//   getDownloadUrl(key, ttl, opts?)   -> opts.filename sets the download name
+//   getBytes(key)                     -> Promise<Uint8Array>  (the worker's read path)
+//   exists(key)                       -> Promise<boolean>
+// Authoritative signature: src/lib/storage/types.ts.
 ```
 
 Presign matters — a 200MB deck must not stream through Node. Local driver fakes it with a
@@ -1042,11 +1431,12 @@ and the worker. Two small baselines to add when the first push-style integration
 (`/api/webhooks/:provider`, signature-verified) and the dedupe-inbox pattern
 generalized into a reusable **review inbox** for assistant/AI suggestions.
 
-**One registry of entity-referencing tables (noted 2026-09-07).** The graph
-is one `link` table in the story but six edge tables in the schema
-(`link`, `entity_space`, `interaction_entity`, `task_entity`,
-`round_co_investor`, `list_entry`, plus every side table keyed on an
-entity). That fan-out is the root of the worst review-cycle bug — the merge
+**One registry of entity-referencing tables (noted 2026-09-07 · shipped
+2026-09-11, `src/db/entity-refs.ts`).** The graph is one `link` table in the
+story but many edge tables in the schema (`link`, `entity_space`,
+`interaction_entity`, `task_entity`, `round_co_investor`, the portfolio
+tables, plus every side table keyed on an entity — `list_entry` was on this
+list until lists were dropped in migration 0023). That fan-out is the root of the worst review-cycle bug — the merge
 executor forgetting a table — and the future context assembler has the
 identical failure mode: a new edge table ships and "everything about this
 record" silently misses it. Before the assembler is built, factor one
@@ -1173,7 +1563,7 @@ archive.
 
 Attio is the reference for shape and craft.
 
-- **Views over data:** table + kanban (group by any select attribute), saved and shared, per list.
+- **Views over data:** table + kanban (group by any select attribute), saved and shared, **per object** (read "per list" until 2026-09-07; lists became views — see _Lists — deferred_).
   One view engine, not separate pipeline/list screens.
 - **Spreadsheet-grade table:** inline cell edit, virtualized rows, resizable/reorderable columns,
   multi-select + bulk edit, keyboard nav. Investors live in Excel. If the table is worse than a
@@ -1290,7 +1680,7 @@ unless-stopped` heals it.
 Backup — three artifacts, one cron line, ship as `scripts/backup.sh`:
 
 ```bash
-docker compose exec db pg_dump -U dealos dealos > dump.sql
+docker compose exec db pg_dump -U spaces spaces > dump.sql
 tar czf blobs.tgz ./data/blobs ./data/secret.key
 ```
 
@@ -1646,11 +2036,17 @@ dilution deltas, and divestment math all need them; retrofitting means
 re-entering history. Ownership stays ours-position-only (our shares ÷
 outstanding ⇒ our % and fully-diluted %); a full all-shareholder cap table is
 Carta-tier and stays out. - **Nullable `vehicle` label on money events** — data, not tenancy (the
-no-workspace_id rule is untouched): one optional column so an All-funds/Fund-I
-grouping is possible later without a migration. Doctrine (2026-08): **workspace =
-firm, never fund** — research, relationships, and pipeline are firm-level; which
+no-workspace_id rule is untouched — _that rule was itself rescinded 2026-08-15 by the
+multi-workspace reversal; what survives here is the narrower point: `vehicle` is a label
+on a money event, never a scope_): one optional column so an All-funds/Fund-I
+grouping is possible later without a migration. Doctrine (2026-08): ~~**workspace =
+firm, never fund** — research, relationships, and pipeline are firm-level~~; which
 vehicle wrote the check is a late accounting detail, and cross-vehicle follow-ons
-must land on one holding. Known limit, accepted: one-active-mandate assumes
+must land on one holding. **Amended 2026-08-15** (multi-workspace reversal): the
+install/org is the firm and a workspace is a **book** — entity graph, taxonomy,
+mandate, pipelines and portfolio are per-workspace, not firm-level. What survives
+unchanged is the vehicle rule: a workspace is never a _fund_, and `vehicle` stays a
+label on a money event rather than a scope. Known limit, accepted: one-active-mandate assumes
 serial vintages; parallel distinct-strategy vehicles would need
 mandate-per-vehicle (a loosening, not a redesign). - **Currency conversion (decided 2026-08-06):** original currency is truth —
 every money event stores amount + currency as entered; converted values are
@@ -1698,7 +2094,13 @@ Today/Tomorrow/Next week/**No date** chips; dateless tasks are legal),
 assignee (defaults to creator), linked records (existing entity
 search); Create-more toggle; global `t` shortcut. Mention-in-content
 (`@Pixxel` auto-linking the record) is the v2 nicety once the composer
-reuses mention infra. Surfacing: /tasks page grouped by urgency
+reuses mention infra. **Re-examined 2026-09-14, stays a non-entity** (a
+task is a verb against a subject, fails the "would you `[[mention]]` it"
+test; `task_entity` + `ENTITY_REFS` + the assembler's `task` ContextKind
+already give the graph sight of it; flips to a system _object_ like `deal`
+only on a custom-fields / task-views ask). **Decided: tasks join the Cmd-K
+search union** as a fourth RRF CTE over `task.content` (ts_rank), hits
+route to /tasks with the row focused — a search lane, not a kind. Surfacing: /tasks page grouped by urgency
 (overdue/today/this week/later/no date), record-page rails, and — the
 self-hosted divergence from Attio — **the Today page is the reminder
 channel**, not email: no SMTP by doctrine, so opening the app is the
@@ -1744,8 +2146,14 @@ it lands.
 Standing debt:
 
 - **Test-db harness.** The suite shares the _dev_ database and mutates it; without a live
-  Postgres on :5432, 8 of 52 tests fail with `ECONNREFUSED`. This is why CI cannot simply
-  run `vitest` yet — fixing it is the first technical task inside ship polish (phase 15).
+  Postgres on :5432, the DB-backed tests fail with `ECONNREFUSED` (the "8 of 52" count is
+  from 2026-08; the suite is now 21 files, 9 of them DB-backed). ~~This is why CI cannot
+  simply run `vitest` yet — fixing it is the first technical task inside ship polish (phase
+  15).~~ **Superseded 2026-09-01: `.github/workflows/ci.yml` already runs `pnpm exec vitest
+run` against a `pgvector/pgvector:pg17` service container** — it shipped without the
+  harness the entry below banked as a prerequisite. What is still owed is a test database
+  the suite owns instead of the dev one: roadmap `mono-4` (global setup) and `mono-5`
+  (truncate between files), inside ship polish, which is entry 16 in this list, not phase 15.
 - **`./data` ownership landmine.** The Dockerfile `chown`s `/data` at build, but the
   compose bind mount overlays it with host ownership at runtime. Wrong UID on a Linux
   host → cannot write blobs or generate `secret.key`, and it **fails at first upload, not
@@ -1800,3 +2208,33 @@ CSV, virtualization + keyboard-grid, kanban, drawer-over-table, Overview/Highlig
   `kind = 'memo'` — same table, same editor, same links. The kind drives presentation and a
   later PDF export, nothing structural. See _Filed vs referenced_.
 - **`values jsonb` indexing strategy** for kanban group-by, per the data model section.
+  **Re-examined 2026-09-13: moot until server-side filtering exists** — every
+  object list is fetched whole and filtered client-side today (no `values->`
+  SQL anywhere). When pagination lands: per-attribute expression index on
+  `(values->>'slug')` created at attribute creation behind a
+  `filterable`/`sortable` flag, not a GIN over the universe.
+- ~~**Space page shape** — sources and contacts sections.~~ Sources answered
+  2026-09-14: documents file into spaces via `entity_space`. Contacts: people
+  tagged into the space or reached through its companies, same collapsed
+  pattern; unbuilt.
+- **`object.kind` column** — one source of truth for "what machinery" so the
+  code-only invariant (core entity kind ↔ object row) becomes structural and
+  the first promotion is an `UPDATE`. Cheap now, painful after the first
+  promotion. Undecided.
+- **Deck reader trigger default** — manual "Read deck" first; auto-on-upload
+  toggle once the suggestion inbox UX exists.
+- ~~**The 48 decisions the 2026-09-15 reconciliation surfaced.**~~ **All
+  closed 2026-09-16/18 — `docs/decisions-2026-09.md` is the ledger.** Ten were
+  the owner's; thirty-eight were ratified as recommended on the rule that the
+  recommendation was in every case the reversible option and its carrying
+  slice is `hitl`, so the judgement is met again in the code. Four change what
+  gets built and are recorded where they bite: the ledger correction policy
+  (D12, also struck in CLAUDE.md), the read API's `?since=` cursor shipping in
+  v1 because adding it later is breaking (D28), `embed(input, { sensitivity })`
+  pinned in the first embedding slice so the local slot is additive (D11), and
+  the forwarding lane's shape — IMAP poll of an operator-owned mailbox, bodies
+  as notes via `interaction.note_id` born `private` and flipped to `shared` on
+  attachment, which answers the _Privacy default_ block above (D30 + D31).
+- **Relationship attributes** — two-way reference attributes (Attio) vs
+  junction custom objects. Junction works today; the reverse rail is raw
+  backlinks, not typed. Undecided.
