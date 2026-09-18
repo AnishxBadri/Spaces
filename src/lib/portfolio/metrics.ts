@@ -80,9 +80,9 @@ export function holdingMetrics(
   events: HoldingEvents,
   opts: {
     baseCurrency: string
-    fxRates?: Array<FxRate>
+    fxRates?: Array<FxRate> | undefined
     /** ISO date; defaults to including everything */
-    asOf?: string
+    asOf?: string | undefined
     /**
      * 'base' disables the single-currency native shortcut so results are
      * always in base currency — required when rolling holdings up.

@@ -22,7 +22,7 @@ export interface Storage {
   getDownloadUrl: (
     key: string,
     ttlSeconds: number,
-    opts?: { filename?: string },
+    opts?: { filename?: string | undefined },
   ) => Promise<string>
   /**
    * `headers` must be sent verbatim with the PUT. The S3 driver bakes the

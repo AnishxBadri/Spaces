@@ -24,12 +24,12 @@ export function RailField({
 }: {
   def: RegistryEntry
   value: unknown
-  refNames?: RefNames
+  refNames?: RefNames | undefined
   onSave: (value: unknown) => Promise<void>
   /** the attribute row, when the rail may open the edit dialog (spec §7) */
-  attr?: EditableAttribute
-  objectLabel?: string
-  onAttributeSaved?: () => void
+  attr?: EditableAttribute | undefined
+  objectLabel?: string | undefined
+  onAttributeSaved?: (() => void) | undefined
 }) {
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -42,7 +42,7 @@ export function RailField({
         <>
           <span
             className="min-w-0 truncate"
-            title={def.description ?? undefined}
+            {...(def.description ? { title: def.description } : {})}
           >
             {def.name}
           </span>

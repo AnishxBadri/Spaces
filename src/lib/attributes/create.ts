@@ -9,6 +9,7 @@ import { deriveOptionIds } from './options'
 import { AttributeQueryFailed } from './update'
 import type { ObjectQueryFailed, SystemObjectNotSeeded } from './objects'
 import type { BadgeColor } from './colors'
+import type { Json } from '#/lib/json'
 import type {
   AttributeOptions,
   AttributeType,
@@ -31,28 +32,32 @@ export class AttributeCreateRejected extends Schema.TaggedError<AttributeCreateR
 
 export type CreateAttributeInput = {
   /** the object row, directly — the only key custom objects have */
-  objectId?: string
+  objectId?: string | undefined
   /** or a core kind, resolved to its system object row */
-  objectKind?: ObjectKind
+  objectKind?: ObjectKind | undefined
   name: string
   type: AttributeType
-  description?: string | null
+  description?: string | null | undefined
   /** select / multi_select / status — ids derived from labels */
-  options?: ReadonlyArray<{
-    label: string
-    group?: SelectOption['group']
-    color?: BadgeColor
-  }>
-  config?: {
-    code?: string
-    max?: number
-    precision?: number
-    targetKind?: ObjectKind
-    targetObjectId?: string
-    multi?: boolean
-  }
-  default?: unknown
-  required?: boolean
+  options?:
+    | ReadonlyArray<{
+        label: string
+        group?: SelectOption['group'] | undefined
+        color?: BadgeColor | undefined
+      }>
+    | undefined
+  config?:
+    | {
+        code?: string | undefined
+        max?: number | undefined
+        precision?: number | undefined
+        targetKind?: ObjectKind | undefined
+        targetObjectId?: string | undefined
+        multi?: boolean | undefined
+      }
+    | undefined
+  default?: Json | undefined
+  required?: boolean | undefined
   createdBy: string
 }
 
@@ -127,7 +132,7 @@ const buildOptions = Effect.fn('buildOptions')(function* (
     if (!cfg.targetKind && !cfg.targetObjectId)
       return yield* reject('Pick what the relationship points at')
     if (cfg.targetKind) out.targetKind = cfg.targetKind
-    else out.targetObjectId = cfg.targetObjectId
+    else if (cfg.targetObjectId) out.targetObjectId = cfg.targetObjectId
     out.multi = cfg.multi ?? false
   } else if (
     cfg.targetKind !== undefined ||

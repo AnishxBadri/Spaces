@@ -11,6 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { entity } from './entities'
+import type { Json } from '#/lib/json'
 
 /**
  * Interaction graph. Gmail sync is post-MVP (forward-only when it lands),
@@ -89,7 +90,7 @@ export const signal = pgTable(
       .notNull()
       .references(() => entity.id),
     source: text('source').notNull(),
-    payload: jsonb('payload').notNull(),
+    payload: jsonb('payload').$type<Json>().notNull(),
     observedAt: timestamp('observed_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -109,7 +110,7 @@ export const enrichmentRecord = pgTable(
       .notNull()
       .references(() => entity.id),
     provider: text('provider').notNull(),
-    raw: jsonb('raw').notNull(),
+    raw: jsonb('raw').$type<Json>().notNull(),
     creditsUsed: integer('credits_used'),
     fetchedAt: timestamp('fetched_at', { withTimezone: true })
       .notNull()

@@ -347,9 +347,9 @@ function TaskItem({
   done?: boolean
   overdue?: boolean
   figure: string
-  last?: boolean
+  last?: boolean | undefined
   /** Mid-exit: struck through and fading, write pending. */
-  leaving?: boolean
+  leaving?: boolean | undefined
   onToggle: () => void
   onDelete: () => void
 }) {

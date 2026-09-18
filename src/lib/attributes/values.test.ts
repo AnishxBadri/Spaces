@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
 import { valueValidator } from './registry'
-import type { AttributeDef } from './registry'
+import type { AttributeDef, AttributeOptions, AttributeType } from './registry'
+import type { Json } from '#/lib/json'
 import { cleanupTestEntities } from '../entities/test-helpers'
 
 describe('valueValidator', () => {
@@ -168,7 +169,11 @@ describe.skipIf(!hasDb)('required means can’t-clear (all types)', () => {
     const objectId = await objectIdForKindAsync('company')
 
     // One required custom attribute per type family, on the company object.
-    const families = [
+    const families: Array<{
+      type: AttributeType
+      held: Json
+      options: AttributeOptions
+    }> = [
       { type: 'text', held: 'thesis', options: {} },
       { type: 'number', held: 7, options: {} },
       { type: 'date', held: '2026-01-01', options: {} },
@@ -184,7 +189,7 @@ describe.skipIf(!hasDb)('required means can’t-clear (all types)', () => {
         held: ['a'],
         options: { options: [{ id: 'a', label: 'A' }] },
       },
-    ] as const
+    ]
     await db.insert(attribute).values(
       families.map((f) => ({
         objectId,

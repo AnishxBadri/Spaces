@@ -15,6 +15,7 @@ import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { matchesConditions } from '#/lib/views/filter'
 import { cn } from '#/lib/utils'
+import { jsonRecord } from '#/lib/json'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import {
   fieldSpanClass,
@@ -113,7 +114,7 @@ function PeoplePage() {
     [rows, vs.conditions, typeOf],
   )
   const selectView = (id: string | null) =>
-    void navigate({ to: '/people', search: { view: id ?? undefined } })
+    void navigate({ to: '/people', search: id === null ? {} : { view: id } })
 
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
@@ -168,22 +169,21 @@ function PeoplePage() {
             </span>
           ) : null,
       }),
-      ...registry.map(
-        (def) =>
-          col.accessor((r) => r.values[def.slug] ?? null, {
-            id: `attr:${def.slug}`,
-            header: def.name,
-            size: def.type === 'text' ? 180 : 140,
-            sortUndefined: 'last',
-            cell: (info) => (
-              <ValueEditor
-                def={def as RegistryEntry}
-                value={info.getValue()}
-                variant="cell"
-                onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
-              />
-            ),
-          }) as ColumnDef<Row, unknown>,
+      ...registry.map((def) =>
+        col.accessor((r): unknown => r.values[def.slug] ?? null, {
+          id: `attr:${def.slug}`,
+          header: def.name,
+          size: def.type === 'text' ? 180 : 140,
+          sortUndefined: 'last',
+          cell: (info) => (
+            <ValueEditor
+              def={def}
+              value={info.getValue()}
+              variant="cell"
+              onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
+            />
+          ),
+        }),
       ),
       col.accessor((r) => r.lastTouched ?? '', {
         id: 'lastTouched',
@@ -236,10 +236,7 @@ function PeoplePage() {
         title="People"
         description="Founders, operators, co-investors — deduped by email, linked to their companies."
         action={
-          <CreatePersonDialog
-            companies={companies}
-            registry={registry as Array<RegistryEntry>}
-          />
+          <CreatePersonDialog companies={companies} registry={registry} />
         }
       />
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
@@ -249,10 +246,7 @@ function PeoplePage() {
             title="No people yet"
             body="Add someone by name and email. Email is identity — the same person arriving from two directions becomes one record."
             action={
-              <CreatePersonDialog
-                companies={companies}
-                registry={registry as Array<RegistryEntry>}
-              />
+              <CreatePersonDialog companies={companies} registry={registry} />
             }
             hint="Gmail and calendar sync will create these automatically later — through the same dedupe gate."
           />
@@ -270,7 +264,7 @@ function PeoplePage() {
             >
               <ViewBar
                 objectId={objectId}
-                registry={registry as Array<RegistryEntry>}
+                registry={registry}
                 views={views}
                 activeId={activeId ?? null}
                 snapshot={vs.snapshot}
@@ -334,8 +328,8 @@ function CreatePersonDialog({
       const result = await createPerson({
         data: {
           name,
-          email: email || undefined,
-          companyId: companyId || undefined,
+          ...(email ? { email } : {}),
+          ...(companyId ? { companyId } : {}),
           values: Object.fromEntries(
             Object.entries(values).filter(
               ([, v]) => v !== null && v !== undefined,
@@ -382,8 +376,8 @@ function CreatePersonDialog({
             objectKind="person"
             context="person"
             onPick={(t) => {
-              const tv = (t.body as { values?: Record<string, unknown> }).values
-              if (tv) setValues((s) => ({ ...tv, ...s }))
+              const tv = jsonRecord(jsonRecord(t.body).values)
+              setValues((s) => ({ ...tv, ...s }))
             }}
           />
         </div>

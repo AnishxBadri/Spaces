@@ -32,7 +32,7 @@ export type BirthValuesInput = {
   entityId: string
   actor: Actor
   /** values the creator asserted — these always win over defaults */
-  supplied?: Record<string, unknown>
+  supplied?: Record<string, unknown> | undefined
   /** door for the supplied values (defaults always log as `default`) */
   suppliedSource?: EventSource
   now?: Date

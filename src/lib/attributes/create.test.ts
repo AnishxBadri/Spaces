@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
 import { deriveOptionIds, slugifyOption } from './options'
+import type { CreateAttributeInput } from './create'
 
 describe('option ids (pure)', () => {
   it('derives slugs and dedupes with the _2 rule, exactly like the server', () => {
@@ -14,6 +15,9 @@ describe('option ids (pure)', () => {
     expect(deriveOptionIds(['High'], ['high'])).toEqual(['high_2'])
   })
 })
+
+/** One row of the per-type creation matrix below. */
+type CaseInput = Omit<CreateAttributeInput, 'name' | 'createdBy'>
 
 const hasDb = Boolean(process.env.DATABASE_URL)
 
@@ -38,7 +42,7 @@ describe.skipIf(!hasDb)('createAttributeProgram', () => {
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)
     const base = { objectKind: 'deal' as const, createdBy: actor.id }
 
-    const cases = [
+    const cases: Array<CaseInput> = [
       { type: 'text', default: 'Untriaged', required: true },
       { type: 'number', config: { precision: 2 } },
       { type: 'currency', config: { code: 'INR' }, default: 5 },
@@ -72,7 +76,7 @@ describe.skipIf(!hasDb)('createAttributeProgram', () => {
         config: { targetKind: 'person', multi: true },
       },
       { type: 'actor_reference', default: 'current-user' },
-    ] as const
+    ]
 
     for (const c of cases) {
       const { id, slug } = await Effect.runPromise(
@@ -82,7 +86,7 @@ describe.skipIf(!hasDb)('createAttributeProgram', () => {
         .select()
         .from(attribute)
         .where(eq(attribute.id, id))
-      const opts = row.options as Record<string, unknown>
+      const opts = row.options
       expect(slug).toBe(`zz_${c.type}_${tag}`)
       expect(row.isSystem).toBe(false)
       if ('default' in c) expect(opts.default).toEqual(c.default)
@@ -98,9 +102,7 @@ describe.skipIf(!hasDb)('createAttributeProgram', () => {
       }
       if (c.type === 'status')
         expect(
-          (opts.options as Array<{ id: string; group: string }>).map(
-            (o) => `${o.id}:${o.group}`,
-          ),
+          (opts.options ?? []).map((o) => `${o.id}:${o.group ?? ''}`),
         ).toEqual(['open:active', 'won:closed'])
     }
   })

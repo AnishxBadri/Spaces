@@ -161,7 +161,7 @@ describe.skipIf(!hasDb)('custom objects', () => {
       .where(eq(entity.id, rec.id))
     expect(row.kind).toBe('custom')
     expect(row.objectId).toBe(fund.id)
-    expect((row.values as Record<string, unknown>).vintage).toBe(2026)
+    expect(row.values.vintage).toBe(2026)
 
     // A deal referencing the Fund materializes a link; a company id is
     // rejected because the target is single-object.

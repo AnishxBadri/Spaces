@@ -8,6 +8,10 @@ import {
 } from 'drizzle-orm/pg-core'
 import { entity } from './entities'
 import { user } from './auth'
+import type { Json } from '#/lib/json'
+
+/** Verb-specific detail — the ids and labels the timeline renders. */
+export type ActivityMeta = { [k: string]: Json }
 
 /**
  * One denormalized activity stream written by every producer: stage change,
@@ -26,7 +30,7 @@ export const activity = pgTable(
       .notNull()
       .references(() => entity.id),
     objectEntityId: uuid('object_entity_id').references(() => entity.id),
-    meta: jsonb('meta').notNull().default({}),
+    meta: jsonb('meta').$type<ActivityMeta>().notNull().default({}),
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

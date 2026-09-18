@@ -232,12 +232,15 @@ function PdfPreview({ doc }: { doc: Doc }) {
           })
           const pdf = await task.promise
           if (runRef.current !== run) return
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- pdf.js ships no types for the CDN build; the shape is asserted once per call site
           pdfRef.current = pdf as never
           setPages(pdf.numPages)
         }
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- pdf.js ships no types for the CDN build; the shape is asserted once per call site
         const pdf = pdfRef.current as unknown as {
           getPage: (n: number) => Promise<never>
         }
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- pdf.js ships no types for the CDN build; the shape is asserted once per call site
         const p = (await pdf.getPage(page)) as unknown as {
           getViewport: (o: { scale: number }) => {
             width: number

@@ -2,7 +2,10 @@ import { Effect, Schema } from 'effect'
 import { and, asc, eq, or } from 'drizzle-orm'
 import { db } from '#/db'
 import { view } from '#/db/schema'
-import type { Condition, ViewExtra } from './filter'
+import type { Condition, ViewExtra, ViewSort } from './filter'
+import type { ViewColumns } from '#/db/schema/views'
+
+export type { ViewSort }
 
 /**
  * Views, the write side (Effect-first). Anyone may create a view, private
@@ -32,15 +35,13 @@ const query = <T>(run: () => Promise<T>) =>
     catch: (cause) => new ViewQueryFailed({ cause }),
   })
 
-export type ViewSort = { id: string; desc: boolean } | null
-
 export type ViewRow = {
   id: string
   objectId: string
   name: string
   filter: Array<Condition>
   sort: ViewSort
-  columns: Record<string, boolean>
+  columns: ViewColumns
   extra: ViewExtra
   visibility: 'shared' | 'private'
   createdBy: string
@@ -51,10 +52,10 @@ const toRow = (r: typeof view.$inferSelect): ViewRow => ({
   id: r.id,
   objectId: r.objectId,
   name: r.name,
-  filter: (r.filter ?? []) as Array<Condition>,
-  sort: (r.sort ?? null) as ViewSort,
-  columns: (r.columns ?? {}) as Record<string, boolean>,
-  extra: (r.extra ?? {}) as ViewExtra,
+  filter: r.filter,
+  sort: r.sort,
+  columns: r.columns,
+  extra: r.extra,
   visibility: r.visibility,
   createdBy: r.createdBy,
   updatedAt: r.updatedAt.toISOString(),
@@ -81,12 +82,12 @@ export const listViewsProgram = Effect.fn('listViewsProgram')(function* (
 })
 
 export type SaveViewInput = {
-  id?: string
+  id?: string | undefined
   objectId: string
   name: string
   filter: Array<Condition>
   sort: ViewSort
-  columns: Record<string, boolean>
+  columns: ViewColumns
   extra: ViewExtra
   visibility: 'shared' | 'private'
 }

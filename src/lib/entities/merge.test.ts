@@ -155,7 +155,7 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
       .select({ values: entity.values })
       .from(entity)
       .where(eq(entity.id, winner.entityId))
-    expect((wEnt.values as Record<string, unknown>).funding_stage).toBe('seed')
+    expect(wEnt.values.funding_stage).toBe('seed')
 
     // …and the fill is logged as the system's rewrite through the merge
     // door — never as the merging user's edit.
@@ -194,7 +194,7 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
       .select()
       .from(mergeEvent)
       .where(eq(mergeEvent.id, mergeEventId))
-    const snap = event.snapshot as Array<{ table: string }>
+    const snap = event.snapshot
     expect(snap.some((s) => s.table === 'entity_alias')).toBe(true)
     expect(snap.some((s) => s.table === 'link')).toBe(true)
     expect(snap.some((s) => s.table === 'entity_space')).toBe(true)
@@ -332,7 +332,7 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
         .select({ snapshot: mergeEvent.snapshot })
         .from(mergeEvent)
         .where(eq(mergeEvent.id, mergeEventId))
-      const snap = event.snapshot as Array<{ table: string; action: string }>
+      const snap = event.snapshot
       const of = (table: string) =>
         snap
           .filter((e) => e.table === table)

@@ -9,12 +9,20 @@ import { useTheme } from 'next-themes'
 import { Toaster as Sonner } from 'sonner'
 import type { ToasterProps } from 'sonner'
 
+const THEMES: Array<NonNullable<ToasterProps['theme']>> = [
+  'light',
+  'dark',
+  'system',
+]
+
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = 'system' } = useTheme()
+  // next-themes hands back a bare string; Sonner's prop is its own union.
+  const named = THEMES.find((t) => t === theme) ?? 'system'
 
   return (
     <Sonner
-      theme={theme as ToasterProps['theme']}
+      theme={named}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,
@@ -26,6 +34,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // Toast · ink (DESIGN.md depth scale): inverted sheet, 0 radius, on the
       // toast layer. Inline zIndex wins over sonner's own stylesheet value.
       style={
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- CSS custom properties are not part of React.CSSProperties
         {
           '--normal-bg': 'var(--foreground)',
           '--normal-text': 'var(--background)',

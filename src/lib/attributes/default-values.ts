@@ -39,7 +39,7 @@ export function resolveDefault(
   const d = def.options.default
   if (d === undefined || d === null) return undefined
   if (def.type === 'actor_reference' && d === 'current-user')
-    return ctx.userId ?? undefined
+    return ctx.userId === null ? undefined : ctx.userId
   if (def.type === 'date' && isIsoDuration(d))
     return isoDate(addIsoDuration(ctx.now, d))
   return d

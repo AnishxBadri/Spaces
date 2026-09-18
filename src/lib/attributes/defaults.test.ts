@@ -134,7 +134,7 @@ describe.skipIf(!hasDb)('birthValues', () => {
       .select({ values: entity.values })
       .from(entity)
       .where(eq(entity.id, human.entityId))
-    const hv = h.values as Record<string, unknown>
+    const hv = h.values
     expect(hv[slug('text')]).toBe('Hot lead') // supplied wins, no default
     expect(hv[slug('owner')]).toBe(actor.id) // current-user resolved
     expect(hv[slug('date')]).toMatch(/^\d{4}-\d{2}-\d{2}$/) // duration → date
@@ -160,7 +160,7 @@ describe.skipIf(!hasDb)('birthValues', () => {
       .select({ values: entity.values })
       .from(entity)
       .where(eq(entity.id, machine.entityId))
-    const mv = m.values as Record<string, unknown>
+    const mv = m.values
     expect(mv[slug('text')]).toBe('Untriaged')
     expect(mv[slug('date')]).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(mv[slug('owner')]).toBeUndefined()
@@ -205,7 +205,7 @@ describe.skipIf(!hasDb)('birthValues', () => {
       .select({ options: attribute.options })
       .from(attribute)
       .where(eq(attribute.id, row.id))
-    expect((saved.options as { default?: unknown }).default).toBe('unrated')
+    expect(saved.options.default).toBe('unrated')
 
     await Effect.runPromise(
       updateAttributeProgram({ id: row.id, config: { default: null } }),
@@ -214,6 +214,6 @@ describe.skipIf(!hasDb)('birthValues', () => {
       .select({ options: attribute.options })
       .from(attribute)
       .where(eq(attribute.id, row.id))
-    expect('default' in (cleared.options as object)).toBe(false)
+    expect('default' in cleared.options).toBe(false)
   })
 })

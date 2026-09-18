@@ -21,8 +21,8 @@ const objectKey = z
   })
 
 const resolveObjectId = async (key: {
-  kind?: 'company' | 'person' | 'deal'
-  objectId?: string
+  kind?: 'company' | 'person' | 'deal' | undefined
+  objectId?: string | undefined
 }) => {
   if (key.objectId) return key.objectId
   const { objectIdForKindAsync } = await import('../attributes/objects')

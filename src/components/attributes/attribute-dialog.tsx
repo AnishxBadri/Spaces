@@ -40,8 +40,10 @@ import { createAttribute, listObjects, updateAttribute } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 import { OptionListEditor, newDraft } from './option-list-editor'
 import { ValueEditor } from './value-editor'
-import type { OptionDraft, OptionGroup } from './option-list-editor'
+import type { OptionDraft } from './option-list-editor'
 import type { RegistryEntry } from './value-editor'
+import { toObjectKind } from '#/lib/attributes/registry'
+import type { AttributeOptions, AttributeType } from '#/lib/attributes/registry'
 import type { ReactNode } from 'react'
 
 /**
@@ -56,7 +58,7 @@ import type { ReactNode } from 'react'
 type ObjectKind = 'company' | 'person' | 'deal'
 
 type TypeMeta = {
-  id: string
+  id: AttributeType
   label: string
   hint: string
   icon: typeof Type
@@ -178,8 +180,8 @@ export type EditableAttribute = {
   name: string
   slug?: string
   description?: string | null
-  type: string
-  options: unknown
+  type: AttributeType
+  options: AttributeOptions | null
 }
 
 type ObjectChoice = {
@@ -193,34 +195,16 @@ type ObjectChoice = {
 const targetValue = (o: ObjectChoice) =>
   (o.isSystem ? CORE_BY_SLUG[o.slug] : undefined) ?? `object:${o.id}`
 
-type StoredOptions = {
-  options?: Array<{
-    id: string
-    label: string
-    group?: string
-    color?: string
-    archived?: boolean
-  }>
-  code?: string
-  max?: number
-  precision?: number
-  targetKind?: ObjectKind
-  targetObjectId?: string
-  multi?: boolean
-  required?: boolean
-  default?: unknown
-}
-
 type Props = {
   /** a core kind, or an object row id — custom objects only have the latter */
-  objectKind?: ObjectKind
-  objectId?: string
+  objectKind?: ObjectKind | undefined
+  objectId?: string | undefined
   /** singular noun for copy ("every company"); defaults from objectKind */
-  objectLabel?: string
+  objectLabel?: string | undefined
   /** plural noun for the head's mono context ("on Companies") */
-  objectPlural?: string
+  objectPlural?: string | undefined
   /** live attribute count — the head reads `19 → 20` on create */
-  attributeCount?: number
+  attributeCount?: number | undefined
   onSaved: () => void
   trigger?: ReactNode
   open?: boolean
@@ -283,17 +267,17 @@ function AttributeForm({
   attr,
   onDone,
 }: {
-  objectKind?: ObjectKind
-  objectId?: string
+  objectKind?: ObjectKind | undefined
+  objectId?: string | undefined
   objectLabel: string
-  objectPlural?: string
-  attributeCount?: number
+  objectPlural?: string | undefined
+  attributeCount?: number | undefined
   mode: 'create' | 'edit'
-  attr?: EditableAttribute
+  attr?: EditableAttribute | undefined
   onDone: (saved: boolean) => void
 }) {
-  const stored = (attr?.options ?? {}) as StoredOptions
-  const [type, setType] = useState<string>(attr?.type ?? 'text')
+  const stored: AttributeOptions = attr?.options ?? {}
+  const [type, setType] = useState<AttributeType>(attr?.type ?? 'text')
   const [name, setName] = useState(attr?.name ?? '')
   const [description, setDescription] = useState(attr?.description ?? '')
   const [drafts, setDrafts] = useState<Array<OptionDraft>>(() =>
@@ -301,7 +285,7 @@ function AttributeForm({
       key: o.id,
       id: o.id,
       label: o.label,
-      ...(o.group ? { group: o.group as OptionGroup } : {}),
+      ...(o.group ? { group: o.group } : {}),
       color: optionColor(o, i),
       ...(o.archived ? { archived: true } : {}),
     })),
@@ -335,8 +319,7 @@ function AttributeForm({
       alive = false
     }
   }, [type, mode])
-  const targetKind = (target && !target.startsWith('object:') ? target : '') as
-    ObjectKind | ''
+  const targetKind = target.startsWith('object:') ? null : toObjectKind(target)
   const targetObjectId = target.startsWith('object:')
     ? target.slice('object:'.length)
     : ''
@@ -354,7 +337,7 @@ function AttributeForm({
 
   // Type drives everything below the header; switching it in create mode
   // resets the slot and the default so nothing from the old shape lingers.
-  function pickType(next: string) {
+  function pickType(next: AttributeType) {
     if (next === type) return
     setType(next)
     setDrafts(
@@ -461,9 +444,9 @@ function AttributeForm({
           data: {
             ...(objectId ? { objectId } : { objectKind }),
             name: trimmed,
-            description: description.trim() || undefined,
-            type: type as Parameters<typeof createAttribute>[0]['data']['type'],
-            options: isOptionType ? optionPayload : undefined,
+            ...(description.trim() ? { description: description.trim() } : {}),
+            type,
+            ...(isOptionType ? { options: optionPayload } : {}),
             config: {
               ...(type === 'currency' ? { code } : {}),
               ...(type === 'rating' ? { max } : {}),
@@ -474,7 +457,7 @@ function AttributeForm({
                   ? { targetObjectId, multi }
                   : {}),
             },
-            default: defaultValue ?? undefined,
+            ...(defaultValue === null ? {} : { default: defaultValue }),
             required,
           },
         })
@@ -888,9 +871,9 @@ function TypePane({
   fixed,
   onPick,
 }: {
-  value: string
+  value: AttributeType
   fixed: boolean
-  onPick: (id: string) => void
+  onPick: (id: AttributeType) => void
 }) {
   return (
     <CommandPrimitive

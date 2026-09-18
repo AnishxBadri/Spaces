@@ -8,7 +8,7 @@ import type { LucideIcon } from 'lucide-react'
  * Serialized into derived markdown as [[label|entity:id]] by the exporter.
  */
 
-export const KIND_ICONS: Record<string, LucideIcon> = {
+export const KIND_ICONS: Record<string, LucideIcon | undefined> = {
   company: Building2,
   person: User,
   organization: Building2,

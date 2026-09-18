@@ -62,7 +62,7 @@ export const getRecordTimeline = createServerFn()
         last.source === ev.source &&
         new Date(last.at).getTime() - ev.at.getTime() < GAP_MS
       ) {
-        last.changes.push({ slug: ev.attrSlug, to: ev.to as Json })
+        last.changes.push({ slug: ev.attrSlug, to: ev.to })
       } else {
         bursts.push({
           type: 'attrs',
@@ -70,7 +70,7 @@ export const getRecordTimeline = createServerFn()
           actor: ev.actorId ?? null,
           source: ev.source,
           at: ev.at.toISOString(),
-          changes: [{ slug: ev.attrSlug, to: ev.to as Json }],
+          changes: [{ slug: ev.attrSlug, to: ev.to }],
         })
       }
     }

@@ -6,7 +6,6 @@ import { db } from '#/db'
 import { attribute, entity, link, objectDef } from '#/db/schema'
 import { user } from '#/db/schema/auth'
 import { requireUser } from './shared'
-import type { Json } from './shared'
 
 /**
  * The object registry, read side (CONTEXT.md "Two-tier object model"). One
@@ -217,7 +216,7 @@ export const listObjectRecords = createServerFn()
       rows: rows.map((r) => ({
         id: r.id,
         name: r.name,
-        values: (r.values ?? {}) as Record<string, Json>,
+        values: r.values,
         spaces: spacesBy.get(r.id) ?? [],
         createdAt: r.createdAt.toISOString(),
       })),
@@ -326,7 +325,7 @@ export const getObjectRecord = createServerFn()
       createdByName: head.createdBy
         ? (userNames[head.createdBy] ?? null)
         : null,
-      values: (head.values ?? {}) as Record<string, Json>,
+      values: head.values,
       object: {
         id: head.objectId!,
         slug: head.objectSlug,

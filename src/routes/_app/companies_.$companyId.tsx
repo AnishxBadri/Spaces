@@ -28,7 +28,6 @@ import {
   RecordSection,
 } from '#/components/record/record-parts'
 import { OptionChip, optionLabel } from '#/components/attributes/value-editor'
-import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
@@ -126,7 +125,7 @@ function CompanyRecordPage() {
   const fundingDef = registry.find((d) => d.slug === 'funding_stage')
   const fundingStage =
     fundingDef && company.values.funding_stage
-      ? optionLabel(fundingDef as RegistryEntry, company.values.funding_stage)
+      ? optionLabel(fundingDef, company.values.funding_stage)
       : null
   const location =
     typeof company.values.location === 'string' ? company.values.location : null
@@ -213,7 +212,7 @@ function CompanyRecordPage() {
                 <>
                   <span>{deals.length}</span>
                   <CreateDealDialog
-                    registry={dealRegistry as Array<RegistryEntry>}
+                    registry={dealRegistry}
                     presetCompany={{ id: company.id, name: company.name }}
                     triggerLabel="New"
                   />
@@ -234,7 +233,7 @@ function CompanyRecordPage() {
                     </Link>
                     {d.stage && stageDef ? (
                       <OptionChip
-                        def={stageDef as RegistryEntry}
+                        def={stageDef}
                         id={d.stage}
                         className="shrink-0"
                       />
@@ -350,7 +349,7 @@ function CompanyRecordPage() {
           {registry.map((def) => (
             <RailField
               key={def.slug}
-              def={def as RegistryEntry}
+              def={def}
               attr={def}
               objectLabel={'company'}
               onAttributeSaved={() => router.invalidate()}
@@ -432,10 +431,7 @@ function CompanyRecordPage() {
               </button>
             }
           />
-          <RecordTimeline
-            items={timeline}
-            registry={registry as Array<RegistryEntry>}
-          />
+          <RecordTimeline items={timeline} registry={registry} />
         </RecordSection>
 
         <RecordSection

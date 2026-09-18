@@ -55,6 +55,8 @@ import {
   updateRecord,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
+import { jsonRecord, jsonString } from '#/lib/json'
+import type { EntityValues } from '#/db/schema/entities'
 
 export const Route = createFileRoute('/_app/deals')({
   validateSearch: z.object({ view: z.string().optional() }),
@@ -87,7 +89,7 @@ const GROUP_LABELS: Record<string, string> = {
 type DealRow = {
   id: string
   name: string
-  values: Record<string, unknown>
+  values: EntityValues
   createdAt: string
 }
 
@@ -171,7 +173,7 @@ function DealsPage() {
     [setExtra],
   )
   const selectView = (id: string | null) =>
-    void navigate({ to: '/deals', search: { view: id ?? undefined } })
+    void navigate({ to: '/deals', search: id === null ? {} : { view: id } })
   // View toggle — read post-mount so SSR and client agree on first paint.
   const [view, setView] = useState<'table' | 'board'>('table')
   useEffect(() => {
@@ -183,10 +185,9 @@ function DealsPage() {
     localStorage.setItem('dealos.deals-view', v)
   }
 
-  const stageDef = registry.find((d) => d.slug === 'stage') as
-    RegistryEntry | undefined
+  const stageDef = registry.find((d) => d.slug === 'stage')
   const stageOptions = useMemo(
-    () => stageDef?.options?.options ?? [],
+    () => stageDef?.options.options ?? [],
     [stageDef],
   )
 
@@ -262,27 +263,25 @@ function DealsPage() {
           />
         ),
       }),
-      ...registry.map(
-        (def) =>
-          col.accessor(
-            (r) =>
-              sortValue(def as RegistryEntry, r.values[def.slug], refNames),
-            {
-              id: `attr:${def.slug}`,
-              header: def.name,
-              size: def.type === 'text' ? 200 : 140,
-              sortUndefined: 'last',
-              cell: (info) => (
-                <ValueEditor
-                  def={def as RegistryEntry}
-                  value={info.row.original.values[def.slug] ?? null}
-                  variant="cell"
-                  refNames={refNames}
-                  onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
-                />
-              ),
-            },
-          ) as ColumnDef<DealRow, unknown>,
+      ...registry.map((def) =>
+        col.accessor(
+          (r): unknown => sortValue(def, r.values[def.slug], refNames),
+          {
+            id: `attr:${def.slug}`,
+            header: def.name,
+            size: def.type === 'text' ? 200 : 140,
+            sortUndefined: 'last',
+            cell: (info) => (
+              <ValueEditor
+                def={def}
+                value={info.row.original.values[def.slug] ?? null}
+                variant="cell"
+                refNames={refNames}
+                onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
+              />
+            ),
+          },
+        ),
       ),
     ]
     return defs
@@ -303,7 +302,7 @@ function DealsPage() {
     onGlobalFilterChange: setGlobalFilter,
     globalFilterFn: (row, _colId, filter) => {
       const q = String(filter).toLowerCase()
-      const companyId = row.original.values.company as string | undefined
+      const companyId = jsonString(row.original.values.company)
       const companyName = companyId ? lookupName(deals.refNames, companyId) : ''
       return (
         row.original.name.toLowerCase().includes(q) ||
@@ -321,9 +320,7 @@ function DealsPage() {
       <PageHeader
         title="Deals"
         description="One record per opportunity — born at Pre-lead, closed as Invested, Passed, or Lost. History is the point."
-        action={
-          <CreateDealDialog registry={registry as Array<RegistryEntry>} />
-        }
+        action={<CreateDealDialog registry={registry} />}
       />
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
         {deals.rows.length === 0 ? (
@@ -331,9 +328,7 @@ function DealsPage() {
             icon={Handshake}
             title="No deals yet"
             body="A deal starts when something arrives — a deck, an intro, a founder email. Create one against a company and triage it from Pre-lead."
-            action={
-              <CreateDealDialog registry={registry as Array<RegistryEntry>} />
-            }
+            action={<CreateDealDialog registry={registry} />}
           />
         ) : view === 'board' ? (
           <>
@@ -349,10 +344,7 @@ function DealsPage() {
               stages={stageOptions}
               refNames={refNames}
               valueCurrency={
-                (
-                  registry.find((d) => d.slug === 'value')?.options as
-                    { code?: string } | undefined
-                )?.code ?? 'USD'
+                registry.find((d) => d.slug === 'value')?.options.code ?? 'USD'
               }
               medianDaysInStage={funnel.medianDaysInStage}
               daysInStage={Object.fromEntries(
@@ -375,7 +367,7 @@ function DealsPage() {
               <ViewToggle view={view} onChange={switchView} />
               <ViewBar
                 objectId={objectId}
-                registry={registry as Array<RegistryEntry>}
+                registry={registry}
                 views={views}
                 activeId={activeId ?? null}
                 snapshot={vs.snapshot}
@@ -657,8 +649,7 @@ export function CreateDealDialog({
             objectKind="deal"
             context="deal"
             onPick={(t) => {
-              const tv = (t.body as { values?: Record<string, unknown> }).values
-              if (!tv) return
+              const tv = jsonRecord(jsonRecord(t.body).values)
               if (typeof tv.stage === 'string') setStage(tv.stage)
               setValues((s) => ({ ...tv, ...s }))
             }}
@@ -679,7 +670,7 @@ export function CreateDealDialog({
                 refNames={
                   companyId ? { [companyId]: { name: companyName } } : {}
                 }
-                onSave={(v) => setCompanyId(v as string | null)}
+                onSave={(v) => setCompanyId(typeof v === 'string' ? v : null)}
               />
               <CompanyNameCapture
                 companyId={companyId}

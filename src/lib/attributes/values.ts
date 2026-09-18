@@ -3,9 +3,11 @@ import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db'
 import { attribute, attributeEvent, entity, link } from '#/db/schema'
 import type { attributeEventSource } from '#/db/schema'
+import type { EntityValues } from '#/db/schema/entities'
+import type { Json } from '#/lib/json'
 import { resolveDefault } from './default-values'
 import { objectIdForKindAsync } from './objects'
-import { valueValidator } from './registry'
+import { toObjectKind, valueValidator } from './registry'
 import type { AttributeDef, ObjectKind } from './registry'
 
 /**
@@ -27,7 +29,7 @@ export async function getRegistryByObjectId(
     .from(attribute)
     .where(and(eq(attribute.objectId, objectId), eq(attribute.archived, false)))
     .orderBy(asc(attribute.sortOrder), asc(attribute.createdAt))
-  return rows as Array<AttributeDef>
+  return rows
 }
 
 export async function getRegistry(
@@ -71,8 +73,8 @@ export type EventSource = (typeof attributeEventSource.enumValues)[number]
 type Change = {
   slug: string
   def: AttributeDef
-  before: unknown
-  value: unknown
+  before: Json
+  value: Json
   /** set when the change came from a default rather than the patch */
   door?: 'default'
 }
@@ -91,7 +93,7 @@ type Change = {
  */
 export const planPatch = Effect.fn('planPatch')(function* (
   registry: Array<AttributeDef>,
-  current: Record<string, unknown>,
+  current: EntityValues,
   patch: Record<string, unknown>,
 ): Effect.fn.Return<Array<Change>, AttributeValidationError> {
   const bySlug = new Map(registry.map((d) => [d.slug, d]))
@@ -101,10 +103,9 @@ export const planPatch = Effect.fn('planPatch')(function* (
     const def = bySlug.get(slug)
     if (!def) return yield* invalid(slug, 'Unknown attribute')
 
-    let value: unknown = raw
-    if (value === undefined || value === null || value === '') value = null
-    if (value !== null) {
-      const parsed = valueValidator(def, current[slug]).safeParse(value)
+    let value: Json = null
+    if (raw !== undefined && raw !== null && raw !== '') {
+      const parsed = valueValidator(def, current[slug]).safeParse(raw)
       if (!parsed.success) {
         return yield* invalid(
           slug,
@@ -132,7 +133,7 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 async function checkReferences(tx: Tx, change: Change) {
   const { def, slug, value } = change
   if (def.type !== 'record_reference' || value === null) return
-  const ids = Array.isArray(value) ? value : [value as string]
+  const ids = (Array.isArray(value) ? value : [value]).map(String)
   if (ids.length === 0) return
   const targets = await tx
     .select({
@@ -220,10 +221,18 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
         // objectId is the registry key; kind fallback covers rows created
         // outside the creation server-fns (tests, raw inserts) — core kinds
         // resolve to their system object row.
-        const objectId =
-          ent.objectId ?? (await objectIdForKindAsync(ent.kind as ObjectKind))
+        let objectId = ent.objectId
+        if (objectId === null) {
+          const core = toObjectKind(ent.kind)
+          if (core === null)
+            throw new EntityNotFound({
+              entityId,
+              message: `No attribute registry for kind ${ent.kind}`,
+            })
+          objectId = await objectIdForKindAsync(core)
+        }
         const registry = await getRegistryByObjectId(objectId)
-        const current = (ent.values ?? {}) as Record<string, unknown>
+        const current = ent.values
 
         // Planning is synchronous and pure; a typed failure surfaces as a
         // throw here and is passed through untouched by the catch below.
@@ -243,11 +252,8 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
           const defaultPatch: Record<string, unknown> = {}
           for (const def of registry) {
             if (def.slug in patch) continue
-            if (
-              afterPatch[def.slug] !== undefined &&
-              afterPatch[def.slug] !== null
-            )
-              continue
+            // Absent and null both mean "blank" — a default fills either.
+            if ((afterPatch[def.slug] ?? null) !== null) continue
             const v = resolveDefault(def, { now: fillDefaults.now, userId })
             if (v !== undefined) defaultPatch[def.slug] = v
           }
@@ -289,12 +295,10 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
                   eq(link.attrSlug, slug),
                 ),
               )
-            const ids =
+            const ids: Array<string> =
               value === null
                 ? []
-                : Array.isArray(value)
-                  ? value
-                  : [value as string]
+                : (Array.isArray(value) ? value : [value]).map(String)
             for (const target of ids) {
               await tx
                 .insert(link)

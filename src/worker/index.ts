@@ -1,5 +1,6 @@
 import { PgBoss } from 'pg-boss'
 import type { Job } from 'pg-boss'
+import { requireEnv } from '#/lib/server/env'
 import { QUEUES } from './queues'
 import { extractDocument } from './jobs/extract-document'
 
@@ -13,7 +14,7 @@ import { extractDocument } from './jobs/extract-document'
 
 async function main() {
   const boss = new PgBoss({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: requireEnv('DATABASE_URL'),
     schema: 'pgboss',
   })
 

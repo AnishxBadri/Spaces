@@ -363,11 +363,12 @@ export function MoveStageDialog({
 
   function confirm() {
     if (!pickedStage || !canMove) return
-    onMove(pickedStage.id, asksReason ? reason.trim() || undefined : undefined)
+    onMove(pickedStage.id, asksReason ? reason.trim() : '')
   }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- a document-level keydown's target is EventTarget; the hotkey guard needs tagName
       const t = e.target as HTMLElement | null
       const typing = t && ['INPUT', 'TEXTAREA'].includes(t.tagName)
       if (e.key === 'Enter' && !typing) {
@@ -522,7 +523,7 @@ export function CloseReasonDialog({
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            onSave(reason.trim() || undefined)
+            onSave(reason.trim())
           }}
         >
           <textarea
@@ -539,7 +540,7 @@ export function CloseReasonDialog({
               // Cmd/Ctrl+Enter submits — Enter alone stays a newline.
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                 e.preventDefault()
-                onSave(reason.trim() || undefined)
+                onSave(reason.trim())
               }
             }}
           />

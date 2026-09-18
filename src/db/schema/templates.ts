@@ -9,6 +9,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { user } from './auth'
+import type { Json } from '#/lib/json'
 
 export const templateKind = pgEnum('template_kind', ['note', 'space', 'record'])
 
@@ -35,7 +36,7 @@ export const template = pgTable('template', {
   /** Only when kind = record. */
   objectKind: text('object_kind'),
   name: text('name').notNull(),
-  body: jsonb('body').notNull(),
+  body: jsonb('body').$type<Json>().notNull(),
   /** Context hint: pickers surface templates tagged for their origin first. */
   suggestOn: text('suggest_on').array().notNull().default([]),
   createdBy: text('created_by')

@@ -1,4 +1,5 @@
 import { PgBoss } from 'pg-boss'
+import { requireEnv } from './server/env'
 import type { QueueName } from '#/worker/queues'
 
 /**
@@ -19,7 +20,7 @@ function boss(): Promise<PgBoss> {
   if (sender) return sender
   sender = (async () => {
     const instance = new PgBoss({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: requireEnv('DATABASE_URL'),
       schema: 'pgboss',
       supervise: false,
       schedule: false,

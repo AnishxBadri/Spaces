@@ -2,6 +2,9 @@ import { createHash, randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '#/db'
+import type { ActivityMeta } from '#/db/schema/activity'
+import type { NoteBody } from '#/db/schema/kinds'
+import type { Condition, ViewExtra } from '#/lib/views/filter'
 import {
   account,
   activity,
@@ -129,10 +132,10 @@ async function stamp(entityId: string, when: Date): Promise<void> {
 async function logActivity(opts: {
   verb: string
   subject: string
-  object?: string
+  object?: string | undefined
   actorId: string | null
   when: Date
-  meta?: Record<string, unknown>
+  meta?: ActivityMeta
 }): Promise<void> {
   await db.insert(activity).values({
     actorId: opts.actorId,
@@ -145,7 +148,7 @@ async function logActivity(opts: {
 }
 
 /** BlockNote paragraphs from plain prose — the shape the editor round-trips. */
-function blocks(md: string): Array<unknown> {
+function blocks(md: string): NoteBody {
   return md.split('\n\n').map((para) => ({
     type: 'paragraph',
     content: [{ type: 'text', text: para, styles: {} }],
@@ -2214,10 +2217,10 @@ type ViewSpec = {
   name: string
   visibility: 'shared' | 'private'
   owner: 'lead' | 'partner'
-  filter: Array<{ slug: string; op: string; value?: unknown }>
+  filter: Array<Condition>
   sort: { id: string; desc: boolean } | null
   columns: Record<string, boolean>
-  extra?: Record<string, string | number | boolean | null>
+  extra?: ViewExtra
 }
 
 const VIEWS: Array<ViewSpec> = [
@@ -2958,15 +2961,13 @@ async function seedNotes(
 
     // body_json is authoritative; body_md is the derived lane search reads,
     // with mentions in the [[Label|entity:uuid]] form the editor emits.
-    const body = [...blocks(n.body)]
+    const body: NoteBody = [...blocks(n.body)]
     let bodyMd = n.body
     if (mentioned.length > 0) {
       body.push({
         type: 'paragraph',
         content: mentioned.flatMap((m, i) => [
-          ...(i > 0
-            ? [{ type: 'text', text: ' · ', styles: {} } as unknown]
-            : []),
+          ...(i > 0 ? [{ type: 'text', text: ' · ', styles: {} }] : []),
           {
             type: 'mention',
             props: {

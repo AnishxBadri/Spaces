@@ -49,7 +49,7 @@ export function LedgerRow({
 }: {
   children: ReactNode
   className?: string
-  last?: boolean
+  last?: boolean | undefined
 }) {
   return (
     <li
@@ -71,9 +71,9 @@ export function LedgerFigure({
   wide,
 }: {
   children: ReactNode
-  tone?: 'bad' | 'muted'
+  tone?: 'bad' | 'muted' | undefined
   /** 80px instead of 64 — for `09-08 · −2d` style figures. */
-  wide?: boolean
+  wide?: boolean | undefined
 }) {
   return (
     <span

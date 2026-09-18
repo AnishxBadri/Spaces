@@ -108,7 +108,7 @@ function ObjectForm(
           data: {
             singular: singular.trim(),
             plural: plural.trim(),
-            icon: icon ?? undefined,
+            ...(icon === null ? {} : { icon }),
           },
         })
         toast(`${plural.trim()} created — now give it attributes`)

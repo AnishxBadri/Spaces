@@ -31,17 +31,19 @@ export type EntityKindResolvable = 'company' | 'person' | 'organization'
 
 export type ResolveInput = {
   kind: EntityKindResolvable
-  name?: string
-  keys?: {
-    domain?: string
-    email?: string
-    linkedin?: string
-    cin?: string
-  }
+  name?: string | undefined
+  keys?:
+    | {
+        domain?: string | undefined
+        email?: string | undefined
+        linkedin?: string | undefined
+        cin?: string | undefined
+      }
+    | undefined
   source: 'manual' | 'gmail' | 'apollo' | 'import' | 'clip'
-  createdBy?: string
+  createdBy?: string | undefined
   /** attribute values asserted at birth — always win over defaults */
-  values?: Record<string, unknown>
+  values?: Record<string, unknown> | undefined
 }
 
 export type ResolveResult = {
@@ -298,7 +300,7 @@ async function suggestDuplicate(
   a: string,
   b: string,
   score: number,
-  reason: Record<string, unknown>,
+  reason: Record<string, string>,
 ) {
   const [entityA, entityB] = a < b ? [a, b] : [b, a]
   await db

@@ -12,6 +12,8 @@ import {
   link,
   mergeEvent,
 } from '#/db/schema'
+import type { EntityValues, MergeSnapshotEntry } from '#/db/schema/entities'
+import type { Json } from '#/lib/json'
 import { activity } from '#/db/schema/activity'
 import { distribution, holding, investment, mark } from '#/db/schema/portfolio'
 
@@ -24,13 +26,8 @@ import { distribution, holding, investment, mark } from '#/db/schema/portfolio'
  * and notes have structural children and different semantics.
  */
 
-type SnapshotEntry = {
-  table: string
-  action:
-    'repointed' | 'dropped' | 'field_filled' | 'field_conflict' | 'inserted'
-  pk: Record<string, unknown>
-  old: Record<string, unknown>
-}
+/** Declared beside the column it lands in (src/db/schema/entities.ts). */
+type SnapshotEntry = MergeSnapshotEntry
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -45,7 +42,7 @@ const MERGEABLE = new Set(['company', 'person', 'organization'])
 async function logMergeEvent(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   snapshot: Array<SnapshotEntry>,
-  change: { entityId: string; attrSlug: string; from: unknown; to: unknown },
+  change: { entityId: string; attrSlug: string; from: Json; to: Json },
 ) {
   const [ev] = await tx
     .insert(attributeEvent)
@@ -88,9 +85,9 @@ for (const ref of ENTITY_REFS) {
 
 /** TS property name for a column (snapshots use property names, not SQL). */
 function propertyKey(table: PgTable, column: PgColumn): string {
-  const hit = Object.entries(
-    getTableColumns(table) as Record<string, PgColumn>,
-  ).find(([, c]) => c.name === column.name)
+  const hit = Object.entries(getTableColumns(table)).find(
+    ([, c]) => c.name === column.name,
+  )
   if (!hit) throw new Error(`column ${column.name} not on table`)
   return hit[0]
 }
@@ -272,9 +269,9 @@ export async function mergeEntities(opts: {
           .from(entity)
           .where(eq(entity.id, loserId))
       ).at(0)
-      const wv = (w?.values ?? {}) as Record<string, unknown>
-      const lv = (l?.values ?? {}) as Record<string, unknown>
-      const fill: Record<string, unknown> = {}
+      const wv: EntityValues = w?.values ?? {}
+      const lv: EntityValues = l?.values ?? {}
+      const fill: EntityValues = {}
       for (const [key, loserVal] of Object.entries(lv)) {
         if (loserVal == null) continue
         const winnerVal = wv[key]
@@ -330,9 +327,9 @@ export async function mergeEntities(opts: {
           .where(eq(entity.id, ref.fromEntityId))
       ).at(0)
       if (!referrer) continue
-      const vals = { ...(referrer.values ?? {}) } as Record<string, unknown>
-      const cur = vals[ref.attrSlug]
-      let nextVal: unknown = cur
+      const vals: EntityValues = { ...referrer.values }
+      const cur = vals[ref.attrSlug] ?? null
+      let nextVal: Json = cur
       if (cur === loserId) nextVal = winnerId
       else if (Array.isArray(cur)) {
         nextVal = [...new Set(cur.map((v) => (v === loserId ? winnerId : v)))]

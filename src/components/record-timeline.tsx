@@ -101,7 +101,7 @@ export function RecordTimeline({
 }: {
   items: Items
   registry: Array<RegistryEntry>
-  refNames?: RefNames
+  refNames?: RefNames | undefined
 }) {
   if (items.length === 0) {
     return <p className="py-2 text-label text-graphite">Nothing yet.</p>
@@ -157,7 +157,7 @@ function AttrBurst({
 }: {
   item: Extract<Items[number], { type: 'attrs' }>
   registry: Array<RegistryEntry>
-  refNames?: RefNames
+  refNames?: RefNames | undefined
   last: boolean
 }) {
   const [open, setOpen] = useState(false)

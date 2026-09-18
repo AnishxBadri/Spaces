@@ -9,6 +9,10 @@ import {
 import { user } from './auth'
 import { visibility } from './kinds'
 import { objectDef } from './objects'
+import type { Condition, ViewExtra, ViewSort } from '#/lib/views/filter'
+
+/** TanStack VisibilityState — column id → shown. */
+export type ViewColumns = Record<string, boolean>
 
 /**
  * A view is a saved way of looking at one object's records (CONTEXT.md
@@ -28,13 +32,13 @@ export const view = pgTable(
       .references(() => objectDef.id),
     name: text('name').notNull(),
     // Array<{ slug, op, value? }> — see src/lib/views/filter.ts
-    filter: jsonb('filter').notNull().default([]),
+    filter: jsonb('filter').$type<Array<Condition>>().notNull().default([]),
     // { id, desc } | null — TanStack's single sort
-    sort: jsonb('sort'),
+    sort: jsonb('sort').$type<ViewSort>(),
     // TanStack VisibilityState — column id → shown
-    columns: jsonb('columns').notNull().default({}),
+    columns: jsonb('columns').$type<ViewColumns>().notNull().default({}),
     // Page-specific state a surface opts into (deals: group/stage chips)
-    extra: jsonb('extra').notNull().default({}),
+    extra: jsonb('extra').$type<ViewExtra>().notNull().default({}),
     visibility: visibility('visibility').notNull().default('private'),
     createdBy: text('created_by')
       .notNull()

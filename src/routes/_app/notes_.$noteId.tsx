@@ -14,6 +14,7 @@ import {
   NoteEditor,
 } from '#/components/editor/note-editor'
 import { KIND_ICONS, KIND_ROUTES } from '#/components/editor/mention'
+import type { NoteBody } from '#/db/schema/kinds'
 import { SaveAsTemplateAction } from '#/components/templates'
 import {
   getNote,
@@ -50,7 +51,7 @@ function NotePage() {
   const [saveState, setSaveState] = useState<SaveState>('idle')
 
   const latest = useRef<{
-    document: unknown
+    document: NoteBody
     blocksToMarkdownLossy: () => Promise<string>
   } | null>(null)
   const titleRef = useRef(initial.title)
@@ -178,9 +179,7 @@ function NotePage() {
             <ul className="mt-2 space-y-1">
               {initial.backlinks.map((b) => {
                 // KIND_ICONS' Record index type hides misses — widen honestly.
-                const Icon = (
-                  KIND_ICONS as Record<string, LucideIcon | undefined>
-                )[b.kind]
+                const Icon: LucideIcon | undefined = KIND_ICONS[b.kind]
                 return (
                   <li key={b.fromId}>
                     <Link

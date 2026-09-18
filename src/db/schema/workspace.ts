@@ -12,6 +12,16 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { note } from './kinds'
+import type { Json } from '#/lib/json'
+
+/**
+ * Workspace-scoped keys. `base_currency` is the only one so far; the index
+ * signature keeps the column honest about the rest rather than pretending
+ * the set is closed.
+ */
+export type WorkspaceSettings = {
+  base_currency?: string
+} & { [k: string]: Json | undefined }
 
 /**
  * The workspace singleton — one deployment, one workspace, one row.
@@ -33,7 +43,10 @@ export const workspace = pgTable(
   {
     id: integer('id').primaryKey().default(1),
     name: text('name').notNull(),
-    settings: jsonb('settings').notNull().default({}),
+    settings: jsonb('settings')
+      .$type<WorkspaceSettings>()
+      .notNull()
+      .default({}),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -346,9 +346,42 @@ function Field({
   )
 }
 
+/**
+ * The three closed vocabularies the event forms write. A `<select>` hands
+ * back a string; these narrow it once, so the form state already holds the
+ * server's type and the submit needs no assertion.
+ */
+const INSTRUMENTS = [
+  'priced',
+  'safe_post_money',
+  'safe_pre_money',
+  'ccd',
+] as const
+type Instrument = (typeof INSTRUMENTS)[number]
+const toInstrument = (v: string): Instrument =>
+  INSTRUMENTS.find((i) => i === v) ?? 'priced'
+
+const MARK_BASES = ['round_price', 'manual', '409a'] as const
+type MarkBasis = (typeof MARK_BASES)[number]
+const toMarkBasis = (v: string): MarkBasis =>
+  MARK_BASES.find((b) => b === v) ?? 'round_price'
+
+const DIST_KINDS = ['exit', 'secondary', 'dividend', 'writeoff'] as const
+type DistKind = (typeof DIST_KINDS)[number]
+const toDistKind = (v: string): DistKind =>
+  DIST_KINDS.find((k) => k === v) ?? 'exit'
+
 function AddInvestmentDialog({ companyId }: { companyId: string }) {
   const f = useEventForm(() => {})
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    date: string
+    amount: string
+    currency: string
+    instrument: Instrument
+    shares: string
+    cap: string
+    vehicle: string
+  }>({
     date: '',
     amount: '',
     currency: 'USD',
@@ -383,11 +416,10 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
                     date: form.date,
                     amount: Number(form.amount),
                     currency: form.currency,
-                    instrument: form.instrument as
-                      'priced' | 'safe_post_money' | 'safe_pre_money' | 'ccd',
-                    shares: form.shares ? Number(form.shares) : undefined,
-                    cap: form.cap ? Number(form.cap) : undefined,
-                    vehicle: form.vehicle || undefined,
+                    instrument: form.instrument,
+                    ...(form.shares ? { shares: Number(form.shares) } : {}),
+                    ...(form.cap ? { cap: Number(form.cap) } : {}),
+                    ...(form.vehicle ? { vehicle: form.vehicle } : {}),
                   },
                 }),
               'Check recorded',
@@ -429,7 +461,10 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
               className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
               value={form.instrument}
               onChange={(e) =>
-                setForm((s) => ({ ...s, instrument: e.target.value }))
+                setForm((s) => ({
+                  ...s,
+                  instrument: toInstrument(e.target.value),
+                }))
               }
             >
               <option value="priced">Priced</option>
@@ -522,11 +557,11 @@ function AddRoundDialog({ companyId }: { companyId: string }) {
                     companyId,
                     date: form.date,
                     kind: form.kind,
-                    raised: form.raised ? Number(form.raised) : undefined,
-                    currency: form.currency || undefined,
-                    postMoney: form.postMoney
-                      ? Number(form.postMoney)
-                      : undefined,
+                    ...(form.raised ? { raised: Number(form.raised) } : {}),
+                    ...(form.currency ? { currency: form.currency } : {}),
+                    ...(form.postMoney
+                      ? { postMoney: Number(form.postMoney) }
+                      : {}),
                     pricePerShare: form.pricePerShare
                       ? Number(form.pricePerShare)
                       : undefined,
@@ -613,7 +648,12 @@ function AddRoundDialog({ companyId }: { companyId: string }) {
 
 function AddMarkDialog({ holdingId }: { holdingId: string }) {
   const f = useEventForm(() => {})
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    date: string
+    fairValue: string
+    currency: string
+    basis: MarkBasis
+  }>({
     date: '',
     fairValue: '',
     currency: 'USD',
@@ -646,7 +686,7 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
                     date: form.date,
                     fairValue: Number(form.fairValue),
                     currency: form.currency,
-                    basis: form.basis as 'round_price' | 'manual' | '409a',
+                    basis: form.basis,
                   },
                 }),
               'Mark recorded',
@@ -688,7 +728,7 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
               className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
               value={form.basis}
               onChange={(e) =>
-                setForm((s) => ({ ...s, basis: e.target.value }))
+                setForm((s) => ({ ...s, basis: toMarkBasis(e.target.value) }))
               }
             >
               <option value="round_price">Round price</option>
@@ -714,7 +754,13 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
 
 function AddDistributionDialog({ holdingId }: { holdingId: string }) {
   const f = useEventForm(() => {})
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    date: string
+    amount: string
+    currency: string
+    kind: DistKind
+    sharesSold: string
+  }>({
     date: '',
     amount: '',
     currency: 'USD',
@@ -748,8 +794,7 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
                     date: form.date,
                     amount: isWriteoff ? 0 : Number(form.amount),
                     currency: form.currency,
-                    kind: form.kind as
-                      'exit' | 'secondary' | 'dividend' | 'writeoff',
+                    kind: form.kind,
                     sharesSold: form.sharesSold
                       ? Number(form.sharesSold)
                       : undefined,
@@ -764,7 +809,9 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
               id="ds-kind"
               className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
               value={form.kind}
-              onChange={(e) => setForm((s) => ({ ...s, kind: e.target.value }))}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, kind: toDistKind(e.target.value) }))
+              }
             >
               <option value="exit">Exit</option>
               <option value="secondary">Secondary</option>

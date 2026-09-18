@@ -54,6 +54,7 @@ import {
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { cn } from '#/lib/utils'
+import { jsonRecord } from '#/lib/json'
 import {
   countOpenDuplicates,
   createCompany,
@@ -118,7 +119,10 @@ function CompaniesPage() {
     [rows, vs.conditions, typeOf],
   )
   const selectView = (id: string | null) =>
-    void navigate({ to: '/companies', search: { view: id ?? undefined } })
+    void navigate({
+      to: '/companies',
+      search: id === null ? {} : { view: id },
+    })
 
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
@@ -157,22 +161,21 @@ function CompaniesPage() {
             </MetaCell>
           ) : null,
       }),
-      ...registry.map(
-        (def) =>
-          col.accessor((r) => r.values[def.slug] ?? null, {
-            id: `attr:${def.slug}`,
-            header: def.name,
-            size: def.type === 'text' ? 200 : 140,
-            sortUndefined: 'last',
-            cell: (info) => (
-              <ValueEditor
-                def={def as RegistryEntry}
-                value={info.getValue()}
-                variant="cell"
-                onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
-              />
-            ),
-          }) as ColumnDef<Row, unknown>,
+      ...registry.map((def) =>
+        col.accessor((r): unknown => r.values[def.slug] ?? null, {
+          id: `attr:${def.slug}`,
+          header: def.name,
+          size: def.type === 'text' ? 200 : 140,
+          sortUndefined: 'last',
+          cell: (info) => (
+            <ValueEditor
+              def={def}
+              value={info.getValue()}
+              variant="cell"
+              onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
+            />
+          ),
+        }),
       ),
       col.accessor((r) => r.spaces.map((s) => s.name).join(', '), {
         id: 'spaces',
@@ -242,9 +245,7 @@ function CompaniesPage() {
       <PageHeader
         title="Companies"
         description="Every company you track — deduped by domain, tagged into spaces."
-        action={
-          <CreateCompanyDialog registry={registry as Array<RegistryEntry>} />
-        }
+        action={<CreateCompanyDialog registry={registry} />}
       />
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
         {openDuplicates > 0 ? (
@@ -264,11 +265,7 @@ function CompaniesPage() {
             icon={Building2}
             title="No companies yet"
             body="Add one by name or domain. The domain is identity — the same company arriving twice becomes one record, not two."
-            action={
-              <CreateCompanyDialog
-                registry={registry as Array<RegistryEntry>}
-              />
-            }
+            action={<CreateCompanyDialog registry={registry} />}
           />
         ) : (
           <>
@@ -284,7 +281,7 @@ function CompaniesPage() {
             >
               <ViewBar
                 objectId={objectId}
-                registry={registry as Array<RegistryEntry>}
+                registry={registry}
                 views={views}
                 activeId={activeId ?? null}
                 snapshot={vs.snapshot}
@@ -339,8 +336,8 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
       // defaults fill the blanks, so a value typed here always wins.
       const result = await createCompany({
         data: {
-          name: name.trim() || undefined,
-          domain: domain.trim() || undefined,
+          ...(name.trim() ? { name: name.trim() } : {}),
+          ...(domain.trim() ? { domain: domain.trim() } : {}),
           values: Object.fromEntries(
             Object.entries(values).filter(
               ([, v]) => v !== null && v !== undefined,
@@ -391,8 +388,8 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
             objectKind="company"
             context="company"
             onPick={(t) => {
-              const tv = (t.body as { values?: Record<string, unknown> }).values
-              if (tv) setValues((s) => ({ ...tv, ...s }))
+              const tv = jsonRecord(jsonRecord(t.body).values)
+              setValues((s) => ({ ...tv, ...s }))
             }}
           />
         </div>

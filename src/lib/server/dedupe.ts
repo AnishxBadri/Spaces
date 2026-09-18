@@ -61,7 +61,7 @@ export const listDuplicates = createServerFn().handler(async () => {
     rows.map(async (r) => ({
       id: r.id,
       score: r.score,
-      reason: r.reason as Record<string, string>,
+      reason: r.reason,
       a: await entityContext(r.entityA),
       b: await entityContext(r.entityB),
     })),

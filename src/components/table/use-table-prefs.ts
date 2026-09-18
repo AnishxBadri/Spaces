@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
+import { z } from 'zod'
 import type { ColumnSizingState, VisibilityState } from '@tanstack/react-table'
 
 type Prefs = {
   columnVisibility: VisibilityState
   columnSizing: ColumnSizingState
 }
+
+/** localStorage is a boundary like any other: decoded, never asserted. */
+const storedPrefs = z.object({
+  columnVisibility: z.record(z.string(), z.boolean()).optional(),
+  columnSizing: z.record(z.string(), z.number()).optional(),
+})
 
 /**
  * Which columns are shown and how wide they are, remembered per object kind.
@@ -17,12 +24,12 @@ export function useTablePrefs(key: string) {
     if (typeof localStorage === 'undefined')
       return { columnVisibility: {}, columnSizing: {} }
     try {
-      const stored = JSON.parse(
-        localStorage.getItem(key) ?? '{}',
-      ) as Partial<Prefs> | null
+      const stored = storedPrefs.safeParse(
+        JSON.parse(localStorage.getItem(key) ?? '{}'),
+      )
       return {
-        columnVisibility: stored?.columnVisibility ?? {},
-        columnSizing: stored?.columnSizing ?? {},
+        columnVisibility: stored.data?.columnVisibility ?? {},
+        columnSizing: stored.data?.columnSizing ?? {},
       }
     } catch {
       return { columnVisibility: {}, columnSizing: {} }

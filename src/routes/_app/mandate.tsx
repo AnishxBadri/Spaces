@@ -19,6 +19,7 @@ import {
   updateMandateFacts,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
+import type { NoteBody } from '#/db/schema/kinds'
 
 /**
  * The Mandate — the fund's one "why we invest" destination. A facts grid
@@ -33,9 +34,7 @@ export const Route = createFileRoute('/_app/mandate')({
       listRegistry({ data: { kind: 'company' } }),
     ])
     const stageAttr = registry.find((a) => a.slug === 'funding_stage')
-    const stageOptions =
-      (stageAttr?.options as { options?: Array<StageOption> } | null)
-        ?.options ?? []
+    const stageOptions = stageAttr?.options.options ?? []
     if (!m) return { mandate: null, note: null, stageOptions }
     const note = await getNote({ data: { id: m.noteEntityId } })
     return { mandate: m, note, stageOptions }
@@ -396,11 +395,11 @@ function MandateProse({
   onState,
 }: {
   noteId: string
-  note: { bodyJson: unknown; title: string }
+  note: { bodyJson: NoteBody | null; title: string }
   onState: (state: SaveState) => void
 }) {
   const latest = useRef<{
-    document: unknown
+    document: NoteBody
     blocksToMarkdownLossy: () => Promise<string>
   } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
