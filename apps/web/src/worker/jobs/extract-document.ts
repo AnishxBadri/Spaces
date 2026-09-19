@@ -6,7 +6,7 @@ import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
 import { storage } from '#/lib/storage'
 import { extractDocumentText } from '@spaces/core/documents/extract'
-import { QUEUES } from '../queues'
+import { QUEUES } from '@spaces/core/queue/names'
 import { JobContext, JobPermanent, JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 

@@ -1,7 +1,7 @@
 import { PgBoss } from 'pg-boss'
 import type { Job } from 'pg-boss'
 import { requireEnv } from '#/lib/server/env'
-import { QUEUES } from './queues'
+import { QUEUES } from '@spaces/core/queue/names'
 import { startHeartbeat, workerIdentity } from './heartbeat'
 import { pgBossHost, runJob } from './run-job'
 import { ExtractionStore, extractDocument } from './jobs/extract-document'

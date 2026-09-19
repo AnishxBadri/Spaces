@@ -1,53 +1,35 @@
-import { PgBoss } from 'pg-boss'
+import { createSender } from '@spaces/core/queue/sender'
 import { requireEnv } from './server/env'
-import type { QueueName } from '#/worker/queues'
+import type { QueueName } from '@spaces/core/queue/names'
+import type { Sender } from '@spaces/core/queue/sender'
 
 /**
- * The web side of the web→worker seam. The web process only ever *sends*:
- * a sender instance runs with maintenance, scheduling and migration off, so
- * booting the app never competes with the worker over pg-boss housekeeping
- * or races it through a schema migration.
+ * The web process's sender. Everything the seam does lives in
+ * @spaces/core/queue/sender — sending only, housekeeping off, an enqueue that
+ * resolves instead of throwing when the queue is unreachable. What is left
+ * here is the one thing core may not do: read the environment.
  *
- * Enqueue failure is deliberately non-fatal to its caller. A document row
- * whose extraction never got queued is a document you can still open and
- * download; refusing the upload because the worker is down is worse. The
- * row keeps extraction_status='pending' and can be re-queued.
+ * Lazily, and once. Module scope would make DATABASE_URL a condition of
+ * importing anything that can file a document; the first enqueue is early
+ * enough, and the sender's own retry means a boot with Postgres down is not
+ * a permanently dead singleton.
  */
 
-let sender: Promise<PgBoss> | null = null
-
-function boss(): Promise<PgBoss> {
-  if (sender) return sender
-  sender = (async () => {
-    const instance = new PgBoss({
-      connectionString: requireEnv('DATABASE_URL'),
-      schema: 'pgboss',
-      supervise: false,
-      schedule: false,
-      migrate: false,
-    })
-    instance.on('error', (err: Error) =>
-      console.error('[queue] pg-boss error', err),
-    )
-    await instance.start()
-    return instance
-  })().catch((err) => {
-    // Don't cache a rejected promise — the next enqueue should retry the
-    // connection rather than inherit a dead one forever.
-    sender = null
-    throw err
-  })
-  return sender
-}
+let sender: Sender | null = null
 
 export async function enqueue(
   queue: QueueName,
   data: Record<string, unknown>,
 ): Promise<string | null> {
   try {
-    return await (await boss()).send(queue, data)
+    sender ??= createSender({ connectionString: requireEnv('DATABASE_URL') })
   } catch (err) {
+    // An unset DATABASE_URL used to surface as a rejected connect promise
+    // inside the sender and so came back as `null` like any other queue
+    // failure. It is read out here now, so the same answer is given here —
+    // a misconfigured deployment must not turn a completed upload into a 500.
     console.error(`[queue] could not enqueue ${queue}`, err)
     return null
   }
+  return sender.enqueue(queue, data)
 }

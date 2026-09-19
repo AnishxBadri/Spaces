@@ -6,9 +6,9 @@ import { user } from '@spaces/db/schema/auth'
 import { document, documentChunk, entity, link } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
+import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue } from '../queue'
 import { storage } from '../storage'
-import { QUEUES } from '#/worker/queues'
 import { requireUser } from './shared'
 
 /**

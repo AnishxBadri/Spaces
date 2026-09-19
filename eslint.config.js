@@ -28,6 +28,26 @@ const NO_INTL_NUMBER_FORMAT = {
   message:
     'Use fmtMoney (packages/core/src/portfolio/format.ts) or the shared formatters in packages/core/src/format.ts — Intl.NumberFormat compact output differs between Node and Chrome (hydration trap).',
 }
+// Spec §2's forbidden edge: `web → core, sdk. Never plugins/*, never worker.`
+// The web app used to take `QueueName` from `#/worker/queues`, which is the
+// whole reason `apps/worker` could not be lifted out without web following it
+// (SPA-146). Both halves of the seam live in @spaces/core now, so the edge can
+// be a rule rather than a convention. Declared once and composed below because
+// a later flat-config block replaces an earlier block's options for the same
+// rule rather than merging with them — the trap that silenced one of these
+// selectors for a whole cycle (SPA-101).
+const NO_WEB_INTO_WORKER = {
+  target: './apps/web/src',
+  from: './apps/web/src/worker',
+  message:
+    'The web app never imports the worker (spec §2). Queue names and the sender live in @spaces/core/queue/*.',
+}
+const SERVER_ONLY = {
+  target: './apps/web/src',
+  from: './apps/web/src/lib/server',
+  message:
+    'Server helpers are server-only. Client code imports from the server-fns barrel (apps/web/src/lib/server-fns.ts).',
+}
 const NO_DIRECT_ENTITY_VALUES = {
   selector:
     "CallExpression[callee.property.name='set'][callee.object.callee.property.name='update'][callee.object.arguments.0.name='entity'] > ObjectExpression > Property[key.name='values']",
@@ -94,17 +114,7 @@ export default [
     rules: {
       'import/no-restricted-paths': [
         'error',
-        {
-          basePath: ROOT,
-          zones: [
-            {
-              target: './apps/web/src',
-              from: './apps/web/src/lib/server',
-              message:
-                'Server helpers are server-only. Client code imports from the server-fns barrel (apps/web/src/lib/server-fns.ts).',
-            },
-          ],
-        },
+        { basePath: ROOT, zones: [SERVER_ONLY, NO_WEB_INTO_WORKER] },
       ],
       'no-restricted-imports': [
         'error',
@@ -117,6 +127,24 @@ export default [
             },
           ],
         },
+      ],
+    },
+  },
+  // …and the worker edge again, over the rest of the app. The block above
+  // owns routes/ and components/, where this rule's options would be replaced
+  // rather than extended, so those two are excluded here and carry the zone in
+  // their own list. The worker excludes itself: it is allowed to be the worker.
+  {
+    files: ['apps/web/src/**'],
+    ignores: [
+      'apps/web/src/routes/**',
+      'apps/web/src/components/**',
+      'apps/web/src/worker/**',
+    ],
+    rules: {
+      'import/no-restricted-paths': [
+        'error',
+        { basePath: ROOT, zones: [NO_WEB_INTO_WORKER] },
       ],
     },
   },
