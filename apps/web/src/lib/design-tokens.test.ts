@@ -293,8 +293,8 @@ describe('@theme colour exports', () => {
   it('exports no v1 colour name Tailwind could build a class from', () => {
     // Deleted 2026-09-18 (SPA-16). Each aliased bone, paper, hairline or ink,
     // so nothing rendered differently — they only kept the v1 class names
-    // reachable. The `:root` --muted / --muted-foreground vars stay: they are
-    // still read by .mention-chip and .glossary-term.
+    // reachable. Their `:root` halves followed in SPA-41, once the note
+    // body's marks stopped reading them — see the block below.
     const dead = [
       '--color-sidebar',
       '--color-chart-',
@@ -315,6 +315,38 @@ describe('@theme colour exports', () => {
       '--color-graphite',
     ]) {
       expect(theme, name).toContain(name)
+    }
+  })
+})
+
+describe(':root custom properties', () => {
+  const css = readFileSync(`${repoRoot}/src/styles.css`, 'utf8')
+  const root = css.slice(
+    css.indexOf(':root {'),
+    css.indexOf('\n}', css.indexOf(':root {')),
+  )
+
+  it('declares none of the v1 aliases — the layer is gone, not just hidden', () => {
+    // SPA-41. `@theme` lost these in SPA-16, which stopped Tailwind building
+    // `bg-muted` and friends; the `:root` declarations outlived it because
+    // .mention-chip and .glossary-term still read them by hand. Both now draw
+    // on the Instrument materials (bone, rule, hairline, ink) directly, so a
+    // declaration here would have no reader at all.
+    for (const name of [
+      '--muted',
+      '--muted-foreground',
+      '--accent',
+      '--accent-foreground',
+      '--secondary',
+      '--secondary-foreground',
+    ]) {
+      expect(root, name).not.toContain(`${name}:`)
+    }
+  })
+
+  it('still declares the Instrument materials the note body reads', () => {
+    for (const name of ['--bone:', '--rule:', '--hairline:', '--graphite:']) {
+      expect(root, name).toContain(name)
     }
   })
 })
