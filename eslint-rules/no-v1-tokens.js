@@ -28,6 +28,16 @@
  * two-tier colour rule is a different axis with its own slice. A genuine
  * one-off (optical sizing of initials inside a 16–22px square) takes an inline
  * comment saying why plus a scoped disable — the honest form of an exception.
+ *
+ * SPA-52 adds the colour axis SPA-79 left open. The app is light by decision
+ * (2026-09-19): `color-scheme: light` on `:root`, no `dark` custom-variant, no
+ * next-themes. Dark stays a post-v1 feature, and what keeps it a second token
+ * file rather than a re-port is that no surface ever writes a colour value
+ * down — so a raw hex (`bg-[#f4f3ef]`), or an `rgb()` / `hsl()` / `oklch()`
+ * spelled into a class string, is an error naming the tokens. Reading a custom
+ * property is the sanctioned arbitrary value: `bg-[var(--badge-amber)]` passes,
+ * because the token is still the one place the value lives. The tree had zero
+ * occurrences when the check landed, and this is what keeps it at zero.
  */
 
 /**
@@ -204,7 +214,7 @@ export function findV1Tokens(value, isRootRoute) {
       found.push({
         ...at,
         token: raw,
-        use: 'nothing — there are no dark token values; drop the variant',
+        use: 'nothing — the app is light by decision (2026-09-19) and the `dark` custom-variant is gone from styles.css; drop the variant',
       })
       continue
     }
@@ -297,6 +307,55 @@ export function findArbitraryType(value) {
   return found
 }
 
+/**
+ * A hex colour written out: `#fff`, `#ffff`, `#f4f3ef`, `#f4f3efcc`. The
+ * trailing guard keeps a longer hex from matching as a shorter one.
+ */
+const HEX = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-fA-F])/
+
+/**
+ * A colour function spelled into a class string. `color-mix()` is deliberately
+ * absent — it mixes tokens rather than stating a value, and the `-` keeps it
+ * off `color(`.
+ */
+const COLOUR_FN = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/
+
+/**
+ * Every raw colour in one class string (SPA-52). Exported for the fixture test.
+ *
+ * @param {string} value
+ * @returns {Array<{ index: number, length: number, token: string, literal: string }>}
+ */
+export function findRawColour(value) {
+  /** @type {Array<{ index: number, length: number, token: string, literal: string }>} */
+  const found = []
+  const re = /\S+/g
+  let m
+  while ((m = re.exec(value)) !== null) {
+    const raw = m[0]
+    const hex = HEX.exec(raw)
+    if (hex) {
+      found.push({
+        index: m.index,
+        length: raw.length,
+        token: raw,
+        literal: hex[0],
+      })
+      continue
+    }
+    const fn = COLOUR_FN.exec(raw)
+    if (fn) {
+      found.push({
+        index: m.index,
+        length: raw.length,
+        token: raw,
+        literal: fn[0].slice(0, -1),
+      })
+    }
+  }
+  return found
+}
+
 /** @type {import('eslint').Rule.RuleModule} */
 export const rule = {
   meta: {
@@ -311,6 +370,8 @@ export const rule = {
         'v1 design token `{{token}}` — Instrument uses {{use}} (DESIGN.md "The seven rules").',
       arbitraryType:
         'arbitrary type size `{{token}}` — use {{fix}}. DESIGN.md §3: if a size isn’t on the list it does not go in the app.',
+      rawColour:
+        'raw colour `{{literal}}` in `{{token}}` — every colour in the app is a token. Use the vocabulary (bg-paper, bg-bone, border-rule, text-graphite, the --badge-* tints) or read the custom property, e.g. bg-[var(--badge-amber)]. DESIGN.md §2: the app is light by decision (2026-09-19) and stays token-only, which is what makes dark a token file later and not a re-port.',
     },
   },
   create(context) {
@@ -337,6 +398,13 @@ export const rule = {
           node,
           messageId: 'arbitraryType',
           data: { token: hit.token, fix: hit.fix },
+        })
+      }
+      for (const hit of findRawColour(value)) {
+        context.report({
+          node,
+          messageId: 'rawColour',
+          data: { token: hit.token, literal: hit.literal },
         })
       }
     }
