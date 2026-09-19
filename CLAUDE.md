@@ -65,9 +65,21 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
 - If the Docker daemon is down: `open -a Docker` first.
 - Dev login: `anish@fund.example` (user knows the password). Login lands on
   `/today`; first-run setup lands on `/spaces`.
-- The test suite needs Postgres up. As of 2026-09-19 the suite is 23 files /
-  183 tests; 10 files are DB-coupled and 27 tests fail with `ECONNREFUSED`
-  without it.
+- The test suite needs Postgres up, and **since 2026-09-19 (SPA-143) it has
+  its own database on it**: a vitest `globalSetup` in each package derives
+  `DATABASE_URL_TEST`, defaulting to `DATABASE_URL` with `_test` suffixed
+  onto the database name (`spaces` → `spaces_test`), creates that database if
+  it is absent, migrates it and — in `apps/web` — seeds it with the system
+  attributes, the starter taxonomy and one fixture `user` row, which is what
+  the `select id from user limit 1` sites in the suite resolve against. Drop
+  `spaces_test` any time; the next run rebuilds it. Same server, second
+  database: `docker-compose.dev.yml` is untouched, and **`pnpm test` no
+  longer writes a row into the database the running app is showing.** With
+  Postgres down the setup now fails once, naming the connection string,
+  instead of ten files each throwing `ECONNREFUSED` — which also means
+  `--filter=@spaces/db` no longer answers with Postgres stopped, even for
+  `entity-refs.test.ts`. The harness is `packages/db/src/test-db.ts`; it
+  never drops a database, only creates one.
 
 ## Gates before any commit
 
@@ -104,8 +116,11 @@ and `typecheck` hash the whole package plus `.env.local`, the lockfile and
 `packages/config/tsconfig.base.json`; `lint` hashes `eslint.config.js` and
 `eslint-rules/**` too, so editing gate 5's rule re-runs gate 4. If you add a
 file the gates read from outside `apps/web`, add it to `turbo.json` — a task
-whose inputs miss it will replay a pass that checked nothing. `--force`
-re-runs a task regardless.
+whose inputs miss it will replay a pass that checked nothing. A file in
+another _workspace package_ is the exception: turbo already folds an internal
+dependency's files into the consumer's hash, so editing
+`packages/db/src/test-db.ts` invalidates `@spaces/web#test` with no entry
+here (verified by SPA-143). `--force` re-runs a task regardless.
 
 Pre-commit hooks (lefthook) run prettier + eslint on staged files from the
 repo root; pre-push runs `pnpm run typecheck` (both tsconfigs). CI (`.github/workflows/ci.yml`) runs prettier, eslint, tsc and vitest
@@ -150,8 +165,10 @@ anyway. Don't re-litigate it from the flag list.
 - New column referencing an entity → add an entry to `ENTITY_REFS`
   (`packages/db/src/entity-refs.ts`) declaring both the merge strategy and the
   context role; `entity-refs.test.ts` diffs the list against drizzle's FK
-  metadata and fails naming the column otherwise — it needs no database, so
-  `pnpm exec turbo run test --filter=@spaces/db` answers with Postgres down. A `custom` merge strategy
+  metadata and fails naming the column otherwise — the test itself reads
+  drizzle's metadata and needs no database, but since SPA-143 its package's
+  global setup does, so `pnpm exec turbo run test --filter=@spaces/db` wants
+  Postgres up like everything else. A `custom` merge strategy
   still needs its section in `apps/web/src/lib/entities/merge.ts` **and** its
   snapshot. This was the worst bug of a review cycle; there is no unmerge
   executor — the snapshot convention is the only contract.

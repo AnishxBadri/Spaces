@@ -2,16 +2,15 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
 import { cleanupTestEntities } from '#/lib/entities/test-helpers'
 
-const hasDb = Boolean(process.env.DATABASE_URL)
 const ASOF = '2026-09-10T00:00:00Z'
 
 /**
- * Integration test on the dev database: builds a company with everything
+ * Integration test on the test database: builds a company with everything
  * the walk can reach — attributes, alias, history, memo, shared note, a
  * teammate's private note, a deck with chunks, a space with a memo, a task,
  * an interaction — assembles it as two users, and snapshots the shape.
  */
-describe.skipIf(!hasDb)('assembleProgram', () => {
+describe('assembleProgram', () => {
   const tag = randomUUID().slice(0, 8)
   const ids: Record<string, string> = {}
   let teammateId = ''

@@ -19,9 +19,7 @@ describe('option ids (pure)', () => {
 /** One row of the per-type creation matrix below. */
 type CaseInput = Omit<CreateAttributeInput, 'name' | 'createdBy'>
 
-const hasDb = Boolean(process.env.DATABASE_URL)
-
-describe.skipIf(!hasDb)('createAttributeProgram', () => {
+describe('createAttributeProgram', () => {
   const tag = randomUUID().slice(0, 8)
   const name = (t: string) => `Zz ${t} ${tag}`
 
@@ -149,7 +147,7 @@ describe.skipIf(!hasDb)('createAttributeProgram', () => {
   })
 })
 
-describe.skipIf(!hasDb)('reorderAttributesProgram', () => {
+describe('reorderAttributesProgram', () => {
   const tag = randomUUID().slice(0, 8)
 
   afterAll(async () => {

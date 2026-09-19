@@ -3,7 +3,6 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { cleanupTestEntities } from './test-helpers'
 
 afterAll(async () => {
-  if (!process.env.DATABASE_URL) return
   await cleanupTestEntities([
     '^(Quantum Forge Robotics|Claimant|Holder|OtherCo|FreeMailCo) [0-9a-f]{4,8}( .*)?$',
     '^Orbital [0-9a-f]{6,8}( Inc| Systems)?$',
@@ -11,13 +10,14 @@ afterAll(async () => {
 })
 
 /**
- * Integration tests — run against the dev database (.env.local). Each run
- * uses unique names/domains so reruns don't collide; rows are left behind
- * in dev, which is acceptable until a test-db harness exists.
+ * Integration tests — run against `spaces_test`, the database the vitest
+ * global setup owns (SPA-143), never the dev one. Each run still uses unique
+ * names/domains so reruns don't collide, and `afterAll` still sweeps: what
+ * changed is that the rows it leaves behind are in a database nobody is
+ * looking at.
  */
-const hasDb = Boolean(process.env.DATABASE_URL)
 
-describe.skipIf(!hasDb)('resolveEntity', () => {
+describe('resolveEntity', () => {
   it('creates, then attaches on the same domain', async () => {
     const { resolveEntity } = await import('./resolve')
     const tag = randomUUID().slice(0, 8)

@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "//exports": "Source entry points, not a build output: every consumer is bundled by vite or loaded by tsx/vitest, all of which resolve TypeScript through `exports`. The five shapes are the ones SPA-135's import sweep wrote into apps/web — `@spaces/db`, `@spaces/db/schema`, `@spaces/db/schema/<name>`, `@spaces/db/entity-refs`, `@spaces/db/heartbeat` — plus `./migrate` and `./json`, which this slice adds.",
+  "//exports": "Source entry points, not a build output: every consumer is bundled by vite or loaded by tsx/vitest, all of which resolve TypeScript through `exports`. The five shapes are the ones SPA-135's import sweep wrote into apps/web — `@spaces/db`, `@spaces/db/schema`, `@spaces/db/schema/<name>`, `@spaces/db/entity-refs`, `@spaces/db/heartbeat` — plus `./migrate` and `./json` from SPA-142 and `./test-db` from SPA-143, which is the vitest harness and is imported by no shipping code.",
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
@@ -13,7 +13,8 @@
     "./heartbeat": "./src/heartbeat.ts",
     "./migrate": "./src/migrate.ts",
     "./downgrade-guard": "./src/downgrade-guard.ts",
-    "./json": "./src/json.ts"
+    "./json": "./src/json.ts",
+    "./test-db": "./src/test-db.ts"
   },
   "//bin": "Migrations only — guard, then `migrate()`, then exit. The boot composition that also seeds is apps/web's (`apps/web/src/db/boot.ts`), and moves to core at mono-9a.",
   "bin": {

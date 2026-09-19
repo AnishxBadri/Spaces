@@ -68,15 +68,13 @@ describe('updateAttributeInput (zod boundary)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// The per-field rules, against the dev database.
+// The per-field rules, against the test database.
 // ---------------------------------------------------------------------------
 
-const hasDb = Boolean(process.env.DATABASE_URL)
 const tag = randomUUID().slice(0, 8)
 const slugFor = (base: string) => `zz_upd_${base}_${tag}`
 
 afterAll(async () => {
-  if (!hasDb) return
   await cleanupTestEntities(['^UpdCo [0-9a-f]{4,8}( .*)?$'])
   const { db } = await import('@spaces/db')
   const { attribute } = await import('@spaces/db/schema')
@@ -124,7 +122,7 @@ async function readOptions(id: string) {
   return row?.options ?? {}
 }
 
-describe.skipIf(!hasDb)('updateAttributeProgram', () => {
+describe('updateAttributeProgram', () => {
   it('rejects lowering rating max below stored values, naming the count', async () => {
     const { updateAttributeProgram, RatingMaxBelowValues } =
       await import('./update')

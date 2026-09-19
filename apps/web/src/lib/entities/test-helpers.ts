@@ -1,9 +1,12 @@
 import { inArray, or, sql } from 'drizzle-orm'
 
 /**
- * Integration tests run against the dev database (no separate test db yet).
+ * Integration tests run against `spaces_test`, which the vitest global setup
+ * creates, migrates and seeds (SPA-143) — not the dev database any more.
  * Every test entity name embeds a hex tag; this deletes everything a suite
- * created so reruns don't pollute the dev UI. Call from afterAll.
+ * created, which still matters: until mono-5 truncates between files, a
+ * leaked row is a row the next run's `select … limit 1` can find. Call from
+ * afterAll.
  */
 export async function cleanupTestEntities(patterns: Array<string>) {
   const { db } = await import('@spaces/db')
