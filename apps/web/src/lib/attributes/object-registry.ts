@@ -1,8 +1,8 @@
 import { Cause, Effect, Exit, Option, Schema } from 'effect'
-import { eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { activity } from '@spaces/db/schema/activity'
-import { entity, objectDef } from '@spaces/db/schema'
+import { attribute, attributeEvent, entity, objectDef } from '@spaces/db/schema'
 import { birthValuesEffect } from './defaults'
 import { createAttributeProgram } from './create'
 import {
@@ -15,7 +15,7 @@ import { recordNameAlias } from '#/lib/entities/resolve'
 import { sweepNameSimilarityEffect } from '#/lib/entities/sweep'
 import { normalizeName } from '@spaces/core/entities/normalize'
 import { slugifyNoun, suggestPlural } from '#/lib/object-nouns'
-import type { AttributeCreateRejected } from './create'
+import type { AttributeCreateRejected, Tx } from './create'
 import type { AttributeQueryFailed } from './update'
 import type {
   ObjectQueryFailed as CoreObjectQueryFailed,
@@ -50,11 +50,16 @@ import type {
  * a Vendor.
  *
  * The one genuinely per-object piece of identity is opt-in: an object may
- * declare `domain` and/or `linkedin` as identity keys at creation, and each
- * declared key materializes its backing attribute in the same transaction
- * (CONTEXT.md "Two-tier object model", 2026-09-19). Nothing is bound later
- * — a key with no attribute behind it would be a promise the write path
- * cannot find.
+ * declare `domain` and/or `linkedin` as identity keys, and each declared key
+ * materializes its backing attribute in the same transaction (CONTEXT.md
+ * "Two-tier object model", 2026-09-19). Nothing is bound later — a key with
+ * no attribute behind it would be a promise the write path cannot find.
+ *
+ * The declaration follows the slug rule (spec §9, §3): revisable while the
+ * object has no records, frozen the moment one exists — otherwise a
+ * record's alias outlives the key that justified it. Creation and revision
+ * go through the same `materializeIdentityKey`, so the two paths cannot
+ * drift into two kinds of backing attribute.
  */
 
 export class ObjectRejected extends Schema.TaggedError<ObjectRejected>()(
@@ -153,6 +158,112 @@ const readIdentityKeys = Effect.fn('readIdentityKeys')(function* (
   return keys
 })
 
+/**
+ * Materialize one declared key's backing attribute inside the caller's
+ * transaction: creation and revision share this step, so a key declared at
+ * birth and one declared later are the same attribute, made by the same
+ * door — `createAttributeProgram`, which rejects config a type cannot
+ * carry. A typed refusal leaves through `ObjectRollback`, so the failure
+ * rides the rollback instead of being swallowed by it.
+ */
+const materializeIdentityKey = async (args: {
+  tx: Tx
+  objectId: string
+  key: IdentityKey
+  createdBy: string
+}) => {
+  const backing = IDENTITY_KEY_ATTRIBUTES[args.key]
+  const exit = await Effect.runPromiseExit(
+    createAttributeProgram({
+      tx: args.tx,
+      objectId: args.objectId,
+      name: backing.name,
+      type: backing.type,
+      description: `Identity key — ${backing.help}.`,
+      config: { identityKey: args.key },
+      createdBy: args.createdBy,
+    }),
+  )
+  if (Exit.isFailure(exit)) {
+    const failure = Cause.findErrorOption(exit.cause)
+    throw new ObjectRollback(
+      Option.isSome(failure)
+        ? failure.value
+        : new ObjectQueryFailed({ cause: Cause.squash(exit.cause) }),
+    )
+  }
+}
+
+/**
+ * Undeclaring a key on an empty object deletes its backing attribute row
+ * outright rather than archiving it: an object with no records holds no
+ * values, so there is nothing an archived column would preserve, and a
+ * retired attribute nobody ever wrote to is litter. No table references
+ * `attribute.id` — `attribute_event` keys on `(entity_id, attr_slug)` — so
+ * the delete cascades into nothing, which is exactly why the event rows are
+ * counted first: one would mean the "empty" check lied, and the answer to
+ * that is to refuse, never to delete history out from under a record.
+ */
+const dropBackingAttribute = async (args: {
+  tx: Tx
+  objectId: string
+  key: IdentityKey
+  plural: string
+}) => {
+  // Found by `options.identityKey`, the way the write path finds it — the
+  // slug is only ever a consequence of the name, and the name renames.
+  const attr = (
+    await args.tx
+      .select({ id: attribute.id, slug: attribute.slug })
+      .from(attribute)
+      .where(
+        and(
+          eq(attribute.objectId, args.objectId),
+          sql`${attribute.options} ->> 'identityKey' = ${args.key}`,
+        ),
+      )
+  ).at(0)
+  if (!attr) return
+  const events = (
+    await args.tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(attributeEvent)
+      .innerJoin(entity, eq(entity.id, attributeEvent.entityId))
+      .where(
+        and(
+          eq(entity.objectId, args.objectId),
+          eq(attributeEvent.attrSlug, attr.slug),
+        ),
+      )
+  ).at(0)
+  if ((events?.count ?? 0) > 0)
+    throw new ObjectRollback(
+      new ObjectRejected({
+        message: `${args.plural} has ${attr.slug} history — identity keys are frozen`,
+      }),
+    )
+  await args.tx.delete(attribute).where(eq(attribute.id, attr.id))
+}
+
+/**
+ * Does this object hold a record? A merged-away record counts: it keeps its
+ * values and its snapshot, and the merge that retired it is itself a
+ * consequence of the identity keys, so the declaration is as frozen by a
+ * loser as by a live record (spec §9 — the slug rule).
+ */
+const objectHasRecords = Effect.fn('objectHasRecords')(function* (
+  objectId: string,
+): Effect.fn.Return<boolean, ObjectQueryFailed> {
+  return yield* query(() =>
+    db
+      .select({ id: entity.id })
+      .from(entity)
+      .where(eq(entity.objectId, objectId))
+      .limit(1)
+      .then((rows) => rows.length > 0),
+  )
+})
+
 export const createObjectProgram = Effect.fn('createObjectProgram')(function* (
   input: CreateObjectInput,
 ): Effect.fn.Return<{ id: string; slug: string }, CreateObjectFailure> {
@@ -202,35 +313,25 @@ export const createObjectProgram = Effect.fn('createObjectProgram')(function* (
             })
             .returning({ id: objectDef.id, slug: objectDef.slug })
         )[0]
-        for (const key of identityKeys) {
-          const backing = IDENTITY_KEY_ATTRIBUTES[key]
-          const exit = await Effect.runPromiseExit(
-            createAttributeProgram({
-              tx,
-              objectId: row.id,
-              name: backing.name,
-              type: backing.type,
-              description: `Identity key — ${backing.help}.`,
-              config: { identityKey: key },
-              createdBy: input.createdBy,
-            }),
-          )
-          if (Exit.isFailure(exit)) {
-            const failure = Cause.findErrorOption(exit.cause)
-            throw new ObjectRollback(
-              Option.isSome(failure)
-                ? failure.value
-                : new ObjectQueryFailed({ cause: Cause.squash(exit.cause) }),
-            )
-          }
-        }
+        for (const key of identityKeys)
+          await materializeIdentityKey({
+            tx,
+            objectId: row.id,
+            key,
+            createdBy: input.createdBy,
+          })
         return row
       }),
     catch: asFailure,
   })
 })
 
-export type UpdateObjectInput = {
+/**
+ * The nouns and the lifecycle flag are free; `identityKeys` is the whole
+ * declaration, not a delta, and carries the actor who declared it because
+ * adding a key creates an attribute that someone owns.
+ */
+type ObjectPatch = {
   id: string
   singular?: string | undefined
   plural?: string | undefined
@@ -238,12 +339,21 @@ export type UpdateObjectInput = {
   archived?: boolean | undefined
 }
 
+export type UpdateObjectInput =
+  | (ObjectPatch & { identityKeys: ReadonlyArray<string>; declaredBy: string })
+  | (ObjectPatch & { identityKeys?: undefined; declaredBy?: undefined })
+
 export const updateObjectProgram = Effect.fn('updateObjectProgram')(function* (
   input: UpdateObjectInput,
-): Effect.fn.Return<{ ok: true }, ObjectRejected | ObjectQueryFailed> {
+): Effect.fn.Return<{ ok: true }, CreateObjectFailure> {
   const row = yield* query(() =>
     db
-      .select({ id: objectDef.id, isSystem: objectDef.isSystem })
+      .select({
+        id: objectDef.id,
+        plural: objectDef.plural,
+        identityKeys: objectDef.identityKeys,
+        isSystem: objectDef.isSystem,
+      })
       .from(objectDef)
       .where(eq(objectDef.id, input.id))
       .then((rows) => rows.at(0)),
@@ -267,6 +377,64 @@ export const updateObjectProgram = Effect.fn('updateObjectProgram')(function* (
   }
   if (input.icon !== undefined) patch.icon = input.icon
   if (input.archived !== undefined) patch.archived = input.archived
+
+  // Identity keys follow the slug rule (spec §9): revisable while the object
+  // has no records, frozen the moment one exists. A no-op declaration is not
+  // a change, so re-saving the dialog on a populated object is not a refusal.
+  const declaration =
+    input.identityKeys === undefined
+      ? null
+      : {
+          keys: yield* readIdentityKeys(input.identityKeys),
+          declaredBy: input.declaredBy,
+        }
+  const added = declaration
+    ? declaration.keys.filter((k) => !row.identityKeys.includes(k))
+    : []
+  const removed = declaration
+    ? row.identityKeys.filter((k) => !declaration.keys.includes(k))
+    : []
+
+  if (declaration && (added.length > 0 || removed.length > 0)) {
+    // Core identity lives in entity_alias under resolution rules, not in
+    // this column — there is nothing here for a system object to declare.
+    if (row.isSystem)
+      return yield* new ObjectRejected({
+        message: 'System objects own their identity in code',
+      })
+    if (yield* objectHasRecords(row.id))
+      return yield* new ObjectRejected({
+        message: `${row.plural} has records — identity keys are frozen`,
+      })
+    // One write or neither, as at creation: the column and every backing
+    // attribute the revision adds or drops move together.
+    yield* Effect.tryPromise({
+      try: () =>
+        db.transaction(async (tx) => {
+          for (const key of removed)
+            await dropBackingAttribute({
+              tx,
+              objectId: row.id,
+              key,
+              plural: row.plural,
+            })
+          for (const key of added)
+            await materializeIdentityKey({
+              tx,
+              objectId: row.id,
+              key,
+              createdBy: declaration.declaredBy,
+            })
+          await tx
+            .update(objectDef)
+            .set({ ...patch, identityKeys: declaration.keys })
+            .where(eq(objectDef.id, row.id))
+        }),
+      catch: asFailure,
+    })
+    return { ok: true }
+  }
+
   if (Object.keys(patch).length > 0)
     yield* query(() =>
       db.update(objectDef).set(patch).where(eq(objectDef.id, input.id)),

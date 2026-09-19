@@ -34,10 +34,11 @@ import type { ReactNode } from 'react'
  * field — derived from the plural, frozen, hidden. Creation lands on the
  * object's attributes page, where the real work starts.
  *
- * Create mode carries one more block: the identity keys this object opts
- * into. Declaring one materializes its backing attribute in the same
- * transaction, which is why it is asked at birth and nowhere else here —
- * edit mode is objects-6's seam, not this dialog's.
+ * Both modes carry one more block: the identity keys this object opts into.
+ * Declaring one materializes its backing attribute in the same transaction,
+ * undeclaring one drops it — which the slug rule allows only while the
+ * object has no records (§9). Once a record exists the block is disabled and
+ * says why, so the rule is met where it binds rather than as a failed save.
  */
 export function ObjectDialog(
   props: {
@@ -54,6 +55,9 @@ export function ObjectDialog(
           singular: string
           plural: string
           icon: string | null
+          identityKeys: Array<IdentityKey>
+          /** one record freezes the declaration (§9 — the slug rule) */
+          hasRecords: boolean
         }
       }
   ),
@@ -93,6 +97,9 @@ function ObjectForm(
           singular: string
           plural: string
           icon: string | null
+          identityKeys: Array<IdentityKey>
+          /** one record freezes the declaration (§9 — the slug rule) */
+          hasRecords: boolean
         }
       }
   ),
@@ -104,8 +111,11 @@ function ObjectForm(
   const [pluralTouched, setPluralTouched] = useState(Boolean(existing))
   const [icon, setIcon] = useState<string | null>(existing?.icon ?? 'boxes')
   // Unticked at birth: identity is opt-in, and a bag that wants none is the
-  // common case (spec §9).
-  const [identityKeys, setIdentityKeys] = useState<Array<IdentityKey>>([])
+  // common case (spec §9). In edit mode it starts as what stands.
+  const [identityKeys, setIdentityKeys] = useState<Array<IdentityKey>>(
+    existing?.identityKeys ?? [],
+  )
+  const keysFrozen = existing?.hasRecords ?? false
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
@@ -143,6 +153,15 @@ function ObjectForm(
               ? { plural: plural.trim() }
               : {}),
             ...(icon !== props.object.icon ? { icon } : {}),
+            // Sent only when it actually moved: an unchanged declaration is
+            // not a change, so a rename on a populated object still saves.
+            ...(IDENTITY_KEYS.some(
+              (k) =>
+                identityKeys.includes(k) !==
+                props.object.identityKeys.includes(k),
+            )
+              ? { identityKeys }
+              : {}),
           },
         })
         toast(`${plural.trim()} saved`)
@@ -252,43 +271,52 @@ function ObjectForm(
         </div>
       </div>
 
-      {/* Identity keys (spec §9) — create mode only: declaring one
-          materializes its backing attribute in the same write. */}
-      {props.mode === 'create' ? (
-        <div className="flex flex-col gap-1.5">
-          <Label>Identity keys</Label>
-          <div className="flex flex-col border border-rule bg-bone px-3 py-2">
-            {IDENTITY_KEYS.map((key) => {
-              const backing = IDENTITY_KEY_ATTRIBUTES[key]
-              const on = identityKeys.includes(key)
-              return (
-                <label
-                  key={key}
-                  className="flex min-h-8 cursor-pointer items-center gap-2.5 py-1"
-                >
-                  <Checkbox
-                    checked={on}
-                    aria-label={backing.name}
-                    onCheckedChange={(next) =>
-                      setIdentityKeys((keys) =>
-                        next ? [...keys, key] : keys.filter((k) => k !== key),
-                      )
-                    }
-                  />
-                  <span className="text-ui">{backing.name}</span>
-                  <span className="mono text-micro text-graphite">
-                    {backing.type} attribute · created with the object
-                  </span>
-                </label>
-              )
-            })}
-            <p className="pt-1 text-label text-graphite">
-              two {plural.trim() || 'Funds'} claiming the same domain become a
-              duplicate suggestion instead of two records
-            </p>
-          </div>
+      {/* Identity keys (spec §9). Declaring one materializes its backing
+          attribute in the same write and undeclaring one drops it, so the
+          declaration is revisable only while the object has no records. */}
+      <div className="flex flex-col gap-1.5">
+        <Label>Identity keys</Label>
+        <div className="flex flex-col border border-rule bg-bone px-3 py-2">
+          {IDENTITY_KEYS.map((key) => {
+            const backing = IDENTITY_KEY_ATTRIBUTES[key]
+            const on = identityKeys.includes(key)
+            return (
+              <label
+                key={key}
+                className={cn(
+                  'flex min-h-8 items-center gap-2.5 py-1',
+                  keysFrozen ? 'text-graphite' : 'cursor-pointer',
+                )}
+              >
+                <Checkbox
+                  checked={on}
+                  disabled={keysFrozen}
+                  aria-label={backing.name}
+                  onCheckedChange={(next) =>
+                    setIdentityKeys((keys) =>
+                      next ? [...keys, key] : keys.filter((k) => k !== key),
+                    )
+                  }
+                />
+                <span className="text-ui">{backing.name}</span>
+                <span className="mono text-micro text-graphite">
+                  {backing.type} attribute ·{' '}
+                  {props.mode === 'create'
+                    ? 'created with the object'
+                    : on
+                      ? 'declared'
+                      : 'not declared'}
+                </span>
+              </label>
+            )
+          })}
+          <p className="pt-1 text-label text-graphite">
+            {keysFrozen
+              ? `${existing?.plural ?? 'This object'} has records — identity keys are frozen, since a record's claim on a domain outlives the tick that allowed it`
+              : `two ${plural.trim() || 'Funds'} claiming the same domain become a duplicate suggestion instead of two records`}
+          </p>
         </div>
-      ) : null}
+      </div>
 
       {/* The slug is derived and frozen — shown, never edited. */}
       <div className="flex flex-col gap-1 border border-rule bg-bone px-3 py-2.5">
