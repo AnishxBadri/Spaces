@@ -681,3 +681,317 @@
   border-bottom-color: var(--hairline);
   background: var(--bone);
 }
+
+/**
+ * ─── The editor's chrome ───────────────────────────────────────────────────
+ *
+ * BlockNote is a vendor surface being taught a vocabulary. `note-editor.tsx`
+ * carries the map of which surface went which way; this is the half that could
+ * not be handed over, because BlockNote builds it from its own markup with
+ * shadcn class names it never reads from a context. Everything below is scoped
+ * to `.prose-note` — the wrapper both call sites put the editor in, and the
+ * ancestor of the element its floating UI portals into — except where a Radix
+ * portal escapes that scope, which is said where it happens.
+ *
+ * DESIGN.md §4 Depth and §5 "Menus / pickers" are the contract: paper, a 1px
+ * ink edge, a 2px hard offset shadow, radius 0, 28px rows highlighting in
+ * bone, caps mono group labels. No blur anywhere.
+ */
+
+/**
+ * BlockNote's own variables, which it declares on `.bn-root` — worn by both
+ * the editor container and the element its floating UI portals into, so one
+ * rule reaches every sheet. Radius is why this block has to state all three
+ * steps: BlockNote derives small and large from the base with
+ * `max(… ± 2px, 1px)`, so a base of 0 yields 1px, not 0.
+ *
+ * The highlight ramp (`--bn-colors-highlights-*`) is deliberately untouched:
+ * those are colours a writer picked and the document stored, not chrome.
+ */
+.prose-note .bn-root {
+  --bn-colors-editor-text: var(--foreground);
+  --bn-colors-editor-background: transparent;
+  --bn-colors-menu-text: var(--foreground);
+  --bn-colors-menu-background: var(--paper);
+  --bn-colors-tooltip-text: var(--background);
+  --bn-colors-tooltip-background: var(--foreground);
+  --bn-colors-hovered-text: var(--foreground);
+  --bn-colors-hovered-background: var(--bone);
+  --bn-colors-selected-text: var(--foreground);
+  --bn-colors-selected-background: var(--selected);
+  --bn-colors-disabled-text: var(--graphite);
+  --bn-colors-disabled-background: var(--bone-deep);
+  --bn-colors-shadow: var(--hairline);
+  --bn-colors-border: var(--rule);
+  /* Also the placeholder's colour — BlockNote draws both from this one. */
+  --bn-colors-side-menu: var(--graphite);
+  --bn-font-family: var(--font-sans);
+  --bn-border: 1px solid var(--hairline);
+  --bn-border-radius: 0;
+  --bn-border-radius-small: 2px; /* controls */
+  --bn-border-radius-medium: 0; /* sheets */
+  --bn-border-radius-large: 0;
+  --bn-shadow-light: 2px 2px 0 0 var(--hairline);
+  --bn-shadow-medium: 2px 2px 0 0 var(--hairline);
+}
+
+/**
+ * Every lifted sheet in the editor: the slash menu, the @-mention menu, the
+ * emoji picker, the formatting toolbar, the link toolbar, the file panel.
+ * One rule, because DESIGN.md gives them one anatomy.
+ */
+.prose-note .bn-suggestion-menu,
+.prose-note .bn-grid-suggestion-menu,
+.prose-note .bn-toolbar,
+.prose-note .bn-panel {
+  border: 1px solid var(--hairline);
+  border-radius: 0;
+  background: var(--paper);
+  box-shadow: 2px 2px 0 0 var(--hairline);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--text-ui);
+  line-height: var(--text-ui--line-height);
+  padding: 4px;
+}
+
+.prose-note .bn-suggestion-menu,
+.prose-note .bn-grid-suggestion-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 15rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.prose-note .bn-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  height: fit-content;
+}
+
+/* A menu row: 28px, square, highlighted in bone — never a wash and never a
+   bar (the No-Bar Rule). `aria-selected` is the keyboard cursor and `:hover`
+   the pointer; both land on the same value so the two can never disagree. */
+.prose-note .bn-suggestion-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding-inline: 8px;
+  border-radius: 0;
+  outline: none;
+  color: var(--foreground);
+  font-size: var(--text-ui);
+  line-height: var(--text-ui--line-height);
+  cursor: default;
+  transition: background-color 100ms var(--ease-out-quart);
+}
+
+.prose-note .bn-suggestion-menu-item:hover,
+.prose-note .bn-suggestion-menu-item[aria-selected='true'] {
+  background: var(--bone);
+}
+
+/* The mark lane. BlockNote pads it to 12px, which a 28px row has no room for;
+   the mark sits in the row's own gap instead. */
+.prose-note .bn-suggestion-menu-item > [data-position='left'] {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  color: var(--graphite);
+}
+
+.prose-note .bn-suggestion-menu-item > [data-position='left'] svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* The label column: BlockNote stacks a title and a subtext in it. The title
+   keeps the row; the subtext does not ship — a 28px row holds one line, and
+   Instrument's menus (the command palette, the columns popover) name an
+   option rather than explaining it in a sentence underneath. Selected
+   structurally because the vendor gives neither div a class of its own. */
+.prose-note .bn-suggestion-menu-item > :not([data-position]) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.prose-note .bn-suggestion-menu-item > :not([data-position]) > * {
+  font-size: var(--text-ui);
+  line-height: var(--text-ui--line-height);
+}
+
+.prose-note .bn-suggestion-menu-item > :not([data-position]) > :nth-child(2) {
+  display: none;
+}
+
+/* The kind chip on a mention row. The badge is BlockNote's own: the app's
+   `Badge` is an option badge and takes its hue off an option row, so there is
+   nothing to hand over here — this dresses the vendor's instead. */
+.prose-note .bn-suggestion-menu-item > [data-position='right'] {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.prose-note
+  .bn-suggestion-menu-item
+  > [data-position='right']
+  [data-slot='badge'] {
+  display: flex;
+  align-items: center;
+  height: 1.25rem;
+  padding-inline: 0.375rem;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: var(--bone);
+  color: var(--graphite);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: var(--text-micro--line-height);
+  font-weight: 500;
+}
+
+/* Group labels — caps mono at the `field-label` step, graphite. The same head
+   a command-palette group wears. */
+.prose-note .bn-suggestion-menu-label {
+  padding: 8px 8px 4px;
+  color: var(--graphite);
+  font-family: var(--font-mono);
+  font-size: var(--text-field);
+  line-height: var(--text-field--line-height);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* The while-you-type loader. Recoloured only: swapping the spinner for the
+   density ramp needs a `Components` override BlockNote does not expose. */
+.prose-note .bn-suggestion-menu-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  color: var(--graphite);
+}
+
+.prose-note .bn-suggestion-menu-loader svg {
+  fill: var(--graphite);
+}
+
+/**
+ * The block-type picker in the formatting toolbar. Radix portals its listbox
+ * to `document.body`, out of `.prose-note`'s reach — `.bn-select` is
+ * BlockNote's own class on that element and the only hook that survives the
+ * portal, which is why this one rule is not scoped like its neighbours.
+ */
+.prose-note .bn-toolbar [data-slot='select-trigger'] {
+  height: 2rem;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--foreground);
+  font-size: var(--text-ui);
+}
+
+.prose-note .bn-toolbar [data-slot='select-trigger']:hover {
+  background: var(--bone);
+}
+
+.bn-select {
+  padding: 4px;
+  border: 1px solid var(--hairline);
+  border-radius: 0;
+  background: var(--paper);
+  box-shadow: 2px 2px 0 0 var(--hairline);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--text-ui);
+}
+
+.bn-select [data-slot='select-item'] {
+  height: 28px;
+  border-radius: 0;
+  font-size: var(--text-ui);
+}
+
+.bn-select [data-slot='select-item'][data-highlighted] {
+  background: var(--bone);
+  color: var(--foreground);
+}
+
+/**
+ * The drag handle and its `+`. Geometry is BlockNote's — the hit area, the
+ * 24px button, the per-block-type heights it sets off `data-block-type` — and
+ * fighting it buys a handle that misses the block it drags. Colour and radius
+ * are the app's.
+ */
+.prose-note .bn-side-menu .bn-button {
+  border-radius: 2px;
+  background: transparent;
+  color: var(--graphite);
+}
+
+.prose-note .bn-side-menu .bn-button:hover {
+  background: var(--bone);
+  color: var(--foreground);
+}
+
+/* Table row/column handles and the extend buttons, on the same terms: bone
+   and graphite, squared, positioning untouched. */
+.prose-note .bn-table-handle,
+.prose-note .bn-extend-button {
+  border-radius: 2px;
+  background: var(--bone);
+  color: var(--graphite);
+}
+
+.prose-note .bn-table-handle:hover,
+.prose-note .bn-extend-button:hover {
+  background: var(--bone-deep);
+  color: var(--foreground);
+}
+
+.prose-note .bn-extend-button-editing {
+  background: var(--selected);
+  color: var(--foreground);
+}
+
+/* The last radii BlockNote spells out by hand instead of deriving them from
+   `--bn-border-radius`: 8px on a code block, 4px on the file-block parts.
+   Instrument has 0 on a block and 2px on a control, and 4, 6 and 8 are not on
+   the list. Colour and geometry are left where they are — a code block's fill
+   is content, and the file block belongs to the slice that lands file drops. */
+.prose-note .bn-block-content[data-content-type='codeBlock'],
+.prose-note [data-file-block] .bn-add-file-button,
+.prose-note [data-file-block] .bn-file-name-with-icon,
+.prose-note [data-file-block] .bn-visual-media,
+.prose-note [data-file-block] .bn-resize-handle {
+  border-radius: 0;
+}
+
+/**
+ * A selected block. BlockNote draws a 4px #64a0ff halo on a 4px radius — a
+ * browser focus ring by another name. Instrument's selection is the wash
+ * behind a 1px ink edge, square; focus is the reticle and never a ring.
+ */
+.prose-note .bn-block-content.ProseMirror-selectednode > *,
+.prose-note .ProseMirror-selectednode > .bn-block-content > * {
+  border-radius: 0;
+  outline: 1px solid var(--hairline);
+  background: var(--selected);
+}
+
+/* The editor body owns no focus ring of its own: the caret is the indicator,
+   and every control inside it carries `focus-ring` from the app's primitives
+   (`instrument-chrome.tsx` is what hands them over). */
+.prose-note .bn-editor:focus,
+.prose-note .bn-editor:focus-visible {
+  outline: none;
+}
