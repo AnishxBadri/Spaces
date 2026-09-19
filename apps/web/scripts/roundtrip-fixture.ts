@@ -74,7 +74,7 @@ async function plant() {
     mime: 'application/pdf',
     sizeBytes,
     kind: 'deck',
-    origin: 'upload',
+    sourceClass: 'manual',
     uploadedBy: FIXTURE.userId,
   })
   await db.insert(link).values({

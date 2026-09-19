@@ -54,7 +54,7 @@ async function buildTaggedDocument(tag: string) {
     blobSha: null,
     filename: `deck-${tag}.pdf`,
     kind: 'deck',
-    origin: 'upload',
+    sourceClass: 'manual',
   })
 
   // The four rows the hand-written lists missed, and the two they cleared.

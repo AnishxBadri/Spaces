@@ -267,6 +267,13 @@ function DocumentRow({
             formatBytes(doc.sizeBytes),
             doc.createdAt.slice(5, 10),
             doc.uploadedByName,
+            // Named, not classed (SPA-137): the reader installed "gmail" and
+            // that is the word they know — "integration" would tell them
+            // nothing they could act on. A hand-uploaded file gets no suffix
+            // at all, because "via nobody" is noise on every row but the few
+            // a connector filed. The server resolved the ref to the
+            // capability id; this line only prints it.
+            doc.sourceCapability ? `via ${doc.sourceCapability}` : null,
           ]
             .filter(Boolean)
             .join(' · ')}

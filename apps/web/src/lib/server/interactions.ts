@@ -1,9 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { db } from '@spaces/db'
-import { interaction, interactionEntity } from '@spaces/db/schema'
-import { activity } from '@spaces/db/schema/activity'
-import { requireUser } from './shared'
+import { requireUser, writeInteraction } from './shared'
 
 const logInteractionInput = z.object({
   kind: z.enum(['meeting', 'call']),
@@ -17,28 +14,14 @@ export const logInteraction = createServerFn({ method: 'POST' })
   .validator(logInteractionInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    return db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(interaction)
-        .values({
-          kind: data.kind,
-          source: 'manual',
-          subject: data.subject,
-          occurredAt: new Date(data.occurredAt),
-        })
-        .returning({ id: interaction.id })
-      for (const entityId of new Set(data.attendeeIds)) {
-        await tx
-          .insert(interactionEntity)
-          .values({ interactionId: row.id, entityId })
-          .onConflictDoNothing()
-      }
-      await tx.insert(activity).values({
-        actorId: u.id,
-        verb: `interaction.${data.kind}`,
-        subjectEntityId: data.attendeeIds[0],
-        meta: { interactionId: row.id },
-      })
-      return { id: row.id }
+    // The write itself is `writeInteraction` in server/shared.ts: this file
+    // is re-exported to the client by the server-fns barrel, and the helper
+    // is what the test calls (CLAUDE.md → Traps).
+    return writeInteraction({
+      kind: data.kind,
+      subject: data.subject,
+      occurredAt: new Date(data.occurredAt),
+      attendeeIds: data.attendeeIds,
+      actorId: u.id,
     })
   })

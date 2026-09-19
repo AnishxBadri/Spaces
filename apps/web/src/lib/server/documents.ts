@@ -4,12 +4,11 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
 import { document, entity, jobRun, link } from '@spaces/db/schema'
-import { activity } from '@spaces/db/schema/activity'
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
 import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue } from '../queue'
 import { storage } from '../storage'
-import { requireUser } from './shared'
+import { documentProvenance, fileDocumentRow, requireUser } from './shared'
 
 /**
  * Upload is two calls around a direct-to-storage PUT, because a 200MB deck
@@ -94,46 +93,19 @@ export const finalizeDocumentUpload = createServerFn({ method: 'POST' })
     ).at(0)
     if (existing) return { id: existing.id, deduped: true }
 
-    const id = await db.transaction(async (tx) => {
-      const [ent] = await tx
-        .insert(entity)
-        .values({
-          kind: 'document',
-          canonicalName: data.filename,
-          createdBy: u.id,
-        })
-        .returning({ id: entity.id })
-
-      await tx.insert(document).values({
-        entityId: ent.id,
-        blobSha: data.sha,
-        filename: data.filename,
-        mime: data.mime ?? null,
-        sizeBytes: data.sizeBytes,
-        kind: data.kind,
-        origin: 'upload',
-        uploadedBy: u.id,
-      })
-
-      // Attachment goes through `link` — document.entity_id is the
-      // document's own identity, not the record it belongs to.
-      await tx.insert(link).values({
-        fromEntityId: ent.id,
-        toEntityId: data.attachTo,
-        relation: 'tagged_in',
-        source: 'manual',
-        createdBy: u.id,
-      })
-
-      await tx.insert(activity).values({
-        actorId: u.id,
-        verb: 'document.filed',
-        subjectEntityId: data.attachTo,
-        objectEntityId: ent.id,
-        meta: { filename: data.filename, kind: data.kind },
-      })
-
-      return ent.id
+    // The rows themselves are `fileDocumentRow` in server/shared.ts: this
+    // file is re-exported to the client by the server-fns barrel (CLAUDE.md
+    // → Traps), so the half a test can call has to live next door. What
+    // stays here is what needs a request — the auth check, the storage
+    // probe, the dedupe read and the enqueue.
+    const { id } = await fileDocumentRow({
+      sha: data.sha,
+      filename: data.filename,
+      mime: data.mime ?? null,
+      sizeBytes: data.sizeBytes,
+      kind: data.kind,
+      attachTo: data.attachTo,
+      actorId: u.id,
     })
 
     // Outside the transaction: a queue that's down must not roll back a
@@ -155,7 +127,6 @@ export const listRecordDocuments = createServerFn()
         mime: document.mime,
         sizeBytes: document.sizeBytes,
         kind: document.kind,
-        origin: document.origin,
         extractionStatus: document.extractionStatus,
         extractionError: document.extractionError,
         createdAt: document.createdAt,
@@ -179,6 +150,14 @@ export const listRecordDocuments = createServerFn()
     if (rows.length === 0) return []
     const users = await db.select({ id: user.id, name: user.name }).from(user)
     const names = new Map(users.map((x) => [x.id, x.name]))
+
+    // Who filed it (SPA-137). The class alone is only half an answer for one
+    // of the eight values — "integration" names no integration — so the ref
+    // is resolved to the capability id here, server side, once, exactly as
+    // the dedupe card resolves an entity's. The row said `origin` until this
+    // slice and nothing rendered it; now the class is a class and the vendor
+    // is a row, and the file line can finally name it.
+    const provenance = await documentProvenance(rows.map((r) => r.id))
 
     // The last extraction attempt per document (SPA-106). `document.extraction_*`
     // says what the file is; `job_run` says what the worker did about it — which
@@ -223,14 +202,24 @@ export const listRecordDocuments = createServerFn()
       ]),
     )
 
-    return rows.map((r) => ({
-      ...r,
-      filename: r.filename ?? 'Untitled file',
-      createdAt: r.createdAt.toISOString(),
-      uploadedByName: r.uploadedBy ? (names.get(r.uploadedBy) ?? null) : null,
-      snippet: r.snippet?.replace(/\s+/g, ' ').trim() || null,
-      lastRun: runs.get(r.id) ?? null,
-    }))
+    return rows.map((r) => {
+      // Not `?? 'manual'`: a default here would invent a provenance for a
+      // row whose own is missing, which is the lie the whole collapse is
+      // against. The id came out of `document` two statements ago, so a miss
+      // is a bug, and it says so.
+      const source = provenance.get(r.id)
+      if (!source) throw new Error(`No provenance row for document ${r.id}`)
+      return {
+        ...r,
+        filename: r.filename ?? 'Untitled file',
+        createdAt: r.createdAt.toISOString(),
+        uploadedByName: r.uploadedBy ? (names.get(r.uploadedBy) ?? null) : null,
+        snippet: r.snippet?.replace(/\s+/g, ' ').trim() || null,
+        lastRun: runs.get(r.id) ?? null,
+        sourceClass: source.sourceClass,
+        sourceCapability: source.sourceCapability,
+      }
+    })
   })
 
 /**

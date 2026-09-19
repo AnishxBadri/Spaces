@@ -211,6 +211,13 @@
       "when": 1789814528755,
       "tag": "0029_source_class",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1789816307848,
+      "tag": "0030_source_class_interaction_document",
+      "breakpoints": true
     }
   ]
 }

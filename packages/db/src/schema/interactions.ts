@@ -1,4 +1,5 @@
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -10,7 +11,9 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
-import { entity } from './entities'
+import { sql } from 'drizzle-orm'
+import { entity, sourceClass } from './entities'
+import { integration } from './integrations'
 import type { Json } from '../json'
 
 /**
@@ -25,28 +28,25 @@ export const interactionKind = pgEnum('interaction_kind', [
   'call',
 ])
 
-/**
- * Which lane produced the interaction (integration map, CONTEXT.md). A
- * Calendar meeting, a Fireflies transcript, and a WhatsApp export are
- * different evidence with different trust; the timeline and relationship
- * scoring need to tell them apart.
- */
-export const interactionSource = pgEnum('interaction_source', [
-  'manual',
-  'email_sync',
-  'forwarding',
-  'calendar',
-  'recorder',
-  'whatsapp',
-  'import',
-])
-
 export const interaction = pgTable(
   'interaction',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     kind: interactionKind('kind').notNull(),
-    source: interactionSource('source').notNull().default('manual'),
+    /**
+     * Which lane produced the interaction — as a class, and the vendor as a
+     * row (SPA-137, migration 0030). `interaction_source` named five of them
+     * in the type itself (`email_sync`, `forwarding`, `calendar`, `recorder`,
+     * `whatsapp`), which is the shape a third-party plugin cannot migrate:
+     * a Fireflies plugin would have had to ALTER a shared enum to say it
+     * wrote a row. A Calendar meeting and a WhatsApp export are still
+     * different evidence with different trust — the difference is now
+     * `source_ref`, which names the installed integration rather than the
+     * product category.
+     */
+    sourceClass: sourceClass('source_class').notNull().default('manual'),
+    /** The integration that wrote the row; null for every other class. */
+    sourceRef: uuid('source_ref').references(() => integration.id),
     // RFC822 Message-ID — dedupe across mailboxes: same thread in both
     // partners' inboxes must be one interaction.
     messageId: text('message_id'),
@@ -61,6 +61,14 @@ export const interaction = pgTable(
     uniqueIndex('interaction_message_id_unique').on(t.messageId),
     index('interaction_thread_idx').on(t.threadId),
     index('interaction_occurred_idx').on(t.occurredAt),
+    // The same biconditional the entity and alias rows carry: an
+    // `integration` row that cannot say which integration wrote it is a
+    // provenance hole, and a `manual` row carrying an integration id is a
+    // provenance lie. Both directions, one constraint.
+    check(
+      'interaction_source_ref_invariant',
+      sql`(${t.sourceClass} = 'integration') = (${t.sourceRef} IS NOT NULL)`,
+    ),
   ],
 )
 

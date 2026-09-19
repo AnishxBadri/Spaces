@@ -1,9 +1,10 @@
 import { getRequest } from '@tanstack/react-start/server'
-import { and, asc, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { auth } from '../auth'
 import { db } from '@spaces/db'
 import {
   attribute,
+  document,
   entity,
   integration,
   interaction,
@@ -13,6 +14,7 @@ import {
   space,
 } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
+import type { DocumentKind } from '@spaces/core/documents'
 
 /** Closed JSON type — Start's serializer rejects `unknown`. */
 export type { Json } from '#/lib/json'
@@ -320,4 +322,152 @@ export function groupReferencedBy(
     if (!existing) groups.set(row.attrSlug, group)
   }
   return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label))
+}
+
+/**
+ * The same question for documents, asked in bulk (SPA-137).
+ *
+ * A document carries its own provenance pair rather than borrowing its
+ * entity row's: the bytes and the record are two different arrivals — a deck
+ * a connector filed against a company a human created — and
+ * `docs/spec-storage-sources.md` §2 lists provenance as an axis of the
+ * document, not of its entity.
+ *
+ * Bulk because the Files tab reads a list, and one row at a time would be
+ * one query per file. Left join for the same reason `provenanceOf` uses one:
+ * every non-integration document's ref is null, and
+ * `document_source_ref_invariant` is what makes that a fact.
+ */
+export async function documentProvenance(
+  documentIds: Array<string>,
+): Promise<
+  Map<string, { sourceClass: SourceClass; sourceCapability: string | null }>
+> {
+  if (documentIds.length === 0) return new Map()
+  const rows = await db
+    .select({
+      id: document.entityId,
+      sourceClass: document.sourceClass,
+      sourceCapability: integration.capabilityId,
+    })
+    .from(document)
+    .leftJoin(integration, eq(integration.id, document.sourceRef))
+    .where(inArray(document.entityId, documentIds))
+  return new Map(
+    rows.map((r) => [
+      r.id,
+      { sourceClass: r.sourceClass, sourceCapability: r.sourceCapability },
+    ]),
+  )
+}
+
+/**
+ * The rows a filed document is made of — entity, document, the `tagged_in`
+ * edge, the activity line — behind the `finalizeDocumentUpload` server fn,
+ * and here for `writeInteraction`'s reason.
+ *
+ * `source_class: 'manual'` with no ref: a person dropped a file on the Files
+ * tab, which is the plainest `manual` write in the product, and the
+ * biconditional would reject a ref anyway. A connector filing the same bytes
+ * would call this with the pair set the other way round — the point of the
+ * collapse is that the two differ by a row id, not by an enum value nobody
+ * outside core can add.
+ */
+export async function fileDocumentRow(input: {
+  sha: string
+  filename: string
+  mime: string | null
+  sizeBytes: number
+  kind: DocumentKind
+  attachTo: string
+  actorId: string
+}): Promise<{ id: string }> {
+  const { activity } = await import('@spaces/db/schema/activity')
+  return db.transaction(async (tx) => {
+    const [ent] = await tx
+      .insert(entity)
+      .values({
+        kind: 'document',
+        canonicalName: input.filename,
+        createdBy: input.actorId,
+      })
+      .returning({ id: entity.id })
+
+    await tx.insert(document).values({
+      entityId: ent.id,
+      blobSha: input.sha,
+      filename: input.filename,
+      mime: input.mime,
+      sizeBytes: input.sizeBytes,
+      kind: input.kind,
+      sourceClass: 'manual',
+      uploadedBy: input.actorId,
+    })
+
+    // Attachment goes through `link` — document.entity_id is the document's
+    // own identity, not the record it belongs to.
+    await tx.insert(link).values({
+      fromEntityId: ent.id,
+      toEntityId: input.attachTo,
+      relation: 'tagged_in',
+      source: 'manual',
+      createdBy: input.actorId,
+    })
+
+    await tx.insert(activity).values({
+      actorId: input.actorId,
+      verb: 'document.filed',
+      subjectEntityId: input.attachTo,
+      objectEntityId: ent.id,
+      meta: { filename: input.filename, kind: input.kind },
+    })
+
+    return { id: ent.id }
+  })
+}
+
+/**
+ * The interaction write behind the `logInteraction` server fn. Here rather
+ * than beside it for `birthHolding`'s reason: `src/lib/server-fns.ts`
+ * re-exports the domain files wholesale to the client (CLAUDE.md), so a
+ * helper that is not a serverFn cannot live in `server/interactions.ts` —
+ * and this is also what makes the write directly testable.
+ *
+ * `source_class: 'manual'` is written as a literal, not left to the column
+ * default: a person filling in the Log-interaction dialog is the clearest
+ * `manual` writer in the product, and a row whose provenance is whatever the
+ * default happened to be is not a claim anyone checked.
+ */
+export async function writeInteraction(input: {
+  kind: 'meeting' | 'call'
+  subject: string
+  occurredAt: Date
+  attendeeIds: Array<string>
+  actorId: string
+}): Promise<{ id: string }> {
+  const { activity } = await import('@spaces/db/schema/activity')
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(interaction)
+      .values({
+        kind: input.kind,
+        sourceClass: 'manual',
+        subject: input.subject,
+        occurredAt: input.occurredAt,
+      })
+      .returning({ id: interaction.id })
+    for (const entityId of new Set(input.attendeeIds)) {
+      await tx
+        .insert(interactionEntity)
+        .values({ interactionId: row.id, entityId })
+        .onConflictDoNothing()
+    }
+    await tx.insert(activity).values({
+      actorId: input.actorId,
+      verb: `interaction.${input.kind}`,
+      subjectEntityId: input.attendeeIds[0],
+      meta: { interactionId: row.id },
+    })
+    return { id: row.id }
+  })
 }

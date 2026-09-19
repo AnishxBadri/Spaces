@@ -3096,7 +3096,9 @@ async function seedDocuments(
       mime: 'text/plain',
       sizeBytes: bytes.byteLength,
       kind: d.kind,
-      origin: 'upload',
+      // The row's writer, not a fiction about how the bytes arrived: this
+      // file wrote it, and its entity row has said `seed` since SPA-118.
+      sourceClass: 'seed',
       extractedText: d.status === 'done' ? d.text : null,
       // Same expression the extraction worker writes — one tsvector config.
       tsv: d.status === 'done' ? sql`to_tsvector('english', ${d.text})` : null,
@@ -3164,7 +3166,13 @@ async function seedInteractions(
         .insert(interaction)
         .values({
           kind,
-          source: kind === 'email' ? 'email_sync' : 'manual',
+          // Was `email_sync` for the email rows — the only writer of a
+          // vendor-named lane anywhere in the tree, and the reason SPA-137
+          // had a backfill to decide at all. Nothing synced these: this file
+          // generated them, so they say `seed` like every other row it
+          // writes. The lane a real email arrives by will be an integration
+          // row in `source_ref`, not a word in a shared enum.
+          sourceClass: 'seed',
           messageId: kind === 'email' ? `<seed-${i}-${k}@dealos.local>` : null,
           threadId: `seed-thread-${i}`,
           subject: `${INTERACTION_SUBJECTS[(i * 3 + k) % INTERACTION_SUBJECTS.length]} — ${c.name}`,

@@ -622,16 +622,19 @@ note(entity_id, title, body_json, body_md, tsv, kind: note|memo|scratch,
      author_id, visibility, updated_at)   -- body_json authoritative (2026-07)
 document(entity_id, blob_sha, filename, mime, url, size_bytes,
          kind: deck|dd|cap_table|legal|article|other,
-         origin: upload|gmail_attachment|url|clip,
+         source_class, source_ref → integration,
          extracted_text, tsv, extraction_status, extraction_error,
          extracted_at, uploaded_by)
   -- Corrected 2026-09-15. The shipped enum carries `other`; the 2026-09-14/15
   -- documents decision drops `memo` (six values remain — an exported memo PDF is
   -- `derived_from → note`) and collapses `origin` into `source_class + source_ref`
   -- with the other vendor enums, adding source_path / external_id / external_url /
-  -- external_status / connection_id. `memo` and `origin` are still present in code
-  -- as of 2026-09-15. See "Sources are documents" below and
-  -- `docs/spec-storage-sources.md` §2, §11.
+  -- external_status / connection_id. The collapse landed 2026-09-19 (SPA-137,
+  -- migration 0030): `upload`/`url`/`clip` → manual, `gmail_attachment` →
+  -- integration + a ref once a connector exists, and `document_origin` is
+  -- dropped. `memo` is still present in code. `interaction.source` went the same
+  -- way in the same migration, so no shared enum in public.* names a vendor. See
+  -- "Sources are documents" below and `docs/spec-storage-sources.md` §2, §11.
 document_chunk(document_id, idx, text, embedding vector)
 term(entity_id, name, aliases[], definition_md, space_id)
 ```
@@ -1072,7 +1075,13 @@ Doctrine:
 ### Interactions and enrichment
 
 ```
-interaction(id, kind: email|meeting|call, message_id, thread_id, occurred_at)
+interaction(id, kind: email|meeting|call, message_id, thread_id, occurred_at,
+            source_class, source_ref → integration)
+  -- `interaction_source` named five lanes in the type itself (email_sync,
+  -- forwarding, calendar, recorder, whatsapp); collapsed 2026-09-19 (SPA-137,
+  -- migration 0030) into the same class+ref pair every other provenance column
+  -- carries. Which product a meeting came from is the integration row, not a
+  -- word a third-party plugin would have to ALTER a shared enum to add.
 interaction_entity(interaction_id, entity_id)       -- relationship graph edge table
 signal(entity_id, source, payload jsonb, observed_at)
 enrichment_record(entity_id, provider, raw jsonb, fetched_at, credits_used)
