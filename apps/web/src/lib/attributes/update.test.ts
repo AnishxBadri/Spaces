@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
-import { afterAll, describe, expect, expectTypeOf, it } from 'vitest'
-import { cleanupTestEntities } from '../entities/test-helpers'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { AttributeConfigPatch, UpdateAttributePatch } from './update'
 
 // ---------------------------------------------------------------------------
@@ -73,14 +72,6 @@ describe('updateAttributeInput (zod boundary)', () => {
 
 const tag = randomUUID().slice(0, 8)
 const slugFor = (base: string) => `zz_upd_${base}_${tag}`
-
-afterAll(async () => {
-  await cleanupTestEntities(['^UpdCo [0-9a-f]{4,8}( .*)?$'])
-  const { db } = await import('@spaces/db')
-  const { attribute } = await import('@spaces/db/schema')
-  const { like } = await import('drizzle-orm')
-  await db.delete(attribute).where(like(attribute.slug, `zz_upd_%_${tag}`))
-})
 
 async function makeAttribute(
   base: string,

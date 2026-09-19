@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { valueValidator } from './registry'
 import type { AttributeDef, AttributeOptions, AttributeType } from './registry'
 import type { Json } from '#/lib/json'
-import { cleanupTestEntities } from '../entities/test-helpers'
 
 describe('valueValidator', () => {
   it('validates select against options', () => {
@@ -148,14 +147,6 @@ describe('required means can’t-clear (all types)', () => {
   const tag = randomUUID().slice(0, 8)
   const slug = (t: string) => `req_${t}_${tag}`
 
-  afterAll(async () => {
-    const { db } = await import('@spaces/db')
-    const { attribute } = await import('@spaces/db/schema')
-    const { like } = await import('drizzle-orm')
-    await cleanupTestEntities([`^ReqCo ${tag}$`])
-    await db.delete(attribute).where(like(attribute.slug, `req_%_${tag}`))
-  })
-
   it('rejects an explicit clear per type family, allows born-empty', async () => {
     const { resolveEntity } = await import('../entities/resolve')
     const { setValues, AttributeValidationError } = await import('./values')
@@ -233,12 +224,6 @@ describe('required means can’t-clear (all types)', () => {
 })
 
 describe('setValues', () => {
-  afterAll(async () => {
-    await cleanupTestEntities([
-      '^(ValCo|ValDeal|ValPerson) [0-9a-f]{4,8}( .*)?$',
-    ])
-  })
-
   it('writes values, events, and reference links in one pass', async () => {
     const { resolveEntity } = await import('../entities/resolve')
     const { setValues, AttributeValidationError } = await import('./values')

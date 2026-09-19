@@ -1,12 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, describe, expect, it } from 'vitest'
-import { cleanupTestEntities } from './test-helpers'
-
-afterAll(async () => {
-  await cleanupTestEntities([
-    '^(MergeCo|KindCo|KindPerson|TestSpace|TestNote) [0-9a-f]{4,8}( .*)?$',
-  ])
-})
+import { describe, expect, it } from 'vitest'
 
 /**
  * Integration test against the test database. Builds two companies with

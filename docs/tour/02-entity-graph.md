@@ -194,13 +194,19 @@ domain now attaches to the **winner** (the redirect and alias move working
 end to end), and that `addIdentityAlias` on the stale loser id answers
 `already_own`.
 
-## `test-helpers.ts`
+## Cleaning up after a test
 
-`cleanupTestEntities(patterns)` deletes test entities and their dependents
-in FK-safe order. Trap: its deletion list is the one shadow of the table
-list that `ENTITY_REFS` doesn't cover — a new entity-referencing table
-needs a line here too, or cleanup starts failing on FK violations. It
-currently skips portfolio and task tables because no test creates them.
+Nothing here does. `test-helpers.ts` used to: `cleanupTestEntities(patterns)`
+found rows by regex over `entity.canonical_name` and hand-deleted from eleven
+tables in FK order, which made its deletion list a second shadow of
+`ENTITY_REFS` — a new entity-referencing table needed a line there too — and
+still missed everything not reachable from a tagged name, an attribute or a
+view or a duplicate_candidate among them.
+
+Deleted in SPA-145. Isolation is structural now: a vitest `setupFiles` entry
+truncates every table in `public` and reseeds before each test file, so a test
+writes whatever it likes and the next file never sees it. Nothing to add when
+a table appears, and nothing to remember when you write a test.
 
 ## What to hold onto
 

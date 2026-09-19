@@ -66,20 +66,33 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
 - Dev login: `anish@fund.example` (user knows the password). Login lands on
   `/today`; first-run setup lands on `/spaces`.
 - The test suite needs Postgres up, and **since 2026-09-19 (SPA-143) it has
-  its own database on it**: a vitest `globalSetup` in each package derives
-  `DATABASE_URL_TEST`, defaulting to `DATABASE_URL` with `_test` suffixed
-  onto the database name (`spaces` → `spaces_test`), creates that database if
-  it is absent, migrates it and — in `apps/web` — seeds it with the system
-  attributes, the starter taxonomy and one fixture `user` row, which is what
-  the `select id from user limit 1` sites in the suite resolve against. Drop
-  `spaces_test` any time; the next run rebuilds it. Same server, second
-  database: `docker-compose.dev.yml` is untouched, and **`pnpm test` no
-  longer writes a row into the database the running app is showing.** With
-  Postgres down the setup now fails once, naming the connection string,
-  instead of ten files each throwing `ECONNREFUSED` — which also means
-  `--filter=@spaces/db` no longer answers with Postgres stopped, even for
-  `entity-refs.test.ts`. The harness is `packages/db/src/test-db.ts`; it
-  never drops a database, only creates one.
+  its own databases on it — never the dev one.** A vitest `globalSetup` in
+  each package derives `DATABASE_URL_TEST`, defaulting to `DATABASE_URL` with
+  `_test` suffixed onto the database name (`spaces` → `spaces_test`), creates
+  that database if it is absent, migrates it and — in `apps/web` — seeds it
+  with the system attributes, the starter taxonomy and one fixture `user`
+  row, which is what the `select id from user limit 1` sites resolve against.
+  `spaces_test` is the _reference_ database: point `pnpm db:migrate:run` at
+  it, read it by hand, but no test writes to it.
+- **Isolation is per file, and structural (SPA-145).** A `setupFiles` entry
+  in each package truncates every table in `public` and reseeds before each
+  test file, so a test writes whatever it likes and the next file sees none
+  of it — no `afterAll` cleanup, no name tags to match, nothing to add when
+  a table appears. `cleanupTestEntities` is gone; do not reintroduce a
+  hand-written delete list. The truncate names tables in `public` only, so
+  `drizzle.__drizzle_migrations` and the `pgboss` schema are out of its
+  reach by construction. The grain is a database per vitest worker —
+  `apps/web` runs `maxWorkers: 4` on `pool: 'forks'` against
+  `spaces_test_web1…4`; `packages/db` runs `fileParallelism: false` against
+  `spaces_test_db1` — because a truncate must not be able to reach a file
+  running at the same moment in another worker. Drop any `spaces_test*`
+  database any time; the next run rebuilds it. With Postgres down the setup
+  fails once, naming the connection string, instead of ten files each
+  throwing `ECONNREFUSED` — which also means `--filter=@spaces/db` no longer
+  answers with Postgres stopped, even for `entity-refs.test.ts`. The harness
+  is `packages/db/src/test-db.ts` plus the `vitest.setup.ts` /
+  `vitest.global-setup.ts` pair in each package; it never drops a database,
+  only creates and truncates.
 
 ## Gates before any commit
 

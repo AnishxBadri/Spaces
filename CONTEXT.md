@@ -2203,27 +2203,34 @@ it lands.
 
 Standing debt:
 
-- **Test-db harness.** The suite shares the _dev_ database and mutates it; without a live
-  Postgres on :5432, the DB-backed tests fail with `ECONNREFUSED`. Recounted 2026-09-19 on
-  the `mono-1` branch: **23 files / 183 tests, 10 of them DB-coupled, 27 tests red** with
-  Postgres down. (The long-quoted "8 of 52" was from 2026-08 and the "21 files, 9 DB-backed"
-  revision from early September; both were stale enough to mislead.) ~~This is why CI cannot
-  simply run `vitest` yet — fixing it is the first technical task inside ship polish (phase
-  15).~~ **Superseded 2026-09-01: `.github/workflows/ci.yml` already runs `pnpm exec vitest
-run` against a `pgvector/pgvector:pg17` service container** — it shipped without the
-  harness the entry below banked as a prerequisite. What is still owed is a test database
-  the suite owns instead of the dev one: roadmap `mono-4` (global setup) and `mono-5`
-  (truncate between files), inside ship polish, which is entry 16 in this list, not phase 15.
-  **`mono-4` landed 2026-09-19 (SPA-143): the suite owns `spaces_test`.** A vitest
-  `globalSetup` per package (`packages/db/src/test-db.ts` is the shared half) derives
-  `DATABASE_URL_TEST`, defaulting to `DATABASE_URL` with `_test` suffixed onto the database
-  name, creates that database on the same server if it is absent, migrates it, and — in
-  `apps/web` — seeds the system attributes, the starter taxonomy and **one fixture `user`
-  row**, which is the part a "just migrate it" harness misses: sites across the DB-coupled
-  files do `select id from user limit 1` and had been resolving against whoever logged into
-  the dev app first. `docker-compose.dev.yml` is untouched; nothing drops a database.
-  Still owed: `mono-5`, truncate between files — until then the suites' own
-  `cleanupTestEntities` is what keeps one file's rows out of the next one's `limit 1`.
+- ~~**Test-db harness.**~~ **Closed 2026-09-19 (SPA-143 then SPA-145).** Kept here because
+  it was quoted for a year. The suite used to share the _dev_ database and mutate it, and
+  without a live Postgres on :5432 the DB-backed tests failed with `ECONNREFUSED` — recounted
+  2026-09-19 on the `mono-1` branch at **23 files / 183 tests, 10 of them DB-coupled, 27 tests
+  red** with Postgres down. (The long-quoted "8 of 52" was from 2026-08 and the "21 files, 9
+  DB-backed" revision from early September; both were stale enough to mislead.) ~~This is why
+  CI cannot simply run `vitest` yet.~~ Superseded 2026-09-01: `.github/workflows/ci.yml`
+  already ran vitest against a `pgvector/pgvector:pg17` service container, without the harness
+  this entry banked as a prerequisite.
+  **`mono-4` (SPA-143): the suite owns `spaces_test`.** A vitest `globalSetup` per package
+  (`packages/db/src/test-db.ts` is the shared half) derives `DATABASE_URL_TEST`, defaulting to
+  `DATABASE_URL` with `_test` suffixed onto the database name, creates that database on the
+  same server if it is absent, migrates it, and — in `apps/web` — seeds the system attributes,
+  the starter taxonomy and **one fixture `user` row**, which is the part a "just migrate it"
+  harness misses: sites across the DB-coupled files do `select id from user limit 1` and had
+  been resolving against whoever logged into the dev app first.
+  **`mono-5` (SPA-145): isolation is per file, and structural.** A `setupFiles` entry truncates
+  every table in `public` and reseeds before each test file, so what a test writes is invisible
+  to the next one and a second run of the suite is identical to the first. `cleanupTestEntities`
+  — eleven hand-ordered deletes driven by a regex over `entity.canonical_name`, which could not
+  see an attribute, a view or a duplicate_candidate — is deleted. The grain is a database per
+  vitest worker (`spaces_test_web1…4`, `spaces_test_db1`), because a truncate must not be able
+  to reach a file running at the same moment in another worker; `packages/db` buys the same
+  guarantee with `fileParallelism: false` and one database, which is cheaper at four files.
+  `spaces_test` itself is now the reference database — migrated and seeded by global setup,
+  the one to point `pnpm db:migrate:run` at, and written to by no test.
+  `docker-compose.dev.yml` is untouched throughout and
+  nothing drops a database. Runtime, 8-core box, warm: `pnpm test` 6.0s against 6.8s before.
 - **`./data` ownership landmine.** The Dockerfile `chown`s `/data` at build, but the
   compose bind mount overlays it with host ownership at runtime. Wrong UID on a Linux
   host → cannot write blobs or generate `secret.key`, and it **fails at first upload, not

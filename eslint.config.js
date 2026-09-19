@@ -154,7 +154,6 @@ export default [
       'apps/web/src/lib/entities/merge.ts',
       'apps/web/src/lib/seeds/**',
       'apps/web/src/**/*.test.ts',
-      'apps/web/src/lib/entities/test-helpers.ts',
     ],
     rules: { 'no-restricted-syntax': ['error', NO_INTL_NUMBER_FORMAT] },
   },
