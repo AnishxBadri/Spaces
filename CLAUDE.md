@@ -123,6 +123,10 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
    `text-graphite`, `border-rule`, `bg-bone`, `bg-paper`, `text-label`,
    `rounded-md` (2px) / `rounded-none`.
 
+Building a surface? `docs/design-contract.md` is what to do before you write
+tsx — the vocabulary, the primitives by file, which shipped route each shape
+copies, and the checklist a reviewer runs. The gates are its mechanical floor.
+
 A second run of a gate with nothing changed is a cache hit that replays the
 first run's output. That is safe only because the inputs are honest: `test`
 and `typecheck` hash the whole package plus `.env.local`, the lockfile and
