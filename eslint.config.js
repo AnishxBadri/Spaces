@@ -1,22 +1,57 @@
 //  @ts-check
 
 import { tanstackConfig } from '@tanstack/eslint-config'
+import { createNodeResolver } from 'eslint-plugin-import-x'
 import reactHooks from 'eslint-plugin-react-hooks'
 import drizzle from 'eslint-plugin-drizzle'
 import instrument from './eslint-rules/no-v1-tokens.js'
 
+// `Intl.NumberFormat`, banned everywhere but the two format modules, and
+// `entity.values`, written only by setValues. Both are `no-restricted-syntax`,
+// and a flat-config block does not merge a rule's options with an earlier
+// block's — it replaces them. Declared once here and composed below so neither
+// selector can shadow the other, which is what happened while both lived in
+// their own block: only the last one was ever enforced (SPA-101).
+const NO_INTL_NUMBER_FORMAT = {
+  selector:
+    "NewExpression[callee.object.name='Intl'][callee.property.name='NumberFormat']",
+  message:
+    'Use fmtMoney (apps/web/src/lib/portfolio/format.ts) or the shared formatters in apps/web/src/lib/format.ts — Intl.NumberFormat compact output differs between Node and Chrome (hydration trap).',
+}
+const NO_DIRECT_ENTITY_VALUES = {
+  selector:
+    "CallExpression[callee.property.name='set'][callee.object.callee.property.name='update'][callee.object.arguments.0.name='entity'] > ObjectExpression > Property[key.name='values']",
+  message:
+    'entity.values has one write path — go through setValues (apps/web/src/lib/attributes/values.ts) so validation, attribute_event, and reference links stay in one transaction.',
+}
+
 export default [
   ...tanstackConfig,
+  // import-x's default resolver knows .mjs/.cjs/.js/.json/.node and nothing
+  // else, so every TypeScript specifier came back unresolved and every rule
+  // that needs a resolved path — `import/no-restricted-paths`, the server-only
+  // zone below — silently matched nothing. Resolving `.ts`/`.tsx` and the
+  // `#/` subpath imports (read from each package's own package.json `imports`
+  // field, which is why this needs no path map) is what makes the zone real.
+  {
+    settings: {
+      'import-x/resolver-next': [
+        createNodeResolver({
+          extensions: ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.json'],
+        }),
+      ],
+    },
+  },
   // The v1 design vocabulary, out (SPA-16). This replaces the CLAUDE.md gate-5
   // grep, which read whole files and so could not tell `rounded` the class from
   // "rounded" the word in a comment. The rule reads className literals and
   // cn()/cva() string arguments only, and names the Instrument replacement in
   // every message. Running here means gate 4 and the pre-commit hook cover it.
   // The rule source is plain JS (eslint.config.js loads it directly) and is
-  // exercised by src/lib/design-tokens.test.ts, so it is not itself linted.
+  // exercised by apps/web/src/lib/design-tokens.test.ts, so it is not itself linted.
   { ignores: ['eslint-rules/*.js'] },
   {
-    files: ['src/**/*.tsx'],
+    files: ['apps/web/src/**/*.tsx'],
     plugins: { instrument },
     rules: { 'instrument/no-v1-tokens': 'error' },
   },
@@ -45,7 +80,7 @@ export default [
   // Architecture seams as lint rules (CLAUDE.md traps, mechanically enforced):
   // client code never reaches server internals, Effect never crosses into React.
   {
-    files: ['src/routes/**', 'src/components/**'],
+    files: ['apps/web/src/routes/**', 'apps/web/src/components/**'],
     rules: {
       'import/no-restricted-paths': [
         'error',
@@ -53,10 +88,10 @@ export default [
           basePath: '.',
           zones: [
             {
-              target: './src',
-              from: './src/lib/server',
+              target: './apps/web/src',
+              from: './apps/web/src/lib/server',
               message:
-                'Server helpers are server-only. Client code imports from the server-fns barrel (src/lib/server-fns.ts).',
+                'Server helpers are server-only. Client code imports from the server-fns barrel (apps/web/src/lib/server-fns.ts).',
             },
           ],
         },
@@ -75,50 +110,43 @@ export default [
       ],
     },
   },
-  // Intl compact notation differs Node vs Chrome → hydration failures.
-  // fmtMoney (src/lib/portfolio/format.ts) hand-rolls compact; only the
-  // format modules may construct Intl.NumberFormat.
+  // Both syntax bans, over the whole app. Intl compact notation differs Node
+  // vs Chrome → hydration failures, so fmtMoney
+  // (apps/web/src/lib/portfolio/format.ts) hand-rolls compact. And attribute
+  // values have one write path (CONTEXT.md "Backend paradigm" #9): setValues
+  // validates, diffs, logs attribute_event and materializes reference links in
+  // one transaction, all four of which a direct `.update(entity).set({ values
+  // })` skips.
   {
-    files: ['src/**'],
-    ignores: ['src/lib/format.ts', 'src/lib/portfolio/format.ts'],
+    files: ['apps/web/src/**'],
     rules: {
       'no-restricted-syntax': [
         'error',
-        {
-          selector:
-            "NewExpression[callee.object.name='Intl'][callee.property.name='NumberFormat']",
-          message:
-            'Use fmtMoney (src/lib/portfolio/format.ts) or the shared formatters in src/lib/format.ts — Intl.NumberFormat compact output differs between Node and Chrome (hydration trap).',
-        },
+        NO_INTL_NUMBER_FORMAT,
+        NO_DIRECT_ENTITY_VALUES,
       ],
     },
   },
-  // One write path for attribute values (CONTEXT.md "Backend paradigm" #9):
-  // entity.values is written by setValues and nowhere else — it validates,
-  // diffs, logs attribute_event, and materializes reference links in one
-  // transaction. A direct `.update(entity).set({ values })` skips all four.
-  // The merge executor rewrites values with its own snapshot contract;
-  // seeds and tests set fixtures.
+  // The two format modules are where compact notation is hand-rolled, so they
+  // are the only files allowed to construct an Intl.NumberFormat.
   {
-    files: ['src/**'],
-    ignores: [
-      'src/lib/attributes/values.ts',
-      'src/lib/entities/merge.ts',
-      'src/lib/seeds/**',
-      'src/**/*.test.ts',
-      'src/lib/entities/test-helpers.ts',
+    files: [
+      'apps/web/src/lib/format.ts',
+      'apps/web/src/lib/portfolio/format.ts',
     ],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector:
-            "CallExpression[callee.property.name='set'][callee.object.callee.property.name='update'][callee.object.arguments.0.name='entity'] > ObjectExpression > Property[key.name='values']",
-          message:
-            'entity.values has one write path — go through setValues (src/lib/attributes/values.ts) so validation, attribute_event, and reference links stay in one transaction.',
-        },
-      ],
-    },
+    rules: { 'no-restricted-syntax': ['error', NO_DIRECT_ENTITY_VALUES] },
+  },
+  // setValues itself, the merge executor (which rewrites values under its own
+  // snapshot contract), the seeds and the tests set values directly.
+  {
+    files: [
+      'apps/web/src/lib/attributes/values.ts',
+      'apps/web/src/lib/entities/merge.ts',
+      'apps/web/src/lib/seeds/**',
+      'apps/web/src/**/*.test.ts',
+      'apps/web/src/lib/entities/test-helpers.ts',
+    ],
+    rules: { 'no-restricted-syntax': ['error', NO_INTL_NUMBER_FORMAT] },
   },
   // The cast ratchet (SPA-151): a type is a claim the compiler checked, not
   // one the author asserted. Data crossing a boundary gets its type once —
@@ -128,7 +156,7 @@ export default [
   // only goes down. no-unsafe-* stays off: drizzle's inferred types trip it
   // too often to be signal.
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['apps/web/src/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/consistent-type-assertions': [
         'error',
@@ -144,7 +172,7 @@ export default [
   // Guard against accidental full-table update/delete (portfolio event
   // tables are append-only by design).
   {
-    files: ['src/**'],
+    files: ['apps/web/src/**'],
     plugins: { drizzle },
     rules: {
       'drizzle/enforce-delete-with-where': [
@@ -174,10 +202,10 @@ export default [
       // Agent worktrees are separate checkouts; each lints itself.
       '.claude/worktrees/**',
       // Build artifacts — regenerated, never linted.
-      '.output/**',
-      '.nitro/**',
-      '.tanstack/**',
-      'dist/**',
+      '**/.output/**',
+      '**/.nitro/**',
+      '**/.tanstack/**',
+      '**/dist/**',
     ],
   },
 ]

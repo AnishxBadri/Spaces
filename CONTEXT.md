@@ -74,22 +74,22 @@ AGPL-3.0. Can relicense permissively later; reverse is impossible once contribut
 
 One language, TypeScript, one codebase. Two processes (web, worker), two containers (app, db).
 
-| Layer      | Choice                                                                                                                                                                                                                                        |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Framework  | **TanStack Start** (TanStack Router + Vite + Nitro), React 19                                                                                                                                                                                 |
-| DB         | Postgres 17 + Drizzle                                                                                                                                                                                                                         |
-| Extensions | `pgvector`, `pg_trgm`, `ltree`, `unaccent`                                                                                                                                                                                                    |
-| Data layer | TanStack Query + Start server functions — one model everywhere                                                                                                                                                                                |
-| Jobs       | pg-boss, Postgres-backed, separate Node process                                                                                                                                                                                               |
-| Auth       | Better Auth (`tanstackStartCookies` plugin, Postgres adapter)                                                                                                                                                                                 |
-| Editor     | **BlockNote** (ProseMirror/TipTap-based), Notion-grade block UX; JSON authoritative, markdown derived                                                                                                                                         |
-| Grid       | TanStack Table + TanStack Virtual, DOM-based                                                                                                                                                                                                  |
-| UI         | shadcn/ui + Tailwind + Radix, `cmdk` for Cmd-K                                                                                                                                                                                                |
-| LLM        | Vercel AI SDK, BYOK                                                                                                                                                                                                                           |
-| Blobs      | local filesystem default, S3 opt-in                                                                                                                                                                                                           |
-| Validation | Zod, hand-written at write-path choke points (drizzle-zod considered and skipped — schema-derived validators can't carry the per-type business rules)                                                                                         |
-| Tests      | Vitest + Playwright                                                                                                                                                                                                                           |
-| Tooling    | pnpm; ~~single app, no monorepo~~ — **reversed 2026-09-13** by _Plugin architecture_ below: Turborepo monorepo (`apps/*` · `packages/*` · `plugins/*`). The flat tree is today's state, not the decision; roadmap `mono-1`…`mono-6` moves it. |
+| Layer      | Choice                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework  | **TanStack Start** (TanStack Router + Vite + Nitro), React 19                                                                                                                                                                                                                                                                                                                                           |
+| DB         | Postgres 17 + Drizzle                                                                                                                                                                                                                                                                                                                                                                                   |
+| Extensions | `pgvector`, `pg_trgm`, `ltree`, `unaccent`                                                                                                                                                                                                                                                                                                                                                              |
+| Data layer | TanStack Query + Start server functions — one model everywhere                                                                                                                                                                                                                                                                                                                                          |
+| Jobs       | pg-boss, Postgres-backed, separate Node process                                                                                                                                                                                                                                                                                                                                                         |
+| Auth       | Better Auth (`tanstackStartCookies` plugin, Postgres adapter)                                                                                                                                                                                                                                                                                                                                           |
+| Editor     | **BlockNote** (ProseMirror/TipTap-based), Notion-grade block UX; JSON authoritative, markdown derived                                                                                                                                                                                                                                                                                                   |
+| Grid       | TanStack Table + TanStack Virtual, DOM-based                                                                                                                                                                                                                                                                                                                                                            |
+| UI         | shadcn/ui + Tailwind + Radix, `cmdk` for Cmd-K                                                                                                                                                                                                                                                                                                                                                          |
+| LLM        | Vercel AI SDK, BYOK                                                                                                                                                                                                                                                                                                                                                                                     |
+| Blobs      | local filesystem default, S3 opt-in                                                                                                                                                                                                                                                                                                                                                                     |
+| Validation | Zod, hand-written at write-path choke points (drizzle-zod considered and skipped — schema-derived validators can't carry the per-type business rules)                                                                                                                                                                                                                                                   |
+| Tests      | Vitest + Playwright                                                                                                                                                                                                                                                                                                                                                                                     |
+| Tooling    | pnpm; ~~single app, no monorepo~~ — **reversed 2026-09-13** by _Plugin architecture_ below: Turborepo monorepo (`apps/*` · `packages/*` · `plugins/*`). The workspace landed 2026-09-19 (SPA-101, `mono-1`): `apps/web` + `packages/config`, scope `@spaces/*`, every package keeping its own `#/*` subpath imports. `turbo.json` is `mono-1b`; `packages/db` · `core` · `sdk` follow through `mono-6`. |
 
 Server functions live in `src/lib/server/`, one file per domain, re-exported through the
 `#/lib/server-fns` barrel (split 2026-08 at ~2,900 lines, before auth/mandate/templates
@@ -393,8 +393,11 @@ cheap after the grid and editor exist.
   through BlockNote's inline-content API instead of raw ProseMirror. If BlockNote fights the
   glossary feature hard, the escape hatch is dropping to its TipTap layer.
 - **Separate vector DB, Elasticsearch, Redis, Trigger.dev** — Postgres and one app
-  cover all of it at this scale. (~~Turborepo~~ sat on this list until **2026-09-13**, when
-  _Plugin architecture_ above adopted a Turborepo monorepo; the other four are unchanged.
+  cover all of it at this scale. (Turborepo used to sit on this list; it came **off**
+  on 2026-09-13 when _Plugin architecture_ above adopted a Turborepo monorepo, and
+  the entry is gone rather than struck through because a rejection this file still
+  lists is a rejection somebody will cite. The other four are unchanged. The
+  workspace itself landed 2026-09-19 (SPA-101); `turbo.json` follows in `mono-1b`.
   See the architecture-week index and `docs/spec-plugin-sdk.md` §2.)
 - **MinIO in default compose** — see storage below.
 
@@ -2164,8 +2167,10 @@ it lands.
 Standing debt:
 
 - **Test-db harness.** The suite shares the _dev_ database and mutates it; without a live
-  Postgres on :5432, the DB-backed tests fail with `ECONNREFUSED` (the "8 of 52" count is
-  from 2026-08; the suite is now 21 files, 9 of them DB-backed). ~~This is why CI cannot
+  Postgres on :5432, the DB-backed tests fail with `ECONNREFUSED`. Recounted 2026-09-19 on
+  the `mono-1` branch: **23 files / 183 tests, 10 of them DB-coupled, 27 tests red** with
+  Postgres down. (The long-quoted "8 of 52" was from 2026-08 and the "21 files, 9 DB-backed"
+  revision from early September; both were stale enough to mislead.) ~~This is why CI cannot
   simply run `vitest` yet — fixing it is the first technical task inside ship polish (phase
   15).~~ **Superseded 2026-09-01: `.github/workflows/ci.yml` already runs `pnpm exec vitest
 run` against a `pgvector/pgvector:pg17` service container** — it shipped without the

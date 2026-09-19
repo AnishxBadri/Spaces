@@ -308,11 +308,21 @@ the worker picks it up, the row gets text or an error, the UI polls
 
 ## Build, boot, ops
 
-**`package.json`**: the `#/*` path alias is a package.json subpath import,
-which is why `tsx` can run the worker and migrations directly with no
-bundling; `tsx` is a **production** dependency for exactly that reason.
-Scripts: `dev` (vite :3000), `worker`, `db:migrate:run`, `generate-routes`,
-the drizzle-kit family, lint/format/check.
+**`apps/web/package.json`**: `@spaces/web` carries the whole dependency list
+and the `#/*` alias, declared twice on purpose — as a package.json subpath
+import and as a tsconfig `paths` entry. `tsx` is the one that matters at
+runtime, and it reads the **tsconfig** entry (Node rejects `#/*` as an
+internal-imports key outright), which is why the image ships `tsconfig.json`
+alongside `src/`; `tsx` is a **production** dependency so the worker and
+migrations run TypeScript with no bundling. Scripts: `dev` (vite :3000),
+`worker`, `db:migrate:run`, `generate-routes`, the drizzle-kit family. The
+**root `package.json`** owns lefthook, prettier, eslint and a proxy script per
+app script that delegates with `pnpm --filter` (turbo takes those over in
+`mono-1b`), plus `lint`/`format`/`check` and the two-tsconfig `typecheck`.
+`.env.local` stays at the root, and each loader is anchored to its own file
+rather than to cwd — the dev/worker/db scripts through
+`dotenv -e ../../.env.local`, `vitest.config.ts` and `drizzle.config.ts`
+through `import.meta.url`, vite through `envDir`.
 
 **`docker-compose.yml`** (production): two services. `app` builds from
 source, binds `./data:/data` (blobs plus the auto-generated `secret.key`;
@@ -327,7 +337,14 @@ driver and never appears in prod compose.
 the compiled Nitro output for the web _and_ the raw `src/` + `drizzle/`
 trees, because the worker and migrations run TypeScript directly via tsx.
 No build-time env vars, non-root user, `VOLUME /data`, healthcheck on
-`/api/health`.
+`/api/health`. The **in-image layout is deliberately unchanged** by the
+workspace move: `apps/web/src` is copied to `/app/src` and `apps/web/drizzle`
+to `/app/drizzle`, so `docker/entrypoint.sh` needed no edit at all. Two
+consequences worth knowing: the prod-deps stage installs with
+`--node-linker=hoisted`, because pnpm's default isolated layout would put the
+worker's dependencies in `apps/web/node_modules` as relative symlinks that
+break the moment the directory is copied; and `/packages/config/tsconfig.base.json`
+is copied in so the `extends` in `/app/tsconfig.json` still resolves.
 
 **`docker/entrypoint.sh`** encodes two contracts:
 

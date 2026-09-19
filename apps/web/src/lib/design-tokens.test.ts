@@ -3,7 +3,11 @@ import { fileURLToPath } from 'node:url'
 import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
-import instrument, { NAMED_STEPS } from '../../eslint-rules/no-v1-tokens.js'
+// eslint-rules/ stays at the workspace root: it is loaded by the root
+// eslint.config.js, and one lint vocabulary serves every package.
+import instrument, {
+  NAMED_STEPS,
+} from '../../../../eslint-rules/no-v1-tokens.js'
 
 /**
  * SPA-16: the v1 vocabulary is out, and the thing that keeps it out is a lint

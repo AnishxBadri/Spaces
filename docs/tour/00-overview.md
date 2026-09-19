@@ -39,6 +39,26 @@ route (src/routes/) → server function (src/lib/server/) → domain lib (src/li
 The worker picks up anything CPU-bound (document text extraction) through
 pg-boss, which is itself just Postgres tables. There is no third service.
 
+## Where the files are
+
+Since 2026-09-19 (SPA-101) the repo is a pnpm workspace. One app,
+`apps/web` — package name `@spaces/web` — holds `src/`, `drizzle/` and every
+config the app owns (`vite.config.ts`, `vitest.config.ts`, `drizzle.config.ts`,
+`tsconfig.json`, `components.json`). `packages/config` holds the shared
+`tsconfig.base.json`, and `packages/*` is where `db`, `core` and `sdk` land
+later. Staying at the repo root: `eslint.config.js` and `eslint-rules/`,
+`prettier.config.js`, `lefthook.yml`, `scripts/`, `docker/`, `docs/`, the
+compose files, `.env.local` and `data/`.
+
+This tour writes paths as `src/…`, because that is what the code says: every
+package keeps its own `#/*` subpath import, so inside `apps/web` the specifier
+`#/lib/server/deals` means `apps/web/src/lib/server/deals` and not one import
+site changed when the tree moved. Read every `src/…` below as
+`apps/web/src/…` on disk. The root `pnpm dev`, `pnpm worker`, `pnpm test` and
+the `db:*` scripts are proxies that delegate with `pnpm --filter`, so you still
+run them from the repo root; `pnpm typecheck` is the gate, because there are
+two tsconfigs now and a bare `tsc` at the root sees only `scripts/`.
+
 ## Reading order
 
 Each chapter is self-contained, but they build on each other in this order:
