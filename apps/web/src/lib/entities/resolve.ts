@@ -264,7 +264,16 @@ export async function resolveEntity(
   return { entityId: created.id, action: 'created' }
 }
 
-async function recordNameAlias(
+/**
+ * Insert-if-absent for one `name` alias. Names are history: an earlier
+ * alias is never replaced or deleted, so a record accumulates every label
+ * it has worn and `searchEntities` keeps finding it by the old one.
+ *
+ * Two callers, one check — `resolveEntity` when a known entity arrives
+ * under a new name, and `renameRecordProgram` when a user renames a record
+ * (SPA-63). Copying the check instead would be how the two drift.
+ */
+export async function recordNameAlias(
   entityId: string,
   name: string,
   source: ResolveSource,
