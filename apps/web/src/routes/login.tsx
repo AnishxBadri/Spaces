@@ -76,7 +76,7 @@ function LoginPage() {
 
         {error ? <FormError>{error}</FormError> : null}
 
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" className="w-full" pending={pending}>
           {pending ? 'Signing in…' : 'Sign in'}
           <KeyHint>↵</KeyHint>
         </Button>

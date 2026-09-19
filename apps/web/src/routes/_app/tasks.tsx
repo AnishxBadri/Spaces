@@ -13,6 +13,7 @@ import { TaskComposer } from '#/components/task-composer'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
+import { useBornRows } from '#/lib/born-rows'
 import { recordPath } from '#/lib/record-path'
 import { deleteTask, listTasks, setTaskDone } from '#/lib/server-fns'
 import { localToday } from '@spaces/core/tasks/parse-due'
@@ -151,6 +152,10 @@ function TasksPage() {
   // Rows mid-exit. The write waits for the transition so completing a task
   // reads as the row leaving, not as the list flinching.
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
+  // Rows this page's composer band created — the only ones the wash touches.
+  // Everything the loader handed us was already here, so nothing washes on
+  // arrival at the page, or on a reload seconds after a task was added.
+  const { washes, bear } = useBornRows()
   const { confirm, confirmDialog } = useConfirm()
   const today = localToday()
 
@@ -254,7 +259,13 @@ function TasksPage() {
           state carries its own composer action. Adding from the Done log
           returns to Open, where the new task actually is. */}
       {empty ? null : (
-        <TaskComposer variant="band" onCreated={() => setShowDone(false)} />
+        <TaskComposer
+          variant="band"
+          onCreated={(id) => {
+            bear(id)
+            setShowDone(false)
+          }}
+        />
       )}
 
       {empty ? (
@@ -293,6 +304,7 @@ function TasksPage() {
                   done={viewDone}
                   overdue={g.key === 'overdue'}
                   leaving={leaving.has(t.id)}
+                  wash={washes(t.id)}
                   last={i === g.rows.length - 1}
                   onToggle={() => toggle(t.id, !viewDone)}
                   onDelete={() => void remove(t)}
@@ -342,6 +354,7 @@ function TaskItem({
   figure,
   last,
   leaving,
+  wash,
   onToggle,
   onDelete,
 }: {
@@ -352,6 +365,8 @@ function TaskItem({
   last?: boolean | undefined
   /** Mid-exit: struck through and fading, write pending. */
   leaving?: boolean | undefined
+  /** Added by the composer band in this session — lands on the bone wash. */
+  wash?: boolean | undefined
   onToggle: () => void
   onDelete: () => void
 }) {
@@ -361,6 +376,7 @@ function TaskItem({
     // keeps its height until the write lands and the row unmounts.
     <LedgerRow
       last={last}
+      wash={wash}
       className={cn(
         'group transition-opacity duration-150 ease-out-quart',
         leaving && 'pointer-events-none opacity-0',

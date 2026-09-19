@@ -158,7 +158,7 @@ function AdminStep({ onDone }: { onDone: () => void }) {
 
         {error ? <FormError>{error}</FormError> : null}
 
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" className="w-full" pending={pending}>
           {pending ? 'Creating…' : 'Create account'}
           <KeyHint>↵</KeyHint>
         </Button>

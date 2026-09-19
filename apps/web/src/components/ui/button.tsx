@@ -38,26 +38,60 @@ const buttonVariants = cva(
   },
 )
 
+/**
+ * Whether the button around you is mid-write (DESIGN.md §5,
+ * Micro-interactions; SPA-53). `KeyHint` reads it so `Save ⌘↵` becoming
+ * `Saving…` does not leave a keycap standing for an action that is no longer
+ * armed. A context rather than a `group-data-` class because the hint has to
+ * leave the accessibility tree too — a screen reader announcing
+ * "Saving… ⌘↵" is the same orphan, just heard instead of seen.
+ */
+const ButtonPending = React.createContext(false)
+
+export function useButtonPending(): boolean {
+  return React.useContext(ButtonPending)
+}
+
+/**
+ * The key hint's two states. It never unmounts: the No-Shift Rule wants the
+ * hint's width reserved while it is gone, so the pending label cannot widen
+ * the button and shove its neighbours. Opacity only, on a named transition.
+ */
+export function keyHintClasses(pending: boolean): string {
+  return cn(
+    'mono text-micro transition-opacity duration-150 ease-out-quart',
+    pending ? 'opacity-0' : 'opacity-85',
+  )
+}
+
 function Button({
   className,
   variant = 'default',
   size = 'default',
   asChild = false,
+  pending = false,
+  disabled,
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    /** A write is in flight: the action is not armed, so its key hint goes. */
+    pending?: boolean
   }) {
   const Comp = asChild ? Slot.Root : 'button'
 
   return (
-    <Comp
-      data-slot="button"
-      data-variant={variant}
-      data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
+    <ButtonPending value={pending}>
+      <Comp
+        data-slot="button"
+        data-variant={variant}
+        data-size={size}
+        data-pending={pending ? '' : undefined}
+        disabled={disabled ?? pending}
+        className={cn(buttonVariants({ variant, size, className }))}
+        {...props}
+      />
+    </ButtonPending>
   )
 }
 

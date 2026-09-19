@@ -55,7 +55,9 @@ export function TaskComposer({
   trigger?: React.ReactNode
   /** Record page rails pass their record — pre-linked, removable. */
   presetEntity?: LinkedRecord
-  onCreated?: () => void
+  /** The composer's row landed: the id is what the list's wash reads
+   *  (`useBornRows`, DESIGN.md §5 Micro-interactions). */
+  onCreated?: (id: string) => void
   /** A bare key that opens the composer from anywhere on the page — the
    *  key hint printed in the trigger must be true. Ignored while typing. */
   hotkey?: string
@@ -98,7 +100,7 @@ export function TaskComposer({
     setPending(true)
     setError(null)
     try {
-      await createTask({
+      const created = await createTask({
         data: {
           content: content.trim(),
           dueDate: due,
@@ -113,7 +115,7 @@ export function TaskComposer({
         if (!presetEntity) setRecords([])
         if (variant === 'dialog') setOpen(false)
       }
-      onCreated?.()
+      onCreated?.(created.id)
       void router.invalidate()
     } catch {
       setError('Could not create the task.')
@@ -197,7 +199,7 @@ export function TaskComposer({
           <Switch checked={keepOpen} onCheckedChange={setKeepOpen}>
             Keep open
           </Switch>
-          <Button type="submit" size="sm" disabled={pending}>
+          <Button type="submit" size="sm" pending={pending}>
             {pending ? 'Saving…' : 'Add task'}
             <KeyHint>↵</KeyHint>
           </Button>
@@ -263,7 +265,7 @@ export function TaskComposer({
             <span className="hidden mono text-micro text-graphite sm:inline">
               ↵ add · ⇧↵ add & keep open
             </span>
-            <Button type="submit" size="sm" disabled={pending}>
+            <Button type="submit" size="sm" pending={pending}>
               {pending ? 'Saving…' : 'Add task'}
               <KeyHint>↵</KeyHint>
             </Button>
