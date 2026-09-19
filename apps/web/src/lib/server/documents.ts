@@ -1,9 +1,15 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, count, desc, eq, isNull, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
-import { document, documentChunk, entity, link } from '@spaces/db/schema'
+import {
+  document,
+  documentChunk,
+  entity,
+  jobRun,
+  link,
+} from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -180,12 +186,56 @@ export const listRecordDocuments = createServerFn()
     const users = await db.select({ id: user.id, name: user.name }).from(user)
     const names = new Map(users.map((x) => [x.id, x.name]))
 
+    // The last extraction attempt per document (SPA-106). `document.extraction_*`
+    // says what the file is; `job_run` says what the worker did about it — which
+    // attempt, how long it took, how long ago — and until this join the second
+    // half was invisible to everyone but an operator with a psql prompt.
+    // `distinct on` sorted by started_at desc is the last row per entity, which
+    // is exactly the shape the index on (entity_id, started_at) serves.
+    const lastRuns = await db
+      .selectDistinctOn([jobRun.entityId], {
+        entityId: jobRun.entityId,
+        status: jobRun.status,
+        attempt: jobRun.attempt,
+        durationMs: jobRun.durationMs,
+        startedAt: jobRun.startedAt,
+        finishedAt: jobRun.finishedAt,
+      })
+      .from(jobRun)
+      .where(
+        and(
+          eq(jobRun.queue, QUEUES.extractDocument),
+          inArray(
+            jobRun.entityId,
+            rows.map((r) => r.id),
+          ),
+        ),
+      )
+      .orderBy(jobRun.entityId, desc(jobRun.startedAt))
+
+    // `sinceMs` is computed here rather than in the component on purpose: a
+    // relative time read off the browser's clock renders one string on the
+    // server and another during hydration, which is a mismatch.
+    const now = Date.now()
+    const runs = new Map(
+      lastRuns.map((r) => [
+        r.entityId,
+        {
+          status: r.status,
+          attempt: r.attempt,
+          durationMs: r.durationMs,
+          sinceMs: now - (r.finishedAt ?? r.startedAt).getTime(),
+        },
+      ]),
+    )
+
     return rows.map((r) => ({
       ...r,
       filename: r.filename ?? 'Untitled file',
       createdAt: r.createdAt.toISOString(),
       uploadedByName: r.uploadedBy ? (names.get(r.uploadedBy) ?? null) : null,
       snippet: r.snippet?.replace(/\s+/g, ' ').trim() || null,
+      lastRun: runs.get(r.id) ?? null,
     }))
   })
 
