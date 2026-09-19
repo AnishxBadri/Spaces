@@ -1,12 +1,12 @@
 import { and, eq, ne, sql } from 'drizzle-orm'
-import { db } from '#/db'
+import { db } from '@spaces/db'
 import {
   company,
   duplicateCandidate,
   entity,
   entityAlias,
   person,
-} from '#/db/schema'
+} from '@spaces/db/schema'
 import {
   isRoleEmail,
   normalizeCin,

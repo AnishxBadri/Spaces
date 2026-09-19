@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
+import { db } from '@spaces/db'
 import {
   company,
   entity,
@@ -10,8 +10,8 @@ import {
   link,
   person,
   space,
-} from '#/db/schema'
-import { activity } from '#/db/schema/activity'
+} from '@spaces/db/schema'
+import { activity } from '@spaces/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from '../entities/resolve'
 import { jsonString } from '#/lib/json'
 import { lastTouchedMap, requireUser } from './shared'

@@ -1,10 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
 import { desc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
-import { user } from '#/db/schema/auth'
-import { entity, interaction, interactionEntity } from '#/db/schema'
-import { activity } from '#/db/schema/activity'
+import { db } from '@spaces/db'
+import { user } from '@spaces/db/schema/auth'
+import { entity, interaction, interactionEntity } from '@spaces/db/schema'
+import { activity } from '@spaces/db/schema/activity'
 import { requireUser } from './shared'
 import type { Json } from './shared'
 
@@ -17,7 +17,7 @@ export const getRecordTimeline = createServerFn()
   .validator(z.object({ entityId: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const { attributeEvent } = await import('#/db/schema')
+    const { attributeEvent } = await import('@spaces/db/schema')
 
     const users = await db.select({ id: user.id, name: user.name }).from(user)
     const userNames = new Map(users.map((u) => [u.id, u.name]))

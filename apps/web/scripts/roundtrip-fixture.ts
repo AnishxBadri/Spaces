@@ -1,6 +1,6 @@
 import { and, eq, isNull } from 'drizzle-orm'
-import { db } from '#/db'
-import { company, document, entity, link, user } from '#/db/schema'
+import { db } from '@spaces/db'
+import { company, document, entity, link, user } from '@spaces/db/schema'
 import { resolveSecret, storeCredential } from '#/lib/vault'
 
 /**

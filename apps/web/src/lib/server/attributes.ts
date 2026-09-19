@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
+import { db } from '@spaces/db'
 import { BADGE_COLORS } from '../attributes/colors'
 import { requireAdmin, requireUser } from './shared'
 import { jsonValue } from '#/lib/json'
@@ -24,7 +24,7 @@ export const listRegistry = createServerFn()
     // Effect-first through the effectFn seam (backend-paradigm ratchet);
     // auth stays promise-land outside the program.
     await requireUser()
-    const { attribute } = await import('#/db/schema')
+    const { attribute } = await import('@spaces/db/schema')
     const { objectIdForKind } = await import('../attributes/objects')
     const { effectFn } = await import('./effect')
     const { Effect } = await import('effect')

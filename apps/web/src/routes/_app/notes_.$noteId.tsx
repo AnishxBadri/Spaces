@@ -14,7 +14,7 @@ import {
   NoteEditor,
 } from '#/components/editor/note-editor'
 import { KIND_ICONS, KIND_ROUTES } from '#/components/editor/mention'
-import type { NoteBody } from '#/db/schema/kinds'
+import type { NoteBody } from '@spaces/db/schema/kinds'
 import { SaveAsTemplateAction } from '#/components/templates'
 import {
   getNote,

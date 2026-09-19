@@ -78,8 +78,8 @@ const slugFor = (base: string) => `zz_upd_${base}_${tag}`
 afterAll(async () => {
   if (!hasDb) return
   await cleanupTestEntities(['^UpdCo [0-9a-f]{4,8}( .*)?$'])
-  const { db } = await import('#/db')
-  const { attribute } = await import('#/db/schema')
+  const { db } = await import('@spaces/db')
+  const { attribute } = await import('@spaces/db/schema')
   const { like } = await import('drizzle-orm')
   await db.delete(attribute).where(like(attribute.slug, `zz_upd_%_${tag}`))
 })
@@ -89,8 +89,8 @@ async function makeAttribute(
   type: 'rating' | 'currency' | 'number' | 'status' | 'record_reference',
   options: Record<string, unknown>,
 ) {
-  const { db } = await import('#/db')
-  const { attribute } = await import('#/db/schema')
+  const { db } = await import('@spaces/db')
+  const { attribute } = await import('@spaces/db/schema')
   const { objectIdForKindAsync } = await import('./objects')
   const objectId = await objectIdForKindAsync('company')
   const row = (
@@ -112,8 +112,8 @@ async function makeAttribute(
 }
 
 async function readOptions(id: string) {
-  const { db } = await import('#/db')
-  const { attribute } = await import('#/db/schema')
+  const { db } = await import('@spaces/db')
+  const { attribute } = await import('@spaces/db/schema')
   const { eq } = await import('drizzle-orm')
   const row = (
     await db
@@ -130,8 +130,8 @@ describe.skipIf(!hasDb)('updateAttributeProgram', () => {
       await import('./update')
     const { resolveEntity } = await import('../entities/resolve')
     const { setValues } = await import('./values')
-    const { db } = await import('#/db')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { user } = await import('@spaces/db/schema/auth')
     const actor = (await db.select({ id: user.id }).from(user).limit(1)).at(0)
     if (!actor) throw new Error('no user seeded')
 
@@ -219,9 +219,9 @@ describe.skipIf(!hasDb)('updateAttributeProgram', () => {
       await import('./update')
     const { resolveEntity } = await import('../entities/resolve')
     const { setValues, AttributeValidationError } = await import('./values')
-    const { db } = await import('#/db')
-    const { entity } = await import('#/db/schema')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { entity } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
     const { eq } = await import('drizzle-orm')
     const actor = (await db.select({ id: user.id }).from(user).limit(1)).at(0)
     if (!actor) throw new Error('no user seeded')

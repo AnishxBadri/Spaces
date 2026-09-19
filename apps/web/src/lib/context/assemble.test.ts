@@ -17,12 +17,12 @@ describe.skipIf(!hasDb)('assembleProgram', () => {
   let teammateId = ''
 
   afterAll(async () => {
-    const { db } = await import('#/db')
-    const { documentChunk, document } = await import('#/db/schema')
-    const { task, taskEntity } = await import('#/db/schema/tasks')
+    const { db } = await import('@spaces/db')
+    const { documentChunk, document } = await import('@spaces/db/schema')
+    const { task, taskEntity } = await import('@spaces/db/schema/tasks')
     const { interaction, interactionEntity } =
-      await import('#/db/schema/interactions')
-    const { user } = await import('#/db/schema/auth')
+      await import('@spaces/db/schema/interactions')
+    const { user } = await import('@spaces/db/schema/auth')
     const { eq } = await import('drizzle-orm')
     if (ids.doc) {
       await db
@@ -48,7 +48,7 @@ describe.skipIf(!hasDb)('assembleProgram', () => {
     const { resolveEntity } = await import('#/lib/entities/resolve')
     const { assembleProgram } = await import('./assemble')
     const { Effect } = await import('effect')
-    const { db } = await import('#/db')
+    const { db } = await import('@spaces/db')
     const {
       attributeEvent,
       document,
@@ -58,11 +58,11 @@ describe.skipIf(!hasDb)('assembleProgram', () => {
       link,
       note,
       space,
-    } = await import('#/db/schema')
-    const { task, taskEntity } = await import('#/db/schema/tasks')
+    } = await import('@spaces/db/schema')
+    const { task, taskEntity } = await import('@spaces/db/schema/tasks')
     const { interaction, interactionEntity } =
-      await import('#/db/schema/interactions')
-    const { user } = await import('#/db/schema/auth')
+      await import('@spaces/db/schema/interactions')
+    const { user } = await import('@spaces/db/schema/auth')
     const { eq } = await import('drizzle-orm')
 
     const [me] = await db.select({ id: user.id }).from(user).limit(1)

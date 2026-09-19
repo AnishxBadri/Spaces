@@ -56,7 +56,7 @@ import {
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 import { jsonRecord, jsonString } from '#/lib/json'
-import type { EntityValues } from '#/db/schema/entities'
+import type { EntityValues } from '@spaces/db/schema/entities'
 
 export const Route = createFileRoute('/_app/deals')({
   validateSearch: z.object({ view: z.string().optional() }),

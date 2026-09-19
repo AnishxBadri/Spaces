@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
-import { entity, entityAlias, link, objectDef } from '#/db/schema'
+import { db } from '@spaces/db'
+import { entity, entityAlias, link, objectDef } from '@spaces/db/schema'
 import { requireUser } from './shared'
 
 /** Autocomplete over entities — mentions and reference pickers share it. */

@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
 import { and, asc, eq, sql } from 'drizzle-orm'
-import { db } from '#/db'
-import type { ActivityMeta } from '#/db/schema/activity'
-import type { NoteBody } from '#/db/schema/kinds'
+import { db } from '@spaces/db'
+import type { ActivityMeta } from '@spaces/db/schema/activity'
+import type { NoteBody } from '@spaces/db/schema/kinds'
 import type { Condition, ViewExtra } from '#/lib/views/filter'
 import {
   account,
@@ -33,7 +33,7 @@ import {
   term,
   user,
   view,
-} from '#/db/schema'
+} from '@spaces/db/schema'
 import { createAttributeProgram } from '#/lib/attributes/create'
 import { birthValues } from '#/lib/attributes/defaults'
 import {

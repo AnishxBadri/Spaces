@@ -2,9 +2,9 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { createServerFn } from '@tanstack/react-start'
 import { and, asc, count, eq, gt, isNull, ne } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
-import { invite, session, user } from '#/db/schema/auth'
-import { workspace } from '#/db/schema/workspace'
+import { db } from '@spaces/db'
+import { invite, session, user } from '@spaces/db/schema/auth'
+import { workspace } from '@spaces/db/schema/workspace'
 import { requireAdmin, requireUser } from './shared'
 
 // ---------- workspace singleton ----------

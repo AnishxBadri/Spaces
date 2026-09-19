@@ -6,8 +6,8 @@ import { inArray, or, sql } from 'drizzle-orm'
  * created so reruns don't pollute the dev UI. Call from afterAll.
  */
 export async function cleanupTestEntities(patterns: Array<string>) {
-  const { db } = await import('#/db')
-  const schema = await import('#/db/schema')
+  const { db } = await import('@spaces/db')
+  const schema = await import('@spaces/db/schema')
 
   const rows = await db
     .select({ id: schema.entity.id })
@@ -20,7 +20,7 @@ export async function cleanupTestEntities(patterns: Array<string>) {
 
   const { entity, entityAlias, duplicateCandidate, mergeEvent, link } = schema
   const { entitySpace, company, person, space, note, attributeEvent } = schema
-  const { activity } = await import('#/db/schema/activity')
+  const { activity } = await import('@spaces/db/schema/activity')
 
   await db.delete(attributeEvent).where(inArray(attributeEvent.entityId, ids))
 

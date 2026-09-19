@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { db } from '#/db'
-import { interaction, interactionEntity } from '#/db/schema'
-import { activity } from '#/db/schema/activity'
+import { db } from '@spaces/db'
+import { interaction, interactionEntity } from '@spaces/db/schema'
+import { activity } from '@spaces/db/schema/activity'
 import { requireUser } from './shared'
 
 const logInteractionInput = z.object({

@@ -151,8 +151,8 @@ describe.skipIf(!hasDb)('required means can’t-clear (all types)', () => {
   const slug = (t: string) => `req_${t}_${tag}`
 
   afterAll(async () => {
-    const { db } = await import('#/db')
-    const { attribute } = await import('#/db/schema')
+    const { db } = await import('@spaces/db')
+    const { attribute } = await import('@spaces/db/schema')
     const { like } = await import('drizzle-orm')
     await cleanupTestEntities([`^ReqCo ${tag}$`])
     await db.delete(attribute).where(like(attribute.slug, `req_%_${tag}`))
@@ -162,9 +162,9 @@ describe.skipIf(!hasDb)('required means can’t-clear (all types)', () => {
     const { resolveEntity } = await import('../entities/resolve')
     const { setValues, AttributeValidationError } = await import('./values')
     const { objectIdForKindAsync } = await import('./objects')
-    const { db } = await import('#/db')
-    const { attribute } = await import('#/db/schema')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { attribute } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)
     const objectId = await objectIdForKindAsync('company')
 
@@ -244,9 +244,9 @@ describe.skipIf(!hasDb)('setValues', () => {
   it('writes values, events, and reference links in one pass', async () => {
     const { resolveEntity } = await import('../entities/resolve')
     const { setValues, AttributeValidationError } = await import('./values')
-    const { db } = await import('#/db')
-    const { attributeEvent, entity, link } = await import('#/db/schema')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { attributeEvent, entity, link } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
     const { and, eq } = await import('drizzle-orm')
 
     const tag = randomUUID().slice(0, 8)
@@ -369,9 +369,9 @@ describe.skipIf(!hasDb)('setValues', () => {
   it('carries provenance on the event row and honours non-user actors', async () => {
     const { resolveEntity } = await import('../entities/resolve')
     const { setValues } = await import('./values')
-    const { db } = await import('#/db')
-    const { attributeEvent } = await import('#/db/schema')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { attributeEvent } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
     const { and, eq } = await import('drizzle-orm')
 
     const tag = randomUUID().slice(0, 8)

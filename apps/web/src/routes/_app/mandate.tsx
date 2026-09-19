@@ -19,7 +19,7 @@ import {
   updateMandateFacts,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
-import type { NoteBody } from '#/db/schema/kinds'
+import type { NoteBody } from '@spaces/db/schema/kinds'
 
 /**
  * The Mandate — the fund's one "why we invest" destination. A facts grid

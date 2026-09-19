@@ -81,8 +81,8 @@ describe.skipIf(!hasDb)('birthValues', () => {
   const slug = (t: string) => `dflt_${t}_${tag}`
 
   afterAll(async () => {
-    const { db } = await import('#/db')
-    const { attribute } = await import('#/db/schema')
+    const { db } = await import('@spaces/db')
+    const { attribute } = await import('@spaces/db/schema')
     const { like } = await import('drizzle-orm')
     await cleanupTestEntities([`^DfltCo ${tag}( .*)?$`])
     await db.delete(attribute).where(like(attribute.slug, `dflt_%_${tag}`))
@@ -91,9 +91,10 @@ describe.skipIf(!hasDb)('birthValues', () => {
   it('fills blanks with resolved defaults, supplied wins, actor is honest', async () => {
     const { resolveEntity } = await import('../entities/resolve')
     const { objectIdForKindAsync } = await import('./objects')
-    const { db } = await import('#/db')
-    const { attribute, attributeEvent, entity } = await import('#/db/schema')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { attribute, attributeEvent, entity } =
+      await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
     const { eq } = await import('drizzle-orm')
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)
     const objectId = await objectIdForKindAsync('company')
@@ -177,8 +178,8 @@ describe.skipIf(!hasDb)('birthValues', () => {
     const { updateAttributeProgram, AttributeConfigRejected } =
       await import('./update')
     const { objectIdForKindAsync } = await import('./objects')
-    const { db } = await import('#/db')
-    const { attribute } = await import('#/db/schema')
+    const { db } = await import('@spaces/db')
+    const { attribute } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
     const objectId = await objectIdForKindAsync('company')
     const [row] = await db

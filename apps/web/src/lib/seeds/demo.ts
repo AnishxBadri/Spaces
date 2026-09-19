@@ -1,5 +1,5 @@
 import { count, eq } from 'drizzle-orm'
-import { db } from '#/db'
+import { db } from '@spaces/db'
 import {
   company,
   entity,
@@ -9,9 +9,9 @@ import {
   person,
   space,
   term,
-} from '#/db/schema'
-import { activity } from '#/db/schema/activity'
-import type { EntityValues } from '#/db/schema/entities'
+} from '@spaces/db/schema'
+import { activity } from '@spaces/db/schema/activity'
+import type { EntityValues } from '@spaces/db/schema/entities'
 import { resolveEntity } from '#/lib/entities/resolve'
 
 /**

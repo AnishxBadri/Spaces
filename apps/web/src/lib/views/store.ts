@@ -1,9 +1,9 @@
 import { Effect, Schema } from 'effect'
 import { and, asc, eq, or } from 'drizzle-orm'
-import { db } from '#/db'
-import { view } from '#/db/schema'
+import { db } from '@spaces/db'
+import { view } from '@spaces/db/schema'
 import type { Condition, ViewExtra, ViewSort } from './filter'
-import type { ViewColumns } from '#/db/schema/views'
+import type { ViewColumns } from '@spaces/db/schema/views'
 
 export type { ViewSort }
 

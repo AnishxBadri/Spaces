@@ -3,8 +3,8 @@ import { getRequest } from '@tanstack/react-start/server'
 import { count } from 'drizzle-orm'
 import { z } from 'zod'
 import { auth } from '../auth'
-import { db } from '#/db'
-import { user } from '#/db/schema/auth'
+import { db } from '@spaces/db'
+import { user } from '@spaces/db/schema/auth'
 import { storeCredential } from '../vault'
 import { requireUser } from './shared'
 
@@ -46,10 +46,10 @@ export const getSetupState = createServerFn().handler(async () => {
 export const getOnboardingProgress = createServerFn().handler(async () => {
   await requireUser()
   const { eq, sql: dsql } = await import('drizzle-orm')
-  const { entity } = await import('#/db/schema/entities')
-  const { note, space } = await import('#/db/schema/kinds')
-  const { mandate } = await import('#/db/schema/workspace')
-  const { invite } = await import('#/db/schema/auth')
+  const { entity } = await import('@spaces/db/schema/entities')
+  const { note, space } = await import('@spaces/db/schema/kinds')
+  const { mandate } = await import('@spaces/db/schema/workspace')
+  const { invite } = await import('@spaces/db/schema/auth')
   const [spaces, notes, mandates, companies, users, invites] =
     await Promise.all([
       db.select({ value: count() }).from(space),

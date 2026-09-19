@@ -65,8 +65,8 @@ describe.skipIf(!hasDb)('resolveEntity', () => {
 
   it('identity collision on addIdentityAlias becomes a suggestion, not an error', async () => {
     const { resolveEntity, addIdentityAlias } = await import('./resolve')
-    const { db } = await import('#/db')
-    const { duplicateCandidate } = await import('#/db/schema')
+    const { db } = await import('@spaces/db')
+    const { duplicateCandidate } = await import('@spaces/db/schema')
     const { and, eq } = await import('drizzle-orm')
 
     const tag = randomUUID().slice(0, 8)
@@ -130,8 +130,8 @@ describe.skipIf(!hasDb)('resolveEntity', () => {
 
   it('similar names suggest, never attach', async () => {
     const { resolveEntity } = await import('./resolve')
-    const { db } = await import('#/db')
-    const { duplicateCandidate } = await import('#/db/schema')
+    const { db } = await import('@spaces/db')
+    const { duplicateCandidate } = await import('@spaces/db/schema')
     const { and, eq } = await import('drizzle-orm')
 
     const tag = randomUUID().slice(0, 6)
