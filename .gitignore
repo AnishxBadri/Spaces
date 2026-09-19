@@ -15,6 +15,9 @@ todos.json
 # runtime data (blobs + secret.key)
 data/
 
+# backup.sh output — a dump and every blob, never in git
+backups/
+
 # NOT docs/ — an over-broad `docs/*` rule landed here 2026-09-07 inside an
 # unrelated commit and silently stopped the decision record from being
 # committed (CONTEXT.md and ARCHITECTURE.md point at specs that were never
