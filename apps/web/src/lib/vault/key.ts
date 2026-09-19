@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 /**
  * Master key resolution, per CONTEXT.md:
@@ -15,8 +16,37 @@ const KEY_BYTES = 32
 
 let cached: Buffer | null = null
 
+/**
+ * The workspace root — the directory holding `pnpm-workspace.yaml` — found by
+ * walking up from this file. Null inside the image, which ships apps/web's
+ * `src/` at `/app/src` with no workspace marker; there `DATA_DIR=/data` is set
+ * by the Dockerfile and this never runs.
+ */
+function workspaceRoot(): string | null {
+  let dir = dirname(fileURLToPath(import.meta.url))
+  for (;;) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir
+    const parent = dirname(dir)
+    if (parent === dir) return null
+    dir = parent
+  }
+}
+
+/**
+ * Where blobs, `secret.key` and the setup token live. DATA_DIR wins; otherwise
+ * `<workspace root>/data`.
+ *
+ * Anchored to the workspace root and NOT to `process.cwd()`: the app's cwd is
+ * `apps/web` under `pnpm --filter`, the repo root under a bare `tsx`, and
+ * `/app` in the image. A cwd fallback would resolve to a different directory
+ * per entry point, and the failure is the quietest one this product has —
+ * nothing throws, `loadMasterKey()` generates a fresh key beside the new cwd,
+ * and every credential written under the old one is unrecoverable.
+ */
 export function dataDir(): string {
-  return process.env.DATA_DIR ?? join(process.cwd(), 'data')
+  const fromEnv = process.env.DATA_DIR
+  if (fromEnv) return fromEnv
+  return join(workspaceRoot() ?? process.cwd(), 'data')
 }
 
 export function loadMasterKey(): Buffer {

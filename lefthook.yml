@@ -1,6 +1,10 @@
-# Git hooks (lefthook). Installed via the package.json "prepare" script.
+# Git hooks (lefthook). Installed via the root package.json "prepare" script.
 # Pre-commit stays fast: format + lint only what's staged.
 # The full gates (tsc, vitest) run in CI and before push.
+#
+# Everything here runs from the repo root, where prettier, eslint and their
+# configs live; {staged_files} are root-relative paths, so apps/web files are
+# covered without a per-package hook.
 
 pre-commit:
   parallel: false
@@ -16,5 +20,8 @@ pre-commit:
 
 pre-push:
   jobs:
+    # Both halves: the root tsconfig (scripts/ + the root config files) and
+    # apps/web's own. A bare `tsc --noEmit` at the root would typecheck the
+    # scripts and silently skip the app.
     - name: typecheck
-      run: pnpm exec tsc --noEmit
+      run: pnpm run typecheck

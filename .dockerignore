@@ -1,13 +1,17 @@
-node_modules
-.output
-.nitro
-.tanstack
+# Docker ignore patterns are anchored at the build context root and do not
+# recurse on their own — `node_modules` would only match /node_modules. Since
+# the tree moved under apps/web, every path that can appear more than once in
+# the workspace is written `**/`.
+**/node_modules
+**/.output
+**/.nitro
+**/.tanstack
 data
 .git
 .env
 .env.*
 *.md
 !README.md
-drizzle/**/*.snapshot.json
+apps/web/drizzle/**/*.snapshot.json
 .vscode
 .impeccable

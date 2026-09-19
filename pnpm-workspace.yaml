@@ -1,0 +1,7 @@
+# The workspace. `apps/*` holds one app today (web); worker, site and
+# extension arrive later. `packages/*` is deliberately globbed rather than
+# listed so the db, core and sdk slots (docs/spec-plugin-sdk.md §2) need no
+# edit here when they land — config is the first tenant.
+packages:
+  - 'apps/*'
+  - 'packages/*'

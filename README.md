@@ -1,13 +1,51 @@
-Welcome to your new TanStack Start app!
+# Spaces
 
-# Getting Started
+Self-hosted deal management for angel and private-capital investing.
 
-To run this application:
+## Getting started (from a clean clone)
 
 ```bash
-pnpm install
-pnpm dev
+pnpm install                                      # links apps/web and packages/config
+docker compose -f docker-compose.dev.yml up -d    # Postgres :5432 (+ MinIO :9000)
+$EDITOR .env.local                                # the two values below
+pnpm db:migrate:run                               # migrations + system attributes
+pnpm dev                                          # http://localhost:3000
+pnpm worker                                       # in a second terminal
 ```
+
+`.env.local` lives at the **repo root** and needs two values:
+
+```
+DATABASE_URL=postgresql://spaces:spaces@localhost:5432/spaces
+BETTER_AUTH_SECRET=<pnpm dlx @better-auth/cli secret>
+```
+
+## Repo layout
+
+This is a pnpm workspace (since 2026-09-19).
+
+```
+apps/web/            the app — @spaces/web. src/, drizzle/, and the configs it owns
+packages/config/     tsconfig.base.json, shared by every package
+eslint.config.js     one lint vocabulary for the workspace (+ eslint-rules/)
+scripts/             backup.sh, restore.sh — operator scripts
+docker/              entrypoint.sh, Caddyfile
+```
+
+Every script below runs **from the repo root**; each is a proxy that delegates
+with `pnpm --filter`. Inside a package, `#/` always means that package's own
+`src/`, so `#/lib/server/deals` in `apps/web` is `apps/web/src/lib/server/deals`.
+
+| command               | what it does                                 |
+| --------------------- | -------------------------------------------- |
+| `pnpm dev`            | vite dev server on :3000                     |
+| `pnpm worker`         | the pg-boss worker                           |
+| `pnpm build`          | production build into `apps/web/.output`     |
+| `pnpm test`           | vitest (needs Postgres up)                   |
+| `pnpm typecheck`      | both tsconfigs — the root one and apps/web's |
+| `pnpm lint`           | eslint, including the design-token rule      |
+| `pnpm db:migrate:run` | run migrations and reseed system attributes  |
+| `pnpm db:generate`    | generate a migration after a schema change   |
 
 # Self-hosting over HTTPS
 
@@ -88,10 +126,10 @@ This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
 
 If you prefer not to use Tailwind CSS:
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
+1. Remove the demo pages in `apps/web/src/routes/demo/`
+2. Replace the Tailwind import in `apps/web/src/styles.css` with your own styles
+3. Remove `tailwindcss()` from the plugins array in `apps/web/vite.config.ts`
+4. Remove `@tailwindcss/vite` and `tailwindcss` from `apps/web/package.json`
 
 ## Linting & Formatting
 
@@ -118,7 +156,7 @@ pnpm check
 Better Auth can work in stateless mode, but to persist user data, add a database:
 
 ```typescript
-// src/lib/auth.ts
+// apps/web/src/lib/auth.ts
 import { betterAuth } from 'better-auth'
 import { Pool } from 'pg'
 
@@ -139,15 +177,16 @@ pnpm dlx @better-auth/cli migrate
 ## Shadcn
 
 Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
+Run it inside `apps/web`, which is where `components.json` lives.
 
 ```bash
-pnpm dlx shadcn@latest add button
+cd apps/web && pnpm dlx shadcn@latest add button
 ```
 
 ## T3Env
 
 - You can use T3Env to add type safety to your environment variables.
-- Add Environment variables to the `src/env.mjs` file.
+- Add Environment variables to the `apps/web/src/env.mjs` file.
 - Use the environment variables in your code.
 
 ### Usage
@@ -173,11 +212,11 @@ For host-specific presets (Vercel, Netlify, Cloudflare, AWS Lambda, etc.) and tu
 
 ## Routing
 
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
+This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `apps/web/src/routes`.
 
 ### Adding A Route
 
-To add a new route to your application just add a new file in the `./src/routes` directory.
+To add a new route to your application just add a new file in the `./apps/web/src/routes` directory.
 
 TanStack will automatically generate the content of the route file for you.
 
@@ -203,7 +242,7 @@ More information on the `Link` component can be found in the [Link documentation
 
 ### Using A Layout
 
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
+In the File Based Routing setup the layout is located in `apps/web/src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
 
 Here is an example layout that includes a header:
 

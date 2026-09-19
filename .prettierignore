@@ -3,8 +3,8 @@ pnpm-lock.yaml
 yarn.lock
 
 # generated — owned by their generators, don't fight them
-drizzle/
-src/routeTree.gen.ts
+apps/web/drizzle/
+apps/web/src/routeTree.gen.ts
 .cta.json
 .impeccable/
 

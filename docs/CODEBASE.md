@@ -19,13 +19,24 @@ docs/
   spec-*.md             buildable specs (attribute engine / custom objects; AI substrate)
   tour/                 file-by-file walkthrough (deeper than this map)
   CODEBASE.md           this file
-drizzle/                generated SQL migrations, numbered (0001…0023)
+pnpm-workspace.yaml     the workspace: apps/* + packages/* (SPA-101, 2026-09-19)
+eslint.config.js        one lint vocabulary for every package
+eslint-rules/           instrument/no-v1-tokens (gate 5), loaded by the config above
+prettier.config.js · lefthook.yml   root-owned formatting and git hooks
+packages/config/        tsconfig.base.json — the shared compilerOptions
+apps/web/               the app (@spaces/web)
+  drizzle/              generated SQL migrations, numbered (0001…0023)
+  src/                  everything below
 docker-compose.yml      production self-host (app + pgvector), build-from-source
 docker-compose.dev.yml  dev Postgres :5432 + MinIO :9000
 Dockerfile + docker/entrypoint.sh   web+worker supervision, auto-migrate on boot
 scripts/backup.sh       both-or-neither backup (pg_dump + ./data tarball)
-src/                    everything below
 ```
+
+Paths below are written `src/…` for readability; every one of them lives under
+`apps/web/`, and the `#/` import specifier resolves to exactly that directory
+— which is why no import site changed when the tree moved. `packages/db`,
+`core` and `sdk` are `mono-2`…`mono-8`; `turbo.json` is `mono-1b`.
 
 ## The layers (and the request flow)
 

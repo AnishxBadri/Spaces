@@ -33,12 +33,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec prettier --check .
-      - run: pnpm exec eslint src
-      - run: pnpm exec tsc --noEmit
+      - run: pnpm exec eslint apps/web/src
+      - run: pnpm run typecheck
       # migrate.ts + vitest read .env.local via dotenv; hand them the CI db
       - run: echo "DATABASE_URL=$DATABASE_URL" > .env.local
-      - run: pnpm exec tsx src/db/migrate.ts
-      - run: pnpm exec vitest run
+      - run: pnpm --filter @spaces/web exec tsx src/db/migrate.ts
+      - run: pnpm --filter @spaces/web exec vitest run
 
   # Hostability contract #1 (CONTEXT.md): the entrypoint owns /data. A macOS
   # bind mount rewrites ownership on the way through, so a Linux runner is the
@@ -376,9 +376,9 @@ jobs:
           # "Older image" = one whose journal stops a migration short, mounted
           # over /app/drizzle so the guard reads it exactly as a real older
           # tag would — without a second image build.
-          cp -r drizzle drizzle-old
-          LAST="$(jq -r '.entries[-1].tag' drizzle/meta/_journal.json)"
-          jq '.entries |= .[:-1]' drizzle/meta/_journal.json > drizzle-old/meta/_journal.json
+          cp -r apps/web/drizzle drizzle-old
+          LAST="$(jq -r '.entries[-1].tag' apps/web/drizzle/meta/_journal.json)"
+          jq '.entries |= .[:-1]' apps/web/drizzle/meta/_journal.json > drizzle-old/meta/_journal.json
           rm "drizzle-old/$LAST.sql"
           mkdir -p olddata
           set +e
