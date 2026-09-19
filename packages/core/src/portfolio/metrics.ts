@@ -1,5 +1,7 @@
 import type { FxRate } from './fx'
 import { rateFor } from './fx'
+import type { Reversible } from './reversal'
+import { liveAt } from './reversal'
 import type { CashFlow } from './xirr'
 import { xirr } from './xirr'
 
@@ -10,15 +12,25 @@ import { xirr } from './xirr'
  * transaction-date rates, unrealized value at the as-of-date rate — FX
  * gain/loss lands inside base-currency performance. A holding whose events
  * share one currency computes natively in it, needing no rates.
+ *
+ * Corrections are appends (D12): the loader passes **originals only** —
+ * never a compensating row — each stamped with `reversedAt`, the instant
+ * its void was written. `liveAt` drops an event once the as-of day has
+ * reached that instant, so an as-of date before the void still sees the
+ * original. See `./reversal.ts`.
  */
 
-export type MetricInvestment = {
+export type MetricInvestment = Reversible & {
   date: string
   amount: number
   currency: string
 }
-export type MetricMark = { date: string; fairValue: number; currency: string }
-export type MetricDistribution = {
+export type MetricMark = Reversible & {
+  date: string
+  fairValue: number
+  currency: string
+}
+export type MetricDistribution = Reversible & {
   date: string
   amount: number
   currency: string
@@ -91,9 +103,21 @@ export function holdingMetrics(
   },
 ): MetricsResult {
   const asOf = opts.asOf ?? '9999-12-31'
-  const investments = events.investments.filter((e) => e.date <= asOf)
-  const marks = events.marks.filter((e) => e.date <= asOf)
-  const distributions = events.distributions.filter((e) => e.date <= asOf)
+  // Two windows, one date: `date <= asOf` is when the event happened,
+  // `liveAt` is whether its void had happened yet.
+  const window = opts.asOf
+  const investments = liveAt(
+    events.investments.filter((e) => e.date <= asOf),
+    window,
+  )
+  const marks = liveAt(
+    events.marks.filter((e) => e.date <= asOf),
+    window,
+  )
+  const distributions = liveAt(
+    events.distributions.filter((e) => e.date <= asOf),
+    window,
+  )
 
   const currencies = new Set([
     ...investments.map((e) => e.currency),

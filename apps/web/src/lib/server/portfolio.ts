@@ -14,117 +14,28 @@ import {
 } from '@spaces/db/schema/portfolio'
 import { activity } from '@spaces/db/schema/activity'
 import { holdingMetrics } from '@spaces/core/portfolio/metrics'
-import type {
-  HoldingEvents,
-  MetricsResult,
-} from '@spaces/core/portfolio/metrics'
+import type { MetricsResult } from '@spaces/core/portfolio/metrics'
 import { ownership } from '@spaces/core/portfolio/ownership'
 import type { Ownership } from '@spaces/core/portfolio/ownership'
-import type { FxRate } from '@spaces/core/portfolio/fx'
+import {
+  baseCurrency,
+  loadFxRates,
+  loadHoldingEvents,
+  num,
+} from '../portfolio/detail'
+import type { LoadedHolding } from '../portfolio/detail'
 import { birthHolding, requireUser } from './shared'
 
 /**
  * The financial engine's server layer (CONTEXT.md phase 15). Events are
  * append-only; every aggregate here is computed at read by the pure lib in
- * src/lib/portfolio/. Base currency lives in workspace.settings.
+ * packages/core/src/portfolio/. Base currency lives in workspace.settings.
+ *
+ * The read itself is `../portfolio/detail`, which is where the reversal
+ * reader contract (D12, SPA-150) is stated: the pure libs are handed
+ * originals only, each stamped with `reversedAt`. These handlers are the
+ * auth gate and the write paths.
  */
-
-const num = (s: string | null): number | null => (s === null ? null : Number(s))
-
-async function baseCurrency(): Promise<string> {
-  const ws = (
-    await db.select({ settings: workspace.settings }).from(workspace)
-  ).at(0)
-  const base = ws?.settings.base_currency
-  return base !== undefined && base.length === 3 ? base : 'USD'
-}
-
-async function loadFxRates(): Promise<Array<FxRate>> {
-  const rows = await db
-    .select({
-      currency: fxRate.currency,
-      date: fxRate.date,
-      rateToBase: fxRate.rateToBase,
-    })
-    .from(fxRate)
-  return rows.map((r) => ({
-    currency: r.currency,
-    date: r.date,
-    rateToBase: Number(r.rateToBase),
-  }))
-}
-
-type LoadedHolding = {
-  events: HoldingEvents
-  ownershipInputs: Array<{
-    date: string
-    amount: number
-    instrument: 'priced' | 'safe_post_money' | 'safe_pre_money' | 'ccd'
-    shares: number | null
-    cap: number | null
-  }>
-}
-
-async function loadHoldingEvents(
-  holdingIds: Array<string>,
-): Promise<Map<string, LoadedHolding>> {
-  const byHolding = new Map<string, LoadedHolding>()
-  for (const id of holdingIds) {
-    byHolding.set(id, {
-      events: { investments: [], marks: [], distributions: [] },
-      ownershipInputs: [],
-    })
-  }
-  if (holdingIds.length === 0) return byHolding
-  const [investments, marks, distributions] = await Promise.all([
-    db
-      .select()
-      .from(investment)
-      .where(inArray(investment.holdingId, holdingIds))
-      .orderBy(asc(investment.date)),
-    db
-      .select()
-      .from(mark)
-      .where(inArray(mark.holdingId, holdingIds))
-      .orderBy(asc(mark.date)),
-    db
-      .select()
-      .from(distribution)
-      .where(inArray(distribution.holdingId, holdingIds))
-      .orderBy(asc(distribution.date)),
-  ])
-  for (const r of investments) {
-    const h = byHolding.get(r.holdingId)
-    h?.events.investments.push({
-      date: r.date,
-      amount: Number(r.amount),
-      currency: r.currency,
-    })
-    h?.ownershipInputs.push({
-      date: r.date,
-      amount: Number(r.amount),
-      instrument: r.instrument,
-      shares: num(r.shares),
-      cap: num(r.cap),
-    })
-  }
-  for (const r of marks) {
-    byHolding.get(r.holdingId)?.events.marks.push({
-      date: r.date,
-      fairValue: Number(r.fairValue),
-      currency: r.currency,
-    })
-  }
-  for (const r of distributions) {
-    byHolding.get(r.holdingId)?.events.distributions.push({
-      date: r.date,
-      amount: Number(r.amount),
-      currency: r.currency,
-      kind: r.kind,
-    })
-  }
-  return byHolding
-}
 
 /**
  * The Portfolio surface's data: per-holding metrics in native-or-base,
@@ -254,132 +165,13 @@ export type HoldingDetail = {
 }
 
 /** The tear-sheet read: every event, plus computed metrics and ownership. */
+/** The tear-sheet read: every event, plus computed metrics and ownership. */
 export const getHolding = createServerFn()
   .validator(z.object({ id: z.string().uuid(), asOf: z.string().optional() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const row = (
-      await db
-        .select({
-          id: holding.id,
-          companyId: holding.companyId,
-          openedAt: holding.openedAt,
-          companyName: entity.canonicalName,
-        })
-        .from(holding)
-        .innerJoin(entity, eq(entity.id, holding.companyId))
-        .where(eq(holding.id, data.id))
-    ).at(0)
-    if (!row) throw new Error('Holding not found')
-
-    const [base, rates, invRows, markRows, distRows, roundRows] =
-      await Promise.all([
-        baseCurrency(),
-        loadFxRates(),
-        db
-          .select()
-          .from(investment)
-          .where(eq(investment.holdingId, row.id))
-          .orderBy(asc(investment.date)),
-        db
-          .select()
-          .from(mark)
-          .where(eq(mark.holdingId, row.id))
-          .orderBy(asc(mark.date)),
-        db
-          .select()
-          .from(distribution)
-          .where(eq(distribution.holdingId, row.id))
-          .orderBy(asc(distribution.date)),
-        db
-          .select()
-          .from(round)
-          .where(eq(round.companyId, row.companyId))
-          .orderBy(asc(round.date)),
-      ])
-
-    const events: HoldingEvents = {
-      investments: invRows.map((r) => ({
-        date: r.date,
-        amount: Number(r.amount),
-        currency: r.currency,
-      })),
-      marks: markRows.map((r) => ({
-        date: r.date,
-        fairValue: Number(r.fairValue),
-        currency: r.currency,
-      })),
-      distributions: distRows.map((r) => ({
-        date: r.date,
-        amount: Number(r.amount),
-        currency: r.currency,
-        kind: r.kind,
-      })),
-    }
-
-    return {
-      ...row,
-      metrics: holdingMetrics(events, {
-        baseCurrency: base,
-        fxRates: rates,
-        asOf: data.asOf,
-      }),
-      ownership: ownership(
-        invRows.map((r) => ({
-          date: r.date,
-          amount: Number(r.amount),
-          instrument: r.instrument,
-          shares: num(r.shares),
-          cap: num(r.cap),
-        })),
-        roundRows.map((r) => ({
-          date: r.date,
-          kind: r.kind,
-          sharesOutstanding: num(r.sharesOutstanding),
-        })),
-        data.asOf,
-      ),
-      rounds: roundRows.map((r) => ({
-        id: r.id,
-        date: r.date,
-        kind: r.kind,
-        raised: num(r.raised),
-        currency: r.currency,
-        preMoney: num(r.preMoney),
-        postMoney: num(r.postMoney),
-        pricePerShare: num(r.pricePerShare),
-        sharesOutstanding: num(r.sharesOutstanding),
-      })),
-      investments: invRows.map((r) => ({
-        id: r.id,
-        date: r.date,
-        amount: Number(r.amount),
-        currency: r.currency,
-        instrument: r.instrument,
-        shares: num(r.shares),
-        cap: num(r.cap),
-        discount: num(r.discount),
-        vehicle: r.vehicle,
-        dealId: r.dealId,
-        roundId: r.roundId,
-      })),
-      marks: markRows.map((r) => ({
-        id: r.id,
-        date: r.date,
-        fairValue: Number(r.fairValue),
-        currency: r.currency,
-        basis: r.basis,
-      })),
-      distributions: distRows.map((r) => ({
-        id: r.id,
-        date: r.date,
-        amount: Number(r.amount),
-        currency: r.currency,
-        kind: r.kind,
-        sharesSold: num(r.sharesSold),
-        pricePerShare: num(r.pricePerShare),
-      })),
-    }
+    const { loadHoldingDetail } = await import('../portfolio/detail')
+    return loadHoldingDetail(data.id, data.asOf)
   })
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
@@ -638,4 +430,49 @@ export const setBaseCurrency = createServerFn({ method: 'POST' })
       })
       .where(eq(workspace.id, 1))
     return { ok: true }
+  })
+
+/**
+ * Void one ledger entry (D12). Nothing is edited and nothing is deleted:
+ * this appends an exact-negative event citing the original. The typed
+ * refusals are turned into sentences here rather than allowed to reject as
+ * they are — Effect rejects with the tagged error itself, which carries no
+ * `message`, so "already voided" would otherwise reach the dialog empty.
+ */
+export const voidLedgerEvent = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      table: z.enum(['investment', 'mark', 'distribution']),
+      id: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { voidLedgerEventProgram, ledgerVoidMessage } =
+      await import('../portfolio/reverse')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(voidLedgerEventProgram)(u.id, data)
+    } catch (failure) {
+      throw new Error(ledgerVoidMessage(failure))
+    }
+  })
+
+/**
+ * Void every live event stamped with one batch id, in one transaction — a
+ * wrong forty-row import is a two-click fix. It refuses whole: one member
+ * already voided leaves the batch exactly as it was.
+ */
+export const voidLedgerBatch = createServerFn({ method: 'POST' })
+  .validator(z.object({ batchId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { voidLedgerBatchProgram, ledgerVoidMessage } =
+      await import('../portfolio/reverse')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(voidLedgerBatchProgram)(u.id, data.batchId)
+    } catch (failure) {
+      throw new Error(ledgerVoidMessage(failure))
+    }
   })

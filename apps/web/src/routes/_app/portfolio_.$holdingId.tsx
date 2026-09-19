@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { LedgerRow, LedgerSection } from '#/components/ledger-section'
+import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   DitherMark,
   RailEmpty,
@@ -29,7 +30,9 @@ import {
   addMark,
   addRound,
   getHolding,
+  voidLedgerEvent,
 } from '#/lib/server-fns'
+import { cn } from '#/lib/utils'
 import {
   fmtMoney,
   fmtMultiple,
@@ -131,18 +134,23 @@ function HoldingPage() {
           title="Checks"
           empty="No checks recorded."
           add={<AddInvestmentDialog companyId={h.companyId} />}
-          rows={h.investments.map((i) => ({
-            id: String(i.id),
-            date: String(i.date),
+          table="investment"
+          rows={h.investments.map((r) => ({
+            id: String(r.id),
+            date: String(r.date),
             kind: 'invest',
-            label: `${String(i.instrument).replace(/_/g, ' ')}${i.vehicle ? ` · ${String(i.vehicle)}` : ''}`,
-            amount: fmtMoney(Number(i.amount), String(i.currency)),
+            label: `${String(r.instrument).replace(/_/g, ' ')}${r.vehicle ? ` · ${String(r.vehicle)}` : ''}`,
+            amount: fmtMoney(Number(r.amount), String(r.currency)),
             detail:
-              i.shares != null
-                ? `${Number(i.shares).toLocaleString()} shares`
-                : i.cap != null
-                  ? `cap ${fmtMoney(Number(i.cap), String(i.currency), { compact: true })}`
+              r.shares != null
+                ? `${Number(r.shares).toLocaleString()} shares`
+                : r.cap != null
+                  ? `cap ${fmtMoney(Number(r.cap), String(r.currency), { compact: true })}`
                   : '',
+            reversedAt: r.reversedAt === null ? null : String(r.reversedAt),
+            reversesId: r.reversesId === null ? null : String(r.reversesId),
+            voidedBy: r.voidedBy === null ? null : String(r.voidedBy),
+            voidedOn: r.voidedOn === null ? null : String(r.voidedOn),
           }))}
         />
         <EventSection
@@ -162,12 +170,17 @@ function HoldingPage() {
               r.sharesOutstanding != null
                 ? `${Number(r.sharesOutstanding).toLocaleString()} FD shares`
                 : '',
+            reversedAt: null,
+            reversesId: null,
+            voidedBy: null,
+            voidedOn: null,
           }))}
         />
         <EventSection
           title="Marks"
           empty="Never marked — value shows at cost, staleness on purpose."
           add={<AddMarkDialog holdingId={h.id} />}
+          table="mark"
           rows={h.marks.map((r) => ({
             id: String(r.id),
             date: String(r.date),
@@ -175,22 +188,31 @@ function HoldingPage() {
             label: String(r.basis).replace(/_/g, ' '),
             amount: fmtMoney(Number(r.fairValue), String(r.currency)),
             detail: '',
+            reversedAt: r.reversedAt === null ? null : String(r.reversedAt),
+            reversesId: r.reversesId === null ? null : String(r.reversesId),
+            voidedBy: r.voidedBy === null ? null : String(r.voidedBy),
+            voidedOn: r.voidedOn === null ? null : String(r.voidedOn),
           }))}
         />
         <EventSection
           title="Distributions"
           empty="Nothing realized yet."
           add={<AddDistributionDialog holdingId={h.id} />}
+          table="distribution"
           rows={h.distributions.map((r) => ({
             id: String(r.id),
             date: String(r.date),
             kind: 'distrib',
             label: String(r.kind),
-            amount: `+${fmtMoney(Number(r.amount), String(r.currency))}`,
+            amount: `${Number(r.amount) < 0 ? '' : '+'}${fmtMoney(Number(r.amount), String(r.currency))}`,
             detail:
               r.sharesSold != null
                 ? `${Number(r.sharesSold).toLocaleString()} shares sold`
                 : '',
+            reversedAt: r.reversedAt === null ? null : String(r.reversedAt),
+            reversesId: r.reversesId === null ? null : String(r.reversesId),
+            voidedBy: r.voidedBy === null ? null : String(r.voidedBy),
+            voidedOn: r.voidedOn === null ? null : String(r.voidedOn),
           }))}
         />
       </RecordBody>
@@ -237,55 +259,152 @@ function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
     </ol>
   )
 }
+/** The three tables a correction can be appended to (D12). */
+type VoidableTable = 'investment' | 'mark' | 'distribution'
+
+type EventRow = {
+  id: string
+  date: string
+  kind: string
+  label: string
+  amount: string
+  detail: string
+  /** Non-null on a struck original: when the void was written. */
+  reversedAt: string | null
+  /** Non-null on the compensating row: the entry it voids. */
+  reversesId: string | null
+  voidedBy: string | null
+  voidedOn: string | null
+}
+
 /**
  * One append-only ledger per event kind: date, kind, entry, amount, detail.
- * No edit or delete affordance is drawn — the correction policy is an open
- * decision, and a wrong entry is answered by a new one.
+ * There is still no edit and no delete affordance. A wrong entry is voided
+ * (D12, SPA-150) — the original stays, struck, with its compensating row
+ * immediately beneath it naming who voided it and when, so the record of
+ * what was believed and when survives the correction.
+ *
+ * `table` is null for Rounds, which are not summed events and carry no
+ * `reverses_id`; that section draws no Void.
  */
 function EventSection({
   title,
   empty,
   add,
   rows,
+  table,
 }: {
   title: string
   empty: string
   add: React.ReactNode
-  rows: Array<{
-    id: string
-    date: string
-    kind: string
-    label: string
-    amount: string
-    detail: string
-  }>
+  rows: Array<EventRow>
+  table?: VoidableTable | undefined
 }) {
+  const router = useRouter()
+  const { confirm, confirmDialog } = useConfirm()
+  const [busy, setBusy] = useState<string | null>(null)
+
+  async function onVoid(r: EventRow) {
+    if (table === undefined) return
+    const ok = await confirm({
+      title: `Void this ${title.toLowerCase().replace(/s$/, '')}?`,
+      body: 'Nothing is edited and nothing is deleted. A compensating entry is appended, dated as this one is dated, and both stay on the record.',
+      rows: [{ name: r.label, meta: `${r.date.slice(0, 10)} · ${r.amount}` }],
+      action: 'Void',
+    })
+    if (!ok) return
+    setBusy(r.id)
+    try {
+      await voidLedgerEvent({ data: { table, id: r.id } })
+      toast('Voided — the correction is on the record')
+      void router.invalidate()
+    } catch (err) {
+      // The server names the refusal ("already voided", "a reversal cannot
+      // be reversed"); never a generic toast.
+      toast(err instanceof Error ? err.message : 'Could not void this entry')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const live = rows.filter(
+    (r) => r.reversesId === null && r.reversedAt === null,
+  )
   return (
     <LedgerSection
       label={title}
-      count={`${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}`}
+      count={`${live.length} entr${live.length === 1 ? 'y' : 'ies'}${
+        rows.length > live.length
+          ? ` · ${rows.length - live.length} voided`
+          : ''
+      }`}
       link={add}
     >
+      {confirmDialog}
       {rows.length === 0 ? (
         <li className="py-2 text-label text-graphite">{empty}</li>
       ) : (
-        rows.map((r, i) => (
-          <LedgerRow key={r.id} last={i === rows.length - 1}>
-            <span className="w-24 shrink-0 mono text-micro text-graphite">
-              {r.date.slice(0, 10)}
-            </span>
-            <span className="w-16 shrink-0 mono text-micro font-medium uppercase">
-              {r.kind}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-ui">{r.label}</span>
-            {r.detail ? (
-              <span className="shrink-0 mono text-micro text-graphite">
-                {r.detail}
+        rows.map((r, i) => {
+          const struck = r.reversedAt !== null
+          const isReversal = r.reversesId !== null
+          return (
+            <LedgerRow key={r.id} last={i === rows.length - 1}>
+              <span
+                className={cn(
+                  'w-24 shrink-0 mono text-micro text-graphite',
+                  isReversal && 'pl-3',
+                )}
+              >
+                {r.date.slice(0, 10)}
               </span>
-            ) : null}
-            <span className="w-32 shrink-0 numeric text-ui">{r.amount}</span>
-          </LedgerRow>
-        ))
+              <span
+                className={cn(
+                  'w-16 shrink-0 mono text-micro font-medium uppercase',
+                  (struck || isReversal) && 'text-graphite',
+                )}
+              >
+                {isReversal ? 'void' : r.kind}
+              </span>
+              <span
+                className={cn(
+                  'min-w-0 flex-1 truncate text-ui',
+                  struck && 'text-graphite line-through',
+                  isReversal && 'text-graphite',
+                )}
+              >
+                {isReversal
+                  ? `voids the ${r.label}${r.voidedBy ? ` · ${r.voidedBy}` : ''}${
+                      r.voidedOn ? ` · ${r.voidedOn}` : ''
+                    }`
+                  : r.label}
+              </span>
+              {r.detail && !isReversal ? (
+                <span className="shrink-0 mono text-micro text-graphite">
+                  {r.detail}
+                </span>
+              ) : null}
+              {table !== undefined && !struck && !isReversal ? (
+                <button
+                  type="button"
+                  disabled={busy === r.id}
+                  onClick={() => void onVoid(r)}
+                  className="focus-ring shrink-0 mono text-micro text-graphite hover:text-destructive hover:underline"
+                >
+                  void
+                </button>
+              ) : null}
+              <span
+                className={cn(
+                  'w-32 shrink-0 numeric text-ui',
+                  struck && 'text-graphite line-through',
+                  isReversal && 'text-graphite',
+                )}
+              >
+                {r.amount}
+              </span>
+            </LedgerRow>
+          )
+        })
       )}
     </LedgerSection>
   )
