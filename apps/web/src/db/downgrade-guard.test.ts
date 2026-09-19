@@ -183,11 +183,11 @@ describe.skipIf(!hasDb)('migrate.ts downgrade guard (real database)', () => {
 
     const truncateJournal = (dir: string, keep: number) => {
       const journalPath = path.join(dir, 'drizzle/meta/_journal.json')
-      const journal: { entries: Array<unknown> } = JSON.parse(
+      const parsed: { entries: Array<unknown> } = JSON.parse(
         readFileSync(journalPath, 'utf8'),
       )
-      journal.entries = journal.entries.slice(0, keep)
-      writeFileSync(journalPath, JSON.stringify(journal, null, 2))
+      parsed.entries = parsed.entries.slice(0, keep)
+      writeFileSync(journalPath, JSON.stringify(parsed, null, 2))
     }
 
     // The "older image": a journal truncated to 20 of the entries, with the
@@ -235,8 +235,8 @@ describe.skipIf(!hasDb)('migrate.ts downgrade guard (real database)', () => {
       `select hash, created_at from drizzle.__drizzle_migrations order by created_at asc`,
     )
     await client.end()
-    const journal = readImageJournal(imageFolder)
-    expect(res.rows.length).toBe(journal.length)
+    const image = readImageJournal(imageFolder)
+    expect(res.rows.length).toBe(image.length)
     expect(
       res.rows.map((r: { hash: string; created_at: string }) => ({
         hash: r.hash,
