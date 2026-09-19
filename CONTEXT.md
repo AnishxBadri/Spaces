@@ -2344,16 +2344,16 @@ lives in `src/styles.css` comments — read those before changing any colour.
 
 **Still open, in order:**
 
-- ~~**Old focus rings** (~60, 5 of them in the shell)~~ **Done — swept during the
-  Instrument port, slices 11–17 (2026-09).** The count above was already stale when it
+- ~~**Old focus rings** (~60, 5 of them in the shell)~~ **Done — swept as Instrument
+  landed, slices 11–17 (2026-09).** The count above was already stale when it
   was written: the shell has none, and the reticle (`focus-ring` /
-  `focus-ring-inset`) is the only focus treatment on screen. The last v1 ring in the
-  tree, `focus-visible:ring-destructive/20` on the destructive button
+  `focus-ring-inset`) is the only focus treatment on screen. The last shadcn ring in
+  the tree, `focus-visible:ring-destructive/20` on the destructive button
   (`src/components/ui/button.tsx`), went with SPA-16 (2026-09-18) — the destructive
   button now focuses with the reticle like every other control. The 11 remaining
   `outline-none` occurrences are each either paired with `focus-ring` or one of the two
   reticle exceptions DESIGN.md records at 2026-09-11. What keeps this swept is no longer
-  a grep: `instrument/no-v1-tokens` runs inside `pnpm lint` (see CLAUDE.md gate 5).
+  a grep: `instrument/vocabulary` runs inside `pnpm lint` (see CLAUDE.md gate 5).
 - **`/impeccable polish`** for the surfaces above (arbitrary type sizes ride along).
 - **`/impeccable document`** to write DESIGN.md §5 (Components) — _after_ the sweep, not before.
 - ~~**Dark theme**~~ **Deferred by decision, 2026-09-19 (SPA-52)** — and the deferral is
@@ -2367,11 +2367,11 @@ lives in `src/styles.css` comments — read those before changing any colour.
   `:root` declares **`color-scheme: light`**, which is the load-bearing half: every
   native control the app still owns — the date inputs, the scrollbars — is drawn by the
   OS, and without it a dark OS bolted dark chrome onto paper. **The deferral's terms:**
-  surfaces stay token-only, enforced by `instrument/no-v1-tokens`, which since SPA-52
+  surfaces stay token-only, enforced by `instrument/vocabulary`, which since SPA-52
   rejects a raw hex or an arbitrary colour value in tsx and names the tokens (reading a
   custom property, `bg-[var(--badge-amber)]`, is the sanctioned form; the tree had zero
   occurrences when the check landed). Dark is therefore later a second token file, not a
-  re-port — which is what the forty surfaces about to be written were the deadline for.
+  redraw — which is what the forty surfaces about to be written were the deadline for.
   Dark stays on the post-v1 backlog; light-only is a decision with a date, not an
   omission.
 

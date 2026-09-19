@@ -1,7 +1,7 @@
 //  @ts-check
 
 /**
- * `instrument/no-v1-tokens` — the v1 design vocabulary, mechanically out.
+ * `instrument/vocabulary` — only Instrument words reach a class string.
  *
  * Replaces the CLAUDE.md gate-5 grep (deleted 2026-09-18). The grep read the
  * whole file, so `rounded(?![-\w])` could not tell a class from the word
@@ -10,11 +10,11 @@
  * the string arguments of `cn()` / `cva()` and nothing else, so prose is
  * invisible to it, and it names the Instrument replacement in every message.
  *
- * It also covers the half of the vocabulary the grep never mentioned: the v1
- * semantic colour names (sidebar, chart-N, card, popover, secondary, muted as a
- * class, background outside the root route). Those `--color-*` exports are gone
- * from the `@theme` block in `src/styles.css`; `design-tokens.test.ts` keeps
- * them gone.
+ * It also covers the half of the vocabulary the grep never mentioned: the
+ * shadcn semantic colour names (sidebar, chart-N, card, popover, secondary,
+ * muted as a class, background outside the root route). Those `--color-*`
+ * exports are gone from the `@theme` block in `src/styles.css`;
+ * `design-tokens.test.ts` keeps them gone.
  *
  * DESIGN.md is the source for the replacements: `text-graphite`, `border-rule`,
  * `bg-bone`, `bg-paper`, `text-label`, `text-ui`, `rounded-md` / `rounded-none`.
@@ -31,8 +31,8 @@
  *
  * SPA-52 adds the colour axis SPA-79 left open. The app is light by decision
  * (2026-09-19): `color-scheme: light` on `:root`, no `dark` custom-variant, no
- * next-themes. Dark stays a post-v1 feature, and what keeps it a second token
- * file rather than a re-port is that no surface ever writes a colour value
+ * next-themes. Dark stays a backlog feature, and what keeps it a second token
+ * file rather than a redraw is that no surface ever writes a colour value
  * down — so a raw hex (`bg-[#f4f3ef]`), or an `rgb()` / `hsl()` / `oklch()`
  * spelled into a class string, is an error naming the tokens. Reading a custom
  * property is the sanctioned arbitrary value: `bg-[var(--badge-amber)]` passes,
@@ -91,8 +91,8 @@ const BANS = [
   { re: /^border-border$/, use: 'border-rule' },
   { re: /^border-input$/, use: 'border-rule' },
 
-  // v1 semantic colours. Everything below aliased bone, paper, hairline or
-  // ink, so each swap renders identically.
+  // The shadcn semantic colours. Everything below aliased bone, paper,
+  // hairline or ink, so each swap renders identically.
   {
     re: /^(bg|border|ring|divide|outline|fill|stroke)-muted(-foreground)?$/,
     use: 'bg-bone',
@@ -200,7 +200,7 @@ function normalize(utility) {
  * @param {boolean} isRootRoute
  * @returns {Array<{ index: number, length: number, token: string, use: string }>}
  */
-export function findV1Tokens(value, isRootRoute) {
+export function findBannedTokens(value, isRootRoute) {
   /** @type {Array<{ index: number, length: number, token: string, use: string }>} */
   const found = []
   const re = /\S+/g
@@ -362,23 +362,23 @@ export const rule = {
     type: 'problem',
     docs: {
       description:
-        'Ban the v1 design vocabulary in class strings; name the Instrument replacement.',
+        'Hold class strings to the Instrument vocabulary; name the replacement.',
     },
     schema: [],
     messages: {
-      v1Token:
-        'v1 design token `{{token}}` — Instrument uses {{use}} (DESIGN.md "The seven rules").',
+      notInstrument:
+        '`{{token}}` is not an Instrument token — use {{use}} (DESIGN.md "The seven rules").',
       arbitraryType:
         'arbitrary type size `{{token}}` — use {{fix}}. DESIGN.md §3: if a size isn’t on the list it does not go in the app.',
       rawColour:
-        'raw colour `{{literal}}` in `{{token}}` — every colour in the app is a token. Use the vocabulary (bg-paper, bg-bone, border-rule, text-graphite, the --badge-* tints) or read the custom property, e.g. bg-[var(--badge-amber)]. DESIGN.md §2: the app is light by decision (2026-09-19) and stays token-only, which is what makes dark a token file later and not a re-port.',
+        'raw colour `{{literal}}` in `{{token}}` — every colour in the app is a token. Use the vocabulary (bg-paper, bg-bone, border-rule, text-graphite, the --badge-* tints) or read the custom property, e.g. bg-[var(--badge-amber)]. DESIGN.md §2: the app is light by decision (2026-09-19) and stays token-only, which is what makes dark a token file later and not a redraw.',
     },
   },
   create(context) {
     const isRootRoute = context.filename.endsWith(ROOT_ROUTE)
 
     /**
-     * Report every v1 token in one class string. The report lands on the whole
+     * Report every banned token in one class string. The report lands on the whole
      * string node: class strings are routinely multi-line template literals,
      * and column arithmetic across them buys nothing.
      *
@@ -386,10 +386,10 @@ export const rule = {
      * @param {string} value
      */
     function check(node, value) {
-      for (const hit of findV1Tokens(value, isRootRoute)) {
+      for (const hit of findBannedTokens(value, isRootRoute)) {
         context.report({
           node,
-          messageId: 'v1Token',
+          messageId: 'notInstrument',
           data: { token: hit.token, use: hit.use },
         })
       }
@@ -481,4 +481,4 @@ export const rule = {
   },
 }
 
-export default { rules: { 'no-v1-tokens': rule } }
+export default { rules: { vocabulary: rule } }

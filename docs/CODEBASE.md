@@ -21,7 +21,7 @@ docs/
   CODEBASE.md           this file
 pnpm-workspace.yaml     the workspace: apps/* + packages/* (SPA-101, 2026-09-19)
 eslint.config.js        one lint vocabulary for every package
-eslint-rules/           instrument/no-v1-tokens (gate 5), loaded by the config above
+eslint-rules/           instrument/vocabulary (gate 5), loaded by the config above
 prettier.config.js · lefthook.yml   root-owned formatting and git hooks
 packages/config/        tsconfig.base.json — the shared compilerOptions
 apps/web/               the app (@spaces/web)

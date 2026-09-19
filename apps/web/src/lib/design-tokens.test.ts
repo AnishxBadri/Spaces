@@ -5,15 +5,13 @@ import { describe, expect, it } from 'vitest'
 
 // eslint-rules/ stays at the workspace root: it is loaded by the root
 // eslint.config.js, and one lint vocabulary serves every package.
-import instrument, {
-  NAMED_STEPS,
-} from '../../../../eslint-rules/no-v1-tokens.js'
+import instrument, { NAMED_STEPS } from '../../../../eslint-rules/vocabulary.js'
 
 /**
- * SPA-16: the v1 vocabulary is out, and the thing that keeps it out is a lint
- * rule instead of the old CLAUDE.md grep. Two halves are tested here — the rule
- * over tsx class strings (gate 4 runs it for real), and the `@theme` block,
- * which no lint rule reads.
+ * SPA-16: the Instrument vocabulary is the only vocabulary, and the thing that
+ * holds it there is a lint rule instead of the old CLAUDE.md grep. Two halves
+ * are tested here — the rule over tsx class strings (gate 4 runs it for real),
+ * and the `@theme` block, which no lint rule reads.
  */
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
@@ -30,13 +28,13 @@ function lint(code: string, filename = 'src/routes/_app/fixture.tsx') {
         sourceType: 'module',
         parserOptions: { ecmaFeatures: { jsx: true } },
       },
-      rules: { 'instrument/no-v1-tokens': 'error' },
+      rules: { 'instrument/vocabulary': 'error' },
     },
     filename,
   )
 }
 
-describe('instrument/no-v1-tokens', () => {
+describe('instrument/vocabulary', () => {
   it('does not read comments — the line the old grep printed forever', () => {
     // Verbatim from src/components/attributes/attribute-dialog.tsx:979-981,
     // the single false positive the gate-5 grep produced on a clean tree.
@@ -290,15 +288,16 @@ describe('@theme colour exports', () => {
     css.indexOf('\n}', css.indexOf('@theme')),
   )
 
-  it('exports no v1 colour name Tailwind could build a class from', () => {
+  it('exports no shadcn colour name Tailwind could build a class from', () => {
     // Deleted 2026-09-18 (SPA-16). Each aliased bone, paper, hairline or ink,
-    // so nothing rendered differently — they only kept the v1 class names
-    // reachable. Their `:root` halves followed in SPA-41, once the note
-    // body's marks stopped reading them — see the block below.
+    // so nothing rendered differently — they only kept the shadcn class names
+    // reachable. Their `:root` halves followed in SPA-41 and SPA-154, once the
+    // note body's marks stopped reading them — see the block below.
     const dead = [
       '--color-sidebar',
       '--color-chart-',
       '--color-card',
+      '--color-popover',
       '--color-accent',
       '--color-secondary',
       '--color-muted',
@@ -326,7 +325,7 @@ describe(':root custom properties', () => {
     css.indexOf('\n}', css.indexOf(':root {')),
   )
 
-  it('declares none of the v1 aliases — the layer is gone, not just hidden', () => {
+  it('declares none of the shadcn aliases — the layer is gone, not just hidden', () => {
     // SPA-41. `@theme` lost these in SPA-16, which stopped Tailwind building
     // `bg-muted` and friends; the `:root` declarations outlived it because
     // .mention-chip and .glossary-term still read them by hand. Both now draw
@@ -339,6 +338,35 @@ describe(':root custom properties', () => {
       '--accent-foreground',
       '--secondary',
       '--secondary-foreground',
+    ]) {
+      expect(root, name).not.toContain(`${name}:`)
+    }
+  })
+
+  it('declares nothing else with zero readers either', () => {
+    // SPA-154 finishes what SPA-41 started: the rest of the alias layer. A
+    // reader is a `var(--name)` somewhere in apps/web/src or packages/, or a
+    // Tailwind class Tailwind could build from a `@theme` mapping of it. None
+    // of these had one — the chassis is drawn from bone and hairline, cards
+    // and popovers are paper on a 1px ink edge, and no chart ever shipped.
+    for (const name of [
+      '--sidebar',
+      '--sidebar-foreground',
+      '--sidebar-primary',
+      '--sidebar-primary-foreground',
+      '--sidebar-accent',
+      '--sidebar-accent-foreground',
+      '--sidebar-border',
+      '--sidebar-ring',
+      '--card',
+      '--card-foreground',
+      '--popover',
+      '--popover-foreground',
+      '--chart-1',
+      '--chart-2',
+      '--chart-3',
+      '--chart-4',
+      '--chart-5',
     ]) {
       expect(root, name).not.toContain(`${name}:`)
     }

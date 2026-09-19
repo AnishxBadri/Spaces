@@ -247,7 +247,7 @@ function DocumentRow({
         /* Optical sizing, not a type step: a three-letter kind code has to sit
            inside a 22px square, and the smallest named step (field, 10px)
            overflows it. DESIGN.md §3's list is for type; this is a glyph. */
-        // eslint-disable-next-line instrument/no-v1-tokens
+        // eslint-disable-next-line instrument/vocabulary
         className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper mono text-[0.5rem] leading-[0.625rem] text-foreground"
       >
         {code}

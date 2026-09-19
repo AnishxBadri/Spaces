@@ -336,7 +336,7 @@ export function InitialsMark({
         size === 'xs'
           ? /* Optical sizing, not a type step: initials in a 16px square.
                The named steps start at 10px (field) and overflow it. */
-            // eslint-disable-next-line instrument/no-v1-tokens
+            // eslint-disable-next-line instrument/vocabulary
             'size-4 text-[0.5rem] leading-[0.625rem]'
           : size === 'lg'
             ? 'size-7 text-label leading-4'

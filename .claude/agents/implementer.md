@@ -41,8 +41,8 @@ one and say which you left and why.
 - Types are claims the compiler checked: no `as Type` on data you could
   have typed at the source, no `any`, no `?? undefined` hedges.
 - Instrument vocabulary only in tsx: `text-graphite`, `border-rule`,
-  `bg-bone`, `text-label`, `rounded-md` / `rounded-none`. Gate 5 lists the
-  banned v1 names.
+  `bg-bone`, `text-label`, `rounded-md` / `rounded-none`. Gate 5 is what holds
+  a class string to it, and names the replacement for anything else.
 - Money is a string from drizzle; parse with `Number()` at the server
   boundary. Never `Intl.NumberFormat` compact — use `fmtMoney`.
 
@@ -55,8 +55,9 @@ pnpm exec prettier --check <touched files>
 pnpm lint
 ```
 
-Gate 5 (no v1 design tokens) is the `instrument/no-v1-tokens` eslint rule
-and runs inside `pnpm lint`; CLAUDE.md is the authority if the two disagree.
+Gate 5 (Instrument vocabulary only) is the `instrument/vocabulary` eslint
+rule and runs inside `pnpm lint`; CLAUDE.md is the authority if the two
+disagree.
 Vitest runs against harness-created `*_test` databases, never the dev
 `spaces` database. **Always set a per-issue test database** so your journal
 cannot collide with another worktree's:

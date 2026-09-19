@@ -6,7 +6,7 @@ import { tanstackConfig } from '@tanstack/eslint-config'
 import { createNodeResolver } from 'eslint-plugin-import-x'
 import reactHooks from 'eslint-plugin-react-hooks'
 import drizzle from 'eslint-plugin-drizzle'
-import instrument from './eslint-rules/no-v1-tokens.js'
+import instrument from './eslint-rules/vocabulary.js'
 
 // The directory this file lives in. `import/no-restricted-paths` resolves its
 // zones against `basePath`, and a relative '.' means eslint's cwd — which is
@@ -72,18 +72,19 @@ export default [
       ],
     },
   },
-  // The v1 design vocabulary, out (SPA-16). This replaces the CLAUDE.md gate-5
-  // grep, which read whole files and so could not tell `rounded` the class from
-  // "rounded" the word in a comment. The rule reads className literals and
-  // cn()/cva() string arguments only, and names the Instrument replacement in
-  // every message. Running here means gate 4 and the pre-commit hook cover it.
+  // The Instrument vocabulary, enforced (SPA-16). This replaces the CLAUDE.md
+  // gate-5 grep, which read whole files and so could not tell `rounded` the
+  // class from "rounded" the word in a comment. The rule reads className
+  // literals and cn()/cva() string arguments only, and names the Instrument
+  // replacement in every message. Running here means gate 4 and the pre-commit
+  // hook cover it.
   // The rule source is plain JS (eslint.config.js loads it directly) and is
   // exercised by apps/web/src/lib/design-tokens.test.ts, so it is not itself linted.
   { ignores: ['eslint-rules/*.js'] },
   {
     files: ['apps/web/src/**/*.tsx'],
     plugins: { instrument },
-    rules: { 'instrument/no-v1-tokens': 'error' },
+    rules: { 'instrument/vocabulary': 'error' },
   },
   // Just the two classic hooks rules — the v7 "recommended" set adds React
   // Compiler rules that fight TanStack Table's API.

@@ -119,9 +119,22 @@ Instrument (2026-09-10) replaces "The Analyst's Desk" (2026-07 → 09). What it 
 white ground, the one pine voice, the contrast floor, the ledger register. What it
 changed: the second neutral is bone, structure is 1px ink rather than a pale border,
 numbers and labels moved to mono, titles moved to serif, radius fell to 0 and 2px,
-focus became a reticle, and dither became the only texture. The Paper canvas
-(`spaces`, pages `v2 · Foundations / Components / Patterns / Surfaces`) is the drafting
-table; this repo is truth.
+focus became a reticle, and dither became the only texture. There is no predecessor
+still running and no flag to flip: the old look survives only in the commit
+history.
+
+The Paper canvas is the drafting table; this repo is truth. File `spaces`
+(id `01M19X8AY9DZD3PZMJK7RWVMTB`), whose pages are named `v2 · Foundations`,
+`v2 · Components`, `v2 · Patterns` and `v2 · Surfaces` — the canvas's own page names,
+not a version of this design. Open a page with `open_file(fileId, pageId)`, then
+`get_tree_summary` to find nodes, then `get_jsx(nodeId, "inline-styles")` for exact
+values; never read a value off a screenshot, and use screenshots only to compare a
+result. Foundations (page `8-0`) carries the Foundations sheet `40Q-0` and Texture
+`211-0`; Components (`9-0`) carries Atoms `2GW-0`, Overlays `2GX-0`, Chassis + Ledger
+`4GV-0`, Ledger · Editing `4RI-0`, Overlays · Flows `56M-0` and Rails · Settings ·
+Ledgers `5LB-0`; Patterns (`A-0`) carries `45Y-0`, the eight patterns P1–P8; Surfaces
+(`B-0`) carries Today `385-0`, Companies `1N8-0`, Deal `210-0`, Deals — Board `3H2-0`
+and Tasks `3H3-0`.
 
 This system explicitly rejects enterprise CRM chrome, the generic SaaS template look
 (shadcn defaults, gradient heroes, purple accents, identical card grids), and the dark
@@ -145,7 +158,7 @@ this section describes; the CSS decides.
 **Light only, by decision (2026-09-19):** `:root` declares `color-scheme: light` so the
 native controls follow the app rather than the OS, there is no `dark` variant, and every
 colour is a token — a raw hex or an arbitrary colour value in tsx is a lint error — so
-dark, when it is built, is a second token file and not a re-port.
+dark, when it is built, is a second token file and not a redraw.
 
 ### Materials
 
@@ -218,7 +231,7 @@ Utilities: `title-serif`, `label-caps` (the 11/14 500 label step whole), `field-
 (the 10/12 400 field-label step whole — mono, caps, .08em), `mono`, `numeric` (tabular +
 right-aligned in one class), `tabular` (figures inline in a sentence). The scale steps
 stay named (`text-field … text-display`, the smallest being the field step at 10/12); if
-a size isn't on the list it does not go in the app — `instrument/no-v1-tokens` rejects
+a size isn't on the list it does not go in the app — `instrument/vocabulary` rejects
 `text-[…]` and `leading-[…]` in tsx, so the only way onto the list is `src/styles.css`.
 A genuine one-off (optical sizing of initials inside a 16–22px square) takes an inline
 comment saying why and a scoped disable; there are four.
@@ -291,9 +304,8 @@ Registers Rule**, now the three voices above.
 
 Refined and restrained: every interactive element ships with default, hover,
 focus-visible, active and disabled states; empty states teach; loading is a density
-ramp, never a shimmer. Documented from the shipped code (2026-09-10, the Instrument
-port) — the reticle, the three voices and the motion doctrine apply to every component
-without exception.
+ramp, never a shimmer. Documented from the shipped code (2026-09-10) — the reticle,
+the three voices and the motion doctrine apply to every component without exception.
 
 ### Motion
 
@@ -319,8 +331,8 @@ entire app. Principles, after Rauno Freiberg's interface guidelines:
 **The Compositor Rule.** If a motion can't be expressed in transform + opacity, it
 doesn't ship.
 
-The canvas sheet **Micro-interactions** (`v2 · Components`, 2026-09-11) draws each
-interaction frame by frame with its contract as a mono line: button press, ledger row
+The canvas sheet **Micro-interactions** (canvas page `v2 · Components`, 2026-09-11)
+draws each interaction frame by frame with its contract as a mono line: button press, ledger row
 states, overlay enter/exit, composer add, field edit, drag reorder, toast and loading,
 chassis fold, tabs, badge toggle. Four specifics on that sheet are proposed, not yet in
 code: a composer's new row lands on a bone wash that fades in 250ms; a rejected cell
@@ -471,7 +483,8 @@ never decoration; the Two-Tier Rule guarantees they never compete with pine.
 
 232px of bone with a hairline right edge. Three groups: the work (Today, Tasks, Spaces,
 Notes), the objects (Companies, People, Deals, then customs), capital (Portfolio,
-Mandate). Rows are 30px with a 14px mark slot so every label sits on one lane. Current
+Mandate) — one list (`NAV_ITEMS`), read in the same order by the command palette and
+the keyboard sheet, so the chassis is where nav order is decided. Rows are 30px with a 14px mark slot so every label sits on one lane. Current
 page = paper + rule border + medium weight — never a pine bar. The head row ends on a
 mono `«` that folds the chassis (`⌘\`). The foot is one account row (ink initials
 square, name, email); its menu opens to the right of the chassis — never up into the

@@ -48,7 +48,7 @@ the page gutter is 32 (`px-8`). Heights: row 36 (`h-row`), control 32, small 26,
 ### The named type steps (`DESIGN.md` §3)
 
 Eight steps, fixed rem, never fluid. The list is the `--text-*` custom properties in
-`apps/web/src/styles.css` and the `NAMED_STEPS` table in `eslint-rules/no-v1-tokens.js`,
+`apps/web/src/styles.css` and the `NAMED_STEPS` table in `eslint-rules/vocabulary.js`,
 which a test keeps in sync.
 
 | step      | size / leading | role                                |
@@ -63,7 +63,7 @@ which a test keeps in sync.
 | `display` | 26 / 32        | record names                        |
 
 **An unnamed size does not ship.** `text-[…]` and `leading-[…]` are rejected by
-`instrument/no-v1-tokens`, which names the nearest step in the message; the only way
+`instrument/vocabulary`, which names the nearest step in the message; the only way
 onto the list is `apps/web/src/styles.css`. A genuine optical one-off (initials inside
 a 16–22px square) takes an inline comment saying why plus a scoped disable.
 
@@ -172,8 +172,8 @@ on the canvas and have it approved before it is coded. Do not derive it from
 
 ### The mechanical floor
 
-The five gates in `CLAUDE.md`. Gate 5 is `instrument/no-v1-tokens`
-(`eslint-rules/no-v1-tokens.js`), which reads `className` literals and the string
+The five gates in `CLAUDE.md`. Gate 5 is `instrument/vocabulary`
+(`eslint-rules/vocabulary.js`), which reads `className` literals and the string
 arguments of `cn()` / `cva()` in `apps/web/src/**/*.tsx` and names the replacement in
 every message — a banned class, an unnamed size, or a raw colour (a hex or an
 `rgb()`/`oklch()` spelled into a class; `var(--…)` is the sanctioned form). Green gates mean the vocabulary is spelled correctly. A surface can pass
