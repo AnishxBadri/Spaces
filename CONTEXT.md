@@ -214,6 +214,24 @@ registry.json   plugin index (id, version, sdk range, sha, sig, tarball url); co
                 copied into the image so offline installs see the list
 ```
 
+**Package manager: pnpm 10 (pinned 2026-09-19, SPA-43).** `packageManager`
+names `pnpm@10.34.5` with the integrity suffix corepack writes, and that field
+is the only place a pnpm version lives: the Dockerfile's `corepack enable`,
+CI's `pnpm/action-setup@v4` (no `version:` key) and lefthook's `pnpm exec`
+hooks all resolve from it. The bump landed ahead of `mono-1` rather than
+behind `mono-13a` because the two pnpm 10 behaviours that matter are about the
+monorepo, not about today's flat tree: `workspace:` protocol resolution, of
+which `mono-1` creates the first instance, and `turbo prune --docker`
+(`docs/spec-plugin-sdk.md` §2), which rewrites the lockfile pnpm wrote and is
+the first thing that cares which pnpm wrote it. A whole-lockfile regeneration
+buried inside a whole-tree rename is a diff nobody can read; on its own it is
+one line, and on this tree it was a no-op — pnpm 10 rewrote the lockfile
+byte-identically, `lockfileVersion` stayed `9.0`, and nothing resolved
+differently. pnpm 10 also stopped running dependency build scripts by default;
+`pnpm.onlyBuiltDependencies: [esbuild, lightningcss]` was already in
+`package.json` and both still build. `mono-1` confirms this pin rather than
+re-arguing it.
+
 **Ports = the SDK contract.** Effect service tags, one per lane, provenance
 stamped by the port from the bound `integration` row (a plugin cannot forge
 who wrote what): `Identity` (resolveEntity / addIdentityAlias) · `Facts`
