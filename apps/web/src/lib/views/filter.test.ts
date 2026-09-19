@@ -94,9 +94,7 @@ describe('view filter (pure)', () => {
   })
 })
 
-const hasDb = Boolean(process.env.DATABASE_URL)
-
-describe.skipIf(!hasDb)('view store', () => {
+describe('view store', () => {
   it('lists shared + own, guards edits to author or admin', async () => {
     const { Effect } = await import('effect')
     const {

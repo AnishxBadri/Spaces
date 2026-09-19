@@ -57,8 +57,8 @@ describe('classifyBeat', () => {
   })
 })
 
-// The shared dev database — scoped to a role nobody else writes, so a
-// concurrent session's real 'worker' row is neither read nor touched.
+// The test database (SPA-143) — still scoped to a role nobody else writes,
+// so a concurrent run's row is neither read nor touched.
 describe('beat (database)', () => {
   const role = `test-${randomUUID()}`
 

@@ -144,9 +144,7 @@ describe('planPatch (pure)', () => {
   })
 })
 
-const hasDb = Boolean(process.env.DATABASE_URL)
-
-describe.skipIf(!hasDb)('required means can’t-clear (all types)', () => {
+describe('required means can’t-clear (all types)', () => {
   const tag = randomUUID().slice(0, 8)
   const slug = (t: string) => `req_${t}_${tag}`
 
@@ -234,7 +232,7 @@ describe.skipIf(!hasDb)('required means can’t-clear (all types)', () => {
   })
 })
 
-describe.skipIf(!hasDb)('setValues', () => {
+describe('setValues', () => {
   afterAll(async () => {
     await cleanupTestEntities([
       '^(ValCo|ValDeal|ValPerson) [0-9a-f]{4,8}( .*)?$',

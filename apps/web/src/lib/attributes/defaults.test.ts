@@ -74,9 +74,7 @@ describe('defaults (pure)', () => {
   })
 })
 
-const hasDb = Boolean(process.env.DATABASE_URL)
-
-describe.skipIf(!hasDb)('birthValues', () => {
+describe('birthValues', () => {
   const tag = randomUUID().slice(0, 8)
   const slug = (t: string) => `dflt_${t}_${tag}`
 

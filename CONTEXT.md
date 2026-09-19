@@ -2214,6 +2214,16 @@ run` against a `pgvector/pgvector:pg17` service container** — it shipped witho
   harness the entry below banked as a prerequisite. What is still owed is a test database
   the suite owns instead of the dev one: roadmap `mono-4` (global setup) and `mono-5`
   (truncate between files), inside ship polish, which is entry 16 in this list, not phase 15.
+  **`mono-4` landed 2026-09-19 (SPA-143): the suite owns `spaces_test`.** A vitest
+  `globalSetup` per package (`packages/db/src/test-db.ts` is the shared half) derives
+  `DATABASE_URL_TEST`, defaulting to `DATABASE_URL` with `_test` suffixed onto the database
+  name, creates that database on the same server if it is absent, migrates it, and — in
+  `apps/web` — seeds the system attributes, the starter taxonomy and **one fixture `user`
+  row**, which is the part a "just migrate it" harness misses: sites across the DB-coupled
+  files do `select id from user limit 1` and had been resolving against whoever logged into
+  the dev app first. `docker-compose.dev.yml` is untouched; nothing drops a database.
+  Still owed: `mono-5`, truncate between files — until then the suites' own
+  `cleanupTestEntities` is what keeps one file's rows out of the next one's `limit 1`.
 - **`./data` ownership landmine.** The Dockerfile `chown`s `/data` at build, but the
   compose bind mount overlays it with host ownership at runtime. Wrong UID on a Linux
   host → cannot write blobs or generate `secret.key`, and it **fails at first upload, not

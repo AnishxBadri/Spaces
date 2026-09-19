@@ -29,10 +29,9 @@ const webRoot = fileURLToPath(new URL('../..', import.meta.url))
 const bootEntry = path.join(webRoot, 'src/db/boot.ts')
 const imageFolder = MIGRATIONS_FOLDER
 
-const hasDb = Boolean(process.env.DATABASE_URL)
 const TEST_DB = 'spa36_downgrade_guard'
 
-describe.skipIf(!hasDb)('db/boot.ts (real database)', () => {
+describe('db/boot.ts (real database)', () => {
   let adminUrl = ''
   let testUrl = ''
   let tmpRoot = ''

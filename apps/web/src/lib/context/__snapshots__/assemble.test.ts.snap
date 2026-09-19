@@ -28,7 +28,7 @@ exports[`assembleProgram > assembles the record for two users, deterministically
     "kind": "event",
     "ref": "event:UUID",
     "score": 0.6122,
-    "text": "Funding stage: — → seed (Anish, 2026-08-29)",
+    "text": "Funding stage: — → seed (Test Fixture, 2026-08-29)",
   },
   {
     "hop": 1,

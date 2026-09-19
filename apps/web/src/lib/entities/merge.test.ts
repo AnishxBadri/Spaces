@@ -3,20 +3,17 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { cleanupTestEntities } from './test-helpers'
 
 afterAll(async () => {
-  if (!process.env.DATABASE_URL) return
   await cleanupTestEntities([
     '^(MergeCo|KindCo|KindPerson|TestSpace|TestNote) [0-9a-f]{4,8}( .*)?$',
   ])
 })
 
-const hasDb = Boolean(process.env.DATABASE_URL)
-
 /**
- * Integration test against the dev database. Builds two companies with
+ * Integration test against the test database. Builds two companies with
  * aliases, a mention link, a space tag, and a candidate — merges — then
  * asserts every repoint, the redirect, and the snapshot.
  */
-describe.skipIf(!hasDb)('mergeEntities', () => {
+describe('mergeEntities', () => {
   it('repoints everything, redirects the loser, snapshots the lot', async () => {
     const { resolveEntity, addIdentityAlias } = await import('./resolve')
     const { mergeEntities } = await import('./merge')
