@@ -17,16 +17,25 @@ type Items = Awaited<ReturnType<typeof getRecordTimeline>>
 
 /**
  * A burst names who attended to the values (typed actor, spec §4): a person
- * by name, an integration, or the system — the merge executor's rewrites
- * must never read as a teammate's edit.
+ * by name, an integration by the capability it installs, or the system — the
+ * merge executor's rewrites must never read as a teammate's edit, and two
+ * integrations must never read as one.
+ *
+ * `capabilityId` comes off `attribute_event.actor_ref` → `integration`, so an
+ * integration burst names the thing the reader configured ("apollo") rather
+ * than the anonymous class of thing it belongs to. The fallback is
+ * unreachable while the check constraint and the FK both hold; it exists
+ * because a label has to render either way.
  */
 function burstActorLabel(item: {
   actorType: 'user' | 'integration' | 'system'
   actorName: string | null
+  capabilityId: string | null
   source: string
 }): string {
   if (item.actorType === 'user') return item.actorName ?? 'Someone'
-  if (item.actorType === 'integration') return 'An integration'
+  if (item.actorType === 'integration')
+    return item.capabilityId ?? 'Unnamed integration'
   return item.source === 'merge' ? 'A merge' : 'System'
 }
 

@@ -184,17 +184,22 @@ export async function resolveEntity(
 
   // Birth values (spec §4): supplied first, then defaults for the blanks.
   // After the transaction, since setValues takes its own row lock. Actor is
-  // the human when one is present; a keyless sync or import is an
-  // integration, and `current-user` defaults skip for it.
+  // the human when one is present; a keyless sync or import is `system`, and
+  // `current-user` defaults skip for it either way.
+  //
+  // It used to say `integration` here, which SPA-70 made unrepresentable: an
+  // integration actor now names an `integration` row, and this call site has
+  // none to name — no plugin is installed and no port called it. `system`
+  // (the merge executor and the seeds: rewrites no person asserted) is the
+  // true answer for a keyless import. A real integration's writes arrive
+  // through the Facts port, which is handed its bound row's id.
   if (input.kind !== 'organization') {
     const { birthValues } = await import('../attributes/defaults')
     await birthValues({
       entityId: created.id,
       actor: input.createdBy
         ? { type: 'user', id: input.createdBy }
-        : input.source === 'manual'
-          ? { type: 'system' }
-          : { type: 'integration' },
+        : { type: 'system' },
       supplied: input.values,
     })
   }

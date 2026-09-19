@@ -13,6 +13,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { entity } from './entities'
+import { integration } from './integrations'
 import { objectDef } from './objects'
 import { user } from './auth'
 import type { Json } from '../json'
@@ -142,7 +143,9 @@ export const attribute = pgTable(
  * whoever connected it through the integration's own config; the merge
  * executor's rewrites are `system`. Attio's typed-actor idea without its
  * polymorphic (type, id) pair: `actor_id` stays a real user FK, set iff
- * type = 'user'. An integration FK arrives with the integration table.
+ * type = 'user', and `actor_ref` is a real integration FK, set iff
+ * type = 'integration' (SPA-70 — the integration table exists now, so the
+ * second half of the invariant is a constraint rather than a comment).
  */
 export const actorType = pgEnum('actor_type', ['user', 'integration', 'system'])
 
@@ -182,6 +185,12 @@ export const attributeEvent = pgTable(
     to: jsonb('to').$type<Json>(),
     actorType: actorType('actor_type').notNull(),
     actorId: text('actor_id').references(() => user.id),
+    /**
+     * Which integration attended to the value — the same row `source_ref`
+     * will point at, so the record timeline's "which integration wrote this"
+     * and the provenance stamp cannot disagree.
+     */
+    actorRef: uuid('actor_ref').references(() => integration.id),
     source: attributeEventSource('source').notNull().default('direct'),
     // No FK yet: the suggestion table lands with the review inbox. Added
     // then, same pattern as the integration FK on actor.
@@ -194,10 +203,14 @@ export const attributeEvent = pgTable(
   (t) => [
     index('attribute_event_entity_idx').on(t.entityId, t.at),
     index('attribute_event_slug_idx').on(t.entityId, t.attrSlug),
-    // actor_type = 'user' ⇔ actor_id set (spec §4 invariant).
+    // actor_type = 'user' ⇔ actor_id set, and actor_type = 'integration' ⇔
+    // actor_ref set (spec §4 invariant, both halves). Biconditionals, not
+    // implications: a `system` row carrying an integration id would be a
+    // provenance lie in the other direction, and an integration write that
+    // cannot say *which* integration is the hole this column closes.
     check(
       'attribute_event_actor_invariant',
-      sql`(${t.actorType} = 'user') = (${t.actorId} IS NOT NULL)`,
+      sql`(${t.actorType} = 'user') = (${t.actorId} IS NOT NULL) AND (${t.actorType} = 'integration') = (${t.actorRef} IS NOT NULL)`,
     ),
   ],
 )
