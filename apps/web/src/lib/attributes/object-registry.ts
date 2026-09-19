@@ -4,6 +4,7 @@ import { db } from '@spaces/db'
 import { activity } from '@spaces/db/schema/activity'
 import { attribute, attributeEvent, entity, objectDef } from '@spaces/db/schema'
 import { birthValuesEffect } from './defaults'
+import type { BirthValuesResult } from './defaults'
 import { createAttributeProgram } from './create'
 import {
   CORE_ONLY_IDENTITY_KEYS,
@@ -452,6 +453,16 @@ export type CreateRecordInput = {
 }
 
 /**
+ * The new record's id, plus what its identity-backed values did on the way
+ * in (SPA-97). A birth that lost a domain race is a `suggested_duplicate`
+ * and the record still exists — the caller toasts, it does not roll back.
+ */
+export type CreateRecordResult = { id: string } & Pick<
+  BirthValuesResult,
+  'identity' | 'identityValues'
+>
+
+/**
  * Birth of a custom record: an entity row and its `name` alias, in one
  * transaction, then the same birth-values pass every record gets (supplied
  * first, defaults for the blanks), then the fuzzy sweep every other record
@@ -465,7 +476,7 @@ export type CreateRecordInput = {
 export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
   input: CreateRecordInput,
 ): Effect.fn.Return<
-  { id: string },
+  CreateRecordResult,
   | ObjectRejected
   | ObjectQueryFailed
   | AttributeValidationError
@@ -514,7 +525,7 @@ export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
       return ent
     }),
   )
-  yield* birthValuesEffect({
+  const { identity, identityValues } = yield* birthValuesEffect({
     entityId: row.id,
     actor: input.actor,
     supplied: input.values,
@@ -534,5 +545,5 @@ export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
       Effect.logError('[objects] fuzzy sweep failed', cause),
     ),
   )
-  return { id: row.id }
+  return { id: row.id, identity, identityValues }
 })

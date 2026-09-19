@@ -5,6 +5,7 @@ import type {
   AttributeValidationError,
   EntityNotFound,
   EventSource,
+  SetValuesResult,
   ValuesWriteFailed,
 } from './values'
 
@@ -45,10 +46,21 @@ export type BirthValuesInput = {
  * program for every creation path, so a record born from a sync and one
  * born from the dialog get the same treatment with different actors.
  */
+/**
+ * What birth reports back. `identity`/`identityValues` ride along unchanged
+ * from the one write path (SPA-97): a record born holding a domain another
+ * record already claims is the same collision an edit makes, and the create
+ * dialog owes the operator the same sentence the rail does.
+ */
+export type BirthValuesResult = Pick<
+  SetValuesResult,
+  'defaulted' | 'identity' | 'identityValues'
+>
+
 export const birthValuesEffect = Effect.fn('birthValues')(function* (
   opts: BirthValuesInput,
 ): Effect.fn.Return<
-  { defaulted: Array<string> },
+  BirthValuesResult,
   AttributeValidationError | EntityNotFound | ValuesWriteFailed
 > {
   const supplied = Object.fromEntries(
@@ -56,18 +68,17 @@ export const birthValuesEffect = Effect.fn('birthValues')(function* (
       ([, v]) => v !== undefined && v !== null && v !== '',
     ),
   )
-  const { defaulted } = yield* setValuesEffect({
+  const { defaulted, identity, identityValues } = yield* setValuesEffect({
     entityId: opts.entityId,
     patch: supplied,
     actor: opts.actor,
     ...(opts.suppliedSource ? { source: opts.suppliedSource } : {}),
     fillDefaults: { now: opts.now ?? new Date() },
   })
-  return { defaulted }
+  return { defaulted, identity, identityValues }
 })
 
 /** Promise seam for creation paths the ratchet hasn't converted yet. */
 export const birthValues = (
   opts: BirthValuesInput,
-): Promise<{ defaulted: Array<string> }> =>
-  Effect.runPromise(birthValuesEffect(opts))
+): Promise<BirthValuesResult> => Effect.runPromise(birthValuesEffect(opts))

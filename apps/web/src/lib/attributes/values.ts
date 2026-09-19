@@ -7,7 +7,11 @@ import type { EntityValues } from '@spaces/db/schema/entities'
 import type { Json } from '#/lib/json'
 import { resolveDefault } from '@spaces/core/attributes/default-values'
 import { objectIdForKindAsync } from './objects'
-import { claimIdentityAlias, releaseIdentityAlias } from '../entities/resolve'
+import {
+  claimIdentityAlias,
+  normalizeIdentityValue,
+  releaseIdentityAlias,
+} from '../entities/resolve'
 import type { IdentityOutcome, ResolveSource } from '../entities/resolve'
 import { toObjectKind, valueValidator } from '@spaces/core/attributes/registry'
 import type {
@@ -254,14 +258,22 @@ export type SetValuesInput = {
 
 /**
  * `identity` is the per-slug outcome of the identity mirror, computed
- * inside the transaction that wrote the values. Nothing surfaces it to the
- * client yet — objects-8 does — but it is decided here, where the claim was
- * actually made, and nowhere else can reconstruct it afterwards.
+ * inside the transaction that wrote the values — decided here, where the
+ * claim was actually made, and nowhere else can reconstruct it afterwards.
+ * `updateRecord` and `createObjectRecord` hand both maps to the client, and
+ * `collisionToast` turns them into the one sentence a losing write owes the
+ * operator (SPA-97 — "a conflict is never silent").
+ *
+ * `identityValues` is the same keys, carrying the *normalized* value each
+ * slug asserted — what the unique index compared, so the toast names
+ * `acme.com` rather than whatever the operator typed. A slug whose outcome
+ * is `released` asserted nothing and has no entry.
  */
 export type SetValuesResult = {
   changed: Array<string>
   defaulted: Array<string>
   identity: Record<string, IdentityOutcome>
+  identityValues: Record<string, string>
 }
 
 export const setValuesEffect = Effect.fn('setValues')(function* (
@@ -422,20 +434,27 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
         // releases the claim (CONTEXT.md, 2026-09-19), so another record may
         // take the domain.
         const identity: Record<string, IdentityOutcome> = {}
+        const identityValues: Record<string, string> = {}
         for (const work of planIdentity(registry, current, patch, changes)) {
           if (work.held !== null && work.held !== work.value) {
             await releaseIdentityAlias(tx, entityId, work.key, work.held)
           }
-          identity[work.slug] =
-            work.value === null
-              ? 'released'
-              : await claimIdentityAlias(
-                  tx,
-                  entityId,
-                  work.key,
-                  work.value,
-                  aliasSource(actor, source),
-                )
+          if (work.value === null) {
+            identity[work.slug] = 'released'
+            continue
+          }
+          identity[work.slug] = await claimIdentityAlias(
+            tx,
+            entityId,
+            work.key,
+            work.value,
+            aliasSource(actor, source),
+          )
+          // The normal form the claim was actually compared in — the same
+          // function the alias row was written through, so whoever reports
+          // the collision reports what collided.
+          const norm = normalizeIdentityValue(work.key, work.value)
+          if (norm !== null) identityValues[work.slug] = norm
         }
 
         return {
@@ -446,6 +465,7 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
             .filter((c) => c.door === 'default')
             .map((c) => c.slug),
           identity,
+          identityValues,
         }
       }),
     catch: (cause) =>

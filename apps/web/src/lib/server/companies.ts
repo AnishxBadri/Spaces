@@ -15,6 +15,7 @@ import { activity } from '@spaces/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from '../entities/resolve'
 import { jsonString } from '#/lib/json'
 import { lastTouchedMap, requireUser } from './shared'
+import type { SetValuesResult } from '../attributes/values'
 
 export const listCompanies = createServerFn().handler(async () => {
   await requireUser()
@@ -263,6 +264,10 @@ export const updateRecord = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
+    // Empty until the patch half runs: a rename asserts no identity key, so
+    // a name-only update truthfully reports no outcomes rather than none.
+    let identity: SetValuesResult['identity'] = {}
+    let identityValues: SetValuesResult['identityValues'] = {}
     if (data.name) {
       // The rename half is Effect-first through the effectFn seam
       // (backend-paradigm ratchet); the values patch below is untouched and
@@ -276,11 +281,17 @@ export const updateRecord = createServerFn({ method: 'POST' })
     }
     if (data.patch && Object.keys(data.patch).length > 0) {
       const { setValues } = await import('../attributes/values')
-      await setValues({
+      // The identity outcome is the only thing this call returns that the
+      // client cannot recompute: the claim was decided inside the write's
+      // transaction. Threaded out so the editing surfaces can say so
+      // (SPA-97) — the write itself is unchanged.
+      const result = await setValues({
         entityId: data.id,
         patch: data.patch,
         actor: { type: 'user', id: u.id },
       })
+      identity = result.identity
+      identityValues = result.identityValues
       // The pipeline→portfolio seam: a deal reaching Invested births a
       // holding (idempotent — follow-ons land on the existing one).
       if (data.patch.stage === 'invested') {
@@ -297,7 +308,7 @@ export const updateRecord = createServerFn({ method: 'POST' })
         }
       }
     }
-    return { ok: true }
+    return { ok: true, identity, identityValues }
   })
 
 /** Surfaces the dedupe tripwire in the UI. */

@@ -318,6 +318,20 @@ const IDENTITY_NORMALIZERS = {
 export type AliasIdentityKind = keyof typeof IDENTITY_NORMALIZERS
 
 /**
+ * The normal form a claim is actually stored and compared in. Exported so a
+ * caller that must *say* what collided says the same thing the unique index
+ * did — the toast on a losing write names `acme.com`, not the
+ * `https://Acme.com/` the operator typed. Empty string (the normalizers'
+ * "nothing here") answers null.
+ */
+export function normalizeIdentityValue(
+  kind: AliasIdentityKind,
+  rawValue: string,
+): string | null {
+  return IDENTITY_NORMALIZERS[kind](rawValue) || null
+}
+
+/**
  * What one identity-backed slug did on a write (spec §9). `released` is the
  * clear: the record stops asserting the key, so the alias is retired and the
  * domain is free for another record to claim (CONTEXT.md, 2026-09-19 —

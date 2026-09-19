@@ -25,6 +25,7 @@ import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
+import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { recordPath } from '#/lib/record-path'
 import {
@@ -292,9 +293,17 @@ function ObjectRecordPage() {
               value={record.values[def.slug] ?? null}
               refNames={record.refNames}
               onSave={async (v) => {
-                await updateRecord({
+                const result = await updateRecord({
                   data: { id: record.id, patch: { [def.slug]: v } },
                 })
+                // The save succeeded either way — the value is the
+                // operator's field and always lands. What a collision
+                // withholds is the *claim*, and this is where it is said.
+                const collision = collisionToast(result, record.object.singular)
+                if (collision)
+                  toast(collision.title, {
+                    description: collision.description,
+                  })
                 void router.invalidate()
               }}
             />
