@@ -34,7 +34,13 @@
 
   // DATABASE_URL can reach vitest from the shell as well as from .env.local;
   // either way it decides what the DB-coupled tests talk to.
-  "globalEnv": ["DATABASE_URL", "APP_URL", "NODE_ENV"],
+  "globalEnv": [
+    "DATABASE_URL",
+    "DATABASE_URL_TEST",
+    "TEST_DATABASE_BASE_URL",
+    "APP_URL",
+    "NODE_ENV"
+  ],
 
   "tasks": {
     "dev": {
