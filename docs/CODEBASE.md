@@ -51,7 +51,7 @@ with the worker handling anything CPU-bound asynchronously.
 - `_app/`: one file per surface — `today` (attention landing), `spaces` +
   `spaces_.$spaceId`, `companies`, `people`, `deals` (table/board toggle),
   `portfolio` + `portfolio_.$holdingId`, `notes`, `tasks`, `mandate`,
-  `dedupe`, `settings` + `settings_.objects.$objectSlug`. Custom objects
+  `inbox` (`dedupe` redirects to it), `settings` + `settings_.objects.$objectSlug`. Custom objects
   share two generic routes — `o.$objectSlug` (the table) and
   `o_.$objectSlug.$recordId` (the record). The `x_.$xId` convention =
   detail page.
@@ -62,7 +62,7 @@ with the worker handling anything CPU-bound asynchronously.
 
 The only write path. Auth checks live here — never in the client. Files:
 `companies` `people` `deals` `objects` `attributes` `views` `notes`
-`documents` `spaces` `interactions` `timeline` `search` `dedupe` `glossary`
+`documents` `spaces` `interactions` `timeline` `search` `inbox` `glossary`
 `mandate` `members` `portfolio` `tasks` `templates` `settings` — plus
 **`shared.ts`** for private cross-domain helpers (e.g. `birthHolding`, the
 Invested→holding seam).
@@ -159,7 +159,7 @@ what they are: `deal-board`, `record-timeline`, `tasks-rail`,
 | Portfolio                 | `routes/_app/portfolio*.tsx`, `lib/server/portfolio.ts`, `lib/portfolio/*`, `db/schema/portfolio.ts` |
 | Invested → holding        | `birthHolding` in `lib/server/shared.ts` (both updateRecord and createDeal paths)                    |
 | Attribute engine          | `lib/attributes/registry.ts`, `components/attributes/`, `db/schema/attributes.ts`                    |
-| Identity / dedupe / merge | `lib/entities/*`, `routes/_app/dedupe.tsx`                                                           |
+| Identity / dedupe / merge | `lib/entities/*`, `routes/_app/inbox.tsx`                                                            |
 | Spaces / taxonomy         | `routes/_app/spaces*.tsx`, `lib/server/spaces.ts`, ltree paths in `db/schema/entities.ts`            |
 | Notes / memos             | `routes/_app/notes*.tsx`, `components/editor/`, mentions-sync in `lib/server/notes.ts`               |
 | Documents pipeline        | `lib/server/documents.ts` → queue → `worker/jobs/extract-document.ts`; `lib/storage/`                |
