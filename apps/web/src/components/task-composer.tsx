@@ -513,7 +513,7 @@ function RecordsPill({
     const mySeq = ++seq.current
     timer.current = setTimeout(() => {
       void searchEntities({
-        data: { q, kinds: ['company', 'person', 'deal', 'organization'] },
+        data: { q, kinds: ['company', 'person', 'deal'] },
       }).then((r) => {
         if (seq.current === mySeq) setResults(r)
       })

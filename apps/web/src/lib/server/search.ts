@@ -11,17 +11,7 @@ export const searchEntities = createServerFn()
     z.object({
       q: z.string().max(120),
       kinds: z
-        .array(
-          z.enum([
-            'company',
-            'person',
-            'organization',
-            'deal',
-            'space',
-            'note',
-            'custom',
-          ]),
-        )
+        .array(z.enum(['company', 'person', 'deal', 'space', 'note', 'custom']))
         .optional(),
       /** narrow to one object's records — a custom-object reference picker */
       objectId: z.string().uuid().optional(),

@@ -1,6 +1,7 @@
 import { createReactInlineContentSpec } from '@blocknote/react'
-import { Boxes, Building2, FileText, Layers, User } from 'lucide-react'
+import { Boxes, Building2, FileText, Kanban, Layers, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { recordPath } from '#/lib/record-path'
 
 /**
  * Entity mention — inline chip carrying {entityId, label, kind}.
@@ -11,16 +12,16 @@ import type { LucideIcon } from 'lucide-react'
 export const KIND_ICONS: Record<string, LucideIcon | undefined> = {
   company: Building2,
   person: User,
-  organization: Building2,
+  deal: Kanban,
   space: Layers,
   note: FileText,
   custom: Boxes,
 }
 
+/** Index routes, by kind — the backlinks list on a note page uses it. */
 export const KIND_ROUTES: Record<string, string> = {
   company: '/companies',
   person: '/people',
-  organization: '/companies',
   space: '/spaces',
   note: '/notes',
 }
@@ -42,20 +43,11 @@ export const Mention = createReactInlineContentSpec(
       const { entityId, label, kind, objectSlug } = props.inlineContent.props
       const Icon = KIND_ICONS[kind] ?? Building2
       // Plain anchor, not router Link — renders inside BlockNote's tree.
+      // One route table for the whole app: a chip whose kind has no record
+      // page renders as text rather than guessing a page it might have.
       const href =
-        kind === 'custom'
-          ? objectSlug
-            ? `/o/${objectSlug}/${entityId}`
-            : undefined
-          : kind === 'company'
-            ? `/companies/${entityId}`
-            : kind === 'note'
-              ? `/notes/${entityId}`
-              : kind === 'space'
-                ? `/spaces/${entityId}`
-                : kind === 'person'
-                  ? `/people/${entityId}`
-                  : KIND_ROUTES[kind]
+        recordPath({ kind, id: entityId, objectSlug: objectSlug || null }) ??
+        undefined
       return (
         <a
           href={href}

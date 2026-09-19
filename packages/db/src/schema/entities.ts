@@ -50,7 +50,6 @@ export type MergeSnapshotEntry = {
 export const entityKind = pgEnum('entity_kind', [
   'company',
   'person',
-  'organization',
   'deal',
   'space',
   'note',

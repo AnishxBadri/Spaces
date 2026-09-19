@@ -10,7 +10,6 @@ export function recordPath(row: {
 }): string | null {
   switch (row.kind) {
     case 'company':
-    case 'organization':
       return `/companies/${row.id}`
     case 'person':
       return `/people/${row.id}`

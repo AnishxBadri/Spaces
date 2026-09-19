@@ -27,7 +27,7 @@ import {
  * - Fuzzy NEVER merges or attaches.
  */
 
-export type EntityKindResolvable = 'company' | 'person' | 'organization'
+export type EntityKindResolvable = 'company' | 'person'
 
 export type ResolveInput = {
   kind: EntityKindResolvable
@@ -132,14 +132,11 @@ export async function resolveEntity(
 
   // 2. No identity match → create.
   const canonicalName = name ?? keys[0].valueNorm
-  // Companies and people are object records; organization is an entity
-  // kind without a registry, so it carries no object row.
-  const objectId =
-    input.kind === 'organization'
-      ? null
-      : await (
-          await import('../attributes/objects')
-        ).objectIdForKindAsync(input.kind)
+  // Every resolvable kind is an object record now, so every one carries an
+  // object row — the ghost kind that had none was deleted (clean-1).
+  const objectId = await (
+    await import('../attributes/objects')
+  ).objectIdForKindAsync(input.kind)
   const created = await db.transaction(async (tx) => {
     const [ent] = await tx
       .insert(entity)
@@ -174,9 +171,11 @@ export async function resolveEntity(
     }
 
     // Side-table row travels with the entity — attributes live there.
+    // The union is exactly company|person, so the else is the person case
+    // and not a silent no-op for some third kind.
     if (input.kind === 'company') {
       await tx.insert(company).values({ entityId: ent.id })
-    } else if (input.kind === 'person') {
+    } else {
       await tx.insert(person).values({ entityId: ent.id })
     }
     return ent
@@ -193,16 +192,14 @@ export async function resolveEntity(
   // (the merge executor and the seeds: rewrites no person asserted) is the
   // true answer for a keyless import. A real integration's writes arrive
   // through the Facts port, which is handed its bound row's id.
-  if (input.kind !== 'organization') {
-    const { birthValues } = await import('../attributes/defaults')
-    await birthValues({
-      entityId: created.id,
-      actor: input.createdBy
-        ? { type: 'user', id: input.createdBy }
-        : { type: 'system' },
-      supplied: input.values,
-    })
-  }
+  const { birthValues } = await import('../attributes/defaults')
+  await birthValues({
+    entityId: created.id,
+    actor: input.createdBy
+      ? { type: 'user', id: input.createdBy }
+      : { type: 'system' },
+    supplied: input.values,
+  })
 
   // 3. Probabilistic: fuzzy name sweep → suggestions only, never merges.
   if (name) {

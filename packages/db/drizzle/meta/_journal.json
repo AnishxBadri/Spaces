@@ -183,6 +183,13 @@
       "when": 1789810162904,
       "tag": "0025_integration_and_actor_ref",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789811478213,
+      "tag": "0026_drop_organization_kind",
+      "breakpoints": true
     }
   ]
 }

@@ -38,7 +38,6 @@ type Hit = Awaited<ReturnType<typeof searchAll>>[number]
 const KIND_ICONS: Record<string, LucideIcon> = {
   company: Building2,
   person: Users,
-  organization: Building2,
   deal: Kanban,
   space: Layers,
   note: FileText,

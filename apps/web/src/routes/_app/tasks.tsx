@@ -12,6 +12,7 @@ import { PageHeader } from '#/components/page-header'
 import { TaskComposer } from '#/components/task-composer'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
+import { recordPath } from '#/lib/record-path'
 import { deleteTask, listTasks, setTaskDone } from '#/lib/server-fns'
 import { localToday } from '@spaces/core/tasks/parse-due'
 import { cn } from '#/lib/utils'
@@ -380,9 +381,10 @@ function TaskItem({
         {t.content}
       </span>
       {t.entities.map((e) => {
-        const path = entityPath(e.kind, e.id)
-        // Kinds without a record page (organizations) stay plain — a
-        // wrong-kind route is worse than no link.
+        // One route table for the whole app (`recordPath`). A kind with no
+        // record page — a document, a term — stays plain text: a wrong-kind
+        // route is worse than no link.
+        const path = recordPath(e)
         return path ? (
           <Link
             key={e.id}
@@ -418,17 +420,4 @@ function TaskItem({
       </LedgerFigure>
     </LedgerRow>
   )
-}
-
-function entityPath(kind: string, id: string): string | null {
-  switch (kind) {
-    case 'company':
-      return `/companies/${id}`
-    case 'person':
-      return `/people/${id}`
-    case 'deal':
-      return `/deals/${id}`
-    default:
-      return null
-  }
 }
