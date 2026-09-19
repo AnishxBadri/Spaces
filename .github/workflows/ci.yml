@@ -263,7 +263,7 @@ jobs:
             "http://localhost:3000/api/blob/$KEY?exp=$EXP&sig=$SIG")"
           [ "$CODE" = 201 ]
 
-          docker compose cp scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
+          docker compose cp apps/web/scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
           docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
             plant --blob="$KEY" --size="$(stat -c%s payload.bin)" --secret="$SECRET"
           echo "NET=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q db)")" >> "$GITHUB_ENV"
@@ -321,7 +321,7 @@ jobs:
           set -euo pipefail
           docker compose up -d --wait --wait-timeout 300
           curl -fsS http://localhost:3000/api/health
-          docker compose cp scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
+          docker compose cp apps/web/scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
           docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
             verify --blob="$KEY" --secret="$SECRET"
           export MASTER_KEY="$MASTER_KEY_BEFORE"
@@ -366,7 +366,7 @@ jobs:
           [ "$LEFT" = 0 ]
           # and the workspace is still there, untouched
           docker compose up -d --wait --wait-timeout 300
-          docker compose cp scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
+          docker compose cp apps/web/scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
           docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
             verify --blob="$KEY" --secret="$SECRET"
 

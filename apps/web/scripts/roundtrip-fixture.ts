@@ -15,8 +15,8 @@ import { resolveSecret, storeCredential } from '#/lib/vault'
  * to hold), the credential through the real vault, so a secret.key that came
  * back wrong fails here rather than silently returning null.
  *
- *   tsx scripts/roundtrip-fixture.ts plant  --blob=<sha256> --size=<bytes> --secret=<s>
- *   tsx scripts/roundtrip-fixture.ts verify --blob=<sha256> --secret=<s>
+ *   tsx apps/web/scripts/roundtrip-fixture.ts plant  --blob=<sha256> --size=<bytes> --secret=<s>
+ *   tsx apps/web/scripts/roundtrip-fixture.ts verify --blob=<sha256> --secret=<s>
  */
 
 const FIXTURE = {
