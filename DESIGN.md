@@ -96,6 +96,12 @@ components:
 
 # Design System: Spaces
 
+_This file describes the system and is the source for it. To **build** a surface, read
+`docs/design-contract.md` first — it names the vocabulary, the primitives by file, the
+shipped route each shape copies, and the checklist a reviewer runs, and it sends you
+back here by section. It restates nothing this file does not say; where they disagree,
+this file is right._
+
 ## 1. Overview
 
 **Creative North Star: "Instrument" — a measuring instrument for capital, printed
