@@ -5,24 +5,20 @@ import {
   OctagonXIcon,
   TriangleAlertIcon,
 } from 'lucide-react'
-import { useTheme } from 'next-themes'
 import { Toaster as Sonner } from 'sonner'
 import type { ToasterProps } from 'sonner'
 
-const THEMES: Array<NonNullable<ToasterProps['theme']>> = [
-  'light',
-  'dark',
-  'system',
-]
-
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = 'system' } = useTheme()
-  // next-themes hands back a bare string; Sonner's prop is its own union.
-  const named = THEMES.find((t) => t === theme) ?? 'system'
-
   return (
     <Sonner
-      theme={named}
+      // Light, literally (2026-09-19, SPA-52). This read `useTheme()` from
+      // next-themes with no ThemeProvider mounted anywhere, so the value was
+      // always the default 'system' — which handed sonner's own dark styling
+      // to an operator on a dark OS, on an app with no dark token values. The
+      // app is light by decision; the toast palette is set by the four
+      // --normal-* overrides below either way, so nothing renders differently
+      // for a user on a light OS.
+      theme="light"
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

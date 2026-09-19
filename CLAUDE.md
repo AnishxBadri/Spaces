@@ -118,7 +118,10 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
    (`eslint-rules/no-v1-tokens.js`, at the repo root) reads className literals
    and `cn()`/`cva()` string arguments in `apps/web/src/**/*.tsx` and names the
    Instrument replacement in the message, so gate 4 and the pre-commit hook
-   enforce it for free; the dead `--color-*` exports are held out of the
+   enforce it for free; since SPA-52 it also rejects a raw colour there (a hex,
+   or `rgb()`/`hsl()`/`oklch()` spelled into a class string — read the custom
+   property instead), which is what keeps the app light-only by decision rather
+   than by omission; the dead `--color-*` exports are held out of the
    `@theme` block by `apps/web/src/lib/design-tokens.test.ts` under gate 2. The Instrument vocabulary is
    `text-graphite`, `border-rule`, `bg-bone`, `bg-paper`, `text-label`,
    `rounded-md` (2px) / `rounded-none`.

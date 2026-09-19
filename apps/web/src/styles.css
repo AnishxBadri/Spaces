@@ -8,8 +8,6 @@
 
 @import 'tw-animate-css';
 
-@custom-variant dark (&:is(.dark *));
-
 /**
  * Spaces tokens — DESIGN.md ("The Analyst's Desk") made concrete.
  * Pure white ground; character lives in Pine and type, never the surface.
@@ -24,6 +22,20 @@
  * never compete, however many badge colours are in play.
  */
 :root {
+  /**
+   * LIGHT ONLY, by decision (2026-09-19, SPA-52). Dark stays a post-v1
+   * feature; what changes here is that the deferral is paid rather than
+   * compounded. `color-scheme: light` is the load-bearing half: it tells the
+   * OS to draw every native control it still owns — the date inputs, the
+   * scrollbars — light, so an operator on a dark OS no longer gets dark
+   * chrome bolted onto paper. The `dark` custom-variant is gone with it: it
+   * had no token values behind it, so every `dark:` class anyone wrote was
+   * dead. Surfaces are token-only (`instrument/no-v1-tokens` rejects a raw
+   * hex or an arbitrary colour in tsx), which is what makes dark later a
+   * second token file rather than a re-port.
+   */
+  color-scheme: light;
+
   /* ground + ink */
   --background: oklch(1 0 0); /* literal white, no hidden warmth */
   --foreground: oklch(0.24 0.012 155); /* ink — ~13:1 on white */

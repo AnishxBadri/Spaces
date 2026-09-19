@@ -136,6 +136,11 @@ Two untinted neutrals, one ink, one LED. Semantic colour only where it encodes s
 Badges are a tint plus same-hue ink, square. Every value is live in `src/styles.css` —
 this section describes; the CSS decides.
 
+**Light only, by decision (2026-09-19):** `:root` declares `color-scheme: light` so the
+native controls follow the app rather than the OS, there is no `dark` variant, and every
+colour is a token — a raw hex or an arbitrary colour value in tsx is a lint error — so
+dark, when it is built, is a second token file and not a re-port.
+
 ### Materials
 
 | token       | value                  | role                                       |

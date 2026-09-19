@@ -156,7 +156,9 @@ describe('arbitrary type sizes (SPA-79)', () => {
     expect(lint('<div className={cn("text-[0.625rem]")} />')).toHaveLength(1)
   })
 
-  it('leaves arbitrary colours alone — a different axis, a different slice', () => {
+  // The size check bans lengths only; colour is its own axis, checked below
+  // since SPA-52 — and reading a token is the sanctioned arbitrary value.
+  it('leaves a colour that reads a custom property alone', () => {
     expect(
       lint('<div className="mono text-[var(--badge-amber-ink)]" />'),
     ).toEqual([])
@@ -169,6 +171,76 @@ describe('arbitrary type sizes (SPA-79)', () => {
         '<div className="field-label mono text-field text-label leading-4 leading-3.5" />',
       ),
     ).toEqual([])
+  })
+})
+
+describe('raw colour (SPA-52)', () => {
+  it('rejects a hex literal, naming it and saying colour is a token', () => {
+    const messages = lint('<div className="bg-[#f4f3ef]" />')
+    expect(messages).toHaveLength(1)
+    expect(messages[0]?.message).toContain('`#f4f3ef`')
+    expect(messages[0]?.message).toContain('every colour in the app is a token')
+  })
+
+  it('reads the short, alpha and long hex forms alike', () => {
+    for (const cls of [
+      'text-[#fff]',
+      'text-[#fff8]',
+      'border-[#d6d4cd]',
+      'bg-[#f4f3efcc]',
+      'shadow-[2px_2px_0_0_#1c1c1a]',
+    ]) {
+      expect(lint(`<div className="${cls}" />`), cls).toHaveLength(1)
+    }
+  })
+
+  it('rejects a colour function spelled into a class string', () => {
+    for (const cls of [
+      'bg-[rgb(244,243,239)]',
+      'bg-[rgba(244,243,239,0.5)]',
+      'text-[hsl(155_100%_27%)]',
+      'text-[oklch(0.55_0.14_155)]',
+      'border-[lab(50%_40_59.5)]',
+    ]) {
+      expect(lint(`<div className="${cls}" />`), cls).toHaveLength(1)
+    }
+    expect(
+      lint('<div className="bg-[oklch(0.55_0.14_155)]" />')[0]?.message,
+    ).toContain('`oklch`')
+  })
+
+  it('reads variants and cn()/cva() the same way', () => {
+    expect(lint('<div className="hover:bg-[#fff]" />')).toHaveLength(1)
+    expect(lint('<div className={cn("bg-[#fff]")} />')).toHaveLength(1)
+  })
+
+  it('allows an arbitrary value that reads a token', () => {
+    const ok =
+      'bg-[var(--badge-amber)] text-[var(--badge-amber-ink)] ' +
+      'shadow-[2px_2px_0_0_var(--hairline)] bg-[color-mix(in_oklch,var(--bone),var(--paper))]'
+    expect(lint(`<div className="${ok}" />`)).toEqual([])
+  })
+
+  it('leaves a class string that merely contains a hash alone', () => {
+    // `#` is not a colour on its own — an arbitrary variant may carry one.
+    expect(lint('<div className="[&_a[href^=\'#\']]:underline" />')).toEqual([])
+  })
+})
+
+describe('light only (SPA-52)', () => {
+  const css = readFileSync(`${repoRoot}/src/styles.css`, 'utf8')
+
+  it('declares color-scheme: light on :root', () => {
+    // The load-bearing half of the decision: the native controls the app still
+    // uses (date inputs, scrollbars) are drawn by the OS, and this is what
+    // tells it to draw them light on a dark OS.
+    const start = css.indexOf(':root {')
+    const root = css.slice(start, css.indexOf('\n}', start))
+    expect(root).toContain('color-scheme: light;')
+  })
+
+  it('declares no dark custom-variant — there were never dark values', () => {
+    expect(css).not.toContain('@custom-variant dark')
   })
 })
 

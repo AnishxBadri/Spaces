@@ -2356,8 +2356,24 @@ lives in `src/styles.css` comments — read those before changing any colour.
   a grep: `instrument/no-v1-tokens` runs inside `pnpm lint` (see CLAUDE.md gate 5).
 - **`/impeccable polish`** for the surfaces above (arbitrary type sizes ride along).
 - **`/impeccable document`** to write DESIGN.md §5 (Components) — _after_ the sweep, not before.
-- **Dark theme** remains a feature, not started: the `dark` custom-variant exists but no
-  dark token values do.
+- ~~**Dark theme**~~ **Deferred by decision, 2026-09-19 (SPA-52)** — and the deferral is
+  now paid rather than compounded. Three artefacts of the unstarted feature were live and
+  are gone: the `dark` custom-variant with no dark token values behind it (so every
+  `dark:` class anyone wrote was dead), and `next-themes`, whose only use was
+  `sonner.tsx` calling `useTheme()` with no `ThemeProvider` mounted anywhere — always
+  `'system'`, which handed sonner's own dark styling to an operator on a dark OS, on an
+  app with no dark values. The Toaster takes a literal `theme="light"` (its palette was
+  already set by four inline `--normal-*` overrides, so nothing renders differently), and
+  `:root` declares **`color-scheme: light`**, which is the load-bearing half: every
+  native control the app still owns — the date inputs, the scrollbars — is drawn by the
+  OS, and without it a dark OS bolted dark chrome onto paper. **The deferral's terms:**
+  surfaces stay token-only, enforced by `instrument/no-v1-tokens`, which since SPA-52
+  rejects a raw hex or an arbitrary colour value in tsx and names the tokens (reading a
+  custom property, `bg-[var(--badge-amber)]`, is the sanctioned form; the tree had zero
+  occurrences when the check landed). Dark is therefore later a second token file, not a
+  re-port — which is what the forty surfaces about to be written were the deadline for.
+  Dark stays on the post-v1 backlog; light-only is a decision with a date, not an
+  omission.
 
 **Also carry into any design run:** the deferral list, or an Attio-shaped brief will
 propose most of it back. Deferred by name: saved/shared views, bulk edit, calculations row,
