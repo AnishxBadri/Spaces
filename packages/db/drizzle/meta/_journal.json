@@ -176,6 +176,13 @@
       "when": 1789801557551,
       "tag": "0024_worker_heartbeat",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1789810162904,
+      "tag": "0025_integration_and_actor_ref",
+      "breakpoints": true
     }
   ]
 }

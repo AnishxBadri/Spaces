@@ -15,7 +15,8 @@
     "./documents/*": "./src/documents/*.ts",
     "./entities/normalize": "./src/entities/normalize.ts",
     "./attributes/*": "./src/attributes/*.ts",
-    "./queue/*": "./src/queue/*.ts"
+    "./queue/*": "./src/queue/*.ts",
+    "./timeline/*": "./src/timeline/*.ts"
   },
   "scripts": {
     "test": "vitest run",

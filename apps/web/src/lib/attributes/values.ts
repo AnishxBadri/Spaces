@@ -62,11 +62,15 @@ const invalid = (slug: string, detail: string) =>
 
 /**
  * Who attended to a write (spec §4). `user` carries the user FK; `integration`
- * gains an id when the integration table lands; `system` is the merge
- * executor and seeds — rewrites no person asserted.
+ * carries the `integration` row's id (SPA-70 — the table landed, so the
+ * id-less member is gone and the column's biconditional check is what makes
+ * its absence unrepresentable rather than merely discouraged); `system` is
+ * the merge executor and seeds — rewrites no person asserted.
  */
 export type Actor =
-  { type: 'user'; id: string } | { type: 'integration' } | { type: 'system' }
+  | { type: 'user'; id: string }
+  | { type: 'integration'; id: string }
+  | { type: 'system' }
 
 export type EventSource = (typeof attributeEventSource.enumValues)[number]
 
@@ -195,6 +199,9 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
     fillDefaults,
   } = opts
   const actorId = actor.type === 'user' ? actor.id : null
+  // The other half of the typed actor: set iff type = 'integration', which
+  // the column's check constraint enforces rather than trusts.
+  const actorRef = actor.type === 'integration' ? actor.id : null
 
   return yield* Effect.tryPromise({
     try: () =>
@@ -278,6 +285,7 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
             to: value,
             actorType: actor.type,
             actorId,
+            actorRef,
             source: viaDefault ? 'default' : source,
             suggestionId: viaDefault ? null : (suggestionId ?? null),
             refs: viaDefault ? null : (refs ?? null),

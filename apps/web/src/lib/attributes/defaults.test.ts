@@ -158,7 +158,11 @@ describe('birthValues', () => {
       .select()
       .from(attributeEvent)
       .where(eq(attributeEvent.entityId, machine.entityId))
-    expect(mEvent.actorType).toBe('integration')
+    // `system`, not `integration`: since SPA-70 an integration actor names an
+    // `integration` row (biconditional check on actor_ref), and a keyless
+    // import has none to name.
+    expect(mEvent.actorType).toBe('system')
+    expect(mEvent.actorRef).toBe(null)
     expect(mEvent.source).toBe('default')
   })
 
