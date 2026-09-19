@@ -1,20 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, describe, expect, it } from 'vitest'
-import { cleanupTestEntities } from './test-helpers'
-
-afterAll(async () => {
-  await cleanupTestEntities([
-    '^(Quantum Forge Robotics|Claimant|Holder|OtherCo|FreeMailCo) [0-9a-f]{4,8}( .*)?$',
-    '^Orbital [0-9a-f]{6,8}( Inc| Systems)?$',
-  ])
-})
+import { describe, expect, it } from 'vitest'
 
 /**
- * Integration tests — run against `spaces_test`, the database the vitest
- * global setup owns (SPA-143), never the dev one. Each run still uses unique
- * names/domains so reruns don't collide, and `afterAll` still sweeps: what
- * changed is that the rows it leaves behind are in a database nobody is
- * looking at.
+ * Integration tests — run against this worker's test database, which
+ * `vitest.setup.ts` truncated and reseeded before this file was imported
+ * (SPA-145), never the dev one. The hex tags in the fixture names are kept:
+ * they cost nothing and they keep a failure message telling you which run
+ * wrote a row.
  */
 
 describe('resolveEntity', () => {

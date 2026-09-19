@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, describe, expect, it } from 'vitest'
-import { cleanupTestEntities } from '#/lib/entities/test-helpers'
+import { describe, expect, it } from 'vitest'
 
 const ASOF = '2026-09-10T00:00:00Z'
 
@@ -13,35 +12,6 @@ const ASOF = '2026-09-10T00:00:00Z'
 describe('assembleProgram', () => {
   const tag = randomUUID().slice(0, 8)
   const ids: Record<string, string> = {}
-  let teammateId = ''
-
-  afterAll(async () => {
-    const { db } = await import('@spaces/db')
-    const { documentChunk, document } = await import('@spaces/db/schema')
-    const { task, taskEntity } = await import('@spaces/db/schema/tasks')
-    const { interaction, interactionEntity } =
-      await import('@spaces/db/schema/interactions')
-    const { user } = await import('@spaces/db/schema/auth')
-    const { eq } = await import('drizzle-orm')
-    if (ids.doc) {
-      await db
-        .delete(documentChunk)
-        .where(eq(documentChunk.documentId, ids.doc))
-      await db.delete(document).where(eq(document.entityId, ids.doc))
-    }
-    if (ids.task) {
-      await db.delete(taskEntity).where(eq(taskEntity.taskId, ids.task))
-      await db.delete(task).where(eq(task.id, ids.task))
-    }
-    if (ids.interaction) {
-      await db
-        .delete(interactionEntity)
-        .where(eq(interactionEntity.interactionId, ids.interaction))
-      await db.delete(interaction).where(eq(interaction.id, ids.interaction))
-    }
-    await cleanupTestEntities([`^Ctx(Co|Note|Memo|Doc|Space|Priv) ${tag}`])
-    if (teammateId) await db.delete(user).where(eq(user.id, teammateId))
-  })
 
   it('assembles the record for two users, deterministically', async () => {
     const { resolveEntity } = await import('#/lib/entities/resolve')
@@ -74,7 +44,6 @@ describe('assembleProgram', () => {
         email: `teammate-${tag}@example.test`,
       })
       .returning({ id: user.id })
-    teammateId = teammate.id
 
     const co = await resolveEntity({
       kind: 'company',

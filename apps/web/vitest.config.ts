@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 // relative specifier is bundled instead. `vitest.global-setup.ts` goes
 // through vitest's own transform and uses the package name, as it should.
 import {
+  TEST_WORKERS,
   loadWorkspaceEnv,
   resolveTestDatabaseUrl,
 } from '../../packages/db/src/test-db.ts'
@@ -36,12 +37,32 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',
-    // Since SPA-143 the ten DB-coupled files write to `spaces_test`, never to
-    // the dev database the running app is showing. `globalSetup` derives that
+    // Since SPA-143 the DB-coupled files write to `spaces_test`, never to the
+    // dev database the running app is showing. `globalSetup` derives that
     // name, creates the database if absent, migrates and seeds it — including
     // the one `user` row the `select id from user limit 1` sites need — and
     // this `env` override is what points the workers at it.
-    env: { ...env, DATABASE_URL: resolveTestDatabaseUrl(env) },
+    //
+    // `TEST_DATABASE_BASE_URL` carries the same value a second time on
+    // purpose: `vitest.setup.ts` overwrites `DATABASE_URL` with this worker's
+    // own database and runs once per *file*, so it needs a base that stays
+    // the base. `DATABASE_URL` keeps pointing at `spaces_test` so a run with
+    // the setup file removed still cannot reach the dev database.
+    env: {
+      ...env,
+      DATABASE_URL: resolveTestDatabaseUrl(env),
+      TEST_DATABASE_BASE_URL: resolveTestDatabaseUrl(env),
+    },
     globalSetup: ['./vitest.global-setup.ts'],
+    // Isolation is per file (SPA-145) and the truncate that buys it is per
+    // worker database, so a worker must own its database and its environment:
+    // `forks` gives each worker its own process, and `maxWorkers` fixes how
+    // many databases `globalSetup` builds. `isolate` stays on — a
+    // non-isolated worker is handed every file at once and runs all the setup
+    // files before any test, which would truncate twenty-four times and then
+    // run twenty-four files against one database.
+    pool: 'forks',
+    maxWorkers: TEST_WORKERS,
+    setupFiles: ['./vitest.setup.ts'],
   },
 })

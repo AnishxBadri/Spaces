@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from './index.ts'
 import { workerHeartbeat } from './schema/worker.ts'
@@ -57,14 +57,11 @@ describe('classifyBeat', () => {
   })
 })
 
-// The test database (SPA-143) — still scoped to a role nobody else writes,
-// so a concurrent run's row is neither read nor touched.
+// This package's own test database (SPA-143), emptied before this file was
+// imported (SPA-145) — no afterAll, because the row this writes is gone
+// before the next file runs whether or not anyone remembers to delete it.
 describe('beat (database)', () => {
   const role = `test-${randomUUID()}`
-
-  afterAll(async () => {
-    await db.delete(workerHeartbeat).where(eq(workerHeartbeat.role, role))
-  })
 
   it('upserts on the role key, so restarts leave exactly one row', async () => {
     const first = {

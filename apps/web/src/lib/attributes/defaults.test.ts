@@ -1,12 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   addIsoDuration,
   isIsoDuration,
   resolveDefault,
   validateDefault,
 } from './defaults'
-import { cleanupTestEntities } from '../entities/test-helpers'
 
 const at = new Date('2026-01-31T10:00:00Z')
 
@@ -77,14 +76,6 @@ describe('defaults (pure)', () => {
 describe('birthValues', () => {
   const tag = randomUUID().slice(0, 8)
   const slug = (t: string) => `dflt_${t}_${tag}`
-
-  afterAll(async () => {
-    const { db } = await import('@spaces/db')
-    const { attribute } = await import('@spaces/db/schema')
-    const { like } = await import('drizzle-orm')
-    await cleanupTestEntities([`^DfltCo ${tag}( .*)?$`])
-    await db.delete(attribute).where(like(attribute.slug, `dflt_%_${tag}`))
-  })
 
   it('fills blanks with resolved defaults, supplied wins, actor is honest', async () => {
     const { resolveEntity } = await import('../entities/resolve')

@@ -2,9 +2,11 @@ import { fileURLToPath } from 'node:url'
 import { config as dotenv } from 'dotenv'
 import { Client } from 'pg'
 import { runMigrations } from './migrate.ts'
+import type { SqlQuery } from './downgrade-guard.ts'
 
 /**
- * The test database — derived, created, migrated (SPA-143).
+ * The test database — derived, created, migrated (SPA-143), and since
+ * SPA-145 one per vitest worker, truncated between files.
  *
  * Until this module existed the suite ran against whatever `DATABASE_URL`
  * named, which in every developer checkout is the *dev* database the running
@@ -13,15 +15,25 @@ import { runMigrations } from './migrate.ts'
  * database on the same server — same Postgres, second database, so
  * `docker-compose.dev.yml` is untouched.
  *
+ * `spaces_test` is the reference database: global setup creates it, migrates
+ * it and (in apps/web) seeds it, and it is the one `pnpm db:migrate:run`
+ * should be pointed at to check that a suite run left the journal alone. The
+ * *workers* never touch it. Each gets a sibling — `spaces_test_web1`,
+ * `spaces_test_db1`, … — because isolation is per file: a worker truncates
+ * every table in `public` before each of its files, and a truncate in one
+ * worker's database must not be able to reach another worker's file
+ * mid-test. `drizzle.__drizzle_migrations` and the `pgboss` schema are out of
+ * reach of that truncate by construction: it only ever names tables in
+ * `public`.
+ *
  * Nothing here ever drops a database. The only DDL it issues is
- * `create database`, and it refuses outright when the database it derived is
- * the one `DATABASE_URL` names. Cleanup between runs is the suites' own
- * (`cleanupTestEntities`), and dropping `spaces_test` is a human typing
- * `dropdb` — after which the next run recreates it.
+ * `create database` and `truncate`, and it refuses outright when the database
+ * it derived is the one `DATABASE_URL` names. Dropping `spaces_test*` is a
+ * human typing `dropdb` — after which the next run recreates it.
  *
  * This module is the harness, not the product: it is imported by the two
- * `vitest.config.ts` files and the two global setups and by nothing that
- * ships.
+ * `vitest.config.ts` files, the two global setups and the two per-file setups,
+ * and by nothing that ships.
  */
 
 /** `.env.local` at the workspace root, resolved from this file, never cwd. */
@@ -126,6 +138,77 @@ export function resolveTestDatabaseUrl(
 }
 
 /**
+ * How many vitest workers `@spaces/web` runs, and therefore how many worker
+ * databases its global setup builds. It lives here rather than in the config
+ * because the name and the count are one decision: `vitest.config.ts` passes
+ * it as `maxWorkers`, the global setup loops to it, and the per-file setup
+ * indexes into the result with `VITEST_POOL_ID`, which vitest documents as
+ * `1…maxWorkers`.
+ *
+ * Four, measured on an 8-core box: `@spaces/web` runs in 9.4s at two workers,
+ * 5.3s at four and 6.0s at six — past four the workers contend for one
+ * Postgres and each one is another database to create, migrate and keep.
+ * Change it here and nowhere else: the global setup builds exactly this many
+ * databases, and a run given more workers than this from the command line is
+ * refused by the per-file setup rather than quietly putting two workers on
+ * one database.
+ */
+export const TEST_WORKERS = 4
+
+/**
+ * The database one worker of one suite owns — `spaces_test` plus the suite's
+ * name and the worker's pool id, so `@spaces/web`'s worker 2 is
+ * `spaces_test_web2` and never collides with `@spaces/db`'s `spaces_test_db1`
+ * while turbo runs the two `test` tasks in parallel.
+ */
+export function workerDatabaseUrl(
+  baseUrl: string,
+  suite: string,
+  poolId: number,
+): string {
+  if (!/^[a-z]+$/.test(suite))
+    throw new Error(
+      `[test-db] suite name ${JSON.stringify(suite)} must be lowercase letters — it becomes part of a database name.`,
+    )
+  const url = new URL(baseUrl)
+  url.pathname = `/${encodeURIComponent(`${databaseName(url)}_${suite}${poolId}`)}`
+  return url.toString()
+}
+
+/** The worker this process is, as vitest numbers them (1…maxWorkers). */
+export function currentPoolId(env: Record<string, string | undefined>): number {
+  const raw = env.VITEST_POOL_ID
+  const parsed = raw === undefined ? Number.NaN : Number.parseInt(raw, 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1
+}
+
+/**
+ * Empty every table in `public`, which is the whole of what a test file may
+ * have written, and nothing else.
+ *
+ * The exclusions are structural rather than a deny-list: the drizzle journal
+ * is `drizzle.__drizzle_migrations` and pg-boss keeps its state in the
+ * `pgboss` schema (`apps/web/src/lib/queue.ts` names it), so restricting the
+ * statement to `schemaname = 'public'` cannot reach either. That is why this
+ * reads `pg_tables` instead of taking a list: a table added by a migration
+ * next month is truncated without anyone remembering to add it, which is the
+ * failure mode of the eleven-table hand-written cleanup this replaced.
+ *
+ * One statement for all of them — `truncate a, b, c` does not care about
+ * foreign keys between the tables it names, and `cascade` covers anything
+ * left. `restart identity` matters for the two serial columns.
+ */
+export async function truncatePublicTables(query: SqlQuery): Promise<number> {
+  const found = await query(
+    "select quote_ident(tablename) as ident from pg_tables where schemaname = 'public'",
+  )
+  const idents = found.rows.map((row) => String(row.ident))
+  if (idents.length === 0) return 0
+  await query(`truncate table ${idents.join(', ')} restart identity cascade`)
+  return idents.length
+}
+
+/**
  * Connect, or fail naming the server. This is the whole point of doing it in
  * a global setup: with Postgres down the old suite threw ECONNREFUSED ten
  * times, once per DB-coupled file, and said nothing about which database it
@@ -203,6 +286,17 @@ export async function prepareTestDatabase(
         `[test-db] the derived test database is the same as DATABASE_URL (${redact(source)}). Refusing — the suite would write to the database the app is showing.`,
       )
 
+  return prepareDatabase(url)
+}
+
+/**
+ * The same create-and-migrate for a database whose name the caller already
+ * holds — the worker databases, which a global setup builds by looping
+ * `workerDatabaseUrl` over `TEST_WORKERS`. They are siblings of the url
+ * `resolveTestDatabaseUrl` derived, so the "is this the app's database"
+ * guard has already run on the name they were derived from.
+ */
+export async function prepareDatabase(url: string): Promise<TestDatabaseReady> {
   const created = await ensureDatabase(url)
 
   const client = await connect(url, 'the test database')
