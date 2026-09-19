@@ -99,10 +99,10 @@ the full reasoning.
    space membership is `entity_space`. Deals are objects, not list entries.
 2. **Attributes grow; objects grow in a second tier.** Users define
    attributes from a fixed type menu. Custom objects (reversed 2026-09-02)
-   join the same `object` registry as attribute bags — full engine, none of
-   the identity/dedupe/merge/enrichment machinery the three core objects
-   get. All values live in one jsonb column, validated by one Zod validator
-   per type.
+   join the same `object` registry as attribute bags — full engine, plus
+   fuzzy-name dedupe and merge-as-target (narrowed 2026-09-13); only
+   enrichment, interactions and seeded attributes stay core-only. All values
+   live in one jsonb column, validated by one Zod validator per type.
 3. **Spaces are a tree.** ltree mono-hierarchy for filing, many-to-many
    tagging for everything cross-cutting. Deliberately a taxonomy, not an
    ontology.

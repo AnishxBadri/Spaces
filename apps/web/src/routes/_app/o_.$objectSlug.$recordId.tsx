@@ -41,9 +41,11 @@ import {
 
 /**
  * The registry-generated record page for a custom object (spec §9). Same
- * shape as a company page minus the identity machinery: rail from the
+ * shape as a company page minus the core-only machinery: rail from the
  * registry, activity/notes/files, spaces, backlinks both ways. No
- * interactions, no aliases, no merge — by design, not by omission.
+ * interactions and no enrichment — by design, not by omission. Merge does
+ * reach here (narrowed 2026-09-13): a record merged away redirects to its
+ * winner from the loader below.
  */
 export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
   loader: async ({ params }) => {
