@@ -4,6 +4,7 @@ import { db } from '@spaces/db'
 import { duplicateCandidate, entity, entityAlias } from '@spaces/db/schema'
 import type { DuplicateReason } from '@spaces/db/schema/entities'
 import { MERGEABLE } from './merge'
+import type { Executor } from './resolve'
 
 /**
  * The fuzzy-name lane of dedupe, in one module: who is a duplicate of whom,
@@ -51,10 +52,19 @@ const query = <T>(run: () => Promise<T>) =>
     catch: (cause) => new SweepFailed({ cause }),
   })
 
-/** Follow a merge redirect. Chains are flattened at merge time → one hop. */
-export async function canonicalId(id: string): Promise<string> {
+/**
+ * Follow a merge redirect. Chains are flattened at merge time → one hop.
+ *
+ * `on` is the executor (`resolve.ts`): `db` by default, a caller's
+ * transaction when the redirect has to be read against writes that
+ * transaction has not committed yet.
+ */
+export async function canonicalId(
+  id: string,
+  on: Executor = db,
+): Promise<string> {
   const row = (
-    await db
+    await on
       .select({ mergedIntoId: entity.mergedIntoId })
       .from(entity)
       .where(eq(entity.id, id))
@@ -68,9 +78,10 @@ export async function suggestDuplicate(
   b: string,
   score: number,
   reason: DuplicateReason,
+  on: Executor = db,
 ) {
   const [entityA, entityB] = a < b ? [a, b] : [b, a]
-  await db
+  await on
     .insert(duplicateCandidate)
     .values({ entityA, entityB, score, reason })
     .onConflictDoNothing()

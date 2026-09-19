@@ -5,6 +5,7 @@ import type {
   SelectOption,
 } from '@spaces/db/schema/attributes'
 import type { IdentityKey } from '@spaces/db/schema/objects'
+import { normalizeDomain, normalizeLinkedin } from '../entities/normalize'
 import type { BadgeColor } from './colors'
 
 /**
@@ -114,6 +115,39 @@ const dateString = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
 
 /**
+ * The normalizer each identity key is matched by — the same two functions
+ * `resolveEntity` and `addIdentityAlias` use, so the validator and the alias
+ * agree on what the value means by construction (CONTEXT.md, "Entity
+ * resolution & merge": these are the ONLY place normalization happens).
+ */
+const IDENTITY_NORMALIZERS: Record<
+  IdentityKey,
+  (raw: string) => string | null
+> = { domain: normalizeDomain, linkedin: normalizeLinkedin }
+
+/**
+ * An identity-backed value has to survive normalization, because the claim
+ * it makes is the normalized form (spec §9). `domain` is `z.string().max(255)`
+ * for everyone else — deliberately permissive, it is a field like any other
+ * — but on an attribute carrying `options.identityKey` a value that
+ * normalizes to null would be stored and then silently claim nothing, which
+ * is the one failure the whole mirror exists to prevent. Free mail is the
+ * everyday case: gmail.com is a real domain and a real string, and it
+ * identifies nobody.
+ */
+const identityValue = (
+  base: z.ZodType<string>,
+  key: IdentityKey,
+): z.ZodType<string> =>
+  base.superRefine((raw, ctx) => {
+    if (IDENTITY_NORMALIZERS[key](raw) !== null) return
+    ctx.addIssue({
+      code: 'custom',
+      message: `${raw.trim().toLowerCase()} never identifies a record`,
+    })
+  })
+
+/**
  * Validator for one attribute's value (null clears — always allowed).
  *
  * `held` is the value the record currently stores. An archived option is
@@ -126,6 +160,7 @@ export function valueValidator(
   held?: unknown,
 ) {
   const options = def.options.options ?? []
+  const identityKey = def.options.identityKey
   const heldIds = new Set(
     Array.isArray(held) ? held.map(String) : held == null ? [] : [String(held)],
   )
@@ -147,14 +182,18 @@ export function valueValidator(
   switch (def.type) {
     case 'text':
       return z.string().max(2000)
-    case 'domain':
-      return z.string().max(255)
+    case 'domain': {
+      const base = z.string().max(255)
+      return identityKey ? identityValue(base, identityKey) : base
+    }
     case 'phone':
       return z.string().max(40)
     case 'email':
       return z.string().email().max(255)
-    case 'url':
-      return z.string().url().max(500)
+    case 'url': {
+      const base = z.string().url().max(500)
+      return identityKey ? identityValue(base, identityKey) : base
+    }
     case 'number':
       return z.number().finite()
     case 'currency':

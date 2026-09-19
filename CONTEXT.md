@@ -905,8 +905,26 @@ enum branch in any registry read. `description` landed 2026-09 (migration
     so the domain is free for another record to claim. This is the split
     that makes the alias table legible: **name aliases are history and never
     retire** (what a record was once called stays searchable); **identity
-    aliases are claims and do** (a domain nobody asserts is nobody's). The
-    write path itself is objects-7, not this slice.
+    aliases are claims and do** (a domain nobody asserts is nobody's).
+  - **The write path, built 2026-09-19 (SPA-95, objects-7).** `setValues` is
+    where the declaration becomes a claim: an attribute carrying
+    `options.identityKey` mirrors its value into `entity_alias` through
+    `claimIdentityAlias`, in the transaction that wrote the value and its
+    `attribute_event` (`apps/web/src/lib/entities/resolve.ts`). Four things
+    the build settled. **The alias insert sits in a savepoint** — a
+    concurrent writer's `23505` rolls back the nested transaction alone and
+    becomes a `duplicate_candidate`, never a lost value write. **The value
+    always lands, only the claim is withheld** from the loser of the race:
+    `values.domain` is the user's field, the alias is the assertion about
+    the world. **`valueValidator` bites**: on an attribute carrying the flag
+    a value that normalizes to null is refused ("gmail.com never identifies
+    a record"), because storing one would be a field that silently claims
+    nothing; a plain `domain`-typed attribute keeps the permissive rule.
+    And **a change of value retires the old claim before asserting the new
+    one**, which is the clear above generalized. The per-slug outcome
+    (`added` · `already_own` · `suggested_duplicate` · `released`) is
+    decided inside the transaction and returned from `setValuesEffect`;
+    objects-8 surfaces it.
 - **Machine-write design for the integrations phase (decided 2026-08-08; design
   only, nothing built).** The dividing line is the kind of claim, not the vendor:
   **a sourced fact may fill an empty field; anything generated, or anything
