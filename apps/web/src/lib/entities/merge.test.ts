@@ -695,7 +695,12 @@ describe('mergeEntities', () => {
     await db.insert(taskEntity).values({ taskId: chore.id, entityId: loser.id })
 
     // The candidate that triggers the merge, plus one open elsewhere.
+    // Upserts, not inserts: since SPA-60 a custom record is born with a name
+    // alias and joins the fuzzy sweep, so these near-identical fixture names
+    // have already proposed themselves and a plain insert would collide with
+    // `duplicate_pair_unique`.
     const pair = (x: string, y: string) => (x < y ? [x, y] : [y, x])
+    const target = [duplicateCandidate.entityA, duplicateCandidate.entityB]
     const [ta, tb] = pair(winner.id, loser.id)
     const [trigger] = await db
       .insert(duplicateCandidate)
@@ -705,14 +710,18 @@ describe('mergeEntities', () => {
         score: 0.9,
         reason: { rule: 'name' },
       })
+      .onConflictDoUpdate({ target, set: { reason: { rule: 'name' } } })
       .returning({ id: duplicateCandidate.id })
     const [oa, ob] = pair(third.id, loser.id)
-    await db.insert(duplicateCandidate).values({
-      entityA: oa,
-      entityB: ob,
-      score: 0.8,
-      reason: { rule: 'name' },
-    })
+    await db
+      .insert(duplicateCandidate)
+      .values({
+        entityA: oa,
+        entityB: ob,
+        score: 0.8,
+        reason: { rule: 'name' },
+      })
+      .onConflictDoUpdate({ target, set: { reason: { rule: 'name' } } })
 
     const eventsBefore = await db
       .select({ id: attributeEvent.id })

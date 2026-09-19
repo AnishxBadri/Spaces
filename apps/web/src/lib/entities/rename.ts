@@ -14,16 +14,15 @@ import { recordNameAlias } from './resolve'
  * So a rename is four writes, not one — the name, the activity row, and
  * *both* names through the insert-if-absent check `resolveEntity` already
  * uses: the one being left behind, then the one being taken. Recording the
- * old name is what makes the title true on its own — a custom record is
- * born with no alias at all (`createRecordProgram`: "no aliases, no dedupe
- * sweep"), so without it the birth name would be lost on the first rename
- * rather than the second. Recording the new one is what makes the *next*
- * rename cheap and what puts the current name in `entity_alias`, which is
- * why the dedupe card had to stop comparing in the wrong normal form.
+ * old name is what makes the title true on its own; recording the new one is
+ * what makes the *next* rename cheap and what puts the current name in
+ * `entity_alias`, which is why the dedupe card had to stop comparing in the
+ * wrong normal form.
  *
- * Both are no-ops when the normalized name is already held, so a core kind
- * — born through `resolveEntity`, which already wrote its name alias —
- * gains exactly one row per rename, not two.
+ * Both are no-ops when the normalized name is already held, so every record
+ * — core through `resolveEntity`, custom through `createRecordProgram`
+ * (SPA-60), both of which write the birth name alias — gains exactly one row
+ * per rename, not two.
  *
  * Names are history: an earlier alias is never replaced or deleted.
  * `searchEntities` matches `entity_alias` name rows already, so the record
