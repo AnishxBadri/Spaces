@@ -881,6 +881,32 @@ enum branch in any registry read. `description` landed 2026-09 (migration
   holds if the custom route dedupes. Attio's customs keep the old
   exclusions; ours no longer match them here. Full spec:
   `docs/spec-attribute-engine.md` §9.
+  - **Identity keys are materialized, not bound later (decided 2026-09-19,
+    SPA-85).** Declaring `domain` or `linkedin` at object creation creates
+    the backing attribute in the same transaction — slug `domain` type
+    `domain`, slug `linkedin` type `url`, `is_system: false`, carrying
+    `options.identityKey`. A custom object is born with zero registry rows,
+    so a key with nothing behind it would be a promise the write path cannot
+    find: the declaration and the attribute are one write or neither. The
+    attribute goes in through `createAttributeProgram` — the same door that
+    rejects config a type cannot carry — never a raw insert, and it cannot
+    be archived while the key stands.
+  - **A materialized backing attribute is not a seeded attribute (decided
+    2026-09-19, SPA-85).** "Seeded attributes stay core-only" is about the
+    `SYSTEM_ATTRIBUTES` rows the registry inserts on boot, unasked, on every
+    object of a kind. A backing attribute exists because the user declared
+    the key, through the same door any attribute enters by, and is
+    `is_system: false` — an ordinary custom attribute that happens to be
+    spoken for. It gets no `SYSTEM_ATTRIBUTES` entry and is excluded from
+    nothing.
+  - **Clearing the value releases the claim (decided 2026-09-19, SPA-85;
+    objects-7's contract).** When a declared-key write routes through
+    `addIdentityAlias`, clearing the attribute retires that identity alias,
+    so the domain is free for another record to claim. This is the split
+    that makes the alias table legible: **name aliases are history and never
+    retire** (what a record was once called stays searchable); **identity
+    aliases are claims and do** (a domain nobody asserts is nobody's). The
+    write path itself is objects-7, not this slice.
 - **Machine-write design for the integrations phase (decided 2026-08-08; design
   only, nothing built).** The dividing line is the kind of claim, not the vendor:
   **a sourced fact may fill an empty field; anything generated, or anything

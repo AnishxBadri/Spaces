@@ -6,6 +6,7 @@ import { db } from '@spaces/db'
 import { attribute, entity, link, objectDef } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { referencedByRows, requireUser } from './shared'
+import type { IdentityKey } from '@spaces/core/attributes/registry'
 
 /**
  * The object registry, read side (CONTEXT.md "Two-tier object model"). One
@@ -40,6 +41,7 @@ const listObjectsProgram = Effect.fn('listObjectsProgram')(function* (
         singular: objectDef.singular,
         plural: objectDef.plural,
         icon: objectDef.icon,
+        identityKeys: objectDef.identityKeys,
         isSystem: objectDef.isSystem,
         archived: objectDef.archived,
       })
@@ -82,6 +84,7 @@ const getObjectProgram = Effect.fn('getObjectProgram')(function* (
     singular: string
     plural: string
     icon: string | null
+    identityKeys: Array<IdentityKey>
     isSystem: boolean
     archived: boolean
   },
@@ -95,6 +98,7 @@ const getObjectProgram = Effect.fn('getObjectProgram')(function* (
         singular: objectDef.singular,
         plural: objectDef.plural,
         icon: objectDef.icon,
+        identityKeys: objectDef.identityKeys,
         isSystem: objectDef.isSystem,
         archived: objectDef.archived,
       })
@@ -124,6 +128,13 @@ export const createObject = createServerFn({ method: 'POST' })
       singular: z.string().trim().min(1).max(60),
       plural: z.string().trim().min(1).max(60),
       icon: z.string().max(40).optional(),
+      /**
+       * Opt-in identity (§9). The enum is the two keys the dialog offers;
+       * `email` and `cin` arrive as free strings from anything but the
+       * dialog and are refused *by name* in the program, which is where the
+       * reason lives.
+       */
+      identityKeys: z.array(z.string().max(20)).max(4).optional(),
     }),
   )
   .handler(async ({ data }) => {

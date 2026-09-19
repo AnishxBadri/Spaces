@@ -1,10 +1,24 @@
-import { Effect, Schema } from 'effect'
+import { Cause, Effect, Exit, Option, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { activity } from '@spaces/db/schema/activity'
 import { entity, objectDef } from '@spaces/db/schema'
 import { birthValuesEffect } from './defaults'
+import { createAttributeProgram } from './create'
+import {
+  CORE_ONLY_IDENTITY_KEYS,
+  CORE_ONLY_IDENTITY_MESSAGE,
+  IDENTITY_KEYS,
+  IDENTITY_KEY_ATTRIBUTES,
+} from '@spaces/core/attributes/registry'
 import { slugifyNoun, suggestPlural } from '#/lib/object-nouns'
+import type { AttributeCreateRejected } from './create'
+import type { AttributeQueryFailed } from './update'
+import type {
+  ObjectQueryFailed as CoreObjectQueryFailed,
+  SystemObjectNotSeeded,
+} from './objects'
+import type { IdentityKey } from '@spaces/core/attributes/registry'
 import type {
   Actor,
   AttributeValidationError,
@@ -19,8 +33,15 @@ import type {
  * are `entity.kind = 'custom'` rows keyed by `object_id`; they get the full
  * attribute engine and the research graph (spaces, mentions, notes,
  * documents); of the identity machinery they get dedupe and merge-as-target
- * (narrowed 2026-09-13) but no aliases, enrichment or interactions — which
- * is why they are born here and never through resolveEntity.
+ * (narrowed 2026-09-13) but no enrichment or interactions — which is why
+ * they are born here and never through resolveEntity.
+ *
+ * The one genuinely per-object piece of identity is opt-in: an object may
+ * declare `domain` and/or `linkedin` as identity keys at creation, and each
+ * declared key materializes its backing attribute in the same transaction
+ * (CONTEXT.md "Two-tier object model", 2026-09-19). Nothing is bound later
+ * — a key with no attribute behind it would be a promise the write path
+ * cannot find.
  */
 
 export class ObjectRejected extends Schema.TaggedError<ObjectRejected>()(
@@ -65,15 +86,63 @@ export type CreateObjectInput = {
   singular: string
   plural: string
   icon?: string | null | undefined
+  /** opt-in identity (§9) — `domain`, `linkedin`, or neither */
+  identityKeys?: ReadonlyArray<string> | undefined
   createdBy: string
 }
 
+/**
+ * Everything object creation can fail with. The attribute half is in the
+ * union because a declared identity key creates its backing attribute
+ * through `createAttributeProgram`, whose refusals are the same refusals.
+ */
+export type CreateObjectFailure =
+  | ObjectRejected
+  | ObjectQueryFailed
+  | AttributeCreateRejected
+  | AttributeQueryFailed
+  | CoreObjectQueryFailed
+  | SystemObjectNotSeeded
+
+/** Carries a typed failure out through the transaction's rollback. */
+class ObjectRollback extends Error {
+  constructor(readonly failure: CreateObjectFailure) {
+    super('object creation refused')
+    this.name = 'ObjectRollback'
+  }
+}
+
+const asFailure = (cause: unknown): CreateObjectFailure =>
+  cause instanceof ObjectRollback
+    ? cause.failure
+    : new ObjectQueryFailed({ cause })
+
+/**
+ * The declared keys, narrowed. `email` and `cin` are refused by name rather
+ * than ignored: a user who ticked them asked for person/company doctrine on
+ * a bag, and the reason is the answer.
+ */
+const readIdentityKeys = Effect.fn('readIdentityKeys')(function* (
+  declared: ReadonlyArray<string> | undefined,
+): Effect.fn.Return<Array<IdentityKey>, ObjectRejected> {
+  const keys: Array<IdentityKey> = []
+  for (const raw of declared ?? []) {
+    const candidate = raw.trim().toLowerCase()
+    if (CORE_ONLY_IDENTITY_KEYS.includes(candidate))
+      return yield* new ObjectRejected({ message: CORE_ONLY_IDENTITY_MESSAGE })
+    const key = IDENTITY_KEYS.find((k) => k === candidate)
+    if (!key)
+      return yield* new ObjectRejected({
+        message: `"${raw}" is not an identity key — domain and linkedin are the two`,
+      })
+    if (!keys.includes(key)) keys.push(key)
+  }
+  return keys
+})
+
 export const createObjectProgram = Effect.fn('createObjectProgram')(function* (
   input: CreateObjectInput,
-): Effect.fn.Return<
-  { id: string; slug: string },
-  ObjectRejected | ObjectQueryFailed
-> {
+): Effect.fn.Return<{ id: string; slug: string }, CreateObjectFailure> {
   const singular = input.singular.trim()
   const plural = input.plural.trim()
   if (!singular || !plural)
@@ -85,6 +154,7 @@ export const createObjectProgram = Effect.fn('createObjectProgram')(function* (
     return yield* new ObjectRejected({
       message: `"${plural}" is taken by the app — pick another plural`,
     })
+  const identityKeys = yield* readIdentityKeys(input.identityKeys)
   // Slug: derived once, suffixed on collision, then immutable (§3).
   let slug = base
   for (let i = 2; ; i++) {
@@ -98,21 +168,53 @@ export const createObjectProgram = Effect.fn('createObjectProgram')(function* (
     if (!taken) break
     slug = `${base}-${i}`
   }
-  const row = yield* query(() =>
-    db
-      .insert(objectDef)
-      .values({
-        slug,
-        singular,
-        plural,
-        icon: input.icon ?? null,
-        isSystem: false,
-        createdBy: input.createdBy,
-      })
-      .returning({ id: objectDef.id, slug: objectDef.slug })
-      .then((rows) => rows[0]),
-  )
-  return row
+  // One write or neither: the object row and the backing attribute of every
+  // key it declares (CONTEXT.md, 2026-09-19). The attributes go in through
+  // createAttributeProgram — the door that rejects config a type cannot
+  // carry — sharing this transaction rather than a second connection.
+  return yield* Effect.tryPromise({
+    try: () =>
+      db.transaction(async (tx) => {
+        const row = (
+          await tx
+            .insert(objectDef)
+            .values({
+              slug,
+              singular,
+              plural,
+              icon: input.icon ?? null,
+              identityKeys,
+              isSystem: false,
+              createdBy: input.createdBy,
+            })
+            .returning({ id: objectDef.id, slug: objectDef.slug })
+        )[0]
+        for (const key of identityKeys) {
+          const backing = IDENTITY_KEY_ATTRIBUTES[key]
+          const exit = await Effect.runPromiseExit(
+            createAttributeProgram({
+              tx,
+              objectId: row.id,
+              name: backing.name,
+              type: backing.type,
+              description: `Identity key — ${backing.help}.`,
+              config: { identityKey: key },
+              createdBy: input.createdBy,
+            }),
+          )
+          if (Exit.isFailure(exit)) {
+            const failure = Cause.findErrorOption(exit.cause)
+            throw new ObjectRollback(
+              Option.isSome(failure)
+                ? failure.value
+                : new ObjectQueryFailed({ cause: Cause.squash(exit.cause) }),
+            )
+          }
+        }
+        return row
+      }),
+    catch: asFailure,
+  })
 })
 
 export type UpdateObjectInput = {

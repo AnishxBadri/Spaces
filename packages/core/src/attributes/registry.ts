@@ -4,6 +4,7 @@ import type {
   ObjectKind,
   SelectOption,
 } from '@spaces/db/schema/attributes'
+import type { IdentityKey } from '@spaces/db/schema/objects'
 import type { BadgeColor } from './colors'
 
 /**
@@ -12,11 +13,12 @@ import type { BadgeColor } from './colors'
  * attribute's options at validation time.
  *
  * `ObjectKind`, `SelectOption` and `AttributeOptions` are declared at the
- * `attribute.options` column (`@spaces/db/schema/attributes`) and re-exported
- * here unchanged — packages/db imports nothing internal, and the column owns
- * the shape of what it stores (SPA-142).
+ * `attribute.options` column (`@spaces/db/schema/attributes`), `IdentityKey`
+ * at the `object.identity_keys` column, and all four are re-exported here
+ * unchanged — packages/db imports nothing internal, and the column owns the
+ * shape of what it stores (SPA-142).
  */
-export type { AttributeOptions, ObjectKind, SelectOption }
+export type { AttributeOptions, IdentityKey, ObjectKind, SelectOption }
 
 /** The three core kinds, as a list — iteration order for the seeder. */
 export const OBJECT_KINDS: Array<ObjectKind> = ['company', 'person', 'deal']
@@ -41,6 +43,42 @@ export function toObjectKind(kind: string): ObjectKind | null {
     ? kind
     : null
 }
+
+/**
+ * The identity keys a custom object may declare, and the attribute each one
+ * materializes (spec §9). The slug falls out of the name through the same
+ * slugifier every attribute uses, which is what makes `domain` and
+ * `linkedin` predictable to the write path.
+ */
+export const IDENTITY_KEYS: Array<IdentityKey> = ['domain', 'linkedin']
+
+export const IDENTITY_KEY_ATTRIBUTES: Record<
+  IdentityKey,
+  { slug: string; name: string; type: AttributeType; help: string }
+> = {
+  domain: {
+    slug: 'domain',
+    name: 'Domain',
+    type: 'domain',
+    help: 'the website that identifies the record',
+  },
+  linkedin: {
+    slug: 'linkedin',
+    name: 'LinkedIn',
+    type: 'url',
+    help: 'the LinkedIn page that identifies the record',
+  },
+}
+
+/**
+ * Keys that identify people and companies and nothing else. Refused rather
+ * than offered: the free-mail and role-prefix rules behind them are core
+ * doctrine and mean nothing on an attribute bag.
+ */
+export const CORE_ONLY_IDENTITY_KEYS: Array<string> = ['email', 'cin']
+
+export const CORE_ONLY_IDENTITY_MESSAGE =
+  'email and cin identify people and companies, not custom records'
 
 export type AttributeType =
   | 'text'
