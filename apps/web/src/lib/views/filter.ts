@@ -1,27 +1,23 @@
+import type {
+  Condition,
+  ConditionOp,
+  ConditionValue,
+  ViewExtra,
+  ViewSort,
+} from '@spaces/db/schema/views'
+
 /**
  * The view filter model — pure, client-safe. Conditions are ANDed and
  * evaluated over loaded rows (tables are not paginated). Ops are typed by
  * attribute so the editor only offers what makes sense: a select is
  * `is`/`is_not`, a number is `gt`/`lt`, everything can be `empty`.
+ *
+ * The shapes themselves are declared at the `view` table's jsonb columns
+ * (`@spaces/db/schema/views`) and re-exported here, so every `#/lib/views/filter`
+ * import reads the same names it always did (SPA-142). This module is the
+ * behaviour: the op menu, the matcher, the coercions.
  */
-
-export type ConditionOp =
-  'is' | 'is_not' | 'contains' | 'empty' | 'not_empty' | 'gt' | 'lt'
-
-/** What a condition may compare against — JSON scalars, or option ids. */
-export type ConditionValue = string | number | boolean | null | Array<string>
-
-export type Condition = {
-  slug: string
-  op: ConditionOp
-  value?: ConditionValue | undefined
-}
-
-/** TanStack's single sort, as a view stores it. */
-export type ViewSort = { id: string; desc: boolean } | null
-
-/** Page-specific view state; scalars only so it crosses the server seam. */
-export type ViewExtra = Record<string, string | number | boolean | null>
+export type { Condition, ConditionOp, ConditionValue, ViewExtra, ViewSort }
 
 const OPS: Array<ConditionOp> = [
   'is',

@@ -14,6 +14,11 @@
 // the root `lint` script, which is `turbo run lint`, and turbo refuses the
 // recursion — which is why the root scripts are `lint:root` / `typecheck:root`
 // and `pnpm lint` runs both names.
+//
+// Since SPA-142 there is a second package with source in it, `@spaces/db`,
+// carrying its own `test`, `typecheck` and `lint` scripts. Nothing here
+// needed changing for it — that is what the package-task shape was for — but
+// it is why `--filter=@spaces/db` now means something.
 {
   "$schema": "https://turbo.build/schema.json",
 
@@ -62,9 +67,9 @@
     },
 
     // .env.local is a globalDependency and DATABASE_URL a globalEnv because
-    // vitest.config.ts loads the first into the test env and 10 of the 23 files
-    // talk to the database named there — a cached pass keyed without them is a
-    // pass that checked nothing.
+    // each package's vitest.config.ts loads the first into the test env and
+    // most of the files talk to the database named there — a cached pass keyed
+    // without them is a pass that checked nothing.
     "test": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$"],

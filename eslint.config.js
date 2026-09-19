@@ -166,7 +166,7 @@ export default [
   // only goes down. no-unsafe-* stays off: drizzle's inferred types trip it
   // too often to be signal.
   {
-    files: ['apps/web/src/**/*.{ts,tsx}'],
+    files: ['apps/web/src/**/*.{ts,tsx}', 'packages/db/src/**/*.ts'],
     rules: {
       '@typescript-eslint/consistent-type-assertions': [
         'error',
@@ -180,9 +180,10 @@ export default [
     },
   },
   // Guard against accidental full-table update/delete (portfolio event
-  // tables are append-only by design).
+  // tables are append-only by design). packages/db is in scope too: the
+  // schema moved there in SPA-142 and so did `heartbeat.ts`, which writes.
   {
-    files: ['apps/web/src/**'],
+    files: ['apps/web/src/**', 'packages/db/src/**'],
     plugins: { drizzle },
     rules: {
       'drizzle/enforce-delete-with-where': [

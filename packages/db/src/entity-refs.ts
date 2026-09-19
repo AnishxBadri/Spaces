@@ -1,5 +1,4 @@
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core'
-import type { ContextHop, ContextKind } from '#/lib/context/types'
 import {
   activity,
   attributeEvent,
@@ -60,7 +59,33 @@ export type MergeStrategy =
 
 // ---------- context ----------
 
-export type { ContextHop, ContextKind } from '#/lib/context/types'
+/**
+ * The two halves of the context contract that ENTITY_REFS itself speaks
+ * (docs/spec-ai-substrate.md §1). They are declared here, and re-exported by
+ * `apps/web/src/lib/context/types.ts` which keeps the rest — `ContextEdge`,
+ * `ContextItem` — because the `context` field of every entry below is typed
+ * against them and packages/db imports nothing internal (SPA-142). Both
+ * halves land in core together at mono-9a; until then this is where the
+ * vocabulary is written down.
+ */
+
+/**
+ * ContextItem kinds. The spec's seven plus `interaction` and `task`: both
+ * are citation targets and neither is an entity (decided 2026-09-09).
+ */
+export type ContextKind =
+  | 'attribute'
+  | 'note'
+  | 'memo'
+  | 'doc_chunk'
+  | 'event'
+  | 'interaction'
+  | 'task'
+  | 'mandate'
+  | 'glossary'
+
+/** Hop distance from the seed record; `standing` = curated source, unranked. */
+export type ContextHop = 0 | 1 | 2 | 'standing'
 
 export type ContextRole =
   /** Rows on this column become ContextItems of `kind`. */

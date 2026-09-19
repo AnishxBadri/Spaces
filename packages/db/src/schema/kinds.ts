@@ -17,7 +17,7 @@ import { sql } from 'drizzle-orm'
 import { ltree, tsvector } from './helpers'
 import { entity } from './entities'
 import { user } from './auth'
-import type { Json } from '#/lib/json'
+import type { Json } from '../json'
 
 /** A BlockNote document — an array of blocks. Null until the note has one. */
 export type NoteBody = Array<Json>

@@ -115,7 +115,7 @@ The most dangerous file in the repo, per CLAUDE.md: a table that references
 entities and never reaches the repoint sections leaves rows pointing at a
 merged-away id, and its snapshot gap makes unmerge impossible for that
 table. Missing one was the worst bug of a review cycle — which is why the
-hand-written list is gone. `ENTITY_REFS` (`src/db/entity-refs.ts`) is now
+hand-written list is gone. `ENTITY_REFS` (`packages/db/src/entity-refs.ts`) is now
 the one list of entity-referencing columns, this file loops over it for
 every generic repoint, and `entity-refs.test.ts` diffs the list against
 drizzle's FK metadata so a new column can't skip it.

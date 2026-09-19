@@ -232,6 +232,43 @@ differently. pnpm 10 also stopped running dependency build scripts by default;
 `package.json` and both still build. `mono-1` confirms this pin rather than
 re-arguing it.
 
+**packages/db — what moved, and the one seam left open (SPA-142, `mono-3`).**
+The schema, the drizzle journal, `ENTITY_REFS`, the worker heartbeat, the
+downgrade guard and the migrator are `packages/db` as of 2026-09-19, and the
+package imports nothing internal — that property, not the file locations, is
+what the slice was for. Four `#/lib/...` imports stood in the way and each was
+resolved the same way: **the column owns the type**, so the payload shape moved
+to the column and the app module that used to declare it now re-exports it.
+`Json` → `@spaces/db/json`; `Condition`/`ViewSort`/`ViewExtra` → the `view`
+table; `AttributeOptions`/`SelectOption`/`ObjectKind`/`BadgeColor` → the
+`attribute` table; `ContextKind`/`ContextHop` → `entity-refs.ts`, which is the
+only file that speaks them. No import in `apps/web` changed; the behaviour —
+matchers, validators, seeded `SYSTEM_ATTRIBUTES`, the badge palette — stayed
+in the app.
+
+The seam deliberately left open is seeding. `packages/db` exports
+`runMigrations()` and a bin that runs migrations and stops; the boot
+composition — migrate, then `seedSystemAttributes`, then `seedStarterTaxonomy`,
+as one command, which is what the container entrypoint and `pnpm
+db:migrate:run` both invoke — lives in `apps/web/src/db/boot.ts`. That is
+interim: the two seeds are core concerns wearing an app's clothes, and
+**`mono-9a` moves them into `packages/core` and the composition with them**.
+The one-command contract survives both moves; what must never happen is
+`packages/db` growing a seed, because then the schema package would depend on
+the product.
+
+Two mechanical facts the move turned on. The migrations folder is resolved
+from `import.meta.url`, never from cwd — it used to be the literal
+`'./drizzle'`, which worked only because the entrypoint happens to `cd /app`
+— so in the image the journal is at `/app/packages/db/drizzle` and an "older
+image" fixture mounts over that path. And drizzle records each applied
+migration as `(hash = sha256 of the .sql body, created_at = the journal's
+"when")`, which is exactly what SPA-36's guard compares: a journal that moves
+unchanged passes, a journal that is regenerated refuses to boot. The move was
+verified by dumping `select hash, created_at from
+drizzle.__drizzle_migrations` before and after — 25 rows, byte-identical —
+not by reading the diff.
+
 **Ports = the SDK contract.** Effect service tags, one per lane, provenance
 stamped by the port from the bound `integration` row (a plugin cannot forge
 who wrote what): `Identity` (resolveEntity / addIdentityAlias) · `Facts`

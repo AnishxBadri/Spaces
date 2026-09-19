@@ -34,10 +34,15 @@ pnpm worker                                       # background worker
 ```
 
 - **pnpm workspace since 2026-09-19 (SPA-101).** The app is `apps/web`
-  (`@spaces/web`); `packages/config` holds `tsconfig.base.json`, and
-  `packages/*` is where `db`, `core` and `sdk` land later. What stayed at
-  the root: `eslint.config.js` + `eslint-rules/`, `prettier.config.js`,
-  `lefthook.yml`, `scripts/`, `docker/`, `docs/`, `.env.local` and `data/`.
+  (`@spaces/web`); `packages/config` holds `tsconfig.base.json`;
+  **`packages/db` (`@spaces/db`) holds the drizzle schema, the `drizzle/`
+  journal, `drizzle.config.ts`, `ENTITY_REFS`, the worker heartbeat, the
+  downgrade guard and `runMigrations()`** (SPA-142) — it depends on
+  drizzle-orm, pg and zod and on nothing internal, so don't reach into
+  `apps/web` from it. `packages/*` is where `core` and `sdk` land later.
+  What stayed at the root: `eslint.config.js` + `eslint-rules/`,
+  `prettier.config.js`, `lefthook.yml`, `scripts/`, `docker/`, `docs/`,
+  `.env.local` and `data/`.
 - **Turbo runs the graph since 2026-09-19 (SPA-127).** `turbo.json` declares
   `dev`, `build`, `lint`, `typecheck`, `test` and `generate-routes`, and the
   root scripts for those six go through `turbo run` instead of
@@ -49,7 +54,8 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
   when you are in a worktree).
 - `.env.local` stays at the **repo root**, and every loader is anchored to the
   file that needs it rather than to cwd (`apps/web/vitest.config.ts`,
-  `apps/web/drizzle.config.ts`, `apps/web/vite.config.ts`'s `envDir`, and
+  `packages/db/vitest.config.ts`, `packages/db/drizzle.config.ts`,
+  `apps/web/vite.config.ts`'s `envDir`, and
   `dotenv -e ../../.env.local` in the app's dev/worker/db scripts — nitro's
   vite plugin loads `.env.local` from the vite root, which is now `apps/web`,
   which is why `dev` carries dotenv-cli too). `dataDir()` is anchored the same
@@ -66,12 +72,14 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
 ## Gates before any commit
 
 1. `pnpm typecheck` → `turbo run typecheck typecheck:root` — **not** a bare
-   `pnpm exec tsc --noEmit`. There are two tsconfigs now: the root one covers
-   `scripts/` and `eslint-rules/` (that is the `typecheck:root` half), and
-   `apps/web/tsconfig.json` covers the app (the `typecheck` half). The root
-   script runs both; a bare root `tsc` would pass while typechecking none of
-   the app.
-2. `pnpm test` → `turbo run test` (`vitest run` in `apps/web`) — must be fully
+   `pnpm exec tsc --noEmit`. There is a tsconfig per package now: the root
+   one covers `scripts/` and `eslint-rules/` (that is the `typecheck:root`
+   half), and `apps/web/tsconfig.json` and `packages/db/tsconfig.json` cover
+   their own source (the `typecheck` half, one task per package). The root
+   script runs them all; a bare root `tsc` would pass while typechecking
+   none of them.
+2. `pnpm test` → `turbo run test` (`vitest run` in `apps/web` and in
+   `packages/db`, which carries its own vitest config) — must be fully
    green
 3. prettier on touched files (root: `pnpm exec prettier --check <files>`) —
    not a turbo task; it is per-file, not per-package
@@ -109,7 +117,7 @@ five.
 - A type is a claim the compiler checked, not one the author asserted
   (`@typescript-eslint/consistent-type-assertions: never`).
 - Data crossing a boundary gets its type once — at the column or at a decode
-  (`jsonb().$type<…>()` on all 18 columns; `apps/web/src/lib/json.ts`).
+  (`jsonb().$type<…>()` on all 18 columns; `packages/db/src/json.ts`).
 - `undefined` is a type, not a state: optional means the caller may omit it
   (`exactOptionalPropertyTypes`).
 - Attribute values have one write path, which validates, logs, and links
@@ -140,9 +148,10 @@ anyway. Don't re-litigate it from the flag list.
   `apps/web/src/lib/attributes/registry.ts`; `pnpm db:migrate:run` reseeds
   insert-if-absent
 - New column referencing an entity → add an entry to `ENTITY_REFS`
-  (`apps/web/src/db/entity-refs.ts`) declaring both the merge strategy and the
+  (`packages/db/src/entity-refs.ts`) declaring both the merge strategy and the
   context role; `entity-refs.test.ts` diffs the list against drizzle's FK
-  metadata and fails naming the column otherwise. A `custom` merge strategy
+  metadata and fails naming the column otherwise — it needs no database, so
+  `pnpm exec turbo run test --filter=@spaces/db` answers with Postgres down. A `custom` merge strategy
   still needs its section in `apps/web/src/lib/entities/merge.ts` **and** its
   snapshot. This was the worst bug of a review cycle; there is no unmerge
   executor — the snapshot convention is the only contract.

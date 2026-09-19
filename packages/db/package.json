@@ -1,0 +1,49 @@
+{
+  "//": "The schema, the journal and the migration runner. Depends on drizzle-orm, pg and zod and on nothing inside this repo — that is the property the package exists to hold, and `src/json.ts`, `src/entity-refs.ts` and the two schema files that declare their own column payload types are where the four former `#/lib/...` imports ended up (SPA-142).",
+  "name": "@spaces/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "//exports": "Source entry points, not a build output: every consumer is bundled by vite or loaded by tsx/vitest, all of which resolve TypeScript through `exports`. The five shapes are the ones SPA-135's import sweep wrote into apps/web — `@spaces/db`, `@spaces/db/schema`, `@spaces/db/schema/<name>`, `@spaces/db/entity-refs`, `@spaces/db/heartbeat` — plus `./migrate` and `./json`, which this slice adds.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts",
+    "./schema/*": "./src/schema/*.ts",
+    "./entity-refs": "./src/entity-refs.ts",
+    "./heartbeat": "./src/heartbeat.ts",
+    "./migrate": "./src/migrate.ts",
+    "./downgrade-guard": "./src/downgrade-guard.ts",
+    "./json": "./src/json.ts"
+  },
+  "//bin": "Migrations only — guard, then `migrate()`, then exit. The boot composition that also seeds is apps/web's (`apps/web/src/db/boot.ts`), and moves to core at mono-9a.",
+  "bin": {
+    "spaces-db-migrate": "./src/bin/migrate.ts"
+  },
+  "scripts": {
+    "migrate": "tsx src/bin/migrate.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:pull": "drizzle-kit pull",
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.16.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.15.6",
+    "dotenv": "^17.3.1",
+    "drizzle-kit": "^0.31.9",
+    "eslint": "^9.20.0",
+    "tsx": "^4.23.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.10"
+  }
+}

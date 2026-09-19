@@ -33,7 +33,7 @@ Worker (pg-boss consumer) ──────────────────
 Every page load and mutation flows the same way:
 
 ```
-route (src/routes/) → server function (src/lib/server/) → domain lib (src/lib/*/) → db (src/db/)
+route (src/routes/) → server function (src/lib/server/) → domain lib (src/lib/*/) → db (@spaces/db)
 ```
 
 The worker picks up anything CPU-bound (document text extraction) through
@@ -42,11 +42,13 @@ pg-boss, which is itself just Postgres tables. There is no third service.
 ## Where the files are
 
 Since 2026-09-19 (SPA-101) the repo is a pnpm workspace. One app,
-`apps/web` — package name `@spaces/web` — holds `src/`, `drizzle/` and every
-config the app owns (`vite.config.ts`, `vitest.config.ts`, `drizzle.config.ts`,
-`tsconfig.json`, `components.json`). `packages/config` holds the shared
-`tsconfig.base.json`, and `packages/*` is where `db`, `core` and `sdk` land
-later. Staying at the repo root: `eslint.config.js` and `eslint-rules/`,
+`apps/web` — package name `@spaces/web` — holds `src/` and every config the
+app owns (`vite.config.ts`, `vitest.config.ts`, `tsconfig.json`,
+`components.json`). `packages/db` — `@spaces/db`, extracted 2026-09-19 by
+SPA-142 — holds the drizzle schema, the `drizzle/` journal,
+`drizzle.config.ts`, `ENTITY_REFS` and the migrator, and imports nothing from
+the app. `packages/config` holds the shared `tsconfig.base.json`, and
+`packages/*` is where `core` and `sdk` land later. Staying at the repo root: `eslint.config.js` and `eslint-rules/`,
 `prettier.config.js`, `lefthook.yml`, `scripts/`, `docker/`, `docs/`, the
 compose files, `.env.local` and `data/`.
 
@@ -56,8 +58,8 @@ package keeps its own `#/*` subpath import, so inside `apps/web` the specifier
 site changed when the tree moved. Read every `src/…` below as
 `apps/web/src/…` on disk. The root `pnpm dev`, `pnpm worker`, `pnpm test` and
 the `db:*` scripts are proxies that delegate with `pnpm --filter`, so you still
-run them from the repo root; `pnpm typecheck` is the gate, because there are
-two tsconfigs now and a bare `tsc` at the root sees only `scripts/`.
+run them from the repo root; `pnpm typecheck` is the gate, because there is a
+tsconfig per package now and a bare `tsc` at the root sees only `scripts/`.
 
 ## Reading order
 
@@ -125,7 +127,7 @@ the full reasoning.
 - **Never `Intl.NumberFormat` compact notation.** Node and Chrome disagree,
   which breaks hydration. `fmtMoney` in `src/lib/format.ts` hand-rolls it.
 - **New column referencing an entity** → add an entry to `ENTITY_REFS`
-  (`src/db/entity-refs.ts`) declaring its merge strategy and its context
+  (`packages/db/src/entity-refs.ts`) declaring its merge strategy and its context
   role; `entity-refs.test.ts` diffs the list against drizzle's FK metadata
   and fails naming the column otherwise. A `custom` strategy also needs its
   section in `src/lib/entities/merge.ts` **and** its snapshot.

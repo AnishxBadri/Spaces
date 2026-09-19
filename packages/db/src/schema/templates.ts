@@ -9,7 +9,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { user } from './auth'
-import type { Json } from '#/lib/json'
+import type { Json } from '../json'
 
 export const templateKind = pgEnum('template_kind', ['note', 'space', 'record'])
 

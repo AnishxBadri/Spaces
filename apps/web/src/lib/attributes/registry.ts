@@ -1,14 +1,22 @@
 import { z } from 'zod'
+import type {
+  AttributeOptions,
+  ObjectKind,
+  SelectOption,
+} from '@spaces/db/schema/attributes'
 import type { BadgeColor } from './colors'
-import type { Json } from '#/lib/json'
 
 /**
  * The attribute type menu — fixed in code; users define attributes, never
  * types. Each type owns its value validator; option-dependent types get the
  * attribute's options at validation time.
+ *
+ * `ObjectKind`, `SelectOption` and `AttributeOptions` are declared at the
+ * `attribute.options` column (`@spaces/db/schema/attributes`) and re-exported
+ * here unchanged — packages/db imports nothing internal, and the column owns
+ * the shape of what it stores (SPA-142).
  */
-
-export type ObjectKind = 'company' | 'person' | 'deal'
+export type { AttributeOptions, ObjectKind, SelectOption }
 
 /** The three core kinds, as a list — iteration order for the seeder. */
 export const OBJECT_KINDS: Array<ObjectKind> = ['company', 'person', 'deal']
@@ -50,40 +58,6 @@ export type AttributeType =
   | 'rating'
   | 'record_reference'
   | 'actor_reference'
-
-export type SelectOption = {
-  id: string
-  label: string
-  /** status only: funnel semantics for kanban/filters */
-  group?: 'active' | 'parked' | 'closed'
-  /** one of BADGE_COLORS; absent falls back to the option's position */
-  color?: BadgeColor
-  /** retired: hidden from write pickers, writes rejected, stored values kept */
-  archived?: boolean
-}
-
-export type AttributeOptions = {
-  options?: Array<SelectOption>
-  /** record_reference — a core kind, or any object row (custom objects) */
-  targetKind?: ObjectKind
-  targetObjectId?: string
-  multi?: boolean
-  required?: boolean
-  /** currency */
-  code?: string
-  /** rating */
-  max?: number
-  /** number: display decimals; stored numbers untouched */
-  precision?: number
-  /**
-   * Default (spec §4): a static value in the type's write shape, or one of
-   * exactly two dynamic forms — `'current-user'` (actor_reference) and an
-   * ISO-8601 duration for dates (`'P7D'` = a week out). Fires on every
-   * creation path, fills blanks only. Validated at attribute save
-   * (`validateDefault`), resolved at record birth (`resolveDefault`).
-   */
-  default?: Json
-}
 
 export type AttributeDef = {
   id: string

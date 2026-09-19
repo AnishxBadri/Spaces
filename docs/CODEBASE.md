@@ -85,7 +85,7 @@ server-fn handler. Effect never crosses into React.
   attribute: registry + `pnpm db:migrate:run` (reseeds insert-if-absent).
 - `entities/` — identity: `resolve.ts` (aliases → entity, collisions →
   duplicate_candidates), `normalize.ts`, `merge.ts` (**the merge executor** —
-  it iterates `ENTITY_REFS` (`src/db/entity-refs.ts`) for generic repoints
+  it iterates `ENTITY_REFS` (`packages/db/src/entity-refs.ts`) for generic repoints
   and keeps a hand-written section per `custom` strategy; no unmerge exists,
   so the snapshot is the only contract).
 - `context/` — **the context assembler** (`docs/spec-ai-substrate.md` §1):
@@ -111,7 +111,7 @@ server-fn handler. Effect never crosses into React.
   `setup-token.ts`, `utils.ts`.
 - Tests are colocated (`*.test.ts`); suite needs Postgres up.
 
-### 4. Database — `src/db/schema/` (drizzle, one file per domain)
+### 4. Database — `packages/db/src/schema/` (drizzle, one file per domain)
 
 `entities.ts` (the spine: entity + kind side tables + link + entity_space +
 alias + duplicate_candidate), `objects.ts` (the object registry — three
