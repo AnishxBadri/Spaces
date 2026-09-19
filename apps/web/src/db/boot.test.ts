@@ -29,7 +29,11 @@ const webRoot = fileURLToPath(new URL('../..', import.meta.url))
 const bootEntry = path.join(webRoot, 'src/db/boot.ts')
 const imageFolder = MIGRATIONS_FOLDER
 
-const TEST_DB = 'spa36_downgrade_guard'
+// Derived from the worker's own test database (SPA-143/145 hand each vitest
+// worker its own), so two checkouts running this file at once — main and an
+// agent worktree — cannot drop each other's database mid-test. A fixed name
+// did exactly that on 2026-09-19.
+const TEST_DB = `${new URL(process.env.DATABASE_URL!).pathname.slice(1)}_boot`
 
 describe('db/boot.ts (real database)', () => {
   let adminUrl = ''
