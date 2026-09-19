@@ -9,7 +9,7 @@
 @import 'tw-animate-css';
 
 /**
- * Spaces tokens — DESIGN.md ("The Analyst's Desk") made concrete.
+ * Spaces tokens — DESIGN.md ("Instrument") made concrete.
  * Pure white ground; character lives in Pine and type, never the surface.
  * The primary appears only as: primary action, current selection, focus.
  * All neutrals carry a whisper of the primary hue (~155°) at near-zero
@@ -23,16 +23,16 @@
  */
 :root {
   /**
-   * LIGHT ONLY, by decision (2026-09-19, SPA-52). Dark stays a post-v1
+   * LIGHT ONLY, by decision (2026-09-19, SPA-52). Dark stays a backlog
    * feature; what changes here is that the deferral is paid rather than
    * compounded. `color-scheme: light` is the load-bearing half: it tells the
    * OS to draw every native control it still owns — the date inputs, the
    * scrollbars — light, so an operator on a dark OS no longer gets dark
    * chrome bolted onto paper. The `dark` custom-variant is gone with it: it
    * had no token values behind it, so every `dark:` class anyone wrote was
-   * dead. Surfaces are token-only (`instrument/no-v1-tokens` rejects a raw
+   * dead. Surfaces are token-only (`instrument/vocabulary` rejects a raw
    * hex or an arbitrary colour in tsx), which is what makes dark later a
-   * second token file rather than a re-port.
+   * second token file rather than a redraw.
    */
   color-scheme: light;
 
@@ -41,7 +41,7 @@
   --foreground: oklch(0.24 0.012 155); /* ink — ~13:1 on white */
 
   /**
-   * INSTRUMENT (v2, 2026-09-10). Two untinted neutrals, one ink, one LED.
+   * INSTRUMENT (2026-09-10). Two untinted neutrals, one ink, one LED.
    * paper is the data field; bone is the chassis (sidebar, rails, foot rows);
    * hairline is structure (1px ink), rule is the inner grid; graphite is the
    * second text colour (5.9:1 on paper). Values are hex on purpose: these are
@@ -53,11 +53,6 @@
   --hairline: #1c1c1a;
   --rule: #d6d4cd;
   --graphite: #5c5b56;
-
-  --card: oklch(1 0 0);
-  --card-foreground: var(--foreground);
-  --popover: oklch(1 0 0);
-  --popover-foreground: var(--foreground);
 
   /**
    * Pine — the one voice, replacing Vermilion (2026-08, owner decision).
@@ -94,22 +89,6 @@
   --border: var(--rule);
   --input: var(--rule);
   --ring: var(--hairline); /* focus is ink, never chroma — the Reticle Rule */
-
-  /* second neutral layer — sidebar, toolbars, rails */
-  --sidebar: var(--bone);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--bone-deep);
-  --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: var(--hairline);
-  --sidebar-ring: var(--ring);
-
-  --chart-1: oklch(0.55 0.14 155);
-  --chart-2: oklch(0.55 0.1 240);
-  --chart-3: oklch(0.588 0.2 35); /* vermilion, freed by the primary swap */
-  --chart-4: oklch(0.7 0.13 75);
-  --chart-5: oklch(0.48 0.17 12);
 
   /**
    * Badge palette — the colour vocabulary for select/status options.
@@ -223,8 +202,6 @@
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);

@@ -89,7 +89,7 @@
     },
 
     // eslint.config.js and eslint-rules/ live at the repo root and decide what
-    // this package's lint run reports — gate 5 (instrument/no-v1-tokens) is one
+    // this package's lint run reports — gate 5 (instrument/vocabulary) is one
     // of those rule files — so both are inputs even though neither is in the
     // package.
     "lint": {

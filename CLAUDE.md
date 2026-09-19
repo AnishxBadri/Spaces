@@ -113,9 +113,9 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
    eliminated 2026-09; don't reintroduce one). Where drizzle's `const [row] =`
    destructure lies about presence, use the `.at(0)` pattern instead of
    deleting the guard.
-5. No v1 design tokens — **`pnpm lint` covers it**, there is no separate gate
-   and no grep any more (2026-09-18). `instrument/no-v1-tokens`
-   (`eslint-rules/no-v1-tokens.js`, at the repo root) reads className literals
+5. Instrument vocabulary only — **`pnpm lint` covers it**, there is no separate
+   gate and no grep any more (2026-09-18). `instrument/vocabulary`
+   (`eslint-rules/vocabulary.js`, at the repo root) reads className literals
    and `cn()`/`cva()` string arguments in `apps/web/src/**/*.tsx` and names the
    Instrument replacement in the message, so gate 4 and the pre-commit hook
    enforce it for free; since SPA-52 it also rejects a raw colour there (a hex,

@@ -1,17 +1,17 @@
 import type { ESLint, Rule } from 'eslint'
 
-export interface V1TokenHit {
+export interface BannedTokenHit {
   index: number
   length: number
   token: string
   use: string
 }
 
-/** Every v1 token in one class string. Exported for the fixture test. */
-export function findV1Tokens(
+/** Every banned token in one class string. Exported for the fixture test. */
+export function findBannedTokens(
   value: string,
   isRootRoute: boolean,
-): Array<V1TokenHit>
+): Array<BannedTokenHit>
 
 export interface ArbitraryTypeHit {
   index: number

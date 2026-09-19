@@ -459,7 +459,7 @@ function CollapsedSidebar({
               <span
                 /* Optical sizing, not a type step: two initials centred in a
                    22px ink square read wrong at the 10px field step. */
-                // eslint-disable-next-line instrument/no-v1-tokens
+                // eslint-disable-next-line instrument/vocabulary
                 className="flex size-[1.375rem] shrink-0 items-center justify-center bg-foreground mono text-[0.5625rem] leading-3 font-medium text-background"
               >
                 {initials(user.name)}

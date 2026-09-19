@@ -292,8 +292,9 @@ Since then, two tracks have run in parallel (2026-09):
   attribute settings, defaults, config-mutability guards, archived-option
   surfaces, custom objects with their `/o/` routes, views replacing lists, and
   `ENTITY_REFS` as the one registry of entity-referencing columns.
-- **The Instrument design port** — v2 replaces v1 outright across every
-  surface (`DESIGN.md`, `docs/instrument-port-brief.md`).
+- **Instrument** — the design of the product, across every surface, with no
+  predecessor still running and no flag between them (`DESIGN.md`,
+  `docs/design-contract.md`).
 
 Next:
 
