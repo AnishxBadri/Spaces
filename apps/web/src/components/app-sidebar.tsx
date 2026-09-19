@@ -41,27 +41,83 @@ import { cn } from '#/lib/utils'
  * it is 48px of marks only — the current page a paper box, names as ink
  * tooltips, the mark at the top the way back out. The foot is one account
  * row whose menu opens to the right and holds Settings (G ,) and Sign out.
+ *
+ * Below is the nav grammar: one row per page, the group and the chord both
+ * data on the row, and the three groups derived from it.
  */
+
+/** The three groups of the chassis, in the order the nav draws them. */
+export const NAV_GROUP_IDS = ['work', 'objects', 'capital'] as const
+export type NavGroupId = (typeof NAV_GROUP_IDS)[number]
+
+type NavItem = {
+  readonly to: string
+  readonly label: string
+  readonly icon: LucideIcon
+  /**
+   * The G-chord printed in the row's right lane — data in the row, not a
+   * decision the slice that adds the page makes by hand. The shell binds it
+   * (`useHotkeys` in `routes/_app.tsx`), the keyboard sheet lists it, and
+   * `nav-grammar.test.ts` names both pages if two rows claim one letter.
+   */
+  readonly key: string
+  /** Which group the row joins. The groups are derived from this, not sliced. */
+  readonly group: NavGroupId
+}
+
 export const NAV_ITEMS = [
   // Today first and login lands there (2026-08-08): the attention page is
-  // the notification channel in a self-hosted product.
-  // `key` is the G-chord printed in the row's right lane; the shell binds
-  // it (useHotkeys) and the keyboard sheet lists it. Portfolio takes F
+  // the notification channel in a self-hosted product. Portfolio takes F
   // (fund) because People has P.
-  { to: '/today', label: 'Today', icon: Sunrise, key: 'G T' },
-  { to: '/tasks', label: 'Tasks', icon: CheckSquare, key: 'G K' },
-  { to: '/spaces', label: 'Spaces', icon: Layers, key: 'G S' },
-  { to: '/notes', label: 'Notes', icon: FileText, key: 'G N' },
-  { to: '/companies', label: 'Companies', icon: Building2, key: 'G C' },
-  { to: '/people', label: 'People', icon: Users, key: 'G P' },
-  { to: '/deals', label: 'Deals', icon: Kanban, key: 'G D' },
-  { to: '/portfolio', label: 'Portfolio', icon: Briefcase, key: 'G F' },
-  { to: '/mandate', label: 'Mandate', icon: Compass, key: 'G M' },
-] as const
+  { to: '/today', label: 'Today', icon: Sunrise, key: 'G T', group: 'work' },
+  {
+    to: '/tasks',
+    label: 'Tasks',
+    icon: CheckSquare,
+    key: 'G K',
+    group: 'work',
+  },
+  { to: '/spaces', label: 'Spaces', icon: Layers, key: 'G S', group: 'work' },
+  { to: '/notes', label: 'Notes', icon: FileText, key: 'G N', group: 'work' },
+  {
+    to: '/companies',
+    label: 'Companies',
+    icon: Building2,
+    key: 'G C',
+    group: 'objects',
+  },
+  { to: '/people', label: 'People', icon: Users, key: 'G P', group: 'objects' },
+  { to: '/deals', label: 'Deals', icon: Kanban, key: 'G D', group: 'objects' },
+  {
+    to: '/portfolio',
+    label: 'Portfolio',
+    icon: Briefcase,
+    key: 'G F',
+    group: 'capital',
+  },
+  {
+    to: '/mandate',
+    label: 'Mandate',
+    icon: Compass,
+    key: 'G M',
+    group: 'capital',
+  },
+] as const satisfies readonly NavItem[]
 
-const WORK = NAV_ITEMS.slice(0, 4)
-const OBJECTS = NAV_ITEMS.slice(4, 7)
-const CAPITAL = NAV_ITEMS.slice(7)
+/**
+ * The groups, derived (SPA-32). They used to be `slice(0, 4)` / `slice(4, 7)`
+ * / `slice(7)`, so a row inserted anywhere but the end silently reshuffled
+ * all three; now a row says which group it joins and the order of `NAV_ITEMS`
+ * is free to mean only what it means elsewhere — the order of the ⌘K "Go to"
+ * list and of the keyboard sheet's Go column.
+ */
+export const NAV_GROUPS = {
+  work: NAV_ITEMS.filter((item) => item.group === 'work'),
+  objects: NAV_ITEMS.filter((item) => item.group === 'objects'),
+  capital: NAV_ITEMS.filter((item) => item.group === 'capital'),
+} satisfies Record<NavGroupId, readonly NavItem[]>
+
+const { work: WORK, objects: OBJECTS, capital: CAPITAL } = NAV_GROUPS
 
 const isMac =
   typeof navigator !== 'undefined' && navigator.platform.startsWith('Mac')
