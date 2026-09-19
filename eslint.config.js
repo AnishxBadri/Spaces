@@ -1,10 +1,20 @@
 //  @ts-check
 
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { tanstackConfig } from '@tanstack/eslint-config'
 import { createNodeResolver } from 'eslint-plugin-import-x'
 import reactHooks from 'eslint-plugin-react-hooks'
 import drizzle from 'eslint-plugin-drizzle'
 import instrument from './eslint-rules/no-v1-tokens.js'
+
+// The directory this file lives in. `import/no-restricted-paths` resolves its
+// zones against `basePath`, and a relative '.' means eslint's cwd — which is
+// the repo root under CI and the pre-commit hook but `apps/web` under turbo's
+// `@spaces/web#lint` task, where the zones then matched nothing and the
+// server-only seam went silent (found by SPA-135). Absolute, it is the same
+// directory from every cwd.
+const ROOT = dirname(fileURLToPath(import.meta.url))
 
 // `Intl.NumberFormat`, banned everywhere but the two format modules, and
 // `entity.values`, written only by setValues. Both are `no-restricted-syntax`,
@@ -85,7 +95,7 @@ export default [
       'import/no-restricted-paths': [
         'error',
         {
-          basePath: '.',
+          basePath: ROOT,
           zones: [
             {
               target: './apps/web/src',
