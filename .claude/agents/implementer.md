@@ -33,7 +33,11 @@ one and say which you left and why.
   and say in your report what it does. Never hand-edit the drizzle journal.
 - Routes change → `pnpm generate-routes`.
 - New entity-referencing column → `ENTITY_REFS` entry in
-  `src/db/entity-refs.ts`; the test will name the column if you forget.
+  `packages/db/src/entity-refs.ts`; the test will name the column if you
+  forget. Schema and the drizzle journal live in `packages/db`; the app is
+  `apps/web`; gates run from the root through turbo (`pnpm typecheck`,
+  `pnpm test`, `pnpm lint`; `pnpm exec turbo run <task> --force` to bypass
+  the cache).
 - Types are claims the compiler checked: no `as Type` on data you could
   have typed at the source, no `any`, no `?? undefined` hedges.
 - Instrument vocabulary only in tsx: `text-graphite`, `border-rule`,
