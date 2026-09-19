@@ -13,7 +13,7 @@ import { createGlossaryExtension } from './glossary-decoration'
 import type { GlossaryTerm } from './glossary-decoration'
 import { searchEntities } from '#/lib/server-fns'
 import type { Json } from '#/lib/json'
-import type { NoteBody } from '#/db/schema/kinds'
+import type { NoteBody } from '@spaces/db/schema/kinds'
 
 const schema = BlockNoteSchema.create({
   inlineContentSpecs: {

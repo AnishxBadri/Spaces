@@ -1,9 +1,9 @@
 import { and, eq, getTableColumns, or, sql } from 'drizzle-orm'
 import { getTableConfig } from 'drizzle-orm/pg-core'
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core'
-import { db } from '#/db'
-import { ENTITY_REFS } from '#/db/entity-refs'
-import type { EntityRef } from '#/db/entity-refs'
+import { db } from '@spaces/db'
+import { ENTITY_REFS } from '@spaces/db/entity-refs'
+import type { EntityRef } from '@spaces/db/entity-refs'
 import {
   attributeEvent,
   duplicateCandidate,
@@ -11,11 +11,19 @@ import {
   entityAlias,
   link,
   mergeEvent,
-} from '#/db/schema'
-import type { EntityValues, MergeSnapshotEntry } from '#/db/schema/entities'
+} from '@spaces/db/schema'
+import type {
+  EntityValues,
+  MergeSnapshotEntry,
+} from '@spaces/db/schema/entities'
 import type { Json } from '#/lib/json'
-import { activity } from '#/db/schema/activity'
-import { distribution, holding, investment, mark } from '#/db/schema/portfolio'
+import { activity } from '@spaces/db/schema/activity'
+import {
+  distribution,
+  holding,
+  investment,
+  mark,
+} from '@spaces/db/schema/portfolio'
 
 /**
  * Merge executor, per CONTEXT.md: repoint at write time, resolve nothing at

@@ -1,8 +1,8 @@
 import { Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
-import { db } from '#/db'
-import { activity } from '#/db/schema/activity'
-import { entity, objectDef } from '#/db/schema'
+import { db } from '@spaces/db'
+import { activity } from '@spaces/db/schema/activity'
+import { entity, objectDef } from '@spaces/db/schema'
 import { birthValuesEffect } from './defaults'
 import { slugifyNoun, suggestPlural } from '#/lib/object-nouns'
 import type {

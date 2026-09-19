@@ -1,6 +1,6 @@
 import { Effect, Schema } from 'effect'
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
-import { db } from '#/db'
+import { db } from '@spaces/db'
 import {
   attribute,
   attributeEvent,
@@ -16,17 +16,17 @@ import {
   signal,
   space,
   term,
-} from '#/db/schema'
-import { user } from '#/db/schema/auth'
-import { interaction, interactionEntity } from '#/db/schema/interactions'
+} from '@spaces/db/schema'
+import { user } from '@spaces/db/schema/auth'
+import { interaction, interactionEntity } from '@spaces/db/schema/interactions'
 import {
   distribution,
   holding,
   investment,
   mark,
   round,
-} from '#/db/schema/portfolio'
-import { task, taskEntity } from '#/db/schema/tasks'
+} from '@spaces/db/schema/portfolio'
+import { task, taskEntity } from '@spaces/db/schema/tasks'
 import type { AttributeDef } from '#/lib/attributes/registry'
 import { fmtMoney } from '#/lib/portfolio/format'
 import { canRead } from '#/lib/server/shared'

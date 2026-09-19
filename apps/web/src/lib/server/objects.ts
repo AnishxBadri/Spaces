@@ -2,9 +2,9 @@ import { createServerFn } from '@tanstack/react-start'
 import { Effect, Schema } from 'effect'
 import { asc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
-import { attribute, entity, link, objectDef } from '#/db/schema'
-import { user } from '#/db/schema/auth'
+import { db } from '@spaces/db'
+import { attribute, entity, link, objectDef } from '@spaces/db/schema'
+import { user } from '@spaces/db/schema/auth'
 import { requireUser } from './shared'
 
 /**
@@ -160,7 +160,7 @@ export const listObjectRecords = createServerFn()
   .validator(z.object({ objectId: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const { entitySpace } = await import('#/db/schema')
+    const { entitySpace } = await import('@spaces/db/schema')
     const { desc, isNull, and: andOp } = await import('drizzle-orm')
     const rows = await db
       .select({
@@ -232,7 +232,7 @@ export const getObjectRecord = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const { entitySpace, space } = await import('#/db/schema')
+    const { entitySpace, space } = await import('@spaces/db/schema')
     const { and: andOp, isNull } = await import('drizzle-orm')
     const head = (
       await db

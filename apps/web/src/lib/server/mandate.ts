@@ -1,10 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
-import { entity, note } from '#/db/schema'
-import { activity } from '#/db/schema/activity'
-import { mandate } from '#/db/schema/workspace'
+import { db } from '@spaces/db'
+import { entity, note } from '@spaces/db/schema'
+import { activity } from '@spaces/db/schema/activity'
+import { mandate } from '@spaces/db/schema/workspace'
 import { requireUser } from './shared'
 
 /**

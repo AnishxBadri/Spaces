@@ -106,8 +106,8 @@ describe.skipIf(!hasDb)('view store', () => {
       ViewForbidden,
     } = await import('./store')
     const { objectIdForKindAsync } = await import('../attributes/objects')
-    const { db } = await import('#/db')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { user } = await import('@spaces/db/schema/auth')
     const [me] = await db.select({ id: user.id }).from(user).limit(1)
     const objectId = await objectIdForKindAsync('company')
     const stranger = {

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
-import { db } from '#/db'
-import { user } from '#/db/schema'
+import { db } from '@spaces/db'
+import { user } from '@spaces/db/schema'
 
 /**
  * Dev fixture runner — `pnpm db:seed`, the sibling of `db/migrate.ts`.

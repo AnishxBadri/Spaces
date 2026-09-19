@@ -1,8 +1,13 @@
 import { getRequest } from '@tanstack/react-start/server'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { auth } from '../auth'
-import { db } from '#/db'
-import { entity, interaction, interactionEntity, space } from '#/db/schema'
+import { db } from '@spaces/db'
+import {
+  entity,
+  interaction,
+  interactionEntity,
+  space,
+} from '@spaces/db/schema'
 
 /** Closed JSON type — Start's serializer rejects `unknown`. */
 export type { Json } from '#/lib/json'
@@ -118,8 +123,8 @@ export async function birthHolding(opts: {
   actorId: string
   openedAt?: string | undefined
 }): Promise<{ id: string; created: boolean }> {
-  const { holding } = await import('#/db/schema/portfolio')
-  const { activity } = await import('#/db/schema/activity')
+  const { holding } = await import('@spaces/db/schema/portfolio')
+  const { activity } = await import('@spaces/db/schema/activity')
   const openedAt = opts.openedAt ?? new Date().toISOString().slice(0, 10)
   const inserted = await db
     .insert(holding)

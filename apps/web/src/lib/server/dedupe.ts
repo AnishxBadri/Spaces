@@ -1,14 +1,14 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, count, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
+import { db } from '@spaces/db'
 import {
   duplicateCandidate,
   entity,
   entityAlias,
   entitySpace,
   link,
-} from '#/db/schema'
+} from '@spaces/db/schema'
 import { mergeEntities } from '../entities/merge'
 import { requireUser } from './shared'
 

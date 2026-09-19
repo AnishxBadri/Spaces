@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
 import { asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
-import { entity, workspace } from '#/db/schema'
+import { db } from '@spaces/db'
+import { entity, workspace } from '@spaces/db/schema'
 import {
   distribution,
   fxRate,
@@ -11,8 +11,8 @@ import {
   mark,
   round,
   roundCoInvestor,
-} from '#/db/schema/portfolio'
-import { activity } from '#/db/schema/activity'
+} from '@spaces/db/schema/portfolio'
+import { activity } from '@spaces/db/schema/activity'
 import { holdingMetrics } from '../portfolio/metrics'
 import type { HoldingEvents, MetricsResult } from '../portfolio/metrics'
 import { ownership } from '../portfolio/ownership'

@@ -12,7 +12,7 @@ import {
   sql,
 } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
+import { db } from '@spaces/db'
 import {
   company,
   entity,
@@ -22,8 +22,8 @@ import {
   objectDef,
   space,
   term,
-} from '#/db/schema'
-import { activity } from '#/db/schema/activity'
+} from '@spaces/db/schema'
+import { activity } from '@spaces/db/schema/activity'
 import { jsonString } from '#/lib/json'
 import { createSpaceRow, requireUser } from './shared'
 

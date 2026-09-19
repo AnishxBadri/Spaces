@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
-import { db } from '#/db'
-import { objectDef } from '#/db/schema'
+import { db } from '@spaces/db'
+import { objectDef } from '@spaces/db/schema'
 import { CORE_OBJECTS } from './registry'
 import type { ObjectKind } from './registry'
 

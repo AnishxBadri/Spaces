@@ -1,11 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, asc, desc, eq, isNull, or } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
-import { entity, entitySpace, link, note, space } from '#/db/schema'
-import { activity } from '#/db/schema/activity'
+import { db } from '@spaces/db'
+import { entity, entitySpace, link, note, space } from '@spaces/db/schema'
+import { activity } from '@spaces/db/schema/activity'
 import { canRead, requireUser } from './shared'
-import type { NoteBody } from '#/db/schema/kinds'
+import type { NoteBody } from '@spaces/db/schema/kinds'
 import { jsonValue } from '#/lib/json'
 
 export const createNote = createServerFn({ method: 'POST' })

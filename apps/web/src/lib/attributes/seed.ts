@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm'
-import { db } from '#/db'
-import { attribute, objectDef } from '#/db/schema'
+import { db } from '@spaces/db'
+import { attribute, objectDef } from '@spaces/db/schema'
 import { CORE_OBJECTS, OBJECT_KINDS, SYSTEM_ATTRIBUTES } from './registry'
 import type { ObjectKind } from './registry'
 

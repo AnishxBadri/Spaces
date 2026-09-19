@@ -1,7 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm'
-import { db } from '#/db'
-import { credential } from '#/db/schema'
-import type { CredentialMeta } from '#/db/schema/vault'
+import { db } from '@spaces/db'
+import { credential } from '@spaces/db/schema'
+import type { CredentialMeta } from '@spaces/db/schema/vault'
 import { decryptSecret, encryptSecret, redact } from './crypto'
 
 export { redact }

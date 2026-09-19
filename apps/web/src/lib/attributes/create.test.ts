@@ -26,8 +26,8 @@ describe.skipIf(!hasDb)('createAttributeProgram', () => {
   const name = (t: string) => `Zz ${t} ${tag}`
 
   afterAll(async () => {
-    const { db } = await import('#/db')
-    const { attribute } = await import('#/db/schema')
+    const { db } = await import('@spaces/db')
+    const { attribute } = await import('@spaces/db/schema')
     const { like } = await import('drizzle-orm')
     await db.delete(attribute).where(like(attribute.name, `Zz % ${tag}`))
   })
@@ -35,9 +35,9 @@ describe.skipIf(!hasDb)('createAttributeProgram', () => {
   it('creates every type with its config, default and required flag', async () => {
     const { Effect } = await import('effect')
     const { createAttributeProgram } = await import('./create')
-    const { db } = await import('#/db')
-    const { attribute } = await import('#/db/schema')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { attribute } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
     const { eq } = await import('drizzle-orm')
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)
     const base = { objectKind: 'deal' as const, createdBy: actor.id }
@@ -111,8 +111,8 @@ describe.skipIf(!hasDb)('createAttributeProgram', () => {
     const { Effect } = await import('effect')
     const { createAttributeProgram, AttributeCreateRejected } =
       await import('./create')
-    const { db } = await import('#/db')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { user } = await import('@spaces/db/schema/auth')
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)
     const base = { objectKind: 'person' as const, createdBy: actor.id }
 
@@ -153,8 +153,8 @@ describe.skipIf(!hasDb)('reorderAttributesProgram', () => {
   const tag = randomUUID().slice(0, 8)
 
   afterAll(async () => {
-    const { db } = await import('#/db')
-    const { attribute } = await import('#/db/schema')
+    const { db } = await import('@spaces/db')
+    const { attribute } = await import('@spaces/db/schema')
     const { like } = await import('drizzle-orm')
     await db.delete(attribute).where(like(attribute.name, `Zo % ${tag}`))
   })
@@ -165,8 +165,8 @@ describe.skipIf(!hasDb)('reorderAttributesProgram', () => {
     const { reorderAttributesProgram } = await import('./update')
     const { getRegistryByObjectId } = await import('./values')
     const { objectIdForKindAsync } = await import('./objects')
-    const { db } = await import('#/db')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { user } = await import('@spaces/db/schema/auth')
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)
     const objectId = await objectIdForKindAsync('deal')
     const personObjectId = await objectIdForKindAsync('person')

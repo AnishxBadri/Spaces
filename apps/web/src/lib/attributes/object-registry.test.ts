@@ -21,10 +21,11 @@ describe.skipIf(!hasDb)('custom objects', () => {
   const dealFixtures: Array<{ entityId: string; attributeId: string }> = []
 
   afterAll(async () => {
-    const { db } = await import('#/db')
-    const { attribute, entity, link, objectDef } = await import('#/db/schema')
-    const { attributeEvent } = await import('#/db/schema')
-    const { activity } = await import('#/db/schema/activity')
+    const { db } = await import('@spaces/db')
+    const { attribute, entity, link, objectDef } =
+      await import('@spaces/db/schema')
+    const { attributeEvent } = await import('@spaces/db/schema')
+    const { activity } = await import('@spaces/db/schema/activity')
     const { eq, inArray, or } = await import('drizzle-orm')
     for (const f of dealFixtures) {
       await db.delete(link).where(eq(link.fromEntityId, f.entityId))
@@ -67,9 +68,9 @@ describe.skipIf(!hasDb)('custom objects', () => {
     const { createAttributeProgram } = await import('./create')
     const { setValues, getRegistryByObjectId } = await import('./values')
     const { objectIdForKindAsync } = await import('./objects')
-    const { db } = await import('#/db')
-    const { entity, link, objectDef } = await import('#/db/schema')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { entity, link, objectDef } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
     const { and, eq } = await import('drizzle-orm')
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)
     const me = { type: 'user' as const, id: actor.id }

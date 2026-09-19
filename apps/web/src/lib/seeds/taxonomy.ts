@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
-import { db } from '#/db'
-import { entity, space } from '#/db/schema'
+import { db } from '@spaces/db'
+import { entity, space } from '@spaces/db/schema'
 
 /**
  * The starter taxonomy — deliberately tiny (CONTEXT.md → Seed taxonomy).

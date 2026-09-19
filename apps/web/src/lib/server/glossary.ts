@@ -1,9 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
 import { asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '#/db'
-import { entity, entitySpace, link, space, term } from '#/db/schema'
-import { activity } from '#/db/schema/activity'
+import { db } from '@spaces/db'
+import { entity, entitySpace, link, space, term } from '@spaces/db/schema'
+import { activity } from '@spaces/db/schema/activity'
 import { requireUser } from './shared'
 
 /**

@@ -20,7 +20,16 @@ function loadEnvLocal(): Record<string, string> {
 // (nitro, devtools, router codegen) just to run unit tests.
 export default defineConfig({
   resolve: {
+    // This block is the whole resolver for the suite — vitest does not read
+    // tsconfig `paths`, so an alias that exists only there resolves for tsc
+    // and vite and fails here, one `Cannot find module` per test file.
+    // `@spaces/db` is the temporary bridge from SPA-135: the db code still
+    // lives at ./src/db, the imports already name the package it becomes.
+    // Both entries are prefix matches — `@spaces/db` alone hits the
+    // directory's index, `@spaces/db/schema/auth` hits the file — so the two
+    // lines cover all four public subpaths.
     alias: {
+      '@spaces/db': fileURLToPath(new URL('./src/db', import.meta.url)),
       '#': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },

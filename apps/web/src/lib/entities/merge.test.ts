@@ -20,7 +20,7 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
   it('repoints everything, redirects the loser, snapshots the lot', async () => {
     const { resolveEntity, addIdentityAlias } = await import('./resolve')
     const { mergeEntities } = await import('./merge')
-    const { db } = await import('#/db')
+    const { db } = await import('@spaces/db')
     const {
       attributeEvent,
       duplicateCandidate,
@@ -30,8 +30,8 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
       link,
       mergeEvent,
       space,
-    } = await import('#/db/schema')
-    const { user } = await import('#/db/schema/auth')
+    } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
     const { and, eq, or } = await import('drizzle-orm')
 
     const tag = randomUUID().slice(0, 8)
@@ -221,11 +221,11 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
   it('generic strategies: repoint-or-drop collides on composite and id PKs, repoint is plain', async () => {
     const { resolveEntity } = await import('./resolve')
     const { mergeEntities } = await import('./merge')
-    const { db } = await import('#/db')
+    const { db } = await import('@spaces/db')
     const { entity, entitySpace, mergeEvent, signal, space } =
-      await import('#/db/schema')
-    const { task, taskEntity } = await import('#/db/schema/tasks')
-    const { user } = await import('#/db/schema/auth')
+      await import('@spaces/db/schema')
+    const { task, taskEntity } = await import('@spaces/db/schema/tasks')
+    const { user } = await import('@spaces/db/schema/auth')
     const { and, eq, inArray } = await import('drizzle-orm')
 
     const tag = randomUUID().slice(0, 8)
@@ -353,8 +353,8 @@ describe.skipIf(!hasDb)('mergeEntities', () => {
   it('refuses cross-kind and self merges', async () => {
     const { resolveEntity } = await import('./resolve')
     const { mergeEntities } = await import('./merge')
-    const { db } = await import('#/db')
-    const { user } = await import('#/db/schema/auth')
+    const { db } = await import('@spaces/db')
+    const { user } = await import('@spaces/db/schema/auth')
 
     const tag = randomUUID().slice(0, 8)
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)
