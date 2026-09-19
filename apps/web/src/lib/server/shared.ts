@@ -1,12 +1,15 @@
 import { getRequest } from '@tanstack/react-start/server'
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import { auth } from '../auth'
 import { db } from '@spaces/db'
 import {
+  attribute,
   entity,
   integration,
   interaction,
   interactionEntity,
+  link,
+  objectDef,
   space,
 } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
@@ -199,4 +202,122 @@ export async function provenanceOf(entityId: string): Promise<{
   ).at(0)
   if (!row) throw new Error('Entity not found')
   return { ...row, label: row.sourceCapability ?? row.sourceClass }
+}
+
+/** One inbound `references` edge: the record pointing here, and its labels. */
+export type ReferencedByRow = {
+  fromId: string
+  attrSlug: string
+  attrName: string | null
+  name: string
+  kind: string
+  objectSlug: string | null
+  objectSingular: string | null
+  objectPlural: string | null
+}
+
+/**
+ * Backlinks both ways (§9), the incoming half: every record whose
+ * record-reference attribute points at this entity. One query for every
+ * entity kind — `getObjectRecord` renders it flat as "Referenced by", the
+ * person page groups it by attribute (`groupReferencedBy`). It lives here
+ * rather than beside either caller because `src/lib/server-fns.ts`
+ * re-exports the domain files wholesale to the client (CLAUDE.md) and this
+ * is a server helper, not a serverFn — which is also what makes it directly
+ * testable. Merged-away referrers are excluded: a backlink to a tombstone
+ * is noise, and the survivor already carries the repointed link.
+ */
+export async function referencedByRows(
+  entityId: string,
+): Promise<Array<ReferencedByRow>> {
+  return (
+    db
+      .select({
+        fromId: link.fromEntityId,
+        attrSlug: link.attrSlug,
+        attrName: attribute.name,
+        name: entity.canonicalName,
+        kind: entity.kind,
+        objectSlug: objectDef.slug,
+        objectSingular: objectDef.singular,
+        objectPlural: objectDef.plural,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.fromEntityId))
+      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+      // The attribute that made the edge, on the referrer's own object: its
+      // display name is the only thing a heading needs that the link lacks.
+      .leftJoin(
+        attribute,
+        and(
+          eq(attribute.objectId, entity.objectId),
+          eq(attribute.slug, link.attrSlug),
+        ),
+      )
+      .where(
+        and(
+          eq(link.toEntityId, entityId),
+          eq(link.relation, 'references'),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+      .orderBy(asc(link.attrSlug), asc(entity.canonicalName))
+  )
+}
+
+/** Inbound references under one attribute, ready to render as a section. */
+export type ReferencedByGroup = {
+  attrSlug: string
+  label: string
+  items: Array<{
+    id: string
+    name: string
+    kind: string
+    objectSlug: string | null
+    objectSingular: string | null
+  }>
+}
+
+/**
+ * A backlink group's heading, from data alone: the attribute's display name
+ * carries the verb, the referring object's plural the noun. "Referred by"
+ * on deals reads "Referred deals"; a later `champion` reads "Champion
+ * deals" — no page edit, and no slug in the markup. The trailing "by" is
+ * the only word of English in it; a link whose attribute has since been
+ * deleted falls back to the slug.
+ */
+function backlinkLabel(row: ReferencedByRow): string {
+  const verb = (row.attrName ?? row.attrSlug.replace(/_/g, ' '))
+    .replace(/\s+by$/i, '')
+    .trim()
+  const noun = (row.objectPlural ?? `${row.kind}s`).toLowerCase()
+  return verb ? `${verb} ${noun}` : noun
+}
+
+/**
+ * Inbound references grouped by the attribute that made them, so a second
+ * record-reference attribute pointing at the same record gets its own
+ * heading for free. The grouping is `attr_slug`, never a hard-coded slug.
+ */
+export function groupReferencedBy(
+  rows: Array<ReferencedByRow>,
+): Array<ReferencedByGroup> {
+  const groups = new Map<string, ReferencedByGroup>()
+  for (const row of rows) {
+    const existing = groups.get(row.attrSlug)
+    const group = existing ?? {
+      attrSlug: row.attrSlug,
+      label: backlinkLabel(row),
+      items: [],
+    }
+    group.items.push({
+      id: row.fromId,
+      name: row.name,
+      kind: row.kind,
+      objectSlug: row.objectSlug,
+      objectSingular: row.objectSingular,
+    })
+    if (!existing) groups.set(row.attrSlug, group)
+  }
+  return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label))
 }

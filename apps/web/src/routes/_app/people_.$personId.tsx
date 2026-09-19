@@ -28,6 +28,7 @@ import {
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
+import { recordPath } from '#/lib/record-path'
 import {
   addPersonContact,
   createNote,
@@ -335,6 +336,56 @@ function PersonRecordPage() {
             </ol>
           )}
         </RecordSection>
+
+        {/* Inbound record-references, one section per attribute — the
+            heading and the grouping are both data (`attr_slug` and the
+            attribute's display name), so a second attribute pointing at
+            people lands here with no edit. No inbound refs, no heading. */}
+        {person.referencedBy.map((group) => (
+          <RecordSection
+            key={group.attrSlug}
+            rule
+            label={group.label}
+            meta={`${group.items.length}`}
+          >
+            <ol>
+              {group.items.map((item) => {
+                const href = recordPath({
+                  kind: item.kind,
+                  id: item.id,
+                  objectSlug: item.objectSlug,
+                })
+                const body = (
+                  <>
+                    <span className="font-serif text-title font-medium">
+                      {item.name}
+                    </span>
+                    <span className="flex-1" />
+                    <span className="mono text-micro text-graphite">
+                      {item.objectSingular ?? item.kind}
+                    </span>
+                  </>
+                )
+                return (
+                  <li key={item.id} className="border-t border-rule">
+                    {href ? (
+                      <Link
+                        to={href}
+                        className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
+                      >
+                        {body}
+                      </Link>
+                    ) : (
+                      <span className="flex h-row items-center gap-3 text-ui text-graphite">
+                        {body}
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+          </RecordSection>
+        ))}
 
         <RecordSection
           rule
