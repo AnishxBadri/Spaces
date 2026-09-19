@@ -160,7 +160,7 @@ anyway. Don't re-litigate it from the flag list.
   committed tree is pre-existing — don't "fix" it here.
 - Schema changed → `pnpm db:generate --name <x>`, then hand-inspect the SQL
 - New system attribute → add to `SYSTEM_ATTRIBUTES` in
-  `apps/web/src/lib/attributes/registry.ts`; `pnpm db:migrate:run` reseeds
+  `packages/core/src/attributes/registry.ts`; `pnpm db:migrate:run` reseeds
   insert-if-absent
 - New column referencing an entity → add an entry to `ENTITY_REFS`
   (`packages/db/src/entity-refs.ts`) declaring both the merge strategy and the
@@ -200,7 +200,7 @@ anyway. Don't re-litigate it from the flag list.
 - Radix `asChild` with a custom trigger component: forward `{...props}` or the
   dialog silently never opens.
 - Money is drizzle `numeric` → **strings in JS**. Parse with `Number()` at the
-  server boundary; pure libs (`apps/web/src/lib/portfolio/`) take numbers. Dates are
+  server boundary; pure libs (`packages/core/src/portfolio/`) take numbers. Dates are
   ISO strings compared lexically.
 - The portfolio event tables (investment/mark/distribution/fx_rate) are
   **append-only by design** — no edit/delete paths. ~~The correction policy is
