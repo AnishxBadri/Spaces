@@ -129,7 +129,7 @@ describe('updateAttributeProgram', () => {
       const co = await resolveEntity({
         kind: 'company',
         name: `UpdCo ${tag} r${rating}`,
-        source: 'manual',
+        source: { class: 'manual' },
       })
       await setValues({
         entityId: co.entityId,
@@ -225,7 +225,7 @@ describe('updateAttributeProgram', () => {
     const co = await resolveEntity({
       kind: 'company',
       name: `UpdCo ${tag} archive`,
-      source: 'manual',
+      source: { class: 'manual' },
     })
     await setValues({
       entityId: co.entityId,
@@ -277,7 +277,7 @@ describe('updateAttributeProgram', () => {
     const other = await resolveEntity({
       kind: 'company',
       name: `UpdCo ${tag} archive2`,
-      source: 'manual',
+      source: { class: 'manual' },
     })
     await expect(
       setValues({

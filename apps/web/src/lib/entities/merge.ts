@@ -220,11 +220,19 @@ export async function mergeEntities(opts: {
           table: 'entity_alias',
           action: 'repointed',
           pk: { id: a.id },
-          old: { entityId: loserId },
+          // The provenance pair travels in the snapshot with the pointer:
+          // the move overwrites both columns, and `source_ref` has to be
+          // cleared explicitly or the row would claim `merge` while still
+          // naming an integration — which the check constraint refuses.
+          old: {
+            entityId: loserId,
+            sourceClass: a.sourceClass,
+            sourceRef: a.sourceRef,
+          },
         })
         await tx
           .update(entityAlias)
-          .set({ entityId: winnerId, source: 'merge' })
+          .set({ entityId: winnerId, sourceClass: 'merge', sourceRef: null })
           .where(eq(entityAlias.id, a.id))
       }
     }

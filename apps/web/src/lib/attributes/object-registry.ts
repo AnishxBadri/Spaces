@@ -211,7 +211,7 @@ export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
         kind: 'custom',
         objectId: object.id,
         canonicalName: name,
-        source: 'manual',
+        sourceClass: 'manual',
         createdBy: userId,
       })
       .returning({ id: entity.id })

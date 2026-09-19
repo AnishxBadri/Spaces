@@ -22,7 +22,7 @@ export const listCompanies = createServerFn().handler(async () => {
     .select({
       id: entity.id,
       name: entity.canonicalName,
-      source: entity.source,
+      sourceClass: entity.sourceClass,
       createdAt: entity.createdAt,
     })
     .from(entity)
@@ -69,7 +69,7 @@ export const createCompany = createServerFn({ method: 'POST' })
       kind: 'company',
       ...(data.name ? { name: data.name } : {}),
       ...(data.domain ? { keys: { domain: data.domain } } : {}),
-      source: 'manual',
+      source: { class: 'manual' },
       createdBy: u.id,
       values: data.values,
     })
@@ -154,7 +154,7 @@ export const getCompany = createServerFn()
         .select({
           id: entity.id,
           name: entity.canonicalName,
-          source: entity.source,
+          sourceClass: entity.sourceClass,
           mergedIntoId: entity.mergedIntoId,
           createdAt: entity.createdAt,
           values: entity.values,
@@ -172,7 +172,7 @@ export const getCompany = createServerFn()
         value: entityAlias.value,
         valueNorm: entityAlias.valueNorm,
         isIdentity: entityAlias.isIdentity,
-        source: entityAlias.source,
+        sourceClass: entityAlias.sourceClass,
       })
       .from(entityAlias)
       .where(eq(entityAlias.entityId, data.id))
@@ -237,7 +237,7 @@ export const getCompany = createServerFn()
     return {
       id: head.id,
       name: head.name,
-      source: head.source,
+      sourceClass: head.sourceClass,
       mergedIntoId: head.mergedIntoId,
       createdAt: head.createdAt.toISOString(),
       values: head.values,
@@ -305,12 +305,9 @@ export const addCompanyDomain = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid(), domain: z.string().max(255) }))
   .handler(async ({ data }) => {
     await requireUser()
-    const result = await addIdentityAlias(
-      data.id,
-      'domain',
-      data.domain,
-      'manual',
-    )
+    const result = await addIdentityAlias(data.id, 'domain', data.domain, {
+      class: 'manual',
+    })
     return result
   })
 

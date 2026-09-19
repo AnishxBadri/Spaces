@@ -10,7 +10,7 @@ import {
   link,
 } from '@spaces/db/schema'
 import { mergeEntities } from '../entities/merge'
-import { requireUser } from './shared'
+import { provenanceOf, requireUser } from './shared'
 
 async function entityContext(id: string) {
   const [head] = await db
@@ -18,11 +18,14 @@ async function entityContext(id: string) {
       id: entity.id,
       name: entity.canonicalName,
       kind: entity.kind,
-      source: entity.source,
       createdAt: entity.createdAt,
     })
     .from(entity)
     .where(eq(entity.id, id))
+  // Provenance is the pair now, and the pair is only half an answer on its
+  // own: "integration" names no integration. `provenanceOf` resolves the
+  // ref to the capability id the operator installed.
+  const provenance = await provenanceOf(id)
   const aliases = await db
     .select({ kind: entityAlias.kind, valueNorm: entityAlias.valueNorm })
     .from(entityAlias)
@@ -38,6 +41,7 @@ async function entityContext(id: string) {
     .where(eq(entitySpace.entityId, id))
   return {
     ...head,
+    ...provenance,
     createdAt: head.createdAt.toISOString(),
     domains: aliases.filter((a) => a.kind === 'domain').map((a) => a.valueNorm),
     otherNames: aliases

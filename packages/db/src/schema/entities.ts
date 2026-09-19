@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   index,
   jsonb,
   pgEnum,
@@ -13,6 +14,7 @@ import {
 // (values column) — attribute registry lives in ./attributes
 import { sql } from 'drizzle-orm'
 import { user } from './auth'
+import { integration } from './integrations'
 import { objectDef } from './objects'
 import type { Json } from '../json'
 
@@ -58,14 +60,35 @@ export const entityKind = pgEnum('entity_kind', [
   'custom',
 ])
 
-export const entitySource = pgEnum('entity_source', [
+/**
+ * Provenance, as a class and never as a vendor (CONTEXT.md "Plugin
+ * architecture" → Schema deltas; `docs/spec-plugin-sdk.md` §8). The four
+ * vendor-named enums baked `gmail`/`apollo`/`clip` into shared types, which
+ * is precisely what a third-party plugin cannot migrate safely — so the
+ * vendor moves out of the type and into a row: `source_class = 'integration'`
+ * plus `source_ref → integration.id`.
+ *
+ * Eight values, each a different kind of writer, not a different product:
+ * `manual` a human in the app (the browser extension's clip included — it is
+ * first-party, and a clip is a person clicking a button) · `integration` an
+ * installed plugin, named by `source_ref` · `ai` the substrate's own lanes ·
+ * `import` a CSV or a backfill · `seed` starter taxonomy and dev data ·
+ * `merge` a row the merge executor moved · `extracted` pulled out of a
+ * document's text · `inherited` carried down from a parent record.
+ */
+export const sourceClass = pgEnum('source_class', [
   'manual',
-  'gmail',
-  'apollo',
+  'integration',
+  'ai',
   'import',
-  'clip',
   'seed',
+  'merge',
+  'extracted',
+  'inherited',
 ])
+
+/** The eight classes as a type — one list, declared at the column. */
+export type SourceClass = (typeof sourceClass.enumValues)[number]
 
 export const entity = pgTable(
   'entity',
@@ -83,7 +106,9 @@ export const entity = pgTable(
     // Attribute values (system + custom), keyed by attribute slug. The
     // registry (attribute table) defines shape; validation happens at write.
     values: jsonb('values').$type<EntityValues>().notNull().default({}),
-    source: entitySource('source').notNull().default('manual'),
+    sourceClass: sourceClass('source_class').notNull().default('manual'),
+    /** The integration that wrote the row; null for every other class. */
+    sourceRef: uuid('source_ref').references(() => integration.id),
     createdBy: text('created_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -94,6 +119,15 @@ export const entity = pgTable(
     index('entity_merged_into_idx')
       .on(t.mergedIntoId)
       .where(sql`${t.mergedIntoId} is not null`),
+    // A biconditional, the same shape as `attribute_event_actor_invariant`
+    // and for the same reason: an implication would let a `seed` row carry
+    // an integration id (a provenance lie the dedupe card would render as
+    // fact) or let a plugin write a row that cannot say which plugin wrote
+    // it. Both directions are the point.
+    check(
+      'entity_source_ref_invariant',
+      sql`(${t.sourceClass} = 'integration') = (${t.sourceRef} IS NOT NULL)`,
+    ),
   ],
 )
 
@@ -103,15 +137,6 @@ export const aliasKind = pgEnum('alias_kind', [
   'email',
   'linkedin',
   'cin',
-])
-
-export const aliasSource = pgEnum('alias_source', [
-  'manual',
-  'gmail',
-  'apollo',
-  'import',
-  'clip',
-  'merge',
 ])
 
 /**
@@ -132,7 +157,9 @@ export const entityAlias = pgTable(
     value: text('value').notNull(),
     valueNorm: text('value_norm').notNull(),
     isIdentity: boolean('is_identity').notNull().default(false),
-    source: aliasSource('source').notNull().default('manual'),
+    sourceClass: sourceClass('source_class').notNull().default('manual'),
+    /** The integration that wrote the alias; null for every other class. */
+    sourceRef: uuid('source_ref').references(() => integration.id),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -144,6 +171,13 @@ export const entityAlias = pgTable(
     index('alias_entity_idx').on(t.entityId),
     // trgm GIN index on value_norm for fuzzy name matching lives in
     // migration 0000 (drizzle-kit can't express operator classes).
+    // Aliases carry the pair too, not just the entity: identity is what a
+    // plugin actually writes, and an unattributed alias is the one row that
+    // could silently weld two companies together.
+    check(
+      'entity_alias_source_ref_invariant',
+      sql`(${t.sourceClass} = 'integration') = (${t.sourceRef} IS NOT NULL)`,
+    ),
   ],
 )
 

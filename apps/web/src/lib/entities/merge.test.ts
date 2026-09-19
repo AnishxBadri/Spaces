@@ -33,13 +33,13 @@ describe('mergeEntities', () => {
       kind: 'company',
       name: `MergeCo ${tag}`,
       keys: { domain: `mergeco-${tag}.com` },
-      source: 'manual',
+      source: { class: 'manual' },
     })
     const loser = await resolveEntity({
       kind: 'company',
       name: `MergeCo ${tag} Pvt Ltd`,
       keys: { domain: `mergeco-${tag}.in` },
-      source: 'manual',
+      source: { class: 'manual' },
     })
     // Fuzzy sweep should already have suggested this pair.
     const [a, b] =
@@ -193,7 +193,7 @@ describe('mergeEntities', () => {
     const reResolved = await resolveEntity({
       kind: 'company',
       keys: { domain: `mergeco-${tag}.in` },
-      source: 'import',
+      source: { class: 'import' },
     })
     expect(reResolved.action).toBe('attached')
     expect(reResolved.entityId).toBe(winner.entityId)
@@ -203,7 +203,7 @@ describe('mergeEntities', () => {
       loser.entityId,
       'domain',
       `mergeco-${tag}.com`,
-      'manual',
+      { class: 'manual' },
     )
     expect(own.outcome).toBe('already_own')
   })
@@ -226,13 +226,13 @@ describe('mergeEntities', () => {
       kind: 'company',
       name: `MergeCo ${tag} W`,
       keys: { domain: `mergeco-w-${tag}.com` },
-      source: 'manual',
+      source: { class: 'manual' },
     })
     const loser = await resolveEntity({
       kind: 'company',
       name: `MergeCo ${tag} L`,
       keys: { domain: `mergeco-l-${tag}.com` },
-      source: 'manual',
+      source: { class: 'manual' },
     })
 
     // Composite-PK collision: both tagged in the same space.
@@ -351,13 +351,13 @@ describe('mergeEntities', () => {
     const c = await resolveEntity({
       kind: 'company',
       name: `KindCo ${tag}`,
-      source: 'manual',
+      source: { class: 'manual' },
     })
     const p = await resolveEntity({
       kind: 'person',
       name: `KindPerson ${tag}`,
       keys: { email: `kind-${tag}@example.dev` },
-      source: 'manual',
+      source: { class: 'manual' },
     })
     await expect(
       mergeEntities({

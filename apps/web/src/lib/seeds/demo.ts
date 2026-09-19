@@ -129,7 +129,11 @@ export async function seedDemoData(
     }
     const [ent] = await db
       .insert(entity)
-      .values({ kind: 'space', canonicalName: node.name, source: 'seed' })
+      .values({
+        kind: 'space',
+        canonicalName: node.name,
+        sourceClass: 'seed',
+      })
       .returning({ id: entity.id })
     await db.insert(space).values({
       entityId: ent.id,
@@ -150,7 +154,7 @@ export async function seedDemoData(
       kind: 'company',
       name: c.name,
       keys: { domain: c.domain },
-      source: 'import',
+      source: { class: 'import' },
       createdBy: userId,
     })
     companyIds.set(c.name, result.entityId)
@@ -186,7 +190,7 @@ export async function seedDemoData(
     kind: 'person',
     name: 'Ana Ruiz',
     keys: { email: 'ana@submer.com' },
-    source: 'import',
+    source: { class: 'import' },
     createdBy: userId,
   })
   await db
@@ -218,7 +222,7 @@ export async function seedDemoData(
       .values({
         kind: 'term',
         canonicalName: t.name,
-        source: 'seed',
+        sourceClass: 'seed',
         createdBy: userId,
       })
       .returning({ id: entity.id })
@@ -237,7 +241,7 @@ export async function seedDemoData(
     .values({
       kind: 'note',
       canonicalName: 'Why liquid cooling, and why now',
-      source: 'import',
+      sourceClass: 'import',
       createdBy: userId,
     })
     .returning({ id: entity.id })

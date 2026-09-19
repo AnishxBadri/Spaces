@@ -100,8 +100,16 @@ export async function writeIsolationProbe(tag: string): Promise<void> {
   const pair = await db
     .insert(entity)
     .values([
-      { kind: 'company', canonicalName: `ProbeCo A ${tag}`, source: 'manual' },
-      { kind: 'company', canonicalName: `ProbeCo B ${tag}`, source: 'manual' },
+      {
+        kind: 'company',
+        canonicalName: `ProbeCo A ${tag}`,
+        sourceClass: 'manual',
+      },
+      {
+        kind: 'company',
+        canonicalName: `ProbeCo B ${tag}`,
+        sourceClass: 'manual',
+      },
     ])
     .returning({ id: entity.id })
 

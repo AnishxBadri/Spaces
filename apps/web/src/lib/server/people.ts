@@ -123,7 +123,7 @@ export const createPerson = createServerFn({ method: 'POST' })
       kind: 'person',
       name: data.name,
       keys: data.email ? { email: data.email } : undefined,
-      source: 'manual',
+      source: { class: 'manual' },
       createdBy: u.id,
       values: data.values,
     })
@@ -242,7 +242,9 @@ export const addPersonContact = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     await requireUser()
-    return addIdentityAlias(data.id, data.kind, data.value, 'manual')
+    return addIdentityAlias(data.id, data.kind, data.value, {
+      class: 'manual',
+    })
   })
 
 export const setPersonCompany = createServerFn({ method: 'POST' })
