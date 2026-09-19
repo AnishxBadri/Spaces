@@ -50,6 +50,7 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { Select } from '#/components/ui/select'
 import {
   createPerson,
   getSession,
@@ -309,6 +310,9 @@ function CreatePersonDialog({
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [values, setValues] = useState<Record<string, unknown>>({})
+  // Still submitted through `FormData` — the picker mirrors its value into a
+  // hidden `company` input, so the submit path below is untouched.
+  const [company, setCompany] = useState('')
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -339,6 +343,7 @@ function CreatePersonDialog({
       })
       setOpen(false)
       setValues({})
+      setCompany('')
       if (result.action === 'attached') {
         toast(`Matched existing person — ${result.name}`, {
           description: `Same ${result.matchedOn}. No duplicate created.`,
@@ -407,19 +412,21 @@ function CreatePersonDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="person-company">Company</Label>
-            <select
+            <Select
               id="person-company"
               name="company"
-              defaultValue=""
-              className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-body transition-colors duration-150 ease-out-quart"
-            >
-              <option value="">None</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              value={company}
+              onChange={setCompany}
+              items={[
+                { value: '', label: 'None' },
+                ...companies.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              width="content"
+              placeholder="None"
+              searchPlaceholder="Search companies…"
+              emptyLabel="No company matches."
+              className="bg-transparent text-body"
+            />
           </div>
 
           {registry.map((def) => (

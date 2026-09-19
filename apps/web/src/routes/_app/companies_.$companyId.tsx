@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { Select } from '#/components/ui/select'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
 import { RailField } from '#/components/attributes/rail-field'
@@ -266,26 +267,26 @@ function CompanyRecordPage() {
                 </RailItem>
               ))}
               {untaggedSpaces.length > 0 ? (
-                <select
+                <Select
                   aria-label="Tag into space"
                   value=""
-                  onChange={async (e) => {
-                    if (!e.target.value) return
+                  onChange={async (spaceId) => {
                     await tagIntoSpace({
-                      data: { entityId: company.id, spaceId: e.target.value },
+                      data: { entityId: company.id, spaceId },
                     })
                     void router.invalidate()
                   }}
-                  className="focus-ring mt-1 h-7 w-full border border-rule bg-paper px-2 text-label text-graphite"
-                >
-                  <option value="">+ Tag into space…</option>
-                  {untaggedSpaces.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {' '.repeat(s.depth * 2)}
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                  items={untaggedSpaces.map((s) => ({
+                    value: s.id,
+                    label: s.name,
+                    depth: s.depth,
+                  }))}
+                  width="content"
+                  placeholder="+ Tag into space…"
+                  searchPlaceholder="Search spaces…"
+                  emptyLabel="No space matches."
+                  className="mt-1 h-7 rounded-none bg-paper px-2 text-label text-graphite"
+                />
               ) : null}
             </RailSection>
 

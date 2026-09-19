@@ -30,7 +30,12 @@ const OPS: Array<ConditionOp> = [
   'lt',
 ]
 
-/** A `<select>`'s string back to an op, or null if it names none. */
+/**
+ * An untrusted string back to an op, or null if it names none — a view read
+ * off the wire or out of a URL. The filter editor no longer needs it: since
+ * SPA-38 its picker is typed by `opsFor`, so the op it hands back is already
+ * the one the stored condition holds.
+ */
 export function toConditionOp(v: string): ConditionOp | null {
   return OPS.find((op) => op === v) ?? null
 }

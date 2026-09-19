@@ -35,7 +35,10 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.test.ts'],
+    // `.tsx` too since SPA-38: `select.test.tsx` renders the picker's trigger
+    // through `renderToStaticMarkup` to assert its ARIA, which wants JSX. The
+    // environment stays `node` — this adds no DOM and no test-renderer.
+    include: ['src/**/*.test.{ts,tsx}'],
     environment: 'node',
     // Since SPA-143 the DB-coupled files write to `spaces_test`, never to the
     // dev database the running app is showing. `globalSetup` derives that

@@ -240,6 +240,18 @@ describe('light only (SPA-52)', () => {
   it('declares no dark custom-variant — there were never dark values', () => {
     expect(css).not.toContain('@custom-variant dark')
   })
+
+  it('declares color-scheme exactly once, so every date input inherits it', () => {
+    // SPA-38 keeps `<input type="date">` native — DESIGN.md §5 "Inputs /
+    // Fields" says native control in forms, and a hand-built calendar is a
+    // month of work and an accessibility regression. What makes that
+    // survivable on a dark OS is inheritance: `color-scheme` is an inherited
+    // property, so the one declaration on `:root` reaches every date field
+    // and every scrollbar with nothing to repeat at the call sites. A second
+    // declaration anywhere below is the only way one of them could go back to
+    // drawing dark, which is what this counts.
+    expect(css.match(/^\s*color-scheme\s*:/gm)).toHaveLength(1)
+  })
 })
 
 describe('the named type steps', () => {

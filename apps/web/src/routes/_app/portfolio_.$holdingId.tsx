@@ -25,6 +25,7 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { Select } from '#/components/ui/select'
 import {
   addDistribution,
   addInvestment,
@@ -475,29 +476,35 @@ function Field({
 }
 
 /**
- * The three closed vocabularies the event forms write. A `<select>` hands
- * back a string; these narrow it once, so the form state already holds the
- * server's type and the submit needs no assertion.
+ * The three closed vocabularies the event forms write — declared once, as
+ * the picker's rows. Before SPA-38 each was an `as const` tuple plus a
+ * `to…(v: string)` narrower, because a native `<select>` hands back a bare
+ * string; `Select<Instrument>` hands back the union member, so the list is
+ * the type and the narrowers are gone. The form state still holds the
+ * server's type and the submit still needs no assertion.
  */
-const INSTRUMENTS = [
-  'priced',
-  'safe_post_money',
-  'safe_pre_money',
-  'ccd',
+const INSTRUMENT_ITEMS = [
+  { value: 'priced', label: 'Priced' },
+  { value: 'safe_post_money', label: 'SAFE (post-money)' },
+  { value: 'safe_pre_money', label: 'SAFE (pre-money)' },
+  { value: 'ccd', label: 'CCD' },
 ] as const
-type Instrument = (typeof INSTRUMENTS)[number]
-const toInstrument = (v: string): Instrument =>
-  INSTRUMENTS.find((i) => i === v) ?? 'priced'
+type Instrument = (typeof INSTRUMENT_ITEMS)[number]['value']
 
-const MARK_BASES = ['round_price', 'manual', '409a'] as const
-type MarkBasis = (typeof MARK_BASES)[number]
-const toMarkBasis = (v: string): MarkBasis =>
-  MARK_BASES.find((b) => b === v) ?? 'round_price'
+const MARK_BASIS_ITEMS = [
+  { value: 'round_price', label: 'Round price' },
+  { value: 'manual', label: 'Manual' },
+  { value: '409a', label: '409A' },
+] as const
+type MarkBasis = (typeof MARK_BASIS_ITEMS)[number]['value']
 
-const DIST_KINDS = ['exit', 'secondary', 'dividend', 'writeoff'] as const
-type DistKind = (typeof DIST_KINDS)[number]
-const toDistKind = (v: string): DistKind =>
-  DIST_KINDS.find((k) => k === v) ?? 'exit'
+const DIST_KIND_ITEMS = [
+  { value: 'exit', label: 'Exit' },
+  { value: 'secondary', label: 'Secondary' },
+  { value: 'dividend', label: 'Dividend' },
+  { value: 'writeoff', label: 'Write-off' },
+] as const
+type DistKind = (typeof DIST_KIND_ITEMS)[number]['value']
 
 function AddInvestmentDialog({ companyId }: { companyId: string }) {
   const f = useEventForm(() => {})
@@ -584,22 +591,14 @@ function AddInvestmentDialog({ companyId }: { companyId: string }) {
             />
           </Field>
           <Field id="inv-instrument" label="Instrument">
-            <select
+            <Select
               id="inv-instrument"
-              className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
               value={form.instrument}
-              onChange={(e) =>
-                setForm((s) => ({
-                  ...s,
-                  instrument: toInstrument(e.target.value),
-                }))
-              }
-            >
-              <option value="priced">Priced</option>
-              <option value="safe_post_money">SAFE (post-money)</option>
-              <option value="safe_pre_money">SAFE (pre-money)</option>
-              <option value="ccd">CCD</option>
-            </select>
+              onChange={(instrument) => setForm((s) => ({ ...s, instrument }))}
+              items={INSTRUMENT_ITEMS}
+              width="content"
+              className="bg-transparent"
+            />
           </Field>
           {form.instrument === 'priced' ? (
             <Field id="inv-shares" label="Shares">
@@ -851,18 +850,14 @@ function AddMarkDialog({ holdingId }: { holdingId: string }) {
             />
           </Field>
           <Field id="mk-basis" label="Basis">
-            <select
+            <Select
               id="mk-basis"
-              className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
               value={form.basis}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, basis: toMarkBasis(e.target.value) }))
-              }
-            >
-              <option value="round_price">Round price</option>
-              <option value="manual">Manual</option>
-              <option value="409a">409A</option>
-            </select>
+              onChange={(basis) => setForm((s) => ({ ...s, basis }))}
+              items={MARK_BASIS_ITEMS}
+              width="content"
+              className="bg-transparent"
+            />
           </Field>
           {f.error ? (
             <p role="alert" className="col-span-2 text-ui text-destructive">
@@ -933,19 +928,14 @@ function AddDistributionDialog({ holdingId }: { holdingId: string }) {
           }}
         >
           <Field id="ds-kind" label="Kind">
-            <select
+            <Select
               id="ds-kind"
-              className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
               value={form.kind}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, kind: toDistKind(e.target.value) }))
-              }
-            >
-              <option value="exit">Exit</option>
-              <option value="secondary">Secondary</option>
-              <option value="dividend">Dividend</option>
-              <option value="writeoff">Write-off</option>
-            </select>
+              onChange={(kind) => setForm((s) => ({ ...s, kind }))}
+              items={DIST_KIND_ITEMS}
+              width="content"
+              className="bg-transparent"
+            />
           </Field>
           <Field id="ds-date" label="Date">
             <Input
