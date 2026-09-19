@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { slugifyNoun, suggestPlural } from '#/lib/object-nouns'
 
 describe('object nouns (pure)', () => {
@@ -13,47 +13,12 @@ describe('object nouns (pure)', () => {
 
 describe('custom objects', () => {
   const tag = randomUUID().slice(0, 8)
-  const created: Array<string> = []
-  // Fixtures on the system Deal object — tracked by id, never by object, so
-  // a failing test can never take the real deal registry down with it.
-  const dealFixtures: Array<{ entityId: string; attributeId: string }> = []
 
-  afterAll(async () => {
-    const { db } = await import('@spaces/db')
-    const { attribute, entity, link, objectDef } =
-      await import('@spaces/db/schema')
-    const { attributeEvent } = await import('@spaces/db/schema')
-    const { activity } = await import('@spaces/db/schema/activity')
-    const { eq, inArray, or } = await import('drizzle-orm')
-    for (const f of dealFixtures) {
-      await db.delete(link).where(eq(link.fromEntityId, f.entityId))
-      await db
-        .delete(attributeEvent)
-        .where(eq(attributeEvent.entityId, f.entityId))
-      await db.delete(entity).where(eq(entity.id, f.entityId))
-      await db.delete(attribute).where(eq(attribute.id, f.attributeId))
-    }
-    if (created.length === 0) return
-    const rows = await db
-      .select({ id: entity.id })
-      .from(entity)
-      .where(inArray(entity.objectId, created))
-    const ids = rows.map((r) => r.id)
-    if (ids.length > 0) {
-      await db
-        .delete(attributeEvent)
-        .where(inArray(attributeEvent.entityId, ids))
-      await db
-        .delete(link)
-        .where(
-          or(inArray(link.fromEntityId, ids), inArray(link.toEntityId, ids)),
-        )
-      await db.delete(activity).where(inArray(activity.subjectEntityId, ids))
-      await db.delete(entity).where(inArray(entity.id, ids))
-    }
-    await db.delete(attribute).where(inArray(attribute.objectId, created))
-    await db.delete(objectDef).where(inArray(objectDef.id, created))
-  })
+  // No afterAll: isolation is per file and structural since SPA-145 — the
+  // setup file truncates and reseeds before this file is imported. The
+  // hand-written delete list that used to live here outlived its purpose
+  // and, once a custom record started carrying a birth alias (SPA-60),
+  // started failing on the alias's own foreign key.
 
   it('creates an object, its attributes, records with defaults, and references both ways', async () => {
     const { Effect } = await import('effect')
@@ -91,7 +56,6 @@ describe('custom objects', () => {
         createdBy: actor.id,
       }),
     )
-    created.push(fund.id)
     expect(fund.slug).toBe(`funds-${tag}`)
     // Same plural again → suffixed, never a collision.
     const fund2 = await Effect.runPromise(
@@ -101,7 +65,6 @@ describe('custom objects', () => {
         createdBy: actor.id,
       }),
     )
-    created.push(fund2.id)
     expect(fund2.slug).toBe(`funds-${tag}-2`)
 
     // Born with zero registry rows; attributes come from the same engine.
@@ -172,7 +135,6 @@ describe('custom objects', () => {
         canonicalName: `Zz deal ${tag}`,
       })
       .returning({ id: entity.id })
-    dealFixtures.push({ entityId: dealRow.id, attributeId: dealRef.id })
     await setValues({
       entityId: dealRow.id,
       patch: { [dealRef.slug]: rec.id },

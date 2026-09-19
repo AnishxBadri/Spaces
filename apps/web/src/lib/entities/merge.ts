@@ -43,7 +43,16 @@ type SnapshotEntry = MergeSnapshotEntry
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
-const MERGEABLE = new Set(['company', 'person', 'custom'])
+/**
+ * The kinds this executor will take. Exported because the fuzzy sweep
+ * (`sweep.ts`) reads it: a suggestion the Merge button would throw on is
+ * worse than no suggestion, and the sweep must not re-derive the list.
+ */
+export const MERGEABLE: ReadonlySet<string> = new Set([
+  'company',
+  'person',
+  'custom',
+])
 
 /**
  * The merge executor's value rewrites (fills, reference repoints) get an

@@ -1,14 +1,9 @@
-import { and, eq, ne, sql } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import {
-  company,
-  duplicateCandidate,
-  entity,
-  entityAlias,
-  person,
-} from '@spaces/db/schema'
+import { company, entity, entityAlias, person } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
 import type { Actor } from '../attributes/values'
+import { canonicalId, suggestDuplicate, sweepNameSimilarity } from './sweep'
 import {
   isRoleEmail,
   normalizeCin,
@@ -30,6 +25,13 @@ import {
  */
 
 export type EntityKindResolvable = 'company' | 'person'
+
+/**
+ * `db` or an open transaction — the two things a write helper can run on.
+ * Narrowed to the verbs the helper uses so a transaction satisfies it
+ * structurally, without a cast.
+ */
+export type Executor = Pick<typeof db, 'select' | 'insert'>
 
 /**
  * Provenance as the pair the columns carry: a class, plus the integration
@@ -141,17 +143,6 @@ function normalizeKeys(input: ResolveInput): Array<NormalizedKey> {
     if (norm) out.push({ kind: 'cin', value: k.cin.trim(), valueNorm: norm })
   }
   return out
-}
-
-/** Follow a merge redirect. Chains are flattened at merge time → one hop. */
-async function canonicalId(id: string): Promise<string> {
-  const row = (
-    await db
-      .select({ mergedIntoId: entity.mergedIntoId })
-      .from(entity)
-      .where(eq(entity.id, id))
-  ).at(0)
-  return row?.mergedIntoId ?? id
 }
 
 export async function resolveEntity(
@@ -269,17 +260,24 @@ export async function resolveEntity(
  * alias is never replaced or deleted, so a record accumulates every label
  * it has worn and `searchEntities` keeps finding it by the old one.
  *
- * Two callers, one check — `resolveEntity` when a known entity arrives
- * under a new name, and `renameRecordProgram` when a user renames a record
- * (SPA-63). Copying the check instead would be how the two drift.
+ * Three callers, one check — `resolveEntity` when a known entity arrives
+ * under a new name, `renameRecordProgram` when a user renames a record
+ * (SPA-63), and `createRecordProgram` for a custom record's birth alias
+ * (SPA-60). Copying the check instead would be how the three drift.
+ *
+ * `on` is the executor: `db` by default, a transaction when the caller needs
+ * the alias to land or fail with the row it names — which is exactly the
+ * custom-record birth, where an entity without its name alias is a record
+ * pg_trgm cannot see.
  */
 export async function recordNameAlias(
   entityId: string,
   name: string,
   source: ResolveSource,
+  on: Executor = db,
 ) {
   const valueNorm = normalizeName(name)
-  const existing = await db
+  const existing = await on
     .select({ id: entityAlias.id })
     .from(entityAlias)
     .where(
@@ -291,7 +289,7 @@ export async function recordNameAlias(
     )
     .limit(1)
   if (existing.length === 0) {
-    await db.insert(entityAlias).values({
+    await on.insert(entityAlias).values({
       entityId,
       kind: 'name',
       value: name,
@@ -357,51 +355,4 @@ export async function addIdentityAlias(
     ...sourceColumns(source),
   })
   return { outcome: 'added' }
-}
-
-/** Ordered pair + upsert-ignore: dismissed stays dismissed forever. */
-async function suggestDuplicate(
-  a: string,
-  b: string,
-  score: number,
-  reason: Record<string, string>,
-) {
-  const [entityA, entityB] = a < b ? [a, b] : [b, a]
-  await db
-    .insert(duplicateCandidate)
-    .values({ entityA, entityB, score, reason })
-    .onConflictDoNothing()
-}
-
-/**
- * pg_trgm sweep for one freshly-created entity. Same-kind entities whose
- * name aliases are similar above threshold become open suggestions.
- */
-const SIMILARITY_THRESHOLD = 0.5
-
-async function sweepNameSimilarity(entityId: string, nameNorm: string) {
-  if (!nameNorm) return
-  const matches = await db
-    .selectDistinct({
-      otherId: entityAlias.entityId,
-      score: sql<number>`similarity(${entityAlias.valueNorm}, ${nameNorm})`,
-    })
-    .from(entityAlias)
-    .innerJoin(entity, eq(entity.id, entityAlias.entityId))
-    .where(
-      and(
-        eq(entityAlias.kind, 'name'),
-        ne(entityAlias.entityId, entityId),
-        sql`${entityAlias.valueNorm} % ${nameNorm}`,
-        sql`similarity(${entityAlias.valueNorm}, ${nameNorm}) >= ${SIMILARITY_THRESHOLD}`,
-        eq(entity.kind, sql`(select kind from entity where id = ${entityId})`),
-      ),
-    )
-    .limit(10)
-
-  for (const m of matches) {
-    await suggestDuplicate(entityId, await canonicalId(m.otherId), m.score, {
-      name_similarity: nameNorm,
-    })
-  }
 }

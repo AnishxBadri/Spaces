@@ -4,6 +4,9 @@ import { db } from '@spaces/db'
 import { activity } from '@spaces/db/schema/activity'
 import { entity, objectDef } from '@spaces/db/schema'
 import { birthValuesEffect } from './defaults'
+import { recordNameAlias } from '#/lib/entities/resolve'
+import { sweepNameSimilarityEffect } from '#/lib/entities/sweep'
+import { normalizeName } from '@spaces/core/entities/normalize'
 import { slugifyNoun, suggestPlural } from '#/lib/object-nouns'
 import type {
   Actor,
@@ -18,9 +21,19 @@ import type {
  * creation and frozen, archive replaces delete. Records of a custom object
  * are `entity.kind = 'custom'` rows keyed by `object_id`; they get the full
  * attribute engine and the research graph (spaces, mentions, notes,
- * documents); of the identity machinery they get dedupe and merge-as-target
- * (narrowed 2026-09-13) but no aliases, enrichment or interactions — which
- * is why they are born here and never through resolveEntity.
+ * documents); of the identity machinery they get fuzzy-name dedupe and
+ * merge-as-target (narrowed 2026-09-13) but no enrichment and no
+ * interactions — which is why they are born here and never through
+ * resolveEntity.
+ *
+ * They do carry a birth `name` alias and they do join the sweep (SPA-60).
+ * That half of the old header — "no aliases, no dedupe sweep" — was the
+ * pre-narrowing boundary left behind: a record with only
+ * `entity.canonical_name` is invisible to pg_trgm, so "customs get dedupe"
+ * was true on paper and dead in the database. The alias is written in the
+ * same transaction as the entity row (there is no birth without it), and the
+ * sweep scopes by `object_id`, so a Fund is never offered as a duplicate of
+ * a Vendor.
  */
 
 export class ObjectRejected extends Schema.TaggedError<ObjectRejected>()(
@@ -168,9 +181,12 @@ export type CreateRecordInput = {
 }
 
 /**
- * Birth of a custom record: an entity row with the display name, then the
- * same birth-values pass every record gets (supplied first, defaults for
- * the blanks). No aliases, no dedupe sweep — that's core-only machinery.
+ * Birth of a custom record: an entity row and its `name` alias, in one
+ * transaction, then the same birth-values pass every record gets (supplied
+ * first, defaults for the blanks), then the fuzzy sweep every other record
+ * gets. The alias is non-identity — a custom object's identity keys are
+ * opt-in and still unbuilt — but it is what puts the record in front of
+ * pg_trgm and in `searchEntities`' alias lane.
  */
 export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
   input: CreateRecordInput,
@@ -204,18 +220,25 @@ export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
   if (object.archived)
     return yield* new ObjectRejected({ message: 'This object is archived' })
   const userId = input.actor.type === 'user' ? input.actor.id : null
+  // One transaction: an entity whose name alias failed to land would be a
+  // record the sweep cannot see and search cannot reach by its birth name.
   const row = yield* query(() =>
-    db
-      .insert(entity)
-      .values({
-        kind: 'custom',
-        objectId: object.id,
-        canonicalName: name,
-        sourceClass: 'manual',
-        createdBy: userId,
-      })
-      .returning({ id: entity.id })
-      .then((rows) => rows[0]),
+    db.transaction(async (tx) => {
+      const [ent] = await tx
+        .insert(entity)
+        .values({
+          kind: 'custom',
+          objectId: object.id,
+          canonicalName: name,
+          sourceClass: 'manual',
+          createdBy: userId,
+        })
+        .returning({ id: entity.id })
+      // Stamped exactly as `resolveEntity` stamps a manual birth alias —
+      // `manual`, no integration ref, `is_identity` false.
+      await recordNameAlias(ent.id, name, { class: 'manual' }, tx)
+      return ent
+    }),
   )
   yield* birthValuesEffect({
     entityId: row.id,
@@ -228,6 +251,14 @@ export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
       verb: 'record.created',
       subjectEntityId: row.id,
     }),
+  )
+  // Probabilistic, suggestion-only, and never fatal: the record exists by
+  // now, so a failing sweep must not report the creation as failed. Same
+  // stance `resolveEntity` takes, said in Effect.
+  yield* sweepNameSimilarityEffect(row.id, normalizeName(name)).pipe(
+    Effect.catch((cause) =>
+      Effect.logError('[objects] fuzzy sweep failed', cause),
+    ),
   )
   return { id: row.id }
 })

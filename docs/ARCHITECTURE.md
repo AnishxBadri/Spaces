@@ -128,6 +128,18 @@ interactions and seeded attributes stay core-only. Schema, the object and
 attribute dialogs, and the `/o/$objectSlug` route pair have all shipped;
 the opt-in identity keys (`object.identity_keys`) have not.
 
+- **Fuzzy-name dedupe reaches customs for real** (SPA-60). A custom record is
+  born with a non-identity `name` alias written in the same transaction as
+  its entity row (`createRecordProgram`), so pg_trgm can see it; without that
+  alias "customs get dedupe" was true on paper and dead in the database. The
+  sweep is one Effect-first module, `lib/entities/sweep.ts`, with a Promise
+  seam for `resolveEntity` — it scopes candidates by `entity.object_id`
+  (falling back to `kind` only for a row that has none, i.e. the research
+  kinds), so a Fund is never offered as a duplicate of a Vendor, and it reads
+  `MERGEABLE` from the merge executor so the inbox can never show a pair
+  whose Merge button would throw. Candidates land in the existing
+  `duplicate_candidate` table and the existing inbox.
+
 - All values — system and custom — live in `entity.values` jsonb keyed by slug. One
   write path (`setValues`, row-locked), one Zod-per-type validator, one renderer; the
   registry generates table columns, create-modal fields (type-driven two-column grid),

@@ -113,8 +113,9 @@ describe('renaming a record', () => {
       renameRecordProgram(actor, { id: rec.id, name: `Fund II ${tag}` }),
     )
 
-    // A custom record is born with no alias at all, so the first rename has
-    // to write both names or the birth name is gone.
+    // Since SPA-60 a custom record is born holding its name alias, so the
+    // rename's insert-if-absent on the outgoing name is a no-op and the
+    // record ends up with exactly two rows, not three.
     const aliases = await nameAliases(rec.id)
     expect(aliases.map((a) => a.valueNorm).sort()).toEqual(
       [normalizeName(`Fund I ${tag}`), normalizeName(`Fund II ${tag}`)].sort(),
@@ -125,8 +126,7 @@ describe('renaming a record', () => {
       expect(a.sourceRef).toBe(null)
     }
 
-    // …which is what makes the birth name still reach the record after one
-    // rename, today, before customs get a birth alias of their own.
+    // …and the birth name still reaches the record after the rename.
     const hits = await entitySearchRows(actor, { q: `Fund I ${tag}` })
     expect(hits.map((h) => h.id)).toContain(rec.id)
   })
