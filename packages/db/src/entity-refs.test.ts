@@ -52,6 +52,9 @@ function entityRefColumnsFromSchema(): Set<string> {
   return out
 }
 
+/** The `del` vocabulary, as `DeleteStrategy` spells it. */
+const DELETE_KINDS = new Set(['cascade', 'block', 'orphan', 'none'])
+
 function registryColumns(): Set<string> {
   return new Set(
     ENTITY_REFS.filter((r) => !r.noFk).map(
@@ -86,6 +89,37 @@ describe('ENTITY_REFS', () => {
     for (const r of ENTITY_REFS.filter((x) => x.noFk)) {
       const c = getTableConfig(r.table)
       expect(c.columns.map((col) => col.name)).toContain(r.column.name)
+    }
+  })
+
+  it('makes every entry declare what delete does with it', () => {
+    // A `del` the type system never saw — a hand-written entry, a merge from
+    // a branch that predates SPA-77 — reaches the delete executor as
+    // `undefined` and falls through its switch, leaving the rows dangling.
+    // Named keys, because the point is to say which entry to go and fix.
+    const undeclared = ENTITY_REFS.filter((r) => {
+      const del: unknown = r.del
+      return (
+        typeof del !== 'object' ||
+        del === null ||
+        !('kind' in del) ||
+        !DELETE_KINDS.has(String(del.kind))
+      )
+    }).map((r) => r.key)
+    expect(
+      undeclared,
+      `ENTITY_REFS entries with no \`del\` strategy — deleteEntity would walk past these rows`,
+    ).toEqual([])
+  })
+
+  it('makes a refusal say why, and only nulls nullable columns', () => {
+    for (const r of ENTITY_REFS) {
+      // The reason is what the caller is told when the delete is refused, so
+      // an empty one is a refusal nobody can act on.
+      if (r.del.kind === 'block') expect(r.del.reason.length).toBeGreaterThan(0)
+      // `orphan` writes NULL into the column. On a NOT NULL column that is a
+      // constraint violation at delete time rather than a design choice.
+      if (r.del.kind === 'orphan') expect(r.column.notNull).toBe(false)
     }
   })
 

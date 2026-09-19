@@ -1143,6 +1143,18 @@ ships in v1 (cheap at merge time, impossible to retrofit); unmerge UI can land l
 Any member can merge — two-person fund, no ceremony. Every merge writes `activity` +
 `merge_event`. Merge UI previews what moves before confirm.
 
+**Deleting an entity a merge_event names is refused (decided 2026-09-19, SPA-77).**
+`ENTITY_REFS` gained a third field, `del`, so the one registry answers the delete
+executor too — `cascade` (the row dies with the entity), `block` (refuse, with the
+reason the caller is shown), `orphan` (null the column, keep the row), `none` (safe by
+a stated invariant). `merge_event.winner` and `merge_event.loser` are **`block`**:
+named in merge history, and history is information — the same principle that makes the
+portfolio ledger append-only (D12). The audit columns stay `NOT NULL`; nothing nulls a
+merge out of its own record. Two neighbours decided with it: `entity.merged_into` is
+`block` while any loser row still redirects at the entity (they would redirect at
+nothing — an explicit delete-with-losers action is a later slice), and `mandate.note`
+is `block`, because the mandate's prose is the mandate.
+
 **Fuzzy sweep:** `pg_trgm` similarity over name aliases, at-create check + nightly sweep
 job. Exact normalized-name collision outranks trigram score. Both only feed the inbox.
 
