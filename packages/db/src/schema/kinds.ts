@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -15,7 +16,8 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { ltree, tsvector } from './helpers'
-import { entity } from './entities'
+import { entity, sourceClass } from './entities'
+import { integration } from './integrations'
 import { user } from './auth'
 import type { Json } from '../json'
 
@@ -151,13 +153,6 @@ export const documentKind = pgEnum('document_kind', [
   'other',
 ])
 
-export const documentOrigin = pgEnum('document_origin', [
-  'upload',
-  'gmail_attachment',
-  'url',
-  'clip',
-])
-
 /**
  * Extraction is a worker job, so the row exists before its text does. The
  * UI needs to tell "still working" from "this format has no text we can
@@ -185,7 +180,19 @@ export const document = pgTable(
     url: text('url'),
     sizeBytes: integer('size_bytes'),
     kind: documentKind('kind').notNull().default('other'),
-    origin: documentOrigin('origin').notNull().default('upload'),
+    /**
+     * How the bytes arrived, as a class and never as a vendor (SPA-137,
+     * migration 0030). `document_origin` was `upload | gmail_attachment |
+     * url | clip`: one class, one vendor, and two first-party channels.
+     * `upload`, `url` and `clip` are all a person choosing a file or a page
+     * in a surface we ship — the extension is first-party (CONTEXT.md
+     * "Plugin architecture"), so all three are `manual`; a connector's
+     * attachment is `integration` plus the row that names it, which is what
+     * `docs/spec-storage-sources.md` §11.2 asks of drive/box/gmail.
+     */
+    sourceClass: sourceClass('source_class').notNull().default('manual'),
+    /** The integration that filed the document; null for every other class. */
+    sourceRef: uuid('source_ref').references(() => integration.id),
     extractedText: text('extracted_text'),
     // Populated by the extraction worker alongside extracted_text.
     tsv: tsvector('tsv'),
@@ -202,7 +209,16 @@ export const document = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index('document_blob_sha_idx').on(t.blobSha)],
+  (t) => [
+    index('document_blob_sha_idx').on(t.blobSha),
+    // Biconditional, as on entity/entity_alias/interaction: a document the
+    // Files tab says arrived "via apollo" must carry the row that says so,
+    // and no hand-uploaded deck may borrow one.
+    check(
+      'document_source_ref_invariant',
+      sql`(${t.sourceClass} = 'integration') = (${t.sourceRef} IS NOT NULL)`,
+    ),
+  ],
 )
 
 /**

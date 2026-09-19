@@ -141,7 +141,7 @@ describe('assembleProgram', () => {
       entityId: docEnt.id,
       filename: 'seed-deck.pdf',
       kind: 'deck',
-      origin: 'upload',
+      sourceClass: 'manual',
       extractionStatus: 'done',
       createdAt: new Date('2026-08-20T00:00:00Z'),
     })

@@ -425,9 +425,14 @@ above the port.
 
 1. `document.source_path text`, `external_id text`, `external_url text`,
    `external_status: linked | gone | null`, `connection_id → account_connection`.
-2. `document.origin` collapses into `source_class` + `source_ref` with the
-   other vendor-named enums (CONTEXT.md "Plugin architecture"); `drive`,
-   `box`, `gmail_attachment` become `integration` + a ref, never enum values.
+2. ~~`document.origin` collapses into `source_class` + `source_ref` with the
+   other vendor-named enums~~ — **landed 2026-09-19 (SPA-137, migration 0030)**, after SPA-118 did the same to `entity`/`entity_alias` (0029).
+   `drive`, `box`, `gmail_attachment` are `integration` + a ref, never enum
+   values; `upload`, `url` and `clip` are all `manual`, because a person
+   choosing a file or a page in a surface we ship is not an integration
+   (CONTEXT.md "Plugin architecture" → first-party channels). Existing rows
+   backfilled to `manual`: no integration row predates the `integration`
+   table, so no historical row can honestly carry a ref.
 3. **Drop `document.kind = 'memo'`** — a naming collision with note memos;
    an exported memo is `derived_from → note`. Six kinds remain.
 4. **Documents file into spaces via `entity_space`** — the doctrine already

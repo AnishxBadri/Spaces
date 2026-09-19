@@ -123,7 +123,7 @@ async function buildDemoNote(tag: string) {
     blobSha: 'a'.repeat(64),
     filename: `teardown-${tag}.pdf`,
     kind: 'memo',
-    origin: 'upload',
+    sourceClass: 'manual',
     extractedText: `The ${BODY_WORD} is the whole thesis.`,
     tsv: sql`to_tsvector('english', ${`The ${BODY_WORD} is the whole thesis.`})`,
     extractionStatus: 'done',
