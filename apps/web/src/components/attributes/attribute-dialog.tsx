@@ -32,6 +32,8 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { Select } from '#/components/ui/select'
+import type { SelectItem } from '#/components/ui/select'
 import { ConfirmDialog } from '#/components/ui/confirm-dialog'
 import { KeyHint } from '#/components/page-header'
 import { optionColor } from '@spaces/core/attributes/colors'
@@ -68,9 +70,20 @@ type TypeMeta = {
   keywords?: string
 }
 
-/** The one select chrome in the dialog: 32px, rule border, 2px radius. */
-const SELECT =
-  'focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui'
+/**
+ * The per-type slot's pickers. Every one is the `Select` sheet (SPA-38) at
+ * `width="content"`: the labels here are sentences — "SAFE (post-money)",
+ * "Relative to creation", an object's singular name — and a sheet locked to
+ * a half-width dialog column would truncate them.
+ */
+const PRECISION_ITEMS: Array<SelectItem<string>> = [0, 1, 2, 3, 4].map((p) => ({
+  value: String(p),
+  label: String(p),
+}))
+
+const MAX_ITEMS: Array<SelectItem<string>> = [3, 4, 5, 6, 7, 8, 9, 10].map(
+  (m) => ({ value: String(m), label: `${m} stars` }),
+)
 
 const TYPES: Array<TypeMeta> = [
   { id: 'text', label: 'Text', hint: 'A line of text', icon: Type },
@@ -507,35 +520,30 @@ function AttributeForm({
       case 'number':
         return (
           <Field label="Decimals" htmlFor="attr-precision">
-            <select
+            <Select
               id="attr-precision"
-              value={precision}
-              onChange={(e) => setPrecision(Number(e.target.value))}
-              className={SELECT}
-            >
-              {[0, 1, 2, 3, 4].map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+              value={String(precision)}
+              onChange={(v) => setPrecision(Number(v))}
+              items={PRECISION_ITEMS}
+              width="content"
+            />
           </Field>
         )
       case 'currency':
         return (
           <Field label="Currency" htmlFor="attr-code">
-            <select
+            <Select
               id="attr-code"
               value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className={SELECT}
-            >
-              {[...new Set([code, ...CURRENCIES])].map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+              onChange={setCode}
+              items={[...new Set([code, ...CURRENCIES])].map((c) => ({
+                value: c,
+                label: c,
+              }))}
+              width="content"
+              searchPlaceholder="Search codes…"
+              emptyLabel="No code matches."
+            />
             {mode === 'edit' && code !== (stored.code ?? 'USD') ? (
               <p className="text-label text-graphite">
                 Changes how every stored amount reads. Nothing is converted.
@@ -546,18 +554,13 @@ function AttributeForm({
       case 'rating':
         return (
           <Field label="Out of" htmlFor="attr-max">
-            <select
+            <Select
               id="attr-max"
-              value={max}
-              onChange={(e) => setMax(Number(e.target.value))}
-              className={SELECT}
-            >
-              {[3, 4, 5, 6, 7, 8, 9, 10].map((m) => (
-                <option key={m} value={m}>
-                  {m} stars
-                </option>
-              ))}
-            </select>
+              value={String(max)}
+              onChange={(v) => setMax(Number(v))}
+              items={MAX_ITEMS}
+              width="content"
+            />
             {mode === 'edit' && max < (stored.max ?? 5) ? (
               <p className="text-label text-graphite">
                 Lowering is refused while any record rates above {max}.
@@ -595,19 +598,19 @@ function AttributeForm({
         ) : (
           <>
             <Field label="Points at" htmlFor="attr-target">
-              <select
+              <Select
                 id="attr-target"
                 value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                className={SELECT}
-              >
-                <option value="">Pick an object…</option>
-                {objects.map((o) => (
-                  <option key={o.id} value={targetValue(o)}>
-                    {o.singular}
-                  </option>
-                ))}
-              </select>
+                onChange={setTarget}
+                items={objects.map((o) => ({
+                  value: targetValue(o),
+                  label: o.singular,
+                }))}
+                width="content"
+                placeholder="Pick an object…"
+                searchPlaceholder="Search objects…"
+                emptyLabel="No object matches."
+              />
             </Field>
             <CheckRow
               id="attr-multi"
@@ -659,18 +662,16 @@ function AttributeForm({
             }}
           />
           {relative ? (
-            <select
+            <Select
               id="attr-default"
               value={isDuration(dflt) ? dflt : 'P7D'}
-              onChange={(e) => setDflt(e.target.value)}
-              className={SELECT}
-            >
-              {RELATIVE_PRESETS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
+              onChange={setDflt}
+              items={RELATIVE_PRESETS.map((p) => ({
+                value: p.id,
+                label: p.label,
+              }))}
+              width="content"
+            />
           ) : (
             <Input
               id="attr-default"

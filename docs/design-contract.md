@@ -124,8 +124,51 @@ needs.
 | `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`         | the destructive confirm; it replaces `window.confirm` everywhere                        |
 | `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                           | the atoms — reticle focus, 2px radius, key hints inside                                 |
 | `Badge`, `badgeClasses`, `badgeTint`                                              | `apps/web/src/components/ui/badge.tsx`                  | the square option badge — takes the option row + index, `archived` and `unselected`     |
+| `Select`, `selectClasses`                                                         | `apps/web/src/components/ui/select.tsx`                 | the one picker — an Input-height trigger, a paper sheet, `width` and `inset` per caller |
 | `Checkbox`, `checkboxClasses`                                                     | `apps/web/src/components/ui/checkbox.tsx`               | the 14px square that fills with pine; a button, never a native control                  |
 | `Switch`, `switchClasses`                                                         | `apps/web/src/components/ui/switch.tsx`                 | the 24×14 square track — graphite knob off, pine knob on, legible from one switch       |
+
+### Pickers and dates (SPA-38)
+
+**A picker is a paper sheet, never the operating system's.** `DESIGN.md` §5
+"Menus / pickers" — paper, 1px ink, a 2px hard shadow, 28px rows, the highlighted row
+in bone, 150/100ms — and `Select` (`apps/web/src/components/ui/select.tsx`) is that
+sheet with a trigger in front of it. A native `<select>` draws the OS list instead:
+rounded on macOS, a different font, a blue system highlight, and on a machine set to
+dark OS chrome a dark list dropping out of a paper form. There are none left in
+`apps/web`. Use `Select`; do not reach for `<select>` and do not build a third sheet —
+the anatomy is Radix `Popover` plus cmdk `Command`, the same two pieces the command
+palette and the attribute type pane are made of.
+
+Three things the **caller** decides, because the primitive guessing them is how a
+picker ends up the wrong width:
+
+- `width="trigger"` — the sheet is the trigger's width. Short labels, few of them: the
+  two-item invite role, the three-item status group.
+- `width="content"` — the sheet sizes to its longest row, with the trigger as a floor.
+  Labels that are sentences: the operator picker, the per-type slots in the attribute
+  dialog, anything listing names.
+- `inset` — `focus-ring-inset` instead of `focus-ring`, for a trigger inside a scroll
+  container where the offset reticle would be clipped. The view bar's filter row is the
+  case, and `select.test.tsx` holds it.
+
+A search box appears at `SEARCH_FROM` rows and above (cmdk's own filtering); below that
+the list gets letter type-ahead, ↑↓, ↵ and esc and no input, because a search field in
+front of three words is chrome.
+
+**A date field stays native, and that is a decision, not an omission.** `DESIGN.md` §5
+"Inputs / Fields": _native control in forms_. A hand-built calendar is a month of work
+and an accessibility regression — the platform picker already carries locale, keyboard
+entry, screen readers and mobile. What makes it survivable is `color-scheme: light` on
+`:root` (SPA-52, `apps/web/src/styles.css`): `color-scheme` is an **inherited**
+property, so the one declaration reaches every `<input type="date">` and every
+scrollbar in the app, and an operator on a dark OS gets a light calendar against the
+paper form rather than a dark one bolted onto it. Nothing re-declares it — a second
+declaration is the only way a field could go back to drawing dark, and
+`design-tokens.test.ts` counts them. The one place a date is _not_ native is a table
+cell, where `<input type="date">` would print a `mm/dd/yyyy` skeleton and a picker
+glyph in every empty row; `DateCellEditor` (`value-editor.tsx`) reads as ISO text until
+clicked, then hands over to the native control.
 
 ---
 

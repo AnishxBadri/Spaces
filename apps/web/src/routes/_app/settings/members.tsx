@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
+import { Select } from '#/components/ui/select'
+import type { SelectItem } from '#/components/ui/select'
 import {
   createInvite,
   revokeInvite,
@@ -45,6 +47,14 @@ function MembersRoute() {
 type Member = Awaited<ReturnType<typeof listMembers>>[number]
 type Invite = Awaited<ReturnType<typeof listInvites>>[number]
 
+type MemberRole = 'member' | 'admin'
+
+/** The two roles an invite can carry — sentence case, a person reads them. */
+const ROLE_ITEMS: Array<SelectItem<MemberRole>> = [
+  { value: 'member', label: 'Member' },
+  { value: 'admin', label: 'Admin' },
+]
+
 function MembersSection({
   me,
   isAdmin,
@@ -58,7 +68,7 @@ function MembersSection({
 }) {
   const router = useRouter()
   const [inviteUrl, setInviteUrl] = useState<string | null>(null)
-  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member')
+  const [inviteRole, setInviteRole] = useState<MemberRole>('member')
   const [inviteEmail, setInviteEmail] = useState('')
   const [pending, setPending] = useState(false)
 
@@ -184,17 +194,15 @@ function MembersSection({
               placeholder="partner@fund.com"
               className="w-52"
             />
-            <select
+            {/* Two words: the sheet is the trigger's width, no search box. */}
+            <Select
               aria-label="Invite role"
               value={inviteRole}
-              onChange={(e) =>
-                setInviteRole(e.target.value === 'admin' ? 'admin' : 'member')
-              }
-              className="focus-ring h-8 rounded-md border border-rule bg-paper px-2 text-ui"
-            >
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-            </select>
+              onChange={setInviteRole}
+              items={ROLE_ITEMS}
+              width="trigger"
+              className="w-28"
+            />
             <Button size="sm" disabled={pending} onClick={invite}>
               <Plus className="size-3.5" strokeWidth={2} />
               Create invite

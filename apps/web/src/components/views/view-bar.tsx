@@ -20,6 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '#/components/ui/popover'
+import { Select } from '#/components/ui/select'
 import { deleteView, saveView } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 import {
@@ -27,7 +28,6 @@ import {
   isUnary,
   opsFor,
   sameJson,
-  toConditionOp,
   toConditionValue,
 } from '@spaces/core/views/filter'
 import type {
@@ -286,40 +286,52 @@ function FilterPopover({
             const ops = def ? opsFor(def.type) : []
             return (
               <div key={i} className="flex items-center gap-1.5">
-                <select
+                {/*
+                  The one picker that sits inside a scroll container: the
+                  conditions list scrolls when a view has more of them than
+                  the popover is tall, so the trigger takes the inset reticle
+                  (an offset one would be clipped by the scroller). Its sheet
+                  sizes to the attribute names, not to the fixed 160px trigger (fixed,
+                  because a trigger that resizes with its value is a shift).
+                */}
+                <Select
                   aria-label="Attribute"
                   value={c.slug}
-                  onChange={(e) => {
-                    const d = bySlug.get(e.target.value)
+                  onChange={(slug) => {
+                    const d = bySlug.get(slug)
                     update(i, {
-                      slug: e.target.value,
+                      slug,
                       op: d ? opsFor(d.type)[0] : 'is',
                       value: undefined,
                     })
                   }}
-                  className="focus-ring h-8 max-w-40 rounded-md border border-rule bg-transparent px-2 text-ui"
-                >
-                  {registry.map((d) => (
-                    <option key={d.slug} value={d.slug}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-                <select
+                  items={registry.map((d) => ({
+                    value: d.slug,
+                    label: d.name,
+                  }))}
+                  width="content"
+                  inset
+                  searchPlaceholder="Search attributes…"
+                  emptyLabel="No attribute matches."
+                  className="w-40 shrink-0 bg-transparent"
+                />
+                {/*
+                  `toConditionOp` is gone from this call: the items are typed
+                  `ConditionOp` by `opsFor`, so the picker hands back the op
+                  the stored condition already holds. Same shape, one fewer
+                  narrowing.
+                */}
+                <Select
                   aria-label="Operator"
                   value={c.op}
-                  onChange={(e) => {
-                    const op = toConditionOp(e.target.value)
-                    if (op) update(i, { op })
-                  }}
-                  className="focus-ring h-8 rounded-md border border-rule bg-transparent px-2 text-ui"
-                >
-                  {ops.map((op) => (
-                    <option key={op} value={op}>
-                      {OP_LABELS[op]}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(op) => update(i, { op })}
+                  items={ops.map((op) => ({
+                    value: op,
+                    label: OP_LABELS[op],
+                  }))}
+                  width="content"
+                  className="w-36 shrink-0 bg-transparent"
+                />
                 {def && !isUnary(c.op) ? (
                   <div className="min-w-0 flex-1">
                     <ConditionValueEditor

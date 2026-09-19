@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { Select } from '#/components/ui/select'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
 import { KeyHint } from '#/components/page-header'
@@ -200,29 +201,29 @@ function PersonRecordPage() {
                 </RailItem>
               ))}
               {unlinkedCompanies.length > 0 ? (
-                <select
+                <Select
                   aria-label="Link to company"
                   value=""
-                  onChange={async (e) => {
-                    if (!e.target.value) return
+                  onChange={async (companyId) => {
                     await setPersonCompany({
                       data: {
                         personId: person.id,
-                        companyId: e.target.value,
+                        companyId,
                         action: 'link',
                       },
                     })
                     void router.invalidate()
                   }}
-                  className="focus-ring mt-1 h-7 w-full border border-rule bg-paper px-2 text-label text-graphite"
-                >
-                  <option value="">+ Link to company…</option>
-                  {unlinkedCompanies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  items={unlinkedCompanies.map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                  }))}
+                  width="content"
+                  placeholder="+ Link to company…"
+                  searchPlaceholder="Search companies…"
+                  emptyLabel="No company matches."
+                  className="mt-1 h-7 rounded-none bg-paper px-2 text-label text-graphite"
+                />
               ) : null}
             </RailSection>
 

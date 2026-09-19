@@ -15,6 +15,7 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { Select } from '#/components/ui/select'
 import { useBornRows } from '#/lib/born-rows'
 import { applySpaceTemplate, createSpace, listSpaces } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
@@ -277,6 +278,9 @@ function CreateSpaceDialog({
   const [scaffold, setScaffold] = useState<{ id: string; name: string } | null>(
     null,
   )
+  // The form is still read through `FormData`; the picker mirrors its value
+  // into a hidden `parent` input, so the submit path is untouched.
+  const [parent, setParent] = useState('')
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -309,6 +313,7 @@ function CreateSpaceDialog({
       }
       onOpenChange(false)
       setScaffold(null)
+      setParent('')
       void router.invalidate()
     } catch {
       setError('Could not create the space.')
@@ -366,20 +371,25 @@ function CreateSpaceDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="space-parent">Parent</Label>
-            <select
+            <Select
               id="space-parent"
               name="parent"
-              defaultValue=""
-              className="focus-ring h-8 w-full rounded-md border border-rule bg-transparent px-2.5 text-ui"
-            >
-              <option value="">None — top level</option>
-              {spaces.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {' '.repeat(s.depth * 3)}
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              value={parent}
+              onChange={setParent}
+              items={[
+                { value: '', label: 'None — top level' },
+                ...spaces.map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                  depth: s.depth,
+                })),
+              ]}
+              width="content"
+              placeholder="None — top level"
+              searchPlaceholder="Search spaces…"
+              emptyLabel="No space matches."
+              className="bg-transparent"
+            />
           </div>
 
           {error ? (

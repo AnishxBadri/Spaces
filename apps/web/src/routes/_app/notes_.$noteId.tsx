@@ -18,6 +18,7 @@ import { KIND_ICONS, KIND_ROUTES } from '#/components/editor/mention'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { useConfirm } from '#/components/ui/confirm-dialog'
+import { Select } from '#/components/ui/select'
 import {
   deleteNote,
   getNote,
@@ -328,29 +329,33 @@ function SpaceFiling({
         </span>
       ))}
 
+      {/*
+        A picker that files rather than holds: its value stays empty, so the
+        trigger keeps the dashed invitation and the sheet is the one the rest
+        of the app draws. Space names nest — the sheet sizes to them and
+        indents by depth, where the old option list padded with spaces.
+      */}
       {unfiled.length > 0 ? (
-        <select
+        <Select
           aria-label="File this note in a space"
           value=""
           disabled={busy}
-          onChange={(e) => {
-            if (!e.target.value) return
-            const spaceId = e.target.value
-            e.target.value = ''
+          onChange={(spaceId) =>
             void run(() =>
               tagIntoSpace({ data: { entityId: noteId, spaceId } }),
             )
-          }}
-          className="focus-ring h-6 border border-dashed border-rule bg-transparent px-2 text-label text-graphite transition-colors outline-none hover:border-hairline hover:text-foreground"
-        >
-          <option value="">+ File in space…</option>
-          {unfiled.map((s) => (
-            <option key={s.id} value={s.id}>
-              {' '.repeat(s.depth * 2)}
-              {s.name}
-            </option>
-          ))}
-        </select>
+          }
+          items={unfiled.map((s) => ({
+            value: s.id,
+            label: s.name,
+            depth: s.depth,
+          }))}
+          width="content"
+          placeholder="+ File in space…"
+          searchPlaceholder="Search spaces…"
+          emptyLabel="No space matches."
+          className="h-6 w-auto rounded-none border-dashed bg-transparent px-2 text-label text-graphite hover:text-foreground"
+        />
       ) : null}
     </div>
   )

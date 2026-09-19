@@ -6,6 +6,8 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { badgeStyle } from '#/components/ui/badge'
+import { Select } from '#/components/ui/select'
+import type { SelectItem } from '#/components/ui/select'
 import { BADGE_COLORS, nextBadgeColor } from '@spaces/core/attributes/colors'
 import type { BadgeColor } from '@spaces/core/attributes/colors'
 import { cn } from '#/lib/utils'
@@ -24,10 +26,16 @@ export type OptionGroup = 'active' | 'parked' | 'closed'
 
 export const OPTION_GROUPS: Array<OptionGroup> = ['active', 'parked', 'closed']
 
-/** A `<select>`'s string back to a status group, or null if it names none. */
-export function toOptionGroup(v: string): OptionGroup | null {
-  return OPTION_GROUPS.find((g) => g === v) ?? null
-}
+/**
+ * The group picker's rows. Before SPA-38 this list was three `<option>`s and
+ * a `toOptionGroup(v: string)` narrower beside them, because a native select
+ * hands back a bare string; `Select<OptionGroup>` hands back the group, so
+ * the narrower is gone and `OPTION_GROUPS` is the only list.
+ */
+const GROUP_ITEMS: Array<SelectItem<OptionGroup>> = OPTION_GROUPS.map((g) => ({
+  value: g,
+  label: g,
+}))
 
 export type OptionDraft = {
   /** stable client key — new rows have no id yet */
@@ -214,19 +222,16 @@ export function OptionListEditor({
               )}
             />
             {isStatus ? (
-              <select
+              // Three lowercase mono words — what the instrument calls the
+              // group, not a sentence — so the sheet locks to the trigger.
+              <Select
                 value={o.group ?? 'active'}
                 aria-label={`Group for ${o.label || `option ${i + 1}`}`}
-                onChange={(e) => {
-                  const group = toOptionGroup(e.target.value)
-                  if (group) update(i, { group })
-                }}
-                className="focus-ring h-6 shrink-0 border border-rule bg-transparent px-1.5 mono text-micro text-graphite"
-              >
-                <option value="active">active</option>
-                <option value="parked">parked</option>
-                <option value="closed">closed</option>
-              </select>
+                onChange={(group) => update(i, { group })}
+                items={GROUP_ITEMS}
+                width="trigger"
+                className="h-6 w-auto shrink-0 rounded-none bg-transparent px-1.5 mono text-micro text-graphite"
+              />
             ) : null}
             {o.archived ? (
               <span className="shrink-0 mono text-field text-graphite">
