@@ -1,26 +1,45 @@
 import { and, eq, isNull } from 'drizzle-orm'
+import { z } from 'zod'
 import { db } from '@spaces/db'
 import { credential } from '@spaces/db/schema'
-import type { CredentialMeta } from '@spaces/db/schema/vault'
+import { credentialKind, credentialScope } from '@spaces/db/schema/vault'
+import { jsonValue } from '#/lib/json'
 import { decryptSecret, encryptSecret, redact } from './crypto'
 
 export { redact }
 
-type CredentialInput = {
-  scope: 'workspace' | 'user'
-  userId?: string
-  provider: string
-  kind: 'llm' | 'enrichment' | 'search'
-  secret: string
-  meta?: CredentialMeta
-  createdBy: string
-}
+/**
+ * The six kinds, read off the column rather than retyped, so widening the
+ * enum (SPA-112) widens this boundary in the same edit and cannot drift from
+ * it. `llm` is the only one written today; `embedding`, `oauth_client` and
+ * `webhook` are claimed by the AI substrate, `storage-1` and `sdk-23`.
+ */
+export const CREDENTIAL_KINDS = credentialKind.enumValues
+
+/**
+ * The vault's write boundary. A kind Postgres would reject is rejected here
+ * first, with a field-named Zod error instead of a 22P02 from the driver —
+ * the database is the backstop, not the validator (CONTEXT.md: Zod stays at
+ * the boundaries, hand-written at write-path choke points).
+ */
+export const credentialInput = z.object({
+  scope: z.enum(credentialScope.enumValues),
+  userId: z.string().optional(),
+  provider: z.string().min(1),
+  kind: z.enum(CREDENTIAL_KINDS),
+  secret: z.string().min(1).max(4000),
+  meta: z.record(z.string(), jsonValue).optional(),
+  createdBy: z.string().min(1),
+})
+
+export type CredentialInput = z.infer<typeof credentialInput>
 
 function aadFor(scope: string, provider: string): string {
   return `${scope}:${provider}`
 }
 
-export async function storeCredential(input: CredentialInput) {
+export async function storeCredential(rawInput: CredentialInput) {
+  const input = credentialInput.parse(rawInput)
   const secretEnc = encryptSecret(
     input.secret,
     aadFor(input.scope, input.provider),
