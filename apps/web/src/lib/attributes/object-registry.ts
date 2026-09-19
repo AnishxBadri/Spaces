@@ -18,9 +18,9 @@ import type {
  * creation and frozen, archive replaces delete. Records of a custom object
  * are `entity.kind = 'custom'` rows keyed by `object_id`; they get the full
  * attribute engine and the research graph (spaces, mentions, notes,
- * documents) and none of the identity machinery (aliases, dedupe, merge,
- * enrichment, interactions) — which is why they are born here and never
- * through resolveEntity.
+ * documents); of the identity machinery they get dedupe and merge-as-target
+ * (narrowed 2026-09-13) but no aliases, enrichment or interactions — which
+ * is why they are born here and never through resolveEntity.
  */
 
 export class ObjectRejected extends Schema.TaggedError<ObjectRejected>()(

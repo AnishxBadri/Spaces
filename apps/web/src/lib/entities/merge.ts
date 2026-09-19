@@ -30,8 +30,12 @@ import {
  * read time. Loser survives as a redirect (merged_into_id); every moved or
  * dropped row lands in merge_event.snapshot so unmerge stays possible.
  *
- * Restricted to company|person and same-kind pairs — spaces
- * and notes have structural children and different semantics.
+ * Restricted to company | person | custom, and to pairs that are the same
+ * kind *and* the same object — spaces and notes have structural children and
+ * different semantics, and two custom records share a kind without sharing a
+ * registry, so a Fund must never merge into a Vendor. Customs need no section
+ * of their own: they have no side table, so the ENTITY_REFS loop below is the
+ * whole job (spec-attribute-engine.md §9, merge-as-target).
  */
 
 /** Declared beside the column it lands in (src/db/schema/entities.ts). */
@@ -39,7 +43,7 @@ type SnapshotEntry = MergeSnapshotEntry
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
-const MERGEABLE = new Set(['company', 'person'])
+const MERGEABLE = new Set(['company', 'person', 'custom'])
 
 /**
  * The merge executor's value rewrites (fills, reference repoints) get an
@@ -169,6 +173,7 @@ export async function mergeEntities(opts: {
         .select({
           id: entity.id,
           kind: entity.kind,
+          objectId: entity.objectId,
           mergedIntoId: entity.mergedIntoId,
         })
         .from(entity)
@@ -179,6 +184,7 @@ export async function mergeEntities(opts: {
         .select({
           id: entity.id,
           kind: entity.kind,
+          objectId: entity.objectId,
           mergedIntoId: entity.mergedIntoId,
         })
         .from(entity)
@@ -191,6 +197,12 @@ export async function mergeEntities(opts: {
       throw new Error('Only same-kind entities can merge')
     if (!MERGEABLE.has(winner.kind))
       throw new Error(`Merging ${winner.kind} entities is not supported`)
+    // Kind alone stopped meaning "same registry" when customs became
+    // mergeable: every custom record is kind `custom`, and the object is
+    // what separates a Fund from a Vendor. Checked after the kind and the
+    // MERGEABLE gates so the older refusals keep their own wording.
+    if (winner.objectId !== loser.objectId)
+      throw new Error('Only records of the same object can merge')
 
     const snapshot: Array<SnapshotEntry> = []
 
