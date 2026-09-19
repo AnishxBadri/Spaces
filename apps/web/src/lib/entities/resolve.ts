@@ -14,7 +14,7 @@ import {
   normalizeEmail,
   normalizeLinkedin,
   normalizeName,
-} from './normalize'
+} from '@spaces/core/entities/normalize'
 
 /**
  * THE choke point. Every entity creator — manual, deck, mention, clip,

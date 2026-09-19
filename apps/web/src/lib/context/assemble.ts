@@ -27,8 +27,8 @@ import {
   round,
 } from '@spaces/db/schema/portfolio'
 import { task, taskEntity } from '@spaces/db/schema/tasks'
-import type { AttributeDef } from '#/lib/attributes/registry'
-import { fmtMoney } from '#/lib/portfolio/format'
+import type { AttributeDef } from '@spaces/core/attributes/registry'
+import { fmtMoney } from '@spaces/core/portfolio/format'
 import { canRead } from '#/lib/server/shared'
 import { rank } from './rank'
 import type { Candidate, RankResult } from './rank'

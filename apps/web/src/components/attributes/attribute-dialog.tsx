@@ -34,16 +34,19 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { ConfirmDialog } from '#/components/ui/confirm-dialog'
 import { KeyHint } from '#/components/page-header'
-import { optionColor } from '#/lib/attributes/colors'
-import { deriveOptionIds } from '#/lib/attributes/options'
+import { optionColor } from '@spaces/core/attributes/colors'
+import { deriveOptionIds } from '@spaces/core/attributes/options'
 import { createAttribute, listObjects, updateAttribute } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 import { OptionListEditor, newDraft } from './option-list-editor'
 import { ValueEditor } from './value-editor'
 import type { OptionDraft } from './option-list-editor'
 import type { RegistryEntry } from './value-editor'
-import { toObjectKind } from '#/lib/attributes/registry'
-import type { AttributeOptions, AttributeType } from '#/lib/attributes/registry'
+import { toObjectKind } from '@spaces/core/attributes/registry'
+import type {
+  AttributeOptions,
+  AttributeType,
+} from '@spaces/core/attributes/registry'
 import type { ReactNode } from 'react'
 
 /**

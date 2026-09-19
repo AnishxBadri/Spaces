@@ -2,20 +2,20 @@ import { Effect, Schema } from 'effect'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute } from '@spaces/db/schema'
-import { nextBadgeColor } from './colors'
+import { nextBadgeColor } from '@spaces/core/attributes/colors'
 import { validateDefault } from './defaults'
 import { objectIdForKind } from './objects'
-import { deriveOptionIds } from './options'
+import { deriveOptionIds } from '@spaces/core/attributes/options'
 import { AttributeQueryFailed } from './update'
 import type { ObjectQueryFailed, SystemObjectNotSeeded } from './objects'
-import type { BadgeColor } from './colors'
+import type { BadgeColor } from '@spaces/core/attributes/colors'
 import type { Json } from '#/lib/json'
 import type {
   AttributeOptions,
   AttributeType,
   ObjectKind,
   SelectOption,
-} from './registry'
+} from '@spaces/core/attributes/registry'
 
 /**
  * Attribute creation as an Effect program (spec §7 dialog, §3 lifecycle).

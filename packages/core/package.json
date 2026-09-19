@@ -1,0 +1,41 @@
+{
+  "//": "The pure half of the domain (mono-7): portfolio maths, the two display-format modules, the glossary automaton, the due-date grammar, the view-filter matcher, document extraction and policy, identity normalization, and the attribute registry's pure quartet. The property this package exists to hold is stated as a test, not a convention — `src/purity.test.ts` fails the build on a `drizzle-orm` import, a React import, a `process.env` read, or a value (as opposed to type) import of @spaces/db.",
+  "name": "@spaces/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "//exports": "Source entry points, not a build output: every consumer is bundled by vite or loaded by tsx/vitest, all of which resolve TypeScript through `exports`. One subpath per domain, so an `#/lib/<domain>/<module>` import became `@spaces/core/<domain>/<module>` with nothing else changing — `./documents` is spelled twice because the old bare-directory specifier resolved to its index.",
+  "exports": {
+    "./format": "./src/format.ts",
+    "./portfolio/*": "./src/portfolio/*.ts",
+    "./glossary/*": "./src/glossary/*.ts",
+    "./tasks/*": "./src/tasks/*.ts",
+    "./views/filter": "./src/views/filter.ts",
+    "./documents": "./src/documents/index.ts",
+    "./documents/*": "./src/documents/*.ts",
+    "./entities/normalize": "./src/entities/normalize.ts",
+    "./attributes/*": "./src/attributes/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "//dependencies": "unpdf, mammoth and fflate arrived with documents/extract.ts, tldts with entities/normalize.ts, zod with the attribute value validators. Not here, and the test enforces it: drizzle-orm, react, and anything that reads the environment.",
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "mammoth": "^1.12.0",
+    "tldts": "^7.4.9",
+    "unpdf": "^1.8.0",
+    "zod": "^4.3.6"
+  },
+  "//devDependencies": "@spaces/db is a devDependency on purpose: spec §2 allows core → db, but only for the column payload types (`AttributeOptions`, `SelectOption`, `ObjectKind`, `BadgeColor`, the view condition shapes), which `import type` erases at compile. A runtime dependency would mean core can reach the database, which is the one thing this package promises it cannot.",
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@spaces/db": "workspace:*",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.10"
+  }
+}

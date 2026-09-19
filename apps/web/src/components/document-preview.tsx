@@ -14,8 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
-import { detectFormat } from '#/lib/documents/extract'
-import { formatBytes } from '#/lib/documents'
+import { detectFormat } from '@spaces/core/documents/extract'
+import { formatBytes } from '@spaces/core/documents'
 import { getDocumentDownloadUrl, getDocumentText } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 

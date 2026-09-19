@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogTitle, DialogTrigger } from './ui/dialog'
 import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { createTask, listUsers, searchEntities } from '#/lib/server-fns'
-import { localToday, parseDue } from '#/lib/tasks/parse-due'
+import { localToday, parseDue } from '@spaces/core/tasks/parse-due'
 import { useHotkey } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 

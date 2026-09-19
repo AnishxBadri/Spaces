@@ -26,7 +26,7 @@ const NO_INTL_NUMBER_FORMAT = {
   selector:
     "NewExpression[callee.object.name='Intl'][callee.property.name='NumberFormat']",
   message:
-    'Use fmtMoney (apps/web/src/lib/portfolio/format.ts) or the shared formatters in apps/web/src/lib/format.ts — Intl.NumberFormat compact output differs between Node and Chrome (hydration trap).',
+    'Use fmtMoney (packages/core/src/portfolio/format.ts) or the shared formatters in packages/core/src/format.ts — Intl.NumberFormat compact output differs between Node and Chrome (hydration trap).',
 }
 const NO_DIRECT_ENTITY_VALUES = {
   selector:
@@ -120,15 +120,17 @@ export default [
       ],
     },
   },
-  // Both syntax bans, over the whole app. Intl compact notation differs Node
-  // vs Chrome → hydration failures, so fmtMoney
-  // (apps/web/src/lib/portfolio/format.ts) hand-rolls compact. And attribute
-  // values have one write path (CONTEXT.md "Backend paradigm" #9): setValues
-  // validates, diffs, logs attribute_event and materializes reference links in
-  // one transaction, all four of which a direct `.update(entity).set({ values
-  // })` skips.
+  // Both syntax bans, over the app and over core. Intl compact notation
+  // differs Node vs Chrome → hydration failures, so fmtMoney
+  // (packages/core/src/portfolio/format.ts) hand-rolls compact — and since
+  // SPA-144 moved both format modules to @spaces/core, the ban has to cover
+  // that package or the one place the trap can still be written is the one
+  // place nothing watches. And attribute values have one write path
+  // (CONTEXT.md "Backend paradigm" #9): setValues validates, diffs, logs
+  // attribute_event and materializes reference links in one transaction, all
+  // four of which a direct `.update(entity).set({ values })` skips.
   {
-    files: ['apps/web/src/**'],
+    files: ['apps/web/src/**', 'packages/core/src/**'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -138,11 +140,12 @@ export default [
     },
   },
   // The two format modules are where compact notation is hand-rolled, so they
-  // are the only files allowed to construct an Intl.NumberFormat.
+  // are the only files allowed to construct an Intl.NumberFormat. They moved
+  // with the rest of the pure half (SPA-144); the exemption moved with them.
   {
     files: [
-      'apps/web/src/lib/format.ts',
-      'apps/web/src/lib/portfolio/format.ts',
+      'packages/core/src/format.ts',
+      'packages/core/src/portfolio/format.ts',
     ],
     rules: { 'no-restricted-syntax': ['error', NO_DIRECT_ENTITY_VALUES] },
   },
@@ -166,7 +169,11 @@ export default [
   // only goes down. no-unsafe-* stays off: drizzle's inferred types trip it
   // too often to be signal.
   {
-    files: ['apps/web/src/**/*.{ts,tsx}', 'packages/db/src/**/*.ts'],
+    files: [
+      'apps/web/src/**/*.{ts,tsx}',
+      'packages/db/src/**/*.ts',
+      'packages/core/src/**/*.ts',
+    ],
     rules: {
       '@typescript-eslint/consistent-type-assertions': [
         'error',

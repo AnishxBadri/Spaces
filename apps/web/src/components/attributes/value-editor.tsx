@@ -9,12 +9,12 @@ import {
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { DitherMark, InitialsMark } from '#/components/record/record-parts'
-import { badgeStyle, optionColor } from '#/lib/attributes/colors'
-import { liveOptions, optionState } from '#/lib/attributes/options'
-import { formatDate, formatNumber } from '#/lib/format'
+import { badgeStyle, optionColor } from '@spaces/core/attributes/colors'
+import { liveOptions, optionState } from '@spaces/core/attributes/options'
+import { formatDate, formatNumber } from '@spaces/core/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
-import type { AttributeOptions } from '#/lib/attributes/registry'
+import type { AttributeOptions } from '@spaces/core/attributes/registry'
 
 /**
  * Typed attribute editors — ONE implementation shared by table cells,

@@ -1,8 +1,8 @@
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import { buildAutomaton, findMatches } from '#/lib/glossary/aho-corasick'
-import type { Automaton, Pattern } from '#/lib/glossary/aho-corasick'
+import { buildAutomaton, findMatches } from '@spaces/core/glossary/aho-corasick'
+import type { Automaton, Pattern } from '@spaces/core/glossary/aho-corasick'
 
 /**
  * Glossary auto-linking, as decorations rather than document content.

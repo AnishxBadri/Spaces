@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { valueValidator } from './registry'
-import type { AttributeDef, AttributeOptions, AttributeType } from './registry'
+import { valueValidator } from '@spaces/core/attributes/registry'
+import type {
+  AttributeDef,
+  AttributeOptions,
+  AttributeType,
+} from '@spaces/core/attributes/registry'
 import type { Json } from '#/lib/json'
 import { cleanupTestEntities } from '../entities/test-helpers'
 

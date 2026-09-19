@@ -1,8 +1,12 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute, objectDef } from '@spaces/db/schema'
-import { CORE_OBJECTS, OBJECT_KINDS, SYSTEM_ATTRIBUTES } from './registry'
-import type { ObjectKind } from './registry'
+import {
+  CORE_OBJECTS,
+  OBJECT_KINDS,
+  SYSTEM_ATTRIBUTES,
+} from '@spaces/core/attributes/registry'
+import type { ObjectKind } from '@spaces/core/attributes/registry'
 
 /**
  * Idempotent system seed — runs on every boot (after migrations). Inserts

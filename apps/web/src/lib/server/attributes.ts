@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { BADGE_COLORS } from '../attributes/colors'
+import { BADGE_COLORS } from '@spaces/core/attributes/colors'
 import { requireAdmin, requireUser } from './shared'
 import { jsonValue } from '#/lib/json'
 

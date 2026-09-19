@@ -5,10 +5,10 @@ import { attribute, attributeEvent, entity, link } from '@spaces/db/schema'
 import type { attributeEventSource } from '@spaces/db/schema'
 import type { EntityValues } from '@spaces/db/schema/entities'
 import type { Json } from '#/lib/json'
-import { resolveDefault } from './default-values'
+import { resolveDefault } from '@spaces/core/attributes/default-values'
 import { objectIdForKindAsync } from './objects'
-import { toObjectKind, valueValidator } from './registry'
-import type { AttributeDef, ObjectKind } from './registry'
+import { toObjectKind, valueValidator } from '@spaces/core/attributes/registry'
+import type { AttributeDef, ObjectKind } from '@spaces/core/attributes/registry'
 
 /**
  * The one write path for attribute values. Validates against the registry,

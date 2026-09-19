@@ -13,9 +13,10 @@ import type {
  * `is`/`is_not`, a number is `gt`/`lt`, everything can be `empty`.
  *
  * The shapes themselves are declared at the `view` table's jsonb columns
- * (`@spaces/db/schema/views`) and re-exported here, so every `#/lib/views/filter`
- * import reads the same names it always did (SPA-142). This module is the
- * behaviour: the op menu, the matcher, the coercions.
+ * (`@spaces/db/schema/views`) and re-exported here, so every
+ * `@spaces/core/views/filter` import reads the same names it always did
+ * (SPA-142). This module is the behaviour: the op menu, the matcher, the
+ * coercions.
  */
 export type { Condition, ConditionOp, ConditionValue, ViewExtra, ViewSort }
 
