@@ -103,6 +103,17 @@ describe.skipIf(!hasDb)('migrate.ts downgrade guard (real database)', () => {
   const SEED_TABLES = ['object', 'attribute', 'entity']
   let baseline: Array<number> = []
 
+  // Derived, never hard-coded: every migration-bearing slice adds an entry,
+  // and a literal count here would turn each one into a red suite that says
+  // nothing about the guard.
+  const journal = readImageJournal(imageFolder)
+  const TOTAL = journal.length
+  // Where the two truncated fixtures cut the journal.
+  const OLD_KEEPS = 20
+  const ANCIENT_KEEPS = 22
+  // The newest journal entry is what both truncated fixtures fail to know.
+  const NEWEST = journal[TOTAL - 1]
+
   const bootDir = (name: string) => path.join(tmpRoot, name)
 
   async function adminExec(sql: string) {
@@ -179,16 +190,16 @@ describe.skipIf(!hasDb)('migrate.ts downgrade guard (real database)', () => {
       writeFileSync(journalPath, JSON.stringify(journal, null, 2))
     }
 
-    // The "older image": a journal truncated to 20 of the 24 entries, with
-    // the .sql files still present — so the refusal can name the tag.
-    truncateJournal(bootDir('old'), 20)
+    // The "older image": a journal truncated to 20 of the entries, with the
+    // .sql files still present — so the refusal can name the tag.
+    truncateJournal(bootDir('old'), OLD_KEEPS)
 
-    // The genuinely older checkout: the journal stops at 22 and the two
-    // later .sql files are not in the image at all, so nothing on disk can
-    // name the unknown entry and the refusal falls back to its timestamp.
-    truncateJournal(bootDir('ancient'), 22)
-    for (const tag of ['0022_views', '0023_drop_lists']) {
-      rmSync(path.join(bootDir('ancient'), `drizzle/${tag}.sql`))
+    // The genuinely older checkout: the journal stops short and every later
+    // .sql file is absent from the image, so nothing on disk can name the
+    // unknown entry and the refusal falls back to its timestamp.
+    truncateJournal(bootDir('ancient'), ANCIENT_KEEPS)
+    for (const entry of journal.slice(ANCIENT_KEEPS)) {
+      rmSync(path.join(bootDir('ancient'), `drizzle/${entry.tag}.sql`))
     }
 
     // The "rebuilt migration": same tag and `when`, different bytes.
@@ -238,8 +249,10 @@ describe.skipIf(!hasDb)('migrate.ts downgrade guard (real database)', () => {
     const run = runMigrateScript(bootDir('old'))
     expect(run.status).toBe(1)
     const out = `${run.stdout}${run.stderr}`
-    expect(out).toContain('database has 24 migrations, this image knows 20')
-    expect(out).toContain('newest unknown: 0023_drop_lists')
+    expect(out).toContain(
+      `database has ${TOTAL} migrations, this image knows ${OLD_KEEPS}`,
+    )
+    expect(out).toContain(`newest unknown: ${NEWEST.tag}`)
     expect(out).toContain('Restore the backup taken before the upgrade')
     expect(out).toContain('never run against a newer schema')
     expect(out).not.toContain('[migrate] up to date')
@@ -258,9 +271,13 @@ describe.skipIf(!hasDb)('migrate.ts downgrade guard (real database)', () => {
     const run = runMigrateScript(bootDir('ancient'))
     expect(run.status).toBe(1)
     const out = `${run.stdout}${run.stderr}`
-    expect(out).toContain('database has 24 migrations, this image knows 22')
-    expect(out).toContain('newest unknown: applied 2026-09-11T09:30:25.129Z')
-    expect(out).toContain('created_at 1789119025129')
+    expect(out).toContain(
+      `database has ${TOTAL} migrations, this image knows ${ANCIENT_KEEPS}`,
+    )
+    expect(out).toContain(
+      `newest unknown: applied ${new Date(NEWEST.when).toISOString()}`,
+    )
+    expect(out).toContain(`created_at ${NEWEST.when}`)
     expect(out).toContain('Restore the backup taken before the upgrade')
     expect(out).not.toContain('[migrate] up to date')
   })
@@ -269,7 +286,9 @@ describe.skipIf(!hasDb)('migrate.ts downgrade guard (real database)', () => {
     const run = runMigrateScript(bootDir('diverged'))
     expect(run.status).toBe(1)
     const out = `${run.stdout}${run.stderr}`
-    expect(out).toContain('database has 24 migrations, this image knows 24')
+    expect(out).toContain(
+      `database has ${TOTAL} migrations, this image knows ${TOTAL}`,
+    )
     expect(out).toContain('0023_drop_lists does not match')
     expect(out).toContain('Restore the backup taken before the upgrade')
   })
