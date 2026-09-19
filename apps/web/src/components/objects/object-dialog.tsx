@@ -13,13 +13,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '#/components/ui/dialog'
+import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { KeyHint } from '#/components/page-header'
 import { slugifyNoun, suggestPlural } from '#/lib/object-nouns'
 import { OBJECT_ICONS, OBJECT_ICON_NAMES } from '#/lib/object-icons'
 import { createObject, updateObject } from '#/lib/server-fns'
+import {
+  IDENTITY_KEYS,
+  IDENTITY_KEY_ATTRIBUTES,
+} from '@spaces/core/attributes/registry'
 import { cn } from '#/lib/utils'
+import type { IdentityKey } from '@spaces/core/attributes/registry'
 import type { ReactNode } from 'react'
 
 /**
@@ -27,6 +33,11 @@ import type { ReactNode } from 'react'
  * (suggested from the singular, always editable), optional icon. No slug
  * field — derived from the plural, frozen, hidden. Creation lands on the
  * object's attributes page, where the real work starts.
+ *
+ * Create mode carries one more block: the identity keys this object opts
+ * into. Declaring one materializes its backing attribute in the same
+ * transaction, which is why it is asked at birth and nowhere else here —
+ * edit mode is objects-6's seam, not this dialog's.
  */
 export function ObjectDialog(
   props: {
@@ -92,6 +103,9 @@ function ObjectForm(
   const [plural, setPlural] = useState(existing?.plural ?? '')
   const [pluralTouched, setPluralTouched] = useState(Boolean(existing))
   const [icon, setIcon] = useState<string | null>(existing?.icon ?? 'boxes')
+  // Unticked at birth: identity is opt-in, and a bag that wants none is the
+  // common case (spec §9).
+  const [identityKeys, setIdentityKeys] = useState<Array<IdentityKey>>([])
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
@@ -109,6 +123,7 @@ function ObjectForm(
             singular: singular.trim(),
             plural: plural.trim(),
             ...(icon === null ? {} : { icon }),
+            identityKeys,
           },
         })
         toast(`${plural.trim()} created — now give it attributes`)
@@ -236,6 +251,44 @@ function ObjectForm(
           })}
         </div>
       </div>
+
+      {/* Identity keys (spec §9) — create mode only: declaring one
+          materializes its backing attribute in the same write. */}
+      {props.mode === 'create' ? (
+        <div className="flex flex-col gap-1.5">
+          <Label>Identity keys</Label>
+          <div className="flex flex-col border border-rule bg-bone px-3 py-2">
+            {IDENTITY_KEYS.map((key) => {
+              const backing = IDENTITY_KEY_ATTRIBUTES[key]
+              const on = identityKeys.includes(key)
+              return (
+                <label
+                  key={key}
+                  className="flex min-h-8 cursor-pointer items-center gap-2.5 py-1"
+                >
+                  <Checkbox
+                    checked={on}
+                    aria-label={backing.name}
+                    onCheckedChange={(next) =>
+                      setIdentityKeys((keys) =>
+                        next ? [...keys, key] : keys.filter((k) => k !== key),
+                      )
+                    }
+                  />
+                  <span className="text-ui">{backing.name}</span>
+                  <span className="mono text-micro text-graphite">
+                    {backing.type} attribute · created with the object
+                  </span>
+                </label>
+              )
+            })}
+            <p className="pt-1 text-label text-graphite">
+              two {plural.trim() || 'Funds'} claiming the same domain become a
+              duplicate suggestion instead of two records
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {/* The slug is derived and frozen — shown, never edited. */}
       <div className="flex flex-col gap-1 border border-rule bg-bone px-3 py-2.5">

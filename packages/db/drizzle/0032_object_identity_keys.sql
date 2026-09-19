@@ -1,0 +1,1 @@
+ALTER TABLE "object" ADD COLUMN "identity_keys" text[] DEFAULT '{}' NOT NULL;

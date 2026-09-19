@@ -15,6 +15,7 @@ import {
 import { entity } from './entities'
 import { integration } from './integrations'
 import { objectDef } from './objects'
+import type { IdentityKey } from './objects'
 import { user } from './auth'
 import type { Json } from '../json'
 
@@ -68,6 +69,13 @@ export type AttributeOptions = {
   max?: number
   /** number: display decimals; stored numbers untouched */
   precision?: number
+  /**
+   * This attribute backs one of its object's declared identity keys (spec
+   * §9). Set by `createObjectProgram` when the key is declared, in the same
+   * transaction as the object row; the write path reads it instead of
+   * guessing at slugs, and archiving is refused while the key stands.
+   */
+  identityKey?: IdentityKey
   /**
    * Default (spec §4): a static value in the type's write shape, or one of
    * exactly two dynamic forms — `'current-user'` (actor_reference) and an

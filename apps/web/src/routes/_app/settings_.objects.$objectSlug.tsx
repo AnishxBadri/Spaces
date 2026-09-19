@@ -7,6 +7,7 @@ import { ObjectDialog } from '#/components/objects/object-dialog'
 import { RegistryList } from '#/components/attributes/registry-list'
 import { KeyHint, PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
+import { IDENTITY_KEY_ATTRIBUTES } from '@spaces/core/attributes/registry'
 import {
   getObject,
   getSession,
@@ -150,6 +151,48 @@ function ObjectAttributesPage() {
             canReshape={isAdmin}
           />
         </div>
+
+        {/* Identity keys (spec §9) — declared at creation, each backed by the
+            attribute above it. Core objects are not listed: their identity is
+            core-owned and lives in entity_alias, not in this column. */}
+        {object.isSystem ? null : (
+          <section className="mt-8 flex flex-col">
+            <div
+              aria-hidden
+              className="flex h-8 items-center gap-3 border-b border-hairline label-caps text-graphite"
+            >
+              <span className="min-w-0 flex-1">Identity keys</span>
+              <span className="mono text-micro">
+                {object.identityKeys.length} declared
+              </span>
+            </div>
+            <ul aria-label={`${object.plural} identity keys`}>
+              {object.identityKeys.map((key) => {
+                const backing = IDENTITY_KEY_ATTRIBUTES[key]
+                return (
+                  <li
+                    key={key}
+                    className="flex h-row items-center gap-3 border-b border-rule text-ui"
+                  >
+                    <span className="min-w-0 flex-1">{backing.name}</span>
+                    <span className="mono text-micro text-graphite">
+                      {backing.slug} · {backing.type}
+                    </span>
+                  </li>
+                )
+              })}
+              {object.identityKeys.length === 0 ? (
+                <li className="flex h-row items-center border-b border-rule text-ui text-graphite">
+                  None — records here are matched by name alone.
+                </li>
+              ) : null}
+            </ul>
+            <p className="flex h-8 items-center mono text-micro text-graphite">
+              declared at creation · the backing attribute cannot be archived
+              while its key stands
+            </p>
+          </section>
+        )}
       </div>
     </div>
   )

@@ -6,6 +6,7 @@ import { nextBadgeColor } from '@spaces/core/attributes/colors'
 import { validateDefault } from './defaults'
 import { objectIdForKind } from './objects'
 import { deriveOptionIds } from '@spaces/core/attributes/options'
+import { IDENTITY_KEY_ATTRIBUTES } from '@spaces/core/attributes/registry'
 import { AttributeQueryFailed } from './update'
 import type { ObjectQueryFailed, SystemObjectNotSeeded } from './objects'
 import type { BadgeColor } from '@spaces/core/attributes/colors'
@@ -13,6 +14,7 @@ import type { Json } from '#/lib/json'
 import type {
   AttributeOptions,
   AttributeType,
+  IdentityKey,
   ObjectKind,
   SelectOption,
 } from '@spaces/core/attributes/registry'
@@ -54,12 +56,27 @@ export type CreateAttributeInput = {
         targetKind?: ObjectKind | undefined
         targetObjectId?: string | undefined
         multi?: boolean | undefined
+        /**
+         * This attribute backs one of its object's declared identity keys
+         * (spec §9). Only `createObjectProgram` passes it, inside the
+         * transaction that declares the key — which is why it is gated to
+         * the one type each key can wear, like every other config field.
+         */
+        identityKey?: IdentityKey | undefined
       }
     | undefined
   default?: Json | undefined
   required?: boolean | undefined
   createdBy: string
+  /**
+   * Run inside a caller's transaction instead of on its own connection.
+   * The backing attribute of an identity key and the object row that
+   * declares it are one write or neither (CONTEXT.md, 2026-09-19).
+   */
+  tx?: Tx | undefined
 }
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 const OPTION_TYPES = new Set<AttributeType>([
   'select',
@@ -142,6 +159,15 @@ const buildOptions = Effect.fn('buildOptions')(function* (
     return yield* reject('Relationship settings are not settings of this type')
   }
 
+  if (cfg.identityKey !== undefined) {
+    const backing = IDENTITY_KEY_ATTRIBUTES[cfg.identityKey]
+    if (input.type !== backing.type)
+      return yield* reject(
+        `The ${cfg.identityKey} identity key is backed by a ${backing.type} attribute, not a ${input.type} one`,
+      )
+    out.identityKey = cfg.identityKey
+  }
+
   // Required means can't-clear (spec §5); unchecked is a value for a
   // checkbox, so the flag is meaningless there and never stored.
   if (input.required && input.type !== 'checkbox') out.required = true
@@ -180,6 +206,9 @@ export const createAttributeProgram = Effect.fn('createAttributeProgram')(
             message: 'Pick the object this attribute belongs to',
           }))
     const options = yield* buildOptions(input)
+    // Either the caller's transaction or the pool — the reads below must see
+    // the object row a caller just inserted, so they share its connection.
+    const conn = input.tx ?? db
 
     // Slug: derived once, suffixed on collision within the object, then
     // immutable forever (spec §3 — Attio's mutable slug is the footgun).
@@ -187,7 +216,7 @@ export const createAttributeProgram = Effect.fn('createAttributeProgram')(
     let slug = base
     for (let i = 2; ; i++) {
       const taken = yield* query(() =>
-        db
+        conn
           .select({ id: attribute.id })
           .from(attribute)
           .where(
@@ -200,7 +229,7 @@ export const createAttributeProgram = Effect.fn('createAttributeProgram')(
     }
 
     const maxOrder = yield* query(() =>
-      db
+      conn
         .select({
           maxOrder: sql<number>`coalesce(max(${attribute.sortOrder}), 0)`,
         })
@@ -210,7 +239,7 @@ export const createAttributeProgram = Effect.fn('createAttributeProgram')(
     )
 
     const row = yield* query(() =>
-      db
+      conn
         .insert(attribute)
         .values({
           objectId,

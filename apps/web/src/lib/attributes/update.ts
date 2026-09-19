@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { attribute, entity } from '@spaces/db/schema'
+import { attribute, entity, objectDef } from '@spaces/db/schema'
 import { nextBadgeColor } from '@spaces/core/attributes/colors'
 import { validateDefault } from './defaults'
 import type { BadgeColor } from '@spaces/core/attributes/colors'
@@ -39,6 +39,16 @@ export class AttributeConfigRejected extends Schema.TaggedError<AttributeConfigR
 export class RatingMaxBelowValues extends Schema.TaggedError<RatingMaxBelowValues>()(
   'RatingMaxBelowValues',
   { max: Schema.Number, count: Schema.Number, message: Schema.String },
+) {}
+
+/**
+ * Archiving an attribute that backs one of its object's declared identity
+ * keys (spec §9). The key would be left pointing at nothing, so the refusal
+ * names the object: undeclare the key, then archive.
+ */
+export class IdentityKeyAttributeLocked extends Schema.TaggedError<IdentityKeyAttributeLocked>()(
+  'IdentityKeyAttributeLocked',
+  { key: Schema.String, object: Schema.String, message: Schema.String },
 ) {}
 
 export class AttributeQueryFailed extends Schema.TaggedError<AttributeQueryFailed>()(
@@ -93,6 +103,7 @@ export type UpdateAttributePatch = {
 export type UpdateAttributeError =
   | AttributeNotFound
   | AttributeConfigRejected
+  | IdentityKeyAttributeLocked
   | RatingMaxBelowValues
   | AttributeQueryFailed
 
@@ -258,6 +269,28 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
         id: patch.id,
         message: 'Attribute not found',
       })
+    // Refused before anything is written: a declared identity key with no
+    // live attribute behind it is the state the materialization rule exists
+    // to prevent (CONTEXT.md "Two-tier object model", 2026-09-19).
+    const identityKey = attr.options.identityKey
+    if (patch.archived === true && identityKey !== undefined) {
+      const owner = yield* query(() =>
+        db
+          .select({
+            plural: objectDef.plural,
+            identityKeys: objectDef.identityKeys,
+          })
+          .from(objectDef)
+          .where(eq(objectDef.id, attr.objectId))
+          .then((rows) => rows.at(0)),
+      )
+      if (owner && owner.identityKeys.includes(identityKey))
+        return yield* new IdentityKeyAttributeLocked({
+          key: identityKey,
+          object: owner.plural,
+          message: `${attr.name} backs the ${identityKey} identity key of ${owner.plural} — drop the key from ${owner.plural} before archiving it`,
+        })
+    }
     const current = attr.options
 
     let next = current
