@@ -34,6 +34,13 @@ export type EntityKindResolvable = 'company' | 'person'
 export type Executor = Pick<typeof db, 'select' | 'insert'>
 
 /**
+ * An open transaction, whole. Wider than `Executor` because the two
+ * identity helpers below need verbs an insert-only alias write does not:
+ * `transaction` to open a savepoint, `delete` to retire a claim.
+ */
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+/**
  * Provenance as the pair the columns carry: a class, plus the integration
  * row when — and only when — the class is `integration`. The union is what
  * makes it a claim the compiler checked rather than one the caller asserted:
@@ -300,30 +307,52 @@ export async function recordNameAlias(
   }
 }
 
+/** The alias kinds that carry `is_identity`, and their one normalizer each. */
+const IDENTITY_NORMALIZERS = {
+  domain: normalizeDomain,
+  email: normalizeEmail,
+  linkedin: normalizeLinkedin,
+  cin: normalizeCin,
+}
+
+export type AliasIdentityKind = keyof typeof IDENTITY_NORMALIZERS
+
+/**
+ * What one identity-backed slug did on a write (spec §9). `released` is the
+ * clear: the record stops asserting the key, so the alias is retired and the
+ * domain is free for another record to claim (CONTEXT.md, 2026-09-19 —
+ * name aliases are history and never retire, identity aliases are claims and
+ * do).
+ */
+export type IdentityOutcome =
+  'added' | 'already_own' | 'suggested_duplicate' | 'released'
+
 /**
  * Add an identity alias to an existing entity. The unique index is the
  * dedupe tripwire: a collision means another entity already owns this key,
  * and that's a duplicate_candidate, not an error. Enrichment finds your
  * duplicates as a side effect.
+ *
+ * `on` is the executor, the same fourth-parameter shape `recordNameAlias`
+ * carries: `db` by default, a transaction (or a savepoint inside one) when
+ * the caller needs the alias to land or fail with the write it belongs to —
+ * which is exactly the attribute write path, where the value and the claim
+ * it makes are one transaction (`claimIdentityAlias` below).
  */
 export async function addIdentityAlias(
   entityId: string,
-  kind: 'domain' | 'email' | 'linkedin' | 'cin',
+  kind: AliasIdentityKind,
   rawValue: string,
   source: ResolveSource,
+  on: Executor = db,
 ): Promise<{ outcome: 'added' | 'already_own' | 'suggested_duplicate' }> {
   // Callers may hold a stale (merged-away) id — follow the redirect.
-  entityId = await canonicalId(entityId)
-  const norm = {
-    domain: normalizeDomain,
-    email: normalizeEmail,
-    linkedin: normalizeLinkedin,
-    cin: normalizeCin,
-  }[kind](rawValue)
+  entityId = await canonicalId(entityId, on)
+  const norm = IDENTITY_NORMALIZERS[kind](rawValue)
   if (!norm) throw new Error(`Invalid ${kind}: ${rawValue}`)
 
   const holder = (
-    await db
+    await on
       .select({ entityId: entityAlias.entityId })
       .from(entityAlias)
       .where(
@@ -337,16 +366,19 @@ export async function addIdentityAlias(
   ).at(0)
 
   if (holder) {
-    const holderId = await canonicalId(holder.entityId)
+    const holderId = await canonicalId(holder.entityId, on)
     if (holderId === entityId) return { outcome: 'already_own' }
-    await suggestDuplicate(entityId, holderId, 1.0, {
-      shared: kind,
-      value: norm,
-    })
+    await suggestDuplicate(
+      entityId,
+      holderId,
+      1.0,
+      { shared: kind, value: norm },
+      on,
+    )
     return { outcome: 'suggested_duplicate' }
   }
 
-  await db.insert(entityAlias).values({
+  await on.insert(entityAlias).values({
     entityId,
     kind,
     value: rawValue.trim(),
@@ -355,4 +387,110 @@ export async function addIdentityAlias(
     ...sourceColumns(source),
   })
   return { outcome: 'added' }
+}
+
+/**
+ * A `23505` anywhere in the cause chain. drizzle wraps a driver error, so
+ * the pg code is not always on the thing that was thrown; the chain is
+ * walked rather than the top frame inspected.
+ */
+function isUniqueViolation(cause: unknown): boolean {
+  let e: unknown = cause
+  for (let depth = 0; e !== null && e !== undefined && depth < 5; depth++) {
+    if (typeof e !== 'object') return false
+    if ('code' in e && e.code === '23505') return true
+    e = 'cause' in e ? e.cause : null
+  }
+  return false
+}
+
+/**
+ * Claim an identity key from inside a caller's transaction, without letting
+ * a losing race take the transaction down with it.
+ *
+ * `addIdentityAlias` checks for a holder first, which settles the ordinary
+ * case; the race it cannot settle is a concurrent writer that commits its
+ * alias between that check and this insert. Postgres answers that with
+ * `23505`, and a `23505` poisons the transaction it was raised in — the
+ * value write, its `attribute_event`, everything. So the alias work runs in
+ * a **savepoint**: the violation rolls back the nested transaction alone,
+ * the outer one is still live, and the loser of the race gets what the
+ * doctrine says it gets — a `duplicate_candidate`, not an error. The
+ * savepoint holds nothing but the alias work, so a `23505` inside it can
+ * only be `alias_identity_unique` (the candidate insert is
+ * `onConflictDoNothing`).
+ */
+export async function claimIdentityAlias(
+  tx: Tx,
+  entityId: string,
+  kind: AliasIdentityKind,
+  rawValue: string,
+  source: ResolveSource,
+): Promise<'added' | 'already_own' | 'suggested_duplicate'> {
+  try {
+    const { outcome } = await tx.transaction((sp) =>
+      addIdentityAlias(entityId, kind, rawValue, source, sp),
+    )
+    return outcome
+  } catch (cause) {
+    if (!isUniqueViolation(cause)) throw cause
+    // The savepoint is gone; the outer transaction reads again and finds the
+    // winner, which is committed by now or the insert would still be waiting
+    // on its lock.
+    const norm = IDENTITY_NORMALIZERS[kind](rawValue)
+    if (!norm) throw cause
+    const holder = (
+      await tx
+        .select({ entityId: entityAlias.entityId })
+        .from(entityAlias)
+        .where(
+          and(
+            eq(entityAlias.kind, kind),
+            eq(entityAlias.valueNorm, norm),
+            eq(entityAlias.isIdentity, true),
+          ),
+        )
+        .limit(1)
+    ).at(0)
+    if (!holder) throw cause
+    const holderId = await canonicalId(holder.entityId, tx)
+    const mine = await canonicalId(entityId, tx)
+    if (holderId === mine) return 'already_own'
+    await suggestDuplicate(
+      mine,
+      holderId,
+      1.0,
+      { shared: kind, value: norm },
+      tx,
+    )
+    return 'suggested_duplicate'
+  }
+}
+
+/**
+ * Retire the claim a record made with one identity key. Scoped to the
+ * normalized value the record held, so a record that lost the race — and
+ * therefore owns no alias — cannot delete the winner's row on its way out.
+ * Returns whether a claim was actually standing.
+ */
+export async function releaseIdentityAlias(
+  tx: Tx,
+  entityId: string,
+  kind: AliasIdentityKind,
+  heldValue: string,
+): Promise<boolean> {
+  const norm = IDENTITY_NORMALIZERS[kind](heldValue)
+  if (!norm) return false
+  const gone = await tx
+    .delete(entityAlias)
+    .where(
+      and(
+        eq(entityAlias.entityId, await canonicalId(entityId, tx)),
+        eq(entityAlias.kind, kind),
+        eq(entityAlias.valueNorm, norm),
+        eq(entityAlias.isIdentity, true),
+      ),
+    )
+    .returning({ id: entityAlias.id })
+  return gone.length > 0
 }

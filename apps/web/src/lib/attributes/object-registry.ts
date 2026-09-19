@@ -454,9 +454,12 @@ export type CreateRecordInput = {
  * Birth of a custom record: an entity row and its `name` alias, in one
  * transaction, then the same birth-values pass every record gets (supplied
  * first, defaults for the blanks), then the fuzzy sweep every other record
- * gets. The alias is non-identity — a custom object's identity keys are
- * opt-in and still unbuilt — but it is what puts the record in front of
- * pg_trgm and in `searchEntities`' alias lane.
+ * gets. The birth alias is the `name` one — non-identity, because a name is
+ * history rather than a claim — and it is what puts the record in front of
+ * pg_trgm and in `searchEntities`' alias lane. Identity aliases arrive by
+ * the other door: a supplied value for an attribute carrying
+ * `options.identityKey` is mirrored into `entity_alias` by the birth-values
+ * pass itself (objects-7), in the transaction that wrote it.
  */
 export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
   input: CreateRecordInput,

@@ -7,8 +7,14 @@ import type { EntityValues } from '@spaces/db/schema/entities'
 import type { Json } from '#/lib/json'
 import { resolveDefault } from '@spaces/core/attributes/default-values'
 import { objectIdForKindAsync } from './objects'
+import { claimIdentityAlias, releaseIdentityAlias } from '../entities/resolve'
+import type { IdentityOutcome, ResolveSource } from '../entities/resolve'
 import { toObjectKind, valueValidator } from '@spaces/core/attributes/registry'
-import type { AttributeDef, ObjectKind } from '@spaces/core/attributes/registry'
+import type {
+  AttributeDef,
+  IdentityKey,
+  ObjectKind,
+} from '@spaces/core/attributes/registry'
 
 /**
  * The one write path for attribute values. Validates against the registry,
@@ -164,6 +170,69 @@ async function checkReferences(tx: Tx, change: Change) {
 }
 
 /**
+ * The same provenance the `attribute_event` row carries, said in the pair
+ * the alias columns want. Only `integration` is a different answer — a
+ * plugin's alias names its own row, never whoever's session carried it —
+ * and `import`/`merge`/`seed` are the three doors both enums spell the same
+ * way. Everything else is a person at a keyboard: `manual`, which is what
+ * `addCompanyDomain` stamps for the same edit made from the company rail.
+ */
+const aliasSource = (actor: Actor, source: EventSource): ResolveSource =>
+  actor.type === 'integration'
+    ? { class: 'integration', ref: actor.id }
+    : source === 'import' || source === 'merge' || source === 'seed'
+      ? { class: source }
+      : { class: 'manual' }
+
+/** One identity-backed slug's before and after, as the mirror needs them. */
+type IdentityWork = {
+  slug: string
+  key: IdentityKey
+  /** the claim standing before this write, if any */
+  held: string | null
+  /** the claim after it; null is the clear */
+  value: string | null
+}
+
+const identityString = (v: Json): string | null =>
+  typeof v === 'string' && v.trim() !== '' ? v : null
+
+/**
+ * Which identity keys this write touches (spec §9). Two sources, because a
+ * no-op is still an answer: a slug the patch changed, and a slug the patch
+ * named without changing — re-writing the domain you already own is
+ * `already_own`, and that is the outcome objects-8 shows. Reconciling the
+ * no-op is also what re-adds an alias that went missing, so the claim and
+ * the field cannot drift apart silently.
+ */
+function planIdentity(
+  registry: Array<AttributeDef>,
+  current: EntityValues,
+  patch: Record<string, unknown>,
+  changes: Array<Change>,
+): Array<IdentityWork> {
+  const changed = new Map(changes.map((c) => [c.slug, c]))
+  const work: Array<IdentityWork> = []
+  for (const def of registry) {
+    const key = def.options.identityKey
+    if (!key) continue
+    const change = changed.get(def.slug)
+    if (change) {
+      work.push({
+        slug: def.slug,
+        key,
+        held: identityString(change.before),
+        value: identityString(change.value),
+      })
+    } else if (def.slug in patch) {
+      const held = identityString(current[def.slug] ?? null)
+      if (held !== null) work.push({ slug: def.slug, key, held, value: held })
+    }
+  }
+  return work
+}
+
+/**
  * Provenance rides the event row: `source` names the door the write came
  * through (default: a direct human edit), `suggestionId` and `refs` carry
  * the receipt when a suggestion or enrichment is accepted.
@@ -183,10 +252,22 @@ export type SetValuesInput = {
   fillDefaults?: { now: Date }
 }
 
+/**
+ * `identity` is the per-slug outcome of the identity mirror, computed
+ * inside the transaction that wrote the values. Nothing surfaces it to the
+ * client yet — objects-8 does — but it is decided here, where the claim was
+ * actually made, and nowhere else can reconstruct it afterwards.
+ */
+export type SetValuesResult = {
+  changed: Array<string>
+  defaulted: Array<string>
+  identity: Record<string, IdentityOutcome>
+}
+
 export const setValuesEffect = Effect.fn('setValues')(function* (
   opts: SetValuesInput,
 ): Effect.fn.Return<
-  { changed: Array<string>; defaulted: Array<string> },
+  SetValuesResult,
   AttributeValidationError | EntityNotFound | ValuesWriteFailed
 > {
   const {
@@ -329,6 +410,34 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
             .set({ values: next })
             .where(eq(entity.id, entityId))
         }
+
+        // The declaration made flesh (spec §9): an attribute carrying
+        // `options.identityKey` mirrors its value into `entity_alias` as an
+        // identity alias, in this transaction, beside the `attribute_event`
+        // that logged it. The value is the user's field and always lands;
+        // only the *claim* is withheld from the loser of a race, which is a
+        // `duplicate_candidate` and never an error. A change of value
+        // retires the claim the old one made before asserting the new one,
+        // and a clear retires it and asserts nothing — clearing the value
+        // releases the claim (CONTEXT.md, 2026-09-19), so another record may
+        // take the domain.
+        const identity: Record<string, IdentityOutcome> = {}
+        for (const work of planIdentity(registry, current, patch, changes)) {
+          if (work.held !== null && work.held !== work.value) {
+            await releaseIdentityAlias(tx, entityId, work.key, work.held)
+          }
+          identity[work.slug] =
+            work.value === null
+              ? 'released'
+              : await claimIdentityAlias(
+                  tx,
+                  entityId,
+                  work.key,
+                  work.value,
+                  aliasSource(actor, source),
+                )
+        }
+
         return {
           changed: changes
             .filter((c) => c.door !== 'default')
@@ -336,6 +445,7 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
           defaulted: changes
             .filter((c) => c.door === 'default')
             .map((c) => c.slug),
+          identity,
         }
       }),
     catch: (cause) =>
@@ -347,7 +457,5 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
 })
 
 /** Promise seam for server-fns and tests; new Effect code composes `setValuesEffect`. */
-export const setValues = (
-  opts: SetValuesInput,
-): Promise<{ changed: Array<string>; defaulted: Array<string> }> =>
+export const setValues = (opts: SetValuesInput): Promise<SetValuesResult> =>
   Effect.runPromise(setValuesEffect(opts))
