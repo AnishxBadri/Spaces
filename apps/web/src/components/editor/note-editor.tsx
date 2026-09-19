@@ -1,3 +1,15 @@
+/**
+ * The LAYOUT half of BlockNote, and only that: this file is
+ * `@blocknote/react/style.css` (which is `@blocknote/core/style.css` plus the
+ * floating-element geometry) and a dozen `.bn-shadcn` rules that size the side
+ * menu, the table cell handle and the toolbar's overflow. It carries no
+ * shadow, no radius, no font and no colour the app has not already replaced —
+ * the visual half of the shadcn theme was never in this stylesheet, it is
+ * Tailwind class names emitted by the vendor's own JSX, which the app's
+ * Tailwind build does not scan and therefore never builds. The VISUAL half is
+ * the app's, in the `.prose-note` block of `src/styles.css`. Keep the import:
+ * without it the editor has no block layout at all.
+ */
 import '@blocknote/shadcn/style.css'
 
 import {
@@ -6,11 +18,22 @@ import {
   filterSuggestionItems,
 } from '@blocknote/core'
 import { BlockNoteView } from '@blocknote/shadcn'
-import { SuggestionMenuController, useCreateBlockNote } from '@blocknote/react'
+import {
+  FormattingToolbarController,
+  LinkToolbarController,
+  SideMenuController,
+  SuggestionMenuController,
+  useCreateBlockNote,
+} from '@blocknote/react'
 import { useMemo } from 'react'
 import { Mention } from './mention'
 import { createGlossaryExtension } from './glossary-decoration'
 import type { GlossaryTerm } from './glossary-decoration'
+import {
+  HANDLE_MOTION,
+  SHEET_MOTION,
+  instrumentChrome,
+} from './instrument-chrome'
 import { searchEntities } from '#/lib/server-fns'
 import type { Json } from '#/lib/json'
 import type { NoteBody } from '@spaces/db/schema/kinds'
@@ -161,6 +184,45 @@ export function NoteEditor({
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- @blocknote's editor/view generics are not exactOptionalPropertyTypes-clean (PartialBlock variance)
       editor={editor as never}
       theme="light"
+      /**
+       * WHICH SURFACE WENT WHICH WAY — the map the next BlockNote upgrade
+       * needs. Three seams, because BlockNote builds its chrome three ways.
+       *
+       * 1. COMPONENT OVERRIDE (`shadCNComponents`, here → `instrument-chrome
+       *    .tsx`). BlockNote reads these out of its own context, so handing it
+       *    the app's primitives means the surface is drawn by the same file
+       *    the rest of the app is drawn by and needs no CSS at all:
+       *      Button        the drag handle, the `+`, every toolbar button
+       *      DropdownMenu  the drag-handle block menu, the toolbar dropdowns
+       *      Popover       edit-link, create-link, file caption and rename
+       *      Tooltip       a toolbar button's name on hover
+       *      Input, Label  the URL field inside those
+       *      Toggle        bold/italic — the one adapter, over `Button`
+       *
+       * 2. CSS, in the `.prose-note` block of `src/styles.css`. These BlockNote
+       *    builds from its own markup with shadcn class names it never reads
+       *    from the context, so there is no seam to hand anything to:
+       *      .bn-suggestion-menu  the slash menu AND the @-mention menu
+       *      .bn-toolbar          the formatting and link toolbar sheets
+       *      .bn-side-menu        the handle colour (geometry left alone)
+       *      .bn-table-handle     colour and radius only, per the same rule
+       *      .bn-select, badge    the block-type picker and the kind chip —
+       *                           the two groups with no app primitive behind
+       *                           them, so they are dressed, not replaced
+       *      --bn-*               BlockNote's own variables: radius, 1px ink
+       *                           edge, the grey ramp → Instrument materials
+       *
+       * 3. MOTION (`floatingUIOptions`, below). Every floating element's enter
+       *    and exit is a floating-ui INLINE style, which neither seam above
+       *    can reach — so the four default controllers are switched off and
+       *    re-rendered here by hand, each carrying the timing. See
+       *    `instrument-chrome.tsx` for why the scale half lives in CSS.
+       */
+      shadCNComponents={instrumentChrome}
+      formattingToolbar={false}
+      linkToolbar={false}
+      slashMenu={false}
+      sideMenu={false}
       onChange={() =>
         onChange({
           document: toNoteBody(editor.document),
@@ -169,10 +231,25 @@ export function NoteEditor({
         })
       }
     >
+      <FormattingToolbarController floatingUIOptions={SHEET_MOTION} />
+      <LinkToolbarController floatingUIOptions={SHEET_MOTION} />
+      <SideMenuController floatingUIOptions={HANDLE_MOTION} />
+      <SuggestionMenuController
+        triggerCharacter="/"
+        // Verbatim from BlockNote's own default slash menu
+        // (BlockNoteDefaultUI.tsx): a table cell is not a place to insert a
+        // block. Switching the default controller off is what makes this our
+        // line to keep.
+        shouldOpen={(tr) =>
+          !tr.selection.$from.parent.type.isInGroup('tableContent')
+        }
+        floatingUIOptions={SHEET_MOTION}
+      />
       <SuggestionMenuController
         triggerCharacter="@"
         minQueryLength={1}
         getItems={getMentionItems}
+        floatingUIOptions={SHEET_MOTION}
       />
     </BlockNoteView>
   )
