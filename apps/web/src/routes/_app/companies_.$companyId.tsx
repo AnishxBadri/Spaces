@@ -468,7 +468,7 @@ function DomainsField({
       if (result.outcome === 'suggested_duplicate') {
         toast(`Another company already owns ${domain}`, {
           description:
-            'Flagged as a possible duplicate — review it in the dedupe inbox.',
+            'Flagged as a possible duplicate — review it in the review inbox.',
         })
       } else if (result.outcome === 'already_own') {
         toast(`${domain} is already on this company`)

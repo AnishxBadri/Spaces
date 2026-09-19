@@ -91,6 +91,7 @@ const RESERVED = new Set([
   'today',
   'mandate',
   'dedupe',
+  'inbox',
   'o',
   'api',
   'login',

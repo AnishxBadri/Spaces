@@ -184,7 +184,7 @@ named file rather than designing. Name the pattern you copied in the PR descript
 no `ViewBar`** — saved views address objects, and a shelf is not one.
 
 **A queue** — pairs or suggestions a human decides one at a time (`/inbox`, the
-suggestion queue). → **`/dedupe`**, `apps/web/src/routes/_app/dedupe.tsx`. `PageHeader`
+suggestion queue). → **`/inbox`**, `apps/web/src/routes/_app/inbox.tsx`. `PageHeader`
 whose description is a mono count line, a `max-w-220` column of cards, each card
 carrying its own accept/dismiss with a toast, `EmptyState` at zero. Not a table: a queue
 row is a decision, not a cell.

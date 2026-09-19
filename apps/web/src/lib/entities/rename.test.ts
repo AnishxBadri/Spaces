@@ -161,7 +161,7 @@ describe('renaming a record', () => {
 
 describe('the dedupe card — "Also seen as"', () => {
   it('never lists the record’s own current name', async () => {
-    const { entityContext } = await import('../server/dedupe')
+    const { entityContext } = await import('../server/inbox')
     const { resolveEntity } = await import('./resolve')
     const { renameRecordProgram } = await import('./rename')
     const { normalizeName } = await import('@spaces/core/entities/normalize')

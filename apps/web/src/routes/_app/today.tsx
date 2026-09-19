@@ -14,10 +14,10 @@ import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import {
+  countOpenInbox,
   dealFunnelStats,
   getOnboardingProgress,
   getWorkspaceActivity,
-  listDuplicates,
   listHoldings,
   listRegistry,
   listTasks,
@@ -35,23 +35,18 @@ import { localToday } from '@spaces/core/tasks/parse-due'
  */
 export const Route = createFileRoute('/_app/today')({
   loader: async () => {
-    const [
-      tasks,
-      holdings,
-      funnel,
-      progress,
-      activity,
-      dealRegistry,
-      duplicates,
-    ] = await Promise.all([
-      listTasks(),
-      listHoldings(),
-      dealFunnelStats(),
-      getOnboardingProgress(),
-      getWorkspaceActivity(),
-      listRegistry({ data: { kind: 'deal' } }),
-      listDuplicates(),
-    ])
+    const [tasks, holdings, funnel, progress, activity, dealRegistry, inbox] =
+      await Promise.all([
+        listTasks(),
+        listHoldings(),
+        dealFunnelStats(),
+        getOnboardingProgress(),
+        getWorkspaceActivity(),
+        listRegistry({ data: { kind: 'deal' } }),
+        // A count, not the list: the readout wants one number, and
+        // `listInbox()` costs four queries per side per pair to produce it.
+        countOpenInbox(),
+      ])
     return {
       tasks,
       holdings,
@@ -59,7 +54,7 @@ export const Route = createFileRoute('/_app/today')({
       progress,
       activity,
       dealRegistry,
-      dedupeCount: duplicates.length,
+      inboxCount: inbox.open,
     }
   },
   component: TodayPage,
@@ -168,7 +163,7 @@ function TodayPage() {
     progress,
     activity,
     dealRegistry,
-    dedupeCount,
+    inboxCount,
   } = Route.useLoaderData()
   const today = localToday()
   // The spine's composer row reports what it made; nothing the loader
@@ -228,7 +223,7 @@ function TodayPage() {
     idleDeals.length +
     staleHoldings.length +
     missingRates +
-    dedupeCount
+    inboxCount
 
   const weekday = WEEKDAY[new Date(`${today}T00:00:00Z`).getUTCDay()]
 
@@ -300,7 +295,7 @@ function TodayPage() {
             tone: 'warn',
             to: '/settings/currency',
           },
-          { label: 'Dedupe inbox', value: dedupeCount, to: '/dedupe' },
+          { label: 'Review inbox', value: inboxCount, to: '/inbox' },
         ]}
       />
 
