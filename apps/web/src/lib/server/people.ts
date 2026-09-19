@@ -6,7 +6,12 @@ import { entity, entityAlias, link, person } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from '../entities/resolve'
 import { jsonString } from '#/lib/json'
-import { lastTouchedMap, requireUser } from './shared'
+import {
+  groupReferencedBy,
+  lastTouchedMap,
+  referencedByRows,
+  requireUser,
+} from './shared'
 
 export const listPeople = createServerFn().handler(async () => {
   await requireUser()
@@ -207,6 +212,11 @@ export const getPerson = createServerFn()
       .innerJoin(entity, eq(entity.id, link.fromEntityId))
       .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
 
+    // Inbound record-references, grouped by the attribute that made them:
+    // `deal.referred_by` (SPA-59) is the first, and any later attribute
+    // pointing at a person joins it with no edit to the page.
+    const referencedBy = groupReferencedBy(await referencedByRows(data.id))
+
     const timeline = await db
       .select({
         id: activity.id,
@@ -227,6 +237,7 @@ export const getPerson = createServerFn()
       linkedins: aliases.filter((a) => a.kind === 'linkedin'),
       companies,
       mentionedIn,
+      referencedBy,
       timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
     }
   })

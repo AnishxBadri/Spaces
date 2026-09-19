@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { attribute, entity, link, objectDef } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
-import { requireUser } from './shared'
+import { referencedByRows, requireUser } from './shared'
 
 /**
  * The object registry, read side (CONTEXT.md "Two-tier object model"). One
@@ -233,7 +233,7 @@ export const getObjectRecord = createServerFn()
   .handler(async ({ data }) => {
     await requireUser()
     const { entitySpace, space } = await import('@spaces/db/schema')
-    const { and: andOp, isNull } = await import('drizzle-orm')
+    const { and: andOp } = await import('drizzle-orm')
     const head = (
       await db
         .select({
@@ -283,25 +283,9 @@ export const getObjectRecord = createServerFn()
         andOp(eq(link.fromEntityId, data.id), eq(link.relation, 'references')),
       )
     // Incoming references — backlinks both ways (§9): who points at this.
-    const referencedBy = await db
-      .select({
-        fromId: link.fromEntityId,
-        attrSlug: link.attrSlug,
-        name: entity.canonicalName,
-        kind: entity.kind,
-        objectSlug: objectDef.slug,
-        objectSingular: objectDef.singular,
-      })
-      .from(link)
-      .innerJoin(entity, eq(entity.id, link.fromEntityId))
-      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
-      .where(
-        andOp(
-          eq(link.toEntityId, data.id),
-          eq(link.relation, 'references'),
-          isNull(entity.mergedIntoId),
-        ),
-      )
+    // The query is `referencedByRows` (server/shared.ts), shared with the
+    // person page; this page renders it flat, unchanged.
+    const referencedBy = await referencedByRows(data.id)
     const mentionedIn = await db
       .select({
         fromId: link.fromEntityId,
