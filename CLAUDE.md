@@ -159,7 +159,8 @@ harness derives `spaces_test*` from it, so the suite never writes the
 - Attribute values have one write path, which validates, logs, and links
   (`no-restricted-syntax` on `entity.values`; `apps/web/src/lib/attributes/values.ts`).
 - Portfolio history is append-only; a correction is a compensating event
-  (_review_ — D12, `docs/decisions-2026-09.md`).
+  (D12, built by SPA-150 — `apps/web/src/lib/portfolio/reverse.ts`, the
+  `<table>_reverses_unique` partial indexes, `packages/core/src/portfolio/reversal.ts`).
 - Effect never crosses into React; the seam is `effectFn()`
   (`no-restricted-imports` on `effect` in `apps/web/src/routes/**`,
   `apps/web/src/components/**`).
@@ -224,14 +225,32 @@ anyway. Don't re-litigate it from the flag list.
   server boundary; pure libs (`packages/core/src/portfolio/`) take numbers. Dates are
   ISO strings compared lexically.
 - The portfolio event tables (investment/mark/distribution/fx_rate) are
-  **append-only by design** — no edit/delete paths. ~~The correction policy is
-  an open decision~~ — **decided 2026-09-18 (D12): reversal by compensating
-  event.** Each event table gains a nullable self-referencing `reverses_id`;
-  a void flow appends an exact-negative event citing the original, and a
-  batch reversal undoes a whole import. Portfolio math sums as before, the
-  timeline shows both rows, and history stays information. Still never add an
-  edit or delete path — the correction is an append like everything else.
-  See `docs/decisions-2026-09.md`.
+  **append-only by design** — no edit/delete paths, and there still are none.
+  The correction policy is **decided and built (D12, SPA-150, 2026-09-19):
+  reversal by compensating event.** **Three** tables carry a nullable
+  self-referencing `reverses_id` and a nullable `batch_id` — `investment`,
+  `mark`, `distribution`. **`fx_rate` is excluded**: it is a lookup rather
+  than a summed event, its `rate_to_base > 0` CHECK would refuse a negated
+  row, and `setFxRate` already upserts on `(currency, date)`, so correcting a
+  rate simply recomputes every derived number. A void appends an
+  exact-negative event citing the original and dated as the original was
+  dated; a partial unique index on `reverses_id` makes a double void a
+  database error, not a race. Batch reversal voids every event sharing one
+  `batch_id` in one transaction and refuses whole. **Never add an edit or a
+  delete path** — the correction is an append like everything else.
+  - The reader contract is the load-bearing half: the loader
+    (`apps/web/src/lib/portfolio/detail.ts`) hands the pure libs
+    **originals only**, each stamped with `reversedAt` (the reversal's
+    `created_at`), and `@spaces/core/portfolio/reversal` drops an event once
+    the as-of day has reached that instant — so an as-of date before the void
+    still sees the original. Nothing derived leans on the negation
+    cancelling: the latest mark wins, `writtenOff` reads the latest write-off,
+    `ownership()` filters `shares > 0`. The negation is stored so a raw SQL
+    `SUM` stays honest and the timeline can show the correction.
+  - The void flow is Effect-first through `effectFn()`
+    (`apps/web/src/lib/portfolio/reverse.ts`); its tagged errors carry an
+    empty `message`, so `ledgerVoidMessage` is what the dialog is shown.
+    See `docs/decisions-2026-09.md`.
 
 ## Browser verification (Chrome MCP)
 

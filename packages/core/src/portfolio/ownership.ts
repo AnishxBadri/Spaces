@@ -6,11 +6,18 @@
  *   *implied %*.
  * - pre-money SAFEs and CCDs are cost-basis-only until conversion — a % is
  *   never faked.
+ *
+ * Corrections are appends (D12): the caller passes originals only, each
+ * stamped with `reversedAt`, and a voided check drops out of the history
+ * once the as-of day has reached the void. The `shares > 0` filter below is
+ * *not* what excludes a compensating row — see `./reversal.ts`.
  */
+import type { Reversible } from './reversal'
+import { liveAt } from './reversal'
 
 export type Instrument = 'priced' | 'safe_post_money' | 'safe_pre_money' | 'ccd'
 
-export type OwnershipInvestment = {
+export type OwnershipInvestment = Reversible & {
   date: string
   amount: number
   instrument: Instrument
@@ -48,9 +55,10 @@ export function ownership(
   rounds: Array<OwnershipRound>,
   asOf?: string,
 ): Ownership {
-  const inWindow = asOf
-    ? investments.filter((i) => i.date <= asOf)
-    : investments
+  const inWindow = liveAt(
+    asOf ? investments.filter((i) => i.date <= asOf) : investments,
+    asOf,
+  )
   const withShares = inWindow.filter(
     (i) => i.instrument === 'priced' && i.shares != null && i.shares > 0,
   )

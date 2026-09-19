@@ -218,6 +218,13 @@
       "when": 1789816307848,
       "tag": "0030_source_class_interaction_document",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1789817727347,
+      "tag": "0031_ledger_reversal",
+      "breakpoints": true
     }
   ]
 }

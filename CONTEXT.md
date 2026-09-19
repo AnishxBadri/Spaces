@@ -2151,7 +2151,24 @@ date / amount / instrument / round info / current mark, decomposed into dated
 for pre-existing positions. Per-row errors, never all-or-nothing.
 Spec refinements (2026-08, stress-tested against a TagHash analytics dashboard): - **Append-only dated events; aggregates always derived, never stored.** This is
 what makes "as on <date>" point-in-time views free — filter events ≤ date and
-recompute. Stated as a rule so nobody adds a mutable current_value column. - **Instrument subtypes carry ownership semantics** (2026-08, YC mechanics):
+recompute. Stated as a rule so nobody adds a mutable current_value column. **A
+correction is an append too (decided 2026-09-18 as D12, built 2026-09-19 by
+SPA-150):** there is no edit path and no delete path on a ledger event. A void
+appends a compensating event — same holding, the _original's_ date, negated
+amount and shares — citing the original through a nullable self-referencing
+`reverses_id`, so the record of what was believed and when survives the
+correction. A partial unique index on `reverses_id` makes a second void a
+database refusal; a nullable `batch_id` (no FK yet — nothing owns a batch
+until import-9 and ai-22 stamp it) lets one wrong forty-row import be voided
+in a single transaction, all or nothing. **`fx_rate` is deliberately not one
+of them:** it is a lookup rather than a summed event, its `rate_to_base > 0`
+CHECK forbids a negated row, and `setFxRate` already upserts on
+`(currency, date)` — correcting a rate recomputes every derived number, so
+there is nothing for a reversal to undo. Readers get the other half of the
+rule: the loader hands the pure libs only live originals, each carrying
+`reversedAt` (the void instant), and a reversal counts only once the as-of day
+has reached it — so "as on <date>" before a void still shows what was believed
+then. The derived numbers never depend on the negation summing to zero. - **Instrument subtypes carry ownership semantics** (2026-08, YC mechanics):
 post-money SAFEs lock ownership at signing (amount ÷ cap — display as _implied %_);
 pre-money SAFEs and CCDs have cost basis only until conversion — never fake a %.
 Enum: priced / safe_post_money / safe_pre_money / ccd. - **Share-level columns from day one**: price_per_share + shares_outstanding on

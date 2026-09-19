@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
+import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { entity } from './entities'
 import { user } from './auth'
 
@@ -21,6 +22,21 @@ import { user } from './auth'
  * is derived at read, never stored. "As on <date>" views are filters over
  * these tables. Money stays in its original currency forever; conversion
  * is a read-time lookup against fx_rate (workspace.settings.base_currency).
+ *
+ * **A correction is an append (D12, SPA-150).** There is still no edit and no
+ * delete path. `investment`, `mark` and `distribution` each carry a nullable
+ * self-referencing `reverses_id`: a void appends an exact-negative event
+ * citing the original, dated as the original was dated, and the partial
+ * unique index on `reverses_id` makes a second void a database error rather
+ * than a race. `batch_id` is the handle a bulk void grabs — nullable uuid,
+ * deliberately no FK, because the table that owns a batch does not exist yet
+ * (import-9 and ai-22 stamp it; a later migration adds the FK).
+ *
+ * `fx_rate` is excluded on purpose: it is a lookup, not a summed event. It
+ * carries a `rate_to_base > 0` CHECK that a negated row would violate, and
+ * `setFxRate` already upserts on (currency, date) — correcting a rate
+ * recomputes every derived number, so there is nothing for a reversal to
+ * undo.
  */
 
 /**
@@ -133,12 +149,26 @@ export const investment = pgTable(
     cap: numeric('cap', { precision: 20, scale: 4 }),
     discount: numeric('discount', { precision: 7, scale: 4 }),
     vehicle: text('vehicle'),
+    /** Set on a compensating event; points at the check it voids (D12). */
+    reversesId: uuid('reverses_id').references(
+      (): AnyPgColumn => investment.id,
+    ),
+    /** The bulk-void handle. No FK — nothing owns a batch yet (D12). */
+    batchId: uuid('batch_id'),
     createdBy: text('created_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index('investment_holding_date_idx').on(t.holdingId, t.date)],
+  (t) => [
+    index('investment_holding_date_idx').on(t.holdingId, t.date),
+    // One reversal per event, enforced by Postgres and not only by the
+    // check the void flow makes — two concurrent voids would both pass it.
+    uniqueIndex('investment_reverses_unique')
+      .on(t.reversesId)
+      .where(sql`${t.reversesId} is not null`),
+    index('investment_batch_idx').on(t.batchId),
+  ],
 )
 
 export const markBasis = pgEnum('mark_basis', ['round_price', 'manual', '409a'])
@@ -158,12 +188,22 @@ export const mark = pgTable(
     fairValue: numeric('fair_value', { precision: 20, scale: 4 }).notNull(),
     currency: char('currency', { length: 3 }).notNull(),
     basis: markBasis('basis').notNull(),
+    /** Set on a compensating event; points at the mark it voids (D12). */
+    reversesId: uuid('reverses_id').references((): AnyPgColumn => mark.id),
+    /** The bulk-void handle. No FK — nothing owns a batch yet (D12). */
+    batchId: uuid('batch_id'),
     createdBy: text('created_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index('mark_holding_date_idx').on(t.holdingId, t.date)],
+  (t) => [
+    index('mark_holding_date_idx').on(t.holdingId, t.date),
+    uniqueIndex('mark_reverses_unique')
+      .on(t.reversesId)
+      .where(sql`${t.reversesId} is not null`),
+    index('mark_batch_idx').on(t.batchId),
+  ],
 )
 
 export const distributionKind = pgEnum('distribution_kind', [
@@ -191,12 +231,24 @@ export const distribution = pgTable(
     kind: distributionKind('kind').notNull(),
     sharesSold: numeric('shares_sold', { precision: 20, scale: 4 }),
     pricePerShare: numeric('price_per_share', { precision: 20, scale: 8 }),
+    /** Set on a compensating event; points at the row it voids (D12). */
+    reversesId: uuid('reverses_id').references(
+      (): AnyPgColumn => distribution.id,
+    ),
+    /** The bulk-void handle. No FK — nothing owns a batch yet (D12). */
+    batchId: uuid('batch_id'),
     createdBy: text('created_by').references(() => user.id),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index('distribution_holding_date_idx').on(t.holdingId, t.date)],
+  (t) => [
+    index('distribution_holding_date_idx').on(t.holdingId, t.date),
+    uniqueIndex('distribution_reverses_unique')
+      .on(t.reversesId)
+      .where(sql`${t.reversesId} is not null`),
+    index('distribution_batch_idx').on(t.batchId),
+  ],
 )
 
 /**
