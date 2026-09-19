@@ -2,14 +2,18 @@ import { PgBoss } from 'pg-boss'
 import type { Job } from 'pg-boss'
 import { requireEnv } from '#/lib/server/env'
 import { QUEUES } from './queues'
-import { extractDocument } from './jobs/extract-document'
+import { pgBossHost, runJob } from './run-job'
+import { ExtractionStore, extractDocument } from './jobs/extract-document'
 
 /**
  * The worker process. Second process in the app container (or run locally
  * with `pnpm worker`). pg-boss keeps its state in Postgres — no Redis.
  *
  * Handlers are stubs until their features land; registering the queues now
- * pins the seam so web-side code can enqueue from day one.
+ * pins the seam so web-side code can enqueue from day one. Real jobs go
+ * through `runJob` (./run-job.ts) — one wrapper, typed outcomes, and a
+ * promise that never rejects, because a rejecting batch handler fails the
+ * whole batch and an uncaught throw past it is a container death.
  */
 
 async function main() {
@@ -23,6 +27,8 @@ async function main() {
   await boss.start()
   console.log('[worker] pg-boss started')
 
+  const host = pgBossHost(boss)
+
   const stub = (label: string) => async (jobs: Array<Job>) => {
     for (const job of jobs) console.log(`[worker] ${label} (stub)`, job.id)
   }
@@ -31,14 +37,25 @@ async function main() {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots
   }
 
+  // JobDef.retry is the queue's policy, not the wrapper's: JobRetryable just
+  // fails the job and lets pg-boss count. updateQueue is how it reaches a
+  // queue row that createQueue already created on an earlier boot.
+  const retry = extractDocument.retry
+  if (retry) {
+    await boss.updateQueue(extractDocument.name, {
+      retryLimit: retry.limit,
+      retryDelay: retry.delaySeconds,
+      retryBackoff: retry.backoff,
+    })
+  }
+
   // Extraction is the CPU-bound one: a whole batch on one tick would block
   // this process the way inline extraction would block the web one.
+  // includeMetadata is what gives JobContext its attempt / isFinalAttempt.
   await boss.work(
     QUEUES.extractDocument,
-    { batchSize: 1 },
-    async (jobs: Array<Job>) => {
-      for (const job of jobs) await extractDocument(job.data)
-    },
+    { batchSize: 1, includeMetadata: true },
+    runJob(extractDocument, { host, layer: ExtractionStore.layer }),
   )
   await boss.work(QUEUES.embedDocument, stub('document.embed'))
   await boss.work(QUEUES.dedupeSweep, stub('entity.dedupe-sweep'))
