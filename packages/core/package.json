@@ -1,5 +1,5 @@
 {
-  "//": "The pure half of the domain (mono-7): portfolio maths, the two display-format modules, the glossary automaton, the due-date grammar, the view-filter matcher, document extraction and policy, identity normalization, and the attribute registry's pure quartet. The property this package exists to hold is stated as a test, not a convention — `src/purity.test.ts` fails the build on a `drizzle-orm` import, a React import, a `process.env` read, or a value (as opposed to type) import of @spaces/db.",
+  "//": "The pure half of the domain (mono-7): portfolio maths, the two display-format modules, the glossary automaton, the due-date grammar, the view-filter matcher, document extraction and policy, identity normalization, the attribute registry's pure quartet, and (mono-9c) both halves of the web→worker queue seam. The property this package exists to hold is stated as a test, not a convention — `src/purity.test.ts` fails the build on a `drizzle-orm` import, a React import, a `process.env` read, or a value (as opposed to type) import of @spaces/db.",
   "name": "@spaces/core",
   "version": "0.0.0",
   "private": true,
@@ -14,17 +14,19 @@
     "./documents": "./src/documents/index.ts",
     "./documents/*": "./src/documents/*.ts",
     "./entities/normalize": "./src/entities/normalize.ts",
-    "./attributes/*": "./src/attributes/*.ts"
+    "./attributes/*": "./src/attributes/*.ts",
+    "./queue/*": "./src/queue/*.ts"
   },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
-  "//dependencies": "unpdf, mammoth and fflate arrived with documents/extract.ts, tldts with entities/normalize.ts, zod with the attribute value validators. Not here, and the test enforces it: drizzle-orm, react, and anything that reads the environment.",
+  "//dependencies": "unpdf, mammoth and fflate arrived with documents/extract.ts, tldts with entities/normalize.ts, zod with the attribute value validators, pg-boss with queue/sender.ts (mono-9c) — the sender is pure in the sense this package means it, because it is handed its connection string rather than reading one. Not here, and the test enforces it: drizzle-orm, react, and anything that reads the environment.",
   "dependencies": {
     "fflate": "^0.8.3",
     "mammoth": "^1.12.0",
+    "pg-boss": "^12.26.3",
     "tldts": "^7.4.9",
     "unpdf": "^1.8.0",
     "zod": "^4.3.6"

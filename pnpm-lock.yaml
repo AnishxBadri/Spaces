@@ -245,6 +245,9 @@ importers:
       mammoth:
         specifier: ^1.12.0
         version: 1.12.0
+      pg-boss:
+        specifier: ^12.26.3
+        version: 12.26.3
       tldts:
         specifier: ^7.4.9
         version: 7.4.9
