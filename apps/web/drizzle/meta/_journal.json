@@ -169,6 +169,13 @@
       "when": 1789119025129,
       "tag": "0023_drop_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789801557551,
+      "tag": "0024_worker_heartbeat",
+      "breakpoints": true
     }
   ]
 }

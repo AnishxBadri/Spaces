@@ -110,6 +110,49 @@ Blob downloads follow the same rule: presigned URLs for the local storage
 driver are built from `APP_URL`, not from the incoming request, so they come
 out `https://` and download back through the proxy.
 
+# Split roles — web and worker in separate containers
+
+The shipped compose runs one `ROLE=all` container, which is right for one
+box. To scale the two apart, overlay `docker-compose.split.yml`:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.split.yml up -d
+```
+
+`app` becomes `ROLE=web` and a `worker` service joins it on the same `./data`
+and the same `DATABASE_URL`. The two halves talk only through Postgres.
+
+## Checking that the worker is actually running
+
+A crashed worker is the failure that looks healthy: the web container still
+serves, and extraction silently never runs. So the worker upserts one
+`worker_heartbeat` row on boot and every 15s, and both healthchecks read it.
+
+`GET /api/health` is unauthenticated and stays thin — a status, the database,
+and how long ago the worker last beat:
+
+```json
+{
+  "status": "ok",
+  "db": "ok",
+  "worker": { "status": "ok", "lastBeatSeconds": 7 }
+}
+```
+
+`worker.status` is `ok`, `stale` (no beat for 60s) or `absent` (no row yet).
+**A stale or absent worker does not change the HTTP code**: it stays 200 with
+`status: "ok"`, because a worker outage must never fail the web container's
+healthcheck and restart it. Only an unreachable database answers 503 with
+`status: "degraded"` and `db: "unreachable"`.
+
+The worker container runs no HTTP server, so its `HEALTHCHECK` is not a wget —
+the Dockerfile branches on `$ROLE` and a `ROLE=worker` container asks its own
+row instead (`src/worker/health.ts`, exit 0 fresh / 1 stale). Stop the worker
+process and `docker ps` shows that container `unhealthy` within a minute while
+the web container stays `healthy`. A graceful stop leaves the row in place on
+purpose: staleness is the signal, so the operator can still see when the
+worker last beat.
+
 # Building For Production
 
 To build this application for production:

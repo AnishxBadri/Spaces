@@ -78,7 +78,17 @@ RUN chmod +x /entrypoint.sh && mkdir -p /data && chown -R node:node /data /app
 VOLUME /data
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
-  CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
+# Branched on ROLE, because a worker-only container runs no HTTP server and
+# wget-ing :3000 in it would fail forever (hostability contract 4). ROLE=worker
+# asks its own worker_heartbeat row through the same threshold /api/health
+# uses; web and all keep the HTTP check, whose payload now carries the
+# worker's status without letting a stale worker fail the web container.
+# The timeout is 10s for the worker branch: tsx has to boot and connect.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s \
+  CMD if [ "${ROLE:-all}" = worker ]; then \
+        node_modules/.bin/tsx src/worker/health.ts; \
+      else \
+        wget -qO- http://127.0.0.1:3000/api/health || exit 1; \
+      fi
 
 ENTRYPOINT ["/entrypoint.sh"]

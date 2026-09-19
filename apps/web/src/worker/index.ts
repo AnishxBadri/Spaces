@@ -2,6 +2,7 @@ import { PgBoss } from 'pg-boss'
 import type { Job } from 'pg-boss'
 import { requireEnv } from '#/lib/server/env'
 import { QUEUES } from './queues'
+import { startHeartbeat, workerIdentity } from './heartbeat'
 import { pgBossHost, runJob } from './run-job'
 import { ExtractionStore, extractDocument } from './jobs/extract-document'
 
@@ -66,8 +67,21 @@ async function main() {
     tz: 'Etc/UTC',
   })
 
+  // The heartbeat (SPA-57). Last, so the row only appears once this process
+  // is actually working queues — a row written before `boss.work` would claim
+  // a worker that is not one yet.
+  const identity = workerIdentity()
+  const heartbeat = startHeartbeat(identity)
+  await heartbeat.booted
+  console.log(
+    `[worker] heartbeat: role '${identity.role}' instance '${identity.instance}' pid ${String(identity.pid)}`,
+  )
+
   const shutdown = async () => {
     console.log('[worker] shutting down')
+    // Stop beating, but leave the row: staleness is the signal, so a graceful
+    // stop still tells the operator when this worker last beat.
+    heartbeat.stop()
     await boss.stop({ graceful: true, timeout: 15000 })
     process.exit(0)
   }

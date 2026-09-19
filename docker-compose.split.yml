@@ -1,0 +1,43 @@
+# Split roles: web and worker in their own containers, one ./data and one
+# DATABASE_URL between them. An overlay on the shipped compose, the same way
+# docker-compose.tls.yml is:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.split.yml up -d
+#
+# The shipped compose ships one ROLE=all service, which is the right default
+# for a single box. This is for the deployment that scales the two apart — and
+# it is also what makes the worker's healthcheck demonstrable: only here is
+# there a container whose health is decided by the worker_heartbeat row rather
+# than by an HTTP endpoint (CONTEXT.md hostability contract 4).
+#
+# `app` keeps its name so the overlay merges onto it; ROLE=web turns it into
+# the web half. Naming the built image once means compose builds it once and
+# the worker starts the same bytes.
+services:
+  app:
+    image: spaces:local
+    environment:
+      ROLE: web
+
+  worker:
+    image: spaces:local
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-spaces}:${POSTGRES_PASSWORD:-spaces}@db:5432/${POSTGRES_DB:-spaces}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      ROLE: worker
+    volumes:
+      # The same ./data as the web half: blobs and secret.key are one unit,
+      # and the backup stays both-or-neither (contract 5).
+      - ./data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+      # Both roles run migrations on boot. Waiting for the web half to be
+      # healthy means one of them runs them and the other finds them applied,
+      # instead of two migrators racing for the journal on a cold start.
+      app:
+        condition: service_healthy
+    # No ports: the worker serves nothing. Its HEALTHCHECK reads its own
+    # worker_heartbeat row (src/worker/health.ts), so `docker ps` flips it to
+    # unhealthy within a minute of the worker process stopping.
+    restart: unless-stopped
