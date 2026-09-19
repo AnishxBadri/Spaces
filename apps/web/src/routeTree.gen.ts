@@ -32,6 +32,12 @@ import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId
 import { Route as AppOObjectSlugRouteImport } from './routes/_app/o.$objectSlug'
 import { Route as AppPeoplePersonIdRouteImport } from './routes/_app/people_.$personId'
 import { Route as AppPortfolioHoldingIdRouteImport } from './routes/_app/portfolio_.$holdingId'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsCurrencyRouteImport } from './routes/_app/settings/currency'
+import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
+import { Route as AppSettingsObjectsRouteImport } from './routes/_app/settings/objects'
+import { Route as AppSettingsTemplatesRouteImport } from './routes/_app/settings/templates'
+import { Route as AppSettingsWorkspaceRouteImport } from './routes/_app/settings/workspace'
 import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
@@ -152,6 +158,36 @@ const AppPortfolioHoldingIdRoute = AppPortfolioHoldingIdRouteImport.update({
   path: '/portfolio/$holdingId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsCurrencyRoute = AppSettingsCurrencyRouteImport.update({
+  id: '/currency',
+  path: '/currency',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsMembersRoute = AppSettingsMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsObjectsRoute = AppSettingsObjectsRouteImport.update({
+  id: '/objects',
+  path: '/objects',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsTemplatesRoute = AppSettingsTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsWorkspaceRoute = AppSettingsWorkspaceRouteImport.update({
+  id: '/workspace',
+  path: '/workspace',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSpacesSpaceIdRoute = AppSpacesSpaceIdRouteImport.update({
   id: '/spaces_/$spaceId',
   path: '/spaces/$spaceId',
@@ -191,7 +227,7 @@ export interface FileRoutesByFullPath {
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
   '/portfolio': typeof AppPortfolioRoute
-  '/settings': typeof AppSettingsRoute
+  '/settings': typeof AppSettingsRouteWithChildren
   '/spaces': typeof AppSpacesRoute
   '/tasks': typeof AppTasksRoute
   '/today': typeof AppTodayRoute
@@ -202,9 +238,15 @@ export interface FileRoutesByFullPath {
   '/o/$objectSlug': typeof AppOObjectSlugRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/portfolio/$holdingId': typeof AppPortfolioHoldingIdRoute
+  '/settings/currency': typeof AppSettingsCurrencyRoute
+  '/settings/members': typeof AppSettingsMembersRoute
+  '/settings/objects': typeof AppSettingsObjectsRoute
+  '/settings/templates': typeof AppSettingsTemplatesRoute
+  '/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/settings/': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
@@ -220,7 +262,6 @@ export interface FileRoutesByTo {
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
   '/portfolio': typeof AppPortfolioRoute
-  '/settings': typeof AppSettingsRoute
   '/spaces': typeof AppSpacesRoute
   '/tasks': typeof AppTasksRoute
   '/today': typeof AppTodayRoute
@@ -231,9 +272,15 @@ export interface FileRoutesByTo {
   '/o/$objectSlug': typeof AppOObjectSlugRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/portfolio/$holdingId': typeof AppPortfolioHoldingIdRoute
+  '/settings/currency': typeof AppSettingsCurrencyRoute
+  '/settings/members': typeof AppSettingsMembersRoute
+  '/settings/objects': typeof AppSettingsObjectsRoute
+  '/settings/templates': typeof AppSettingsTemplatesRoute
+  '/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/settings': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
@@ -251,7 +298,7 @@ export interface FileRoutesById {
   '/_app/notes': typeof AppNotesRoute
   '/_app/people': typeof AppPeopleRoute
   '/_app/portfolio': typeof AppPortfolioRoute
-  '/_app/settings': typeof AppSettingsRoute
+  '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/spaces': typeof AppSpacesRoute
   '/_app/tasks': typeof AppTasksRoute
   '/_app/today': typeof AppTodayRoute
@@ -262,9 +309,15 @@ export interface FileRoutesById {
   '/_app/o/$objectSlug': typeof AppOObjectSlugRoute
   '/_app/people_/$personId': typeof AppPeoplePersonIdRoute
   '/_app/portfolio_/$holdingId': typeof AppPortfolioHoldingIdRoute
+  '/_app/settings/currency': typeof AppSettingsCurrencyRoute
+  '/_app/settings/members': typeof AppSettingsMembersRoute
+  '/_app/settings/objects': typeof AppSettingsObjectsRoute
+  '/_app/settings/templates': typeof AppSettingsTemplatesRoute
+  '/_app/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/_app/settings_/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
@@ -293,9 +346,15 @@ export interface FileRouteTypes {
     | '/o/$objectSlug'
     | '/people/$personId'
     | '/portfolio/$holdingId'
+    | '/settings/currency'
+    | '/settings/members'
+    | '/settings/objects'
+    | '/settings/templates'
+    | '/settings/workspace'
     | '/spaces/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/settings/'
     | '/o/$objectSlug/$recordId'
     | '/settings/objects/$objectSlug'
   fileRoutesByTo: FileRoutesByTo
@@ -311,7 +370,6 @@ export interface FileRouteTypes {
     | '/notes'
     | '/people'
     | '/portfolio'
-    | '/settings'
     | '/spaces'
     | '/tasks'
     | '/today'
@@ -322,9 +380,15 @@ export interface FileRouteTypes {
     | '/o/$objectSlug'
     | '/people/$personId'
     | '/portfolio/$holdingId'
+    | '/settings/currency'
+    | '/settings/members'
+    | '/settings/objects'
+    | '/settings/templates'
+    | '/settings/workspace'
     | '/spaces/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/settings'
     | '/o/$objectSlug/$recordId'
     | '/settings/objects/$objectSlug'
   id:
@@ -352,9 +416,15 @@ export interface FileRouteTypes {
     | '/_app/o/$objectSlug'
     | '/_app/people_/$personId'
     | '/_app/portfolio_/$holdingId'
+    | '/_app/settings/currency'
+    | '/_app/settings/members'
+    | '/_app/settings/objects'
+    | '/_app/settings/templates'
+    | '/_app/settings/workspace'
     | '/_app/spaces_/$spaceId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/_app/settings/'
     | '/_app/o_/$objectSlug/$recordId'
     | '/_app/settings_/objects/$objectSlug'
   fileRoutesById: FileRoutesById
@@ -533,6 +603,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPortfolioHoldingIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/currency': {
+      id: '/_app/settings/currency'
+      path: '/currency'
+      fullPath: '/settings/currency'
+      preLoaderRoute: typeof AppSettingsCurrencyRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/members': {
+      id: '/_app/settings/members'
+      path: '/members'
+      fullPath: '/settings/members'
+      preLoaderRoute: typeof AppSettingsMembersRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/objects': {
+      id: '/_app/settings/objects'
+      path: '/objects'
+      fullPath: '/settings/objects'
+      preLoaderRoute: typeof AppSettingsObjectsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/templates': {
+      id: '/_app/settings/templates'
+      path: '/templates'
+      fullPath: '/settings/templates'
+      preLoaderRoute: typeof AppSettingsTemplatesRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/workspace': {
+      id: '/_app/settings/workspace'
+      path: '/workspace'
+      fullPath: '/settings/workspace'
+      preLoaderRoute: typeof AppSettingsWorkspaceRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/spaces_/$spaceId': {
       id: '/_app/spaces_/$spaceId'
       path: '/spaces/$spaceId'
@@ -571,6 +683,28 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppSettingsRouteChildren {
+  AppSettingsCurrencyRoute: typeof AppSettingsCurrencyRoute
+  AppSettingsMembersRoute: typeof AppSettingsMembersRoute
+  AppSettingsObjectsRoute: typeof AppSettingsObjectsRoute
+  AppSettingsTemplatesRoute: typeof AppSettingsTemplatesRoute
+  AppSettingsWorkspaceRoute: typeof AppSettingsWorkspaceRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+}
+
+const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsCurrencyRoute: AppSettingsCurrencyRoute,
+  AppSettingsMembersRoute: AppSettingsMembersRoute,
+  AppSettingsObjectsRoute: AppSettingsObjectsRoute,
+  AppSettingsTemplatesRoute: AppSettingsTemplatesRoute,
+  AppSettingsWorkspaceRoute: AppSettingsWorkspaceRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
+}
+
+const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
+  AppSettingsRouteChildren,
+)
+
 interface AppRouteChildren {
   AppCompaniesRoute: typeof AppCompaniesRoute
   AppDealsRoute: typeof AppDealsRoute
@@ -579,7 +713,7 @@ interface AppRouteChildren {
   AppNotesRoute: typeof AppNotesRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppPortfolioRoute: typeof AppPortfolioRoute
-  AppSettingsRoute: typeof AppSettingsRoute
+  AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppSpacesRoute: typeof AppSpacesRoute
   AppTasksRoute: typeof AppTasksRoute
   AppTodayRoute: typeof AppTodayRoute
@@ -602,7 +736,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppNotesRoute: AppNotesRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppPortfolioRoute: AppPortfolioRoute,
-  AppSettingsRoute: AppSettingsRoute,
+  AppSettingsRoute: AppSettingsRouteWithChildren,
   AppSpacesRoute: AppSpacesRoute,
   AppTasksRoute: AppTasksRoute,
   AppTodayRoute: AppTodayRoute,

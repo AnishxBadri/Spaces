@@ -52,7 +52,12 @@ function ObjectAttributesPage() {
               Settings
             </Link>
             <span className="text-rule">/</span>
-            <span>Objects</span>
+            <Link
+              to="/settings/objects"
+              className="focus-ring hover:text-foreground"
+            >
+              Objects
+            </Link>
           </span>
         }
         title={object.plural}
