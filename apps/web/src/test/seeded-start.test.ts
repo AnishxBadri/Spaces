@@ -7,7 +7,7 @@ import {
   CORE_OBJECTS,
   OBJECT_KINDS,
   SYSTEM_ATTRIBUTES,
-} from '#/lib/attributes/registry'
+} from '@spaces/core/attributes/registry'
 import { FIXTURE_ACTOR } from '../../vitest.seed'
 
 /**
