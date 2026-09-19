@@ -166,6 +166,32 @@ intersection looks like in a surface whose rows and columns are both dimensions.
 on the canvas and have it approved before it is coded. Do not derive it from
 `RecordTable` — that is rows of records, a different object.
 
+### The nav grammar
+
+A page reaches the chassis as **one row of data** in `NAV_ITEMS`
+(`apps/web/src/components/app-sidebar.tsx`), and the row decides everything about
+its place there. It joins one of the three groups — `work`, `objects`, `capital`
+(`DESIGN.md` §5, "Navigation — the chassis") — by naming it in the row's `group`
+field; the groups are derived by filter, so a row may be appended or inserted
+anywhere without reshuffling them. Its G-chord is the row's `key` field: **data, not
+a decision the slice that adds the page makes by hand.**
+`apps/web/src/components/nav-grammar.test.ts` fails naming both pages when two rows
+claim one letter, and it fails again on a chord that is not `G` plus a single letter
+or a group that is not one of the three — so the chord is checked, not negotiated.
+
+Rows stay grouped: the `group` values run `work` → `objects` → `capital` down the
+array and never go back, which is what the old `slice()` arithmetic assumed without
+checking, and the test holds it — so put the new row with its own kind rather than
+at the end.
+
+The sidebar (expanded and collapsed), the `?` keyboard sheet, the `⌘K` palette and
+the G-chord binding in `routes/_app.tsx` all read that same array, so adding a page
+edits nothing else — **one row, no other edit, the test included.**
+**`NAV_ITEMS` order feeds the command palette** — and the sheet's Go column — so
+those two surfaces read the array straight through; the test holds that each group
+keeps that order and that the three together are the whole array, never a literal
+list a new page would have to come back and amend.
+
 ---
 
 ## 4. What is enforced, what is judged
