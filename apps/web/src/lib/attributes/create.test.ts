@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { deriveOptionIds, slugifyOption } from './options'
+import { deriveOptionIds, slugifyOption } from '@spaces/core/attributes/options'
 import type { CreateAttributeInput } from './create'
 
 describe('option ids (pure)', () => {

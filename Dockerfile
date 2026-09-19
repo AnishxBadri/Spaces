@@ -11,6 +11,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/config/package.json ./packages/config/
 COPY packages/db/package.json ./packages/db/
+COPY packages/core/package.json ./packages/core/
 # --ignore-scripts, both install stages. The root `prepare` is `lefthook
 # install`, which needs a git binary and a .git directory; alpine ships
 # neither and .dockerignore keeps .git out of the context — so without this
@@ -30,6 +31,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/config/package.json ./packages/config/
 COPY packages/db/package.json ./packages/db/
+COPY packages/core/package.json ./packages/core/
 # --node-linker=hoisted, and only here. apps/web's `src/` lands at /app/src, so
 # the worker and the boot entry resolve their dependencies from
 # /app/node_modules. pnpm's default isolated linker would put them in
@@ -54,8 +56,9 @@ ENV NODE_ENV=production \
 RUN apk add --no-cache su-exec
 
 # Runtime needs: .output (web), apps/web's src (worker + the boot entry via
-# tsx), packages/db's src + drizzle (schema, migrator and the journal), prod
-# node_modules (pg-boss, drizzle-orm, tsx).
+# tsx), packages/db's src + drizzle (schema, migrator and the journal),
+# packages/core's src (the worker's extractor lives there since SPA-144), prod
+# node_modules (pg-boss, drizzle-orm, unpdf, mammoth, fflate, tsx).
 #
 # apps/web's tree is still flattened back onto /app — /app/src and
 # /app/package.json sit exactly where they did — but packages/db is NOT
@@ -64,6 +67,8 @@ RUN apk add --no-cache su-exec
 # `import.meta.url`. So the journal now lives at /app/packages/db/drizzle, and
 # that is the path an "older image" fixture has to mount over (CI's
 # `hostability` job does exactly that). /app/drizzle no longer exists.
+# packages/core keeps its workspace path for the same symlink reason; it has
+# no journal, so its src is all that comes along.
 #
 # tsconfig.json comes along because tsx resolves `#/…` from tsconfig `paths`
 # and NOT from package.json `imports` — Node rejects `#/*` as an internal
@@ -79,15 +84,19 @@ COPY packages/config/tsconfig.base.json /packages/config/tsconfig.base.json
 COPY packages/db/package.json ./packages/db/
 COPY packages/db/src ./packages/db/src
 COPY packages/db/drizzle ./packages/db/drizzle
+COPY packages/core/package.json ./packages/core/
+COPY packages/core/src ./packages/core/src
 COPY apps/web/src ./src
 COPY docker/entrypoint.sh /entrypoint.sh
-# The one link the prod-deps install could not make (see above). Without it
-# `tsx src/db/boot.ts` dies on `Cannot find package '@spaces/db'` — the app's
-# own source imports it by name, and node needs a node_modules entry whose
-# package.json carries the `exports` map. Relative, so it survives the copy
-# and a re-rooted /app; it resolves to /app/packages/db.
+# The two links the prod-deps install could not make (see above). Without the
+# first, `tsx src/db/boot.ts` dies on `Cannot find package '@spaces/db'`;
+# without the second, the worker dies on `@spaces/core/documents/extract` the
+# first time a document is uploaded. The app's own source imports both by
+# name, and node needs a node_modules entry whose package.json carries the
+# `exports` map. Relative, so they survive the copy and a re-rooted /app.
 RUN mkdir -p node_modules/@spaces \
     && ln -s ../../packages/db node_modules/@spaces/db \
+    && ln -s ../../packages/core node_modules/@spaces/core \
     && chmod +x /entrypoint.sh && mkdir -p /data && chown -R node:node /data /app
 
 # No `USER node`: the entrypoint starts as root so it can repair the ownership

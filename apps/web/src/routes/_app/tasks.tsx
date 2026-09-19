@@ -13,7 +13,7 @@ import { TaskComposer } from '#/components/task-composer'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { deleteTask, listTasks, setTaskDone } from '#/lib/server-fns'
-import { localToday } from '#/lib/tasks/parse-due'
+import { localToday } from '@spaces/core/tasks/parse-due'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/tasks')({

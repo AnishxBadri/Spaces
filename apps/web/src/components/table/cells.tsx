@@ -1,7 +1,7 @@
 import { createLink } from '@tanstack/react-router'
 import type { LucideIcon } from 'lucide-react'
 import type { AnchorHTMLAttributes, ReactNode, Ref } from 'react'
-import { formatDate } from '#/lib/format'
+import { formatDate } from '@spaces/core/format'
 import { cn } from '#/lib/utils'
 
 /**

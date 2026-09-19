@@ -1,0 +1,14 @@
+{
+  "//": "`#/` deliberately absent, as in packages/db: this package has nothing to alias to. Every import inside it is relative, a real dependency, or the type-only `@spaces/db` reach described in package.json.",
+
+  "extends": "../config/tsconfig.base.json",
+
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"],
+
+  "compilerOptions": {
+    // `Buffer` in documents/extract.ts (mammoth takes a Node buffer) and
+    // node:fs in the purity test. No `vite/client` — nothing here renders.
+    "types": ["node"]
+  }
+}

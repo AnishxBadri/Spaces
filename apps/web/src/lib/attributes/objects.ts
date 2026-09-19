@@ -2,8 +2,8 @@ import { Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { objectDef } from '@spaces/db/schema'
-import { CORE_OBJECTS } from './registry'
-import type { ObjectKind } from './registry'
+import { CORE_OBJECTS } from '@spaces/core/attributes/registry'
+import type { ObjectKind } from '@spaces/core/attributes/registry'
 
 /**
  * Kind → object-row resolution for the core objects (Effect-first per the

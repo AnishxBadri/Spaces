@@ -9,7 +9,7 @@ import { mkdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { MAX_UPLOAD_BYTES } from '#/lib/documents'
+import { MAX_UPLOAD_BYTES } from '@spaces/core/documents'
 import { dataDir, loadMasterKey } from '#/lib/vault/key'
 import type { Storage } from './types'
 

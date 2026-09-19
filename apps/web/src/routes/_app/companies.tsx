@@ -18,7 +18,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
-import { matchesConditions } from '#/lib/views/filter'
+import { matchesConditions } from '@spaces/core/views/filter'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import {
   fieldSpanClass,

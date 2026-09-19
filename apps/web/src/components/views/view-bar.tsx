@@ -29,13 +29,13 @@ import {
   sameJson,
   toConditionOp,
   toConditionValue,
-} from '#/lib/views/filter'
+} from '@spaces/core/views/filter'
 import type {
   Condition,
   ConditionOp,
   ConditionValue,
   ViewExtra,
-} from '#/lib/views/filter'
+} from '@spaces/core/views/filter'
 import type { ViewRow, ViewSort } from '#/lib/views/store'
 
 /**

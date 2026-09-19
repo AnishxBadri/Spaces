@@ -4,7 +4,7 @@ import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import type { ActivityMeta } from '@spaces/db/schema/activity'
 import type { NoteBody } from '@spaces/db/schema/kinds'
-import type { Condition, ViewExtra } from '#/lib/views/filter'
+import type { Condition, ViewExtra } from '@spaces/core/views/filter'
 import {
   account,
   activity,
@@ -44,7 +44,7 @@ import { objectIdForKindAsync } from '#/lib/attributes/objects'
 import { getRegistry, setValues } from '#/lib/attributes/values'
 import { addIdentityAlias, resolveEntity } from '#/lib/entities/resolve'
 import { storage } from '#/lib/storage'
-import type { ObjectKind } from '#/lib/attributes/registry'
+import type { ObjectKind } from '@spaces/core/attributes/registry'
 
 /**
  * Dev fixtures — a whole working fund, so every surface has something on it.

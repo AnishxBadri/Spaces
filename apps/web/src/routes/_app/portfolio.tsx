@@ -21,7 +21,7 @@ import {
   fmtMultiple,
   fmtPct,
   fmtXirr,
-} from '#/lib/portfolio/format'
+} from '@spaces/core/portfolio/format'
 
 export const Route = createFileRoute('/_app/portfolio')({
   loader: async () => listHoldings(),

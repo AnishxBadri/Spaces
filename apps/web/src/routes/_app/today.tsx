@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { Sunrise } from 'lucide-react'
 import { toast } from 'sonner'
-import { badgeStyle, optionColor } from '#/lib/attributes/colors'
+import { badgeStyle, optionColor } from '@spaces/core/attributes/colors'
 import { GettingStarted } from '#/components/getting-started'
 import {
   LedgerFigure,
@@ -22,8 +22,8 @@ import {
   listTasks,
   setTaskDone,
 } from '#/lib/server-fns'
-import { fmtMoney, fmtMultiple } from '#/lib/portfolio/format'
-import { localToday } from '#/lib/tasks/parse-due'
+import { fmtMoney, fmtMultiple } from '@spaces/core/portfolio/format'
+import { localToday } from '@spaces/core/tasks/parse-due'
 
 /**
  * The Today page (CONTEXT.md 15b): attention-driven, not chart-driven.

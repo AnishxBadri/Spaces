@@ -9,8 +9,8 @@ import {
   BADGE_COLORS,
   badgeStyle,
   nextBadgeColor,
-} from '#/lib/attributes/colors'
-import type { BadgeColor } from '#/lib/attributes/colors'
+} from '@spaces/core/attributes/colors'
+import type { BadgeColor } from '@spaces/core/attributes/colors'
 import { cn } from '#/lib/utils'
 
 /**

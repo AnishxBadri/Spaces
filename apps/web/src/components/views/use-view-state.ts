@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { SortingState, VisibilityState } from '@tanstack/react-table'
-import { matchesConditions } from '#/lib/views/filter'
-import type { Condition, ViewExtra } from '#/lib/views/filter'
+import { matchesConditions } from '@spaces/core/views/filter'
+import type { Condition, ViewExtra } from '@spaces/core/views/filter'
 import type { ViewRow } from '#/lib/views/store'
 import type { ViewSnapshot } from './view-bar'
 

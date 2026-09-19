@@ -17,7 +17,7 @@ import {
   MAX_UPLOAD_BYTES,
   formatBytes,
   guessDocumentKind,
-} from '#/lib/documents'
+} from '@spaces/core/documents'
 import {
   deleteDocument,
   finalizeDocumentUpload,

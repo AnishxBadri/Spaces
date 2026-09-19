@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { TaskComposer } from './task-composer'
 import { RailEmpty, RailSection } from './record/record-parts'
 import { listEntityTasks, setTaskDone } from '#/lib/server-fns'
-import { localToday } from '#/lib/tasks/parse-due'
+import { localToday } from '@spaces/core/tasks/parse-due'
 import { cn } from '#/lib/utils'
 
 type RailTask = {

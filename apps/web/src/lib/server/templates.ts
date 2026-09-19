@@ -5,7 +5,7 @@ import { db } from '@spaces/db'
 import { entity, note, space, term } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { template } from '@spaces/db/schema/templates'
-import { toObjectKind } from '../attributes/registry'
+import { toObjectKind } from '@spaces/core/attributes/registry'
 import { canRead, requireUser } from './shared'
 import type { Json } from './shared'
 

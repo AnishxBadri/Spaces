@@ -13,7 +13,7 @@ export {
   isIsoDuration,
   resolveDefault,
   validateDefault,
-} from './default-values'
+} from '@spaces/core/attributes/default-values'
 
 /**
  * Default values (spec §4, grilled 2026-09). A default is a standing human

@@ -12,10 +12,10 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { DitherMark, InitialsMark } from './record/record-parts'
-import { badgeStyle, optionColor } from '#/lib/attributes/colors'
+import { badgeStyle, optionColor } from '@spaces/core/attributes/colors'
 import { updateRecord } from '#/lib/server-fns'
-import { fmtMoney } from '#/lib/portfolio/format'
-import { localToday } from '#/lib/tasks/parse-due'
+import { fmtMoney } from '@spaces/core/portfolio/format'
+import { localToday } from '@spaces/core/tasks/parse-due'
 import { cn } from '#/lib/utils'
 
 /** Cards shown per column before the dashed "+N more" row. */

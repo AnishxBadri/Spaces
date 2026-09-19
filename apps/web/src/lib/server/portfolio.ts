@@ -13,11 +13,14 @@ import {
   roundCoInvestor,
 } from '@spaces/db/schema/portfolio'
 import { activity } from '@spaces/db/schema/activity'
-import { holdingMetrics } from '../portfolio/metrics'
-import type { HoldingEvents, MetricsResult } from '../portfolio/metrics'
-import { ownership } from '../portfolio/ownership'
-import type { Ownership } from '../portfolio/ownership'
-import type { FxRate } from '../portfolio/fx'
+import { holdingMetrics } from '@spaces/core/portfolio/metrics'
+import type {
+  HoldingEvents,
+  MetricsResult,
+} from '@spaces/core/portfolio/metrics'
+import { ownership } from '@spaces/core/portfolio/ownership'
+import type { Ownership } from '@spaces/core/portfolio/ownership'
+import type { FxRate } from '@spaces/core/portfolio/fx'
 import { birthHolding, requireUser } from './shared'
 
 /**

@@ -2,11 +2,15 @@ import { Effect, Schema } from 'effect'
 import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute, entity } from '@spaces/db/schema'
-import { nextBadgeColor } from './colors'
+import { nextBadgeColor } from '@spaces/core/attributes/colors'
 import { validateDefault } from './defaults'
-import type { BadgeColor } from './colors'
+import type { BadgeColor } from '@spaces/core/attributes/colors'
 import type { Json } from '#/lib/json'
-import type { AttributeOptions, AttributeType, SelectOption } from './registry'
+import type {
+  AttributeOptions,
+  AttributeType,
+  SelectOption,
+} from '@spaces/core/attributes/registry'
 
 /**
  * Attribute maintenance as an Effect program (backend-paradigm ratchet: the

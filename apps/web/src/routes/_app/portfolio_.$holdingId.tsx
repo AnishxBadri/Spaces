@@ -30,7 +30,12 @@ import {
   addRound,
   getHolding,
 } from '#/lib/server-fns'
-import { fmtMoney, fmtMultiple, fmtPct, fmtXirr } from '#/lib/portfolio/format'
+import {
+  fmtMoney,
+  fmtMultiple,
+  fmtPct,
+  fmtXirr,
+} from '@spaces/core/portfolio/format'
 
 export const Route = createFileRoute('/_app/portfolio_/$holdingId')({
   loader: async ({ params }) => getHolding({ data: { id: params.holdingId } }),

@@ -9,7 +9,7 @@ import {
 import { EmptyState } from '#/components/empty-state'
 import { PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
-import { badgeStyle, optionColor } from '#/lib/attributes/colors'
+import { badgeStyle, optionColor } from '@spaces/core/attributes/colors'
 import {
   createMandate,
   getMandate,
