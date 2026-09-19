@@ -198,7 +198,7 @@ describe('required means can’t-clear (all types)', () => {
     const co = await resolveEntity({
       kind: 'company',
       name: `ReqCo ${tag}`,
-      source: 'manual',
+      source: { class: 'manual' },
     })
     const actorArg = { type: 'user' as const, id: actor.id }
 
@@ -242,7 +242,7 @@ describe('setValues', () => {
     const co = await resolveEntity({
       kind: 'company',
       name: `ValCo ${tag}`,
-      source: 'manual',
+      source: { class: 'manual' },
     })
 
     // Plain values + validation failure
@@ -366,7 +366,7 @@ describe('setValues', () => {
     const co = await resolveEntity({
       kind: 'company',
       name: `ValCo ${tag}`,
-      source: 'manual',
+      source: { class: 'manual' },
     })
 
     // Accepting a suggestion: the accepter is the actor, the receipt rides

@@ -7,6 +7,8 @@ import {
   entityAlias,
   person,
 } from '@spaces/db/schema'
+import type { SourceClass } from '@spaces/db/schema'
+import type { Actor } from '../attributes/values'
 import {
   isRoleEmail,
   normalizeCin,
@@ -29,6 +31,21 @@ import {
 
 export type EntityKindResolvable = 'company' | 'person'
 
+/**
+ * Provenance as the pair the columns carry: a class, plus the integration
+ * row when — and only when — the class is `integration`. The union is what
+ * makes it a claim the compiler checked rather than one the caller asserted:
+ * `{ class: 'integration' }` with no `ref` does not typecheck, which is the
+ * same thing `entity_source_ref_invariant` says in Postgres, said earlier.
+ *
+ * This replaces `'manual' | 'gmail' | 'apollo' | 'import' | 'clip'`, a
+ * vendor list that had also drifted off the enum it was writing into — it
+ * omitted `seed`, which the seeds wrote straight through drizzle.
+ */
+export type ResolveSource =
+  | { class: 'integration'; ref: string }
+  | { class: Exclude<SourceClass, 'integration'>; ref?: undefined }
+
 export type ResolveInput = {
   kind: EntityKindResolvable
   name?: string | undefined
@@ -40,7 +57,7 @@ export type ResolveInput = {
         cin?: string | undefined
       }
     | undefined
-  source: 'manual' | 'gmail' | 'apollo' | 'import' | 'clip'
+  source: ResolveSource
   createdBy?: string | undefined
   /** attribute values asserted at birth — always win over defaults */
   values?: Record<string, unknown> | undefined
@@ -51,6 +68,45 @@ export type ResolveResult = {
   action: 'attached' | 'created'
   /** Which key matched, when attached. */
   matchedOn?: 'domain' | 'email' | 'linkedin' | 'cin'
+}
+
+/**
+ * The pair, shaped for the columns. One place builds it, so entity and
+ * alias cannot disagree about who wrote a record — the alias is the row
+ * that matters, since an unattributed identity alias is the one write that
+ * can silently weld two companies together.
+ */
+function sourceColumns(source: ResolveSource): {
+  sourceClass: SourceClass
+  sourceRef: string | null
+} {
+  return { sourceClass: source.class, sourceRef: source.ref ?? null }
+}
+
+/**
+ * Who the birth events name. The full mapping, all eight classes:
+ *
+ * | class                                        | actor                      |
+ * | -------------------------------------------- | -------------------------- |
+ * | `integration`                                | `{integration, id: ref}`   |
+ * | `manual`                                     | the creator, else `system` |
+ * | `ai` `import` `seed` `merge` `extracted` `inherited` | same            |
+ *
+ * Only `integration` is a different answer, which is the point of the
+ * collapse: the other seven are "a person did this" or "the machine did
+ * this", and `createdBy` already separates those two. An integration write
+ * names its row even when a human's session carried it — a plugin cannot
+ * launder its provenance through whoever clicked Sync — so the branch is
+ * on the class first and `createdBy` second.
+ */
+function birthActor(
+  source: ResolveSource,
+  createdBy: string | undefined,
+): Actor {
+  if (source.class === 'integration') {
+    return { type: 'integration', id: source.ref }
+  }
+  return createdBy ? { type: 'user', id: createdBy } : { type: 'system' }
 }
 
 type NormalizedKey = {
@@ -144,7 +200,7 @@ export async function resolveEntity(
         kind: input.kind,
         objectId,
         canonicalName,
-        source: input.source,
+        ...sourceColumns(input.source),
         createdBy: input.createdBy,
       })
       .returning({ id: entity.id })
@@ -156,7 +212,7 @@ export async function resolveEntity(
         value: key.value,
         valueNorm: key.valueNorm,
         isIdentity: true,
-        source: input.source,
+        ...sourceColumns(input.source),
       })
     }
     if (name) {
@@ -166,7 +222,7 @@ export async function resolveEntity(
         value: name,
         valueNorm: normalizeName(name),
         isIdentity: false,
-        source: input.source,
+        ...sourceColumns(input.source),
       })
     }
 
@@ -182,22 +238,19 @@ export async function resolveEntity(
   })
 
   // Birth values (spec §4): supplied first, then defaults for the blanks.
-  // After the transaction, since setValues takes its own row lock. Actor is
-  // the human when one is present; a keyless sync or import is `system`, and
-  // `current-user` defaults skip for it either way.
+  // After the transaction, since setValues takes its own row lock.
   //
-  // It used to say `integration` here, which SPA-70 made unrepresentable: an
-  // integration actor now names an `integration` row, and this call site has
-  // none to name — no plugin is installed and no port called it. `system`
-  // (the merge executor and the seeds: rewrites no person asserted) is the
-  // true answer for a keyless import. A real integration's writes arrive
-  // through the Facts port, which is handed its bound row's id.
+  // SPA-70 left this at `user`-or-`system`, because an integration actor
+  // names an `integration` row and this call site had no way to be handed
+  // one. The pair is that way: `{class:'integration', ref}` is exactly the
+  // id the actor wants, so `birthActor` above can finally return it, and
+  // the birth `attribute_event` rows carry `actor_ref` = the same row
+  // `entity.source_ref` points at. The two provenance stories on a record
+  // now come from one argument and cannot disagree.
   const { birthValues } = await import('../attributes/defaults')
   await birthValues({
     entityId: created.id,
-    actor: input.createdBy
-      ? { type: 'user', id: input.createdBy }
-      : { type: 'system' },
+    actor: birthActor(input.source, input.createdBy),
     supplied: input.values,
   })
 
@@ -214,7 +267,7 @@ export async function resolveEntity(
 async function recordNameAlias(
   entityId: string,
   name: string,
-  source: ResolveInput['source'],
+  source: ResolveSource,
 ) {
   const valueNorm = normalizeName(name)
   const existing = await db
@@ -235,7 +288,7 @@ async function recordNameAlias(
       value: name,
       valueNorm,
       isIdentity: false,
-      source,
+      ...sourceColumns(source),
     })
   }
 }
@@ -250,7 +303,7 @@ export async function addIdentityAlias(
   entityId: string,
   kind: 'domain' | 'email' | 'linkedin' | 'cin',
   rawValue: string,
-  source: ResolveInput['source'],
+  source: ResolveSource,
 ): Promise<{ outcome: 'added' | 'already_own' | 'suggested_duplicate' }> {
   // Callers may hold a stale (merged-away) id — follow the redirect.
   entityId = await canonicalId(entityId)
@@ -292,7 +345,7 @@ export async function addIdentityAlias(
     value: rawValue.trim(),
     valueNorm: norm,
     isIdentity: true,
-    source,
+    ...sourceColumns(source),
   })
   return { outcome: 'added' }
 }

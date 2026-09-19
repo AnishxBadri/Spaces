@@ -121,7 +121,7 @@ async function known(
 async function stamp(entityId: string, when: Date): Promise<void> {
   await db
     .update(entity)
-    .set({ createdAt: when, source: 'seed' })
+    .set({ createdAt: when, sourceClass: 'seed' })
     .where(eq(entity.id, entityId))
   await db
     .update(attributeEvent)
@@ -2428,7 +2428,11 @@ async function seedSpaces(): Promise<Ids> {
     if (!id) {
       const [ent] = await db
         .insert(entity)
-        .values({ kind: 'space', canonicalName: node.name, source: 'seed' })
+        .values({
+          kind: 'space',
+          canonicalName: node.name,
+          sourceClass: 'seed',
+        })
         .returning({ id: entity.id })
       await db.insert(space).values({
         entityId: ent.id,
@@ -2543,7 +2547,7 @@ async function seedCompanies(spaces: Ids, userId: string): Promise<Ids> {
       kind: 'company',
       name: c.name,
       keys: { domain: c.domain },
-      source: 'import',
+      source: { class: 'import' },
       createdBy: userId,
       values: await known('company', {
         ...c.values,
@@ -2594,7 +2598,7 @@ async function seedPeople(companies: Ids, userId: string): Promise<Ids> {
       kind: 'person',
       name: p.name,
       keys: { email: p.email },
-      source: 'import',
+      source: { class: 'import' },
       createdBy: userId,
       values: await known('person', p.values),
     })
@@ -2661,7 +2665,7 @@ async function seedDeals(
         kind: 'deal',
         objectId,
         canonicalName: d.name,
-        source: 'seed',
+        sourceClass: 'seed',
         createdBy: ownerId,
       })
       .returning({ id: entity.id })
@@ -2748,7 +2752,7 @@ async function seedInvestors(userId: string): Promise<Ids> {
       kind: 'company',
       name: inv.name,
       keys: { domain: inv.domain },
-      source: 'import',
+      source: { class: 'import' },
       createdBy: userId,
     })
     ids.set(inv.name, res.entityId)
@@ -2930,7 +2934,7 @@ async function seedNotes(
       .values({
         kind: 'note',
         canonicalName: n.title,
-        source: 'seed',
+        sourceClass: 'seed',
         createdBy: authorId,
       })
       .returning({ id: entity.id })
@@ -3034,7 +3038,7 @@ async function seedTerms(spaces: Ids, userId: string): Promise<number> {
       .values({
         kind: 'term',
         canonicalName: t.name,
-        source: 'seed',
+        sourceClass: 'seed',
         createdBy: userId,
       })
       .returning({ id: entity.id })
@@ -3081,7 +3085,7 @@ async function seedDocuments(
       .values({
         kind: 'document',
         canonicalName: d.filename,
-        source: 'seed',
+        sourceClass: 'seed',
         createdBy: userId,
       })
       .returning({ id: entity.id })
@@ -3425,7 +3429,7 @@ async function seedMandate(userId: string): Promise<void> {
     .values({
       kind: 'note',
       canonicalName: 'Mandate',
-      source: 'seed',
+      sourceClass: 'seed',
       createdBy: userId,
     })
     .returning({ id: entity.id })
@@ -3467,7 +3471,7 @@ async function seedNearDuplicates(userId: string): Promise<number> {
     await resolveEntity({
       kind: d.kind,
       name: d.name,
-      source: 'import',
+      source: { class: 'import' },
       createdBy: userId,
     })
     created++
@@ -3484,7 +3488,7 @@ async function seedBulk(count: number, userId: string): Promise<number> {
       kind: 'company',
       name: `Bench Co ${n}`,
       keys: { domain: `benchco${n}.example` },
-      source: 'import',
+      source: { class: 'import' },
       createdBy: userId,
       values: await known('company', {
         description: 'Volume filler — safe to delete.',

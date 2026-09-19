@@ -123,7 +123,7 @@ function PairCard({
       label: 'Attached',
       mono: true,
       render: (side) =>
-        `${side.mentionCount} mention${side.mentionCount === 1 ? '' : 's'} · added ${side.createdAt.slice(0, 10)} · ${side.source}`,
+        `${side.mentionCount} mention${side.mentionCount === 1 ? '' : 's'} · added ${side.createdAt.slice(0, 10)} · ${side.label}`,
     },
   ]
 

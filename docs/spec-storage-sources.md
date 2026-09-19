@@ -62,13 +62,13 @@ workspace-visible (private documents deferred, §13).
 
 Same three axes as notes, plus two of its own:
 
-| axis           | mechanism                                           | values                                                |
-| -------------- | --------------------------------------------------- | ----------------------------------------------------- |
-| **where**      | `link(tagged_in → record)` · `entity_space` (space) | zero or more                                          |
-| **what** genre | `document.kind`                                     | six values, held (§11 drops `memo`)                   |
-| **who**        | none                                                | workspace                                             |
-| **provenance** | `source_class` + `source_ref`                       | upload · email · url · clip · integration(drive/box…) |
-| **state**      | `extraction_status`                                 | four values                                           |
+| axis           | mechanism                                           | values                                                                                      |
+| -------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **where**      | `link(tagged_in → record)` · `entity_space` (space) | zero or more                                                                                |
+| **what** genre | `document.kind`                                     | six values, held (§11 drops `memo`)                                                         |
+| **who**        | none                                                | workspace                                                                                   |
+| **provenance** | `source_class` + `source_ref`                       | manual · integration(drive/box/gmail…) · ai · import · seed · merge · extracted · inherited |
+| **state**      | `extraction_status`                                 | four values                                                                                 |
 
 Edges a document participates in: `tagged_in → record` (filed, the act);
 `entity_space` (a _source_ for a space); `derived_from → note` (exported
@@ -83,21 +83,36 @@ Three questions define it.
 
 ### 3.1 Entry points — how bytes get in
 
-| #   | where                         | gesture                                         | filed as                                                | status      |
-| --- | ----------------------------- | ----------------------------------------------- | ------------------------------------------------------- | ----------- |
-| 1   | record page (any object)      | drop on Files tab, "Upload"                     | `tagged_in → record`, kind chosen inline                | built       |
-| 2   | space page                    | drop into Sources, "Add source"                 | `entity_space → space`                                  | not built   |
-| 3   | global                        | `/documents` "Upload", `+` menu, Cmd-K "upload" | picker: record / space / leave unfiled                  | not built   |
-| 4   | note editor                   | drop a file into the body                       | filed where the note is filed + `[[mention]]` at cursor | not built   |
-| 5   | paste a URL                   | any upload box                                  | `source_class: url`, readability clip or PDF snapshot   | deferred    |
-| 6   | email forwarding              | attachments                                     | matched company, else unfiled                           | integration |
-| 7   | Drive / Box                   | pick · paste link · bound folder (§5)           | copy-in, pointer kept                                   | this spec   |
-| 8   | API / capture extension / MCP | `POST /api/documents`                           | as declared                                             | later       |
-| 9   | memo export                   | "Export PDF" on a memo                          | `derived_from → note`, filed where the memo is          | later       |
+| #   | where                         | gesture                                         | filed as                                                 | status      |
+| --- | ----------------------------- | ----------------------------------------------- | -------------------------------------------------------- | ----------- |
+| 1   | record page (any object)      | drop on Files tab, "Upload"                     | `tagged_in → record`, kind chosen inline                 | built       |
+| 2   | space page                    | drop into Sources, "Add source"                 | `entity_space → space`                                   | not built   |
+| 3   | global                        | `/documents` "Upload", `+` menu, Cmd-K "upload" | picker: record / space / leave unfiled                   | not built   |
+| 4   | note editor                   | drop a file into the body                       | filed where the note is filed + `[[mention]]` at cursor  | not built   |
+| 5   | paste a URL                   | any upload box                                  | `source_class: manual`, readability clip or PDF snapshot | deferred    |
+| 6   | email forwarding              | attachments                                     | matched company, else unfiled                            | integration |
+| 7   | Drive / Box                   | pick · paste link · bound folder (§5)           | copy-in, pointer kept                                    | this spec   |
+| 8   | API / capture extension / MCP | `POST /api/documents`                           | as declared                                              | later       |
+| 9   | memo export                   | "Export PDF" on a memo                          | `derived_from → note`, filed where the memo is           | later       |
 
 All nine converge on one server path: **hash → blob → `document` row →
 edges → enqueue extract.** Presigned PUT; bytes never stream through Node.
 The path exists; 2–4 are UI on top of it.
+
+**Provenance on these rows, corrected 2026-09-19 (SPA-118, decision D1).**
+This table originally wrote a per-entry word into `source_class` — `url` for
+entry 5, and §5.3 below wrote `source_ref: binding.connection_id` for entry 7. Both were drafting errors and neither is representable. `source_class` is
+the eight-value class enum (CONTEXT.md _Plugin architecture_;
+`docs/spec-plugin-sdk.md` §8) and `source_ref` **always references
+`integration.id`**, FK enforced, null unless the class is `integration` — a
+check constraint on each table enforces both halves. So of these nine
+entries: 1–5 and 9 are `manual` (a person in the app; the capture extension
+at 8 too, since it is first-party and a clip is a human clicking a button),
+6 and 7 are `integration` + the id of the integration that owns the mailbox
+or the binding, and "whose account" is one hop further on through
+`integration.connection_id` / `document.connection_id` /
+`storage_binding.connection_id`. Nothing in this spec ever puts a vendor
+name in a shared enum, which is the whole reason the collapse exists.
 
 ### 3.2 Surfaces — where you see them
 
@@ -231,13 +246,15 @@ resolveItem(item, parentTarget):
     enqueue extract
 ```
 
-**`source_ref` corrected 2026-09-15.** This block first wrote `source_ref:
-binding.connection_id`; that was the drafting error. `source_ref` always
+**`source_ref` corrected 2026-09-15, landed 2026-09-19 (SPA-118).** This
+block first wrote `source_ref: binding.connection_id`; that was the drafting
+error. `source_ref` always
 references `integration.id`, FK enforced, null unless `source_class =
 'integration'` — CONTEXT.md _Plugin architecture_ and `docs/spec-plugin-sdk.md`
 §8. "Whose account" is one hop away through `document.connection_id` /
 `storage_binding.connection_id` / `integration.connection_id`. Carried by slice
-`clean-3` in `docs/roadmap-2026-09.md`.
+`clean-3` in `docs/roadmap-2026-09.md`, which landed the pair on `entity` and
+`entity_alias`; `document.origin` follows (§11, item 2).
 
 **Folder names are hints, never identity.** A folder called "Ohmium" goes
 through the same `resolveEntity` every creator uses; a typo lands as a

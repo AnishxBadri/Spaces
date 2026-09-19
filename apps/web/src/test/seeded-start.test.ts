@@ -79,8 +79,10 @@ describe('a file starts against the seed and nothing else', () => {
     })
 
     // Deliberately uncleaned — see the file comment.
-    await db
-      .insert(entity)
-      .values({ kind: 'company', canonicalName: 'SeedProbe', source: 'manual' })
+    await db.insert(entity).values({
+      kind: 'company',
+      canonicalName: 'SeedProbe',
+      sourceClass: 'manual',
+    })
   })
 })

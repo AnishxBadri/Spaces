@@ -57,7 +57,11 @@ async function insertNode(
   if (!id) {
     const [ent] = await db
       .insert(entity)
-      .values({ kind: 'space', canonicalName: node.name, source: 'seed' })
+      .values({
+        kind: 'space',
+        canonicalName: node.name,
+        sourceClass: 'seed',
+      })
       .returning({ id: entity.id })
     await db.insert(space).values({
       entityId: ent.id,

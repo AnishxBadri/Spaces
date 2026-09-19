@@ -116,7 +116,7 @@ describe('birthValues', () => {
     const human = await resolveEntity({
       kind: 'company',
       name: `DfltCo ${tag} human`,
-      source: 'manual',
+      source: { class: 'manual' },
       createdBy: actor.id,
       values: { [slug('text')]: 'Hot lead' },
     })
@@ -144,7 +144,7 @@ describe('birthValues', () => {
     const machine = await resolveEntity({
       kind: 'company',
       name: `DfltCo ${tag} sync`,
-      source: 'import',
+      source: { class: 'import' },
     })
     const [m] = await db
       .select({ values: entity.values })
@@ -164,6 +164,59 @@ describe('birthValues', () => {
     expect(mEvent.actorType).toBe('system')
     expect(mEvent.actorRef).toBe(null)
     expect(mEvent.source).toBe('default')
+  })
+
+  it('an integration-sourced create names its integration on the birth events', async () => {
+    const { resolveEntity } = await import('../entities/resolve')
+    const { objectIdForKindAsync } = await import('./objects')
+    const { db } = await import('@spaces/db')
+    const { attribute, attributeEvent, entity, integration } =
+      await import('@spaces/db/schema')
+    const { eq } = await import('drizzle-orm')
+    const objectId = await objectIdForKindAsync('company')
+
+    await db.insert(attribute).values({
+      objectId,
+      slug: slug('plugin'),
+      name: 'Triage (plugin)',
+      type: 'text',
+      options: { default: 'Untriaged' },
+    })
+
+    const [inst] = await db
+      .insert(integration)
+      .values({ capabilityId: 'apollo', version: '1.0.0' })
+      .returning({ id: integration.id })
+
+    // The hole SPA-70 left open: the call site had no integration row to
+    // name, so a machine birth said `system`. The pair carries the id now.
+    const written = await resolveEntity({
+      kind: 'company',
+      name: `DfltCo ${tag} plugin`,
+      source: { class: 'integration', ref: inst.id },
+    })
+
+    const [row] = await db
+      .select({
+        sourceClass: entity.sourceClass,
+        sourceRef: entity.sourceRef,
+      })
+      .from(entity)
+      .where(eq(entity.id, written.entityId))
+    expect(row.sourceClass).toBe('integration')
+    expect(row.sourceRef).toBe(inst.id)
+
+    const events = await db
+      .select()
+      .from(attributeEvent)
+      .where(eq(attributeEvent.entityId, written.entityId))
+    expect(events.length).toBeGreaterThan(0)
+    // Every one of them, not just the first: the actor is one argument.
+    for (const e of events) {
+      expect(e.actorType).toBe('integration')
+      expect(e.actorRef).toBe(inst.id)
+      expect(e.actorId).toBe(null)
+    }
   })
 
   it('rejects a bad default at attribute save, accepts a good one', async () => {

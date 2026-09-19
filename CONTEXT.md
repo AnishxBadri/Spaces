@@ -349,6 +349,28 @@ by shape (created as an ordinary user-owned attribute-bag object on enable)
 so plugin data is graph-visible without plugin UI — copied from Twenty,
 noted, not built.
 
+**The collapse landed on `entity` and `entity_alias` 2026-09-19 (SPA-118,
+migration 0029).** Two things were settled to get it in, and both generalise:
+
+- **`source_ref` references `integration.id`** — FK enforced, null unless
+  `source_class = 'integration'`, both halves of the biconditional carried by
+  a check constraint on each table, exactly as `attribute_event.actor_ref`
+  does (decision D1). Not the connection: a storage binding's writes are
+  attributed to the integration that owns the binding, and "whose account" is
+  one hop away through `integration.connection_id`.
+  `docs/spec-storage-sources.md` §3.1 is corrected to match.
+- **First-party channels are not integrations.** Existing `clip` rows
+  backfilled to `manual`: the browser extension is ours, and a clip is a
+  person clicking a button. Core does not seed a synthetic `integration` row
+  to describe its own channels — that would put a fiction in the table the
+  Integrations page reads. If a first-party channel ever needs recording as
+  such, it becomes its own column, never a fake integration row. Same rule
+  retires `gmail` and `apollo` in that migration: with no integration row to
+  name they backfill to `manual` and the vendor name is lost, which is the
+  honest trade for a type no plugin could ever have migrated.
+
+`interaction_source` and `document_origin` are the two still to convert.
+
 **Build order:** `packages/sdk` (manifest, ports, `definePlugin`, testing
 kit) + `runJob` + loader reading a plugins dir → `integration` table +
 enum collapse → Apollo as `plugins/apollo`, loaded by path in dev through
@@ -1077,12 +1099,17 @@ name match **suggests, never merges** — no threshold is safe ("Stripe" payment
 design agency corrupts silently). Fuzzy feeds a dedupe inbox; a human clicks.
 
 ```
-entity(id, kind, canonical_name, merged_into_id → entity, source, created_by, created_at)
+entity(id, kind, canonical_name, merged_into_id → entity,
+       source_class, source_ref → integration, created_by, created_at)
 
 entity_alias(id, entity_id, kind: name|domain|email|linkedin|cin,
-             value, value_norm, is_identity bool, source: manual|gmail|apollo|import|merge)
+             value, value_norm, is_identity bool,
+             source_class, source_ref → integration)
   -- UNIQUE partial index on (kind, value_norm) WHERE is_identity
   -- name aliases: never identity, never unique
+  -- source_class: the eight classes (see Plugin architecture); the ref is
+  -- set iff the class is 'integration', on the entity AND on every alias,
+  -- so a plugin cannot write an unattributed identity key
 
 duplicate_candidate(id, entity_a, entity_b, score, reason jsonb,
                     status: open|merged|dismissed, resolved_by, resolved_at)
@@ -1102,7 +1129,7 @@ merge_event(id, winner_id, loser_id, merged_by, merged_at, snapshot jsonb, unmer
 - Name → unaccent, lowercase, strip legal suffixes (Inc, Ltd, Pvt Ltd, LLC, GmbH, SAS…).
   Feeds `pg_trgm` only.
 
-**One choke point.** `resolveEntity({kind, keys, name?, source})` — every creator goes
+**One choke point.** `resolveEntity({kind, keys, name?, source: {class, ref?}})` — every creator goes
 through it: manual create, deck upload, `[[mention]]`, URL clip, Apollo, Gmail, future CSV
 import. Same pattern as `canRead()`. Exact identity-key match → alias match → create.
 Fuzzy runs after, emits `duplicate_candidate` rows only.
@@ -1123,7 +1150,9 @@ flip `is_identity` off on one alias. Rare, manual, possible.
    executor iterates it: link, entity_space, interaction_entity, task_entity,
    round_co_investor, the portfolio tables, … Every moved row is recorded in
    `merge_event.snapshot` as `{table, pk, old_value}`.
-2. Loser's aliases move to winner (`source: merge`), identity flags intact.
+2. Loser's aliases move to winner (`source_class: merge`, `source_ref` cleared —
+   the pair is one claim and a moved row cannot keep naming the integration
+   that wrote it), identity flags intact.
 3. Values (`entity.values` — side tables have carried no attribute columns since the
    2026-07 unified-storage decision): winner keeps its values, loser fills winner's
    nulls, conflicts stay with winner but land in snapshot. Same never-overwrite rule

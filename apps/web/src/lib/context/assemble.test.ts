@@ -49,7 +49,7 @@ describe('assembleProgram', () => {
       kind: 'company',
       name: `CtxCo ${tag}`,
       keys: { domain: `ctxco-${tag}.com` },
-      source: 'manual',
+      source: { class: 'manual' },
     })
     ids.co = co.entityId
     await db
