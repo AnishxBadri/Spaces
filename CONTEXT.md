@@ -585,6 +585,22 @@ mechanisms, never mixed:
   mention), a `Note · Memo · Scratch` toggle in the editor header, "Filed
   against" chips next to "Filed in space", and record Notes sections read
   `tagged_in` first ("Filed here · Mentions this"), memo pinned.
+- **Deletion is hard, and there is no trash (decided 2026-09-19, SPA-125).** A note
+  is text a human typed, which is the argument for a soft delete — and it loses. The
+  product hard-deletes documents and terms and has no trash anywhere; one kind with a
+  recoverable state would be a second deletion model to explain, and "deleted" would
+  stop meaning the same thing on two pages of the same app. The real cost is the
+  merge-snapshot one: an unmerge that would repoint a link out of the note degrades to
+  a silent no-op once the note is gone. That cost is already paid — it is exactly the
+  documents story today, and there is no unmerge executor at all; the snapshot
+  convention is the only contract (CLAUDE.md). A slice that builds one inherits the
+  same question for every kind at once, which is where it belongs, not here.
+  Mechanically: `deleteNote` runs the registry executor, so the `note` row, the
+  `entity` row, every `link` in both directions, `entity_space` and `activity` go, and
+  what the note fed survives — a document `derived_from → note` keeps its blob, its
+  `extracted_text` and its `tsv` and loses only the edge. The mandate's note refuses by
+  name (`mandate.note` is `block`), and a private note someone else wrote answers
+  "Note not found" rather than confirming it exists.
 - **Meeting notes are notes:** `interaction.note_id → note` (see
   _Interactions_). Documents are not notes (see _Sources are documents_).
 - The deal memo is optional and scales `close_reason` → note → memo, same
@@ -2282,8 +2298,9 @@ Standing debt:
 - **No published images yet.** Compose still says `build: .` — installing means building
   on the target box (583MB of node_modules for a 9.3MB `.output`; tight on 2GB RAM, fails
   on 1GB). Phase 11's GHCR multi-arch pipeline is the fix and the biggest adoption win.
-- Note deletion, S3 storage driver, orphan-blob sweep (a finalize that never arrives
-  leaves bytes with no row).
+- ~~Note deletion~~ **shipped 2026-09-19 (SPA-125)** — hard delete on the registry
+  executor; see _The note model_. S3 storage driver, orphan-blob sweep (a finalize that
+  never arrives leaves bytes with no row).
 
 ## UI craft debt (catalogued 2026-07 · token pass shipped 2026-08)
 

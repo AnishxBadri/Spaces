@@ -182,6 +182,48 @@ export const getNote = createServerFn()
   })
 
 /**
+ * What deleting this note would unlink, and what would refuse it — the two
+ * things the confirm dialog has to say before it offers a Delete button.
+ */
+export const previewNoteDeletion = createServerFn()
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { noteDeleteImpactProgram, noteDeleteMessage } =
+      await import('../notes/delete')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(noteDeleteImpactProgram)(u.id, data.id)
+    } catch (failure) {
+      throw new Error(noteDeleteMessage(failure))
+    }
+  })
+
+/**
+ * Hard delete, no trash — decided 2026-09-19 (CONTEXT.md → The note model).
+ * The note goes; what it fed survives, because the registry says which edges
+ * die with it and which rows only lose an edge.
+ *
+ * The typed failures are turned into sentences here rather than allowed to
+ * reject as they are: Effect rejects with the `Blocked` value itself, which
+ * carries no `message`, so the mandate's refusal would otherwise reach the
+ * dialog as an empty string.
+ */
+export const deleteNote = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { deleteNoteProgram, noteDeleteMessage } =
+      await import('../notes/delete')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(deleteNoteProgram)(u.id, data.id)
+    } catch (failure) {
+      throw new Error(noteDeleteMessage(failure))
+    }
+  })
+
+/**
  * Visibility is the author's choice alone — an admin flipping someone's
  * private note shared would break the trust the default-shared model
  * depends on.

@@ -117,6 +117,25 @@ async function hasRows(tx: Tx, ref: EntityRef, id: string): Promise<boolean> {
   return rows.length > 0
 }
 
+/**
+ * The first `block` entry that still has rows, or null. Phase 1 of the
+ * delete, lifted out so a caller can ask the question without attempting the
+ * delete — a confirm dialog that offers a Delete button the registry is
+ * going to refuse is a dialog that lies. Registry order is the answer order:
+ * the first refusal wins, exactly as it does inside the transaction.
+ */
+async function findRefusal(
+  tx: Tx,
+  id: string,
+): Promise<{ key: string; reason: string } | null> {
+  for (const ref of ENTITY_REFS) {
+    if (ref.del.kind !== 'block') continue
+    if (await hasRows(tx, ref, id))
+      return { key: ref.key, reason: ref.del.reason }
+  }
+  return null
+}
+
 async function runDelete(id: string): Promise<{ deleted: boolean }> {
   return db.transaction(async (tx) => {
     const target = (
@@ -130,11 +149,8 @@ async function runDelete(id: string): Promise<{ deleted: boolean }> {
     if (!target) return { deleted: false }
 
     // Phase 1 — refusals first, so nothing is half-deleted when one fires.
-    for (const ref of ENTITY_REFS) {
-      if (ref.del.kind !== 'block') continue
-      if (await hasRows(tx, ref, id))
-        throw new BlockedRollback(ref.key, ref.del.reason)
-    }
+    const refusal = await findRefusal(tx, id)
+    if (refusal) throw new BlockedRollback(refusal.key, refusal.reason)
 
     // Phase 2 — the registry, one pass, no table named here.
     for (const ref of ENTITY_REFS) {
@@ -177,3 +193,22 @@ export const deleteEntityProgram = Effect.fn('deleteEntityProgram')(function* (
         : new DeleteQueryFailed({ cause }),
   })
 })
+
+/**
+ * What `deleteEntityProgram` would refuse with, without attempting it — a
+ * `Blocked` in the *success* channel, because "nothing refuses this" is an
+ * answer, not a failure. The delete still asks the same question inside its
+ * own transaction: this is for a confirm dialog that has to name the reason
+ * before it offers the button, never a substitute for the check.
+ */
+export const deleteRefusalProgram = Effect.fn('deleteRefusalProgram')(
+  function* (id: string): Effect.fn.Return<Blocked | null, DeleteQueryFailed> {
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const refusal = await db.transaction((tx) => findRefusal(tx, id))
+        return refusal === null ? null : new Blocked(refusal)
+      },
+      catch: (cause) => new DeleteQueryFailed({ cause }),
+    })
+  },
+)
