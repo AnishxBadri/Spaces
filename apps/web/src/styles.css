@@ -27,7 +27,6 @@
   /* ground + ink */
   --background: oklch(1 0 0); /* literal white, no hidden warmth */
   --foreground: oklch(0.24 0.012 155); /* ink — ~13:1 on white */
-  --muted-foreground: var(--graphite); /* secondary text — 5.9:1 */
 
   /**
    * INSTRUMENT (v2, 2026-09-10). Two untinted neutrals, one ink, one LED.
@@ -63,14 +62,9 @@
   /* selection wash — active nav, selected rows. Ink on it: 14.8:1 */
   --selected: oklch(0.962 0.022 155);
 
-  --secondary: var(--bone);
-  --secondary-foreground: var(--foreground);
-  --muted: var(--bone);
-  --accent: var(--bone); /* hover tint on menu items, rows, ghost buttons */
-  --accent-foreground: var(--foreground);
   /* Row hover — opaque on purpose. A translucent tint on a sticky column lets
-     the columns scrolling underneath bleed through it; this is `accent/50`
-     resolved against the white ground so the sticky cell and the rest of the
+     the columns scrolling underneath bleed through it; bone is the tint
+     resolved against the white ground, so the sticky cell and the rest of the
      row land on exactly the same value with no seam. */
   --row-hover: var(--bone);
 
@@ -566,32 +560,45 @@
   font-family: inherit;
 }
 
-/* Mention chip — quiet ink, not a colored pill; the primary is for actions. */
+/**
+ * Mention chip — the same object a record page draws for a reference value
+ * (src/components/attributes/value-editor.tsx, `ChipLink` in
+ * src/components/table/cells.tsx): a 20px square of bone behind a rule edge,
+ * the kind's 1-bit mark, ink at the label step in the ledger's sans. Hover
+ * takes the edge to hairline, as the reference chip's does — a chip is navigable,
+ * so it is drawn, not washed. The prose register stops at its border.
+ */
 .mention-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.25em;
-  padding: 0.05em 0.35em;
-  border-radius: 4px;
-  background: var(--muted);
+  gap: 0.375rem;
+  height: 1.25rem;
+  padding-inline: 0.375rem;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: var(--bone);
   font-family: var(--font-sans);
-  font-size: 0.85em;
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
   font-weight: 500;
   color: var(--foreground);
   white-space: nowrap;
+  transition: border-color 150ms var(--ease-out-quart);
   cursor: pointer;
 }
 .mention-chip:hover {
-  background: var(--selected);
+  border-color: var(--hairline);
 }
 
-/* Glossary auto-link — a hint, not a link. A dotted underline says "there is
-   a definition here" without competing with mentions, which are navigable. */
+/* Glossary auto-link — a hint, not a link: one hairline on the inner grid
+   colour, darkening to ink over a bone wash on hover. It carries no mark and
+   no border box, so it can never be mistaken for a mention — the Meaning
+   Rule: a mention is navigable, a term is a definition. */
 .glossary-term {
-  border-bottom: 1px dotted var(--muted-foreground);
+  border-bottom: 1px solid var(--rule);
   cursor: help;
 }
 .glossary-term:hover {
-  border-bottom-color: var(--foreground);
-  background: var(--muted);
+  border-bottom-color: var(--hairline);
+  background: var(--bone);
 }
