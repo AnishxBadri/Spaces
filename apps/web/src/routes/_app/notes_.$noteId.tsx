@@ -2,9 +2,10 @@ import {
   ClientOnly,
   createFileRoute,
   Link,
+  useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { ArrowLeft, Globe, Layers, Lock } from 'lucide-react'
+import { ArrowLeft, Globe, Layers, Lock, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -16,10 +17,13 @@ import {
 import { KIND_ICONS, KIND_ROUTES } from '#/components/editor/mention'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import { SaveAsTemplateAction } from '#/components/templates'
+import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
+  deleteNote,
   getNote,
   listSpaces,
   listTermsForNote,
+  previewNoteDeletion,
   saveNote,
   saveNoteAsTemplate,
   setNoteVisibility,
@@ -136,6 +140,7 @@ function NotePage() {
               isPrivate={initial.isPrivate}
             />
           ) : null}
+          <DeleteNoteAction noteId={initial.id} />
         </span>
       </div>
 
@@ -348,5 +353,73 @@ function SpaceFiling({
         </select>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Hard delete, no trash (CONTEXT.md → The note model, 2026-09-19). The
+ * preview runs before the sheet opens, so the sheet can name what loses its
+ * edge to this note — and so the mandate's note is refused *in the dialog*,
+ * in the registry's own words, rather than by a toast after the user has
+ * already said yes.
+ */
+function DeleteNoteAction({ noteId }: { noteId: string }) {
+  const navigate = useNavigate()
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
+
+  async function remove() {
+    setBusy(true)
+    try {
+      const impact = await previewNoteDeletion({ data: { id: noteId } })
+      const name = impact.title || 'Untitled'
+      if (impact.blockedReason !== null) {
+        // A notice, not a question: no Delete button, because the server has
+        // already said it would refuse, and it said why.
+        await confirm({
+          title: `“${name}” stays`,
+          body: impact.blockedReason,
+          kind: 'primary',
+          keep: 'Close',
+        })
+        return
+      }
+      const ok = await confirm({
+        title: `Delete “${name}”?`,
+        body:
+          impact.unlinks.length > 0
+            ? 'The note and its text go for good. Everything listed below keeps its own row — only its link to this note goes.'
+            : 'The note and its text go for good. This cannot be undone.',
+        rows: impact.unlinks,
+        action: 'Delete',
+      })
+      if (!ok) return
+      await deleteNote({ data: { id: noteId } })
+      // Leave first, then invalidate: this route's loader would otherwise
+      // refetch a note that is no longer there.
+      await navigate({ to: '/notes' })
+      void router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not delete')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={remove}
+        disabled={busy}
+        title="Delete this note"
+        className="focus-ring flex items-center gap-1 rounded-md px-1.5 py-0.5 text-label font-medium text-graphite hover:bg-bone hover:text-destructive"
+      >
+        <Trash2 className="size-3" strokeWidth={1.75} />
+        Delete
+      </button>
+      {confirmDialog}
+    </>
   )
 }

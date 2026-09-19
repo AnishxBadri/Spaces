@@ -19,8 +19,12 @@ export type ConfirmOptions = {
   body?: ReactNode
   /** The things affected — name left, mono meta right — when there are several. */
   rows?: Array<{ name: string; meta?: string }>
-  /** The verb on the acting button: "Delete", "Archive 3". */
-  action: string
+  /**
+   * The verb on the acting button: "Delete", "Archive 3". Omitted, the sheet
+   * is a notice — one way out and no button that promises something the
+   * server has already refused (SPA-125: the mandate's note).
+   */
+  action?: string
   /** The safe way out. */
   keep?: string
   /** Destructive is the default — that is what confirms are for. */
@@ -52,7 +56,11 @@ export function ConfirmDialog({
         showCloseButton={false}
         className="sm:max-w-[27.5rem]"
         onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+          if (
+            options.action !== undefined &&
+            (e.metaKey || e.ctrlKey) &&
+            e.key === 'Enter'
+          ) {
             e.preventDefault()
             onConfirm()
           }
@@ -98,13 +106,15 @@ export function ConfirmDialog({
           <DialogClose asChild>
             <Button variant="outline">{options.keep ?? 'Keep'}</Button>
           </DialogClose>
-          <Button
-            variant={kind === 'destructive' ? 'destructive' : 'default'}
-            onClick={onConfirm}
-          >
-            {options.action}
-            <kbd className="mono text-micro opacity-85">⌘↵</kbd>
-          </Button>
+          {options.action === undefined ? null : (
+            <Button
+              variant={kind === 'destructive' ? 'destructive' : 'default'}
+              onClick={onConfirm}
+            >
+              {options.action}
+              <kbd className="mono text-micro opacity-85">⌘↵</kbd>
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
