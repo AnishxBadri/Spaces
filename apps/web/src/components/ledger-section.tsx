@@ -41,21 +41,39 @@ export function LedgerSection({
   )
 }
 
+/**
+ * The class a row takes when a composer on this page just created it
+ * (DESIGN.md §5, Micro-interactions; SPA-53) — a bone wash that fades out
+ * over 250ms. Exported so a row that is not a `LedgerRow` (a table row, a
+ * card) can land the same way, and so the contract is testable without a DOM.
+ *
+ * `wash` comes from `useBornRows().washes(id)`, never from a timestamp: the
+ * wash is for a row this session added, not for a row that happens to be
+ * young. The utility itself lives in styles.css.
+ */
+export function rowWashClass(wash: boolean | undefined): string {
+  return wash === true ? 'row-wash' : ''
+}
+
 /** A 36px row on a rule. `last` drops the rule so a composer can follow. */
 export function LedgerRow({
   children,
   className,
   last,
+  wash,
 }: {
   children: ReactNode
   className?: string
   last?: boolean | undefined
+  /** Born through a composer on this page — lands on the bone wash. */
+  wash?: boolean | undefined
 }) {
   return (
     <li
       className={cn(
         'flex h-row items-center gap-3',
         !last && 'border-b border-rule',
+        rowWashClass(wash),
         className,
       )}
     >

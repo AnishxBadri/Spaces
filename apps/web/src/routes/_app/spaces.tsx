@@ -15,6 +15,7 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { useBornRows } from '#/lib/born-rows'
 import { applySpaceTemplate, createSpace, listSpaces } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
@@ -47,6 +48,9 @@ function Lane({ n }: { n: number }) {
 function SpacesPage() {
   const spaces = Route.useLoaderData()
   const [open, setOpen] = useState(false)
+  // The composer row's arrivals, and only those: a space the loader already
+  // knew about is never in the set, however recently it was created.
+  const { washes, bear } = useBornRows()
   useHotkey('s', () => setOpen(true))
 
   const nested = spaces.filter((s) => s.depth > 0).length
@@ -94,7 +98,7 @@ function SpacesPage() {
             }
           >
             {spaces.map((s) => (
-              <LedgerRow key={s.id}>
+              <LedgerRow key={s.id} wash={washes(s.id)}>
                 <Link
                   to="/spaces/$spaceId"
                   params={{ spaceId: s.id }}
@@ -147,7 +151,12 @@ function SpacesPage() {
         )}
       </div>
 
-      <CreateSpaceDialog spaces={spaces} open={open} onOpenChange={setOpen} />
+      <CreateSpaceDialog
+        spaces={spaces}
+        open={open}
+        onOpenChange={setOpen}
+        onCreated={bear}
+      />
     </div>
   )
 }
@@ -236,7 +245,7 @@ function MarketsCreator() {
             {error}
           </p>
         ) : null}
-        <Button type="submit" disabled={pending} className="w-full">
+        <Button type="submit" pending={pending} className="w-full">
           {pending ? 'Creating…' : 'Create my map'}
           <KeyHint>↵</KeyHint>
         </Button>
@@ -252,10 +261,15 @@ function CreateSpaceDialog({
   spaces,
   open,
   onOpenChange,
+  onCreated,
 }: {
   spaces: Array<SpaceRow>
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** The row that landed — what the market map's wash reads. A stamped
+   *  scaffold reports its root: the children are a subtree the composer
+   *  did not name, and only the named row is the arrival. */
+  onCreated?: (id: string) => void
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -279,17 +293,19 @@ function CreateSpaceDialog({
       if (scaffold) {
         // Stamp the pattern: subtree + glossary, skip-existing. The tree it
         // creates is fully editable afterwards — copy, not reference.
-        await applySpaceTemplate({
+        const stamped = await applySpaceTemplate({
           data: {
             templateId: scaffold.id,
             name,
             ...(parentId ? { parentId } : {}),
           },
         })
+        onCreated?.(stamped.id)
       } else {
-        await createSpace({
+        const created = await createSpace({
           data: { name, ...(parentId ? { parentId } : {}) },
         })
+        onCreated?.(created.id)
       }
       onOpenChange(false)
       setScaffold(null)

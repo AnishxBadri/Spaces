@@ -1,10 +1,15 @@
 import { Pencil } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AttributeDialog } from './attribute-dialog'
 import type { EditableAttribute } from './attribute-dialog'
 import { ValueEditor } from './value-editor'
 import type { RefNames, RegistryEntry } from './value-editor'
-import { PropertyCell } from '#/components/record/record-parts'
+import {
+  PropertyCell,
+  REJECT_HOLD_MS,
+  REJECT_LEAVE_MS,
+} from '#/components/record/record-parts'
+import type { RejectPhase } from '#/components/record/record-parts'
 
 /**
  * One labelled attribute in a record's property grid. A rejected write (a
@@ -12,6 +17,12 @@ import { PropertyCell } from '#/components/record/record-parts'
  * field and the editor remounts to the stored value — not a toast-and-revert
  * the reader has to reconcile across the screen. The server's message is
  * `slug: detail`; the slug is redundant next to the label, so it's cut.
+ *
+ * The visual half of that path (DESIGN.md §5, Micro-interactions; SPA-53):
+ * the snap back to the stored value is what the remount already does, and the
+ * cell reads crimson in place for two seconds on top of it. It runs off the
+ * rejection `setValues` already returns — the same rejected promise the error
+ * line reads — so nothing asks the server a second time.
  */
 export function RailField({
   def,
@@ -34,10 +45,25 @@ export function RailField({
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [editing, setEditing] = useState(false)
+  const [reject, setReject] = useState<RejectPhase>('rest')
+
+  // The clock behind the two-second hold. `attempt` is in the deps so a
+  // second rejection during a hold restarts it rather than being swallowed
+  // by a phase that did not change.
+  useEffect(() => {
+    if (reject === 'rest') return
+    const leaving = reject === 'leaving'
+    const t = setTimeout(
+      () => setReject(leaving ? 'rest' : 'leaving'),
+      leaving ? REJECT_LEAVE_MS : REJECT_HOLD_MS - REJECT_LEAVE_MS,
+    )
+    return () => clearTimeout(t)
+  }, [reject, attempt])
 
   return (
     <PropertyCell
       className="group/rail"
+      reject={reject}
       label={
         <>
           <span
@@ -85,11 +111,15 @@ export function RailField({
         refNames={refNames}
         onSave={(v) => {
           onSave(v).then(
-            () => setError(null),
+            () => {
+              setError(null)
+              setReject('rest')
+            },
             (err: unknown) => {
               const raw = err instanceof Error ? err.message : 'Could not save'
               setError(raw.replace(new RegExp(`^${def.slug}: `), ''))
               setAttempt((n) => n + 1)
+              setReject('hold')
             },
           )
         }}

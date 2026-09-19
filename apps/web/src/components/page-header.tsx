@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
+import { keyHintClasses, useButtonPending } from './ui/button'
 import { cn } from '#/lib/utils'
 
 /**
@@ -52,9 +53,22 @@ export function PageHeader({
   )
 }
 
-/** A key hint inside a button — mono, never a chip. */
+/**
+ * A key hint inside a button — mono, never a chip. It drops with the label
+ * swap while the button is pending (SPA-53) and comes back when the action
+ * re-arms; it stays in the DOM throughout, so the width it holds never moves
+ * anything next to it, and leaves the accessibility tree with the paint.
+ */
 export function KeyHint({ children }: { children: ReactNode }) {
-  return <kbd className="mono text-micro opacity-85">{children}</kbd>
+  const pending = useButtonPending()
+  return (
+    <kbd
+      className={keyHintClasses(pending)}
+      {...(pending ? { 'aria-hidden': true } : {})}
+    >
+      {children}
+    </kbd>
+  )
 }
 
 export type ReadoutTone = 'bad' | 'warn'

@@ -466,6 +466,96 @@
   z-index: var(--z-toast);
 }
 
+/**
+ * Composer wash (DESIGN.md §5, Micro-interactions — SPA-53). A row a composer
+ * just created lands washed in bone, and the wash fades out over 250ms: the
+ * eye is told where the new row went without the list moving a pixel.
+ *
+ * Opacity only, so the Compositor Rule holds. The wash is a bone pane on the
+ * row's own `::before` at `z-index: -1` — the utility sets `position: relative`
+ * and nothing else, so the row makes no stacking context and its content keeps
+ * painting over the pane. An animation rather than a transition because it
+ * plays once, on arrival: a re-render never replays it, and a row that was
+ * already on the page when the list loaded never carries the class at all
+ * (`useBornRows`, src/lib/born-rows.ts).
+ */
+@keyframes row-wash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@utility row-wash {
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--bone);
+    pointer-events: none;
+    animation: row-wash 250ms var(--ease-out-quart) forwards;
+  }
+}
+
+/**
+ * Toast — rises 8px as it fades in (DESIGN.md §5, Micro-interactions — SPA-53).
+ * sonner ships a 400ms slide from a whole toast-height away and transitions
+ * `height` and `box-shadow` alongside it; the instrument's frequency scale puts
+ * a toast on the dialog tier — 180ms in, 120ms out — and the travel is 8px.
+ * Listing exactly two properties is also what takes `height` and `box-shadow`
+ * out of the transition: transform and opacity only, the Compositor Rule.
+ *
+ * sonner appends its stylesheet to <head> at runtime, so it always lands after
+ * this file. Every selector here therefore carries the toaster as well as the
+ * toast — one attribute of specificity above sonner's own — which is what lets
+ * these win with no `!important` anywhere. The reduced-motion switch in
+ * `@layer base` is `!important` inside a layer, and important-in-a-layer
+ * outranks every unlayered declaration, so it still silences all of it.
+ */
+[data-sonner-toaster] [data-sonner-toast] {
+  transition:
+    transform 180ms var(--ease-out-quart),
+    opacity 180ms var(--ease-out-quart);
+}
+
+/* Where the toast comes from: 8px on the far side of its resting place. */
+[data-sonner-toaster] [data-sonner-toast][data-y-position='bottom'] {
+  --y: translateY(8px);
+}
+[data-sonner-toaster] [data-sonner-toast][data-y-position='top'] {
+  --y: translateY(-8px);
+}
+
+/* …and where it rests. This has to out-specify the rule above, which is why
+   it follows it: sonner's own `[data-mounted]` rule sits a step lower. The
+   stacked and expanded cases keep sonner's arithmetic — those rules are one
+   attribute higher again, and sonner's sheet is the later one. */
+[data-sonner-toaster] [data-sonner-toast][data-mounted='true'] {
+  --y: translateY(0);
+}
+
+/* Exit faster than it entered, and back the way it came. */
+[data-sonner-toaster] [data-sonner-toast][data-removed='true'] {
+  transition:
+    transform 120ms var(--ease-out-quart),
+    opacity 120ms var(--ease-out-quart);
+}
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed='true'][data-front='false'][data-swipe-out='false'][data-expanded='false'] {
+  transition:
+    transform 120ms var(--ease-out-quart),
+    opacity 120ms var(--ease-out-quart);
+}
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed='true'][data-front='true'][data-swipe-out='false'] {
+  --y: translateY(calc(var(--lift) * -8px));
+}
+
 @layer base {
   * {
     @apply border-border;

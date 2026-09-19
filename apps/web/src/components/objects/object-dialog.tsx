@@ -274,7 +274,7 @@ function ObjectForm(
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" pending={pending}>
           {props.mode === 'create' ? (
             <Plus className="size-4" strokeWidth={2} />
           ) : null}

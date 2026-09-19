@@ -23,6 +23,7 @@ import {
   listTasks,
   setTaskDone,
 } from '#/lib/server-fns'
+import { useBornRows } from '#/lib/born-rows'
 import { fmtMoney, fmtMultiple } from '@spaces/core/portfolio/format'
 import { localToday } from '@spaces/core/tasks/parse-due'
 
@@ -170,6 +171,9 @@ function TodayPage() {
     dedupeCount,
   } = Route.useLoaderData()
   const today = localToday()
+  // The spine's composer row reports what it made; nothing the loader
+  // handed us is in the set, so the wash is for arrivals only.
+  const { washes, bear } = useBornRows()
 
   const dueTasks = tasks.open.filter((t) => t.dueDate && t.dueDate <= today)
   const overdue = dueTasks.filter((t) => t.dueDate && t.dueDate < today).length
@@ -332,7 +336,7 @@ function TodayPage() {
               {dueTasks.map((t) => {
                 const late = !!t.dueDate && t.dueDate < today
                 return (
-                  <LedgerRow key={t.id}>
+                  <LedgerRow key={t.id} wash={washes(t.id)}>
                     <Checkbox
                       checked={false}
                       onCheckedChange={() => void complete(t.id)}
@@ -358,6 +362,7 @@ function TodayPage() {
               })}
               <LedgerRow last>
                 <TaskComposer
+                  onCreated={bear}
                   trigger={
                     <button
                       type="button"

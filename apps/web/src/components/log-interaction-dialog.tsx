@@ -178,7 +178,7 @@ export function LogInteractionDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" pending={pending}>
               {pending ? 'Logging…' : `Log ${kind}`}
               <KeyHint>⌘↵</KeyHint>
             </Button>

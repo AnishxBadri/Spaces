@@ -126,7 +126,7 @@ function JoinPage() {
 
         {error ? <FormError>{error}</FormError> : null}
 
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" className="w-full" pending={pending}>
           {pending ? 'Joining…' : 'Join workspace'}
           <KeyHint>↵</KeyHint>
         </Button>

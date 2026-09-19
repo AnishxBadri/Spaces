@@ -334,10 +334,43 @@ doesn't ship.
 The canvas sheet **Micro-interactions** (canvas page `v2 · Components`, 2026-09-11)
 draws each interaction frame by frame with its contract as a mono line: button press, ledger row
 states, overlay enter/exit, composer add, field edit, drag reorder, toast and loading,
-chassis fold, tabs, badge toggle. Four specifics on that sheet are proposed, not yet in
-code: a composer's new row lands on a bone wash that fades in 250ms; a rejected cell
-write snaps back and reads crimson in place for 2s; toasts rise 8px as they fade in; a
-pending button drops its key hint with the label swap.
+chassis fold, tabs, badge toggle. Four specifics on that sheet shipped 2026-09-19
+(SPA-53), each beside the code that already owned the state rather than as an animation
+layer:
+
+- **Composer add.** A row a composer just created lands on a bone wash that fades out
+  over 250ms. The wash is the row's own `::before` at `z-index: -1`, so only opacity
+  animates (`row-wash`, `apps/web/src/styles.css`); `LedgerRow` takes it through a
+  `wash` prop (`apps/web/src/components/ledger-section.tsx`). Which rows wash is decided
+  by who created them, never by how young they are: `useBornRows`
+  (`apps/web/src/lib/born-rows.ts`) starts empty on mount and grows only when a composer
+  reports the id its write returned, so a list the loader filled washes nothing and a
+  reload moments after an add washes nothing either. In code on `/tasks` (the composer
+  band), `/today` (the spine's composer row) and `/spaces` (the market map's).
+- **Field edit, refused.** A rejected attribute write snaps back to the stored value —
+  the remount `RailField` already did — and the cell reads crimson in place for 2s, off
+  the same rejection `setValues` already returns, with no second ask of the server. The
+  crimson is a pane over the cell, not a border on it, so nothing moves by a pixel
+  (`rejectPaneClass` / `PropertyCell`,
+  `apps/web/src/components/record/record-parts.tsx`; the clock is in
+  `apps/web/src/components/attributes/rail-field.tsx`). It arrives at full strength —
+  a snap has nothing to fade in from — and leaves on opacity over 120ms.
+- **Toast.** Rises 8px as it fades in, 180ms in and 120ms out, on the frequency scale's
+  dialog tier. sonner's own 400ms slide and its `height` / `box-shadow` transitions are
+  overridden in `apps/web/src/styles.css`, which leaves transform and opacity and
+  nothing else.
+- **Pending button.** `Button` takes `pending`, publishes it on a context, and `KeyHint`
+  reads it: `Save ⌘↵` becoming `Saving…` drops the keycap for an action that is no
+  longer armed, and reclaims it when the action re-arms. The hint fades on opacity and
+  never unmounts, so the width it holds is the width it keeps — the No-Shift Rule — and
+  it leaves the accessibility tree with the paint
+  (`apps/web/src/components/ui/button.tsx`, `apps/web/src/components/page-header.tsx`).
+
+All four are transform and opacity only, so the one global `prefers-reduced-motion`
+query in `apps/web/src/styles.css` silences every one of them; the crimson hold is a
+state rather than a motion, so it still holds its two seconds there.
+`apps/web/src/components/micro-interactions.test.ts` reads the stylesheet and the class
+helpers and holds all of that.
 
 **Row exit** (2026-09-15, in code on Tasks). A row that leaves because you acted on it
 strikes through and fades to 0 over 150ms, and the write is held until the transition

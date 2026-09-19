@@ -827,7 +827,7 @@ function AttributeForm({
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" pending={pending}>
           {pending
             ? mode === 'create'
               ? 'Creating…'

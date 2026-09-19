@@ -154,25 +154,60 @@ export function PropertyGrid({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * A rejected write reads crimson in place for two seconds, then returns to
+ * rest (DESIGN.md §5, Micro-interactions; SPA-53). Three phases, because the
+ * hold and the leaving are different things: `rest` draws nothing, `hold` is
+ * the crimson, `leaving` is the 120ms fade off it.
+ */
+export type RejectPhase = 'rest' | 'hold' | 'leaving'
+
+/** How long the cell reads crimson, the fade out included. */
+export const REJECT_HOLD_MS = 2000
+/** The fade off it — the tail of the hold, not time added to it. */
+export const REJECT_LEAVE_MS = 120
+
+/**
+ * The crimson the cell wears while a write is being refused. It is a pane, not
+ * a border on the cell itself: a border would move the cell's content by a
+ * pixel, and the No-Shift Rule has no exceptions. It arrives at full strength
+ * — the snap-back is instant, there is nothing to animate into — and leaves on
+ * opacity alone, so the Compositor Rule holds and `prefers-reduced-motion`
+ * takes the fade to nothing while the two-second hold, which is a state and
+ * not a motion, still happens.
+ */
+export function rejectPaneClass(phase: RejectPhase): string {
+  return cn(
+    'pointer-events-none absolute inset-0 border border-destructive transition-opacity duration-[120ms] ease-out-quart',
+    phase === 'leaving' ? 'opacity-0' : 'opacity-100',
+  )
+}
+
 export function PropertyCell({
   label,
   children,
   below,
   className,
+  reject = 'rest',
 }: {
   label: ReactNode
   children: ReactNode
   /** An error or hint line under the value. */
   below?: ReactNode
   className?: string
+  /** The cell's rejected-write phase; `RailField` owns the clock. */
+  reject?: RejectPhase | undefined
 }) {
   return (
     <div
       className={cn(
-        'flex min-h-[2.125rem] flex-col justify-center border-r border-b border-rule px-3 py-1 max-md:border-r-0 md:max-xl:[&:nth-child(2n)]:border-r-0 xl:[&:nth-child(3n)]:border-r-0',
+        'relative flex min-h-[2.125rem] flex-col justify-center border-r border-b border-rule px-3 py-1 max-md:border-r-0 md:max-xl:[&:nth-child(2n)]:border-r-0 xl:[&:nth-child(3n)]:border-r-0',
         className,
       )}
     >
+      {reject === 'rest' ? null : (
+        <span aria-hidden className={rejectPaneClass(reject)} />
+      )}
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex w-24 shrink-0 items-center gap-1 field-label text-graphite">
           {label}
