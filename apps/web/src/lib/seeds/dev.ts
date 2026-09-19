@@ -42,7 +42,7 @@ import {
 } from '#/lib/attributes/object-registry'
 import { objectIdForKindAsync } from '#/lib/attributes/objects'
 import { getRegistry, setValues } from '#/lib/attributes/values'
-import { addIdentityAlias, resolveEntity } from '#/lib/entities/resolve'
+import { resolveEntity } from '#/lib/entities/resolve'
 import { storage } from '#/lib/storage'
 import type { ObjectKind } from '@spaces/core/attributes/registry'
 
@@ -637,9 +637,11 @@ const NEAR_DUPES = [
 ]
 
 /**
- * Co-investors are organizations: real counterparties, not pipeline records.
- * Each carries a domain — an identity key is what makes a re-run attach to
- * the firm already on file instead of minting a second one.
+ * Co-investors are Companies, since clean-1 deleted the ghost kind they used
+ * to carry (CONTEXT.md "Two-tier object model": no fourth system object for
+ * funds/investors — a user models co-investors as Companies or as a custom
+ * object, their call). Each carries a domain — an identity key is what makes
+ * a re-run attach to the firm already on file instead of minting a second one.
  */
 const INVESTORS = [
   { name: 'Meridian Deeptech', domain: 'meridiandeeptech.example' },
@@ -2740,27 +2742,10 @@ async function seedDeals(
 async function seedInvestors(userId: string): Promise<Ids> {
   const ids: Ids = new Map()
   for (const inv of INVESTORS) {
-    // Name lookup first. An organization has no side table and may predate
-    // the domain key; without this, resolveEntity finds no identity match
-    // and mints a second copy of a firm that is already on file.
-    const existing = (
-      await db
-        .select({ id: entity.id })
-        .from(entity)
-        .where(
-          and(
-            eq(entity.kind, 'organization'),
-            eq(entity.canonicalName, inv.name),
-          ),
-        )
-    ).at(0)
-    if (existing) {
-      await addIdentityAlias(existing.id, 'domain', inv.domain, 'import')
-      ids.set(inv.name, existing.id)
-      continue
-    }
+    // The domain is the identity key, so a re-run attaches to the firm
+    // already on file rather than minting a second copy of it.
     const res = await resolveEntity({
-      kind: 'organization',
+      kind: 'company',
       name: inv.name,
       keys: { domain: inv.domain },
       source: 'import',
@@ -3570,7 +3555,7 @@ export type DevSeedSummary = {
   spaces: number
   companies: number
   people: number
-  organizations: number
+  investors: number
   deals: number
   holdings: number
   notes: number
@@ -3643,7 +3628,7 @@ export async function seedDevData(opts: {
     spaces: spaces.size,
     companies: companies.size,
     people: people.size,
-    organizations: investors.size,
+    investors: investors.size,
     deals: deals.byName.size,
     holdings,
     notes,

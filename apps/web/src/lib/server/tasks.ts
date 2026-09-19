@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity } from '@spaces/db/schema'
+import { entity, objectDef } from '@spaces/db/schema'
 import { task, taskEntity } from '@spaces/db/schema/tasks'
 import { user } from '@spaces/db/schema/auth'
 import { requireUser } from './shared'
@@ -47,26 +47,41 @@ export const createTask = createServerFn({ method: 'POST' })
     })
   })
 
+/**
+ * The records a task is linked to. `objectSlug` travels with every row —
+ * a custom record's page lives under its object's slug, and `recordPath`
+ * needs it to build `/o/:slug/:id` instead of dropping the link.
+ */
+type LinkedEntity = {
+  id: string
+  name: string
+  kind: string
+  objectSlug: string | null
+}
+
 async function linkedEntities(taskIds: Array<string>) {
-  if (taskIds.length === 0)
-    return new Map<string, Array<{ id: string; name: string; kind: string }>>()
+  if (taskIds.length === 0) return new Map<string, Array<LinkedEntity>>()
   const rows = await db
     .select({
       taskId: taskEntity.taskId,
       id: entity.id,
       name: entity.canonicalName,
       kind: entity.kind,
+      objectSlug: objectDef.slug,
     })
     .from(taskEntity)
     .innerJoin(entity, eq(entity.id, taskEntity.entityId))
+    .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
     .where(inArray(taskEntity.taskId, taskIds))
-  const map = new Map<
-    string,
-    Array<{ id: string; name: string; kind: string }>
-  >()
+  const map = new Map<string, Array<LinkedEntity>>()
   for (const r of rows) {
     const list = map.get(r.taskId) ?? []
-    list.push({ id: r.id, name: r.name, kind: r.kind })
+    list.push({
+      id: r.id,
+      name: r.name,
+      kind: r.kind,
+      objectSlug: r.objectSlug,
+    })
     map.set(r.taskId, list)
   }
   return map

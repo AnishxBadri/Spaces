@@ -30,7 +30,7 @@ import {
  * read time. Loser survives as a redirect (merged_into_id); every moved or
  * dropped row lands in merge_event.snapshot so unmerge stays possible.
  *
- * Restricted to company|person|organization and same-kind pairs — spaces
+ * Restricted to company|person and same-kind pairs — spaces
  * and notes have structural children and different semantics.
  */
 
@@ -39,7 +39,7 @@ type SnapshotEntry = MergeSnapshotEntry
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
-const MERGEABLE = new Set(['company', 'person', 'organization'])
+const MERGEABLE = new Set(['company', 'person'])
 
 /**
  * The merge executor's value rewrites (fills, reference repoints) get an
