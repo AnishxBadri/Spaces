@@ -32,16 +32,35 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec prettier --check .
+
+      # One named step per gate, in CLAUDE.md's numbering, so a red run says
+      # which gate broke from the job list alone. Each is the same command a
+      # developer runs at the root; the turbo tasks behind them cover every
+      # package (`turbo run lint --dry=json` lists web, db, core and the
+      # `//#lint:root` half).
+      - name: Gate 3 — prettier
+        run: pnpm exec prettier --check .
       # `pnpm run lint`, not `eslint apps/web/src`: since SPA-142 there is a
       # second package with source in it, and the root halves (eslint-rules/,
-      # scripts/) are in the same graph.
-      - run: pnpm run lint
-      - run: pnpm run typecheck
-      # boot.ts + vitest read .env.local via dotenv; hand them the CI db
-      - run: echo "DATABASE_URL=$DATABASE_URL" > .env.local
-      - run: pnpm --filter @spaces/web exec tsx src/db/boot.ts
-      - run: pnpm run test
+      # scripts/) are in the same graph. It also carries gate 5 — the v1 design
+      # tokens are the `instrument/no-v1-tokens` eslint rule, not a grep.
+      - name: Gates 4 and 5 — eslint (carries instrument/no-v1-tokens)
+        run: pnpm run lint
+      - name: Gate 1 — typecheck
+        run: pnpm run typecheck
+      # The one thing that proves the journal applies to an *empty* database:
+      # this service container is fresh, `spaces` has no tables, and boot.ts is
+      # origin log → downgrade guard → migrate → seeds. Its own step, before
+      # the suite, and the only writer of the `spaces` database in this job —
+      # vitest derives `spaces_test*` from DATABASE_URL and builds its own.
+      # No `.env.local` is written: every loader falls back to the environment,
+      # which the job's `env:` above supplies.
+      - name: Migrations apply to an empty database
+        run: pnpm --filter @spaces/web exec tsx src/db/boot.ts
+      - name: Gate 2 — vitest
+        run: pnpm run test
+      - name: turbo run build
+        run: pnpm run build
 
   # Hostability contract #1 (CONTEXT.md): the entrypoint owns /data. A macOS
   # bind mount rewrites ownership on the way through, so a Linux runner is the
