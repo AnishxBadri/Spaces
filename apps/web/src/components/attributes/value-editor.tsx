@@ -1,4 +1,4 @@
-import { Check, ChevronDown } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   DropdownMenu,
@@ -9,7 +9,8 @@ import {
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { DitherMark, InitialsMark } from '#/components/record/record-parts'
-import { badgeStyle, optionColor } from '@spaces/core/attributes/colors'
+import { Badge } from '#/components/ui/badge'
+import { Checkbox } from '#/components/ui/checkbox'
 import { liveOptions, optionState } from '@spaces/core/attributes/options'
 import { formatDate, formatNumber } from '@spaces/core/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
@@ -84,21 +85,19 @@ export function OptionChip({
 }) {
   const state = optionState(def, id)
   return (
-    <span
-      style={
-        state.archived
-          ? undefined
-          : badgeStyle(optionColor(state.option, state.index))
-      }
+    // The one badge that sizes to its text instead of to the 20px lane: it
+    // renders inside table cells and property rows that set their own height,
+    // so `h-auto py-0.5` keeps the chip intrinsic and `inline-flex` keeps it
+    // inline-level where the parent is not a flex row.
+    <Badge
+      option={state.option}
+      index={state.index}
+      archived={state.archived}
       title={state.archived ? 'Archived option' : undefined}
-      className={cn(
-        'truncate px-1.5 py-0.5 mono text-micro font-medium',
-        state.archived && 'bg-bone text-graphite',
-        className,
-      )}
+      className={cn('inline-flex h-auto truncate py-0.5', className)}
     >
       {state.label}
-    </span>
+    </Badge>
   )
 }
 
@@ -171,22 +170,12 @@ export function ValueEditor({
       )
     case 'checkbox':
       return (
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={Boolean(value)}
+        <Checkbox
+          checked={Boolean(value)}
+          onCheckedChange={(next) => onSave(next)}
           aria-label={def.name}
-          onClick={() => onSave(!value)}
-          className={cn(
-            'focus-ring flex size-3.5 items-center justify-center border transition-colors duration-150 ease-out-quart',
-            variant === 'field' && 'ml-2',
-            value
-              ? 'border-primary bg-primary text-primary-foreground'
-              : 'border-hairline bg-paper',
-          )}
-        >
-          {value ? <Check className="size-2.5" strokeWidth={3} /> : null}
-        </button>
+          className={cn(variant === 'field' && 'ml-2')}
+        />
       )
     case 'rating': {
       const max = def.options?.max ?? 5

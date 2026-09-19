@@ -22,17 +22,17 @@ reviewer judges.
 Two untinted neutrals, one ink, one LED. Every value is live in
 `apps/web/src/styles.css`; that file decides, this table names.
 
-| token       | class                       | role                                           |
-| ----------- | --------------------------- | ---------------------------------------------- |
-| `paper`     | `bg-paper`                  | the data field — tables, records, dialogs      |
-| `bone`      | `bg-bone`                   | the chassis — sidebar, rails, dialog feet      |
-| `bone-deep` | `bg-bone-deep`              | pressed, disabled, archived rows               |
-| `rule`      | `border-rule`               | inner rules — rows, cells, inputs              |
-| `hairline`  | `border-hairline`           | 1px structure — sections, sheets, the edge     |
-| `graphite`  | `text-graphite`             | the second text colour, and the only one       |
-| `ink`       | `text-foreground`           | text                                           |
-| `pine`      | `bg-primary`/`text-primary` | the LED — primary action, active tab, end-dots |
-| wash        | `bg-selected`               | the selection tint                             |
+| token       | class                       | role                                                                                              |
+| ----------- | --------------------------- | ------------------------------------------------------------------------------------------------- |
+| `paper`     | `bg-paper`                  | the data field — tables, records, dialogs                                                         |
+| `bone`      | `bg-bone`                   | the chassis — sidebar, rails, dialog feet                                                         |
+| `bone-deep` | `bg-bone-deep`              | pressed, disabled, archived rows (an archived option badge is struck on plain bone — see `Badge`) |
+| `rule`      | `border-rule`               | inner rules — rows, cells, inputs                                                                 |
+| `hairline`  | `border-hairline`           | 1px structure — sections, sheets, the edge                                                        |
+| `graphite`  | `text-graphite`             | the second text colour, and the only one                                                          |
+| `ink`       | `text-foreground`           | text                                                                                              |
+| `pine`      | `bg-primary`/`text-primary` | the LED — primary action, active tab, end-dots                                                    |
+| wash        | `bg-selected`               | the selection tint                                                                                |
 
 Semantic colour only where it encodes state: `text-destructive`, `text-warning`,
 `text-success`, `text-info`. A readout is coloured only when its value is nonzero and
@@ -121,6 +121,9 @@ needs.
 | `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`            | P8 — 44px serif head + mono context + `esc`, 20px body, 52px bone foot                  |
 | `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`    | the destructive confirm; it replaces `window.confirm` everywhere                        |
 | `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                      | the atoms — reticle focus, 2px radius, key hints inside                                 |
+| `Badge`, `badgeClasses`, `badgeTint`                                              | `apps/web/src/components/ui/badge.tsx`             | the square option badge — takes the option row + index, `archived` and `unselected`     |
+| `Checkbox`, `checkboxClasses`                                                     | `apps/web/src/components/ui/checkbox.tsx`          | the 14px square that fills with pine; a button, never a native control                  |
+| `Switch`, `switchClasses`                                                         | `apps/web/src/components/ui/switch.tsx`            | the 24×14 square track — graphite knob off, pine knob on, legible from one switch       |
 
 ---
 

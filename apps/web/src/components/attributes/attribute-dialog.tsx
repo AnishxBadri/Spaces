@@ -1,7 +1,6 @@
 import {
   AtSign,
   Calendar,
-  Check,
   Coins,
   Globe,
   Hash,
@@ -19,6 +18,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
+import { Checkbox } from '#/components/ui/checkbox'
 import { Command as CommandPrimitive } from 'cmdk'
 import { CommandEmpty, CommandItem } from '#/components/ui/command'
 import {
@@ -980,22 +980,13 @@ function CheckRow({
 }) {
   return (
     <div className="flex min-h-8 items-start gap-2.5 py-1.5">
-      <button
+      <Checkbox
         id={id}
-        type="button"
-        role="checkbox"
-        aria-checked={checked}
+        checked={checked}
+        onCheckedChange={onChange}
         aria-label={label}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          'focus-ring mt-0.5 flex size-3.5 shrink-0 touch-manipulation items-center justify-center border transition-colors duration-150 ease-out-quart',
-          checked
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-hairline bg-paper hover:bg-bone',
-        )}
-      >
-        {checked ? <Check className="size-2.5" strokeWidth={3} /> : null}
-      </button>
+        className="mt-0.5"
+      />
       <label
         htmlFor={id}
         className="flex cursor-pointer flex-col"

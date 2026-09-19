@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { DitherMark, InitialsMark } from './record/record-parts'
-import { badgeStyle, optionColor } from '@spaces/core/attributes/colors'
+import { Badge } from './ui/badge'
 import { updateRecord } from '#/lib/server-fns'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { localToday } from '@spaces/core/tasks/parse-due'
@@ -197,20 +197,15 @@ export function DealBoard({
                 title={stage.archived ? 'Archived stage' : undefined}
               >
                 <div className="flex items-baseline justify-between gap-2">
-                  <span
-                    className={cn(
-                      'flex h-[1.125rem] min-w-0 items-center truncate px-1.5 mono text-micro font-medium',
-                      stage.archived && 'bg-bone-deep text-graphite',
-                    )}
-                    style={
-                      stage.archived
-                        ? undefined
-                        : badgeStyle(optionColor(stage, stageIndex))
-                    }
+                  <Badge
+                    option={stage}
+                    index={stageIndex}
+                    archived={stage.archived}
+                    className="h-[1.125rem] min-w-0 truncate"
                   >
                     {stage.label}
                     {stage.archived ? ' · archived' : ''}
-                  </span>
+                  </Badge>
                   <span className="mono text-micro text-foreground">
                     {cards.length}
                   </span>
@@ -415,12 +410,9 @@ export function MoveStageDialog({
                   )}
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <span
-                      className="flex h-5 shrink-0 items-center px-1.5 mono text-micro font-medium"
-                      style={badgeStyle(optionColor(stage, i))}
-                    >
+                    <Badge option={stage} index={i} className="shrink-0">
                       {stage.label}
-                    </span>
+                    </Badge>
                     <span
                       className={cn(
                         'truncate mono text-micro',

@@ -12,6 +12,7 @@ import {
   RecordBody,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import {
   Dialog,
@@ -85,9 +86,12 @@ function HoldingPage() {
         name={h.companyName}
         badges={
           missing.length > 0 ? (
-            <span className="flex h-5 shrink-0 items-center bg-[var(--badge-amber)] px-1.5 mono text-micro font-medium text-[var(--badge-amber-ink)]">
+            // Amber is named, not resolved: `optionColor` returns a stored
+            // colour unchanged, so a badge the instrument colours for itself
+            // goes through the same primitive as the data-coloured ones.
+            <Badge option={{ color: 'amber' }} index={0} className="shrink-0">
               unpriced · {missing.join(', ')}
-            </span>
+            </Badge>
           ) : null
         }
         readouts={

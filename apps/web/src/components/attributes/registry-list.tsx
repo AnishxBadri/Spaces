@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from './attribute-dialog'
 import { Button } from '#/components/ui/button'
-import { badgeStyle, optionColor } from '@spaces/core/attributes/colors'
+import { Badge } from '#/components/ui/badge'
 import { reorderAttributes, updateAttribute } from '#/lib/server-fns'
 import type { listRegistry } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -409,17 +409,15 @@ function AttributeRow({
       {hasOptions && options.length > 0 ? (
         <div className="flex flex-wrap gap-1 pb-2.5 pl-9">
           {options.map((o, i) => (
-            <span
+            <Badge
               key={o.id}
-              style={o.archived ? undefined : badgeStyle(optionColor(o, i))}
+              option={o}
+              index={i}
+              archived={o.archived}
               title={o.archived ? 'Archived option' : undefined}
-              className={cn(
-                'flex h-5 items-center px-1.5 mono text-micro font-medium',
-                o.archived && 'bg-bone font-normal text-graphite line-through',
-              )}
             >
               {o.label}
-            </span>
+            </Badge>
           ))}
         </div>
       ) : null}
