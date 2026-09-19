@@ -202,3 +202,195 @@ jobs:
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v || true
           docker rm -f sup unpriv nochown 2>/dev/null || true
+
+  # Hostability contract #5 (CONTEXT.md): backup is both-or-neither, and
+  # rollback is restore. Prose cannot prove that, so this job destroys the box
+  # and puts it back: up → plant a document, its blob and a credential →
+  # backup.sh → `docker compose down -v` + `rm -rf ./data` → restore.sh → the
+  # app boots, the document is listed, its bytes still hash to the same key,
+  # and the credential decrypts. `down -v` and `rm -rf ./data` are safe here
+  # and nowhere else: a fresh runner owns this whole Docker daemon.
+  #
+  # Separate job, like `hostability`, so it never sits in front of the gates.
+  # No MASTER_KEY anywhere: the point is the auto-generated ./data/secret.key,
+  # the half of the backup that everything else is worthless without.
+  roundtrip:
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the runtime image
+        run: docker build -t spaces:ci .
+
+      - name: Boot, then plant a document, its blob and a credential
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          cat > docker-compose.ci.yml <<'YML'
+          services:
+            app:
+              image: spaces:ci
+          YML
+          docker compose up -d --wait --wait-timeout 300
+          curl -fsS http://localhost:3000/api/health
+
+          # The key the app generated for itself on first boot. Reading it
+          # needs root because the entrypoint left it 0600 owned by 1000 —
+          # which is exactly what the restore has to reproduce.
+          sudo test -f data/secret.key
+          MASTER_KEY="$(sudo cat data/secret.key | tr -d '\n')"
+          echo "::add-mask::$MASTER_KEY"
+          echo "MASTER_KEY_BEFORE=$MASTER_KEY" >> "$GITHUB_ENV"
+          export MASTER_KEY
+
+          head -c 65536 /dev/urandom > payload.bin
+          KEY="$(sha256sum payload.bin | cut -d' ' -f1)"
+          SECRET="sk-roundtrip-$(openssl rand -hex 8)"
+          echo "::add-mask::$SECRET"
+          {
+            echo "KEY=$KEY"
+            echo "SECRET=$SECRET"
+          } >> "$GITHUB_ENV"
+
+          # Upload through the app's own presigned PUT, so the blob lands in
+          # ./data the way a real deck does — hashed by the store, not by us.
+          EXP="$(( ($(date +%s) + 600) * 1000 ))"
+          SIG="$(node -e 'const {createHmac}=require("crypto");const [k,v,e]=process.argv.slice(1);process.stdout.write(createHmac("sha256",Buffer.from(process.env.MASTER_KEY,"base64")).update(`blob:${v}:${k}:${e}`).digest("base64url"))' "$KEY" put "$EXP")"
+          CODE="$(curl -sS -o /dev/null -w '%{http_code}' -X PUT \
+            --data-binary @payload.bin \
+            "http://localhost:3000/api/blob/$KEY?exp=$EXP&sig=$SIG")"
+          [ "$CODE" = 201 ]
+
+          docker compose cp scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
+          docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
+            plant --blob="$KEY" --size="$(stat -c%s payload.bin)" --secret="$SECRET"
+          echo "NET=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q db)")" >> "$GITHUB_ENV"
+
+      - name: backup.sh — and what it cost
+        run: |
+          set -euo pipefail
+          # As root: the blob tree is 0600 owned by 1000, so an operator who
+          # is not root cannot read their own blobs to tar them. The env goes
+          # in through the root shell rather than `sudo -E`, which sudoers is
+          # free to refuse.
+          START=$(date +%s%3N)
+          sudo sh -c 'COMPOSE_FILE="$0" ./scripts/backup.sh ./backups' "$COMPOSE_FILE"
+          MS=$(( $(date +%s%3N) - START ))
+          DIR="$(ls -d backups/*/ | tail -1)"
+          DIR="${DIR%/}"
+          echo "BACKUP_DIR=$DIR" >> "$GITHUB_ENV"
+          DUMP=$(stat -c%s "$DIR/dump.sql")
+          TAR=$(stat -c%s "$DIR/blobs.tgz")
+          # ship-10's install doc quotes these numbers.
+          {
+            echo "### Backup round trip"
+            echo
+            echo "| measurement | value |"
+            echo "| --- | --- |"
+            echo "| dump.sql | $DUMP bytes |"
+            echo "| blobs.tgz | $TAR bytes |"
+            echo "| backup.sh wall clock | ${MS} ms |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "[roundtrip] dump $DUMP bytes, blobs $TAR bytes, ${MS} ms"
+
+      - name: Total loss — down -v and rm -rf ./data
+        run: |
+          set -euo pipefail
+          docker compose down -v
+          sudo rm -rf ./data
+          [ ! -e data ]
+          docker volume ls
+
+      - name: restore.sh — as an ordinary user, not root
+        run: |
+          set -euo pipefail
+          START=$(date +%s%3N)
+          ./scripts/restore.sh "$BACKUP_DIR"
+          MS=$(( $(date +%s%3N) - START ))
+          echo "| restore.sh wall clock | ${MS} ms |" >> "$GITHUB_STEP_SUMMARY"
+          echo "[roundtrip] restore ${MS} ms"
+          # 0600 owned by 1000, put there by the script and not by the
+          # entrypoint — the app has not been started yet.
+          [ "$(sudo stat -c '%a %u:%g' data/secret.key)" = '600 1000:1000' ]
+          [ "$(sudo cat data/secret.key | tr -d '\n')" = "$MASTER_KEY_BEFORE" ]
+
+      - name: The app comes up, the document is listed, the bytes match
+        run: |
+          set -euo pipefail
+          docker compose up -d --wait --wait-timeout 300
+          curl -fsS http://localhost:3000/api/health
+          docker compose cp scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
+          docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
+            verify --blob="$KEY" --secret="$SECRET"
+          export MASTER_KEY="$MASTER_KEY_BEFORE"
+          EXP="$(( ($(date +%s) + 600) * 1000 ))"
+          SIG="$(node -e 'const {createHmac}=require("crypto");const [k,v,e]=process.argv.slice(1);process.stdout.write(createHmac("sha256",Buffer.from(process.env.MASTER_KEY,"base64")).update(`blob:${v}:${k}:${e}`).digest("base64url"))' "$KEY" get "$EXP")"
+          curl -fsS -o got.bin "http://localhost:3000/api/blob/$KEY?exp=$EXP&sig=$SIG"
+          [ "$(sha256sum got.bin | cut -d' ' -f1)" = "$KEY" ]
+          cmp payload.bin got.bin
+
+      - name: Both refusals, each naming what to do instead
+        run: |
+          set -euo pipefail
+          set +e
+          OUT="$(./scripts/restore.sh "$BACKUP_DIR" 2>&1)"; CODE=$?
+          set -e
+          echo "$OUT"
+          [ "$CODE" -ne 0 ]
+          grep -F 'docker compose stop app' <<<"$OUT"
+          docker compose stop app
+          set +e
+          OUT="$(./scripts/restore.sh "$BACKUP_DIR" 2>&1)"; CODE=$?
+          set -e
+          echo "$OUT"
+          [ "$CODE" -ne 0 ]
+          grep -F -- '--force' <<<"$OUT"
+
+      - name: A half that fails changes nothing
+        run: |
+          set -euo pipefail
+          cp -r "$BACKUP_DIR" broken
+          chmod -R u+w broken
+          printf 'not a tar' > broken/blobs.tgz
+          set +e
+          OUT="$(./scripts/restore.sh broken --force 2>&1)"; CODE=$?
+          set -e
+          echo "$OUT"
+          [ "$CODE" -ne 0 ]
+          grep -F 'nothing was changed' <<<"$OUT"
+          # the staging database the dump half had already loaded is gone
+          LEFT="$(docker compose exec -T db psql -qtAX -U spaces -d postgres \
+            -c "select count(*) from pg_database where datname like 'spaces\_restore\_%'")"
+          [ "$LEFT" = 0 ]
+          # and the workspace is still there, untouched
+          docker compose up -d --wait --wait-timeout 300
+          docker compose cp scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
+          docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
+            verify --blob="$KEY" --secret="$SECRET"
+
+      - name: An older image refuses the restored database (ship-4's guard)
+        run: |
+          set -euo pipefail
+          # "Older image" = one whose journal stops a migration short, mounted
+          # over /app/drizzle so the guard reads it exactly as a real older
+          # tag would — without a second image build.
+          cp -r drizzle drizzle-old
+          LAST="$(jq -r '.entries[-1].tag' drizzle/meta/_journal.json)"
+          jq '.entries |= .[:-1]' drizzle/meta/_journal.json > drizzle-old/meta/_journal.json
+          rm "drizzle-old/$LAST.sql"
+          mkdir -p olddata
+          set +e
+          OUT="$(timeout 120 docker run --rm --network "$NET" \
+            -e DATABASE_URL=postgresql://spaces:spaces@db:5432/spaces \
+            -v "$PWD/drizzle-old:/app/drizzle:ro" -v "$PWD/olddata:/data" \
+            spaces:ci 2>&1)"; CODE=$?
+          set -e
+          echo "$OUT"
+          [ "$CODE" -ne 0 ]
+          grep -F 'Restore the backup taken before the upgrade' <<<"$OUT"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v || true
