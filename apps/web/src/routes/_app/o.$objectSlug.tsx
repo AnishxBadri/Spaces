@@ -51,6 +51,7 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import {
   createObjectRecord,
@@ -131,7 +132,15 @@ function ObjectListPage() {
 
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
-      await updateRecord({ data: { id: entityId, patch: { [slug]: value } } })
+      const result = await updateRecord({
+        data: { id: entityId, patch: { [slug]: value } },
+      })
+      // The grid's own half of "a conflict is never silent": an inline edit
+      // that lost a domain race saved fine and claimed nothing, and the
+      // only other evidence is a row in the review inbox.
+      const collision = collisionToast(result, object.singular)
+      if (collision)
+        toast(collision.title, { description: collision.description })
       void router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
@@ -334,7 +343,7 @@ function CreateRecordDialog({
       return setError(`Name the ${object.singular.toLowerCase()}.`)
     setPending(true)
     try {
-      await createObjectRecord({
+      const result = await createObjectRecord({
         data: {
           objectId: object.id,
           name: name.trim(),
@@ -348,7 +357,13 @@ function CreateRecordDialog({
       setOpen(false)
       setName('')
       setValues({})
-      toast(`${name.trim()} added`)
+      // A record born onto a domain another record already claims is the
+      // same collision an edit makes; the birth toast gives way to the one
+      // that says something.
+      const collision = collisionToast(result, object.singular)
+      if (collision)
+        toast(collision.title, { description: collision.description })
+      else toast(`${name.trim()} added`)
       void router.invalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not add it.')

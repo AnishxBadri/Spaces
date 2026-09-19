@@ -91,3 +91,76 @@ describe('entityContext — the noun and the link', () => {
     expect(recordPath(side)).toBeNull()
   })
 })
+
+/**
+ * SPA-97. The Domain row's fallback. The side that *caused* an identity pair
+ * is the side that lost the claim, so it holds no domain alias — the card
+ * printed "—" for the record under discussion. `identityDomain` is that
+ * side's own value for its object's `domain` identity key.
+ */
+describe('entityContext — the colliding side still shows its domain', () => {
+  it('reads the record’s identity-key value when no alias was won', async () => {
+    const { Effect } = await import('effect')
+    const { createObjectProgram, createRecordProgram } =
+      await import('#/lib/attributes/object-registry')
+    const { entityContext } = await import('./inbox')
+
+    const actor = await actorId()
+    const object = await Effect.runPromise(
+      createObjectProgram({
+        singular: 'Vendor',
+        plural: 'Vendors',
+        identityKeys: ['domain'],
+        createdBy: actor,
+      }),
+    )
+    const holder = await Effect.runPromise(
+      createRecordProgram({
+        objectId: object.id,
+        name: 'Northwind Supply',
+        values: { domain: 'northwind.example' },
+        actor: { type: 'user', id: actor },
+      }),
+    )
+    // The second record types the same domain: the value lands, the claim
+    // does not, and the pair is born.
+    const loser = await Effect.runPromise(
+      createRecordProgram({
+        objectId: object.id,
+        name: 'Northwind Supply Co',
+        values: { domain: 'https://Northwind.example/' },
+        actor: { type: 'user', id: actor },
+      }),
+    )
+    expect(loser.identity).toEqual({ domain: 'suggested_duplicate' })
+    expect(loser.identityValues).toEqual({ domain: 'northwind.example' })
+
+    const winnerSide = await entityContext(holder.id)
+    const loserSide = await entityContext(loser.id)
+
+    // The winner owns the alias; the loser owns none and would have read
+    // "—" before the fallback.
+    expect(winnerSide.domains).toEqual(['northwind.example'])
+    expect(loserSide.domains).toEqual([])
+    // Normalized the same way the alias lane is, so the two columns compare.
+    expect(loserSide.identityDomain).toBe('northwind.example')
+  })
+
+  it('leaves a core company pair reading its aliases, not a fallback', async () => {
+    const { resolveEntity } = await import('#/lib/entities/resolve')
+    const { entityContext } = await import('./inbox')
+
+    const co = await resolveEntity({
+      kind: 'company',
+      name: 'Contoso Analytics',
+      keys: { domain: 'contoso.example' },
+      source: { class: 'manual' },
+    })
+    const side = await entityContext(co.entityId)
+
+    expect(side.domains).toEqual(['contoso.example'])
+    // The system company object declares no identity-key attribute, so the
+    // fallback is null by construction and the alias lane is what renders.
+    expect(side.identityDomain).toBeNull()
+  })
+})

@@ -166,8 +166,7 @@ function PairCard({
     {
       label: 'Domain',
       mono: true,
-      render: (side) =>
-        side.domains.length > 0 ? side.domains.join(' · ') : '—',
+      render: (side) => sideDomain(side),
     },
     {
       label: 'Also seen as',
@@ -293,6 +292,24 @@ function PairCard({
       </div>
     </li>
   )
+}
+
+/**
+ * Aliases first, then the record's own field (SPA-97).
+ *
+ * The side that caused an identity pair is the side that *lost* the claim,
+ * so it holds no domain alias and this row used to read "—" for the exact
+ * record under discussion. `identityDomain` is that side's value for its
+ * object's `domain` identity key, normalized the same way the alias lane is,
+ * so both columns print the colliding domain and the pair is comparable.
+ *
+ * Core pairs are unchanged: a company's domain *is* an alias, the system
+ * objects declare no identity-key attribute, so `identityDomain` is null
+ * and the first branch is the only one that ever runs.
+ */
+function sideDomain(side: InboxSide): string {
+  if (side.domains.length > 0) return side.domains.join(' · ')
+  return side.identityDomain ?? '—'
 }
 
 /**
