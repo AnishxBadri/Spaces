@@ -264,14 +264,14 @@ export const updateRecord = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const u = await requireUser()
     if (data.name) {
-      await db
-        .update(entity)
-        .set({ canonicalName: data.name })
-        .where(eq(entity.id, data.id))
-      await db.insert(activity).values({
-        actorId: u.id,
-        verb: 'renamed',
-        subjectEntityId: data.id,
+      // The rename half is Effect-first through the effectFn seam
+      // (backend-paradigm ratchet); the values patch below is untouched and
+      // stays Promise-shaped until it is open for behavioural change.
+      const { effectFn } = await import('./effect')
+      const { renameRecordProgram } = await import('../entities/rename')
+      await effectFn(renameRecordProgram)(u.id, {
+        id: data.id,
+        name: data.name,
       })
     }
     if (data.patch && Object.keys(data.patch).length > 0) {

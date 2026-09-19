@@ -9,10 +9,11 @@ import {
   entitySpace,
   link,
 } from '@spaces/db/schema'
+import { normalizeName } from '@spaces/core/entities/normalize'
 import { mergeEntities } from '../entities/merge'
 import { provenanceOf, requireUser } from './shared'
 
-async function entityContext(id: string) {
+export async function entityContext(id: string) {
   const [head] = await db
     .select({
       id: entity.id,
@@ -44,9 +45,14 @@ async function entityContext(id: string) {
     ...provenance,
     createdAt: head.createdAt.toISOString(),
     domains: aliases.filter((a) => a.kind === 'domain').map((a) => a.valueNorm),
+    // "Other" is measured in the same normal form the aliases are written
+    // in — `normalizeName`, not lowercase. Lowercasing leaves the legal
+    // suffix on ("acme inc" vs the alias "acme"), so a record would list
+    // its own current name as something it was also seen as. Renames write
+    // a name alias now (SPA-63), so every record has that row.
     otherNames: aliases
       .filter(
-        (a) => a.kind === 'name' && a.valueNorm !== head.name.toLowerCase(),
+        (a) => a.kind === 'name' && a.valueNorm !== normalizeName(head.name),
       )
       .map((a) => a.valueNorm),
     mentionCount,
