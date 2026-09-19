@@ -136,9 +136,17 @@ dependency's files into the consumer's hash, so editing
 here (verified by SPA-143). `--force` re-runs a task regardless.
 
 Pre-commit hooks (lefthook) run prettier + eslint on staged files from the
-repo root; pre-push runs `pnpm run typecheck` (both tsconfigs). CI (`.github/workflows/ci.yml`) runs prettier, eslint, tsc and vitest
-against a real Postgres — and since gate 5 is an eslint rule, CI enforces all
-five.
+repo root; pre-push runs `pnpm run typecheck`, which is turbo over every
+package that has one — `@spaces/web`, `@spaces/db`, `@spaces/core` — plus the
+`typecheck:root` half, so no package can be typechecked by nobody.
+CI (`.github/workflows/ci.yml`) runs the same root commands, **one named step
+per gate** against a real Postgres: prettier, `pnpm run lint` (which carries
+gate 5, since it is an eslint rule), `pnpm run typecheck`, `boot.ts` against
+the empty service database, `pnpm run test`, then `turbo run build` — a red
+run names the gate that broke. CI writes no `.env.local`: `DATABASE_URL` comes
+from the job's `env:`, every loader falls back to the environment, and the
+harness derives `spaces_test*` from it, so the suite never writes the
+`spaces` database `boot.ts` migrated.
 
 ## Principles (no principle without an enforcer)
 
