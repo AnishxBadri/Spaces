@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { TaskComposer } from './task-composer'
 import { RailEmpty, RailSection } from './record/record-parts'
+import { Checkbox } from './ui/checkbox'
 import { listEntityTasks, setTaskDone } from '#/lib/server-fns'
 import { localToday } from '@spaces/core/tasks/parse-due'
 import { cn } from '#/lib/utils'
@@ -89,11 +90,9 @@ export function TasksRail({
               key={t.id}
               className="flex h-row items-center gap-3 border-t border-rule"
             >
-              <input
-                type="checkbox"
-                className="focus-ring size-3.5 shrink-0 appearance-none border border-hairline bg-paper checked:bg-primary"
+              <Checkbox
                 checked={false}
-                onChange={() => complete(t.id)}
+                onCheckedChange={() => complete(t.id)}
                 aria-label={`Complete: ${t.content}`}
               />
               <span className="min-w-0 flex-1 truncate text-ui">

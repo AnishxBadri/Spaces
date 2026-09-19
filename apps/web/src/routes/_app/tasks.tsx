@@ -11,6 +11,7 @@ import {
 import { PageHeader } from '#/components/page-header'
 import { TaskComposer } from '#/components/task-composer'
 import { Button } from '#/components/ui/button'
+import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { recordPath } from '#/lib/record-path'
 import { deleteTask, listTasks, setTaskDone } from '#/lib/server-fns'
@@ -365,11 +366,9 @@ function TaskItem({
         leaving && 'pointer-events-none opacity-0',
       )}
     >
-      <input
-        type="checkbox"
-        className="focus-ring size-3.5 shrink-0 appearance-none border border-hairline bg-paper checked:border-primary checked:bg-primary"
+      <Checkbox
         checked={!!done !== !!leaving}
-        onChange={onToggle}
+        onCheckedChange={onToggle}
         aria-label={done ? 'Reopen task' : 'Complete task'}
       />
       <span

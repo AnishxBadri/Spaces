@@ -8,8 +8,8 @@ import {
 } from '#/components/editor/note-editor'
 import { EmptyState } from '#/components/empty-state'
 import { PageHeader } from '#/components/page-header'
+import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
-import { badgeStyle, optionColor } from '@spaces/core/attributes/colors'
 import {
   createMandate,
   getMandate,
@@ -206,26 +206,27 @@ function FactsGrid({
         {stages.map((opt) => {
           const active = mandate.stages.includes(opt.id)
           return (
-            <button
+            <Badge
               key={opt.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() =>
-                save({
-                  stages: active
-                    ? mandate.stages.filter((s) => s !== opt.id)
-                    : [...mandate.stages, opt.id],
-                })
-              }
-              className={cn(
-                'focus-ring flex h-5 items-center px-1.5 mono text-micro font-medium transition-colors',
-                !active &&
-                  'border border-dashed border-rule font-normal text-graphite hover:border-hairline hover:text-foreground',
-              )}
-              style={active ? badgeStyle(optionColor(opt, 0)) : undefined}
+              asChild
+              option={opt}
+              index={0}
+              unselected={!active}
             >
-              {opt.label}
-            </button>
+              <button
+                type="button"
+                aria-pressed={active}
+                onClick={() =>
+                  save({
+                    stages: active
+                      ? mandate.stages.filter((s) => s !== opt.id)
+                      : [...mandate.stages, opt.id],
+                  })
+                }
+              >
+                {opt.label}
+              </button>
+            </Badge>
           )
         })}
       </FactRow>

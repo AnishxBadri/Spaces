@@ -423,7 +423,20 @@ load-bearing rules promoted here:
   pine selection wash with a pine border and a **pine** knob. State must be legible
   from one switch alone — position is not a state, it is a consequence of one, so a
   track that only moves an ink block is a bug (it reads as a stray mark). The knob
-  travels on `translate-x`; the Compositor Rule holds inside controls too.
+  travels on `translate-x`; the Compositor Rule holds inside controls too. One
+  implementation, `Switch` (`apps/web/src/components/ui/switch.tsx`), since 2026-09-19
+  (SPA-22): a `<button role="switch" aria-checked>` and not Radix's Switch, which would
+  bring its own focus treatment and the Reticle Rule has no exceptions left. `children`
+  is the label the control reads as, so track and text share one hit area and one
+  reticle.
+- **Checkboxes**: a 14px square that fills with pine and carries a 10px check — never a
+  native rounded control, never a circle. Unchecked rests on paper inside a hairline and
+  tints to bone on hover, the way a highlighted option does. One implementation,
+  `Checkbox` (`apps/web/src/components/ui/checkbox.tsx`), since 2026-09-19 (SPA-22),
+  also a `<button role="checkbox" aria-checked>`: no call site sits inside a form that
+  submits — each writes through a server fn the moment it is toggled — so there is no
+  name/value pair for a native input to contribute. The caller owns the label and the
+  hit area around it.
 
 ### Page header + readout strip (P1)
 
@@ -478,6 +491,24 @@ with pine. Pickers are paper sheets with the 2px shadow and highlight in bone.
 Square chips carrying select / status / stage values: pale tint background + same-hue
 ink from the twelve-hue palette, mono 11 medium, 18–20px tall, 6px inset. Data colours,
 never decoration; the Two-Tier Rule guarantees they never compete with pine.
+
+One implementation, `Badge` (`apps/web/src/components/ui/badge.tsx`), since 2026-09-19
+(SPA-22). It takes **the option row and its index**, never a colour the caller
+resolved: `optionColor`'s index fallback is what lands the board, Today and the
+registry on the same hue for the same stage, and a set defined before the palette
+existed still renders fully coloured. Two states drop the hue and are the primitive's
+to draw, not each caller's:
+
+- `archived` — struck graphite on bone. The treatment had been redrawn at four sites
+  and had drifted at three of them; it is a prop now.
+- `unselected` — a dashed rule in graphite, the Mandate's unpicked stages.
+
+Renders a `<span>`; `asChild` wears a button or a link instead, which is also what
+turns on hover (opacity), press and the reticle — a badge that cannot be clicked gets
+no states it cannot use. The one badge the instrument colours for itself (`unpriced`,
+`Outside mandate`) names amber as a stored colour rather than spelling
+`bg-[var(--badge-amber)]`, so it goes through the same primitive as the data-coloured
+ones.
 
 ### Navigation — the chassis
 

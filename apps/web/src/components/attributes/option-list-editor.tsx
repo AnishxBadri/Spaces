@@ -5,11 +5,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
-import {
-  BADGE_COLORS,
-  badgeStyle,
-  nextBadgeColor,
-} from '@spaces/core/attributes/colors'
+import { badgeStyle } from '#/components/ui/badge'
+import { BADGE_COLORS, nextBadgeColor } from '@spaces/core/attributes/colors'
 import type { BadgeColor } from '@spaces/core/attributes/colors'
 import { cn } from '#/lib/utils'
 

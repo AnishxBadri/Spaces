@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { Sunrise } from 'lucide-react'
 import { toast } from 'sonner'
-import { badgeStyle, optionColor } from '@spaces/core/attributes/colors'
 import { GettingStarted } from '#/components/getting-started'
 import {
   LedgerFigure,
@@ -11,7 +10,9 @@ import {
 } from '#/components/ledger-section'
 import { KeyHint, PageHeader, ReadoutStrip } from '#/components/page-header'
 import { TaskComposer } from '#/components/task-composer'
+import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
+import { Checkbox } from '#/components/ui/checkbox'
 import {
   dealFunnelStats,
   getOnboardingProgress,
@@ -193,18 +194,16 @@ function TodayPage() {
   )
   const stageLabel = (id: string) =>
     stageOptions.find((o) => o.id === id)?.label ?? id
-  // Badge styling for the stage pill — same data-driven colors the board uses.
+  // The stage pill reads the same option row the board reads, so optionColor's
+  // index fallback lands both surfaces on the same hue.
   const stageBadge = (id: string) => {
     const idx = stageOptions.findIndex((o) => o.id === id)
-    // A retired stage reads as history here too: no hue, muted ink.
-    if (idx >= 0 && stageOptions[idx].archived)
-      return {
-        backgroundColor: 'var(--bone)',
-        color: 'var(--graphite)',
-      }
-    return badgeStyle(
-      optionColor(idx >= 0 ? stageOptions[idx] : undefined, Math.max(idx, 0)),
-    )
+    return {
+      option: idx >= 0 ? stageOptions[idx] : undefined,
+      index: Math.max(idx, 0),
+      // A retired stage reads as history here too: no hue, muted ink.
+      archived: idx >= 0 && Boolean(stageOptions[idx].archived),
+    }
   }
   const idleDeals = funnel.daysInStage
     .filter(
@@ -334,11 +333,9 @@ function TodayPage() {
                 const late = !!t.dueDate && t.dueDate < today
                 return (
                   <LedgerRow key={t.id}>
-                    <input
-                      type="checkbox"
-                      className="focus-ring size-3.5 shrink-0 appearance-none border border-hairline bg-paper checked:bg-primary"
+                    <Checkbox
                       checked={false}
-                      onChange={() => void complete(t.id)}
+                      onCheckedChange={() => void complete(t.id)}
                       aria-label="Complete task"
                     />
                     <span className="min-w-0 truncate text-ui">
@@ -405,12 +402,12 @@ function TodayPage() {
                         {d.name}
                       </span>
                       <span className="flex w-[6.875rem] shrink-0">
-                        <span
-                          className="flex h-[1.125rem] items-center px-1.5 mono text-micro font-medium"
-                          style={stageBadge(d.stage)}
+                        <Badge
+                          {...stageBadge(d.stage)}
+                          className="h-[1.125rem]"
                         >
                           {stageLabel(d.stage)}
-                        </span>
+                        </Badge>
                       </span>
                       <ReferenceBar
                         value={days}

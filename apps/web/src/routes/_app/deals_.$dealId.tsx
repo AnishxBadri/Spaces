@@ -31,6 +31,7 @@ import {
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { TaskComposer } from '#/components/task-composer'
+import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { localToday } from '@spaces/core/tasks/parse-due'
@@ -231,14 +232,24 @@ function DealRecordPage() {
             {deal.outsideMandate ? (
               // A hint, never a block — edge cases are the job. Deliberately
               // quiet: same-hue tint, no red.
-              <Link
-                to="/mandate"
-                className="focus-ring flex h-5 shrink-0 items-center gap-1 bg-[var(--badge-amber)] px-1.5 mono text-micro font-medium text-[var(--badge-amber-ink)] hover:opacity-80"
-                title="This company's stage is outside the mandate's stages. Click to review the mandate."
+              // Amber is named, not resolved: `optionColor` returns a stored
+              // colour unchanged, so the one badge the instrument colours for
+              // itself goes through the same primitive as the data-coloured
+              // ones.
+              <Badge
+                asChild
+                option={{ color: 'amber' }}
+                index={0}
+                className="shrink-0 gap-1"
               >
-                <Compass className="size-3" strokeWidth={2} />
-                Outside mandate
-              </Link>
+                <Link
+                  to="/mandate"
+                  title="This company's stage is outside the mandate's stages. Click to review the mandate."
+                >
+                  <Compass className="size-3" strokeWidth={2} />
+                  Outside mandate
+                </Link>
+              </Badge>
             ) : null}
           </>
         }

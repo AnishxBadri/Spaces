@@ -8,6 +8,7 @@ import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from './ui/dialog'
 import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import { Switch } from './ui/switch'
 import { createTask, listUsers, searchEntities } from '#/lib/server-fns'
 import { localToday, parseDue } from '@spaces/core/tasks/parse-due'
 import { useHotkey } from '#/lib/use-hotkey'
@@ -193,7 +194,9 @@ export function TaskComposer({
         <div className="flex flex-wrap items-center gap-2">
           {chips}
           <span className="flex-1" />
-          <KeepOpenSwitch checked={keepOpen} onChange={setKeepOpen} />
+          <Switch checked={keepOpen} onCheckedChange={setKeepOpen}>
+            Keep open
+          </Switch>
           <Button type="submit" size="sm" disabled={pending}>
             {pending ? 'Saving…' : 'Add task'}
             <KeyHint>↵</KeyHint>
@@ -253,7 +256,9 @@ export function TaskComposer({
             {chips}
           </div>
           <div className="flex min-h-11 items-center gap-4 border-t border-rule bg-bone px-5 py-2">
-            <KeepOpenSwitch checked={keepOpen} onChange={setKeepOpen} />
+            <Switch checked={keepOpen} onCheckedChange={setKeepOpen}>
+              Keep open
+            </Switch>
             <span className="flex-1" />
             <span className="hidden mono text-micro text-graphite sm:inline">
               ↵ add · ⇧↵ add & keep open
@@ -266,49 +271,6 @@ export function TaskComposer({
         </form>
       </DialogContent>
     </Dialog>
-  )
-}
-
-/**
- * The composer's one switch, in both variants. Off is a rule track with a
- * graphite knob; on is the pine selection wash with a pine knob — pine is
- * what "active" is made of everywhere else in the instrument, and state has
- * to be readable without a second switch to compare against. The knob
- * travels on transform, never on layout.
- */
-function KeepOpenSwitch({
-  checked,
-  onChange,
-}: {
-  checked: boolean
-  onChange: (v: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className="focus-ring flex items-center gap-2 text-label text-graphite transition-colors duration-100 hover:text-foreground"
-    >
-      <span
-        aria-hidden
-        className={cn(
-          'flex h-3.5 w-6 items-center border p-px transition-colors duration-100 ease-out-quart',
-          checked ? 'border-primary bg-selected' : 'border-rule bg-paper',
-        )}
-      >
-        <span
-          className={cn(
-            'size-2.5 transition-transform duration-100 ease-out-quart',
-            checked
-              ? 'translate-x-2.5 bg-primary'
-              : 'translate-x-0 bg-graphite',
-          )}
-        />
-      </span>
-      Keep open
-    </button>
   )
 }
 
