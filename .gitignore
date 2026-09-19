@@ -12,6 +12,9 @@ dist-ssr
 __unconfig*
 todos.json
 
+# turbo's local cache + per-task logs (no remote cache; the cache is this box)
+.turbo
+
 # runtime data (blobs + secret.key)
 data/
 

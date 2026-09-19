@@ -7,11 +7,16 @@
     "#/*": "./apps/web/src/*"
   },
   "scripts": {
-    "dev": "pnpm --filter @spaces/web dev",
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "generate-routes": "turbo run generate-routes",
+    "test": "turbo run test",
+    "lint": "turbo run lint lint:root",
+    "typecheck": "turbo run typecheck typecheck:root",
+    "lint:root": "eslint eslint-rules scripts --no-error-on-unmatched-pattern",
+    "typecheck:root": "tsc --noEmit",
     "worker": "pnpm --filter @spaces/web worker",
-    "build": "pnpm --filter @spaces/web build",
     "preview": "pnpm --filter @spaces/web preview",
-    "generate-routes": "pnpm --filter @spaces/web generate-routes",
     "db:migrate:run": "pnpm --filter @spaces/web db:migrate:run",
     "db:seed": "pnpm --filter @spaces/web db:seed",
     "db:generate": "pnpm --filter @spaces/web db:generate",
@@ -19,9 +24,6 @@
     "db:push": "pnpm --filter @spaces/web db:push",
     "db:pull": "pnpm --filter @spaces/web db:pull",
     "db:studio": "pnpm --filter @spaces/web db:studio",
-    "test": "pnpm --filter @spaces/web test",
-    "typecheck": "tsc --noEmit && pnpm --filter @spaces/web typecheck",
-    "lint": "eslint",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",
     "prepare": "lefthook install"
@@ -37,6 +39,7 @@
     "lefthook": "^2.1.12",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.8.1",
+    "turbo": "2.11.2",
     "typescript": "^6.0.2"
   },
   "pnpm": {

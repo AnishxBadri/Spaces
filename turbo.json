@@ -1,0 +1,113 @@
+// The five gates of CLAUDE.md as a task graph. The failure this file exists to
+// prevent is a gate serving a cached pass for inputs that changed, so every
+// task's `inputs` is written to be a superset of what the command actually
+// reads.
+//
+// `lint` and `typecheck` each come in two halves because two configs own two
+// disjoint file sets: eslint.config.js and the root tsconfig cover what stayed
+// at the repo root (eslint-rules/, scripts/, the root config files), and
+// apps/web's own tsconfig covers the app. The root halves are root tasks
+// (`//#lint:root`, `//#typecheck:root`) because that code is not in any
+// package; the package halves are ordinary tasks so `turbo run lint
+// --filter=@spaces/db` means something when db, core and sdk land. Neither
+// half can be the entry point itself — a root task named `//#lint` would run
+// the root `lint` script, which is `turbo run lint`, and turbo refuses the
+// recursion — which is why the root scripts are `lint:root` / `typecheck:root`
+// and `pnpm lint` runs both names.
+{
+  "$schema": "https://turbo.build/schema.json",
+
+  "ui": "stream",
+
+  // Read by tasks in every package: the lockfile (what got installed), the
+  // shared tsconfig base both tsconfigs extend, and the env file vitest loads.
+  "globalDependencies": [
+    "pnpm-lock.yaml",
+    "packages/config/tsconfig.base.json",
+    ".env.local"
+  ],
+
+  // DATABASE_URL can reach vitest from the shell as well as from .env.local;
+  // either way it decides what the DB-coupled tests talk to.
+  "globalEnv": ["DATABASE_URL", "APP_URL", "NODE_ENV"],
+
+  "tasks": {
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+
+    // `tsr generate` reads the route files and tsr.config.json and writes the
+    // route tree. The tree is declared as an output, but this task is NOT a
+    // dependency of `build`: vite's tanstackStart plugin regenerates
+    // src/routeTree.gen.ts during `vite build`, and its tree keeps the
+    // `declare module '@tanstack/react-start'` Register block that the CLI
+    // strips (a pre-existing difference, reproducible on main). Chaining the
+    // CLI in front of build would hand build the stripped tree, and a cache
+    // hit here would replay the stripped tree over vite's. build instead takes
+    // the route tree as an input — it is under src/** — so a changed tree
+    // invalidates build without the CLI in the path.
+    "generate-routes": {
+      "inputs": ["src/routes/**", "src/router.tsx", "tsr.config.json"],
+      "outputs": ["src/routeTree.gen.ts"]
+    },
+
+    // Default inputs — every non-gitignored file in the package. vite reads the
+    // app source, the route tree, vite.config.ts, tsconfig.json and
+    // package.json, so anything narrower would under-invalidate.
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": [".output/**", ".nitro/**", ".tanstack/**"]
+    },
+
+    // .env.local is a globalDependency and DATABASE_URL a globalEnv because
+    // vitest.config.ts loads the first into the test env and 10 of the 23 files
+    // talk to the database named there — a cached pass keyed without them is a
+    // pass that checked nothing.
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": []
+    },
+
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": []
+    },
+
+    // eslint.config.js and eslint-rules/ live at the repo root and decide what
+    // this package's lint run reports — gate 5 (instrument/no-v1-tokens) is one
+    // of those rule files — so both are inputs even though neither is in the
+    // package.
+    "lint": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/eslint.config.js",
+        "$TURBO_ROOT$/eslint-rules/**"
+      ],
+      "outputs": []
+    },
+
+    "//#lint:root": {
+      "inputs": ["eslint.config.js", "eslint-rules/**", "scripts/**"],
+      "outputs": []
+    },
+
+    // Exactly what the root tsconfig includes. Its `paths` maps `#/*` into
+    // apps/web/src, so if anything under scripts/ ever imports `#/`,
+    // apps/web/src/** has to join this list — which is why SPA-101 moved the
+    // roundtrip fixture into apps/web instead.
+    "//#typecheck:root": {
+      "inputs": [
+        "tsconfig.json",
+        "scripts/**",
+        "eslint-rules/**",
+        "eslint.config.js",
+        "prettier.config.js"
+      ],
+      "outputs": []
+    }
+  }
+}

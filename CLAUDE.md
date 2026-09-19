@@ -35,11 +35,18 @@ pnpm worker                                       # background worker
 
 - **pnpm workspace since 2026-09-19 (SPA-101).** The app is `apps/web`
   (`@spaces/web`); `packages/config` holds `tsconfig.base.json`, and
-  `packages/*` is where `db`, `core` and `sdk` land later. Every root script
-  above is a proxy that delegates with `pnpm --filter`, so run them from the
-  repo root as before — turbo takes those over in `mono-1b`. What stayed at
+  `packages/*` is where `db`, `core` and `sdk` land later. What stayed at
   the root: `eslint.config.js` + `eslint-rules/`, `prettier.config.js`,
   `lefthook.yml`, `scripts/`, `docker/`, `docs/`, `.env.local` and `data/`.
+- **Turbo runs the graph since 2026-09-19 (SPA-127).** `turbo.json` declares
+  `dev`, `build`, `lint`, `typecheck`, `test` and `generate-routes`, and the
+  root scripts for those six go through `turbo run` instead of
+  `pnpm --filter` (`worker`, `preview` and the `db:*` scripts are still plain
+  `--filter` proxies — they are stateful, not gates, and not in the graph).
+  Run them from the repo root as before. Per package: `pnpm exec turbo run
+test --filter=@spaces/web`. The cache is local only, no remote cache; the
+  artifacts live in `.turbo/` (gitignored, and shared with the main checkout
+  when you are in a worktree).
 - `.env.local` stays at the **repo root**, and every loader is anchored to the
   file that needs it rather than to cwd (`apps/web/vitest.config.ts`,
   `apps/web/drizzle.config.ts`, `apps/web/vite.config.ts`'s `envDir`, and
@@ -58,13 +65,18 @@ pnpm worker                                       # background worker
 
 ## Gates before any commit
 
-1. `pnpm typecheck` — **not** a bare `pnpm exec tsc --noEmit`. There are two
-   tsconfigs now: the root one covers `scripts/` and `eslint-rules/`, and
-   `apps/web/tsconfig.json` covers the app. `pnpm typecheck` runs both; a bare
-   root `tsc` would pass while typechecking none of the app.
-2. `pnpm test` (root proxy for `vitest run` in `apps/web`) — must be fully green
-3. prettier on touched files (root: `pnpm exec prettier --check <files>`)
-4. `pnpm lint` — must be zero errors (the old tolerated baseline was
+1. `pnpm typecheck` → `turbo run typecheck typecheck:root` — **not** a bare
+   `pnpm exec tsc --noEmit`. There are two tsconfigs now: the root one covers
+   `scripts/` and `eslint-rules/` (that is the `typecheck:root` half), and
+   `apps/web/tsconfig.json` covers the app (the `typecheck` half). The root
+   script runs both; a bare root `tsc` would pass while typechecking none of
+   the app.
+2. `pnpm test` → `turbo run test` (`vitest run` in `apps/web`) — must be fully
+   green
+3. prettier on touched files (root: `pnpm exec prettier --check <files>`) —
+   not a turbo task; it is per-file, not per-package
+4. `pnpm lint` → `turbo run lint lint:root` — must be zero errors (the old
+   tolerated baseline was
    eliminated 2026-09; don't reintroduce one). Where drizzle's `const [row] =`
    destructure lies about presence, use the `.at(0)` pattern instead of
    deleting the guard.
@@ -77,6 +89,15 @@ pnpm worker                                       # background worker
    `@theme` block by `apps/web/src/lib/design-tokens.test.ts` under gate 2. The Instrument vocabulary is
    `text-graphite`, `border-rule`, `bg-bone`, `bg-paper`, `text-label`,
    `rounded-md` (2px) / `rounded-none`.
+
+A second run of a gate with nothing changed is a cache hit that replays the
+first run's output. That is safe only because the inputs are honest: `test`
+and `typecheck` hash the whole package plus `.env.local`, the lockfile and
+`packages/config/tsconfig.base.json`; `lint` hashes `eslint.config.js` and
+`eslint-rules/**` too, so editing gate 5's rule re-runs gate 4. If you add a
+file the gates read from outside `apps/web`, add it to `turbo.json` — a task
+whose inputs miss it will replay a pass that checked nothing. `--force`
+re-runs a task regardless.
 
 Pre-commit hooks (lefthook) run prettier + eslint on staged files from the
 repo root; pre-push runs `pnpm run typecheck` (both tsconfigs). CI (`.github/workflows/ci.yml`) runs prettier, eslint, tsc and vitest
@@ -107,7 +128,13 @@ anyway. Don't re-litigate it from the flag list.
 
 ## After specific change kinds
 
-- Routes changed → `pnpm generate-routes`
+- Routes changed → `pnpm generate-routes` (turbo task `generate-routes`, whose
+  output is `apps/web/src/routeTree.gen.ts`). `build` deliberately does **not**
+  depend on it: vite's tanstackStart plugin writes the route tree during
+  `vite build` and its tree keeps the `declare module '@tanstack/react-start'`
+  Register block that the `tsr generate` CLI strips. Chaining the CLI in front
+  of build would hand build the stripped tree. The CLI's diff against the
+  committed tree is pre-existing — don't "fix" it here.
 - Schema changed → `pnpm db:generate --name <x>`, then hand-inspect the SQL
 - New system attribute → add to `SYSTEM_ATTRIBUTES` in
   `apps/web/src/lib/attributes/registry.ts`; `pnpm db:migrate:run` reseeds
