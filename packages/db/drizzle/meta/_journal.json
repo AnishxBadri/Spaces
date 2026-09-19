@@ -190,6 +190,13 @@
       "when": 1789811478213,
       "tag": "0026_drop_organization_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1789812324460,
+      "tag": "0027_credential_kinds",
+      "breakpoints": true
     }
   ]
 }
