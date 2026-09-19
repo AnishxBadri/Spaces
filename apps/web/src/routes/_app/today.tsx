@@ -294,7 +294,7 @@ function TodayPage() {
             label: 'Missing FX',
             value: missingRates,
             tone: 'warn',
-            to: '/settings',
+            to: '/settings/currency',
           },
           { label: 'Dedupe inbox', value: dedupeCount, to: '/dedupe' },
         ]}
@@ -507,7 +507,7 @@ function TodayPage() {
                     unpriced
                   </span>
                   <Link
-                    to="/settings"
+                    to="/settings/currency"
                     className="focus-ring mono text-micro text-primary hover:underline"
                   >
                     add FX rate ›

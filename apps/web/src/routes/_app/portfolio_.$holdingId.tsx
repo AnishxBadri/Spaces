@@ -128,7 +128,7 @@ function HoldingPage() {
         {missing.length > 0 ? (
           <p className="mono text-micro text-destructive">
             metrics need fx rates for {missing.join(', ')} —{' '}
-            <Link to="/settings" className="focus-ring underline">
+            <Link to="/settings/currency" className="focus-ring underline">
               add them in Settings
             </Link>
           </p>

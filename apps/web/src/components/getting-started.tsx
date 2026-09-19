@@ -48,7 +48,7 @@ const STEPS: Array<{
     key: 'invitedPartner',
     label: 'Invite your partner',
     detail: 'Solo? Skip it — dismiss the card whenever.',
-    to: '/settings',
+    to: '/settings/members',
   },
 ]
 

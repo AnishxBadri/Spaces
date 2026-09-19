@@ -105,25 +105,27 @@ The tier is decided by who is speaking, never by how small the text is.
 Compose these. A new component is a last resort and needs the same argument a modal
 needs.
 
-| primitive                                                                         | file                                               | for                                                                                     |
-| --------------------------------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `PageHeader`, `KeyHint`, `ReadoutStrip`                                           | `apps/web/src/components/page-header.tsx`          | P1 — serif title or sentence, mono eyebrow/readout, actions right, hairline under       |
-| `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`                      | `apps/web/src/components/ledger-section.tsx`       | P2/P3 — caps label + mono count, 36px rows on rules, a fixed mono lane, value-vs-median |
-| `RecordHeader`, `RecordBody`, `RecordSection`, `PropertyGrid`, `PropertyCell`     | `apps/web/src/components/record/record-parts.tsx`  | P7 — the record anatomy: crumb, readouts, property grid, sections                       |
-| `RailSection`, `RailRow`, `RailItem`, `RailEmpty`, `StageStepper`                 | `apps/web/src/components/record/record-parts.tsx`  | the bone rail right of a record                                                         |
-| `InitialsMark`, `DitherMark`, `initialsOf`                                        | `apps/web/src/components/record/record-parts.tsx`  | ink initials squares and 1-bit fallback marks                                           |
-| `RecordTable`, `TableToolbar`, `AddColumnButton`                                  | `apps/web/src/components/table/record-table.tsx`   | the signature grid — sticky head, 36px rows, columns popover, `N OF M` foot             |
-| `useTablePrefs`                                                                   | `apps/web/src/components/table/use-table-prefs.ts` | per-surface column order / visibility / width, under a frozen key                       |
-| `RecordLinkCell`, `IconBadge`, `InitialBadge`, `ChipLink`, `MetaCell`, `DateCell` | `apps/web/src/components/table/cells.tsx`          | the cell renderers a hand-declared column uses                                          |
-| `ViewBar`, `useViewState`                                                         | `apps/web/src/components/views/`                   | saved views — **object surfaces only** (`/companies`, `/deals`, `/people`, `/o/$slug`)  |
-| `EmptyState`                                                                      | `apps/web/src/components/empty-state.tsx`          | P5 — dither block, serif sentence, one sans line, the primary with its key              |
-| `DitherBlock`, `DensityRamp`                                                      | `apps/web/src/components/dither.tsx`               | the only texture; loading is a density ramp, never a shimmer                            |
-| `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`            | P8 — 44px serif head + mono context + `esc`, 20px body, 52px bone foot                  |
-| `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`    | the destructive confirm; it replaces `window.confirm` everywhere                        |
-| `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                      | the atoms — reticle focus, 2px radius, key hints inside                                 |
-| `Badge`, `badgeClasses`, `badgeTint`                                              | `apps/web/src/components/ui/badge.tsx`             | the square option badge — takes the option row + index, `archived` and `unselected`     |
-| `Checkbox`, `checkboxClasses`                                                     | `apps/web/src/components/ui/checkbox.tsx`          | the 14px square that fills with pine; a button, never a native control                  |
-| `Switch`, `switchClasses`                                                         | `apps/web/src/components/ui/switch.tsx`            | the 24×14 square track — graphite knob off, pine knob on, legible from one switch       |
+| primitive                                                                         | file                                                    | for                                                                                     |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `PageHeader`, `KeyHint`, `ReadoutStrip`                                           | `apps/web/src/components/page-header.tsx`               | P1 — serif title or sentence, mono eyebrow/readout, actions right, hairline under       |
+| `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`                      | `apps/web/src/components/ledger-section.tsx`            | P2/P3 — caps label + mono count, 36px rows on rules, a fixed mono lane, value-vs-median |
+| `RecordHeader`, `RecordBody`, `RecordSection`, `PropertyGrid`, `PropertyCell`     | `apps/web/src/components/record/record-parts.tsx`       | P7 — the record anatomy: crumb, readouts, property grid, sections                       |
+| `RailSection`, `RailRow`, `RailItem`, `RailEmpty`, `StageStepper`                 | `apps/web/src/components/record/record-parts.tsx`       | the bone rail right of a record                                                         |
+| `InitialsMark`, `DitherMark`, `initialsOf`                                        | `apps/web/src/components/record/record-parts.tsx`       | ink initials squares and 1-bit fallback marks                                           |
+| `RecordTable`, `TableToolbar`, `AddColumnButton`                                  | `apps/web/src/components/table/record-table.tsx`        | the signature grid — sticky head, 36px rows, columns popover, `N OF M` foot             |
+| `useTablePrefs`                                                                   | `apps/web/src/components/table/use-table-prefs.ts`      | per-surface column order / visibility / width, under a frozen key                       |
+| `RecordLinkCell`, `IconBadge`, `InitialBadge`, `ChipLink`, `MetaCell`, `DateCell` | `apps/web/src/components/table/cells.tsx`               | the cell renderers a hand-declared column uses                                          |
+| `ViewBar`, `useViewState`                                                         | `apps/web/src/components/views/`                        | saved views — **object surfaces only** (`/companies`, `/deals`, `/people`, `/o/$slug`)  |
+| `SettingsSection`, `SettingsRow`                                                  | `apps/web/src/components/settings/settings-section.tsx` | a section of the settings shell — serif title, sans sentence, mono crumb, 48px rows     |
+| `SettingsNav`, `SETTINGS_SECTIONS`                                                | `apps/web/src/components/settings/settings-nav.tsx`     | the settings nav grammar — one row per section, groups derived, `admin` in the lane     |
+| `EmptyState`                                                                      | `apps/web/src/components/empty-state.tsx`               | P5 — dither block, serif sentence, one sans line, the primary with its key              |
+| `DitherBlock`, `DensityRamp`                                                      | `apps/web/src/components/dither.tsx`                    | the only texture; loading is a density ramp, never a shimmer                            |
+| `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`                 | P8 — 44px serif head + mono context + `esc`, 20px body, 52px bone foot                  |
+| `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`         | the destructive confirm; it replaces `window.confirm` everywhere                        |
+| `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                           | the atoms — reticle focus, 2px radius, key hints inside                                 |
+| `Badge`, `badgeClasses`, `badgeTint`                                              | `apps/web/src/components/ui/badge.tsx`                  | the square option badge — takes the option row + index, `archived` and `unselected`     |
+| `Checkbox`, `checkboxClasses`                                                     | `apps/web/src/components/ui/checkbox.tsx`               | the 14px square that fills with pine; a button, never a native control                  |
+| `Switch`, `switchClasses`                                                         | `apps/web/src/components/ui/switch.tsx`                 | the 24×14 square track — graphite knob off, pine knob on, legible from one switch       |
 
 ---
 
@@ -145,11 +147,32 @@ carrying its own accept/dismiss with a toast, `EmptyState` at zero. Not a table:
 row is a decision, not a cell.
 
 **A settings section** — Integrations, Connections, Providers, Routing.
-→ **the FX ledger**, `apps/web/src/routes/_app/settings.tsx:567`, built from
-`SettingsSection` (`:121`) and `SettingsRow` (`:156`). Serif title, one sans sentence, a
-mono `Settings / …` crumb right, hairline under; 48px rows on rules with the control
-right. A ledger inside the section takes a `field-label` head on `border-y-hairline`
-with lanes shared by head and rows, and its foot says what the model does.
+→ **the FX ledger**, `apps/web/src/routes/_app/settings/currency.tsx`, built from
+`SettingsSection` and `SettingsRow`
+(`apps/web/src/components/settings/settings-section.tsx`). Serif title, one sans
+sentence, a mono `SETTINGS / …` crumb right, hairline under; 48px rows on rules with
+the control right. A ledger inside the section takes a `field-label` head on
+`border-y-hairline` with lanes shared by head and rows, and its foot says what the
+model does.
+
+**A settings section is a child route under the settings shell** (SPA-26). `/settings`
+is a layout — `apps/web/src/routes/_app/settings.tsx` — and every section is one file
+under `apps/web/src/routes/_app/settings/` plus one row in `SETTINGS_SECTIONS`
+(`apps/web/src/components/settings/settings-nav.tsx`). Never a section appended to
+another section's file, and never a page of its own outside the shell: the eleven
+pending sections (Providers, Routing, Usage, Integrations, the manifest form, install,
+OAuth, Connections, Binding health, and the two embeddings slices) all take this one
+answer. The row carries the path, the label, the `group` it joins — `workspace`,
+`objects`, `capital`, the same three the chassis uses — and `admin`. The group is also
+the crumb the section prints, so `SETTINGS / CAPITAL` cannot name a place the nav does
+not have; `admin: true` draws the row graphite for a member with `admin` in the right
+lane rather than a link into a page that refuses, and changes no guard. Below `md` the
+nav is the same rows as a horizontal strip above the content. `/settings` redirects to
+the first row. `settings-nav.test.ts` holds the grammar the way `nav-grammar.test.ts`
+holds the chassis'. The shell's loader carries what its readout counts; a section that
+needs anything else loads it in its own child route's loader. A page that is _about_
+one record rather than a section of settings stays outside the shell — that is why
+`settings_.objects.$objectSlug.tsx` keeps its escaping `_`.
 
 **A record** — the term page, a provider, a connection. → **`RecordHeader`**,
 `apps/web/src/components/record/record-parts.tsx:21`, used as
