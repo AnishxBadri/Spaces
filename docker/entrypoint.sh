@@ -56,7 +56,7 @@ if ! (touch "$PROBE" && rm -f "$PROBE") 2>/dev/null; then
 fi
 
 # Migrations auto-run on every boot — no `docker exec` step, ever.
-node_modules/.bin/tsx src/db/migrate.ts
+node_modules/.bin/tsx src/db/boot.ts
 
 ROLE="${ROLE:-all}"
 

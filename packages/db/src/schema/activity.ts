@@ -8,7 +8,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { entity } from './entities'
 import { user } from './auth'
-import type { Json } from '#/lib/json'
+import type { Json } from '../json'
 
 /** Verb-specific detail — the ids and labels the timeline renders. */
 export type ActivityMeta = { [k: string]: Json }

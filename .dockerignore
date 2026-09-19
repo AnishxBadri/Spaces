@@ -12,6 +12,6 @@ data
 .env.*
 *.md
 !README.md
-apps/web/drizzle/**/*.snapshot.json
+packages/db/drizzle/**/*.snapshot.json
 .vscode
 .impeccable

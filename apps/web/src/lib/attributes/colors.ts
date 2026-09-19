@@ -1,3 +1,5 @@
+import type { BadgeColor } from '@spaces/db/schema/attributes'
+
 /**
  * The badge colour vocabulary for select / multi_select / status options.
  *
@@ -25,9 +27,17 @@ export const BADGE_COLORS = [
   'emerald',
   'teal',
   'cyan',
-] as const
+] as const satisfies ReadonlyArray<BadgeColor>
 
-export type BadgeColor = (typeof BADGE_COLORS)[number]
+/**
+ * The union itself is declared at `attribute.options` — a stored option's
+ * colour is column data, so the column owns its type (SPA-142). This list is
+ * the picker's order *and*, through `z.enum(BADGE_COLORS)` in
+ * `lib/server/attributes.ts`, the write vocabulary; the `satisfies` above is
+ * the tie between the two, so a name added here that the column's union does
+ * not know fails the build rather than becoming an unreadable stored value.
+ */
+export type { BadgeColor }
 
 export function isBadgeColor(v: unknown): v is BadgeColor {
   return typeof v === 'string' && BADGE_COLORS.some((c) => c === v)

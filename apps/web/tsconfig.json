@@ -5,23 +5,17 @@
   "exclude": ["node_modules", ".output", ".nitro", ".tanstack", "dist"],
 
   "compilerOptions": {
-    // `@spaces/db` is the name `packages/db` will answer to; the sweep
-    // (SPA-135) moved every db import onto it while the code still lives at
-    // `apps/web/src/db`, so the extraction that follows is a pure file move
-    // with no import churn buried under it. These two entries are the
-    // temporary bridge and come out when the package is real and
-    // `@spaces/db` resolves through the workspace. Vite reads them via
-    // `resolve.tsconfigPaths` and tsx reads them for the migrate/seed/worker
-    // entries; vitest does not read tsconfig at all and carries its own copy
-    // in `vitest.config.ts`.
+    // `@spaces/db` is no longer here. SPA-135 put two temporary `paths`
+    // entries in this block so every db import could be written at its
+    // destination while the code still lived at `apps/web/src/db`; SPA-142
+    // moved the code to `packages/db`, so the name now resolves through the
+    // workspace dependency and its `exports` map, like any other package.
     //
     // `@/*` used to sit here as a second alias for `./src/*`. Zero files
     // imported it — deleted with the sweep. `components.json`'s shadcn
     // aliases are already `#/`, so nothing there changes.
     "paths": {
-      "#/*": ["./src/*"],
-      "@spaces/db": ["./src/db/index.ts"],
-      "@spaces/db/*": ["./src/db/*"]
+      "#/*": ["./src/*"]
     },
     "types": ["vite/client"]
   }

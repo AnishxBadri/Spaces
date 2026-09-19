@@ -12,7 +12,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { note } from './kinds'
-import type { Json } from '#/lib/json'
+import type { Json } from '../json'
 
 /**
  * Workspace-scoped keys. `base_currency` is the only one so far; the index

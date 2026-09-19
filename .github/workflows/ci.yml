@@ -33,12 +33,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec prettier --check .
-      - run: pnpm exec eslint apps/web/src
+      # `pnpm run lint`, not `eslint apps/web/src`: since SPA-142 there is a
+      # second package with source in it, and the root halves (eslint-rules/,
+      # scripts/) are in the same graph.
+      - run: pnpm run lint
       - run: pnpm run typecheck
-      # migrate.ts + vitest read .env.local via dotenv; hand them the CI db
+      # boot.ts + vitest read .env.local via dotenv; hand them the CI db
       - run: echo "DATABASE_URL=$DATABASE_URL" > .env.local
-      - run: pnpm --filter @spaces/web exec tsx src/db/migrate.ts
-      - run: pnpm --filter @spaces/web exec vitest run
+      - run: pnpm --filter @spaces/web exec tsx src/db/boot.ts
+      - run: pnpm run test
 
   # Hostability contract #1 (CONTEXT.md): the entrypoint owns /data. A macOS
   # bind mount rewrites ownership on the way through, so a Linux runner is the
@@ -374,17 +377,20 @@ jobs:
         run: |
           set -euo pipefail
           # "Older image" = one whose journal stops a migration short, mounted
-          # over /app/drizzle so the guard reads it exactly as a real older
-          # tag would — without a second image build.
-          cp -r apps/web/drizzle drizzle-old
-          LAST="$(jq -r '.entries[-1].tag' apps/web/drizzle/meta/_journal.json)"
-          jq '.entries |= .[:-1]' apps/web/drizzle/meta/_journal.json > drizzle-old/meta/_journal.json
+          # over the image's journal so the guard reads it exactly as a real
+          # older tag would — without a second image build. Since SPA-142 that
+          # path is /app/packages/db/drizzle: the migrator resolves the folder
+          # from its own import.meta.url, so the mount has to land where the
+          # package actually is.
+          cp -r packages/db/drizzle drizzle-old
+          LAST="$(jq -r '.entries[-1].tag' packages/db/drizzle/meta/_journal.json)"
+          jq '.entries |= .[:-1]' packages/db/drizzle/meta/_journal.json > drizzle-old/meta/_journal.json
           rm "drizzle-old/$LAST.sql"
           mkdir -p olddata
           set +e
           OUT="$(timeout 120 docker run --rm --network "$NET" \
             -e DATABASE_URL=postgresql://spaces:spaces@db:5432/spaces \
-            -v "$PWD/drizzle-old:/app/drizzle:ro" -v "$PWD/olddata:/data" \
+            -v "$PWD/drizzle-old:/app/packages/db/drizzle:ro" -v "$PWD/olddata:/data" \
             spaces:ci 2>&1)"; CODE=$?
           set -e
           echo "$OUT"

@@ -1,0 +1,14 @@
+{
+  "//": "`#/` deliberately absent: this package has no path alias, because it has nothing to alias to. Every import inside it is relative or a real dependency, and that is the shape the extraction was for.",
+
+  "extends": "../config/tsconfig.base.json",
+
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"],
+
+  "compilerOptions": {
+    // node:crypto, node:fs and `process` in the guard and the migrator; the
+    // app's `vite/client` types have no business here.
+    "types": ["node"]
+  }
+}

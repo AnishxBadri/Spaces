@@ -15,8 +15,67 @@ import {
 import { entity } from './entities'
 import { objectDef } from './objects'
 import { user } from './auth'
-import type { Json } from '#/lib/json'
-import type { AttributeOptions } from '#/lib/attributes/registry'
+import type { Json } from '../json'
+
+/**
+ * The payload of `attribute.options`, declared at the column that claims it
+ * and re-exported by the registry that validates against it
+ * (`apps/web/src/lib/attributes/registry.ts` — SPA-142). Only the shapes
+ * moved: the type menu, the validators, the seeded SYSTEM_ATTRIBUTES and the
+ * badge palette are behaviour and stayed in the app.
+ */
+
+/** The three core object kinds; `entity.kind` is the wider vocabulary. */
+export type ObjectKind = 'company' | 'person' | 'deal'
+
+/** The badge colour vocabulary — `apps/web/src/lib/attributes/colors.ts`. */
+export type BadgeColor =
+  | 'slate'
+  | 'blue'
+  | 'indigo'
+  | 'violet'
+  | 'fuchsia'
+  | 'rose'
+  | 'orange'
+  | 'amber'
+  | 'lime'
+  | 'emerald'
+  | 'teal'
+  | 'cyan'
+
+export type SelectOption = {
+  id: string
+  label: string
+  /** status only: funnel semantics for kanban/filters */
+  group?: 'active' | 'parked' | 'closed'
+  /** one of BADGE_COLORS; absent falls back to the option's position */
+  color?: BadgeColor
+  /** retired: hidden from write pickers, writes rejected, stored values kept */
+  archived?: boolean
+}
+
+export type AttributeOptions = {
+  options?: Array<SelectOption>
+  /** record_reference — a core kind, or any object row (custom objects) */
+  targetKind?: ObjectKind
+  targetObjectId?: string
+  multi?: boolean
+  required?: boolean
+  /** currency */
+  code?: string
+  /** rating */
+  max?: number
+  /** number: display decimals; stored numbers untouched */
+  precision?: number
+  /**
+   * Default (spec §4): a static value in the type's write shape, or one of
+   * exactly two dynamic forms — `'current-user'` (actor_reference) and an
+   * ISO-8601 duration for dates (`'P7D'` = a week out). Fires on every
+   * creation path, fills blanks only. Validated at attribute save
+   * (`validateDefault`), resolved at record birth (`resolveDefault`).
+   */
+  default?: Json
+}
 
 /**
  * The attribute engine (CONTEXT.md "Attribute engine"). Every object — core

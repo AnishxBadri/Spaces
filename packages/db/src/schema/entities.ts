@@ -14,7 +14,7 @@ import {
 import { sql } from 'drizzle-orm'
 import { user } from './auth'
 import { objectDef } from './objects'
-import type { Json } from '#/lib/json'
+import type { Json } from '../json'
 
 /**
  * Attribute values (system + custom), keyed by attribute slug. The registry

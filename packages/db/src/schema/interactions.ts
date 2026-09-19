@@ -11,7 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { entity } from './entities'
-import type { Json } from '#/lib/json'
+import type { Json } from '../json'
 
 /**
  * Interaction graph. Gmail sync is post-MVP (forward-only when it lands),

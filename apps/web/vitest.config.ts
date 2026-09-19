@@ -23,13 +23,11 @@ export default defineConfig({
     // This block is the whole resolver for the suite — vitest does not read
     // tsconfig `paths`, so an alias that exists only there resolves for tsc
     // and vite and fails here, one `Cannot find module` per test file.
-    // `@spaces/db` is the temporary bridge from SPA-135: the db code still
-    // lives at ./src/db, the imports already name the package it becomes.
-    // Both entries are prefix matches — `@spaces/db` alone hits the
-    // directory's index, `@spaces/db/schema/auth` hits the file — so the two
-    // lines cover all four public subpaths.
+    // `@spaces/db` used to need a line here too, pointing at ./src/db while
+    // the code was still in this package (SPA-135's bridge); since SPA-142 it
+    // is a real workspace dependency and resolves through node_modules and
+    // its own `exports` map, so `#` is all that is left.
     alias: {
-      '@spaces/db': fileURLToPath(new URL('./src/db', import.meta.url)),
       '#': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },

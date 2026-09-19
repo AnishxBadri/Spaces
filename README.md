@@ -25,7 +25,8 @@ BETTER_AUTH_SECRET=<pnpm dlx @better-auth/cli secret>
 This is a pnpm workspace (since 2026-09-19).
 
 ```
-apps/web/            the app — @spaces/web. src/, drizzle/, and the configs it owns
+apps/web/            the app — @spaces/web. src/ and the configs it owns
+packages/db/         @spaces/db — drizzle schema, the drizzle/ journal, migrator
 packages/config/     tsconfig.base.json, shared by every package
 eslint.config.js     one lint vocabulary for the workspace (+ eslint-rules/)
 scripts/             backup.sh, restore.sh — operator scripts
@@ -42,7 +43,7 @@ with `pnpm --filter`. Inside a package, `#/` always means that package's own
 | `pnpm worker`         | the pg-boss worker                           |
 | `pnpm build`          | production build into `apps/web/.output`     |
 | `pnpm test`           | vitest (needs Postgres up)                   |
-| `pnpm typecheck`      | both tsconfigs — the root one and apps/web's |
+| `pnpm typecheck`      | every tsconfig — root, apps/web, packages/db |
 | `pnpm lint`           | eslint, including the design-token rule      |
 | `pnpm db:migrate:run` | run migrations and reseed system attributes  |
 | `pnpm db:generate`    | generate a migration after a schema change   |
