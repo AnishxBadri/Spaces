@@ -56,7 +56,7 @@ import { Label } from '#/components/ui/label'
 import { cn } from '#/lib/utils'
 import { jsonRecord } from '#/lib/json'
 import {
-  countOpenDuplicates,
+  countOpenInbox,
   createCompany,
   getSession,
   listCompaniesTable,
@@ -71,14 +71,15 @@ export const Route = createFileRoute('/_app/companies')({
     const [rows, registry, dupes, viewData, session] = await Promise.all([
       listCompaniesTable(),
       listRegistry({ data: { kind: 'company' } }),
-      countOpenDuplicates(),
+      countOpenInbox(),
       listViews({ data: { kind: 'company' } }),
       getSession(),
     ])
     return {
       rows,
       registry,
-      openDuplicates: dupes.open,
+      // The banner speaks for one lane of the queue, not the whole of it.
+      openDuplicates: dupes.byKind.duplicate_candidate,
       views: viewData.views,
       objectId: viewData.objectId,
       me: session?.user ?? null,
@@ -250,7 +251,7 @@ function CompaniesPage() {
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
         {openDuplicates > 0 ? (
           <Link
-            to="/dedupe"
+            to="/inbox"
             className="focus-ring mt-4 flex items-center gap-2 rounded-md border border-rule bg-bone px-3 py-2 text-ui transition-colors duration-150 ease-out-quart hover:bg-bone"
           >
             <Copy className="size-3.5 text-graphite" strokeWidth={1.75} />
