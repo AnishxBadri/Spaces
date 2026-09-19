@@ -1,9 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, count, desc, eq, isNull, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
-import { document, documentChunk, entity, link } from '@spaces/db/schema'
+import { document, entity, link } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -234,6 +234,12 @@ export const getDocumentDownloadUrl = createServerFn({ method: 'POST' })
  * remove is worse than the audit trail it costs. The blob only goes when no
  * other document row shares its digest — content-addressing means one file
  * can back several rows.
+ *
+ * What dies with the entity is the registry's answer, not this file's: the
+ * hand-list that used to live here cleared chunks, links, activity and the
+ * two rows, and missed `entity_space`, `task_entity`, `interaction_entity`
+ * and `duplicate_candidate` — a document tagged into a space could not be
+ * deleted at all.
  */
 export const deleteDocument = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
@@ -247,24 +253,9 @@ export const deleteDocument = createServerFn({ method: 'POST' })
     ).at(0)
     if (!row) return { ok: true }
 
-    await db.transaction(async (tx) => {
-      await tx
-        .delete(documentChunk)
-        .where(eq(documentChunk.documentId, data.id))
-      await tx
-        .delete(link)
-        .where(or(eq(link.fromEntityId, data.id), eq(link.toEntityId, data.id)))
-      await tx
-        .delete(activity)
-        .where(
-          or(
-            eq(activity.subjectEntityId, data.id),
-            eq(activity.objectEntityId, data.id),
-          ),
-        )
-      await tx.delete(document).where(eq(document.entityId, data.id))
-      await tx.delete(entity).where(eq(entity.id, data.id))
-    })
+    const { deleteEntityProgram } = await import('../entities/delete')
+    const { effectFn } = await import('./effect')
+    await effectFn(deleteEntityProgram)(data.id)
 
     if (row.blobSha) {
       const [{ value: remaining }] = await db

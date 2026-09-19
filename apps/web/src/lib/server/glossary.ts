@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, entitySpace, link, space, term } from '@spaces/db/schema'
+import { entity, entitySpace, space, term } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { requireUser } from './shared'
 
@@ -151,24 +151,18 @@ export const updateTerm = createServerFn({ method: 'POST' })
     return { ok: true }
   })
 
+/**
+ * The term row and its entity, through the one delete executor — what dies
+ * with an entity is ENTITY_REFS' answer, not a list kept here (SPA-77). The
+ * list that used to live here cleared links and activity and missed the four
+ * join tables that had shipped since.
+ */
 export const deleteTerm = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    await db.transaction(async (tx) => {
-      await tx
-        .delete(link)
-        .where(or(eq(link.fromEntityId, data.id), eq(link.toEntityId, data.id)))
-      await tx
-        .delete(activity)
-        .where(
-          or(
-            eq(activity.subjectEntityId, data.id),
-            eq(activity.objectEntityId, data.id),
-          ),
-        )
-      await tx.delete(term).where(eq(term.entityId, data.id))
-      await tx.delete(entity).where(eq(entity.id, data.id))
-    })
+    const { deleteEntityProgram } = await import('../entities/delete')
+    const { effectFn } = await import('./effect')
+    await effectFn(deleteEntityProgram)(data.id)
     return { ok: true }
   })
