@@ -284,5 +284,23 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       type: 'text',
       options: {},
     },
+    {
+      // The who behind the channel (CONTEXT.md machine-write design, build
+      // order ①): `source` says how the deal arrived, `referred_by` says who
+      // sent it. A record-reference and nothing more — the one write path
+      // already syncs a link(relation:'references', attr_slug:'referred_by')
+      // row in the same transaction, so backlinks, the merge executor's
+      // referrer repoint and the context assembler read it for free.
+      //
+      // Appended, never slotted next to Source: `seedSystemAttributes`
+      // derives sortOrder from the array index ((i+1)*10) and only inserts
+      // what is missing, so a mid-array insert would hand this the sortOrder
+      // an already-seeded install already gave close_reason. Sitting beside
+      // Source on screen is a reorder in the object's attribute settings.
+      slug: 'referred_by',
+      name: 'Referred by',
+      type: 'record_reference',
+      options: { targetKind: 'person', multi: false },
+    },
   ],
 }
