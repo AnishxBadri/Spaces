@@ -7,7 +7,11 @@ import { ObjectDialog } from '#/components/objects/object-dialog'
 import { RegistryList } from '#/components/attributes/registry-list'
 import { KeyHint, PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
-import { IDENTITY_KEY_ATTRIBUTES } from '@spaces/core/attributes/registry'
+import { Checkbox } from '#/components/ui/checkbox'
+import {
+  IDENTITY_KEYS,
+  IDENTITY_KEY_ATTRIBUTES,
+} from '@spaces/core/attributes/registry'
 import {
   getObject,
   getSession,
@@ -15,6 +19,7 @@ import {
   updateObject,
 } from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
+import type { IdentityKey } from '@spaces/core/attributes/registry'
 
 /**
  * One object's attributes (spec §7, §9): the registry as a settings page,
@@ -43,6 +48,37 @@ function ObjectAttributesPage() {
   const archivedCount = registry.length - live
   const [creating, setCreating] = useState(false)
   useHotkey('a', () => setCreating(true))
+
+  // The identity-key declaration is live while the object is empty and read
+  // only once a record exists (§9 — the slug rule). Each tick is a save:
+  // ticking materializes the backing attribute, unticking deletes it, which
+  // is why the registry above is re-read after every one.
+  const [saving, setSaving] = useState<IdentityKey | null>(null)
+  const editable = isAdmin && !object.isSystem && !object.hasRecords
+  async function toggleKey(key: IdentityKey, next: boolean) {
+    setSaving(key)
+    try {
+      await updateObject({
+        data: {
+          id: object.id,
+          identityKeys: next
+            ? [...object.identityKeys, key]
+            : object.identityKeys.filter((k) => k !== key),
+        },
+      })
+      const name = IDENTITY_KEY_ATTRIBUTES[key].name
+      toast(
+        next
+          ? `${name} is an identity key — its attribute is on every ${object.singular.toLowerCase()}`
+          : `${name} is no longer an identity key — its attribute is gone`,
+      )
+      void router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not update')
+    } finally {
+      setSaving(null)
+    }
+  }
 
   return (
     <div className="flex min-h-full flex-col">
@@ -152,9 +188,10 @@ function ObjectAttributesPage() {
           />
         </div>
 
-        {/* Identity keys (spec §9) — declared at creation, each backed by the
-            attribute above it. Core objects are not listed: their identity is
-            core-owned and lives in entity_alias, not in this column. */}
+        {/* Identity keys (spec §9) — each backed by an attribute above, and
+            revisable only while the object has no records (the slug rule).
+            Core objects are not listed: their identity is core-owned and
+            lives in entity_alias, not in this column. */}
         {object.isSystem ? null : (
           <section className="mt-8 flex flex-col">
             <div
@@ -166,31 +203,63 @@ function ObjectAttributesPage() {
                 {object.identityKeys.length} declared
               </span>
             </div>
-            <ul aria-label={`${object.plural} identity keys`}>
-              {object.identityKeys.map((key) => {
-                const backing = IDENTITY_KEY_ATTRIBUTES[key]
-                return (
-                  <li
-                    key={key}
-                    className="flex h-row items-center gap-3 border-b border-rule text-ui"
-                  >
-                    <span className="min-w-0 flex-1">{backing.name}</span>
-                    <span className="mono text-micro text-graphite">
-                      {backing.slug} · {backing.type}
-                    </span>
+            {editable ? (
+              <ul aria-label={`${object.plural} identity keys`}>
+                {IDENTITY_KEYS.map((key) => {
+                  const backing = IDENTITY_KEY_ATTRIBUTES[key]
+                  const on = object.identityKeys.includes(key)
+                  return (
+                    <li key={key}>
+                      <label className="flex h-row cursor-pointer items-center gap-3 border-b border-rule text-ui">
+                        <Checkbox
+                          checked={on}
+                          disabled={saving !== null}
+                          aria-label={backing.name}
+                          onCheckedChange={(next) => void toggleKey(key, next)}
+                        />
+                        <span className="min-w-0 flex-1">{backing.name}</span>
+                        <span className="mono text-micro text-graphite">
+                          {backing.slug} · {backing.type}
+                        </span>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <ul aria-label={`${object.plural} identity keys`}>
+                {object.identityKeys.map((key) => {
+                  const backing = IDENTITY_KEY_ATTRIBUTES[key]
+                  return (
+                    <li
+                      key={key}
+                      className="flex h-row items-center gap-3 border-b border-rule text-ui"
+                    >
+                      <span className="min-w-0 flex-1">{backing.name}</span>
+                      <span className="mono text-micro text-graphite">
+                        {backing.slug} · {backing.type}
+                      </span>
+                    </li>
+                  )
+                })}
+                {object.identityKeys.length === 0 ? (
+                  <li className="flex h-row items-center border-b border-rule text-ui text-graphite">
+                    None — records here are matched by name alone.
                   </li>
-                )
-              })}
-              {object.identityKeys.length === 0 ? (
-                <li className="flex h-row items-center border-b border-rule text-ui text-graphite">
-                  None — records here are matched by name alone.
-                </li>
-              ) : null}
-            </ul>
-            <p className="flex h-8 items-center mono text-micro text-graphite">
-              declared at creation · the backing attribute cannot be archived
-              while its key stands
-            </p>
+                ) : null}
+              </ul>
+            )}
+            {object.hasRecords ? (
+              <p className="flex h-row items-center text-ui text-graphite">
+                Frozen: {object.plural} has records, and a key that justified a
+                record&apos;s identity cannot be withdrawn under it.
+              </p>
+            ) : (
+              <p className="flex h-8 items-center mono text-micro text-graphite">
+                revisable while empty · ticking one creates its attribute,
+                unticking one deletes it
+              </p>
+            )}
           </section>
         )}
       </div>

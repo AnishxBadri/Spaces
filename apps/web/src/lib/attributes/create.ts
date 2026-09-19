@@ -76,7 +76,8 @@ export type CreateAttributeInput = {
   tx?: Tx | undefined
 }
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+/** A drizzle transaction handle, as the caller of `tx` above must hold one. */
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 const OPTION_TYPES = new Set<AttributeType>([
   'select',

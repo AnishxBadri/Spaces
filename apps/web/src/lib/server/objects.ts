@@ -85,6 +85,8 @@ const getObjectProgram = Effect.fn('getObjectProgram')(function* (
     plural: string
     icon: string | null
     identityKeys: Array<IdentityKey>
+    /** whether the identity-key declaration is still revisable (§9) */
+    hasRecords: boolean
     isSystem: boolean
     archived: boolean
   },
@@ -108,7 +110,18 @@ const getObjectProgram = Effect.fn('getObjectProgram')(function* (
   )
   if (!row)
     return yield* new ObjectNotFound({ slug, message: 'Object not found' })
-  return row
+  // One record — merged-away included, it still holds values — freezes the
+  // identity-key declaration (§9, the slug rule). The page asks here so it
+  // can show the rule rather than an error toast.
+  const hasRecords = yield* query(() =>
+    db
+      .select({ id: entity.id })
+      .from(entity)
+      .where(eq(entity.objectId, row.id))
+      .limit(1)
+      .then((rows) => rows.length > 0),
+  )
+  return { ...row, hasRecords }
 })
 
 export const getObject = createServerFn()
@@ -155,15 +168,27 @@ export const updateObject = createServerFn({ method: 'POST' })
       plural: z.string().trim().min(1).max(60).optional(),
       icon: z.string().max(40).nullable().optional(),
       archived: z.boolean().optional(),
+      /**
+       * The whole declaration, not a delta (§9 — the slug rule). Applied
+       * only while the object has no records; the two keys the dialog
+       * offers are narrowed in the program, where the reason lives.
+       */
+      identityKeys: z.array(z.string().max(20)).max(4).optional(),
     }),
   )
   .handler(async ({ data }) => {
     const { requireAdmin } = await import('./shared')
-    await requireAdmin()
+    const u = await requireAdmin()
     const { updateObjectProgram } =
       await import('../attributes/object-registry')
     const { effectFn } = await import('./effect')
-    return effectFn(updateObjectProgram)(data)
+    // Declaring a key creates an attribute, and an attribute has an author.
+    const { identityKeys, ...patch } = data
+    return effectFn(updateObjectProgram)(
+      identityKeys === undefined
+        ? patch
+        : { ...patch, identityKeys, declaredBy: u.id },
+    )
   })
 
 /** The registry-generated list page's rows: name, values, spaces, added. */
