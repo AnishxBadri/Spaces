@@ -10,14 +10,24 @@ import {
   JobRetryable,
   runJob,
 } from './run-job'
-import type { JobDef, JobHost, JobOutcome } from './run-job'
+import type { JobDef, JobHost, JobOutcome, JobRunLedger } from './run-job'
 
 /**
  * The wrapper's own tests. No Postgres: `runJob` settles through a JobHost,
  * so a fake host is the whole pg-boss surface it touches. That is the point —
  * hostability contract 2 says an uncaught throw past the wrapper kills the
  * container, and a claim like that has to be testable without a database.
+ *
+ * The `job_run` ledger is the second seam and is stubbed out the same way: a
+ * `begin` that returns null is a ledger that is not there, which `runJob`
+ * already has to survive. The rows themselves are asserted against a real
+ * database in `run-job.ledger.test.ts`.
  */
+
+const noLedger: JobRunLedger = {
+  begin: async () => null,
+  end: async () => undefined,
+}
 
 type Settlement =
   | { call: 'complete'; queue: string; jobId: string; output: JobOutcome }
@@ -124,7 +134,7 @@ describe('runJob — batch resolution', () => {
           ? Effect.fail(new JobPermanent({ reason: 'middle one' }))
           : Effect.void,
       ),
-      { host, layer: nothing },
+      { host, layer: nothing, ledger: noLedger },
     )
 
     await expect(
@@ -152,7 +162,7 @@ describe('runJob — schema', () => {
     const { host, calls } = fakeHost()
     const handler = runJob(
       def(() => Effect.die('the handler must never run')),
-      { host, layer: nothing },
+      { host, layer: nothing, ledger: noLedger },
     )
 
     await handler([fakeJob('bad', { n: 'twelve' })])
@@ -175,7 +185,7 @@ describe('runJob — typed outcomes', () => {
       def(() =>
         Effect.fail(new JobRetryable({ reason: 'blob not there yet' })),
       ),
-      { host, layer: nothing },
+      { host, layer: nothing, ledger: noLedger },
     )
 
     await handler([fakeJob('r', { n: 1 })])
@@ -206,7 +216,7 @@ describe('runJob — typed outcomes', () => {
           }),
         ),
       ),
-      { host, layer: nothing },
+      { host, layer: nothing, ledger: noLedger },
     )
 
     const before = Date.now()
@@ -227,7 +237,7 @@ describe('runJob — typed outcomes', () => {
     const { host, calls } = fakeHost()
     const handler = runJob(
       def(() => Effect.fail(new JobPermanent({ reason: 'unsupported mime' }))),
-      { host, layer: nothing },
+      { host, layer: nothing, ledger: noLedger },
     )
 
     await handler([fakeJob('p', { n: 1 }, { count: 0, limit: 5 })])
@@ -245,7 +255,7 @@ describe('runJob — defects', () => {
           throw new Error('handler exploded')
         }),
       ),
-      { host, layer: nothing },
+      { host, layer: nothing, ledger: noLedger },
     )
 
     // Resolving rather than rejecting is the assertion: a rejecting batch
@@ -276,7 +286,7 @@ describe('runJob — JobContext', () => {
           })
         }),
       ),
-      { host, layer: nothing },
+      { host, layer: nothing, ledger: noLedger },
     )
 
     await handler([
@@ -313,6 +323,7 @@ describe('runJob — timeout', () => {
     const handler = runJob(slow, {
       host,
       layer: Layer.succeed(Clock.Clock, clock),
+      ledger: noLedger,
     })
 
     const promise = handler([fakeJob('slow', { n: 1 })])
@@ -348,6 +359,7 @@ describe('runJob — a host that itself fails', () => {
       {
         host: exploding,
         layer: nothing,
+        ledger: noLedger,
       },
     )
 

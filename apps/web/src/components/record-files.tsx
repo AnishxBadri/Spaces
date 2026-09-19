@@ -18,6 +18,7 @@ import {
   formatBytes,
   guessDocumentKind,
 } from '@spaces/core/documents'
+import { formatDurationMs, formatSince } from '@spaces/core/format'
 import {
   deleteDocument,
   finalizeDocumentUpload,
@@ -325,6 +326,13 @@ function extCode(filename: string): string {
  * "Extracting", "no text layer", and "extraction broke" are three different
  * facts, and only the last one is a problem — a scanned deck is a normal
  * document, not a failure.
+ *
+ * A broken one also gets the attempt ledger's side of the story (SPA-106):
+ * which attempt of the extract job wrote this, how long that attempt ran, and
+ * how long ago. Until `job_run` existed the row said only *what* went wrong,
+ * never *when* or *how many times* — so a queue that had quietly retried
+ * three times over an hour looked identical to one that failed once a second
+ * ago. A healthy document gets none of it: nothing to observe.
  */
 function ExtractionNote({ doc }: { doc: Documents[number] }) {
   if (doc.extractionStatus === 'pending') {
@@ -332,9 +340,12 @@ function ExtractionNote({ doc }: { doc: Documents[number] }) {
   }
   if (doc.extractionStatus === 'failed') {
     return (
-      <p className="mono text-field text-destructive">
-        text extraction failed — {doc.extractionError}
-      </p>
+      <>
+        <p className="mono text-field text-destructive">
+          text extraction failed — {doc.extractionError}
+        </p>
+        <RunNote run={doc.lastRun} />
+      </>
     )
   }
   if (doc.extractionStatus === 'unsupported') {
@@ -350,6 +361,31 @@ function ExtractionNote({ doc }: { doc: Documents[number] }) {
     )
   }
   return null
+}
+
+/**
+ * The wrapper's row, read back. `duration_ms` and `attempt` come from
+ * `job_run` and exist for every queue, so this line is the same line an
+ * Integrations page will show for a plugin job — extraction is just its first
+ * reader. Both magnitudes are formatted from numbers the server computed, not
+ * from the browser's clock, which is what keeps the string stable across
+ * hydration.
+ */
+function RunNote({ run }: { run: Documents[number]['lastRun'] }) {
+  if (!run) return null
+  return (
+    <p className="mono text-field text-graphite">
+      {[
+        `attempt ${String(run.attempt)}`,
+        run.durationMs === null
+          ? null
+          : `took ${formatDurationMs(run.durationMs)}`,
+        `${formatSince(run.sinceMs)} ago`,
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+    </p>
+  )
 }
 
 /**

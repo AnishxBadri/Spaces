@@ -57,10 +57,18 @@ pnpm lint
 
 Gate 5 (no v1 design tokens) is the `instrument/no-v1-tokens` eslint rule
 and runs inside `pnpm lint`; CLAUDE.md is the authority if the two disagree.
-Vitest needs Postgres up and shares the dev database with other sessions;
-if tests fail with a connection error or on rows you did not create, say so
-with the output rather than calling it green — the orchestrator reruns
-vitest serially.
+Vitest runs against harness-created `*_test` databases, never the dev
+`spaces` database. **Always set a per-issue test database** so your journal
+cannot collide with another worktree's:
+
+```
+export DATABASE_URL_TEST=postgresql://spaces:spaces@localhost:5432/spaces_spa<NN>_test
+```
+
+before any `pnpm test` / `turbo run test` (turbo passes it through). A
+migration-bearing slice that runs the suite against the shared
+`spaces_test` moves it ahead of main's journal and makes every other
+checkout's tests refuse. Say in the report which database name you used.
 
 Never `git commit`, never `git push`, never `git stash`. Leave the tree for
 the orchestrator to review.

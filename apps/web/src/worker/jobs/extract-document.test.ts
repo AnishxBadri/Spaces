@@ -3,7 +3,7 @@ import { Effect, Layer } from 'effect'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JobWithMetadata } from 'pg-boss'
 import { runJob } from '../run-job'
-import type { JobHost, JobOutcome } from '../run-job'
+import type { JobHost, JobOutcome, JobRunLedger } from '../run-job'
 import {
   BlobUnreadable,
   ExtractionStore,
@@ -15,7 +15,8 @@ import type { DocumentForExtraction } from './extract-document'
 /**
  * The retryable-versus-terminal mapping, asserted. No Postgres and no blob
  * store: the job's Layer is the seam, so a fake ExtractionStore is the whole
- * of its I/O. The reason strings are quoted verbatim here on purpose — they
+ * of its I/O, and the `job_run` ledger is stubbed out the same way (its rows
+ * are asserted against a real database in `../run-job.ledger.test.ts`). The reason strings are quoted verbatim here on purpose — they
  * are what the operator reads on the document row, and the port onto runJob
  * must not have changed a byte of them.
  */
@@ -96,6 +97,11 @@ function fakeStore(options: {
   return { layer, writes }
 }
 
+const noLedger: JobRunLedger = {
+  begin: async () => null,
+  end: async () => undefined,
+}
+
 const documentId = '11111111-1111-4111-8111-111111111111'
 const epoch = new Date(0)
 
@@ -146,7 +152,9 @@ async function run(
   retry: { count: number; limit: number } = { count: 0, limit: 2 },
 ) {
   const { host, calls } = fakeHost()
-  await runJob(extractDocument, { host, layer: store.layer })([fakeJob(retry)])
+  await runJob(extractDocument, { host, layer: store.layer, ledger: noLedger })(
+    [fakeJob(retry)],
+  )
   return { calls, writes: store.writes }
 }
 

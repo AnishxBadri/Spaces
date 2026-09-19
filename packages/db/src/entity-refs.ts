@@ -11,6 +11,7 @@ import {
   holding,
   interactionEntity,
   investment,
+  jobRun,
   link,
   mandate,
   mergeEvent,
@@ -378,5 +379,15 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
         'named in merge history; history is information (same principle as the ledger, D12)',
     },
     context: null,
+  },
+
+  // --- the attempt ledger -------------------------------------------------
+  {
+    key: 'job_run.entity',
+    table: jobRun,
+    column: jobRun.entityId,
+    merge: { kind: 'repoint' }, // the runs were about the record, not the row
+    context: null, // an attempt ledger is operator-facing, never AI-visible
+    del: { kind: 'cascade' }, // a run about a deleted entity goes with it
   },
 ]

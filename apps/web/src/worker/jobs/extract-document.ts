@@ -269,6 +269,10 @@ const onBlobUnreadable = Effect.fn('extractDocument.onBlobUnreadable')(
 export const extractDocument: JobDef<ExtractDocumentData, ExtractionStore> = {
   name: QUEUES.extractDocument,
   schema: extractDocumentData,
+  // The document *is* an entity, so its id is the ledger's entity_id. This is
+  // a declaration, not instrumentation: there is no job_run code in this
+  // file, and the row runJob writes from it is what the Files tab reads.
+  refs: (data) => ({ entityId: data.documentId }),
   // Extraction is CPU-bound and synchronous once it starts, so an Effect
   // timeout could not interrupt it — pg-boss's own expiry is the backstop.
   retry: { limit: 2, delaySeconds: 30, backoff: true },
