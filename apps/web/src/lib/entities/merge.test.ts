@@ -340,6 +340,85 @@ describe('mergeEntities', () => {
     }
   })
 
+  it('repoints referred_by on every deal that named the loser', async () => {
+    const { resolveEntity } = await import('./resolve')
+    const { mergeEntities } = await import('./merge')
+    const { setValues } = await import('#/lib/attributes/values')
+    const { db } = await import('@spaces/db')
+    const { attributeEvent, entity, link } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+    const { and, eq } = await import('drizzle-orm')
+
+    const tag = randomUUID().slice(0, 8)
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    expect(actor).toBeTruthy()
+
+    // Two records of the same person; the deal named the one that loses.
+    const winner = await resolveEntity({
+      kind: 'person',
+      name: `Referrer ${tag}`,
+      keys: { email: `referrer-w-${tag}@example.test` },
+      source: { class: 'manual' },
+    })
+    const loser = await resolveEntity({
+      kind: 'person',
+      name: `Referrer ${tag} (dup)`,
+      keys: { email: `referrer-l-${tag}@example.test` },
+      source: { class: 'manual' },
+    })
+    const [dealEnt] = await db
+      .insert(entity)
+      .values({ kind: 'deal', canonicalName: `ReferredDeal ${tag}` })
+      .returning({ id: entity.id })
+    await setValues({
+      entityId: dealEnt.id,
+      patch: { source: 'referral', referred_by: loser.entityId },
+      actor: { type: 'user', id: actor.id },
+    })
+
+    await mergeEntities({
+      winnerId: winner.entityId,
+      loserId: loser.entityId,
+      mergedBy: actor.id,
+    })
+
+    // The value lives in values jsonb, so the repoint is the referrers'
+    // pass over inbound reference links — not an ENTITY_REFS column.
+    const [deal] = await db
+      .select({ values: entity.values })
+      .from(entity)
+      .where(eq(entity.id, dealEnt.id))
+    expect(deal.values.referred_by).toBe(winner.entityId)
+
+    const refLinks = await db
+      .select()
+      .from(link)
+      .where(
+        and(
+          eq(link.fromEntityId, dealEnt.id),
+          eq(link.relation, 'references'),
+          eq(link.attrSlug, 'referred_by'),
+        ),
+      )
+    expect(refLinks.map((l) => l.toEntityId)).toEqual([winner.entityId])
+
+    // …and the rewrite is the system's, through the merge door.
+    const [repointEvent] = await db
+      .select()
+      .from(attributeEvent)
+      .where(
+        and(
+          eq(attributeEvent.entityId, dealEnt.id),
+          eq(attributeEvent.attrSlug, 'referred_by'),
+          eq(attributeEvent.source, 'merge'),
+        ),
+      )
+    expect(repointEvent).toBeTruthy()
+    expect(repointEvent.actorType).toBe('system')
+    expect(repointEvent.from).toBe(loser.entityId)
+    expect(repointEvent.to).toBe(winner.entityId)
+  })
+
   it('refuses cross-kind and self merges', async () => {
     const { resolveEntity } = await import('./resolve')
     const { mergeEntities } = await import('./merge')
