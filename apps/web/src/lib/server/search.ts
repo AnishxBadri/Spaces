@@ -14,7 +14,17 @@ import { requireUser } from './shared'
 const entitySearchInput = z.object({
   q: z.string().max(120),
   kinds: z
-    .array(z.enum(['company', 'person', 'deal', 'space', 'note', 'custom']))
+    .array(
+      z.enum([
+        'company',
+        'person',
+        'deal',
+        'space',
+        'note',
+        'document',
+        'custom',
+      ]),
+    )
     .optional(),
   /** narrow to one object's records — a custom-object reference picker */
   objectId: z.string().uuid().optional(),
