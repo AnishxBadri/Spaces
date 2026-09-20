@@ -187,7 +187,12 @@ anyway. Don't re-litigate it from the flag list.
   Register block that the `tsr generate` CLI strips. Chaining the CLI in front
   of build would hand build the stripped tree. The CLI's diff against the
   committed tree is pre-existing — don't "fix" it here.
-- Schema changed → `pnpm db:generate --name <x>`, then hand-inspect the SQL
+- Schema changed → `pnpm db:generate --name <x>`, then hand-inspect the SQL.
+  A hand-written data migration (0008, 0036) writes its own journal entry;
+  its `when` is the clock at write time (`date -u +%s000`), never a made-up
+  future value — the migrator and the downgrade guard order by `when`, and a
+  future one mis-orders the next `db:generate` (cost a session 2026-09-20).
+  The journal is squashed to one file at the v1 cut, not before.
 - New system attribute → add to `SYSTEM_ATTRIBUTES` in
   `packages/core/src/attributes/registry.ts`; `pnpm db:migrate:run` reseeds
   insert-if-absent

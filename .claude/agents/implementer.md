@@ -31,6 +31,13 @@ one and say which you left and why.
   `pnpm install --frozen-lockfile` once.
 - Schema change → `pnpm db:generate --name <x>`, then read the generated SQL
   and say in your report what it does. Never hand-edit the drizzle journal.
+- **Hand-written data migration** (no column changes, the shape of `0008` /
+  `0036`): you write the journal entry yourself, and its `when` must be the
+  clock at the moment you write it — `date -u +%s000` — strictly greater
+  than the previous entry's and never in the future. Drizzle and the
+  downgrade guard order by `when`, not `idx`; a future value sorts the next
+  generated migration _before_ yours and breaks `boot.test.ts` three
+  migrations later. Print the value in your report.
 - Routes change → `pnpm generate-routes`.
 - New entity-referencing column → `ENTITY_REFS` entry in
   `packages/db/src/entity-refs.ts`; the test will name the column if you
