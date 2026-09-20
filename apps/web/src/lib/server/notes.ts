@@ -2,7 +2,14 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, desc, eq, isNull, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, entitySpace, link, note, space } from '@spaces/db/schema'
+import {
+  entity,
+  entitySpace,
+  link,
+  note,
+  objectDef,
+  space,
+} from '@spaces/db/schema'
 import { canRead, requireUser } from './shared'
 import { jsonValue } from '#/lib/json'
 
@@ -149,6 +156,29 @@ export const getNote = createServerFn()
       .innerJoin(entity, eq(entity.id, space.entityId))
       .where(eq(entitySpace.entityId, data.id))
       .orderBy(asc(entity.canonicalName))
+    // Records this note is filed against — the *outbound* tagged_in edges,
+    // which is the opposite direction from `backlinks` above. `objectSlug`
+    // rides along so a custom record's chip routes through `/o/<slug>/<id>`
+    // (`recordPath`); a merged-away target drops out rather than linking to
+    // a tombstone.
+    const filedAgainst = await db
+      .select({
+        id: entity.id,
+        name: entity.canonicalName,
+        kind: entity.kind,
+        objectSlug: objectDef.slug,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.toEntityId))
+      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+      .where(
+        and(
+          eq(link.fromEntityId, data.id),
+          eq(link.relation, 'tagged_in'),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+      .orderBy(asc(entity.canonicalName))
 
     return {
       id: row.id,
@@ -158,6 +188,7 @@ export const getNote = createServerFn()
       updatedAt: row.updatedAt.toISOString(),
       backlinks,
       spaces,
+      filedAgainst,
       isPrivate: row.visibility === 'private',
       isMine: row.authorId === u.id,
     }
@@ -264,6 +295,49 @@ export const setNoteKind = createServerFn({ method: 'POST' })
       return await effectFn(setNoteKindProgram)(u.id, data.id, data.kind)
     } catch (failure) {
       throw new Error(noteKindMessage(failure))
+    }
+  })
+
+/**
+ * File this note against a record — the record half of the two filing
+ * mechanisms (CONTEXT.md → The note model). The kind allowlist is the
+ * program's, not this validator's: the picker only ever offers the four
+ * kinds, but the rule is enforced where it cannot be skipped.
+ */
+export const fileNoteAgainst = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid(), targetId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { fileNoteAgainstProgram, noteFilingMessage } =
+      await import('../notes/filing')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(fileNoteAgainstProgram)(
+        u.id,
+        data.id,
+        data.targetId,
+      )
+    } catch (failure) {
+      throw new Error(noteFilingMessage(failure))
+    }
+  })
+
+/**
+ * Remove one filing, and only the filing: a `mentions` edge to the same
+ * record survives, so the note moves to that record's "Mentions this" lane
+ * rather than off its page.
+ */
+export const unfileNoteFrom = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid(), targetId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { unfileNoteFromProgram, noteFilingMessage } =
+      await import('../notes/filing')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(unfileNoteFromProgram)(u.id, data.id, data.targetId)
+    } catch (failure) {
+      throw new Error(noteFilingMessage(failure))
     }
   })
 
