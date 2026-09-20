@@ -1,5 +1,13 @@
-import { useRouter } from '@tanstack/react-router'
-import { Download, Eye, FileText, Loader2, Trash2, Upload } from 'lucide-react'
+import { Link, useRouter } from '@tanstack/react-router'
+import {
+  ChevronRight,
+  Download,
+  Eye,
+  FileText,
+  Loader2,
+  Trash2,
+  Upload,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
@@ -13,7 +21,11 @@ import {
   guessDocumentKind,
 } from '@spaces/core/documents'
 import { formatSince } from '@spaces/core/format'
-import type { SpaceSource } from '#/lib/documents/space-sources'
+import type {
+  InheritedSource,
+  SpaceSource,
+} from '#/lib/documents/space-sources'
+import { recordPath } from '#/lib/record-path'
 import {
   deleteDocument,
   finalizeDocumentUpload,
@@ -56,10 +68,17 @@ export function SpaceSources({
   spaceId,
   spaceName,
   sources,
+  inherited,
 }: {
   spaceId: string
   spaceName: string
   sources: Array<SpaceSource>
+  /**
+   * Documents reached through the companies tagged into this space
+   * (SPA-67). They render in a closed disclosure under the filed rows and
+   * are never counted anywhere else on the page.
+   */
+  inherited: Array<InheritedSource>
 }) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -183,6 +202,39 @@ export function SpaceSources({
             </button>
           </LedgerRow>
         ) : null}
+
+        {/* The inherited lane (SPA-67, spec §3.2): documents on the
+            companies tagged in here. Closed on first render because it is a
+            convenience and not a claim of filing — `<details>` with no
+            `open`, so "closed" is the markup's state and not a hook's, and
+            the first paint on the server is already the closed one. Nothing
+            at all when the lane is empty: an empty disclosure is a promise
+            of content that isn't there. */}
+        {inherited.length > 0 ? (
+          <li>
+            <details className="group/inherited">
+              <summary className="focus-ring flex h-row cursor-pointer list-none items-center gap-2 border-b border-rule mono text-micro text-graphite transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+                <ChevronRight
+                  className="size-3 shrink-0 transition-transform group-open/inherited:rotate-90"
+                  strokeWidth={2}
+                />
+                {inherited.length} from companies in this space
+              </summary>
+              <ol>
+                {inherited.map((s) => (
+                  /* One row per (document, company) edge, so the key is the
+                     pair: the same deck can hang off two companies that are
+                     both tagged in here. */
+                  <InheritedRow
+                    key={`${s.companyId}:${s.id}`}
+                    source={s}
+                    onPreview={() => setPreviewing(s)}
+                  />
+                ))}
+              </ol>
+            </details>
+          </li>
+        ) : null}
       </LedgerSection>
 
       <input
@@ -304,6 +356,94 @@ function SourceRow({
       </div>
       <LedgerFigure tone="muted">{formatBytes(source.sizeBytes)}</LedgerFigure>
       {confirmDialog}
+    </li>
+  )
+}
+
+/**
+ * One inherited source (SPA-67). The same row as a direct source with two
+ * differences, and both are the point:
+ *
+ * - it names the company it came in on, and that name is the link to the
+ *   company's record — a row on this page that nobody filed here has to say
+ *   where it came from;
+ * - **there is no delete.** Deleting is a filing action and this document is
+ *   not filed here; the control belongs on the company's Files tab, where
+ *   the edge that put it on screen actually lives.
+ */
+function InheritedRow({
+  source,
+  onPreview,
+}: {
+  source: InheritedSource
+  onPreview: () => void
+}) {
+  async function download() {
+    try {
+      const { url } = await getDocumentDownloadUrl({ data: { id: source.id } })
+      window.location.href = url
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not download')
+    }
+  }
+
+  // One route table for the whole app. A company always has a page, so the
+  // null arm is unreachable — and rendering the name unlinked rather than
+  // `<Link to={undefined}>` is what keeps it unreachable *and* harmless.
+  const href = recordPath({ kind: 'company', id: source.companyId })
+
+  return (
+    <li className="group flex items-center gap-3 border-b border-rule py-2.5">
+      <FileText
+        className="size-3.5 shrink-0 text-graphite"
+        strokeWidth={1.75}
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <button
+          type="button"
+          onClick={onPreview}
+          title={`Preview ${source.filename}`}
+          className="focus-ring min-w-0 truncate text-left text-ui font-medium hover:underline"
+        >
+          {source.filename}
+        </button>
+        <SourceNote source={source} />
+        <span className="flex min-w-0 items-center gap-1 mono text-field text-graphite">
+          {href ? (
+            <Link
+              to={href}
+              className="focus-ring truncate text-primary hover:underline"
+            >
+              {source.companyName}
+            </Link>
+          ) : (
+            <span className="truncate">{source.companyName}</span>
+          )}
+          <span aria-hidden>·</span>
+          <span className="truncate">{formatSince(source.sinceMs)} ago</span>
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          aria-label={`Preview ${source.filename}`}
+          onClick={onPreview}
+          className="text-graphite opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          <Eye />
+        </Button>
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          aria-label={`Download ${source.filename}`}
+          onClick={download}
+          className="text-graphite"
+        >
+          <Download />
+        </Button>
+      </div>
+      <LedgerFigure tone="muted">{formatBytes(source.sizeBytes)}</LedgerFigure>
     </li>
   )
 }

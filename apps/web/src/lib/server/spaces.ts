@@ -24,7 +24,10 @@ import {
   term,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
-import { spaceSourcesProgram } from '#/lib/documents/space-sources'
+import {
+  spaceInheritedSourcesProgram,
+  spaceSourcesProgram,
+} from '#/lib/documents/space-sources'
 import { jsonString } from '#/lib/json'
 import { filedNotesProgram } from '#/lib/notes/filed'
 import { createSpaceRow, requireUser } from './shared'
@@ -289,7 +292,16 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
   // A space's sources arrive through `entity_space`, not `link(tagged_in)`,
   // so the query is its own — `lib/documents/space-sources`, outside
   // `lib/server/` for the reason `filedNotesProgram` is.
-  const sources = yield* spaceSourcesProgram(id)
+  //
+  // And the inherited lane (SPA-67): documents on the companies tagged in
+  // here. It is deliberately a *second* field and not more `sources` — the
+  // headline count says what was filed here on purpose, and inheritance is
+  // a convenience, not a claim of filing. The two run concurrently: they
+  // share nothing but the space id.
+  const [sources, inheritedSources] = yield* Effect.all(
+    [spaceSourcesProgram(id), spaceInheritedSourcesProgram(id)],
+    { concurrency: 'unbounded' },
+  )
 
   // Referenced: notes whose body happens to mention this space. A note
   // that is filed here too shows once, at the top — not in both lists.
@@ -335,6 +347,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
     records,
     filed,
     sources,
+    inheritedSources,
     notes: mentions
       .filter((n) => !filedIds.has(n.id))
       .map((n) => ({
