@@ -1,11 +1,16 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { Check, Copy, X } from 'lucide-react'
+import { Check, Copy, Search, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { EmptyState } from '#/components/empty-state'
 import { PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
-import { dismissDuplicate, listInbox, mergeDuplicate } from '#/lib/server-fns'
+import {
+  dismissDuplicate,
+  listInbox,
+  mergeDuplicate,
+  runDedupeSweep,
+} from '#/lib/server-fns'
 import type {
   DuplicateCandidateRow,
   InboxKind,
@@ -104,6 +109,7 @@ function InboxPage() {
             <span>dismissed pairs never come back</span>
           </>
         }
+        action={<ScanAction />}
       />
 
       {rows.length === 0 ? (
@@ -120,6 +126,37 @@ function InboxPage() {
         </ul>
       )}
     </div>
+  )
+}
+
+/**
+ * The nightly sweep's human door (SPA-81). It queues the job, it does not
+ * run it — the rows appear when the worker gets to it, which is why the
+ * toast says "queued" and the list is not invalidated here. Admin-only on
+ * the server; a teammate who presses it is told so by `requireAdmin`.
+ */
+function ScanAction() {
+  const [pending, setPending] = useState(false)
+
+  async function scan() {
+    setPending(true)
+    try {
+      await runDedupeSweep()
+      toast('Scan queued')
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not queue the scan',
+      )
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Button variant="outline" pending={pending} onClick={() => void scan()}>
+      <Search className="size-3" strokeWidth={2} />
+      Scan for duplicates
+    </Button>
   )
 }
 

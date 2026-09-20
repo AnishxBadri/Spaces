@@ -116,6 +116,11 @@ export const entity = pgTable(
   },
   (t) => [
     index('entity_kind_idx').on(t.kind),
+    // The scope column of everything object-shaped: the nightly dedupe
+    // sweep's self-join (`worker/jobs/dedupe-sweep.ts`), the merge guard's
+    // same-object refusal, `objectHasRecords`, and every `/o/<slug>` list.
+    // Added by SPA-81, which is the slice that gave it a set-based reader.
+    index('entity_object_idx').on(t.objectId),
     index('entity_merged_into_idx')
       .on(t.mergedIntoId)
       .where(sql`${t.mergedIntoId} is not null`),

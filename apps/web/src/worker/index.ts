@@ -1,3 +1,4 @@
+import { Layer } from 'effect'
 import { PgBoss } from 'pg-boss'
 import type { Job } from 'pg-boss'
 import { requireEnv } from '#/lib/server/env'
@@ -5,6 +6,7 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { startHeartbeat, workerIdentity } from './heartbeat'
 import { pgBossHost, runJob } from './run-job'
 import { ExtractionStore, extractDocument } from './jobs/extract-document'
+import { dedupeSweep } from './jobs/dedupe-sweep'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -59,7 +61,16 @@ async function main() {
     runJob(extractDocument, { host, layer: ExtractionStore.layer }),
   )
   await boss.work(QUEUES.embedDocument, stub('document.embed'))
-  await boss.work(QUEUES.dedupeSweep, stub('entity.dedupe-sweep'))
+  // The nightly sweep (SPA-81), second tenant of the wrapper and the queue
+  // the 03:30 schedule below has been firing into a stub since it was
+  // registered. One statement per run, so the default batch of one is right;
+  // includeMetadata is what `runJob` reads retryCount/retryLimit from, and
+  // the job itself carries no Layer — its whole I/O is that statement.
+  await boss.work(
+    QUEUES.dedupeSweep,
+    { includeMetadata: true },
+    runJob(dedupeSweep, { host, layer: Layer.empty }),
+  )
   await boss.work(QUEUES.enrichEntity, stub('entity.enrich'))
 
   // Nightly dedupe sweep at 03:30.
