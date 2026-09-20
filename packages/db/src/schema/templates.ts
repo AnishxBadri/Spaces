@@ -9,6 +9,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { user } from './auth'
+import { noteKind } from './kinds'
 import type { Json } from '../json'
 
 export const templateKind = pgEnum('template_kind', ['note', 'space', 'record'])
@@ -35,6 +36,16 @@ export const template = pgTable('template', {
   kind: templateKind('kind').notNull(),
   /** Only when kind = record. */
   objectKind: text('object_kind'),
+  /**
+   * Only when kind = note — the genre the template stamps (SPA-131).
+   * CONTEXT.md freezes note kinds at three on the grounds that "IC memo" and
+   * "post-mortem" are *templates that set title/structure/kind*; without this
+   * column a template set two of the three and an IC-memo template stamped a
+   * plain note. Nullable on purpose and never backfilled: a template saved
+   * before this column has nothing to say about kind, and stamps the note
+   * default.
+   */
+  noteKind: noteKind('note_kind'),
   name: text('name').notNull(),
   body: jsonb('body').$type<Json>().notNull(),
   /** Context hint: pickers surface templates tagged for their origin first. */
