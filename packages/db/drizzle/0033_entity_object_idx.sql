@@ -1,0 +1,1 @@
+CREATE INDEX "entity_object_idx" ON "entity" USING btree ("object_id");
