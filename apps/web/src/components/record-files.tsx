@@ -463,7 +463,11 @@ async function uploadOne(
       mime: file.type || null,
       sizeBytes: file.size,
       kind: guessDocumentKind(file.name),
-      attachTo: entityId,
+      // The Files tab is a record surface: every one of its four routes
+      // (company, person, deal, custom record) files through
+      // `link(tagged_in)`. A space files the other way and has no Files tab
+      // yet — that surface is docsurf-1b's.
+      fileAgainst: { kind: 'record', entityId },
     },
   })
 }
