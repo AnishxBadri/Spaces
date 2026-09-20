@@ -9,7 +9,7 @@ block before designing anything); synthesis in `docs/ARCHITECTURE.md`; ADRs in
 ## Where the work is (read before picking anything up)
 
 - **Linear, team `Spaces` (SPA)** is the store of record for work that is
-  scheduled: 138 issues, `SPA-16`…`SPA-154`, across projects 1–13 with 44
+  scheduled: 139 issues, `SPA-16`…`SPA-155`, across projects 1–13 with 44
   milestones and real blocking relations. An issue body is the spec; do not
   re-derive it. Two saved views are the whole workflow: **grabbable now**
   (`afk`, no open blockers) and **needs me** (`hitl`).

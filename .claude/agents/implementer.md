@@ -58,6 +58,13 @@ pnpm lint
 Gate 5 (Instrument vocabulary only) is the `instrument/vocabulary` eslint
 rule and runs inside `pnpm lint`; CLAUDE.md is the authority if the two
 disagree.
+
+**Gate 6, when you touched anything under `apps/web/src/lib/server/`,
+`apps/web/src/routes/` or `apps/web/src/lib/server-fns.ts`:**
+`corepack pnpm exec turbo run build --filter=@spaces/web --force`. The five
+gates cannot see a server-only import leaking into the client bundle; the
+build can, and CI runs it. A plain `export function` from a `lib/server/*.ts`
+module ships to the browser — helpers a test needs live outside `lib/server/`.
 Vitest runs against harness-created `*_test` databases, never the dev
 `spaces` database. **Always set a per-issue test database** so your journal
 cannot collide with another worktree's:
