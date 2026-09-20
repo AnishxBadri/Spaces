@@ -21,6 +21,7 @@ import {
   RecordBody,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { SpaceContacts } from '#/components/space-contacts'
 import { SpaceGlossary } from '#/components/space-glossary'
 import { SpaceSources } from '#/components/space-sources'
 import { TagCompanyRow } from '#/components/space-tag-row'
@@ -215,6 +216,13 @@ function SpacePage() {
             tone: zero(spc.sources.length),
           },
           {
+            // Tagged here only. The inherited lane is a convenience, and a
+            // readout that folded it in would claim a tag nobody made.
+            label: 'Contacts',
+            value: `${spc.contacts.length}`,
+            tone: zero(spc.contacts.length),
+          },
+          {
             label: 'Terms',
             value:
               terms.length === ownTerms
@@ -387,6 +395,17 @@ function SpacePage() {
           spaceName={spc.name}
           sources={spc.sources}
           inherited={spc.inheritedSources}
+        />
+
+        {/* Who I know here — the people tagged into this space, then the
+            ones the companies here bring with them. Between the reading and
+            the market map on purpose: a contact is what turns a stack of
+            reading into a company you can actually reach. */}
+        <SpaceContacts
+          spaceId={spc.id}
+          spaceName={spc.name}
+          contacts={spc.contacts}
+          inherited={spc.inheritedContacts}
         />
 
         {/* What I track here — the market map. Tracking is not evaluating:

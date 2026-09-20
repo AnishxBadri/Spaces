@@ -30,6 +30,10 @@ import {
 } from '#/lib/documents/space-sources'
 import { jsonString } from '#/lib/json'
 import { filedNotesProgram } from '#/lib/notes/filed'
+import {
+  spaceContactsProgram,
+  spaceInheritedContactsProgram,
+} from '#/lib/people/space-contacts'
 import { createSpaceRow, requireUser } from './shared'
 
 // Spaces — first real write path through the entity core. The reads are
@@ -303,6 +307,17 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
     { concurrency: 'unbounded' },
   )
 
+  // Contacts: the people of this space (SPA-99), the other half of CONTEXT's
+  // "sources and contacts sections" question and the same two lanes for the
+  // same reasons — `contacts` is who was tagged in here and is the only
+  // thing counted, `inheritedContacts` is who the companies here bring with
+  // them and is a convenience. `lib/people/space-contacts` for the same
+  // reason the sources lane is outside `lib/server/`.
+  const [contacts, inheritedContacts] = yield* Effect.all(
+    [spaceContactsProgram(id), spaceInheritedContactsProgram(id)],
+    { concurrency: 'unbounded' },
+  )
+
   // Referenced: notes whose body happens to mention this space. A note
   // that is filed here too shows once, at the top — not in both lists.
   const mentions = yield* query(() =>
@@ -348,6 +363,8 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
     filed,
     sources,
     inheritedSources,
+    contacts,
+    inheritedContacts,
     notes: mentions
       .filter((n) => !filedIds.has(n.id))
       .map((n) => ({
