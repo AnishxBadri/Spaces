@@ -6,6 +6,7 @@ import {
   attribute,
   document,
   entity,
+  entitySpace,
   integration,
   interaction,
   interactionEntity,
@@ -321,6 +322,91 @@ export async function documentProvenance(
 }
 
 /**
+ * Every edge one document is filed by — the two tables together (SPA-50).
+ *
+ * The Files tab's filing control renders chips for both kinds, so the list
+ * has to arrive with the row rather than behind a second round trip per
+ * document: a tab with twelve files would otherwise open twelve requests to
+ * draw twelve popovers nobody has clicked yet.
+ *
+ * `objectSlug` rides along for the same reason every other record list
+ * carries it — `recordPath` needs a custom record's object to route, and the
+ * client has nowhere else to get it.
+ */
+export type DocumentFilingEdge =
+  | {
+      kind: 'record'
+      id: string
+      name: string
+      entityKind: string
+      objectSlug: string | null
+    }
+  | { kind: 'space'; id: string; name: string }
+
+/**
+ * Bulk, like `documentProvenance` and for the same reason. A merged-away
+ * target is left out: it has a surviving record, and a chip pointing at the
+ * tombstone would route to a page the merge redirects away from.
+ */
+export async function documentFilingEdges(
+  documentIds: Array<string>,
+): Promise<Map<string, Array<DocumentFilingEdge>>> {
+  const edges = new Map<string, Array<DocumentFilingEdge>>()
+  if (documentIds.length === 0) return edges
+
+  const [records, spaces] = await Promise.all([
+    db
+      .select({
+        documentId: link.fromEntityId,
+        id: entity.id,
+        name: entity.canonicalName,
+        entityKind: entity.kind,
+        objectSlug: objectDef.slug,
+      })
+      .from(link)
+      .innerJoin(entity, eq(entity.id, link.toEntityId))
+      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+      .where(
+        and(
+          inArray(link.fromEntityId, documentIds),
+          eq(link.relation, 'tagged_in'),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+      .orderBy(asc(entity.canonicalName)),
+    db
+      .select({
+        documentId: entitySpace.entityId,
+        id: entity.id,
+        name: entity.canonicalName,
+      })
+      .from(entitySpace)
+      .innerJoin(entity, eq(entity.id, entitySpace.spaceId))
+      .where(inArray(entitySpace.entityId, documentIds))
+      .orderBy(asc(entity.canonicalName)),
+  ])
+
+  const push = (documentId: string, edge: DocumentFilingEdge) => {
+    const list = edges.get(documentId)
+    if (list) list.push(edge)
+    else edges.set(documentId, [edge])
+  }
+  for (const r of records) {
+    push(r.documentId, {
+      kind: 'record',
+      id: r.id,
+      name: r.name,
+      entityKind: r.entityKind,
+      objectSlug: r.objectSlug,
+    })
+  }
+  for (const s of spaces) {
+    push(s.documentId, { kind: 'space', id: s.id, name: s.name })
+  }
+  return edges
+}
+
+/**
  * Where a document is filed (SPA-19). Two mechanisms, never mixed, exactly
  * the split notes already carry (CONTEXT.md → Sources are documents): a
  * record files through `link(tagged_in)`, a space files through
@@ -377,7 +463,6 @@ export async function existingDocumentFiling(
   sha: string,
   target: DocumentFilingTarget,
 ): Promise<string | null> {
-  const { entitySpace } = await import('@spaces/db/schema')
   const rows =
     target.kind === 'record'
       ? await db
@@ -432,7 +517,6 @@ export async function fileDocumentRow(input: {
   actorId: string
 }): Promise<{ id: string }> {
   const { activity } = await import('@spaces/db/schema/activity')
-  const { entitySpace } = await import('@spaces/db/schema')
   const target = input.fileAgainst
   return db.transaction(async (tx) => {
     // Read inside the transaction: the kind decides which table the edge
