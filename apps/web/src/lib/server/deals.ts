@@ -187,16 +187,6 @@ export const getDeal = createServerFn()
       )
     const users = await db.select({ id: user.id, name: user.name }).from(user)
 
-    const mentionedIn = await db
-      .select({
-        fromId: link.fromEntityId,
-        name: entity.canonicalName,
-        kind: entity.kind,
-      })
-      .from(link)
-      .innerJoin(entity, eq(entity.id, link.fromEntityId))
-      .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
-
     // Outside-mandate hint (CONTEXT.md, 2026-08): rendered on the deal
     // record only — where the invest/pass judgment happens. A hint, never a
     // block; null when there is no mandate, no stages, or no company stage.
@@ -233,7 +223,6 @@ export const getDeal = createServerFn()
         refs.map((r) => [r.toId, { name: r.name, kind: r.kind }]),
       ),
       userNames: Object.fromEntries(users.map((u) => [u.id, u.name])),
-      mentionedIn,
     }
   })
 

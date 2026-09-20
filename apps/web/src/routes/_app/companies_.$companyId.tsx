@@ -316,33 +316,6 @@ function CompanyRecordPage() {
               )}
             </RailSection>
 
-            <RailSection
-              label="Mentioned in"
-              meta={`${company.mentionedIn.length}`}
-            >
-              {company.mentionedIn.length === 0 ? (
-                <RailEmpty>Nowhere yet.</RailEmpty>
-              ) : (
-                company.mentionedIn.map((m) => (
-                  <RailItem key={m.fromId}>
-                    {m.kind === 'note' ? (
-                      <Link
-                        to="/notes/$noteId"
-                        params={{ noteId: m.fromId }}
-                        className="focus-ring min-w-0 truncate hover:underline"
-                      >
-                        {m.name}
-                      </Link>
-                    ) : (
-                      <span className="min-w-0 truncate text-graphite">
-                        {m.name}
-                      </span>
-                    )}
-                  </RailItem>
-                ))
-              )}
-            </RailSection>
-
             <TasksRail
               entityId={company.id}
               entityName={company.name}

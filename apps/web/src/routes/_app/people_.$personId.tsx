@@ -19,7 +19,6 @@ import {
   InitialsMark,
   PropertyCell,
   PropertyGrid,
-  RailEmpty,
   RailItem,
   RailSection,
   RecordBody,
@@ -27,6 +26,7 @@ import {
   RecordSection,
 } from '#/components/record/record-parts'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { recordPath } from '#/lib/record-path'
@@ -37,6 +37,7 @@ import {
   getRecordTimeline,
   listCompanies,
   listRecordDocuments,
+  listRecordNotes,
   listRegistry,
   setPersonCompany,
   updateRecord,
@@ -44,13 +45,14 @@ import {
 
 export const Route = createFileRoute('/_app/people_/$personId')({
   loader: async ({ params }) => {
-    const [personData, companies, registry, timeline, documents] =
+    const [personData, companies, registry, timeline, documents, notes] =
       await Promise.all([
         getPerson({ data: { id: params.personId } }),
         listCompanies(),
         listRegistry({ data: { kind: 'person' } }),
         getRecordTimeline({ data: { entityId: params.personId } }),
         listRecordDocuments({ data: { entityId: params.personId } }),
+        listRecordNotes({ data: { entityId: params.personId } }),
       ])
     if (personData.mergedIntoId) {
       throw redirect({
@@ -64,18 +66,18 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       registry,
       timeline,
       documents,
+      notes,
     }
   },
   component: PersonRecordPage,
 })
 
 function PersonRecordPage() {
-  const { person, allCompanies, registry, timeline, documents } =
+  const { person, allCompanies, registry, timeline, documents, notes } =
     Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
 
-  const noteMentions = person.mentionedIn.filter((m) => m.kind === 'note')
   const unlinkedCompanies = allCompanies.filter(
     (c) => !person.companies.some((pc) => pc.id === c.id),
   )
@@ -164,7 +166,6 @@ function PersonRecordPage() {
             tone: location ? undefined : 'muted',
           },
           { label: 'Emails', value: `${person.emails.length}` },
-          { label: 'Mentions', value: `${person.mentionedIn.length}` },
         ]}
       />
 
@@ -226,33 +227,6 @@ function PersonRecordPage() {
                 />
               ) : null}
             </RailSection>
-
-            <RailSection
-              label="Mentioned in"
-              meta={`${person.mentionedIn.length}`}
-            >
-              {person.mentionedIn.length === 0 ? (
-                <RailEmpty>Nowhere yet.</RailEmpty>
-              ) : (
-                person.mentionedIn.map((m) => (
-                  <RailItem key={m.fromId}>
-                    {m.kind === 'note' ? (
-                      <Link
-                        to="/notes/$noteId"
-                        params={{ noteId: m.fromId }}
-                        className="focus-ring min-w-0 truncate hover:underline"
-                      >
-                        {m.name}
-                      </Link>
-                    ) : (
-                      <span className="min-w-0 truncate text-graphite">
-                        {m.name}
-                      </span>
-                    )}
-                  </RailItem>
-                ))
-              )}
-            </RailSection>
           </>
         }
       >
@@ -302,41 +276,12 @@ function PersonRecordPage() {
           </PropertyCell>
         </PropertyGrid>
 
-        <RecordSection
-          label="Notes"
-          meta={`${noteMentions.length} note${noteMentions.length === 1 ? '' : 's'}`}
-          action={
-            <button
-              type="button"
-              onClick={newNoteAboutThis}
-              className="focus-ring text-primary hover:underline"
-            >
-              note about this ›
-            </button>
-          }
-        >
-          {noteMentions.length === 0 ? (
-            <p className="border-t border-rule py-2 text-label text-graphite">
-              No notes mention {person.name} yet.
-            </p>
-          ) : (
-            <ol>
-              {noteMentions.map((m) => (
-                <li key={m.fromId} className="border-t border-rule">
-                  <Link
-                    to="/notes/$noteId"
-                    params={{ noteId: m.fromId }}
-                    className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
-                  >
-                    <span className="font-serif text-title font-medium">
-                      {m.name}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
-        </RecordSection>
+        <RecordNotes
+          recordName={person.name}
+          filed={notes.filed}
+          mentions={notes.mentions}
+          onNewNote={newNoteAboutThis}
+        />
 
         {/* Inbound record-references, one section per attribute — the
             heading and the grouping are both data (`attr_slug` and the

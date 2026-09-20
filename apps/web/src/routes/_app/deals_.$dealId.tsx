@@ -28,6 +28,7 @@ import {
   PropertyGrid,
   StageStepper,
 } from '#/components/record/record-parts'
+import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { TaskComposer } from '#/components/task-composer'
@@ -42,17 +43,19 @@ import {
   getDeal,
   getRecordTimeline,
   listRecordDocuments,
+  listRecordNotes,
   listRegistry,
   updateRecord,
 } from '#/lib/server-fns'
 
 export const Route = createFileRoute('/_app/deals_/$dealId')({
   loader: async ({ params }) => {
-    const [deal, registry, timeline, documents] = await Promise.all([
+    const [deal, registry, timeline, documents, notes] = await Promise.all([
       getDeal({ data: { id: params.dealId } }),
       listRegistry({ data: { kind: 'deal' } }),
       getRecordTimeline({ data: { entityId: params.dealId } }),
       listRecordDocuments({ data: { entityId: params.dealId } }),
+      listRecordNotes({ data: { entityId: params.dealId } }),
     ])
     if (deal.mergedIntoId) {
       throw redirect({
@@ -60,13 +63,13 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
         params: { dealId: deal.mergedIntoId },
       })
     }
-    return { deal, registry, timeline, documents }
+    return { deal, registry, timeline, documents, notes }
   },
   component: DealRecordPage,
 })
 
 function DealRecordPage() {
-  const { deal, registry, timeline, documents } = Route.useLoaderData()
+  const { deal, registry, timeline, documents, notes } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [moveOpen, setMoveOpen] = useState(false)
@@ -86,8 +89,6 @@ function DealRecordPage() {
   const companyRef: { name: string } | undefined = companyId
     ? deal.refNames[companyId]
     : undefined
-  const noteMentions = deal.mentionedIn.filter((m) => m.kind === 'note')
-
   const stageDef = registry.find((d) => d.slug === 'stage')
   const stageOptions = stageDef?.options.options ?? []
   const stageOption = stageOptions.find((o) => o.id === deal.values.stage)
@@ -373,41 +374,12 @@ function DealRecordPage() {
           </PropertyCell>
         </PropertyGrid>
 
-        <RecordSection
-          label="Notes"
-          meta={`${noteMentions.length} note${noteMentions.length === 1 ? '' : 's'}`}
-          action={
-            <button
-              type="button"
-              onClick={newNoteAboutThis}
-              className="focus-ring text-primary hover:underline"
-            >
-              note about this ›
-            </button>
-          }
-        >
-          {noteMentions.length === 0 ? (
-            <p className="border-t border-rule py-2 text-label text-graphite">
-              No notes mention this deal yet — diligence notes land here.
-            </p>
-          ) : (
-            <ol>
-              {noteMentions.map((m) => (
-                <li key={m.fromId} className="border-t border-rule">
-                  <Link
-                    to="/notes/$noteId"
-                    params={{ noteId: m.fromId }}
-                    className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
-                  >
-                    <span className="font-serif text-title font-medium">
-                      {m.name}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
-        </RecordSection>
+        <RecordNotes
+          recordName={deal.name}
+          filed={notes.filed}
+          mentions={notes.mentions}
+          onNewNote={newNoteAboutThis}
+        />
 
         <RecordSection
           rule

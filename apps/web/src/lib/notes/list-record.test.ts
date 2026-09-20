@@ -252,3 +252,100 @@ describe('byMemoThenRecent', () => {
     expect(byMemoThenRecent(rows[2], rows[2])).toBe(0)
   })
 })
+
+/** A person, a deal and a custom record — the three pages notes-1b fans out to. */
+async function aPerson(tag: string): Promise<string> {
+  const { db } = await import('@spaces/db')
+  const { entity, person } = await import('@spaces/db/schema')
+  const [ent] = await db
+    .insert(entity)
+    .values({ kind: 'person', canonicalName: `Ada ${tag}` })
+    .returning({ id: entity.id })
+  await db.insert(person).values({ entityId: ent.id })
+  return ent.id
+}
+
+async function aDeal(tag: string): Promise<string> {
+  const { db } = await import('@spaces/db')
+  const { entity } = await import('@spaces/db/schema')
+  const [ent] = await db
+    .insert(entity)
+    .values({ kind: 'deal', canonicalName: `Seed ${tag}` })
+    .returning({ id: entity.id })
+  return ent.id
+}
+
+/** A record of a custom object — the /o/$objectSlug/$recordId page's subject. */
+async function aCustomRecord(tag: string): Promise<string> {
+  const { db } = await import('@spaces/db')
+  const { entity, objectDef } = await import('@spaces/db/schema')
+  const [obj] = await db
+    .insert(objectDef)
+    .values({
+      slug: `vehicles_${tag}`,
+      singular: 'Vehicle',
+      plural: 'Vehicles',
+    })
+    .returning({ id: objectDef.id })
+  const [ent] = await db
+    .insert(entity)
+    .values({
+      kind: 'custom',
+      objectId: obj.id,
+      canonicalName: `Fund II ${tag}`,
+    })
+    .returning({ id: entity.id })
+  return ent.id
+}
+
+/**
+ * notes-1b fans the one component out to people, deals and custom records.
+ * The lanes are keyed by entity id and nothing else — no record kind and,
+ * for an /o/ page, no object slug — so the split and the privacy filter are
+ * the company page's, proven once per kind rather than re-implemented.
+ */
+describe('the lanes on every record kind (SPA-107)', () => {
+  const kinds: Array<[string, (tag: string) => Promise<string>]> = [
+    ['person', aPerson],
+    ['deal', aDeal],
+    ['custom record', aCustomRecord],
+  ]
+
+  for (const [label, makeRecord] of kinds) {
+    it(`splits filed from mentions on a ${label}, and keeps a teammate's private note out`, async () => {
+      const { listRecordNotesProgram } = await import('./list-record')
+
+      const tag = randomUUID().slice(0, 8)
+      const me = await actorId()
+      const other = await anotherUser(tag)
+      const recordId = await makeRecord(tag)
+
+      const filed = await aNote({
+        title: `Filed on the ${label} ${tag}`,
+        authorId: me,
+        filedAgainst: recordId,
+      })
+      const mentioned = await aNote({
+        title: `Merely names the ${label} ${tag}`,
+        authorId: me,
+        mentions: recordId,
+      })
+      const theirs = await aNote({
+        title: `Their private filing ${tag}`,
+        authorId: other,
+        visibility: 'private',
+        filedAgainst: recordId,
+        mentions: recordId,
+      })
+
+      const lanes = await Effect.runPromise(
+        listRecordNotesProgram(me, recordId),
+      )
+      expect(lanes.filed.map((f) => f.id)).toEqual([filed])
+      expect(lanes.mentions.map((m) => m.id)).toEqual([mentioned])
+      const seen = [...lanes.filed, ...lanes.mentions]
+      expect(seen.map((n) => n.id)).not.toContain(theirs)
+      expect(JSON.stringify(seen)).not.toContain('Their private')
+    })
+  }
+})
