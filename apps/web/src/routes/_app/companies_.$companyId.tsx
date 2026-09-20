@@ -30,6 +30,7 @@ import {
 } from '#/components/record/record-parts'
 import { OptionChip, optionLabel } from '#/components/attributes/value-editor'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { CreateDealDialog } from '#/routes/_app/deals'
@@ -40,6 +41,7 @@ import {
   getRecordTimeline,
   listCompanyDeals,
   listRecordDocuments,
+  listRecordNotes,
   listRegistry,
   listSpaces,
   tagIntoSpace,
@@ -58,6 +60,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       deals,
       timeline,
       documents,
+      notes,
     ] = await Promise.all([
       getCompany({ data: { id: params.companyId } }),
       listSpaces(),
@@ -66,6 +69,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       listCompanyDeals({ data: { companyId: params.companyId } }),
       getRecordTimeline({ data: { entityId: params.companyId } }),
       listRecordDocuments({ data: { entityId: params.companyId } }),
+      listRecordNotes({ data: { entityId: params.companyId } }),
     ])
     // Merged-away records redirect to their survivor — stale URLs keep working.
     if (companyData.mergedIntoId) {
@@ -82,6 +86,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       deals,
       timeline,
       documents,
+      notes,
     }
   },
   component: CompanyRecordPage,
@@ -96,12 +101,12 @@ function CompanyRecordPage() {
     deals,
     timeline,
     documents,
+    notes,
   } = Route.useLoaderData()
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
   const navigate = useNavigate()
 
-  const noteMentions = company.mentionedIn.filter((m) => m.kind === 'note')
   const domains = company.aliases.filter((a) => a.kind === 'domain')
   const nameAliases = company.aliases.filter(
     (a) => a.kind === 'name' && a.value !== company.name,
@@ -377,42 +382,12 @@ function CompanyRecordPage() {
           </PropertyCell>
         </PropertyGrid>
 
-        <RecordSection
-          label="Notes"
-          meta={`${noteMentions.length} note${noteMentions.length === 1 ? '' : 's'}`}
-          action={
-            <button
-              type="button"
-              onClick={newNoteAboutThis}
-              className="focus-ring text-primary hover:underline"
-            >
-              note about this ›
-            </button>
-          }
-        >
-          {noteMentions.length === 0 ? (
-            <p className="border-t border-rule py-2 text-label text-graphite">
-              No notes mention {company.name} yet. Write one — it links itself
-              here.
-            </p>
-          ) : (
-            <ol>
-              {noteMentions.map((m) => (
-                <li key={m.fromId} className="border-t border-rule">
-                  <Link
-                    to="/notes/$noteId"
-                    params={{ noteId: m.fromId }}
-                    className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
-                  >
-                    <span className="font-serif text-title font-medium">
-                      {m.name}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
-        </RecordSection>
+        <RecordNotes
+          recordName={company.name}
+          filed={notes.filed}
+          mentions={notes.mentions}
+          onNewNote={newNoteAboutThis}
+        />
 
         <RecordSection
           rule
