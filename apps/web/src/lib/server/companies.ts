@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
@@ -8,6 +8,7 @@ import {
   entityAlias,
   entitySpace,
   link,
+  note,
   person,
   space,
 } from '@spaces/db/schema'
@@ -148,7 +149,7 @@ export const listCompaniesTable = createServerFn().handler(async () => {
 export const getCompany = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
-    await requireUser()
+    const u = await requireUser()
 
     const head = (
       await db
@@ -212,7 +213,10 @@ export const getCompany = createServerFn()
       headline: jsonString(p.values.job_title),
     }))
 
-    // Notes (and anything else) that mention this company.
+    // Notes (and anything else) that mention this company. A note's title is
+    // the note, so `canRead` applies in SQL here too: a teammate's private
+    // note must not reach the rail at all. The left join is what lets a
+    // non-note mention through — it has no visibility to check.
     const mentionedIn = await db
       .select({
         fromId: link.fromEntityId,
@@ -221,7 +225,18 @@ export const getCompany = createServerFn()
       })
       .from(link)
       .innerJoin(entity, eq(entity.id, link.fromEntityId))
-      .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
+      .leftJoin(note, eq(note.entityId, link.fromEntityId))
+      .where(
+        and(
+          eq(link.toEntityId, data.id),
+          eq(link.relation, 'mentions'),
+          or(
+            isNull(note.entityId),
+            eq(note.visibility, 'shared'),
+            eq(note.authorId, u.id),
+          ),
+        ),
+      )
 
     const timeline = await db
       .select({

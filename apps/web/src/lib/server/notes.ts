@@ -3,9 +3,7 @@ import { and, asc, desc, eq, isNull, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { entity, entitySpace, link, note, space } from '@spaces/db/schema'
-import { activity } from '@spaces/db/schema/activity'
 import { canRead, requireUser } from './shared'
-import type { NoteBody } from '@spaces/db/schema/kinds'
 import { jsonValue } from '#/lib/json'
 
 export const createNote = createServerFn({ method: 'POST' })
@@ -30,75 +28,38 @@ export const createNote = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const u = await requireUser()
     const about = data?.about
-    const noteKind = data?.noteKind ?? 'note'
-    return db.transaction(async (tx) => {
-      const [ent] = await tx
-        .insert(entity)
-        .values({ kind: 'note', canonicalName: 'Untitled', createdBy: u.id })
-        .returning({ id: entity.id })
-
-      const bodyJson: NoteBody | null = about
-        ? [
-            {
-              type: 'paragraph',
-              content: [
-                {
-                  type: 'mention',
-                  props: {
-                    entityId: about.entityId,
-                    label: about.label,
-                    kind: about.kind,
-                    objectSlug: about.objectSlug ?? '',
-                  },
-                },
-                { type: 'text', text: ' — ', styles: {} },
-              ],
-            },
-          ]
-        : null
-
-      await tx.insert(note).values({
-        entityId: ent.id,
-        authorId: u.id,
-        kind: noteKind,
-        bodyJson: noteKind === 'memo' ? null : bodyJson,
-        bodyMd:
-          about && noteKind !== 'memo'
-            ? `Mentions: [[${about.label}|entity:${about.entityId}]]\n`
-            : '',
+    const { createNoteProgram, noteCreateMessage } =
+      await import('../notes/create')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(createNoteProgram)(u.id, {
+        about: about
+          ? {
+              entityId: about.entityId,
+              label: about.label,
+              kind: about.kind,
+              objectSlug: about.objectSlug ?? '',
+            }
+          : null,
+        noteKind: data?.noteKind ?? 'note',
       })
-      if (about) {
-        if (about.kind === 'space') {
-          // Written while standing in the space, so it is filed there, not
-          // merely referenced — and it files through entity_space like every
-          // other kind, inheriting its provenance/confidence story.
-          await tx
-            .insert(entitySpace)
-            .values({
-              entityId: ent.id,
-              spaceId: about.entityId,
-              source: 'manual',
-              createdBy: u.id,
-            })
-            .onConflictDoNothing()
-        } else {
-          await tx.insert(link).values({
-            fromEntityId: ent.id,
-            toEntityId: about.entityId,
-            relation: 'mentions',
-            source: 'extracted',
-            createdBy: u.id,
-          })
-        }
-      }
-      await tx.insert(activity).values({
-        actorId: u.id,
-        verb: 'note.created',
-        subjectEntityId: about ? about.entityId : ent.id,
-        objectEntityId: about ? ent.id : undefined,
-      })
-      return { id: ent.id }
-    })
+    } catch (failure) {
+      throw new Error(noteCreateMessage(failure))
+    }
+  })
+
+/**
+ * The two lanes of a record's Notes section — filed against it, and merely
+ * mentioning it. Visibility and merge state are filtered in SQL; see
+ * `lib/notes/list-record.ts`.
+ */
+export const listRecordNotes = createServerFn()
+  .validator(z.object({ entityId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { listRecordNotesProgram } = await import('../notes/list-record')
+    const { effectFn } = await import('./effect')
+    return effectFn(listRecordNotesProgram)(u.id, data.entityId)
   })
 
 export const listNotes = createServerFn().handler(async () => {
@@ -125,7 +86,14 @@ export const listNotes = createServerFn().handler(async () => {
   return rows.map((r) => ({
     id: r.id,
     title: r.title || 'Untitled',
-    snippet: r.bodyMd.replace(/\s+/g, ' ').slice(0, 140),
+    // The starter block's `Mentions: [[…]]` marker is a seed, not prose —
+    // strip it the way the space page already strips it, or every freshly
+    // created note reads as its own wiki-link in the list.
+    snippet: r.bodyMd
+      .replace(/Mentions:.*$/s, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 140),
     updatedAt: r.updatedAt.toISOString(),
     isPrivate: r.visibility === 'private',
   }))
