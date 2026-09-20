@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { optionLabel, refName } from './attributes/value-editor'
@@ -139,7 +140,24 @@ export function RecordTimeline({
         if (item.type === 'interaction') {
           return (
             <Row key={item.id} at={item.at} type={item.kind} last={last}>
-              <span>{item.subject}</span>
+              {/*
+                An interaction that was written up reads as a way in to its
+                note; one that was not reads exactly as it did before. The
+                treatment is `record-notes.tsx`'s own — pine, underline on
+                hover, the reticle for focus — so the two surfaces that point
+                at a note point at it the same way.
+              */}
+              {item.noteId ? (
+                <Link
+                  to="/notes/$noteId"
+                  params={{ noteId: item.noteId }}
+                  className="focus-ring text-primary hover:underline"
+                >
+                  {item.subject}
+                </Link>
+              ) : (
+                <span>{item.subject}</span>
+              )}
               {item.attendees.length > 0 ? (
                 <span className="block mono text-micro text-graphite">
                   {item.attendees.map((a) => a.name).join(' · ')}

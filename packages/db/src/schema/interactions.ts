@@ -14,6 +14,7 @@ import {
 import { sql } from 'drizzle-orm'
 import { entity, sourceClass } from './entities'
 import { integration } from './integrations'
+import { note } from './kinds'
 import type { Json } from '../json'
 
 /**
@@ -52,6 +53,22 @@ export const interaction = pgTable(
     messageId: text('message_id'),
     threadId: text('thread_id'),
     subject: text('subject'),
+    /**
+     * The interaction's write-up, as a real note row (CONTEXT.md →
+     * "Interactions and enrichment", decided 2026-09-14; built SPA-123).
+     * `interaction` never had a body column, so this is the whole of the
+     * unification: the structured event keeps kind / occurred_at / attendees
+     * and the prose lives in `note`, where one editor, one mention system and
+     * one search index already are.
+     *
+     * **Nullable, and lazily filled.** A call logged in twenty seconds with
+     * nothing written should not manufacture an empty note row — the plain
+     * "Log meeting" path leaves this null, and "Log and write up" is what
+     * sets it. The `interaction_note_unique` index below stops two
+     * interactions claiming one body; being partial by nature of a unique
+     * index over NULLs, it says nothing about the many bodyless rows.
+     */
+    noteId: uuid('note_id').references(() => note.entityId),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -59,6 +76,10 @@ export const interaction = pgTable(
   },
   (t) => [
     uniqueIndex('interaction_message_id_unique').on(t.messageId),
+    // One body, one interaction. Postgres treats NULLs as distinct in a
+    // unique index, so this admits any number of write-up-less rows and
+    // exactly one interaction per note.
+    uniqueIndex('interaction_note_unique').on(t.noteId),
     index('interaction_thread_idx').on(t.threadId),
     index('interaction_occurred_idx').on(t.occurredAt),
     // The same biconditional the entity and alias rows carry: an

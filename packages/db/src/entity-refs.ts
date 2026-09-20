@@ -9,6 +9,7 @@ import {
   entityAlias,
   entitySpace,
   holding,
+  interaction,
   interactionEntity,
   investment,
   jobRun,
@@ -250,6 +251,20 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     },
     del: { kind: 'cascade' },
     context: { role: 'item', kind: 'interaction', hop: 1 },
+  },
+  {
+    key: 'interaction.note',
+    table: interaction,
+    column: interaction.noteId,
+    merge: { kind: 'none', why: 'note kind is not mergeable' },
+    del: {
+      kind: 'orphan',
+      why: 'the meeting outlives its write-up: kind, occurred_at and the attendee edges are the event, and the note is prose someone may delete without unhappening the call (SPA-123)',
+    },
+    // The write-up is already reached through its own `tagged_in` edges to
+    // every attendee, which is how it lands under "Filed here"; an item entry
+    // here would walk the same note a second time and double-count it.
+    context: null,
   },
   {
     key: 'task_entity.entity',

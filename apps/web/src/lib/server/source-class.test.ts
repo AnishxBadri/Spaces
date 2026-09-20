@@ -159,18 +159,20 @@ describe('interaction provenance', () => {
     const { db } = await import('@spaces/db')
     const { interaction } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
-    const { writeInteraction } = await import('./shared')
+    const { logInteractionProgram } = await import('../interactions/log')
     const { recordTimelineProgram } = await import('../timeline/record')
     const tag = randomUUID().slice(0, 8)
 
     const recordId = await aRecord(tag)
-    const { id } = await writeInteraction({
-      kind: 'meeting',
-      subject: `Site visit ${tag}`,
-      occurredAt: new Date('2026-09-18T10:00:00Z'),
-      attendeeIds: [recordId],
-      actorId: await actorId(),
-    })
+    const { id } = await Effect.runPromise(
+      logInteractionProgram(await actorId(), {
+        kind: 'meeting',
+        subject: `Site visit ${tag}`,
+        occurredAt: new Date('2026-09-18T10:00:00Z'),
+        attendeeIds: [recordId],
+        writeUp: false,
+      }),
+    )
 
     const row = (
       await db
