@@ -10,6 +10,7 @@ import { enqueue } from '../queue'
 import { storage } from '../storage'
 import {
   deleteDocumentWithBlobGc,
+  documentFilingEdges,
   documentFilingRefusal,
   documentProvenance,
   existingDocumentFiling,
@@ -168,6 +169,11 @@ export const listRecordDocuments = createServerFn()
     // is a row, and the file line can finally name it.
     const provenance = await documentProvenance(rows.map((r) => r.id))
 
+    // Every edge each document is filed by, not just this record's (SPA-50).
+    // The filing control renders both kinds as chips, and a per-row fetch
+    // would open one request per file to draw a popover nobody has clicked.
+    const filings = await documentFilingEdges(rows.map((r) => r.id))
+
     // The last extraction attempt per document (SPA-106). `document.extraction_*`
     // says what the file is; `job_run` says what the worker did about it — which
     // attempt, how long it took, how long ago — and until this join the second
@@ -227,6 +233,7 @@ export const listRecordDocuments = createServerFn()
         lastRun: runs.get(r.id) ?? null,
         sourceClass: source.sourceClass,
         sourceCapability: source.sourceCapability,
+        filedIn: filings.get(r.id) ?? [],
       }
     })
   })
@@ -294,4 +301,87 @@ export const deleteDocument = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await requireUser()
     return deleteDocumentWithBlobGc(data.id)
+  })
+
+/**
+ * Re-file, change kind, re-extract — §3.3's three actions on a filed
+ * document (SPA-50). Each is `requireUser()` plus `effectFn(program)` and
+ * nothing else; the programs are `#/lib/documents/refile`, outside
+ * `lib/server/` so a test can drive them without a request.
+ *
+ * The typed refusals are turned into sentences here rather than allowed to
+ * reject as they are: `Effect.runPromise` rejects with the tagged error
+ * itself, and a `Schema.TaggedError` carries no `message`, so "merged away"
+ * would otherwise reach the chip row empty (the rule `voidLedgerEvent` set).
+ */
+const filingTarget = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('record'), entityId: z.string().uuid() }),
+  z.object({ kind: z.literal('space'), entityId: z.string().uuid() }),
+])
+
+export const fileDocument = createServerFn({ method: 'POST' })
+  .validator(z.object({ documentId: z.string().uuid(), target: filingTarget }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { fileDocumentProgram, documentRefileMessage } =
+      await import('../documents/refile')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(fileDocumentProgram)(u.id, data)
+    } catch (failure) {
+      throw new Error(documentRefileMessage(failure))
+    }
+  })
+
+export const unfileDocument = createServerFn({ method: 'POST' })
+  .validator(z.object({ documentId: z.string().uuid(), target: filingTarget }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { unfileDocumentProgram, documentRefileMessage } =
+      await import('../documents/refile')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(unfileDocumentProgram)(u.id, data)
+    } catch (failure) {
+      throw new Error(documentRefileMessage(failure))
+    }
+  })
+
+/**
+ * `z.enum(DOCUMENT_KINDS)` is where a kind outside the list dies — the
+ * validator, not the program, for the reason every other enum the client can
+ * name is narrowed there: the boundary is the one place the untrusted string
+ * exists.
+ */
+export const setDocumentKind = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      documentId: z.string().uuid(),
+      kind: z.enum(DOCUMENT_KINDS),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { setDocumentKindProgram, documentRefileMessage } =
+      await import('../documents/refile')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(setDocumentKindProgram)(u.id, data)
+    } catch (failure) {
+      throw new Error(documentRefileMessage(failure))
+    }
+  })
+
+export const reExtractDocument = createServerFn({ method: 'POST' })
+  .validator(z.object({ documentId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { reExtractDocumentProgram, documentRefileMessage } =
+      await import('../documents/refile')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(reExtractDocumentProgram)(u.id, data.documentId)
+    } catch (failure) {
+      throw new Error(documentRefileMessage(failure))
+    }
   })

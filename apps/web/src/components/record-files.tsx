@@ -1,18 +1,26 @@
-import { useRouter } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import {
   Download,
   Eye,
   File as FileIcon,
+  FolderTree,
+  Layers,
   Loader2,
+  RefreshCw,
   Trash2,
   Upload,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { useConfirm } from './ui/confirm-dialog'
+import { Input } from './ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import { Select } from './ui/select'
 import { DocumentPreview } from './document-preview'
+import { KIND_ICONS } from './editor/mention'
 import {
+  DOCUMENT_KINDS,
   DOCUMENT_KIND_LABELS,
   MAX_UPLOAD_BYTES,
   formatBytes,
@@ -21,11 +29,18 @@ import {
 import { formatDurationMs, formatSince } from '@spaces/core/format'
 import {
   deleteDocument,
+  fileDocument,
   finalizeDocumentUpload,
   getDocumentDownloadUrl,
+  listSpaces,
   prepareDocumentUpload,
+  reExtractDocument,
+  searchEntities,
+  setDocumentKind,
+  unfileDocument,
 } from '#/lib/server-fns'
 import type { listRecordDocuments } from '#/lib/server-fns'
+import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
 
 /**
@@ -281,6 +296,7 @@ function DocumentRow({
         <ExtractionNote doc={doc} />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
+        <FilingControl doc={doc} />
         <Button
           size="icon-xs"
           variant="ghost"
@@ -312,6 +328,353 @@ function DocumentRow({
       </div>
       {confirmDialog}
     </li>
+  )
+}
+
+/**
+ * The filing control (SPA-50) — §3.3's re-file, change kind and re-extract,
+ * on the row they act on.
+ *
+ * A document is filed in N places (§3.4): the deck lives on the company *and*
+ * the deal without copying, and until this control existed the set was
+ * whatever the upload said. So the popover shows **every** edge, not just
+ * this tab's — records routed through `recordPath`, spaces to their page —
+ * each with a remove control, and two pickers to add more.
+ *
+ * Removing the edge to the record whose tab this is takes the row off this
+ * tab on the next `router.invalidate()`. That is the point, and it is not a
+ * delete: the row, the blob and the extracted text all stay, and an unfiled
+ * document is a first-class state rather than an orphan.
+ */
+function FilingControl({ doc }: { doc: Documents[number] }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const run = useCallback(
+    async (action: () => Promise<unknown>) => {
+      setBusy(true)
+      try {
+        await action()
+        await router.invalidate()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not file')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [router],
+  )
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          aria-label={`Filing for ${doc.filename}`}
+          title={`Filed in ${String(doc.filedIn.length)} place${doc.filedIn.length === 1 ? '' : 's'}`}
+          className="text-graphite"
+        >
+          <FolderTree />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80">
+        <p className="field-label text-graphite">Filed in</p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {doc.filedIn.length === 0 ? (
+            <p className="text-label text-graphite">
+              Nowhere. The file and its text stay either way.
+            </p>
+          ) : null}
+          {doc.filedIn.map((edge) => (
+            <FilingChip
+              key={`${edge.kind}-${edge.id}`}
+              edge={edge}
+              busy={busy}
+              onRemove={() =>
+                void run(() =>
+                  unfileDocument({
+                    data: {
+                      documentId: doc.id,
+                      target: { kind: edge.kind, entityId: edge.id },
+                    },
+                  }),
+                )
+              }
+            />
+          ))}
+        </div>
+
+        <RecordPicker
+          disabled={busy}
+          filedIds={doc.filedIn.map((e) => e.id)}
+          onPick={(entityId) =>
+            void run(() =>
+              fileDocument({
+                data: {
+                  documentId: doc.id,
+                  target: { kind: 'record', entityId },
+                },
+              }),
+            )
+          }
+        />
+
+        <SpacePicker
+          open={open}
+          disabled={busy}
+          filedIds={doc.filedIn.map((e) => e.id)}
+          onPick={(entityId) =>
+            void run(() =>
+              fileDocument({
+                data: {
+                  documentId: doc.id,
+                  target: { kind: 'space', entityId },
+                },
+              }),
+            )
+          }
+        />
+
+        {/* Kind and extraction: the other two §3.3 actions, below the edges
+            because neither moves the document — a genre and a re-read. */}
+        <div className="mt-3 flex items-center gap-1.5 border-t border-rule pt-3">
+          <Select
+            aria-label={`Kind of ${doc.filename}`}
+            value={doc.kind}
+            disabled={busy}
+            onChange={(kind) =>
+              void run(() =>
+                setDocumentKind({ data: { documentId: doc.id, kind } }),
+              )
+            }
+            items={DOCUMENT_KINDS.map((k) => ({
+              value: k,
+              label: DOCUMENT_KIND_LABELS[k],
+            }))}
+            width="content"
+            className="h-6 w-auto flex-1 text-label"
+          />
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const { queued } = await reExtractDocument({
+                  data: { documentId: doc.id },
+                })
+                // The row is `pending` either way and re-queueable; say so
+                // rather than letting a down worker look like a done job.
+                if (!queued) toast.message('Queued when the worker is back')
+              })
+            }
+          >
+            <RefreshCw className="size-3" strokeWidth={2} />
+            Re-extract
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/** One edge, as the square chip the note page's filing rows already draw. */
+function FilingChip({
+  edge,
+  busy,
+  onRemove,
+}: {
+  edge: Documents[number]['filedIn'][number]
+  busy: boolean
+  onRemove: () => void
+}) {
+  // A custom record routes through its object's slug; a kind with no page
+  // reads as plain text rather than a broken link.
+  const href =
+    edge.kind === 'space'
+      ? `/spaces/${edge.id}`
+      : recordPath({
+          kind: edge.entityKind,
+          id: edge.id,
+          objectSlug: edge.objectSlug,
+        })
+  const Icon = edge.kind === 'space' ? Layers : KIND_ICONS[edge.entityKind]
+
+  return (
+    <span className="flex h-6 items-center gap-1.5 border border-rule bg-paper pr-1.5 pl-2 text-label font-medium">
+      {Icon ? <Icon className="size-2.5 shrink-0" strokeWidth={1.75} /> : null}
+      {href ? (
+        <Link to={href} className="focus-ring hover:underline">
+          {edge.name}
+        </Link>
+      ) : (
+        edge.name
+      )}
+      <button
+        type="button"
+        aria-label={`Unfile from ${edge.name}`}
+        disabled={busy}
+        onClick={onRemove}
+        className="focus-ring mono text-micro text-graphite hover:text-foreground"
+      >
+        ×
+      </button>
+    </span>
+  )
+}
+
+/**
+ * Records are unbounded where spaces are a tree of a few dozen, so this is a
+ * debounced search — the lane `RecordFilingPicker` on the note page and
+ * `value-editor.tsx`'s reference picker already draw.
+ *
+ * The `kinds` argument is **explicit** and names four: SPA-27 widened the
+ * default lane to include documents so a deck could be mentioned in a note
+ * body, and a document filed against a document is a mention, not a filing.
+ * A client allowlist is a convenience either way — `fileDocumentProgram`
+ * refuses the same targets, and `searchEntities` already drops merged-away
+ * rows in SQL.
+ */
+function RecordPicker({
+  filedIds,
+  disabled,
+  onPick,
+}: {
+  filedIds: Array<string>
+  disabled: boolean
+  onPick: (entityId: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<
+    Awaited<ReturnType<typeof searchEntities>>
+  >([])
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([])
+      return
+    }
+    let alive = true
+    const t = setTimeout(() => {
+      void (async () => {
+        const rows = await searchEntities({
+          data: { q: query, kinds: ['company', 'person', 'deal', 'custom'] },
+        })
+        if (alive) setResults(rows)
+      })()
+    }, 200)
+    return () => {
+      alive = false
+      clearTimeout(t)
+    }
+  }, [query])
+
+  const offered = results.filter((r) => !filedIds.includes(r.id))
+
+  return (
+    <div className="mt-3">
+      <Input
+        value={query}
+        disabled={disabled}
+        placeholder="File against a record…"
+        onChange={(e) => setQuery(e.target.value)}
+        className="h-7 text-label"
+      />
+      {offered.length > 0 ? (
+        <ul className="mt-1 flex flex-col">
+          {offered.map((r) => (
+            <li key={r.id}>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                  onPick(r.id)
+                  setQuery('')
+                }}
+                className="focus-ring flex h-7 w-full items-center px-2 text-left text-ui hover:bg-bone"
+              >
+                {r.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {query.trim() && offered.length === 0 ? (
+        <p className="mt-1 px-2 text-label text-graphite">No record matches.</p>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * The space lane. Its value stays empty so the trigger keeps reading as an
+ * invitation rather than as a held choice — `SpaceFiling`'s picker on the
+ * note page, with the same nesting as the filter popover's attribute picker.
+ *
+ * The list is fetched when the popover opens rather than in four route
+ * loaders: a Files tab with twelve rows would otherwise pay for the whole
+ * space tree twelve times to draw twelve popovers nobody clicked.
+ */
+function SpacePicker({
+  open,
+  filedIds,
+  disabled,
+  onPick,
+}: {
+  open: boolean
+  filedIds: Array<string>
+  disabled: boolean
+  onPick: (entityId: string) => void
+}) {
+  const [spaces, setSpaces] = useState<Awaited<ReturnType<typeof listSpaces>>>(
+    [],
+  )
+
+  useEffect(() => {
+    if (!open) return
+    // A cell rather than a `let`: the flag is read after an `await`, and a
+    // local boolean reads as always-true to the compiler there, which is
+    // `no-unnecessary-condition`'s complaint and not a wrong one.
+    const live = { current: true }
+    void (async () => {
+      try {
+        const rows = await listSpaces()
+        if (live.current) setSpaces(rows)
+      } catch {
+        // A picker that cannot list is an empty picker, not a toast on a
+        // popover the reader opened to do something else.
+        if (live.current) setSpaces([])
+      }
+    })()
+    return () => {
+      live.current = false
+    }
+  }, [open])
+
+  const unfiled = spaces.filter((s) => !filedIds.includes(s.id))
+  if (unfiled.length === 0) return null
+
+  return (
+    <div className="mt-1.5">
+      <Select
+        aria-label="File this document into a space"
+        value=""
+        disabled={disabled}
+        onChange={onPick}
+        items={unfiled.map((s) => ({
+          value: s.id,
+          label: s.name,
+          depth: s.depth,
+        }))}
+        width="content"
+        placeholder="+ File into a space…"
+        searchPlaceholder="Search spaces…"
+        emptyLabel="No space matches."
+        className="h-7 w-full rounded-none border-dashed bg-transparent px-2 text-label text-graphite hover:text-foreground"
+      />
+    </div>
   )
 }
 
