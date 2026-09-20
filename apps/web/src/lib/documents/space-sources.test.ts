@@ -63,6 +63,48 @@ async function sourcesOf(spaceId: string) {
   return Effect.runPromise(spaceSourcesProgram(spaceId))
 }
 
+async function inheritedOf(spaceId: string) {
+  const { Effect } = await import('effect')
+  const { spaceInheritedSourcesProgram } = await import('./space-sources')
+  return Effect.runPromise(spaceInheritedSourcesProgram(spaceId))
+}
+
+/** A live company, optionally tagged into a space. */
+async function aCompany(name: string, spaceId?: string): Promise<string> {
+  const { db } = await import('@spaces/db')
+  const { company, entity, entitySpace } = await import('@spaces/db/schema')
+  const [ent] = await db
+    .insert(entity)
+    .values({ kind: 'company', canonicalName: name })
+    .returning({ id: entity.id })
+  await db.insert(company).values({ entityId: ent.id })
+  if (spaceId) {
+    await db
+      .insert(entitySpace)
+      .values({ entityId: ent.id, spaceId, createdBy: await actorId() })
+  }
+  return ent.id
+}
+
+/** `link(tagged_in)` — the edge a record filing writes. */
+async function fileAgainstRecord(
+  entityId: string,
+  filename: string,
+  sha: string,
+): Promise<string> {
+  const { fileDocumentRow } = await import('#/lib/server/shared')
+  const { id } = await fileDocumentRow({
+    sha,
+    filename,
+    mime: 'application/pdf',
+    sizeBytes: 2048,
+    kind: 'deck',
+    fileAgainst: { kind: 'record', entityId },
+    actorId: await actorId(),
+  })
+  return id
+}
+
 describe('spaceSourcesProgram', () => {
   it('reads back a document filed into the space, newest first', async () => {
     const tag = randomUUID().slice(0, 8)
@@ -177,5 +219,173 @@ describe('spaceSourcesProgram', () => {
     // `link(tagged_in)` is the record's edge and never a space's: a lane
     // keyed on it would have shown this row here.
     expect(await sourcesOf(spaceId)).toEqual([])
+  })
+})
+
+/**
+ * The inherited lane (SPA-67) — documents reached *through* the companies
+ * tagged into the space. What is worth pinning is the seam between the two
+ * lanes: a document that is both filed here and tagged onto a company here
+ * belongs to the direct list and must not be counted twice, and the merge
+ * filter has to hold on both ends of the join, because there are now two
+ * `entity` rows in one statement.
+ */
+describe('spaceInheritedSourcesProgram', () => {
+  it('reads documents on a company tagged into the space, newest first', async () => {
+    const tag = randomUUID().slice(0, 8)
+    const spaceId = await aSpace(tag)
+    const companyId = await aCompany(`Ohmium ${tag}`, spaceId)
+
+    expect(await inheritedOf(spaceId)).toEqual([])
+
+    const older = await fileAgainstRecord(
+      companyId,
+      `older-${tag}.pdf`,
+      await aBlob(`a-${tag}`),
+    )
+    const newer = await fileAgainstRecord(
+      companyId,
+      `newer-${tag}.pdf`,
+      await aBlob(`b-${tag}`),
+    )
+
+    const rows = await inheritedOf(spaceId)
+    expect(rows.map((r) => r.id)).toEqual([newer, older])
+
+    const row = rows[0]
+    expect(row.companyId).toBe(companyId)
+    expect(row.companyName).toBe(`Ohmium ${tag}`)
+    // The rest is the row shape the direct lane returns — the section
+    // renders both lanes through one component.
+    expect(row.filename).toBe(`newer-${tag}.pdf`)
+    expect(row.kind).toBe('deck')
+    expect(row.sizeBytes).toBe(2048)
+    expect(row.mime).toBe('application/pdf')
+    expect(row.extractionStatus).toBe('pending')
+    expect(row.uploadedByName).toBeTruthy()
+    expect(row.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(row.sinceMs).toBeGreaterThanOrEqual(0)
+
+    // And the direct lane is untouched by any of it: nothing was filed into
+    // the space itself, so the headline count is still zero.
+    expect(await sourcesOf(spaceId)).toEqual([])
+  })
+
+  it('leaves a doubly-filed document to the direct lane', async () => {
+    const { db } = await import('@spaces/db')
+    const { link } = await import('@spaces/db/schema')
+    const tag = randomUUID().slice(0, 8)
+    const spaceId = await aSpace(tag)
+    const companyId = await aCompany(`Electric Hydrogen ${tag}`, spaceId)
+
+    // Filed into the space *and* tagged onto a company in it.
+    const both = await fileIntoSpace(
+      spaceId,
+      `both-${tag}.pdf`,
+      await aBlob(`both-${tag}`),
+    )
+    await db.insert(link).values({
+      fromEntityId: both,
+      toEntityId: companyId,
+      relation: 'tagged_in',
+      source: 'manual',
+      createdBy: await actorId(),
+    })
+
+    const onlyCompany = await fileAgainstRecord(
+      companyId,
+      `company-${tag}.pdf`,
+      await aBlob(`c-${tag}`),
+    )
+
+    expect((await sourcesOf(spaceId)).map((r) => r.id)).toEqual([both])
+    expect((await inheritedOf(spaceId)).map((r) => r.id)).toEqual([onlyCompany])
+  })
+
+  it('gives one row per company when a deck hangs off two companies here', async () => {
+    const { db } = await import('@spaces/db')
+    const { link } = await import('@spaces/db/schema')
+    const tag = randomUUID().slice(0, 8)
+    const spaceId = await aSpace(tag)
+    const first = await aCompany(`Alpha ${tag}`, spaceId)
+    const second = await aCompany(`Beta ${tag}`, spaceId)
+
+    const doc = await fileAgainstRecord(
+      first,
+      `shared-${tag}.pdf`,
+      await aBlob(tag),
+    )
+    await db.insert(link).values({
+      fromEntityId: doc,
+      toEntityId: second,
+      relation: 'tagged_in',
+      source: 'manual',
+      createdBy: await actorId(),
+    })
+
+    // Two edges, two rows — the company column is what tells them apart,
+    // and `link_edge_unique` is what stops a third.
+    const rows = await inheritedOf(spaceId)
+    expect(rows.map((r) => r.companyName)).toEqual([
+      `Alpha ${tag}`,
+      `Beta ${tag}`,
+    ])
+    expect(rows.every((r) => r.id === doc)).toBe(true)
+  })
+
+  it('drops a merged-away company and a merged-away document', async () => {
+    const { db } = await import('@spaces/db')
+    const { entity } = await import('@spaces/db/schema')
+    const { eq } = await import('drizzle-orm')
+    const tag = randomUUID().slice(0, 8)
+    const spaceId = await aSpace(tag)
+
+    const kept = await aCompany(`Kept ${tag}`, spaceId)
+    const merged = await aCompany(`Merged ${tag}`, spaceId)
+    const keptDoc = await fileAgainstRecord(
+      kept,
+      `kept-${tag}.pdf`,
+      await aBlob(`k-${tag}`),
+    )
+    const deadDoc = await fileAgainstRecord(
+      kept,
+      `dead-${tag}.pdf`,
+      await aBlob(`d-${tag}`),
+    )
+    await fileAgainstRecord(
+      merged,
+      `hidden-${tag}.pdf`,
+      await aBlob(`h-${tag}`),
+    )
+
+    await db
+      .update(entity)
+      .set({ mergedIntoId: kept })
+      .where(eq(entity.id, merged))
+    await db
+      .update(entity)
+      .set({ mergedIntoId: keptDoc })
+      .where(eq(entity.id, deadDoc))
+
+    expect((await inheritedOf(spaceId)).map((r) => r.id)).toEqual([keptDoc])
+  })
+
+  it('is empty for a space with no companies, and for companies with no documents', async () => {
+    const tag = randomUUID().slice(0, 8)
+    const spaceId = await aSpace(tag)
+    expect(await inheritedOf(spaceId)).toEqual([])
+
+    await aCompany(`Empty ${tag}`, spaceId)
+    expect(await inheritedOf(spaceId)).toEqual([])
+  })
+
+  it('does not reach a company that is not tagged into this space', async () => {
+    const tag = randomUUID().slice(0, 8)
+    const spaceId = await aSpace(tag)
+    const elsewhere = await aCompany(`Elsewhere ${tag}`)
+
+    await fileAgainstRecord(elsewhere, `deck-${tag}.pdf`, await aBlob(tag))
+
+    expect(await inheritedOf(spaceId)).toEqual([])
   })
 })

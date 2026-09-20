@@ -386,6 +386,7 @@ function SpacePage() {
           spaceId={spc.id}
           spaceName={spc.name}
           sources={spc.sources}
+          inherited={spc.inheritedSources}
         />
 
         {/* What I track here — the market map. Tracking is not evaluating:
