@@ -2015,7 +2015,7 @@ const TERMS: Array<TermSpec> = [
 
 type DocSpec = {
   filename: string
-  kind: 'deck' | 'memo' | 'dd' | 'cap_table' | 'legal' | 'article' | 'other'
+  kind: 'deck' | 'dd' | 'cap_table' | 'legal' | 'article' | 'other'
   attachTo: string
   days: number
   text: string

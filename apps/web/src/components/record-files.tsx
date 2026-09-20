@@ -319,7 +319,6 @@ function DocumentRow({
 const KIND_CODES: Record<string, string> = {
   deck: 'DCK',
   cap_table: 'CAP',
-  memo: 'MEM',
   dd: 'DD',
   legal: 'LGL',
 }
