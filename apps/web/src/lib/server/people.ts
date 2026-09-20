@@ -202,16 +202,6 @@ export const getPerson = createServerFn()
         ),
       )
 
-    const mentionedIn = await db
-      .select({
-        fromId: link.fromEntityId,
-        name: entity.canonicalName,
-        kind: entity.kind,
-      })
-      .from(link)
-      .innerJoin(entity, eq(entity.id, link.fromEntityId))
-      .where(and(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
-
     // Inbound record-references, grouped by the attribute that made them:
     // `deal.referred_by` (SPA-59) is the first, and any later attribute
     // pointing at a person joins it with no edit to the page.
@@ -236,7 +226,6 @@ export const getPerson = createServerFn()
       emails: aliases.filter((a) => a.kind === 'email'),
       linkedins: aliases.filter((a) => a.kind === 'linkedin'),
       companies,
-      mentionedIn,
       referencedBy,
       timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
     }

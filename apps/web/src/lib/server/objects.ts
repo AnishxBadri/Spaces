@@ -322,18 +322,6 @@ export const getObjectRecord = createServerFn()
     // The query is `referencedByRows` (server/shared.ts), shared with the
     // person page; this page renders it flat, unchanged.
     const referencedBy = await referencedByRows(data.id)
-    const mentionedIn = await db
-      .select({
-        fromId: link.fromEntityId,
-        name: entity.canonicalName,
-        kind: entity.kind,
-        objectSlug: objectDef.slug,
-      })
-      .from(link)
-      .innerJoin(entity, eq(entity.id, link.fromEntityId))
-      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
-      .where(andOp(eq(link.toEntityId, data.id), eq(link.relation, 'mentions')))
-
     const users = await db.select({ id: user.id, name: user.name }).from(user)
     const userNames = Object.fromEntries(users.map((u) => [u.id, u.name]))
 
@@ -356,7 +344,6 @@ export const getObjectRecord = createServerFn()
       },
       spaces,
       referencedBy,
-      mentionedIn,
       refNames: {
         ...Object.fromEntries(
           outRefs.map((r) => [

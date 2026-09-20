@@ -21,6 +21,7 @@ import {
   RecordHeader,
   RecordSection,
 } from '#/components/record/record-parts'
+import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordTimeline } from '#/components/record-timeline'
 import { Button } from '#/components/ui/button'
@@ -33,6 +34,7 @@ import {
   getObjectRecord,
   getRecordTimeline,
   listRecordDocuments,
+  listRecordNotes,
   listRegistry,
   listSpaces,
   tagIntoSpace,
@@ -61,24 +63,26 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
           recordId: record.mergedIntoId,
         },
       })
-    const [registry, timeline, documents, spaces] = await Promise.all([
+    const [registry, timeline, documents, spaces, notes] = await Promise.all([
       listRegistry({ data: { objectId: record.object.id } }),
       getRecordTimeline({ data: { entityId: record.id } }),
       listRecordDocuments({ data: { entityId: record.id } }),
       listSpaces(),
+      // A custom record is an entity like any other, so the lanes need only
+      // its id — the object slug is the page's, never the note row's.
+      listRecordNotes({ data: { entityId: record.id } }),
     ])
-    return { record, registry, timeline, documents, allSpaces: spaces }
+    return { record, registry, timeline, documents, allSpaces: spaces, notes }
   },
   component: ObjectRecordPage,
 })
 
 function ObjectRecordPage() {
-  const { record, registry, timeline, documents, allSpaces } =
+  const { record, registry, timeline, documents, allSpaces, notes } =
     Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const Icon = objectIcon(record.object)
-  const noteMentions = record.mentionedIn.filter((m) => m.kind === 'note')
   const untaggedSpaces = allSpaces.filter(
     (s) => !record.spaces.some((rs) => rs.id === s.id),
   )
@@ -143,7 +147,6 @@ function ObjectRecordPage() {
           { label: 'Object', value: record.object.singular, kind: 'text' },
           { label: 'Spaces', value: `${record.spaces.length}` },
           { label: 'Referenced by', value: `${record.referencedBy.length}` },
-          { label: 'Mentions', value: `${record.mentionedIn.length}` },
         ]}
       />
 
@@ -246,39 +249,6 @@ function ObjectRecordPage() {
                 })
               )}
             </RailSection>
-
-            <RailSection
-              label="Mentioned in"
-              meta={`${record.mentionedIn.length}`}
-            >
-              {record.mentionedIn.length === 0 ? (
-                <RailEmpty>Nowhere yet.</RailEmpty>
-              ) : (
-                record.mentionedIn.map((m) => {
-                  const href = recordPath({
-                    kind: m.kind,
-                    id: m.fromId,
-                    objectSlug: m.objectSlug,
-                  })
-                  return (
-                    <RailItem key={m.fromId}>
-                      {href ? (
-                        <Link
-                          to={href}
-                          className="focus-ring min-w-0 truncate hover:underline"
-                        >
-                          {m.name}
-                        </Link>
-                      ) : (
-                        <span className="min-w-0 truncate text-graphite">
-                          {m.name}
-                        </span>
-                      )}
-                    </RailItem>
-                  )
-                })
-              )}
-            </RailSection>
           </>
         }
       >
@@ -323,42 +293,12 @@ function ObjectRecordPage() {
           </PropertyCell>
         </PropertyGrid>
 
-        <RecordSection
-          label="Notes"
-          meta={`${noteMentions.length} note${noteMentions.length === 1 ? '' : 's'}`}
-          action={
-            <button
-              type="button"
-              onClick={newNoteAboutThis}
-              className="focus-ring text-primary hover:underline"
-            >
-              note about this ›
-            </button>
-          }
-        >
-          {noteMentions.length === 0 ? (
-            <p className="border-t border-rule py-2 text-label text-graphite">
-              No notes mention {record.name} yet. Write one — it links itself
-              here.
-            </p>
-          ) : (
-            <ol>
-              {noteMentions.map((m) => (
-                <li key={m.fromId} className="border-t border-rule">
-                  <Link
-                    to="/notes/$noteId"
-                    params={{ noteId: m.fromId }}
-                    className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
-                  >
-                    <span className="font-serif text-title font-medium">
-                      {m.name}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
-        </RecordSection>
+        <RecordNotes
+          recordName={record.name}
+          filed={notes.filed}
+          mentions={notes.mentions}
+          onNewNote={newNoteAboutThis}
+        />
 
         <RecordSection
           rule
