@@ -2459,7 +2459,10 @@ CSV, virtualization + keyboard-grid, kanban, drawer-over-table, Overview/Highlig
 - ~~**Space page shape** — sources and contacts sections.~~ Sources answered
   2026-09-14: documents file into spaces via `entity_space`. Contacts: people
   tagged into the space or reached through its companies, same collapsed
-  pattern; unbuilt.
+  pattern. Both built 2026-09-20 (roadmap project 7, SPA-44/67/99): a direct
+  ledger lane plus a closed disclosure for the inherited lane, headline counts
+  direct only; the person page gained the Spaces rail so the direct lane has a
+  writer.
 - **`object.kind` column** — one source of truth for "what machinery" so the
   code-only invariant (core entity kind ↔ object row) becomes structural and
   the first promotion is an `UPDATE`. Cheap now, painful after the first
