@@ -37,3 +37,27 @@ export const logInteraction = createServerFn({ method: 'POST' })
       throw new Error(interactionLogMessage(failure))
     }
   })
+
+const writeUpInteractionInput = z.object({
+  interactionId: z.string().uuid(),
+})
+
+/**
+ * Write up an interaction that was logged without a body (SPA-128) — the
+ * timeline row's "Write up" affordance. Idempotent: an interaction that
+ * already has a note answers with that note's id, so a double click lands
+ * in one editor rather than forking a second body.
+ */
+export const writeUpInteraction = createServerFn({ method: 'POST' })
+  .validator(writeUpInteractionInput)
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { writeUpInteractionProgram, writeUpMessage } =
+      await import('../interactions/write-up')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(writeUpInteractionProgram)(u.id, data.interactionId)
+    } catch (failure) {
+      throw new Error(writeUpMessage(failure))
+    }
+  })

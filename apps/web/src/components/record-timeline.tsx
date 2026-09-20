@@ -1,8 +1,11 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { optionLabel, refName } from './attributes/value-editor'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
+import { writeUpInteraction } from '#/lib/server-fns'
+import { stamp } from '#/lib/timeline/stamp'
 import { cn } from '#/lib/utils'
 import type { getRecordTimeline } from '#/lib/server-fns'
 
@@ -38,13 +41,6 @@ function burstActorLabel(item: {
   if (item.actorType === 'integration')
     return item.capabilityId ?? 'Unnamed integration'
   return item.source === 'merge' ? 'A merge' : 'System'
-}
-
-/** `MM-DD HH:MM` in the reader's clock — the ledger's time lane. */
-function stamp(iso: string): string {
-  const d = new Date(iso)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
 /**
@@ -142,33 +138,7 @@ export function RecordTimeline({
           )
         }
         if (item.type === 'interaction') {
-          return (
-            <Row key={item.id} at={item.at} type={item.kind} last={last}>
-              {/*
-                An interaction that was written up reads as a way in to its
-                note; one that was not reads exactly as it did before. The
-                treatment is `record-notes.tsx`'s own — pine, underline on
-                hover, the reticle for focus — so the two surfaces that point
-                at a note point at it the same way.
-              */}
-              {item.noteId ? (
-                <Link
-                  to="/notes/$noteId"
-                  params={{ noteId: item.noteId }}
-                  className="focus-ring text-primary hover:underline"
-                >
-                  {item.subject}
-                </Link>
-              ) : (
-                <span>{item.subject}</span>
-              )}
-              {item.attendees.length > 0 ? (
-                <span className="block mono text-micro text-graphite">
-                  {item.attendees.map((a) => a.name).join(' · ')}
-                </span>
-              ) : null}
-            </Row>
-          )
+          return <InteractionRow key={item.id} item={item} last={last} />
         }
         return (
           <AttrBurst
@@ -181,6 +151,73 @@ export function RecordTimeline({
         )
       })}
     </ul>
+  )
+}
+
+/**
+ * One interaction on the ledger, and its way in to a body.
+ *
+ * Two affordances, one treatment (SPA-128). A row that was written up opens
+ * its note; a row that was not — every row logged before SPA-123, every row
+ * a calendar or a mailbox will sync — writes one now and lands in the
+ * editor. The classes are the ones SPA-123 introduced here and
+ * `record-notes.tsx` uses: pine, underline on hover, the reticle for focus.
+ * No new visual vocabulary, and the pair is symmetric on purpose — the
+ * subject stays prose, and the one thing you can click is the one thing
+ * that goes to the note.
+ */
+function InteractionRow({
+  item,
+  last,
+}: {
+  item: Extract<Items[number], { type: 'interaction' }>
+  last: boolean
+}) {
+  const router = useRouter()
+  const [pending, setPending] = useState(false)
+
+  async function writeUp() {
+    setPending(true)
+    try {
+      const { noteId } = await writeUpInteraction({
+        data: { interactionId: item.id },
+      })
+      void router.invalidate()
+      await router.navigate({ to: '/notes/$noteId', params: { noteId } })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not write it up')
+      setPending(false)
+    }
+  }
+
+  return (
+    <Row at={item.at} type={item.kind} last={last}>
+      {/* Synced rows carry no subject at all; the affordance stands alone. */}
+      {item.subject ? <span>{item.subject}</span> : null}{' '}
+      {item.noteId ? (
+        <Link
+          to="/notes/$noteId"
+          params={{ noteId: item.noteId }}
+          className="focus-ring text-primary hover:underline"
+        >
+          Open note
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void writeUp()}
+          disabled={pending}
+          className="focus-ring text-primary hover:underline"
+        >
+          {pending ? 'Writing up…' : 'Write up'}
+        </button>
+      )}
+      {item.attendees.length > 0 ? (
+        <span className="block mono text-micro text-graphite">
+          {item.attendees.map((a) => a.name).join(' · ')}
+        </span>
+      ) : null}
+    </Row>
   )
 }
 

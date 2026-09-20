@@ -85,9 +85,15 @@ const query = <T>(run: () => Promise<T>) =>
 /**
  * The write-up, born before the interaction that claims it. The seed is the
  * first attendee, which is the one filing `createNoteProgram` itself writes;
- * the rest are added by the interaction's own transaction.
+ * the rest are added by the caller's own transaction.
+ *
+ * Exported for its second caller (SPA-128): `interactions/write-up.ts` fills
+ * `note_id` on an interaction that was logged without one, and a meeting
+ * written up that evening has to be born exactly the way one written up in
+ * the dialog is — same kind, same visibility, same `starter: false`, same
+ * `note.created` row. One helper, or the two paths drift.
  */
-const writeUpNote = Effect.fn('writeUpNote')(function* (
+export const writeUpNote = Effect.fn('writeUpNote')(function* (
   actorId: string,
   title: string,
   seed: string,
