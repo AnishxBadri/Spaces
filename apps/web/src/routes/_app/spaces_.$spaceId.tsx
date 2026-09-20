@@ -22,6 +22,7 @@ import {
   RecordHeader,
 } from '#/components/record/record-parts'
 import { SpaceGlossary } from '#/components/space-glossary'
+import { SpaceSources } from '#/components/space-sources'
 import { TagCompanyRow } from '#/components/space-tag-row'
 import { TasksRail } from '#/components/tasks-rail'
 import { SaveAsTemplateAction } from '#/components/templates'
@@ -209,6 +210,11 @@ function SpacePage() {
             tone: zero(spc.filed.length),
           },
           {
+            label: 'Sources',
+            value: `${spc.sources.length}`,
+            tone: zero(spc.sources.length),
+          },
+          {
             label: 'Terms',
             value:
               terms.length === ownTerms
@@ -372,6 +378,15 @@ function SpacePage() {
             </button>
           </LedgerRow>
         </LedgerSection>
+
+        {/* What I read here — the documents filed into this space. Sources
+            come before the market map on purpose: a space starts as a stack
+            of reading, and the companies are what falls out of it. */}
+        <SpaceSources
+          spaceId={spc.id}
+          spaceName={spc.name}
+          sources={spc.sources}
+        />
 
         {/* What I track here — the market map. Tracking is not evaluating:
             a company can sit here in no pipeline at all. */}
