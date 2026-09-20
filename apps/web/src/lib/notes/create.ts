@@ -1,3 +1,4 @@
+import type { NoteKind } from './ordering'
 import { Effect, Schema } from 'effect'
 import { db } from '@spaces/db'
 import { entity, entitySpace, link, note } from '@spaces/db/schema'
@@ -42,7 +43,7 @@ export type NoteAbout = {
 
 export type CreateNoteInput = {
   about: NoteAbout | null
-  noteKind: 'note' | 'memo'
+  noteKind: NoteKind
 }
 
 /** The sentence the client is shown; a `Schema.TaggedError` carries none. */
