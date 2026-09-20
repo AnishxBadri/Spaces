@@ -46,12 +46,17 @@ function stamp(iso: string): string {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-const VERB_LABELS: Record<string, string> = {
+/**
+ * Exported so a producer's new verb can be pinned to a label by a test
+ * rather than discovered as a raw `note.kind_changed` in the timeline.
+ */
+export const VERB_LABELS: Record<string, string> = {
   'record.created': 'created this record',
   'company.created': 'created this company',
   'person.created': 'created this person',
   'deal.created': 'created a deal',
   'note.created': 'wrote a note',
+  'note.kind_changed': 'changed a note’s kind',
   'document.filed': 'filed a document',
   'space.tagged': 'tagged into a space',
   'space.untagged': 'removed from a space',
@@ -59,12 +64,13 @@ const VERB_LABELS: Record<string, string> = {
   renamed: 'renamed this record',
 }
 
-const VERB_TYPES: Record<string, string> = {
+export const VERB_TYPES: Record<string, string> = {
   'record.created': 'born',
   'company.created': 'born',
   'person.created': 'born',
   'deal.created': 'deal',
   'note.created': 'note',
+  'note.kind_changed': 'note',
   'document.filed': 'file',
   'space.tagged': 'space',
   'space.untagged': 'space',

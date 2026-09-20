@@ -23,7 +23,7 @@ export const createNote = createServerFn({ method: 'POST' })
           })
           .optional(),
         /** memo: the note IS the memo of `about` (tagged_in, not mentions). */
-        noteKind: z.enum(['note', 'memo']).optional(),
+        noteKind: z.enum(['note', 'memo', 'scratch']).optional(),
       })
       .optional(),
   )
@@ -101,13 +101,19 @@ export const createNote = createServerFn({ method: 'POST' })
     })
   })
 
-export const listNotes = createServerFn().handler(async () => {
-  const u = await requireUser()
-  const rows = await db
+/**
+ * The query behind `listNotes`, minus the request context, so the rows can
+ * be exercised without a session — the same reason `entitySearchRows` exists.
+ * It has no kind predicate and must not grow one: a scratch note is a note
+ * that is listed like any other (SPA-109).
+ */
+export async function listNoteRows(userId: string) {
+  return db
     .select({
       id: note.entityId,
       title: note.title,
       bodyMd: note.bodyMd,
+      kind: note.kind,
       updatedAt: note.updatedAt,
       authorId: note.authorId,
       visibility: note.visibility,
@@ -118,14 +124,20 @@ export const listNotes = createServerFn().handler(async () => {
       and(
         isNull(entity.mergedIntoId),
         // canRead in SQL: shared, or private-and-mine.
-        or(eq(note.visibility, 'shared'), eq(note.authorId, u.id)),
+        or(eq(note.visibility, 'shared'), eq(note.authorId, userId)),
       ),
     )
     .orderBy(desc(note.updatedAt))
+}
+
+export const listNotes = createServerFn().handler(async () => {
+  const u = await requireUser()
+  const rows = await listNoteRows(u.id)
   return rows.map((r) => ({
     id: r.id,
     title: r.title || 'Untitled',
     snippet: r.bodyMd.replace(/\s+/g, ' ').slice(0, 140),
+    kind: r.kind,
     updatedAt: r.updatedAt.toISOString(),
     isPrivate: r.visibility === 'private',
   }))
@@ -141,6 +153,7 @@ export const getNote = createServerFn()
           id: note.entityId,
           title: note.title,
           bodyJson: note.bodyJson,
+          kind: note.kind,
           updatedAt: note.updatedAt,
           authorId: note.authorId,
           visibility: note.visibility,
@@ -173,6 +186,7 @@ export const getNote = createServerFn()
       id: row.id,
       title: row.title,
       bodyJson: row.bodyJson,
+      kind: row.kind,
       updatedAt: row.updatedAt.toISOString(),
       backlinks,
       spaces,
@@ -254,6 +268,35 @@ export const setNoteVisibility = createServerFn({ method: 'POST' })
       .set({ visibility: data.visibility, updatedAt: new Date() })
       .where(eq(note.entityId, data.id))
     return { ok: true }
+  })
+
+/**
+ * Kind is a promote or a demote of the same row — same entity, same links,
+ * same filing (CONTEXT.md → The note model: "a memo is a note with the flag
+ * up"). Deliberately *not* author-only, unlike visibility: a shared note's
+ * genre is the team's reading of it, so whoever may read it may change it.
+ *
+ * The typed failure is turned into a sentence here for the same reason the
+ * delete path does it — `Effect.runPromise` rejects with a
+ * `Schema.TaggedError`, which carries no `message`.
+ */
+export const setNoteKind = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      kind: z.enum(['note', 'memo', 'scratch']),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { setNoteKindProgram, noteKindMessage } =
+      await import('../notes/kind')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(setNoteKindProgram)(u.id, data.id, data.kind)
+    } catch (failure) {
+      throw new Error(noteKindMessage(failure))
+    }
   })
 
 const saveNoteInput = z.object({

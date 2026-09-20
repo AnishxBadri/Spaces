@@ -137,7 +137,12 @@ export const listSpaces = createServerFn().handler(async () => {
   return Effect.runPromise(listSpacesProgram(u.id))
 })
 
-const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
+/**
+ * Exported for the test that pins the lanes' contents — in particular that
+ * the `filed` lane carries a scratch note like any other (SPA-109). The
+ * server fn below is the only production caller.
+ */
+export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
   id: string,
   userId: string,
 ) {

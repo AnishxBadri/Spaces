@@ -16,8 +16,8 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { Segmented } from '#/components/ui/segmented'
 import { logInteraction, searchEntities } from '#/lib/server-fns'
-import { cn } from '#/lib/utils'
 import { useHotkey } from '#/lib/use-hotkey'
 
 /**
@@ -114,28 +114,16 @@ export function LogInteractionDialog({
           }}
         >
           {/* Segmented type: ink for the chosen one, a digit in each. */}
-          <div className="flex w-fit border border-hairline">
-            {(['call', 'meeting'] as const).map((k, i) => (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={kind === k}
-                onClick={() => setKind(k)}
-                className={cn(
-                  'focus-ring-inset flex h-7 items-center gap-2 px-3 text-label font-medium capitalize transition-colors',
-                  i > 0 && 'border-l border-hairline',
-                  kind === k
-                    ? 'bg-hairline text-paper'
-                    : 'text-foreground hover:bg-bone',
-                )}
-              >
-                {k}
-                <span className="mono text-micro font-normal opacity-70">
-                  {i + 1}
-                </span>
-              </button>
-            ))}
-          </div>
+          <Segmented
+            size="sm"
+            label="Interaction kind"
+            value={kind}
+            options={[
+              { id: 'call', label: 'Call', hint: '1' },
+              { id: 'meeting', label: 'Meeting', hint: '2' },
+            ]}
+            onChange={setKind}
+          />
 
           <div className="grid grid-cols-[minmax(0,1fr)_12rem] gap-4">
             <div className="space-y-1.5">

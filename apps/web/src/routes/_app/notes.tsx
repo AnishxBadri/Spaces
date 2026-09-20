@@ -146,6 +146,12 @@ function NoteLedgerRow({ note }: { note: NoteRow }) {
         <span className="min-w-0 flex-1 truncate text-ui text-graphite">
           {note.snippet || 'Empty so far'}
         </span>
+        {/* The kind lane: quiet, lowercase, and blank for the default — a
+            ledger says "memo" or "scratch" because those are the exceptions,
+            and prints nothing where there is nothing to say. */}
+        <span className="w-14 shrink-0 mono text-micro text-graphite">
+          {note.kind === 'note' ? '' : note.kind}
+        </span>
         <LedgerFigure tone="muted">{note.updatedAt.slice(5, 10)}</LedgerFigure>
       </Link>
     </LedgerRow>
