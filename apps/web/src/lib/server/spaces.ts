@@ -25,6 +25,7 @@ import {
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { jsonString } from '#/lib/json'
+import { filedNotesProgram } from '#/lib/notes/filed'
 import { createSpaceRow, requireUser } from './shared'
 
 // Spaces — first real write path through the entity core. The reads are
@@ -278,32 +279,10 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
   )
 
   // Filed: notes the user deliberately put in this space. No singleton —
-  // a space holds as many as its owner wants, and the "memo" is just the
-  // first one filed.
-  const filedRows = yield* query(() =>
-    db
-      .select({
-        id: note.entityId,
-        title: note.title,
-        bodyMd: note.bodyMd,
-        kind: note.kind,
-        updatedAt: note.updatedAt,
-      })
-      .from(entitySpace)
-      .innerJoin(note, eq(note.entityId, entitySpace.entityId))
-      .innerJoin(entity, eq(entity.id, note.entityId))
-      .where(
-        and(
-          eq(entitySpace.spaceId, id),
-          isNull(entity.mergedIntoId),
-          // canRead in SQL: private notes file into spaces like any other,
-          // but only their author sees them there.
-          or(eq(note.visibility, 'shared'), eq(note.authorId, userId)),
-        ),
-      )
-      .orderBy(desc(note.updatedAt)),
-  )
-  const filedIds = new Set(filedRows.map((f) => f.id))
+  // a space holds as many as its owner wants, and which one leads is the
+  // ordering's answer, not the schema's (see `lib/notes/filed`).
+  const filed = yield* filedNotesProgram(userId, id)
+  const filedIds = new Set(filed.map((f) => f.id))
 
   // Referenced: notes whose body happens to mention this space. A note
   // that is filed here too shows once, at the top — not in both lists.
@@ -347,17 +326,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
     })),
     companies,
     records,
-    filed: filedRows.map((f) => ({
-      id: f.id,
-      title: f.title,
-      kind: f.kind,
-      snippet: f.bodyMd
-        .replace(/Mentions:.*$/s, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 400),
-      updatedAt: f.updatedAt.toISOString(),
-    })),
+    filed,
     notes: mentions
       .filter((n) => !filedIds.has(n.id))
       .map((n) => ({
