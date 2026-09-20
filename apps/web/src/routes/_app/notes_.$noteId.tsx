@@ -18,6 +18,7 @@ import { KIND_ICONS, KIND_ROUTES } from '#/components/editor/mention'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { useConfirm } from '#/components/ui/confirm-dialog'
+import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
 import {
   deleteNote,
@@ -27,6 +28,7 @@ import {
   previewNoteDeletion,
   saveNote,
   saveNoteAsTemplate,
+  setNoteKind,
   setNoteVisibility,
   tagIntoSpace,
   untagFromSpace,
@@ -113,6 +115,7 @@ function NotePage() {
           Notes
         </Link>
         <span className="flex items-center gap-3">
+          <KindToggle noteId={initial.id} kind={initial.kind} />
           <span
             className="text-label text-graphite"
             role="status"
@@ -213,11 +216,63 @@ function NotePage() {
   )
 }
 
+/** The three kinds the enum holds, as `getNote` hands them over. */
+type NoteKind = Awaited<ReturnType<typeof getNote>>['kind']
+
 /**
- * Filing, not referencing. Mentioning a space in the body links to it;
- * filing says the note *lives* here, and puts it in the space's top block.
- * Same `entity_space` write a company tag makes — one mechanism per kind.
+ * Note · Memo · Scratch, in the head row beside the save state. Kind is
+ * presentation and intent, never structure (CONTEXT.md → The note model): a
+ * promote or a demote moves this one column and leaves every link, every
+ * space filing and the body exactly where they were.
+ *
+ * Not gated on `isMine`, unlike visibility beside it — a shared note's genre
+ * is the team's reading of it, and the server agrees.
  */
+function KindToggle({
+  noteId,
+  kind: initial,
+}: {
+  noteId: string
+  kind: NoteKind
+}) {
+  const router = useRouter()
+  const [kind, setKind] = useState(initial)
+  const [pending, setPending] = useState(false)
+
+  async function pick(next: NoteKind) {
+    if (next === kind || pending) return
+    const previous = kind
+    // Optimistic: the segment inks on the click, and rolls back if the
+    // server refuses — the alternative is a control that lags a round trip.
+    setKind(next)
+    setPending(true)
+    try {
+      await setNoteKind({ data: { id: noteId, kind: next } })
+      await router.invalidate()
+    } catch (e) {
+      setKind(previous)
+      toast.error(e instanceof Error ? e.message : 'Could not change that')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Segmented
+      size="sm"
+      label="Note kind"
+      value={kind}
+      disabled={pending}
+      options={[
+        { id: 'note', label: 'Note' },
+        { id: 'memo', label: 'Memo' },
+        { id: 'scratch', label: 'Scratch' },
+      ]}
+      onChange={(next) => void pick(next)}
+    />
+  )
+}
+
 /**
  * Author-only. Default is shared — private is the exception you opt into
  * (CONTEXT.md: notes private-by-default is the trap that keeps partner #2
@@ -273,6 +328,11 @@ function VisibilityToggle({
   )
 }
 
+/**
+ * Filing, not referencing. Mentioning a space in the body links to it;
+ * filing says the note *lives* here, and puts it in the space's top block.
+ * Same `entity_space` write a company tag makes — one mechanism per kind.
+ */
 function SpaceFiling({
   noteId,
   filed,

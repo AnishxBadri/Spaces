@@ -32,6 +32,7 @@ import {
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
+import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
 import type { SelectItem } from '#/components/ui/select'
 import { ConfirmDialog } from '#/components/ui/confirm-dialog'
@@ -996,41 +997,6 @@ function CheckRow({
         <span className="text-ui">{label}</span>
         {hint ? <span className="text-label text-graphite">{hint}</span> : null}
       </label>
-    </div>
-  )
-}
-
-function Segmented({
-  value,
-  options,
-  onChange,
-}: {
-  value: string
-  options: Array<{ id: string; label: string }>
-  onChange: (id: string) => void
-}) {
-  return (
-    <div
-      role="radiogroup"
-      className="flex h-8 w-fit items-center border border-hairline"
-    >
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          role="radio"
-          aria-checked={value === o.id}
-          onClick={() => onChange(o.id)}
-          className={cn(
-            'focus-ring-inset h-full px-2.5 text-ui font-medium transition-colors duration-150 ease-out-quart',
-            value === o.id
-              ? 'bg-hairline text-paper'
-              : 'text-graphite hover:bg-bone hover:text-foreground',
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
     </div>
   )
 }
