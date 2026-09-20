@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { AtSign, Linkedin, X } from 'lucide-react'
+import { AtSign, Layers, Linkedin, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
@@ -39,21 +39,32 @@ import {
   listRecordDocuments,
   listRecordNotes,
   listRegistry,
+  listSpaces,
   setPersonCompany,
+  tagIntoSpace,
+  untagFromSpace,
   updateRecord,
 } from '#/lib/server-fns'
 
 export const Route = createFileRoute('/_app/people_/$personId')({
   loader: async ({ params }) => {
-    const [personData, companies, registry, timeline, documents, notes] =
-      await Promise.all([
-        getPerson({ data: { id: params.personId } }),
-        listCompanies(),
-        listRegistry({ data: { kind: 'person' } }),
-        getRecordTimeline({ data: { entityId: params.personId } }),
-        listRecordDocuments({ data: { entityId: params.personId } }),
-        listRecordNotes({ data: { entityId: params.personId } }),
-      ])
+    const [
+      personData,
+      companies,
+      spaces,
+      registry,
+      timeline,
+      documents,
+      notes,
+    ] = await Promise.all([
+      getPerson({ data: { id: params.personId } }),
+      listCompanies(),
+      listSpaces(),
+      listRegistry({ data: { kind: 'person' } }),
+      getRecordTimeline({ data: { entityId: params.personId } }),
+      listRecordDocuments({ data: { entityId: params.personId } }),
+      listRecordNotes({ data: { entityId: params.personId } }),
+    ])
     if (personData.mergedIntoId) {
       throw redirect({
         to: '/people/$personId',
@@ -63,6 +74,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
     return {
       person: personData,
       allCompanies: companies,
+      allSpaces: spaces,
       registry,
       timeline,
       documents,
@@ -73,13 +85,23 @@ export const Route = createFileRoute('/_app/people_/$personId')({
 })
 
 function PersonRecordPage() {
-  const { person, allCompanies, registry, timeline, documents, notes } =
-    Route.useLoaderData()
+  const {
+    person,
+    allCompanies,
+    allSpaces,
+    registry,
+    timeline,
+    documents,
+    notes,
+  } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
 
   const unlinkedCompanies = allCompanies.filter(
     (c) => !person.companies.some((pc) => pc.id === c.id),
+  )
+  const untaggedSpaces = allSpaces.filter(
+    (s) => !person.spaces.some((ps) => ps.id === s.id),
   )
 
   async function newNoteAboutThis() {
@@ -223,6 +245,63 @@ function PersonRecordPage() {
                   placeholder="+ Link to company…"
                   searchPlaceholder="Search companies…"
                   emptyLabel="No company matches."
+                  className="mt-1 h-7 rounded-none bg-paper px-2 text-label text-graphite"
+                />
+              ) : null}
+            </RailSection>
+
+            {/* Spaces (SPA-99). The same rail the company and custom-record
+                pages carry, on the same two server fns — and the writer the
+                space page's Contacts section had been missing: `entity_space`
+                always took a person, but nothing in the UI could write one,
+                so the direct lane could never fill. */}
+            <RailSection label="Spaces" meta={`${person.spaces.length}`}>
+              {person.spaces.map((s) => (
+                <RailItem key={s.id} className="group">
+                  <Layers
+                    className="size-3.5 shrink-0 text-graphite"
+                    strokeWidth={1.75}
+                  />
+                  <Link
+                    to="/spaces/$spaceId"
+                    params={{ spaceId: s.id }}
+                    className="focus-ring min-w-0 flex-1 truncate hover:underline"
+                  >
+                    {s.name}
+                  </Link>
+                  <button
+                    aria-label={`Remove from ${s.name}`}
+                    onClick={async () => {
+                      await untagFromSpace({
+                        data: { entityId: person.id, spaceId: s.id },
+                      })
+                      void router.invalidate()
+                    }}
+                    className="focus-ring hidden size-5 items-center justify-center text-graphite group-hover:flex hover:text-foreground focus-visible:flex"
+                  >
+                    <X className="size-3" strokeWidth={2} />
+                  </button>
+                </RailItem>
+              ))}
+              {untaggedSpaces.length > 0 ? (
+                <Select
+                  aria-label="Tag into space"
+                  value=""
+                  onChange={async (spaceId) => {
+                    await tagIntoSpace({
+                      data: { entityId: person.id, spaceId },
+                    })
+                    void router.invalidate()
+                  }}
+                  items={untaggedSpaces.map((s) => ({
+                    value: s.id,
+                    label: s.name,
+                    depth: s.depth,
+                  }))}
+                  width="content"
+                  placeholder="+ Tag into space…"
+                  searchPlaceholder="Search spaces…"
+                  emptyLabel="No space matches."
                   className="mt-1 h-7 rounded-none bg-paper px-2 text-label text-graphite"
                 />
               ) : null}

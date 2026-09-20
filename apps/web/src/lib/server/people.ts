@@ -2,7 +2,14 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, entityAlias, link, person } from '@spaces/db/schema'
+import {
+  entity,
+  entityAlias,
+  entitySpace,
+  link,
+  person,
+  space,
+} from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from '../entities/resolve'
 import { jsonString } from '#/lib/json'
@@ -202,6 +209,22 @@ export const getPerson = createServerFn()
         ),
       )
 
+    // Spaces this person is tagged into (SPA-99). `entity_space` always
+    // accepted any kind, but until this slice only the company and custom
+    // record pages had a rail to write one — so the space page's Contacts
+    // section had no writer and its direct lane could never fill. Same
+    // query as `getCompany`'s, same two server fns on the rail.
+    const spaces = await db
+      .select({
+        id: space.entityId,
+        name: entity.canonicalName,
+        source: entitySpace.source,
+      })
+      .from(entitySpace)
+      .innerJoin(space, eq(space.entityId, entitySpace.spaceId))
+      .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(eq(entitySpace.entityId, data.id))
+
     // Inbound record-references, grouped by the attribute that made them:
     // `deal.referred_by` (SPA-59) is the first, and any later attribute
     // pointing at a person joins it with no edit to the page.
@@ -226,6 +249,7 @@ export const getPerson = createServerFn()
       emails: aliases.filter((a) => a.kind === 'email'),
       linkedins: aliases.filter((a) => a.kind === 'linkedin'),
       companies,
+      spaces,
       referencedBy,
       timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
     }
