@@ -6,20 +6,11 @@ import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
 import { Button } from './ui/button'
 import { useConfirm } from './ui/confirm-dialog'
 import { DocumentPreview } from './document-preview'
-import {
-  DOCUMENT_KIND_LABELS,
-  MAX_UPLOAD_BYTES,
-  formatBytes,
-  guessDocumentKind,
-} from '@spaces/core/documents'
+import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import { formatSince } from '@spaces/core/format'
 import type { SpaceSource } from '#/lib/documents/space-sources'
-import {
-  deleteDocument,
-  finalizeDocumentUpload,
-  getDocumentDownloadUrl,
-  prepareDocumentUpload,
-} from '#/lib/server-fns'
+import { uploadDocument } from '#/lib/documents/upload'
+import { deleteDocument, getDocumentDownloadUrl } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
@@ -32,10 +23,9 @@ import { cn } from '#/lib/utils'
  * What is shared is the upload path, which is the same four steps the Files
  * tab takes: hash in the browser, ask for a URL, PUT straight at storage,
  * then file the row — with `fileAgainst: {kind:'space'}`, so the edge is
- * `entity_space` and never `link(tagged_in)` (SPA-19). `uploadToSpace` and
- * `sha256Hex` below deliberately mirror `record-files.tsx` line for line;
- * SPA-71 hoists both into one module, and until it does, two readable copies
- * beat one premature abstraction.
+ * `entity_space` and never `link(tagged_in)` (SPA-19). Those four steps are
+ * `uploadDocument` in `#/lib/documents/upload.ts` since SPA-71; this file and
+ * the Files tab are its two callers, and the union is all that differs.
  */
 
 /** In-flight uploads, shown above the filed rows. */
@@ -77,7 +67,14 @@ export function SpaceSources({
       const setPhase = (phase: Pending['phase']) =>
         setPending((p) => p.map((x) => (x.key === key ? { ...x, phase } : x)))
       try {
-        await uploadToSpace(file, spaceId, setPhase)
+        await uploadDocument({
+          file,
+          // The one line that differs from the Files tab: a space is filed
+          // *into*, through `entity_space`, so the target says `space` and
+          // the writer picks the other edge table (SPA-19).
+          fileAgainst: { kind: 'space', entityId: spaceId },
+          onPhase: setPhase,
+        })
         setPending((p) => p.filter((x) => x.key !== key))
         void router.invalidate()
       } catch (err) {
@@ -370,80 +367,4 @@ function useExtractionPolling(
     }, 2500)
     return () => clearTimeout(timer)
   }, [waiting, attempts, router])
-}
-
-// ---------- upload ----------
-
-/**
- * The Files tab's `uploadOne`, with `fileAgainst: {kind:'space'}`. Kept a
- * copy on purpose: SPA-71 hoists this and `record-files.tsx`'s twin into one
- * module, and doing it here would mean editing a file two other slices are
- * open in.
- */
-async function uploadToSpace(
-  file: File,
-  spaceId: string,
-  setPhase: (phase: Pending['phase']) => void,
-): Promise<void> {
-  if (file.size === 0) throw new Error('File is empty')
-  if (file.size > MAX_UPLOAD_BYTES) {
-    throw new Error(`Larger than the ${formatBytes(MAX_UPLOAD_BYTES)} limit`)
-  }
-
-  setPhase('hashing')
-  const sha = await sha256Hex(file)
-
-  const { uploadUrl, uploadHeaders } = await prepareDocumentUpload({
-    data: { sha, sizeBytes: file.size },
-  })
-
-  if (uploadUrl) {
-    setPhase('uploading')
-    // uploadHeaders carry the S3 checksum condition when that driver is
-    // live — the signature breaks without them. Empty for local.
-    const response = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: file,
-      headers: uploadHeaders,
-    })
-    if (!response.ok) {
-      throw new Error((await response.text()) || 'Storage rejected the upload')
-    }
-  }
-
-  setPhase('filing')
-  await finalizeDocumentUpload({
-    data: {
-      sha,
-      filename: file.name,
-      mime: file.type || null,
-      sizeBytes: file.size,
-      kind: guessDocumentKind(file.name),
-      // The one line that differs from the Files tab: a space is filed
-      // *into*, through `entity_space`, so the target says `space` and the
-      // writer picks the other edge table (SPA-19).
-      fileAgainst: { kind: 'space', entityId: spaceId },
-    },
-  })
-}
-
-/**
- * Keys are content addresses, so the browser has to compute one before it
- * can be handed an upload URL. crypto.subtle only exists in a secure
- * context — which the app already requires for its own Secure cookies, so
- * say that plainly instead of failing with "undefined is not a function".
- */
-async function sha256Hex(file: File): Promise<string> {
-  // The DOM types promise crypto.subtle unconditionally; an insecure context
-  // does not, and that's exactly the case worth reporting well.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!globalThis.crypto?.subtle) {
-    throw new Error(
-      'Uploads need a secure context — serve the app over HTTPS or on localhost',
-    )
-  }
-  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
-  return [...new Uint8Array(digest)]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
 }

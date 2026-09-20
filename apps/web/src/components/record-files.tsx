@@ -22,24 +22,21 @@ import { KIND_ICONS } from './editor/mention'
 import {
   DOCUMENT_KINDS,
   DOCUMENT_KIND_LABELS,
-  MAX_UPLOAD_BYTES,
   formatBytes,
-  guessDocumentKind,
 } from '@spaces/core/documents'
 import { formatDurationMs, formatSince } from '@spaces/core/format'
 import {
   deleteDocument,
   fileDocument,
-  finalizeDocumentUpload,
   getDocumentDownloadUrl,
   listSpaces,
-  prepareDocumentUpload,
   reExtractDocument,
   searchEntities,
   setDocumentKind,
   unfileDocument,
 } from '#/lib/server-fns'
 import type { listRecordDocuments } from '#/lib/server-fns'
+import { uploadDocument } from '#/lib/documents/upload'
 import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
 
@@ -93,7 +90,14 @@ export function RecordFiles({
       const setPhase = (phase: Pending['phase']) =>
         setPending((p) => p.map((x) => (x.key === key ? { ...x, phase } : x)))
       try {
-        await uploadOne(file, entityId, setPhase)
+        await uploadDocument({
+          file,
+          // The Files tab is a record surface: every one of its four routes
+          // (company, person, deal, custom record) files through
+          // `link(tagged_in)`.
+          fileAgainst: { kind: 'record', entityId },
+          onPhase: setPhase,
+        })
         setPending((p) => p.filter((x) => x.key !== key))
         void router.invalidate()
       } catch (err) {
@@ -782,75 +786,4 @@ function useExtractionPolling(
     }, 2500)
     return () => clearTimeout(timer)
   }, [waiting, attempts, router])
-}
-
-// ---------- upload ----------
-
-async function uploadOne(
-  file: File,
-  entityId: string,
-  setPhase: (phase: Pending['phase']) => void,
-): Promise<void> {
-  if (file.size === 0) throw new Error('File is empty')
-  if (file.size > MAX_UPLOAD_BYTES) {
-    throw new Error(`Larger than the ${formatBytes(MAX_UPLOAD_BYTES)} limit`)
-  }
-
-  setPhase('hashing')
-  const sha = await sha256Hex(file)
-
-  const { uploadUrl, uploadHeaders } = await prepareDocumentUpload({
-    data: { sha, sizeBytes: file.size },
-  })
-
-  if (uploadUrl) {
-    setPhase('uploading')
-    // uploadHeaders carry the S3 checksum condition when that driver is
-    // live — the signature breaks without them. Empty for local.
-    const response = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: file,
-      headers: uploadHeaders,
-    })
-    if (!response.ok) {
-      throw new Error((await response.text()) || 'Storage rejected the upload')
-    }
-  }
-
-  setPhase('filing')
-  await finalizeDocumentUpload({
-    data: {
-      sha,
-      filename: file.name,
-      mime: file.type || null,
-      sizeBytes: file.size,
-      kind: guessDocumentKind(file.name),
-      // The Files tab is a record surface: every one of its four routes
-      // (company, person, deal, custom record) files through
-      // `link(tagged_in)`. A space files the other way and has no Files tab
-      // yet — that surface is docsurf-1b's.
-      fileAgainst: { kind: 'record', entityId },
-    },
-  })
-}
-
-/**
- * Keys are content addresses, so the browser has to compute one before it
- * can be handed an upload URL. crypto.subtle only exists in a secure
- * context — which the app already requires for its own Secure cookies, so
- * say that plainly instead of failing with "undefined is not a function".
- */
-async function sha256Hex(file: File): Promise<string> {
-  // The DOM types promise crypto.subtle unconditionally; an insecure context
-  // does not, and that's exactly the case worth reporting well.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!globalThis.crypto?.subtle) {
-    throw new Error(
-      'Uploads need a secure context — serve the app over HTTPS or on localhost',
-    )
-  }
-  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
-  return [...new Uint8Array(digest)]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
 }
