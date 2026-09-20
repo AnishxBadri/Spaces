@@ -114,6 +114,8 @@ async function buildDemoNote(tag: string) {
   ])
 
   // The exported-memo PDF: a document whose only tie to the note is the edge.
+  // `other` and not a `memo` kind — document_kind lost that label (SPA-25);
+  // the `derived_from` edge below is what says this PDF is the memo.
   const [doc] = await db
     .insert(entity)
     .values({ kind: 'document', canonicalName: `teardown-${tag}.pdf` })
@@ -122,7 +124,7 @@ async function buildDemoNote(tag: string) {
     entityId: doc.id,
     blobSha: 'a'.repeat(64),
     filename: `teardown-${tag}.pdf`,
-    kind: 'memo',
+    kind: 'other',
     sourceClass: 'manual',
     extractedText: `The ${BODY_WORD} is the whole thesis.`,
     tsv: sql`to_tsvector('english', ${`The ${BODY_WORD} is the whole thesis.`})`,

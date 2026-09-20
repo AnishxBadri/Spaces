@@ -143,9 +143,15 @@ export const note = pgTable('note', {
 
 // ---------- document (uploads, decks, and clipped URLs — sources ARE documents) ----------
 
+/**
+ * Six, not seven: `memo` was dropped 2026-09-20 (SPA-25,
+ * spec-storage-sources §11 delta 3). It collided with `note_kind = 'memo'`
+ * while meaning something else — an exported memo PDF is a document that is
+ * `derived_from` a note, a provenance edge, not a genre of file. Existing
+ * rows were mapped to `other` by migration 0037.
+ */
 export const documentKind = pgEnum('document_kind', [
   'deck',
-  'memo',
   'dd',
   'cap_table',
   'legal',

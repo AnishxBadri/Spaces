@@ -10,10 +10,16 @@
  */
 export const MAX_UPLOAD_BYTES = 250 * 1024 * 1024
 
-/** Mirrors the document_kind enum. */
+/**
+ * Mirrors the document_kind enum — six, not seven. `memo` was dropped
+ * 2026-09-20 (SPA-25, spec-storage-sources §11 delta 3): it collided with
+ * `note.kind = 'memo'` while meaning something else. An exported memo PDF is
+ * a document that is `derived_from` a note — a provenance edge, which
+ * link_relation already carries — not a genre of file. Anything that reads
+ * like a memo now files as `other` and earns its meaning from the edge.
+ */
 export const DOCUMENT_KINDS = [
   'deck',
-  'memo',
   'dd',
   'cap_table',
   'legal',
@@ -25,7 +31,6 @@ export type DocumentKind = (typeof DOCUMENT_KINDS)[number]
 
 export const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
   deck: 'Deck',
-  memo: 'Memo',
   dd: 'Diligence',
   cap_table: 'Cap table',
   legal: 'Legal',
@@ -38,7 +43,7 @@ export function guessDocumentKind(filename: string): DocumentKind {
   const name = filename.toLowerCase()
   if (/\bdeck\b|pitch|\.pptx?$/.test(name)) return 'deck'
   if (/cap[\s_-]?table|captable/.test(name)) return 'cap_table'
-  if (/\bmemo\b/.test(name)) return 'memo'
+  // No `memo` branch: an exported memo is `other` plus a derived_from edge.
   if (/\bdd\b|diligence|data[\s_-]?room/.test(name)) return 'dd'
   if (/\bsafe\b|\bsha\b|term[\s_-]?sheet|agreement|\bnda\b/.test(name))
     return 'legal'
