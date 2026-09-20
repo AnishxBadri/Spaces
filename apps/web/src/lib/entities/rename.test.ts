@@ -42,7 +42,7 @@ describe('renaming a record', () => {
   it('keeps a company findable by the name it used to have', async () => {
     const { renameRecordProgram } = await import('./rename')
     const { resolveEntity } = await import('./resolve')
-    const { entitySearchRows } = await import('../server/search')
+    const { entitySearchRows } = await import('../search/rows')
     const { normalizeName } = await import('@spaces/core/entities/normalize')
     const { Effect } = await import('effect')
     const tag = randomUUID().slice(0, 8)
@@ -88,7 +88,7 @@ describe('renaming a record', () => {
     const { renameRecordProgram } = await import('./rename')
     const { createObjectProgram, createRecordProgram } =
       await import('../attributes/object-registry')
-    const { entitySearchRows } = await import('../server/search')
+    const { entitySearchRows } = await import('../search/rows')
     const { normalizeName } = await import('@spaces/core/entities/normalize')
     const { Effect } = await import('effect')
     const tag = randomUUID().slice(0, 8)
@@ -161,7 +161,7 @@ describe('renaming a record', () => {
 
 describe('the dedupe card — "Also seen as"', () => {
   it('never lists the record’s own current name', async () => {
-    const { entityContext } = await import('../server/inbox')
+    const { entityContext } = await import('../inbox/context')
     const { resolveEntity } = await import('./resolve')
     const { renameRecordProgram } = await import('./rename')
     const { normalizeName } = await import('@spaces/core/entities/normalize')

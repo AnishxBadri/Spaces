@@ -39,18 +39,13 @@ export async function requireAdmin() {
 }
 
 /**
- * canRead, as a predicate. Policy is deliberately trivial (2026-08): shared
- * unless private-and-not-yours. Private applies to note bodies (and later
- * interaction bodies) only. The point of the choke point is that it exists
- * — every read path routes through it before any richer policy needs it.
+ * `canRead` and `provenanceOf` take no request context, so they live outside
+ * `lib/server/` where the helpers that need them can import them without
+ * dragging `getRequest` into the client bundle (SPA-155). Re-exported here so
+ * the server-fn modules keep importing them from where they always did.
  */
-export function canRead(
-  user: { id: string },
-  row: { visibility?: string | null; authorId?: string | null },
-): boolean {
-  if (row.visibility !== 'private') return true
-  return row.authorId === user.id
-}
+export { canRead } from '#/lib/notes/visibility'
+export { provenanceOf } from '#/lib/entities/provenance'
 
 /** ltree labels: [a-z0-9_] only. */
 export function toLabel(name: string): string {
@@ -168,42 +163,6 @@ export async function lastTouchedMap(): Promise<
   return Object.fromEntries(
     rows.map((r) => [r.entityId, new Date(r.last).toISOString()]),
   )
-}
-
-/**
- * Who wrote a record, resolved to a word a reader recognises.
- *
- * The class alone is only half an answer for one of the eight values:
- * "integration" names no integration. `source_ref` is the other half, and
- * it is exactly the row the operator installed, so the label for a plugin
- * write is its capability id — "apollo", the word on the Integrations page
- * — and for the other seven classes it is the class itself. The left join
- * is a left join because a non-integration row's ref is null by
- * construction; `entity_source_ref_invariant` is what makes that a fact and
- * not a habit.
- *
- * Here rather than beside its one caller because `src/lib/server-fns.ts`
- * re-exports the domain files wholesale to the client (CLAUDE.md) and this
- * is a server helper, not a serverFn — which is also what makes it
- * directly testable.
- */
-export async function provenanceOf(entityId: string): Promise<{
-  sourceClass: SourceClass
-  sourceCapability: string | null
-  label: string
-}> {
-  const row = (
-    await db
-      .select({
-        sourceClass: entity.sourceClass,
-        sourceCapability: integration.capabilityId,
-      })
-      .from(entity)
-      .leftJoin(integration, eq(integration.id, entity.sourceRef))
-      .where(eq(entity.id, entityId))
-  ).at(0)
-  if (!row) throw new Error('Entity not found')
-  return { ...row, label: row.sourceCapability ?? row.sourceClass }
 }
 
 /** One inbound `references` edge: the record pointing here, and its labels. */

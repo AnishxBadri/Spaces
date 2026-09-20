@@ -223,7 +223,10 @@ anyway. Don't re-litigate it from the flag list.
 
 - `apps/web/src/lib/server-fns.ts` is a **client-imported barrel**: serverFns + types
   only. Server-side helpers go in `server/shared.ts` (that's why
-  `birthHolding` lives there).
+  `birthHolding` lives there). A plain export from a `lib/server/*.ts` module
+  the barrel re-exports ships to the browser — only `createServerFn().handler()`
+  bodies are stripped — so a helper a test needs to call without a request
+  lives outside `lib/server/` (SPA-155).
 - **Never use `Intl.NumberFormat` compact notation** — Node vs Chrome output
   differs → hydration failures. `fmtMoney` hand-rolls compact; use it.
 - Radix `asChild` with a custom trigger component: forward `{...props}` or the

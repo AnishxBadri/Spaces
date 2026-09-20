@@ -99,7 +99,7 @@ async function readTemplate(templateId: string) {
 describe('note template kind', () => {
   it('captures the source note’s kind and stamps a note of that kind', async () => {
     const { captureNoteTemplate, stampNoteTemplate } =
-      await import('./templates')
+      await import('#/lib/notes/templates')
     const tag = randomUUID().slice(0, 8)
     const me = await actorId()
     const memoId = await makeNote({ tag, authorId: me, kind: 'memo' })
@@ -120,7 +120,7 @@ describe('note template kind', () => {
 
   it('captures scratch and plain note the same way', async () => {
     const { captureNoteTemplate, stampNoteTemplate } =
-      await import('./templates')
+      await import('#/lib/notes/templates')
     const me = await actorId()
     for (const kind of ['note', 'scratch'] as const) {
       const tag = randomUUID().slice(0, 8)
@@ -138,7 +138,7 @@ describe('note template kind', () => {
   it('stamps a plain note from a template saved before the column', async () => {
     const { db } = await import('@spaces/db')
     const { template } = await import('@spaces/db/schema/templates')
-    const { stampNoteTemplate } = await import('./templates')
+    const { stampNoteTemplate } = await import('#/lib/notes/templates')
     const tag = randomUUID().slice(0, 8)
     const me = await actorId()
 
@@ -164,7 +164,7 @@ describe('note template kind', () => {
     const { company, entity, link } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
     const { captureNoteTemplate, stampNoteTemplate } =
-      await import('./templates')
+      await import('#/lib/notes/templates')
     const tag = randomUUID().slice(0, 8)
     const me = await actorId()
 

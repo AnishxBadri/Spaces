@@ -1,10 +1,16 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, entityAlias, link, objectDef } from '@spaces/db/schema'
+import { entity, link, objectDef } from '@spaces/db/schema'
 import { requireUser } from './shared'
 
+/**
+ * The validator stays here rather than beside the query in
+ * `lib/search/rows.ts`: a server fn's `.validator()` survives into the client
+ * bundle, and that module imports `db` (SPA-155). `rows.ts` takes the
+ * inferred type, which is erased.
+ */
 const entitySearchInput = z.object({
   q: z.string().max(120),
   kinds: z
@@ -16,52 +22,12 @@ const entitySearchInput = z.object({
 
 export type EntitySearchInput = z.infer<typeof entitySearchInput>
 
-/**
- * The query behind `searchEntities`, minus the request context, so it can
- * be exercised without a session — which is how SPA-63 pins that a renamed
- * record is still reachable by its previous name.
- */
-export async function entitySearchRows(
-  userId: string,
-  data: EntitySearchInput,
-) {
-  const q = data.q.trim()
-  if (!q) return []
-  const pattern = `%${q}%`
-  return db
-    .selectDistinctOn([entity.id], {
-      id: entity.id,
-      name: entity.canonicalName,
-      kind: entity.kind,
-      // Custom records route through their object's slug; core kinds
-      // carry it too, harmlessly.
-      objectSlug: objectDef.slug,
-    })
-    .from(entity)
-    .leftJoin(entityAlias, eq(entityAlias.entityId, entity.id))
-    .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
-    .where(
-      and(
-        isNull(entity.mergedIntoId),
-        data.objectId
-          ? eq(entity.objectId, data.objectId)
-          : data.kinds
-            ? inArray(entity.kind, data.kinds)
-            : ne(entity.kind, 'document'),
-        // canRead at the SQL layer: a private note's title must not
-        // surface in anyone else's autocomplete.
-        sql`not exists (select 1 from note pn where pn.entity_id = ${entity.id} and pn.visibility = 'private' and pn.author_id <> ${userId})`,
-        sql`(${entity.canonicalName} ilike ${pattern} or (${entityAlias.kind} = 'name' and ${entityAlias.valueNorm} ilike ${pattern}))`,
-      ),
-    )
-    .limit(8)
-}
-
 /** Autocomplete over entities — mentions and reference pickers share it. */
 export const searchEntities = createServerFn()
   .validator(entitySearchInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
+    const { entitySearchRows } = await import('#/lib/search/rows')
     return entitySearchRows(u.id, data)
   })
 

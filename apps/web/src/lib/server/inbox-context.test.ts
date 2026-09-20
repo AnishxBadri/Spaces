@@ -25,7 +25,7 @@ async function actorId(): Promise<string> {
 describe('entityContext — the noun and the link', () => {
   it('reads a core company as its registry row, not as its kind', async () => {
     const { resolveEntity } = await import('#/lib/entities/resolve')
-    const { entityContext } = await import('./inbox')
+    const { entityContext } = await import('#/lib/inbox/context')
     const { recordPath } = await import('#/lib/record-path')
 
     const co = await resolveEntity({
@@ -44,7 +44,7 @@ describe('entityContext — the noun and the link', () => {
     const { Effect } = await import('effect')
     const { createObjectProgram, createRecordProgram } =
       await import('#/lib/attributes/object-registry')
-    const { entityContext } = await import('./inbox')
+    const { entityContext } = await import('#/lib/inbox/context')
     const { recordPath } = await import('#/lib/record-path')
 
     const actor = await actorId()
@@ -74,7 +74,7 @@ describe('entityContext — the noun and the link', () => {
   it('answers null for a kind with no object row, and no page', async () => {
     const { db } = await import('@spaces/db')
     const { entity } = await import('@spaces/db/schema')
-    const { entityContext } = await import('./inbox')
+    const { entityContext } = await import('#/lib/inbox/context')
     const { recordPath } = await import('#/lib/record-path')
 
     // A research kind: no object row to join, so no noun and no route. The
@@ -103,7 +103,7 @@ describe('entityContext — the colliding side still shows its domain', () => {
     const { Effect } = await import('effect')
     const { createObjectProgram, createRecordProgram } =
       await import('#/lib/attributes/object-registry')
-    const { entityContext } = await import('./inbox')
+    const { entityContext } = await import('#/lib/inbox/context')
 
     const actor = await actorId()
     const object = await Effect.runPromise(
@@ -148,7 +148,7 @@ describe('entityContext — the colliding side still shows its domain', () => {
 
   it('leaves a core company pair reading its aliases, not a fallback', async () => {
     const { resolveEntity } = await import('#/lib/entities/resolve')
-    const { entityContext } = await import('./inbox')
+    const { entityContext } = await import('#/lib/inbox/context')
 
     const co = await resolveEntity({
       kind: 'company',
