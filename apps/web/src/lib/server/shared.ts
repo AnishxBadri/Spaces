@@ -1,5 +1,5 @@
 import { getRequest } from '@tanstack/react-start/server'
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { auth } from '../auth'
 import { db } from '@spaces/db'
 import {
@@ -321,11 +321,95 @@ export async function documentProvenance(
 }
 
 /**
- * The rows a filed document is made of — entity, document, the `tagged_in`
- * edge, the activity line — behind the `finalizeDocumentUpload` server fn,
- * and here for `birthHolding`'s reason: `src/lib/server-fns.ts` re-exports
- * the domain files wholesale to the client (CLAUDE.md), so a helper that is
- * not a serverFn cannot live beside the server fn that calls it.
+ * Where a document is filed (SPA-19). Two mechanisms, never mixed, exactly
+ * the split notes already carry (CONTEXT.md → Sources are documents): a
+ * record files through `link(tagged_in)`, a space files through
+ * `entity_space`, which is what gives a space-filed document the
+ * source/confidence provenance every other member of a space has.
+ *
+ * It is a discriminated union rather than a bare uuid because the old
+ * `attachTo: string` made "a space is a link target" expressible, and the
+ * whole of migration 0008 was undoing that for notes. Here the caller has to
+ * say which mechanism it means, and the writer checks the entity agrees.
+ */
+export type DocumentFilingTarget =
+  { kind: 'record'; entityId: string } | { kind: 'space'; entityId: string }
+
+/**
+ * Why this entity may not take this filing, or `null` if it may. Pure and
+ * shared, so the server fn's early refusal and the writer's own guard cannot
+ * drift apart — the server fn refuses before the storage probe's cost is
+ * spent, the writer refuses whoever calls it without one.
+ *
+ * `space` and `document` are the two refusals on the record side: a space is
+ * filed *into*, and a document filed against a document is a mention.
+ */
+export function documentFilingRefusal(
+  target: DocumentFilingTarget,
+  entityKind: string,
+): string | null {
+  if (target.kind === 'space') {
+    return entityKind === 'space'
+      ? null
+      : `A document files into a space through entity_space — that target is a ${entityKind}.`
+  }
+  if (entityKind === 'space')
+    return 'A space is filed into, not against — file the document into it.'
+  if (entityKind === 'document')
+    return 'A document is filed against a record, not against another document.'
+  return null
+}
+
+/**
+ * The document already filed at this target with these bytes, if there is
+ * one — the dedupe guard behind `finalizeDocumentUpload`. Same file, same
+ * target, twice is one row: a second drop is almost always a double-click.
+ *
+ * It reads the edge table the filing *would* write, which is the half that
+ * had to change with the union. Keyed on `link` alone it could never dedupe
+ * a space, so a space-filed deck re-dropped would have become a second
+ * document row sharing the blob — the §3.4 rule read backwards.
+ *
+ * Filed on a company and then into a space is the other side of that rule
+ * and stays two rows on one blob: different target, different filing.
+ */
+export async function existingDocumentFiling(
+  sha: string,
+  target: DocumentFilingTarget,
+): Promise<string | null> {
+  const { entitySpace } = await import('@spaces/db/schema')
+  const rows =
+    target.kind === 'record'
+      ? await db
+          .select({ id: document.entityId })
+          .from(document)
+          .innerJoin(link, eq(link.fromEntityId, document.entityId))
+          .where(
+            and(
+              eq(document.blobSha, sha),
+              eq(link.toEntityId, target.entityId),
+              eq(link.relation, 'tagged_in'),
+            ),
+          )
+      : await db
+          .select({ id: document.entityId })
+          .from(document)
+          .innerJoin(entitySpace, eq(entitySpace.entityId, document.entityId))
+          .where(
+            and(
+              eq(document.blobSha, sha),
+              eq(entitySpace.spaceId, target.entityId),
+            ),
+          )
+  return rows.at(0)?.id ?? null
+}
+
+/**
+ * The rows a filed document is made of — entity, document, the filing edge,
+ * the activity line — behind the `finalizeDocumentUpload` server fn, and
+ * here for `birthHolding`'s reason: `src/lib/server-fns.ts` re-exports the
+ * domain files wholesale to the client (CLAUDE.md), so a helper that is not
+ * a serverFn cannot live beside the server fn that calls it.
  *
  * `source_class: 'manual'` with no ref: a person dropped a file on the Files
  * tab, which is the plainest `manual` write in the product, and the
@@ -333,6 +417,10 @@ export async function documentProvenance(
  * would call this with the pair set the other way round — the point of the
  * collapse is that the two differ by a row id, not by an enum value nobody
  * outside core can add.
+ *
+ * The activity row says `document.filed` with the *target* as subject for
+ * both kinds: the record's timeline and the space's read the same verb, and
+ * a second verb per mechanism would buy nothing but a join rule.
  */
 export async function fileDocumentRow(input: {
   sha: string
@@ -340,11 +428,26 @@ export async function fileDocumentRow(input: {
   mime: string | null
   sizeBytes: number
   kind: DocumentKind
-  attachTo: string
+  fileAgainst: DocumentFilingTarget
   actorId: string
 }): Promise<{ id: string }> {
   const { activity } = await import('@spaces/db/schema/activity')
+  const { entitySpace } = await import('@spaces/db/schema')
+  const target = input.fileAgainst
   return db.transaction(async (tx) => {
+    // Read inside the transaction: the kind decides which table the edge
+    // goes in, so a target that is not what the caller said it was must
+    // take the whole insert down with it rather than leave a half-filed row.
+    const targetRow = (
+      await tx
+        .select({ kind: entity.kind })
+        .from(entity)
+        .where(eq(entity.id, target.entityId))
+    ).at(0)
+    if (!targetRow) throw new Error('Record not found')
+    const refusal = documentFilingRefusal(target, targetRow.kind)
+    if (refusal) throw new Error(refusal)
+
     const [ent] = await tx
       .insert(entity)
       .values({
@@ -365,24 +468,78 @@ export async function fileDocumentRow(input: {
       uploadedBy: input.actorId,
     })
 
-    // Attachment goes through `link` — document.entity_id is the document's
-    // own identity, not the record it belongs to.
-    await tx.insert(link).values({
-      fromEntityId: ent.id,
-      toEntityId: input.attachTo,
-      relation: 'tagged_in',
-      source: 'manual',
-      createdBy: input.actorId,
-    })
+    if (target.kind === 'record') {
+      // Attachment goes through `link` — document.entity_id is the
+      // document's own identity, not the record it belongs to.
+      await tx.insert(link).values({
+        fromEntityId: ent.id,
+        toEntityId: target.entityId,
+        relation: 'tagged_in',
+        source: 'manual',
+        createdBy: input.actorId,
+      })
+    } else {
+      // `source: 'manual'` and a `created_by`: a person dropped this file
+      // into this space, which is the same provenance an AI-suggested tag
+      // would carry with `source: 'ai'` and a confidence.
+      await tx.insert(entitySpace).values({
+        entityId: ent.id,
+        spaceId: target.entityId,
+        source: 'manual',
+        createdBy: input.actorId,
+      })
+    }
 
     await tx.insert(activity).values({
       actorId: input.actorId,
       verb: 'document.filed',
-      subjectEntityId: input.attachTo,
+      subjectEntityId: target.entityId,
       objectEntityId: ent.id,
       meta: { filename: input.filename, kind: input.kind },
     })
 
     return { id: ent.id }
   })
+}
+
+/**
+ * Delete one document and, if nothing else points at its bytes, the blob.
+ *
+ * The rows are the registry's answer, not this file's: `deleteEntityProgram`
+ * walks `ENTITY_REFS`, which is what already clears `entity_space` alongside
+ * `document_chunk`, `link` and `activity` — the hand-list that used to live
+ * in `deleteDocument` missed exactly that table, which is why a
+ * space-filed document could not be deleted before SPA-77.
+ *
+ * It lives here rather than in the server fn so a test can delete without a
+ * request (SPA-155): the server fn is the auth check and nothing else.
+ */
+export async function deleteDocumentWithBlobGc(
+  id: string,
+): Promise<{ ok: true }> {
+  const row = (
+    await db
+      .select({ blobSha: document.blobSha })
+      .from(document)
+      .where(eq(document.entityId, id))
+  ).at(0)
+  if (!row) return { ok: true }
+
+  const { deleteEntityProgram } = await import('#/lib/entities/delete')
+  const { effectFn } = await import('./effect')
+  await effectFn(deleteEntityProgram)(id)
+
+  if (row.blobSha) {
+    // Content addressing means one file can back several rows: the deck sent
+    // to both partners, or the same deck filed on a company and a space.
+    const [{ value: remaining }] = await db
+      .select({ value: count() })
+      .from(document)
+      .where(eq(document.blobSha, row.blobSha))
+    if (remaining === 0) {
+      const { storage } = await import('#/lib/storage')
+      await storage().delete(row.blobSha)
+    }
+  }
+  return { ok: true }
 }

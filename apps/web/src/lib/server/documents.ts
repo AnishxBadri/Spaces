@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
@@ -8,7 +8,14 @@ import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
 import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue } from '../queue'
 import { storage } from '../storage'
-import { documentProvenance, fileDocumentRow, requireUser } from './shared'
+import {
+  deleteDocumentWithBlobGc,
+  documentFilingRefusal,
+  documentProvenance,
+  existingDocumentFiling,
+  fileDocumentRow,
+  requireUser,
+} from './shared'
 
 /**
  * Upload is two calls around a direct-to-storage PUT, because a 200MB deck
@@ -54,8 +61,15 @@ export const finalizeDocumentUpload = createServerFn({ method: 'POST' })
       mime: z.string().max(200).nullish(),
       sizeBytes: z.number().int().nonnegative().max(MAX_UPLOAD_BYTES),
       kind: z.enum(DOCUMENT_KINDS).default('other'),
-      /** The record this document is filed against. */
-      attachTo: z.string().uuid(),
+      /**
+       * Where this document is filed. A record files through
+       * `link(tagged_in)`, a space through `entity_space` — the union is
+       * what stops a space ever being a link target again (SPA-19).
+       */
+      fileAgainst: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('record'), entityId: z.string().uuid() }),
+        z.object({ kind: z.literal('space'), entityId: z.string().uuid() }),
+      ]),
     }),
   )
   .handler(async ({ data }) => {
@@ -67,31 +81,26 @@ export const finalizeDocumentUpload = createServerFn({ method: 'POST' })
       throw new Error('Upload incomplete — the file never reached storage')
     }
 
+    const fileAgainst = data.fileAgainst
     const target = (
       await db
-        .select({ id: entity.id, mergedIntoId: entity.mergedIntoId })
+        .select({ kind: entity.kind, mergedIntoId: entity.mergedIntoId })
         .from(entity)
-        .where(eq(entity.id, data.attachTo))
+        .where(eq(entity.id, fileAgainst.entityId))
     ).at(0)
     if (!target) throw new Error('Record not found')
     if (target.mergedIntoId) throw new Error('That record has been merged away')
+    // Refused here as well as in the writer, and before the dedupe read: a
+    // mismatched target would otherwise dedupe against the wrong edge table
+    // and answer `{ deduped: true }` for a filing that could never exist.
+    const refusal = documentFilingRefusal(fileAgainst, target.kind)
+    if (refusal) throw new Error(refusal)
 
-    // Same file, same record, twice — one row. Filing it again is almost
-    // always a double-click or a re-drop, not a second document.
-    const existing = (
-      await db
-        .select({ id: document.entityId })
-        .from(document)
-        .innerJoin(link, eq(link.fromEntityId, document.entityId))
-        .where(
-          and(
-            eq(document.blobSha, data.sha),
-            eq(link.toEntityId, data.attachTo),
-            eq(link.relation, 'tagged_in'),
-          ),
-        )
-    ).at(0)
-    if (existing) return { id: existing.id, deduped: true }
+    // Same file, same target, twice — one row, for both edge kinds. The
+    // read is `existingDocumentFiling` in server/shared.ts, next to the
+    // writer whose table choice it has to mirror.
+    const existing = await existingDocumentFiling(data.sha, fileAgainst)
+    if (existing) return { id: existing, deduped: true }
 
     // The rows themselves are `fileDocumentRow` in server/shared.ts: this
     // file is re-exported to the client by the server-fns barrel (CLAUDE.md
@@ -104,7 +113,7 @@ export const finalizeDocumentUpload = createServerFn({ method: 'POST' })
       mime: data.mime ?? null,
       sizeBytes: data.sizeBytes,
       kind: data.kind,
-      attachTo: data.attachTo,
+      fileAgainst,
       actorId: u.id,
     })
 
@@ -272,30 +281,17 @@ export const getDocumentDownloadUrl = createServerFn({ method: 'POST' })
  * hand-list that used to live here cleared chunks, links, activity and the
  * two rows, and missed `entity_space`, `task_entity`, `interaction_entity`
  * and `duplicate_candidate` — a document tagged into a space could not be
- * deleted at all.
+ * deleted at all. Now that a document files into a space on purpose (SPA-19)
+ * that registry entry is load-bearing rather than incidental, which is what
+ * `documents-filing.test.ts` pins.
+ *
+ * The rows and the blob GC are `deleteDocumentWithBlobGc` in
+ * `server/shared.ts`, for the reason `fileDocumentRow` lives there: a test
+ * has no request, and this handler is the auth check and nothing else.
  */
 export const deleteDocument = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const row = (
-      await db
-        .select({ blobSha: document.blobSha })
-        .from(document)
-        .where(eq(document.entityId, data.id))
-    ).at(0)
-    if (!row) return { ok: true }
-
-    const { deleteEntityProgram } = await import('../entities/delete')
-    const { effectFn } = await import('./effect')
-    await effectFn(deleteEntityProgram)(data.id)
-
-    if (row.blobSha) {
-      const [{ value: remaining }] = await db
-        .select({ value: count() })
-        .from(document)
-        .where(eq(document.blobSha, row.blobSha))
-      if (remaining === 0) await storage().delete(row.blobSha)
-    }
-    return { ok: true }
+    return deleteDocumentWithBlobGc(data.id)
   })

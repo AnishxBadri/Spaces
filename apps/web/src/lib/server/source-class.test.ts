@@ -84,7 +84,7 @@ describe('document provenance', () => {
       mime: 'application/pdf',
       sizeBytes: 1024,
       kind: 'deck',
-      attachTo: await aRecord(tag),
+      fileAgainst: { kind: 'record', entityId: await aRecord(tag) },
       actorId: await actorId(),
     })
 
