@@ -9,12 +9,17 @@ import { ArrowLeft, Globe, Layers, Lock, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { DocumentPreview } from '#/components/document-preview'
 import {
   deriveMarkdown,
   extractMentionIds,
   NoteEditor,
 } from '#/components/editor/note-editor'
-import { KIND_ICONS, KIND_ROUTES } from '#/components/editor/mention'
+import { KIND_ICONS } from '#/components/editor/mention'
+import {
+  DOCUMENT_PREVIEW_EVENT,
+  documentPreviewRequest,
+} from '#/lib/editor/document-preview-event'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -31,6 +36,7 @@ import { recordPath } from '#/lib/record-path'
 import {
   deleteNote,
   fileNoteAgainst,
+  getDocumentPreview,
   getNote,
   listSpaces,
   listTermsForNote,
@@ -67,6 +73,7 @@ function NotePage() {
   const { note: initial, allSpaces, terms } = Route.useLoaderData()
   const [title, setTitle] = useState(initial.title)
   const [saveState, setSaveState] = useState<SaveState>('idle')
+  const preview = useDocumentPreview()
 
   const latest = useRef<{
     document: NoteBody
@@ -202,22 +209,39 @@ function NotePage() {
               {initial.backlinks.map((b) => {
                 // KIND_ICONS' Record index type hides misses — widen honestly.
                 const Icon: LucideIcon | undefined = KIND_ICONS[b.kind]
+                const row = (
+                  <>
+                    {Icon ? (
+                      <Icon className="size-3.5" strokeWidth={1.75} />
+                    ) : null}
+                    {b.name}
+                  </>
+                )
+                const className =
+                  'flex items-center gap-2 rounded-md px-1 py-0.5 text-ui text-graphite hover:text-foreground'
+                // One route table for the whole app, as the chip row below
+                // already uses: `KIND_ROUTES` covers four kinds, so every
+                // other one rendered `<Link to={undefined}>` — a focusable
+                // row that goes nowhere. A document has no page at all, and
+                // opens the same preview its chip does.
+                const href = recordPath({ kind: b.kind, id: b.fromId })
                 return (
                   <li key={b.fromId}>
-                    <Link
-                      to={
-                        b.kind === 'note'
-                          ? '/notes/$noteId'
-                          : KIND_ROUTES[b.kind]
-                      }
-                      params={b.kind === 'note' ? { noteId: b.fromId } : {}}
-                      className="flex items-center gap-2 rounded-md px-1 py-0.5 text-ui text-graphite hover:text-foreground"
-                    >
-                      {Icon ? (
-                        <Icon className="size-3.5" strokeWidth={1.75} />
-                      ) : null}
-                      {b.name}
-                    </Link>
+                    {b.kind === 'document' ? (
+                      <button
+                        type="button"
+                        className={className}
+                        onClick={() => preview.open(b.fromId)}
+                      >
+                        {row}
+                      </button>
+                    ) : href ? (
+                      <Link to={href} className={className}>
+                        {row}
+                      </Link>
+                    ) : (
+                      <span className={className}>{row}</span>
+                    )}
                   </li>
                 )
               })}
@@ -225,8 +249,71 @@ function NotePage() {
           </aside>
         ) : null}
       </div>
+
+      {/* Mounted by the page, not by the editor: a mention chip renders
+          inside BlockNote's ProseMirror tree, where a Radix dialog has no
+          context to open in and is remounted on every nearby keystroke.
+          The chip dispatches; this listens. */}
+      <DocumentPreview doc={preview.doc} onOpenChange={preview.onOpenChange} />
     </div>
   )
+}
+
+/**
+ * The document preview this page opens on behalf of its mention chips
+ * (SPA-27). The chip carries only an entity id, so the row is fetched on the
+ * click rather than loaded with the note — a note may mention a dozen decks
+ * and open none of them.
+ */
+function useDocumentPreview() {
+  const [doc, setDoc] =
+    useState<Awaited<ReturnType<typeof getDocumentPreview>>>(null)
+
+  // A run token, not a boolean: a second chip clicked while the first fetch
+  // is in flight must win, and a fetch that resolves after a close must not
+  // reopen the dialog.
+  const runRef = useRef(0)
+
+  const open = useCallback((entityId: string) => {
+    const run = ++runRef.current
+    void (async () => {
+      try {
+        const row = await getDocumentPreview({ data: { id: entityId } })
+        if (runRef.current !== run) return
+        if (!row) {
+          toast.error('That document is no longer here')
+          return
+        }
+        setDoc(row)
+      } catch (err) {
+        if (runRef.current !== run) return
+        toast.error(
+          err instanceof Error ? err.message : 'Could not open that document',
+        )
+      }
+    })()
+  }, [])
+
+  const onOpenChange = useCallback((next: boolean) => {
+    if (next) return
+    runRef.current++
+    setDoc(null)
+  }, [])
+
+  useEffect(() => {
+    const onRequest = (event: Event) => {
+      const request = documentPreviewRequest(event)
+      if (request) open(request.entityId)
+    }
+    // The event bubbles out of the editor to the document, which is the one
+    // node guaranteed to be above every chip however BlockNote nests them.
+    globalThis.document.addEventListener(DOCUMENT_PREVIEW_EVENT, onRequest)
+    return () => {
+      globalThis.document.removeEventListener(DOCUMENT_PREVIEW_EVENT, onRequest)
+    }
+  }, [open])
+
+  return { doc, open, onOpenChange }
 }
 
 /** The three kinds the enum holds, as `getNote` hands them over. */

@@ -1,6 +1,15 @@
 import { createReactInlineContentSpec } from '@blocknote/react'
-import { Boxes, Building2, FileText, Kanban, Layers, User } from 'lucide-react'
+import {
+  Boxes,
+  Building2,
+  FileText,
+  Kanban,
+  Layers,
+  Paperclip,
+  User,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { documentPreviewEvent } from '#/lib/editor/document-preview-event'
 import { recordPath } from '#/lib/record-path'
 
 /**
@@ -15,6 +24,9 @@ export const KIND_ICONS: Record<string, LucideIcon | undefined> = {
   deal: Kanban,
   space: Layers,
   note: FileText,
+  // A document has no page, so its chip is the only place the paperclip has
+  // to say what was mentioned (SPA-27).
+  document: Paperclip,
   custom: Boxes,
 }
 
@@ -45,9 +57,58 @@ export const Mention = createReactInlineContentSpec(
       // Plain anchor, not router Link — renders inside BlockNote's tree.
       // One route table for the whole app: a chip whose kind has no record
       // page renders as text rather than guessing a page it might have.
-      const href =
-        recordPath({ kind, id: entityId, objectSlug: objectSlug || null }) ??
-        undefined
+      const href = recordPath({
+        kind,
+        id: entityId,
+        objectSlug: objectSlug || null,
+      })
+      const inside = (
+        <>
+          <Icon size={12} strokeWidth={1.75} aria-hidden />
+          {label}
+        </>
+      )
+
+      // A document is the one kind with no page *and* somewhere to go: the
+      // preview modal. The chip cannot open it from in here (no dialog
+      // context under ProseMirror), so it asks the page to — see
+      // `lib/editor/document-preview-event.ts`. A button, never an anchor:
+      // there is no URL to put in one, and `href={undefined}` renders a
+      // focusable element that navigates nowhere.
+      if (kind === 'document') {
+        return (
+          <button
+            type="button"
+            data-entity-id={entityId}
+            data-entity-kind={kind}
+            className="mention-chip"
+            contentEditable={false}
+            onClick={(e) =>
+              e.currentTarget.dispatchEvent(
+                documentPreviewEvent({ entityId, label }),
+              )
+            }
+          >
+            {inside}
+          </button>
+        )
+      }
+
+      // Every other page-less kind reads as text, which is what the rule
+      // above always meant — an anchor with no href was the bug.
+      if (!href) {
+        return (
+          <span
+            data-entity-id={entityId}
+            data-entity-kind={kind}
+            className="mention-chip"
+            contentEditable={false}
+          >
+            {inside}
+          </span>
+        )
+      }
+
       return (
         <a
           href={href}
@@ -56,8 +117,7 @@ export const Mention = createReactInlineContentSpec(
           className="mention-chip"
           contentEditable={false}
         >
-          <Icon size={12} strokeWidth={1.75} aria-hidden />
-          {label}
+          {inside}
         </a>
       )
     },

@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, entityAlias, objectDef } from '@spaces/db/schema'
 import type { EntitySearchInput } from '#/lib/server/search'
@@ -34,11 +34,17 @@ export async function entitySearchRows(
     .where(
       and(
         isNull(entity.mergedIntoId),
+        // The default lane excludes nothing by kind (SPA-27). It used to end
+        // `ne(entity.kind, 'document')`, which is what kept a deck out of the
+        // note-body @ menu — and the note editor is the only caller that
+        // omits `kinds`, so widening it widens exactly that one menu. Every
+        // other caller (log-interaction, value-editor, the record-filing
+        // picker) names its kinds and is unchanged.
         data.objectId
           ? eq(entity.objectId, data.objectId)
           : data.kinds
             ? inArray(entity.kind, data.kinds)
-            : ne(entity.kind, 'document'),
+            : undefined,
         // canRead at the SQL layer: a private note's title must not
         // surface in anyone else's autocomplete.
         sql`not exists (select 1 from note pn where pn.entity_id = ${entity.id} and pn.visibility = 'private' and pn.author_id <> ${userId})`,
