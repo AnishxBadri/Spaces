@@ -41,8 +41,8 @@ import { cn } from '#/lib/utils'
 
 /**
  * A space is a record like any other (P7): the head measures it, the body
- * is what you think (memos) and what you track (companies, records) with
- * the vocabulary underneath, the rail is the map around it — parent,
+ * is what you think (filed notes) and what you track (companies, records)
+ * with the vocabulary underneath, the rail is the map around it — parent,
  * subspaces, the notes that mention it, open tasks. Reading runs left;
  * moving runs right.
  */
@@ -204,7 +204,7 @@ function SpacePage() {
             tone: zero(inPipeline),
           },
           {
-            label: 'Memos',
+            label: 'Filed notes',
             value: `${spc.filed.length}`,
             tone: zero(spc.filed.length),
           },
@@ -262,7 +262,7 @@ function SpacePage() {
                     {c.companies > 0
                       ? `${c.companies} compan${c.companies === 1 ? 'y' : 'ies'}`
                       : c.memos > 0
-                        ? `${c.memos} memo${c.memos === 1 ? '' : 's'}`
+                        ? `${c.memos} note${c.memos === 1 ? '' : 's'}`
                         : '—'}
                   </span>
                 </RailItem>
@@ -315,7 +315,7 @@ function SpacePage() {
         {/* What I think here — the prose filed against this space. */}
         <LedgerSection
           label="Filed here"
-          count={`${spc.filed.length} memo${spc.filed.length === 1 ? '' : 's'}`}
+          count={`${spc.filed.length} note${spc.filed.length === 1 ? '' : 's'}`}
           link={
             <Link to="/notes" className="focus-ring text-primary">
               all notes ›

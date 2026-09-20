@@ -552,7 +552,7 @@ suggestions land in a review queue instead of being silently written. Routing no
 question forever.
 
 **There is no singular memo.** A space holds as many filed notes as the user wants; the memo
-is simply the first one filed, and `note.kind = 'memo'` is presentation (serif, wide measure,
+is simply the first one filed, and `note.kind = 'memo'` is presentation (serif at the same measure as every prose surface — DESIGN.md §layout —
 PDF export later), never structure. Spaces are how a user imposes hierarchy on their own
 research — constraining that to one document per space is the tool telling the investor how
 to think.
@@ -569,10 +569,13 @@ mechanisms, never mixed:
 | **who** can read     | `note.visibility` + `author_id`                                                                  | `shared` (default) · `private`          |
 
 - **A memo is a note with the flag up.** Same row, same edges; the kind is
-  presentation (serif, wide, pins to the top of wherever it is filed, is the
-  face of a space) and intent ("this is my view"), never structure. Promote
-  by flipping the kind. Kind never restricts filing targets — an IC memo is a
-  memo filed against a deal; a market memo is a memo filed into a space.
+  presentation (serif, pins to the top of wherever it is filed, is the face
+  of a space) and intent ("this is my view"), never structure. The measure is
+  not one of those differences: `DESIGN.md` §The Page Shell puts a memo at the
+  same `max-w-160` gutter as every other prose surface, and it is the later
+  document. Promote by flipping the kind. Kind never restricts filing targets
+  — an IC memo is a memo filed against a deal; a market memo is a memo filed
+  into a space.
 - **Kinds stay at three; genres are templates.** "Teardown", "post-mortem",
   "IC memo" are note templates that set title/structure/kind, not new kinds.
   A fourth kind is a taxonomy leaking into structure (the sectors rule). Tags
