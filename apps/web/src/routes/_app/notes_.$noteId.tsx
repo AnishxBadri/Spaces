@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-router'
 import { ArrowLeft, Globe, Layers, Lock, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   deriveMarkdown,
@@ -18,19 +18,30 @@ import { KIND_ICONS, KIND_ROUTES } from '#/components/editor/mention'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { useConfirm } from '#/components/ui/confirm-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
+import { Input } from '#/components/ui/input'
 import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
+import { recordPath } from '#/lib/record-path'
 import {
   deleteNote,
+  fileNoteAgainst,
   getNote,
   listSpaces,
   listTermsForNote,
   previewNoteDeletion,
   saveNote,
   saveNoteAsTemplate,
+  searchEntities,
   setNoteKind,
   setNoteVisibility,
   tagIntoSpace,
+  unfileNoteFrom,
   untagFromSpace,
 } from '#/lib/server-fns'
 
@@ -166,6 +177,8 @@ function NotePage() {
           filed={initial.spaces}
           allSpaces={allSpaces}
         />
+
+        <RecordFiling noteId={initial.id} filed={initial.filedAgainst} />
 
         <div className="prose-note mt-4">
           <ClientOnly fallback={<div className="min-h-40" />}>
@@ -328,6 +341,99 @@ function VisibilityToggle({
   )
 }
 
+/** One chip: what it is, where it goes, how it is spelled. */
+type FilingChip = {
+  id: string
+  name: string
+  /** null = this kind has no page; the chip reads as text, not a dead link. */
+  href: string | null
+  Icon: LucideIcon | undefined
+}
+
+/**
+ * The chip row, once. Both filing lanes draw it — spaces through
+ * `entity_space`, records through `link(tagged_in)` — because the two are
+ * different *writes*, not different shapes: a square chip, its kind icon,
+ * its link, and an × that removes exactly that one edge.
+ *
+ * Deliberately **not** pre-parameterised for the documents surface. It takes
+ * the chips it is given and an adder node; the lane above it owns the write,
+ * the picker and the refresh. A third caller adds a third lane, and whatever
+ * that lane needs gets argued then, with the caller in front of us.
+ */
+function FilingRow({
+  label,
+  chips,
+  busy,
+  removeLabel,
+  onRemove,
+  adder,
+}: {
+  label: string
+  chips: Array<FilingChip>
+  busy: boolean
+  removeLabel: (name: string) => string
+  onRemove: (chip: FilingChip) => void
+  adder: React.ReactNode
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className="w-24 shrink-0 field-label text-graphite">{label}</span>
+      {/* Square chips, like the subspace chips on a space page. */}
+      {chips.map((chip) => (
+        <span
+          key={chip.id}
+          className="flex h-6 items-center gap-1.5 border border-rule bg-paper pr-1.5 pl-2 text-label font-medium"
+        >
+          {chip.Icon ? (
+            <chip.Icon className="size-2.5 shrink-0" strokeWidth={1.75} />
+          ) : null}
+          {chip.href ? (
+            <Link to={chip.href} className="focus-ring hover:underline">
+              {chip.name}
+            </Link>
+          ) : (
+            chip.name
+          )}
+          <button
+            type="button"
+            aria-label={removeLabel(chip.name)}
+            disabled={busy}
+            onClick={() => onRemove(chip)}
+            className="focus-ring mono text-micro text-graphite hover:text-foreground"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {adder}
+    </div>
+  )
+}
+
+/** Run a filing write, then let the loader say what the row now is. */
+function useFiling() {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+
+  const run = useCallback(
+    async (action: () => Promise<unknown>) => {
+      setBusy(true)
+      try {
+        await action()
+        await router.invalidate()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not file')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [router],
+  )
+
+  return { busy, run }
+}
+
 /**
  * Filing, not referencing. Mentioning a space in the body links to it;
  * filing says the note *lives* here, and puts it in the space's top block.
@@ -342,82 +448,205 @@ function SpaceFiling({
   filed: Array<{ id: string; name: string }>
   allSpaces: Awaited<ReturnType<typeof listSpaces>>
 }) {
-  const router = useRouter()
-  const [busy, setBusy] = useState(false)
+  const { busy, run } = useFiling()
   const unfiled = allSpaces.filter((s) => !filed.some((f) => f.id === s.id))
 
-  async function run(action: () => Promise<unknown>) {
-    setBusy(true)
-    try {
-      await action()
-      await router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not file')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-      {/* Square chips, like the subspace chips on a space page. */}
-      {filed.map((s) => (
-        <span
-          key={s.id}
-          className="flex h-6 items-center gap-1.5 border border-rule bg-paper pr-1.5 pl-2 text-label font-medium"
-        >
-          <Layers className="size-2.5 shrink-0" strokeWidth={1.75} />
-          <Link
-            to="/spaces/$spaceId"
-            params={{ spaceId: s.id }}
-            className="focus-ring hover:underline"
-          >
-            {s.name}
-          </Link>
-          <button
-            aria-label={`Remove from ${s.name}`}
+    <FilingRow
+      label="Filed in space"
+      busy={busy}
+      chips={filed.map((s) => ({
+        id: s.id,
+        name: s.name,
+        href: `/spaces/${s.id}`,
+        Icon: Layers,
+      }))}
+      removeLabel={(name) => `Remove from ${name}`}
+      onRemove={(chip) =>
+        void run(() =>
+          untagFromSpace({ data: { entityId: noteId, spaceId: chip.id } }),
+        )
+      }
+      adder={
+        /*
+          A picker that files rather than holds: its value stays empty, so the
+          trigger keeps the dashed invitation and the sheet is the one the rest
+          of the app draws. Spaces are a tree of a few dozen, so the whole list
+          is offered and it nests by depth — the record lane below cannot do
+          that, which is why it searches instead.
+        */
+        unfiled.length > 0 ? (
+          <Select
+            aria-label="File this note in a space"
+            value=""
             disabled={busy}
-            onClick={() =>
-              run(() =>
-                untagFromSpace({ data: { entityId: noteId, spaceId: s.id } }),
+            onChange={(spaceId) =>
+              void run(() =>
+                tagIntoSpace({ data: { entityId: noteId, spaceId } }),
               )
             }
-            className="focus-ring mono text-micro text-graphite hover:text-foreground"
-          >
-            ×
-          </button>
-        </span>
-      ))}
+            items={unfiled.map((s) => ({
+              value: s.id,
+              label: s.name,
+              depth: s.depth,
+            }))}
+            width="content"
+            placeholder="+ File in space…"
+            searchPlaceholder="Search spaces…"
+            emptyLabel="No space matches."
+            className="h-6 w-auto rounded-none border-dashed bg-transparent px-2 text-label text-graphite hover:text-foreground"
+          />
+        ) : null
+      }
+    />
+  )
+}
 
-      {/*
-        A picker that files rather than holds: its value stays empty, so the
-        trigger keeps the dashed invitation and the sheet is the one the rest
-        of the app draws. Space names nest — the sheet sizes to them and
-        indents by depth, where the old option list padded with spaces.
-      */}
-      {unfiled.length > 0 ? (
-        <Select
-          aria-label="File this note in a space"
-          value=""
+/**
+ * The other lane (SPA-116): the records this note is filed against, which is
+ * `link(tagged_in)` — the outbound direction, and the opposite of the
+ * "Linked from" aside, which lists who mentions the note.
+ *
+ * Unfiling removes the filing alone. A body mention of the same record is a
+ * different edge and stays, so the note slides from "Filed here" to "Mentions
+ * this" on that record instead of vanishing from it.
+ */
+function RecordFiling({
+  noteId,
+  filed,
+}: {
+  noteId: string
+  filed: Awaited<ReturnType<typeof getNote>>['filedAgainst']
+}) {
+  const { busy, run } = useFiling()
+
+  return (
+    <FilingRow
+      label="Filed against"
+      busy={busy}
+      chips={filed.map((r) => ({
+        id: r.id,
+        name: r.name,
+        // One route table for the whole app: a custom record goes through
+        // its object's slug, and a kind with no page reads as text.
+        href: recordPath(r),
+        Icon: KIND_ICONS[r.kind],
+      }))}
+      removeLabel={(name) => `Unfile from ${name}`}
+      onRemove={(chip) =>
+        void run(() =>
+          unfileNoteFrom({ data: { id: noteId, targetId: chip.id } }),
+        )
+      }
+      adder={
+        <RecordFilingPicker
+          noteId={noteId}
+          filedIds={filed.map((r) => r.id)}
           disabled={busy}
-          onChange={(spaceId) =>
-            void run(() =>
-              tagIntoSpace({ data: { entityId: noteId, spaceId } }),
-            )
+          onPick={(targetId) =>
+            void run(() => fileNoteAgainst({ data: { id: noteId, targetId } }))
           }
-          items={unfiled.map((s) => ({
-            value: s.id,
-            label: s.name,
-            depth: s.depth,
-          }))}
-          width="content"
-          placeholder="+ File in space…"
-          searchPlaceholder="Search spaces…"
-          emptyLabel="No space matches."
-          className="h-6 w-auto rounded-none border-dashed bg-transparent px-2 text-label text-graphite hover:text-foreground"
         />
-      ) : null}
-    </div>
+      }
+    />
+  )
+}
+
+/**
+ * Records are unbounded where spaces are a tree of a few dozen, so this is a
+ * debounced search rather than a list — the combobox `value-editor.tsx`'s
+ * record-reference picker already draws.
+ *
+ * `searchEntities` filters merged records and unreadable notes in SQL; the
+ * `kinds` argument is what keeps `space`, `note` and `document` out. That is
+ * a convenience, not the rule: `fileNoteAgainstProgram` refuses the same
+ * targets server-side. `mandate` is absent from the list because it is a
+ * workspace row rather than an entity — it has no id the `link` table could
+ * point at, so it cannot be offered and could not be accepted.
+ */
+function RecordFilingPicker({
+  noteId,
+  filedIds,
+  disabled,
+  onPick,
+}: {
+  noteId: string
+  filedIds: Array<string>
+  disabled: boolean
+  onPick: (targetId: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<
+    Awaited<ReturnType<typeof searchEntities>>
+  >([])
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([])
+      return
+    }
+    let alive = true
+    const t = setTimeout(() => {
+      void (async () => {
+        const rows = await searchEntities({
+          data: { q: query, kinds: ['company', 'person', 'deal', 'custom'] },
+        })
+        if (alive) setResults(rows)
+      })()
+    }, 200)
+    return () => {
+      alive = false
+      clearTimeout(t)
+    }
+  }, [query])
+
+  // Already filed, and the note itself — the second is unreachable through
+  // `kinds` above, and held here anyway so the exclusion does not depend on
+  // an argument a future edit could widen.
+  const excluded = useMemo(
+    () => new Set([...filedIds, noteId]),
+    [filedIds, noteId],
+  )
+  const offered = results.filter((r) => !excluded.has(r.id))
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label="File this note against a record"
+        disabled={disabled}
+        className="focus-ring flex h-6 items-center rounded-none border border-dashed border-rule px-2 text-label text-graphite hover:text-foreground disabled:opacity-50"
+      >
+        + File against…
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <div className="p-1.5">
+          <Input
+            value={query}
+            autoFocus
+            placeholder="Search records…"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-7 text-label"
+          />
+        </div>
+        {offered.map((r) => (
+          <DropdownMenuItem
+            key={r.id}
+            onSelect={() => {
+              onPick(r.id)
+              setQuery('')
+            }}
+          >
+            {r.name}
+          </DropdownMenuItem>
+        ))}
+        {query.trim() && offered.length === 0 ? (
+          <p className="px-2 py-1.5 text-label text-graphite">
+            No record matches.
+          </p>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
