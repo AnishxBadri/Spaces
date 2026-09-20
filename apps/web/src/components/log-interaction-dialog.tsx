@@ -57,20 +57,30 @@ export function LogInteractionDialog({
   const [occurredAt, setOccurredAt] = useState(localNow)
   const [attendees, setAttendees] = useState<Array<Attendee>>([seed])
   const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
+  /**
+   * Which of the two footer buttons is mid-write. One flag rather than two
+   * booleans: only one of them can be in flight, and the other has to read
+   * as disarmed rather than merely idle while it is.
+   */
+  const [pending, setPending] = useState<'log' | 'writeUp' | null>(null)
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+  /**
+   * Both footer buttons, one write. `writeUp` is the whole difference: the
+   * server creates the body note and answers with its id, and the caller
+   * lands in the editor instead of staying where it was (SPA-123).
+   */
+  async function submit(writeUp: boolean) {
     setError(null)
     if (!subject.trim()) return setError('What was it about?')
-    setPending(true)
+    setPending(writeUp ? 'writeUp' : 'log')
     try {
-      await logInteraction({
+      const logged = await logInteraction({
         data: {
           kind,
           subject: subject.trim(),
           occurredAt,
           attendeeIds: attendees.map((a) => a.id),
+          writeUp,
         },
       })
       setOpen(false)
@@ -80,10 +90,16 @@ export function LogInteractionDialog({
       toast(`${kind === 'meeting' ? 'Meeting' : 'Call'} logged`)
       onLogged?.()
       void router.invalidate()
+      if (logged.noteId) {
+        await router.navigate({
+          to: '/notes/$noteId',
+          params: { noteId: logged.noteId },
+        })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not log it')
     } finally {
-      setPending(false)
+      setPending(null)
     }
   }
 
@@ -103,7 +119,10 @@ export function LogInteractionDialog({
           <DialogDescription>{seed.name}</DialogDescription>
         </DialogHeader>
         <form
-          onSubmit={onSubmit}
+          onSubmit={(e) => {
+            e.preventDefault()
+            void submit(false)
+          }}
           className="space-y-4"
           noValidate
           onKeyDown={(e) => {
@@ -166,8 +185,27 @@ export function LogInteractionDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" pending={pending}>
-              {pending ? 'Logging…' : `Log ${kind}`}
+            {/*
+              The second door out of the dialog: the same interaction, plus
+              the note it deserves, with the editor as the landing. Outline,
+              because the twenty-second log is still the primary act and
+              ⌘↵ still means that one.
+            */}
+            <Button
+              type="button"
+              variant="outline"
+              pending={pending === 'writeUp'}
+              disabled={pending !== null}
+              onClick={() => void submit(true)}
+            >
+              {pending === 'writeUp' ? 'Writing up…' : 'Log and write up'}
+            </Button>
+            <Button
+              type="submit"
+              pending={pending === 'log'}
+              disabled={pending !== null}
+            >
+              {pending === 'log' ? 'Logging…' : `Log ${kind}`}
               <KeyHint>⌘↵</KeyHint>
             </Button>
           </DialogFooter>

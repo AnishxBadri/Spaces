@@ -1122,8 +1122,8 @@ Doctrine:
 ### Interactions and enrichment
 
 ```
-interaction(id, kind: email|meeting|call, message_id, thread_id, occurred_at,
-            source_class, source_ref → integration)
+interaction(id, kind: email|meeting|call, message_id, thread_id, subject,
+            occurred_at, note_id → note, source_class, source_ref → integration)
   -- `interaction_source` named five lanes in the type itself (email_sync,
   -- forwarding, calendar, recorder, whatsapp); collapsed 2026-09-19 (SPA-137,
   -- migration 0030) into the same class+ref pair every other provenance column
@@ -1141,10 +1141,25 @@ records. One editor, one mention system, one search index: mentions in
 meeting notes create links, glossary highlights, concept links, PDF export
 all apply. Call recorders (Fathom / tl;dv / Granola) write the transcript as
 a `document(derived_from → interaction)` and the summary as a suggestion
-that becomes the note body. (Checked 2026-09-15: `interaction` carries
-`subject` and no body column at all, so the unification is an additive
-`note_id` column, not a migration off an existing body.) `close_reason` stays an
-attribute.
+that becomes the note body. `close_reason` stays an attribute.
+
+**Built 2026-09-20 (SPA-123, migration 0034).** `interaction` never carried a
+body column — only `subject` — so the unification was one additive column and
+a write path, with nothing to backfill. **`note_id` is nullable and lazily
+filled:** a call logged in twenty seconds with nothing written must not
+manufacture an empty note row, so plain "Log meeting" leaves it null and the
+dialog's second footer button, "Log and write up", is what fills it. The
+write-up is an ordinary note — kind `note`, visibility `shared`, authored by
+the caller, titled from the subject, with a `note.created` activity row beside
+the `interaction.*` one — filed by `link(tagged_in, manual)` against every
+attendee, so it lands under "Filed here" on each of their records rather than
+under "Mentions this". A `uniqueIndex interaction_note_unique` stops two
+interactions claiming one body; a unique index treats NULLs as distinct, so it
+says nothing about the many interactions that have none. The registry entry is
+`interaction.note` — `merge: none` (note kind is not mergeable, the
+`mandate.note` precedent), `context: null` (the note is already reached
+through its own `tagged_in` edges; an item entry would double-count it), and
+`del: orphan`, because the meeting outlives its write-up.
 
 Relationship intelligence = query over `interaction_entity` weighted by recency + frequency.
 "Who knows someone at X" falls out of it. Computed live — at two mailboxes over three years

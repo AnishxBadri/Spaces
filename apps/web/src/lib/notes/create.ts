@@ -44,6 +44,22 @@ export type NoteAbout = {
 export type CreateNoteInput = {
   about: NoteAbout | null
   noteKind: NoteKind
+  /**
+   * The note's name at birth (SPA-123). Omitted, the note is born Untitled
+   * and the editor is where it gets a name — which is right for "Note about
+   * this" and wrong for a meeting write-up, whose name is the subject the
+   * user already typed into the log dialog.
+   */
+  title?: string
+  /**
+   * Whether the note opens on the starter mention block (SPA-123). Default
+   * true, which is the "Note about this" behaviour above. A meeting write-up
+   * passes false: its attendees are *filed*, not mentioned, and the
+   * `link(mentions, extracted)` a starter block drags along would put the
+   * note in both lanes of every attendee's Notes section for a sentence
+   * nobody wrote.
+   */
+  starter?: boolean
 }
 
 /** The sentence the client is shown; a `Schema.TaggedError` carries none. */
@@ -57,12 +73,14 @@ export const createNoteProgram = Effect.fn('createNoteProgram')(function* (
   input: CreateNoteInput,
 ): Effect.fn.Return<{ id: string }, NoteCreateFailed> {
   const { about, noteKind } = input
+  const title = input.title ?? ''
 
   // A memo opens on a blank page — it is the author's own view, not a reply
   // to a record — so it gets no starter block and therefore no starter
-  // mention. Everything else opens on the thing it is about.
+  // mention. Everything else opens on the thing it is about, unless the
+  // caller said otherwise.
   const starter: NoteBody | null =
-    about && noteKind !== 'memo'
+    about && noteKind !== 'memo' && input.starter !== false
       ? [
           {
             type: 'paragraph',
@@ -90,7 +108,10 @@ export const createNoteProgram = Effect.fn('createNoteProgram')(function* (
             .insert(entity)
             .values({
               kind: 'note',
-              canonicalName: 'Untitled',
+              // `saveNote` keeps these two in step the same way; a titled
+              // note has to be findable by that name from the moment it
+              // exists, not from its first save.
+              canonicalName: title || 'Untitled',
               createdBy: userId,
             })
             .returning({ id: entity.id })
@@ -100,6 +121,7 @@ export const createNoteProgram = Effect.fn('createNoteProgram')(function* (
         await tx.insert(note).values({
           entityId: ent.id,
           authorId: userId,
+          title,
           kind: noteKind,
           bodyJson: starter,
           bodyMd:

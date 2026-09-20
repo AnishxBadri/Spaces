@@ -364,7 +364,9 @@ export async function documentProvenance(
 /**
  * The rows a filed document is made of — entity, document, the `tagged_in`
  * edge, the activity line — behind the `finalizeDocumentUpload` server fn,
- * and here for `writeInteraction`'s reason.
+ * and here for `birthHolding`'s reason: `src/lib/server-fns.ts` re-exports
+ * the domain files wholesale to the client (CLAUDE.md), so a helper that is
+ * not a serverFn cannot live beside the server fn that calls it.
  *
  * `source_class: 'manual'` with no ref: a person dropped a file on the Files
  * tab, which is the plainest `manual` write in the product, and the
@@ -423,51 +425,5 @@ export async function fileDocumentRow(input: {
     })
 
     return { id: ent.id }
-  })
-}
-
-/**
- * The interaction write behind the `logInteraction` server fn. Here rather
- * than beside it for `birthHolding`'s reason: `src/lib/server-fns.ts`
- * re-exports the domain files wholesale to the client (CLAUDE.md), so a
- * helper that is not a serverFn cannot live in `server/interactions.ts` —
- * and this is also what makes the write directly testable.
- *
- * `source_class: 'manual'` is written as a literal, not left to the column
- * default: a person filling in the Log-interaction dialog is the clearest
- * `manual` writer in the product, and a row whose provenance is whatever the
- * default happened to be is not a claim anyone checked.
- */
-export async function writeInteraction(input: {
-  kind: 'meeting' | 'call'
-  subject: string
-  occurredAt: Date
-  attendeeIds: Array<string>
-  actorId: string
-}): Promise<{ id: string }> {
-  const { activity } = await import('@spaces/db/schema/activity')
-  return db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(interaction)
-      .values({
-        kind: input.kind,
-        sourceClass: 'manual',
-        subject: input.subject,
-        occurredAt: input.occurredAt,
-      })
-      .returning({ id: interaction.id })
-    for (const entityId of new Set(input.attendeeIds)) {
-      await tx
-        .insert(interactionEntity)
-        .values({ interactionId: row.id, entityId })
-        .onConflictDoNothing()
-    }
-    await tx.insert(activity).values({
-      actorId: input.actorId,
-      verb: `interaction.${input.kind}`,
-      subjectEntityId: input.attendeeIds[0],
-      meta: { interactionId: row.id },
-    })
-    return { id: row.id }
   })
 }

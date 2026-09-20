@@ -95,6 +95,10 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           kind: interaction.kind,
           subject: interaction.subject,
           occurredAt: interaction.occurredAt,
+          // The write-up, when there is one (SPA-123). Null is the ordinary
+          // case — a meeting logged in twenty seconds has no body — and the
+          // row renders exactly as it did before.
+          noteId: interaction.noteId,
         })
         .from(interactionEntity)
         .innerJoin(
@@ -169,6 +173,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
         id: i.id,
         kind: i.kind,
         subject: i.subject ?? '',
+        noteId: i.noteId,
         at: i.occurredAt.toISOString(),
         attendees: attendeesBy.get(i.id) ?? [],
       })),
