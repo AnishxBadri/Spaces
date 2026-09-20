@@ -303,7 +303,7 @@ describe('scratch', () => {
 
   it('suppresses nothing: it lists, files, searches and reaches the assembler as a note', async () => {
     const { setNoteKindProgram } = await import('./kind')
-    const { listNoteRows } = await import('#/lib/server/notes')
+    const { listNoteRows } = await import('#/lib/notes/list-rows')
     const { getSpaceProgram } = await import('#/lib/server/spaces')
     const { assembleProgram } = await import('#/lib/context/assemble')
     const { db } = await import('@spaces/db')
