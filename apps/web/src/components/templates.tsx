@@ -80,11 +80,24 @@ export function TemplatePicker({
             {kind === 'record' ? (objectKind ?? 'record') : kind}.
           </DropdownMenuItem>
         ) : (
-          items.map((t) => (
-            <DropdownMenuItem key={t.id} onSelect={() => onPick(t)}>
-              {t.name}
-            </DropdownMenuItem>
-          ))
+          items.map((t) => {
+            // The kind lane, drawn the way the notes index draws it
+            // (SPA-109): quiet, lowercase, and blank for the default. A memo
+            // template is legible before you stamp it; a plain-note template
+            // has nothing to say, and space/record templates carry no note
+            // kind at all.
+            const genre = t.noteKind === 'note' ? null : t.noteKind
+            return (
+              <DropdownMenuItem key={t.id} onSelect={() => onPick(t)}>
+                <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                {genre ? (
+                  <span className="shrink-0 mono text-micro text-graphite">
+                    {genre}
+                  </span>
+                ) : null}
+              </DropdownMenuItem>
+            )
+          })
         )}
       </DropdownMenuContent>
     </DropdownMenu>

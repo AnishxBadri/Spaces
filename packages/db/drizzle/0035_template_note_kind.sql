@@ -1,0 +1,1 @@
+ALTER TABLE "template" ADD COLUMN "note_kind" "note_kind";

@@ -48,6 +48,9 @@ export const listTemplates = createServerFn()
       id: t.id,
       kind: t.kind,
       objectKind: t.objectKind,
+      // The genre a note template stamps (SPA-131); null on every
+      // space/record template and on note templates saved before the column.
+      noteKind: t.noteKind,
       name: t.name,
       body: t.body,
       suggestOn: t.suggestOn,
@@ -108,6 +111,51 @@ function stripMentions(node: Json): Json {
   return out
 }
 
+/**
+ * Capture (SPA-131). A note template stamps a *genre*, not just a shape:
+ * CONTEXT.md freezes `note.kind` at three precisely because "IC memo" and
+ * "post-mortem" are templates that set title/structure/**kind**, so the
+ * source note's current kind is captured alongside its body. Saving a memo
+ * as a template records `note_kind = 'memo'`; nothing else about capture
+ * changes — mentions are still stripped, and the body is still a copy.
+ *
+ * Split out of the server fn so the suite can drive it: `requireUser` reads
+ * a request the tests have no way to build (the `entityContext` pattern in
+ * `inbox.ts`).
+ */
+export async function captureNoteTemplate(
+  userId: string,
+  input: { noteId: string; name: string },
+): Promise<{ id: string }> {
+  const row = (
+    await db
+      .select({
+        bodyJson: note.bodyJson,
+        kind: note.kind,
+        authorId: note.authorId,
+        visibility: note.visibility,
+      })
+      .from(note)
+      .where(eq(note.entityId, input.noteId))
+  ).at(0)
+  if (!row || !canRead({ id: userId }, row)) throw new Error('Note not found')
+  const body = stripMentions(row.bodyJson ?? [])
+  const t = (
+    await db
+      .insert(template)
+      .values({
+        kind: 'note',
+        noteKind: row.kind,
+        name: input.name,
+        body: body ?? [],
+        createdBy: userId,
+      })
+      .returning({ id: template.id })
+  ).at(0)
+  if (!t) throw new Error('Template insert returned no row')
+  return { id: t.id }
+}
+
 export const saveNoteAsTemplate = createServerFn({ method: 'POST' })
   .validator(
     z.object({
@@ -117,61 +165,65 @@ export const saveNoteAsTemplate = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const row = (
-      await db
-        .select({
-          bodyJson: note.bodyJson,
-          authorId: note.authorId,
-          visibility: note.visibility,
-        })
-        .from(note)
-        .where(eq(note.entityId, data.noteId))
-    ).at(0)
-    if (!row || !canRead(u, row)) throw new Error('Note not found')
-    const body = stripMentions(row.bodyJson ?? [])
-    const [t] = await db
-      .insert(template)
-      .values({
-        kind: 'note',
-        name: data.name,
-        body: body ?? [],
-        createdBy: u.id,
-      })
-      .returning({ id: template.id })
-    return { id: t.id }
+    return captureNoteTemplate(u.id, data)
   })
+
+/**
+ * Stamp (SPA-131). The template's `note_kind` becomes the new note's kind,
+ * so an IC-memo template stamps a memo and not a plain note. Null — every
+ * template saved before the column, and there is deliberately no backfill —
+ * falls through to the column default, which is what those templates have
+ * always produced.
+ *
+ * Still copy-not-reference and still mention-free: the body was stripped at
+ * capture, so no `link` row is materialised here and none ever was. That is
+ * also why this does not route through `createNoteProgram` — see the note in
+ * `lib/notes/create.ts`: that program's job is a note born *about* something,
+ * with the filing and starter-mention rows that implies, and a template note
+ * is born about nothing with a body it did not write.
+ */
+export async function stampNoteTemplate(
+  userId: string,
+  input: { templateId: string },
+): Promise<{ id: string }> {
+  const t = (
+    await db
+      .select()
+      .from(template)
+      .where(and(eq(template.id, input.templateId), eq(template.kind, 'note')))
+  ).at(0)
+  if (!t) throw new Error('Template not found')
+  return db.transaction(async (tx) => {
+    const ent = (
+      await tx
+        .insert(entity)
+        .values({ kind: 'note', canonicalName: t.name, createdBy: userId })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!ent) throw new Error('note entity insert returned no row')
+    // Copy, not reference — divergence after stamping is the point.
+    await tx.insert(note).values({
+      entityId: ent.id,
+      authorId: userId,
+      title: t.name,
+      ...(t.noteKind ? { kind: t.noteKind } : {}),
+      bodyJson: Array.isArray(t.body) ? t.body : [],
+      bodyMd: '',
+    })
+    await tx.insert(activity).values({
+      actorId: userId,
+      verb: 'note.created',
+      subjectEntityId: ent.id,
+    })
+    return { id: ent.id }
+  })
+}
 
 export const createNoteFromTemplate = createServerFn({ method: 'POST' })
   .validator(z.object({ templateId: z.string().uuid() }))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const t = (
-      await db
-        .select()
-        .from(template)
-        .where(and(eq(template.id, data.templateId), eq(template.kind, 'note')))
-    ).at(0)
-    if (!t) throw new Error('Template not found')
-    return db.transaction(async (tx) => {
-      const [ent] = await tx
-        .insert(entity)
-        .values({ kind: 'note', canonicalName: t.name, createdBy: u.id })
-        .returning({ id: entity.id })
-      // Copy, not reference — divergence after stamping is the point.
-      await tx.insert(note).values({
-        entityId: ent.id,
-        authorId: u.id,
-        title: t.name,
-        bodyJson: Array.isArray(t.body) ? t.body : [],
-        bodyMd: '',
-      })
-      await tx.insert(activity).values({
-        actorId: u.id,
-        verb: 'note.created',
-        subjectEntityId: ent.id,
-      })
-      return { id: ent.id }
-    })
+    return stampNoteTemplate(u.id, data)
   })
 
 // ---------- record templates ----------
