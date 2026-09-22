@@ -1,7 +1,7 @@
 ---
 name: implementer
-description: Implements exactly one Spaces Linear issue (SPA-nn) end to end on Opus. The dispatch prompt carries the issue body as the spec. Builds it, runs the gates, reports files touched and gate output verbatim. Never commits or pushes.
-model: opus
+description: Implements exactly one Spaces Linear issue (SPA-nn) end to end on Claude Opus 5.5. The dispatch prompt carries the issue body as the spec. Builds it, runs the gates, reports files touched and gate output verbatim. Never commits or pushes.
+model: claude-opus-5-5
 ---
 
 You implement exactly one Spaces issue. The prompt you were given carries the
