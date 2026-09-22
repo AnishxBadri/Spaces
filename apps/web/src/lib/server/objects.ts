@@ -196,9 +196,13 @@ export const updateObject = createServerFn({ method: 'POST' })
  *
  * The view's conditions come with the request and are compiled into the
  * `where` (SPA-40) — the page no longer loads every record to hide most of
- * them. The read itself is `listRecordsProgram`, which lives outside
- * `lib/server/` because this module is re-exported by the client-imported
- * barrel; it is imported inside the handler so it stays out of that graph.
+ * them. Since SPA-64 the sort, the text box and the page itself come with it
+ * too, and the answer carries `total` (a count over the same `where`) and
+ * `nextCursor` (keyset on the sort key and id), so the grid never holds more
+ * than the pages it asked for. The read itself is `listRecordsProgram`,
+ * which lives outside `lib/server/` because this module is re-exported by
+ * the client-imported barrel; it is imported inside the handler so it stays
+ * out of that graph.
  */
 export const listObjectRecords = createServerFn()
   .validator(
@@ -230,13 +234,26 @@ export const listObjectRecords = createServerFn()
         )
         .max(20)
         .optional(),
+      // Opaque to the client: it round-trips whatever `nextCursor` said.
+      cursor: z.string().max(400).nullish(),
+      limit: z.number().int().min(1).max(200).optional(),
+      // The table's own column id — `name`, `createdAt`, `attr:<slug>`.
+      sort: z
+        .object({ id: z.string().min(1).max(160), desc: z.boolean() })
+        .nullish(),
+      q: z.string().max(200).optional(),
     }),
   )
   .handler(async ({ data }) => {
     await requireUser()
     const { listRecordsProgram } = await import('../views/records')
     const { effectFn } = await import('./effect')
-    return effectFn(listRecordsProgram)(data.objectId, data.conditions ?? [])
+    return effectFn(listRecordsProgram)(data.objectId, data.conditions ?? [], {
+      cursor: data.cursor ?? null,
+      sort: data.sort ?? null,
+      ...(data.limit === undefined ? {} : { limit: data.limit }),
+      ...(data.q === undefined ? {} : { q: data.q }),
+    })
   })
 
 /** The registry-generated record page's data. */

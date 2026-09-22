@@ -176,6 +176,35 @@ function compileCondition(c: Condition, f: ResolvedField): SQL {
 }
 
 /**
+ * How the sort key must be cast on its way back out of a keyset cursor.
+ * The cursor travels as text, so the comparison has to say what it is again.
+ */
+export type SortCast = 'text' | 'numeric'
+
+/**
+ * The same two coercions, in `order by` position instead of in a predicate
+ * (SPA-64). A paged list cannot sort in the browser — the browser only holds
+ * the pages it asked for — so the sort key is compiled here, from the same
+ * `resolve` seam and the same `String(v)` / `Number(v)` readings that
+ * `gt`/`lt` use, rather than by a second set of rules that would order a
+ * column differently than "greater than" filters it.
+ *
+ * Dates are ISO strings, so lexical order is chronological order and `text`
+ * is right for them; `gt`/`lt` already compare them that way.
+ *
+ * The expression is SQL NULL exactly when the key is absent — `text`/`num`
+ * both pass a NULL through — which is what `nulls last` then sorts on.
+ */
+export function compileSortKey(f: ResolvedField): {
+  expr: SQL
+  cast: SortCast
+} {
+  return isNumericType(f.type)
+    ? { expr: num(f.expr), cast: 'numeric' }
+    : { expr: text(f.expr), cast: 'text' }
+}
+
+/**
  * One drizzle predicate for a whole condition list, ANDed — or undefined when
  * nothing survived, which is the caller's signal to add no `where` at all.
  *
