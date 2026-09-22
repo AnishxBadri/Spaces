@@ -16,7 +16,9 @@ one and say which you left and why.
    your very first command and confirm `git log --oneline -1` matches
    `git -C "$(git rev-parse --git-common-dir)/.." log --oneline -1 main`.
    If the fast-forward refuses, stop and report — do not build on an old
-   base.
+   base. Then `cp "$(git rev-parse --git-common-dir)/../.env.local" .` —
+   `.env.local` is gitignored and does not come across with the worktree;
+   without it every DB-backed test fails with `ECONNREFUSED`.
 1. Read `CLAUDE.md` in full. It is short and every line has already cost a
    session.
 2. Read the block of `CONTEXT.md` the issue's Spec section names.
