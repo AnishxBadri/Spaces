@@ -276,9 +276,13 @@ describe('one reference check', () => {
       .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
       .filter((f) => {
         const text = readFileSync(join(src, f), 'utf8')
-        // A count over `document` narrowed by its blob digest, however the
-        // author spelled the intermediate: the pair is the query.
-        return text.includes('count()') && text.includes('document.blobSha')
+        // A count over `document` **narrowed by** its blob digest: the
+        // `eq(...)` is what makes it this query rather than a coincidence.
+        // `document.blobSha` alone was the test until docsurf-10b, when the
+        // shelf started selecting the column to decide Download versus
+        // "Open source" — and a module that merely reads the column while
+        // counting something else entirely is not a second asker.
+        return text.includes('count()') && text.includes('eq(document.blobSha')
       })
       .sort()
     expect(askers).toEqual(['lib/documents/blob-refs.ts'])

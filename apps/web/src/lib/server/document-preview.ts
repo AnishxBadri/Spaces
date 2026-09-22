@@ -34,6 +34,13 @@ export const getDocumentPreview = createServerFn()
           sizeBytes: document.sizeBytes,
           extractionStatus: document.extractionStatus,
           extractionError: document.extractionError,
+          // The two columns that decide whether there is a file to fetch at
+          // all (docsurf-10b). A clipped article has no blob and an address
+          // instead, and the dialog renders the extracted text with the
+          // address linked rather than asking storage for bytes it never
+          // stored — which is what `getDocumentDownloadUrl` throws about.
+          blobSha: document.blobSha,
+          url: document.url,
           mergedIntoId: entity.mergedIntoId,
         })
         .from(document)
@@ -50,5 +57,7 @@ export const getDocumentPreview = createServerFn()
       sizeBytes: row.sizeBytes,
       extractionStatus: row.extractionStatus,
       extractionError: row.extractionError,
+      blobSha: row.blobSha,
+      url: row.url,
     }
   })

@@ -181,6 +181,11 @@ export const listRecordDocuments = createServerFn()
         extractionError: document.extractionError,
         createdAt: document.createdAt,
         uploadedBy: document.uploadedBy,
+        // Whether there are bytes at all (docsurf-10b). Null on a clipped
+        // article — the page was read, never stored — and the row's controls
+        // read it: a download that cannot exist is offered as "Open source"
+        // instead, rather than as a button that throws when pressed.
+        blobSha: document.blobSha,
         // The clip's own address (SPA-117), and the one column that tells a
         // saved article from a file: the row's pending state reads
         // "fetching…" rather than "extracting text…" when it is set.
@@ -355,6 +360,18 @@ export const getDocumentText = createServerFn({ method: 'POST' })
     return { text: row?.text ?? null }
   })
 
+/**
+ * A short-lived URL for the bytes.
+ *
+ * **The `blob_sha IS NULL` throw stays** (docsurf-10b). A clip keeps no
+ * bytes by design (§3.1), so "this document has no stored file" is the
+ * literal truth about the row and the right answer to an id that names one —
+ * an SDK caller, a stale tab, a hand-made request. What changed is that no
+ * control can reach it any more: the Files tab, the space Sources lane,
+ * `/documents` and `DocumentPreview` all read `blobSha` and render "Open
+ * source" against `document.url` where there is nothing to download. Softening
+ * this into a null answer would have turned a wrong call into a silent one.
+ */
 export const getDocumentDownloadUrl = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {

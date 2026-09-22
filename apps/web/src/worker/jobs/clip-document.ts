@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { Readability } from '@mozilla/readability'
 import { Effect, Schema } from 'effect'
 import { eq, sql } from 'drizzle-orm'
@@ -5,8 +6,11 @@ import { parseHTML } from 'linkedom'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { document, entity } from '@spaces/db/schema'
+import { guessDocumentKind } from '@spaces/core/documents'
 import { QUEUES } from '@spaces/core/queue/names'
 import { guardedFetch } from '#/lib/documents/fetch-guard'
+import { enqueue } from '#/lib/queue'
+import { storage } from '#/lib/storage'
 import { JobPermanent, JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 
@@ -26,7 +30,8 @@ import type { JobDef } from '../run-job'
  *
  *   - the guard refused the URL or a redirect → 'failed', the sentence
  *   - a network error or a timeout            → 'failed', the sentence
- *   - a non-HTML content-type                 → 'unsupported', the type
+ *   - a content-type that is neither HTML
+ *     nor PDF                                 → 'unsupported', the type
  *   - readability found no article            → 'unsupported'
  *
  * The network branch is the judgement call. A blob read is retried by
@@ -38,9 +43,23 @@ import type { JobDef } from '../run-job'
  * needs. The one retryable failure is Postgres itself, which says nothing
  * about the page and may well take the write next time.
  *
- * docsurf-10b is the one exception that will be added here: a PDF
- * content-type becomes a real blob through intake rather than an
- * 'unsupported' row, using the same `guardedFetch` bytes.
+ * **The PDF branch is docsurf-10b** (§3.1 entry point 5, "PDF snapshot"): a
+ * URL whose response is a PDF is not a second kind of thing, it is a deck
+ * that happened to arrive over HTTP, so it goes down the ordinary blob path
+ * — hash the bytes, store them under the digest, point the row at them and
+ * hand it to `document.extract`, which is the same pipeline an upload walks.
+ *
+ * **It is the second `storage().put(` in the app, and deliberately not
+ * `intakeDocumentProgram`.** The server byte lane
+ * (`lib/documents/intake.ts`) ends in `birthDocumentProgram`: it *births a
+ * row*. Here the row already exists — `clipUrlProgram` wrote it, named it,
+ * filed it and enqueued this job before a packet left the box — so reusing
+ * intake would mean a second document for the same clip and an orphaned
+ * first one. What is shared instead is the thing worth sharing: content
+ * addressing. The digest is the key, so an identical deck already uploaded
+ * is already stored and `exists` says so — one blob, two rows, which is the
+ * only dedupe a pre-existing row can have. `intake.test.ts`'s one-caller
+ * assertion names this file for exactly that reason.
  */
 
 export const clipDocumentData = z.object({
@@ -104,6 +123,44 @@ function isHtml(type: string): boolean {
   return type === 'text/html' || type === 'application/xhtml+xml'
 }
 
+/** The one mime a clipped PDF is stored under, whatever the server said. */
+const PDF_MIME = 'application/pdf'
+
+/** `%PDF-`, the five bytes every PDF opens with (ISO 32000-1 §7.5.2). */
+const PDF_MAGIC = Uint8Array.from([0x25, 0x50, 0x44, 0x46, 0x2d])
+
+/**
+ * A PDF, by what the server said *or* by what it actually sent. The magic
+ * bytes are not belt-and-braces: a deck behind a download endpoint is served
+ * as `application/octet-stream` about as often as it is labelled honestly,
+ * and a content-type table alone would record those as 'unsupported' with a
+ * perfectly good PDF in hand. Read before the HTML branch, so bytes win over
+ * a mislabel in either direction.
+ */
+function isPdf(type: string, bytes: Uint8Array): boolean {
+  if (type === PDF_MIME) return true
+  if (bytes.length < PDF_MAGIC.length) return false
+  return PDF_MAGIC.every((byte, i) => bytes[i] === byte)
+}
+
+/**
+ * The filename inside a URL — `…/decks/seed-deck.pdf` → `seed-deck.pdf` —
+ * which is all `guessDocumentKind` needs and the only name this arrival has.
+ * A URL ending in a slash, or one with no path at all, has no segment to
+ * read and falls back to the whole address, which guesses `other`.
+ */
+function lastPathSegment(raw: string): string {
+  try {
+    const last = new URL(raw).pathname
+      .split('/')
+      .filter((segment) => segment !== '')
+      .at(-1)
+    return last === undefined ? raw : decodeURIComponent(last)
+  } catch {
+    return raw
+  }
+}
+
 /**
  * Readability over linkedom. linkedom rather than jsdom because this parses
  * hostile HTML on the worker: jsdom runs scripts and implements far more of
@@ -152,6 +209,71 @@ function decode(bytes: Uint8Array): string {
   return new TextDecoder('utf-8', { fatal: false }).decode(bytes)
 }
 
+/**
+ * The PDF response, stored — hash, put (unless the digest is already there),
+ * point the row at it, enqueue extraction.
+ *
+ * The bytes are already whole and already capped: `guardedFetch` counted
+ * them off the stream against `CLIP_MAX_BYTES` and answered `ok: false` at
+ * 10MB + 1, so a runaway response is a 'failed' row with the limit in the
+ * sentence and **nothing stored** — the store is never reached. That is why
+ * a `Buffer` is honest here where `intake.ts` needs a temp file: intake
+ * takes a 250MB upload of unknown length, this takes ten megabytes at most.
+ *
+ * `extraction_status` back to 'pending' and `extraction_error` to null on
+ * purpose: a re-clip of a row that failed last time must not leave the old
+ * sentence sitting under a blob that is now perfectly extractable.
+ *
+ * The enqueue is last and outside any transaction, exactly as birth's is: a
+ * queue that is down must not undo a good row, and with no worker the row
+ * reads 'pending' and says so on every surface.
+ */
+const storePdf = Effect.fn('clipDocument.storePdf')(function* (
+  documentId: string,
+  fetched: { readonly url: string; readonly bytes: Uint8Array },
+): Effect.fn.Return<void, ClipStoreUnavailable> {
+  const bytes = fetched.bytes
+  const sha = createHash('sha256').update(bytes).digest('hex')
+
+  // Content addressing *is* the dedupe available to a row that already
+  // exists: the same deck uploaded an hour ago is already these bytes under
+  // this key, so the two rows share one file on disk. §3.4's row-level
+  // dedupe is birth's, and birth is not on this path.
+  const stored = yield* store('blobExists', () => storage().exists(sha))
+  if (!stored) {
+    yield* store('blobPut', () =>
+      storage().put(sha, Buffer.from(bytes), { mime: PDF_MIME }),
+    )
+  }
+
+  yield* store('markStored', async () => {
+    await db
+      .update(document)
+      .set({
+        blobSha: sha,
+        // What we counted, never what the server declared — the same rule
+        // intake applies to `declaredSize`.
+        sizeBytes: bytes.byteLength,
+        mime: PDF_MIME,
+        // The row was born `article`, which is what a pasted link usually
+        // is. This one turned out to be a file, so it is filed the way the
+        // same file would have been had somebody dragged it in.
+        kind: guessDocumentKind(lastPathSegment(fetched.url)),
+        extractionStatus: 'pending',
+        extractionError: null,
+      })
+      .where(eq(document.entityId, documentId))
+  })
+
+  yield* store('enqueueExtract', () =>
+    enqueue(QUEUES.extractDocument, { documentId }),
+  )
+
+  console.log(
+    `[worker] stored ${String(bytes.byteLength)} PDF bytes from ${fetched.url} as ${sha}`,
+  )
+})
+
 const program = Effect.fn('clipDocument')(function* (data: ClipDocumentData) {
   const { documentId } = data
   const row = yield* store(
@@ -194,12 +316,17 @@ const program = Effect.fn('clipDocument')(function* (data: ClipDocumentData) {
   }
 
   const type = mediaType(fetched.contentType)
+  // Before the HTML branch: a PDF is a document with bytes, not a page that
+  // failed to be an article, and this is the whole of docsurf-10b.
+  if (isPdf(type, fetched.bytes)) {
+    return yield* storePdf(documentId, fetched)
+  }
   if (!isHtml(type)) {
     return yield* new ClipRefused({
       status: 'unsupported',
       // The content-type verbatim, because the next question an operator asks
-      // is "what was it then" — and docsurf-10b reads this branch to decide
-      // which types become a blob through intake instead.
+      // is "what was it then". PDF is handled above; everything still landing
+      // here — a zip, a video, a JSON API — has no reader in the product.
       reason: `Not an HTML page — the server answered ${type === '' ? 'no content-type' : type}`,
     })
   }

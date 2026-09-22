@@ -18,7 +18,11 @@ import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Select } from './ui/select'
 import { DocumentPreview } from './document-preview'
-import { GoneMarker, OpenInSourceButton } from './document-source'
+import {
+  GoneMarker,
+  OpenInSourceButton,
+  OpenSourceButton,
+} from './document-source'
 import { DocumentTile } from './document-tile'
 import { KIND_ICONS } from './editor/mention'
 import {
@@ -344,15 +348,27 @@ function DocumentRow({
         >
           <Eye />
         </Button>
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          aria-label={`Download ${doc.filename}`}
-          onClick={download}
-          className="text-graphite"
-        >
-          <Download />
-        </Button>
+        {/* Bytes or an address, never both (docsurf-10b). A clipped article
+            has no blob, so Download would only reach
+            `getDocumentDownloadUrl`'s throw — the row offers the page it was
+            read from instead. A blobless row with no URL either is not a
+            state the product writes, and it gets no control rather than a
+            broken one. */}
+        {doc.blobSha === null ? (
+          doc.url === null ? null : (
+            <OpenSourceButton url={doc.url} filename={doc.filename} />
+          )
+        ) : (
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label={`Download ${doc.filename}`}
+            onClick={download}
+            className="text-graphite"
+          >
+            <Download />
+          </Button>
+        )}
         <Button
           size="icon-xs"
           variant="ghost"

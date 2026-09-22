@@ -21,11 +21,18 @@ import type {
 
 /**
  * **The server byte lane** (SPA-130) — every arrival that is not a browser
- * PUT. The URL clip's PDF response, a plugin filing a document through the
- * SDK, a pasted Drive link, the Drive walker: four slices across three areas
- * all hold a `Readable` server-side and hold **no sha**, and this is the half
- * `birthDocumentProgram` deliberately cannot do. Built exactly once, which is
- * the point of the cluster.
+ * PUT and has **no row yet**. A plugin filing a document through the SDK, a
+ * pasted Drive link, the Drive walker: they hold a `Readable` server-side,
+ * hold **no sha**, and want a document born at the end of it — which is the
+ * half `birthDocumentProgram` deliberately cannot do. Built exactly once,
+ * which is the point of the cluster.
+ *
+ * **The URL clip's PDF response is the one arrival this lane does not
+ * serve** (docsurf-10b, `worker/jobs/clip-document.ts`). This program ends
+ * in birth, and a clip's row already exists — `clipUrlProgram` wrote it
+ * before the fetch — so routing it here would mint a second document and
+ * orphan the first. It hashes and `put`s the bytes itself, which is why
+ * `intake.test.ts` asserts *two* `storage().put(` sites and not one.
  *
  * **The other lane is `lib/documents/upload.ts`,** and browser uploads must
  * keep using it: the page hashes with WebCrypto and PUTs straight at storage
