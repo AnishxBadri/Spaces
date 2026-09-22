@@ -5,8 +5,8 @@
  * through Node (CONTEXT.md → Storage). Only the row is filed through a server
  * fn.
  *
- * The other lane is `#/lib/server/document-intake.ts` (SPA-130, not built
- * yet): bytes that arrive server-side already — the URL clip's PDF response, a
+ * The other lane is `#/lib/documents/intake.ts` (SPA-130): bytes that arrive
+ * server-side already — the URL clip's PDF response, a
  * plugin filing a document, the Drive walker — where Node holds the buffer and
  * hashes it itself. Two lanes, one writer: both end at
  * `finalizeDocumentUpload`.
