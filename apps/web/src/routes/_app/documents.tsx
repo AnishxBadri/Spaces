@@ -9,7 +9,7 @@ import {
 import type { ColumnDef } from '@tanstack/react-table'
 import { FileText, Layers, Upload } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { z } from 'zod'
 import { DocumentPreview } from '#/components/document-preview'
 import {
@@ -27,10 +27,17 @@ import { RecordTable, TableToolbar } from '#/components/table/record-table'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { useViewState } from '#/components/views/use-view-state'
 import { ViewBar } from '#/components/views/view-bar'
-import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import { formatSince } from '@spaces/core/format'
+import { matchesConditions } from '@spaces/core/views/filter'
+import {
+  DOCUMENT_EXTRACTION_LABELS,
+  documentFieldType,
+  documentRegistry,
+} from '#/lib/documents/registry'
+import { projectDocument } from '#/lib/documents/project'
 import { recordPath } from '#/lib/record-path'
+import type { ViewRow } from '#/lib/views/store'
 import { getSession, listDocuments, listViews } from '#/lib/server-fns'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 
@@ -48,10 +55,16 @@ import { openUploadDialog } from '#/lib/upload-dialog-store'
  * `ViewBar` the four object lists use — no second bar. That is what `D2`
  * bought: `view.surface` is `document` here and `object_id` is null, so
  * `listViews({ surface: 'document' })` hands back `objectId: null` and
- * `viewTarget(null)` inside the bar turns it back into the document key. Column
- * visibility and sort are the view; the Filter control is present but disabled
- * until docsurf-12b (SPA-141) gives the shelf a filter model, because there is
- * no registry to build an attribute → op → value row from.
+ * `viewTarget(null)` inside the bar turns it back into the document key.
+ *
+ * Since docsurf-12b (SPA-141) it **filters** too, through the same bar. The
+ * registry the condition editor draws from is declared in code rather than
+ * read from the `attribute` table — `lib/documents/registry.ts` says why that
+ * is legitimate — and `lib/documents/project.ts` turns each loaded row into
+ * the values record `matchesConditions` already reads. The pure filter model
+ * (`@spaces/core/views/filter`) gains nothing: no operator, no branch, no
+ * knowledge that documents exist. Evaluation is client-side over the loaded
+ * rows, as on every other unpaginated table.
  *
  * **Column widths stay in `useTablePrefs` under a frozen key**, as on every
  * other list: `view.columns` is `Record<string, boolean>` — visibility only —
@@ -73,6 +86,14 @@ import { openUploadDialog } from '#/lib/upload-dialog-store'
  * reload, back/forward and a linkable badge on Today for free; the toolbar's
  * toggle writes the param and reads it back and holds no state of its own, so
  * the URL is the one place the answer lives.
+ *
+ * A view now carries it in `extra` (docsurf-12b, D3) — saved with the toggle
+ * as it stands, and written back into the param when the view is applied —
+ * but the param stays the truth and stays addressable on its own, so
+ * `?filed=unfiled` with no `?view=` is exactly what it was. It is deliberately
+ * **not** a condition: it is a server-side slice (a `loaderDeps` key, one
+ * `where` clause) and the target Today's readout cell links to, and folding it
+ * into the condition list would make the badge and the link disagree.
  */
 /**
  * `loaderDeps` is what re-runs the loader when the param changes — a loader
@@ -87,8 +108,9 @@ import { openUploadDialog } from '#/lib/upload-dialog-store'
  * rows. `filed` is in, because it changes which rows the server sends.
  * The two are independent params on purpose — `?filed=unfiled&view=…` is a
  * legal URL, and every control below writes its own key and leaves the other
- * alone (docsurf-12b folds `filed` into the view's `extra`; until then it is
- * a bare param, SPA-124).
+ * alone. Applying a view is the one crossing: it carries `filed` in its
+ * `extra` and writes the param, which costs one loader run and is why that
+ * sync is a navigation rather than the render-time seed the columns get.
  */
 const documentsSearch = z.object({
   filed: z.enum(['all', 'unfiled']).catch('all').default('all'),
@@ -118,15 +140,6 @@ export const Route = createFileRoute('/_app/documents')({
 })
 
 type DocumentRow = Awaited<ReturnType<typeof listDocuments>>[number]
-
-/**
- * The shelf has no attribute registry, and the bar's conditions editor is the
- * only thing that would read one — it is disabled here. Hoisted so the bar
- * does not get a fresh array every render.
- */
-const NO_REGISTRY: Array<RegistryEntry> = []
-
-const FILTER_UNAVAILABLE = 'Filters for documents arrive with the next slice'
 
 const col = createColumnHelper<DocumentRow>()
 // FROZEN: renaming resets saved column layouts with no recovery path.
@@ -175,17 +188,16 @@ function sourceText(r: DocumentRow): string {
   return r.sourcePath === null ? origin : `${origin} · ${r.sourcePath}`
 }
 
-/** The status word, and whether it is the bad kind. */
+/**
+ * The status word, and whether it is the bad kind. The word itself comes from
+ * `DOCUMENT_EXTRACTION_LABELS`, which is also what the Filter popover's
+ * Extraction options read — the cell and the filter naming the same state
+ * differently is the drift that file exists to prevent.
+ */
 function extractionText(r: DocumentRow): { text: string; bad: boolean } {
-  switch (r.extractionStatus) {
-    case 'pending':
-      return { text: 'extracting…', bad: false }
-    case 'failed':
-      return { text: 'failed', bad: true }
-    case 'unsupported':
-      return { text: 'no text layer', bad: false }
-    default:
-      return { text: 'extracted', bad: false }
+  return {
+    text: DOCUMENT_EXTRACTION_LABELS[r.extractionStatus],
+    bad: r.extractionStatus === 'failed',
   }
 }
 
@@ -237,6 +249,80 @@ function DocumentsPage() {
         ...(id === null ? {} : { view: id }),
       }),
     })
+
+  /**
+   * Applying a view writes both keys in one navigation: its `extra.filed`
+   * into the param, and its own id. "All" (`v === null`) leaves `filed`
+   * alone — the bare param is addressable on its own and clearing a view is
+   * not a statement about the inbox.
+   */
+  const applyView = (v: ViewRow | null) => {
+    vs.apply(v)
+    const stored = v?.extra.filed
+    void navigate({
+      search: (prev) => ({
+        filed: stored === 'all' || stored === 'unfiled' ? stored : prev.filed,
+        ...(v === null ? {} : { view: v.id }),
+      }),
+    })
+  }
+
+  /**
+   * The other way in: a pasted `?view=` link, a reload, back/forward. Columns
+   * and conditions are seeded during render (above, and in `useViewState`'s
+   * initializers) because they are React state; `filed` is a `loaderDeps` key,
+   * so restoring it is a navigation and a navigation cannot happen during a
+   * render. `undefined` as the initial value is what makes the first pass
+   * count as a change — `null` is the legitimate "no view" id.
+   *
+   * It fires only when the *view id* changes, which is what keeps it off the
+   * toggle's back: flipping Unfiled while a view is active changes `filed`
+   * and not `activeId`, so this sees nothing to do and the snapshot simply
+   * goes dirty.
+   */
+  const storedFiled = views.find((v) => v.id === activeId)?.extra.filed
+  const [filedSyncedFor, setFiledSyncedFor] = useState<
+    string | null | undefined
+  >(undefined)
+  useEffect(() => {
+    if (filedSyncedFor === (activeId ?? null)) return
+    setFiledSyncedFor(activeId ?? null)
+    if (
+      (storedFiled === 'all' || storedFiled === 'unfiled') &&
+      storedFiled !== filed
+    )
+      void navigate({
+        search: (prev) => ({ ...prev, filed: storedFiled }),
+        replace: true,
+      })
+  }, [activeId, filed, filedSyncedFor, navigate, storedFiled])
+
+  /**
+   * The surface's field list, with the space and record options filled from
+   * the rows on screen (`lib/documents/registry.ts`). Memoized on the rows so
+   * the popover's pickers do not get a fresh option array every render.
+   */
+  const registry = useMemo(() => documentRegistry(documents), [documents])
+
+  /**
+   * Conditions run before the table, the way `/deals` narrows by stage before
+   * its table: the free-text box is the table's own filter and these are the
+   * view's, and the toolbar's "N of M" should count the shelf, not the
+   * conditions.
+   */
+  const rows = useMemo(
+    () =>
+      vs.conditions.length === 0
+        ? documents
+        : documents.filter((r) =>
+            matchesConditions(
+              projectDocument(r),
+              vs.conditions,
+              documentFieldType,
+            ),
+          ),
+    [documents, vs.conditions],
+  )
 
   const columns = useMemo(() => {
     const defs: Array<ColumnDef<DocumentRow, unknown>> = [
@@ -409,7 +495,7 @@ function DocumentsPage() {
   }, [])
 
   const table = useReactTable({
-    data: documents,
+    data: rows,
     columns,
     state: {
       sorting,
@@ -499,15 +585,18 @@ function DocumentsPage() {
             >
               <ViewBar
                 objectId={objectId}
-                registry={NO_REGISTRY}
-                filterUnavailable={FILTER_UNAVAILABLE}
+                registry={registry}
                 views={views}
                 activeId={activeId ?? null}
-                snapshot={vs.snapshot}
-                onApply={(v) => {
-                  vs.apply(v)
-                  selectView(v?.id ?? null)
-                }}
+                /*
+                  `filed` is read off the URL rather than out of the hook's
+                  `extra`: the param is this surface's one source of truth for
+                  it (see the route comment), so the snapshot the bar saves
+                  and compares is what the address bar says, and the two can
+                  never drift.
+                */
+                snapshot={{ ...vs.snapshot, extra: { filed } }}
+                onApply={applyView}
                 selectView={selectView}
                 onFilterChange={vs.setConditions}
                 onSaved={() => router.invalidate()}
