@@ -30,9 +30,11 @@ import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
+import { WaitingRail } from '#/components/record/waiting-rail'
 import { recordPath } from '#/lib/record-path'
 import {
   addPersonContact,
+  countOpenSuggestions,
   createNote,
   getPerson,
   getRecordTimeline,
@@ -57,6 +59,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       timeline,
       documents,
       notes,
+      waiting,
     ] = await Promise.all([
       getPerson({ data: { id: params.personId } }),
       listCompanies(),
@@ -65,6 +68,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       getRecordTimeline({ data: { entityId: params.personId } }),
       listRecordDocuments({ data: { entityId: params.personId } }),
       listRecordNotes({ data: { entityId: params.personId } }),
+      countOpenSuggestions({ data: { entityId: params.personId } }),
     ])
     if (personData.mergedIntoId) {
       throw redirect({
@@ -80,6 +84,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       timeline,
       documents,
       notes,
+      waiting,
     }
   },
   component: PersonRecordPage,
@@ -94,6 +99,7 @@ function PersonRecordPage() {
     timeline,
     documents,
     notes,
+    waiting,
   } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
@@ -195,6 +201,7 @@ function PersonRecordPage() {
       <RecordBody
         rail={
           <>
+            <WaitingRail entityId={person.id} counts={waiting} />
             <RailSection label="Companies" meta={`${person.companies.length}`}>
               {person.companies.map((c) => (
                 <RailItem key={c.id} className="group">

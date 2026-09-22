@@ -25,6 +25,7 @@ export type {
   InboxCounts,
   InboxKind,
   InboxRow,
+  InboxScopeRecord,
   SuggestionCitation,
   SuggestionField,
   SuggestionItem,
@@ -35,12 +36,27 @@ export type {
 export type { InboxSide } from '../inbox/context'
 export type { SuggestionKind } from '../ai/propose'
 
-export const listInbox = createServerFn().handler(async () => {
-  await requireUser()
-  const { listInboxProgram } = await import('../inbox/queue')
-  const { effectFn } = await import('./effect')
-  return effectFn(listInboxProgram)()
-})
+/**
+ * The queue, optionally scoped to one record (SPA-114: the record rail's
+ * "Waiting" chips land here with `?record=`). `scope` is the record's name
+ * for the header's dismissible chip, read beside the rows rather than from
+ * them — an emptied queue still names what it is scoped to.
+ */
+export const listInbox = createServerFn()
+  .validator(z.object({ record: z.string().uuid().nullable() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { listInboxProgram, inboxScopeRecordProgram } =
+      await import('../inbox/queue')
+    const { effectFn } = await import('./effect')
+    const [rows, scope] = await Promise.all([
+      effectFn(listInboxProgram)({ record: data.record }),
+      data.record === null
+        ? Promise.resolve(null)
+        : effectFn(inboxScopeRecordProgram)(data.record),
+    ])
+    return { rows, scope }
+  })
 
 export const countOpenInbox = createServerFn().handler(async () => {
   await requireUser()

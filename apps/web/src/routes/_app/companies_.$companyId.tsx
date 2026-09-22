@@ -34,9 +34,11 @@ import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
+import { WaitingRail } from '#/components/record/waiting-rail'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import {
   addCompanyDomain,
+  countOpenSuggestions,
   createNote,
   getCompany,
   getRecordTimeline,
@@ -62,6 +64,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       timeline,
       documents,
       notes,
+      waiting,
     ] = await Promise.all([
       getCompany({ data: { id: params.companyId } }),
       listSpaces(),
@@ -71,6 +74,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       getRecordTimeline({ data: { entityId: params.companyId } }),
       listRecordDocuments({ data: { entityId: params.companyId } }),
       listRecordNotes({ data: { entityId: params.companyId } }),
+      countOpenSuggestions({ data: { entityId: params.companyId } }),
     ])
     // Merged-away records redirect to their survivor — stale URLs keep working.
     if (companyData.mergedIntoId) {
@@ -88,6 +92,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       timeline,
       documents,
       notes,
+      waiting,
     }
   },
   component: CompanyRecordPage,
@@ -103,6 +108,7 @@ function CompanyRecordPage() {
     timeline,
     documents,
     notes,
+    waiting,
   } = Route.useLoaderData()
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
@@ -213,6 +219,7 @@ function CompanyRecordPage() {
       <RecordBody
         rail={
           <>
+            <WaitingRail entityId={company.id} counts={waiting} />
             <RailSection
               label="Deals"
               meta={
