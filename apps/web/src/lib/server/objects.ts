@@ -6,6 +6,7 @@ import { db } from '@spaces/db'
 import { attribute, entity, link, objectDef } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { referencedByRows, requireUser } from './shared'
+import { pagedListShape, pageOptions } from '#/lib/views/page-input'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
 
 /**
@@ -205,55 +206,16 @@ export const updateObject = createServerFn({ method: 'POST' })
  * out of that graph.
  */
 export const listObjectRecords = createServerFn()
-  .validator(
-    z.object({
-      objectId: z.string().uuid(),
-      conditions: z
-        .array(
-          z.object({
-            slug: z.string().min(1).max(120),
-            op: z.enum([
-              'is',
-              'is_not',
-              'contains',
-              'empty',
-              'not_empty',
-              'gt',
-              'lt',
-            ]),
-            value: z
-              .union([
-                z.string().max(400),
-                z.number(),
-                z.boolean(),
-                z.null(),
-                z.array(z.string().max(400)).max(50),
-              ])
-              .optional(),
-          }),
-        )
-        .max(20)
-        .optional(),
-      // Opaque to the client: it round-trips whatever `nextCursor` said.
-      cursor: z.string().max(400).nullish(),
-      limit: z.number().int().min(1).max(200).optional(),
-      // The table's own column id — `name`, `createdAt`, `attr:<slug>`.
-      sort: z
-        .object({ id: z.string().min(1).max(160), desc: z.boolean() })
-        .nullish(),
-      q: z.string().max(200).optional(),
-    }),
-  )
+  .validator(z.object({ objectId: z.string().uuid(), ...pagedListShape }))
   .handler(async ({ data }) => {
     await requireUser()
     const { listRecordsProgram } = await import('../views/records')
     const { effectFn } = await import('./effect')
-    return effectFn(listRecordsProgram)(data.objectId, data.conditions ?? [], {
-      cursor: data.cursor ?? null,
-      sort: data.sort ?? null,
-      ...(data.limit === undefined ? {} : { limit: data.limit }),
-      ...(data.q === undefined ? {} : { q: data.q }),
-    })
+    return effectFn(listRecordsProgram)(
+      data.objectId,
+      data.conditions ?? [],
+      pageOptions(data),
+    )
   })
 
 /** The registry-generated record page's data. */

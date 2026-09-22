@@ -23,6 +23,17 @@ import {
   fmtXirr,
 } from '@spaces/core/portfolio/format'
 
+/**
+ * **This page does not page, and that is a decision, not an omission
+ * (SPA-96).** Every number above the table — cost basis, unrealized,
+ * realized, TVPI — is summed across **all** holdings, and the excluded-rows
+ * banner counts the ones whose FX is missing out of the same whole. A paged
+ * loader would compute a fund's position from whichever fifty rows arrived
+ * first. If this ever outgrows one fetch, the totals become their own server
+ * aggregate before the rows become a page — never the other way round.
+ * (The deal board stays whole for the sibling reason: its stage chips
+ * count the whole pipeline.)
+ */
 export const Route = createFileRoute('/_app/portfolio')({
   loader: async () => listHoldings(),
   component: PortfolioPage,

@@ -1,5 +1,5 @@
 import { getRequest } from '@tanstack/react-start/server'
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { auth } from '../auth'
 import { db } from '@spaces/db'
 import {
@@ -8,8 +8,6 @@ import {
   entity,
   entitySpace,
   integration,
-  interaction,
-  interactionEntity,
   link,
   objectDef,
   space,
@@ -146,23 +144,6 @@ export async function birthHolding(opts: {
     .from(holding)
     .where(eq(holding.companyId, opts.companyId))
   return { id: existing.id, created: false }
-}
-
-/** Latest interaction per entity — the "last touched" signal for tables. */
-export async function lastTouchedMap(): Promise<
-  Record<string, string | undefined>
-> {
-  const rows = await db
-    .select({
-      entityId: interactionEntity.entityId,
-      last: sql<string>`max(${interaction.occurredAt})`,
-    })
-    .from(interactionEntity)
-    .innerJoin(interaction, eq(interaction.id, interactionEntity.interactionId))
-    .groupBy(interactionEntity.entityId)
-  return Object.fromEntries(
-    rows.map((r) => [r.entityId, new Date(r.last).toISOString()]),
-  )
 }
 
 /** One inbound `references` edge: the record pointing here, and its labels. */

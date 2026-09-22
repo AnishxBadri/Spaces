@@ -3,11 +3,19 @@ import { and, eq, ilike, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute, entity, entitySpace, link } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
-import { compileConditions, compileSortKey } from './sql'
+import { compileConditions } from './sql'
 import { entityValuesResolver } from './resolve'
-import { RECORD_PAGE_MAX, RECORD_PAGE_SIZE } from './page-size'
-import type { SQL } from 'drizzle-orm'
-import type { SortCast } from './sql'
+import {
+  afterCursor,
+  clampLimit,
+  cutPage,
+  decodeCursor,
+  likeArg,
+  orderByPage,
+  planSort,
+  sortKeyColumn,
+} from './paging'
+import type { ListPageOptions, RecordSort } from './paging'
 import type { Condition } from '@spaces/core/views/filter'
 
 /**
@@ -55,104 +63,12 @@ const query = <T>(run: () => Promise<T>) =>
   })
 
 /**
- * A sort as the table spells it: the column id, which is `name`,
- * `createdAt`, or `attr:<slug>`. The grid is the only caller and those ids
- * are its own, so the translation to a column or a `values` member lives
- * here rather than being re-derived on the client and sent as SQL-ish input.
+ * Re-exported so the shape of this surface's options reads at the call site;
+ * the pager itself is `./paging`, shared with `/companies` and `/people`
+ * (SPA-96).
  */
-export type RecordSort = { id: string; desc: boolean }
-
-export type ListRecordsOptions = {
-  /** Opaque keyset cursor from a previous page's `nextCursor`. */
-  cursor?: string | null
-  /** Rows per page; clamped to `RECORD_PAGE_MAX`. */
-  limit?: number
-  /** The view's sort, or the header the reader clicked. */
-  sort?: RecordSort | null
-  /** The toolbar's text box — `ILIKE '%q%'` on `canonical_name`. */
-  q?: string
-}
-
-/** The default order, and the fallback for a sort key this surface has not got. */
-const NEWEST_FIRST: RecordSort = { id: 'createdAt', desc: true }
-
-type SortPlan = { expr: SQL; cast: SortCast | 'timestamptz'; desc: boolean }
-
-/** A page's place in the order: the last row's sort key, and its id. */
-type PageCursor = { k: string | null; id: string }
-
-function planSort(
-  sort: RecordSort | null | undefined,
-  resolve: ReturnType<typeof entityValuesResolver>,
-): SortPlan {
-  const s = sort ?? NEWEST_FIRST
-  const created: SortPlan = {
-    expr: sql`${entity.createdAt}`,
-    cast: 'timestamptz',
-    desc: s.desc,
-  }
-  if (s.id === 'name')
-    return { expr: sql`${entity.canonicalName}`, cast: 'text', desc: s.desc }
-  if (s.id.startsWith('attr:')) {
-    // An archived or unknown attribute drops its sort the way it drops its
-    // condition: the list is still ordered, just by the default key.
-    const field = resolve(s.id.slice('attr:'.length))
-    if (!field) return { ...created, desc: NEWEST_FIRST.desc }
-    const key = compileSortKey(field)
-    return { expr: key.expr, cast: key.cast, desc: s.desc }
-  }
-  // `createdAt`, and anything the server has no key for (`spaces`).
-  return s.id === 'createdAt'
-    ? created
-    : { ...created, desc: NEWEST_FIRST.desc }
-}
-
-/** The cursor's `k`, cast back to the type the order by compares. */
-const keyLiteral = (k: string, cast: SortPlan['cast']): SQL =>
-  cast === 'numeric'
-    ? sql`${k}::numeric`
-    : cast === 'timestamptz'
-      ? sql`${k}::timestamptz`
-      : sql`${k}::text`
-
-/**
- * "Strictly after the cursor, in this order." Null keys sort last in both
- * directions, so a cursor whose key is null has already passed every
- * non-null row and only `id` is left to break the tie; a cursor with a key
- * has not reached the null tail yet, which is why `is null` is an
- * alternative rather than an exclusion.
- */
-function afterCursor(plan: SortPlan, cur: PageCursor): SQL {
-  const cmp = plan.desc ? sql`<` : sql`>`
-  if (cur.k === null)
-    return sql`(${plan.expr} is null and ${entity.id} ${cmp} ${cur.id}::uuid)`
-  const lit = keyLiteral(cur.k, plan.cast)
-  return sql`((${plan.expr} ${cmp} ${lit})
-    or (${plan.expr} = ${lit} and ${entity.id} ${cmp} ${cur.id}::uuid)
-    or ${plan.expr} is null)`
-}
-
-const encodeCursor = (c: PageCursor): string =>
-  Buffer.from(JSON.stringify(c), 'utf8').toString('base64url')
-
-/** Opaque in, opaque out: an unreadable cursor is page one, never an error. */
-function decodeCursor(raw: string): PageCursor | null {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'))
-  } catch {
-    return null
-  }
-  if (typeof parsed !== 'object' || parsed === null) return null
-  if (!('id' in parsed) || !('k' in parsed)) return null
-  const { id, k } = parsed
-  if (typeof id !== 'string' || id === '') return null
-  if (k !== null && typeof k !== 'string') return null
-  return { id, k }
-}
-
-/** `%`, `_` and `\` are LIKE syntax; a reader typing them means the characters. */
-const likeArg = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+export type { RecordSort }
+export type ListRecordsOptions = ListPageOptions
 
 export const listRecordsProgram = Effect.fn('listRecordsProgram')(function* (
   objectId: string,
@@ -172,10 +88,7 @@ export const listRecordsProgram = Effect.fn('listRecordsProgram')(function* (
   const resolve = entityValuesResolver(registry)
   const filter = compileConditions(conditions, resolve)
   const plan = planSort(options.sort, resolve)
-  const limit = Math.max(
-    1,
-    Math.min(options.limit ?? RECORD_PAGE_SIZE, RECORD_PAGE_MAX),
-  )
+  const limit = clampLimit(options.limit)
   const q = (options.q ?? '').trim()
 
   // Everything the reader asked for, cursor excluded: the page is a window
@@ -190,7 +103,6 @@ export const listRecordsProgram = Effect.fn('listRecordsProgram')(function* (
     q ? ilike(entity.canonicalName, likeArg(q)) : undefined,
   )
   const cursor = options.cursor ? decodeCursor(options.cursor) : null
-  const dir = plan.desc ? sql`desc` : sql`asc`
 
   const page = yield* query(() =>
     db
@@ -200,12 +112,12 @@ export const listRecordsProgram = Effect.fn('listRecordsProgram')(function* (
         values: entity.values,
         createdAt: entity.createdAt,
         // The key comes back as text so the cursor can carry it; the cast
-        // back is `keyLiteral`'s job.
-        sortKey: sql<string | null>`(${plan.expr})::text`,
+        // back is the pager's job.
+        sortKey: sortKeyColumn(plan),
       })
       .from(entity)
       .where(cursor ? and(matching, afterCursor(plan, cursor)) : matching)
-      .orderBy(sql`${plan.expr} ${dir} nulls last, ${entity.id} ${dir}`)
+      .orderBy(orderByPage(plan))
       // One more than asked: its existence is the only question, so it is
       // never returned. `nextCursor` null is what the foot reads as "end".
       .limit(limit + 1),
@@ -218,12 +130,7 @@ export const listRecordsProgram = Effect.fn('listRecordsProgram')(function* (
   )
   const total = counted.at(0)?.total ?? 0
 
-  const rows = page.slice(0, limit)
-  const last = rows.at(-1)
-  const nextCursor =
-    page.length > limit && last
-      ? encodeCursor({ k: last.sortKey, id: last.id })
-      : null
+  const { rows, nextCursor } = cutPage(page, limit)
 
   const ids = rows.map((r) => r.id)
   const tags =

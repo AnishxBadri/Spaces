@@ -2,20 +2,23 @@ import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
 import { AtSign, Building2, Plus, Users } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
-import { matchesConditions } from '@spaces/core/views/filter'
 import { cn } from '#/lib/utils'
 import { jsonRecord } from '#/lib/json'
+import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import {
   fieldSpanClass,
@@ -63,16 +66,29 @@ import {
 
 export const Route = createFileRoute('/_app/people')({
   validateSearch: z.object({ view: z.string().optional() }),
-  loader: async () => {
-    const [rows, registry, companies, viewData, session] = await Promise.all([
-      listPeopleTable(),
+  // `?view=` is the only linkable filter state, so it is the only loader dep:
+  // an ad-hoc condition edit refetches through the query below instead.
+  loaderDeps: ({ search }) => ({ view: search.view ?? null }),
+  loader: async ({ deps }) => {
+    const [registry, companies, viewData, session] = await Promise.all([
       listRegistry({ data: { kind: 'person' } }),
       listCompanies(),
       listViews({ data: { surface: 'object', kind: 'person' } }),
       getSession(),
     ])
+    // The view's conditions and its sort go down with the request (SPA-96,
+    // on views-3's contract), so the first paint is already the filtered,
+    // ordered first page rather than every person with most of them hidden.
+    const view = viewData.views.find((v) => v.id === deps.view) ?? null
+    const conditions = view?.filter ?? []
+    const sort = view?.sort ?? null
+    const initial = await listPeopleTable({
+      data: { conditions, sort, limit: RECORD_PAGE_SIZE, cursor: null },
+    })
     return {
-      rows,
+      conditions,
+      sort,
+      initial,
       registry,
       companies,
       views: viewData.views,
@@ -83,18 +99,25 @@ export const Route = createFileRoute('/_app/people')({
   component: PeoplePage,
 })
 
-type Row = Awaited<ReturnType<typeof listPeopleTable>>[number]
+type Row = Awaited<ReturnType<typeof listPeopleTable>>['rows'][number]
 
 const col = createColumnHelper<Row>()
 // FROZEN: renaming resets saved column layouts with no recovery path.
 const PREFS_KEY = 'dealos.people-table.v1'
 
 function PeoplePage() {
-  const { rows, registry, companies, views, objectId, me } =
-    Route.useLoaderData()
+  const {
+    conditions,
+    sort: loaderSort,
+    initial,
+    registry,
+    companies,
+    views,
+    objectId,
+    me,
+  } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
-  const [globalFilter, setGlobalFilter] = useState('')
   const prefs = useTablePrefs(PREFS_KEY)
   const { view: activeId } = Route.useSearch()
   const vs = useViewState({
@@ -105,25 +128,83 @@ function PeoplePage() {
     defaultExtra: {},
   })
   const { sorting, setSorting } = vs
-  const typeOf = useCallback(
-    (slug: string) => registry.find((d) => d.slug === slug)?.type,
-    [registry],
-  )
-  const visibleRows = useMemo(
-    () =>
-      rows.filter((r) => matchesConditions(r.values, vs.conditions, typeOf)),
-    [rows, vs.conditions, typeOf],
-  )
+  /**
+   * The text box is a **server** narrowing now (SPA-96): `ILIKE` on the name
+   * or on any identity email, debounced. A client `globalFilter` over the
+   * loaded rows stopped being able to tell the truth the moment the table
+   * stopped loading every row. The employer dropped out of what it matches —
+   * that is a join, not a column — so the placeholder no longer promises it.
+   */
+  const [globalFilter, setGlobalFilter] = useState('')
+  const [q, setQ] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setQ(globalFilter.trim()), 250)
+    return () => clearTimeout(t)
+  }, [globalFilter])
+
+  const asSort = (s: { id: string; desc: boolean } | null | undefined) =>
+    s ? { id: s.id, desc: s.desc } : null
+  const sort = asSort(sorting[0])
+  const sortKey = JSON.stringify(sort)
+
+  /**
+   * Filtering, sorting, counting and paging all happen in Postgres, on the
+   * same contract `/o/$objectSlug` and `/companies` use. The loader asked for
+   * page one of the `?view=` conditions; this query seeds itself from that
+   * answer and refetches page one whenever the conditions, the sort or the
+   * text box change — no navigation, and `keepPreviousData` rather than a
+   * blank table while the next answer is in flight.
+   */
+  const loaderKey = JSON.stringify({
+    conditions,
+    sort: asSort(loaderSort),
+    q: '',
+  })
+  const pageOne: string | null = null
+  const records = useInfiniteQuery({
+    queryKey: ['people-records', vs.conditionKey, sortKey, q],
+    // Annotated: the inference otherwise narrows `pageParam` to the literal
+    // type of `initialPageParam` and refuses the cursor a later page carries.
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
+      listPeopleTable({
+        data: {
+          conditions: vs.conditions,
+          cursor: pageParam,
+          limit: RECORD_PAGE_SIZE,
+          sort,
+          q,
+        },
+      }),
+    initialPageParam: pageOne,
+    getNextPageParam: (last) => last.nextCursor,
+    ...(JSON.stringify({ conditions: vs.conditions, sort, q }) === loaderKey
+      ? { initialData: { pages: [initial], pageParams: [pageOne] } }
+      : {}),
+    placeholderData: keepPreviousData,
+  })
+  const pages = records.data?.pages
+  const loaded = useMemo(() => pages ?? [initial], [pages, initial])
+  const rows = useMemo(() => loaded.flatMap((p) => p.rows), [loaded])
+  const total = loaded.at(-1)?.total ?? 0
+
+  // Both halves: the loader for the registry and the views, the query for
+  // whichever condition set is on screen. A row edited out of the active
+  // filter leaves on this refetch, and `total` comes back down with it.
+  const queryClient = useQueryClient()
+  const refresh = useCallback(() => {
+    void router.invalidate()
+    void queryClient.invalidateQueries({ queryKey: ['people-records'] })
+  }, [router, queryClient])
   const selectView = (id: string | null) =>
     void navigate({ to: '/people', search: id === null ? {} : { view: id } })
 
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
       await updateRecord({ data: { id: entityId, patch: { [slug]: value } } })
-      void router.invalidate()
+      refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
-      void router.invalidate()
+      refresh()
     }
   }
 
@@ -147,6 +228,10 @@ function PeoplePage() {
         id: 'emails',
         header: 'Email',
         size: 200,
+        // The sort is a SQL order by over `entity` now, and emails, the
+        // employer and last-touched are all joins; offering the menu would
+        // promise an order nobody can serve.
+        enableSorting: false,
         cell: (info) =>
           info.row.original.emails.length > 0 ? (
             <MetaCell icon={AtSign}>
@@ -158,6 +243,7 @@ function PeoplePage() {
         id: 'company',
         header: 'Company',
         size: 170,
+        enableSorting: false,
         cell: (info) =>
           info.row.original.company ? (
             <span className="flex px-1">
@@ -175,7 +261,6 @@ function PeoplePage() {
           id: `attr:${def.slug}`,
           header: def.name,
           size: def.type === 'text' ? 180 : 140,
-          sortUndefined: 'last',
           cell: (info) => (
             <ValueEditor
               def={def}
@@ -190,7 +275,7 @@ function PeoplePage() {
         id: 'lastTouched',
         header: 'Last touched',
         size: 120,
-        sortUndefined: 'last',
+        enableSorting: false,
         cell: (info) => <DateCell value={info.row.original.lastTouched} />,
       }),
       col.accessor('createdAt', {
@@ -204,30 +289,24 @@ function PeoplePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registry])
 
+  // No `getSortedRowModel` and no `getFilteredRowModel`: both would reorder
+  // and narrow the loaded page and call that the answer. `manualSorting` /
+  // `manualFiltering` say so — `sorting` stays the table's state, so the
+  // header menu and `aria-sort` keep working, and toggling it re-queries.
   const table = useReactTable({
-    data: visibleRows,
+    data: rows,
     columns,
     state: {
       sorting,
       columnVisibility: prefs.columnVisibility,
       columnSizing: prefs.columnSizing,
-      globalFilter,
     },
     onSortingChange: setSorting,
     onColumnVisibilityChange: prefs.setColumnVisibility,
     onColumnSizingChange: prefs.setColumnSizing,
-    onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: (row, _colId, filter) => {
-      const q = String(filter).toLowerCase()
-      return (
-        row.original.name.toLowerCase().includes(q) ||
-        row.original.emails.some((e) => e.includes(q)) ||
-        (row.original.company?.name.toLowerCase().includes(q) ?? false)
-      )
-    },
+    manualSorting: true,
+    manualFiltering: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     columnResizeMode: 'onChange',
   })
 
@@ -241,7 +320,7 @@ function PeoplePage() {
         }
       />
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
-        {rows.length === 0 ? (
+        {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (
           <EmptyState
             icon={Users}
             title="No people yet"
@@ -257,11 +336,11 @@ function PeoplePage() {
               table={table}
               filter={globalFilter}
               onFilterChange={setGlobalFilter}
-              filterPlaceholder="Filter by name, email, company…"
+              filterPlaceholder="Filter by name or email…"
               filterLabel="Filter people"
               noun={{ one: 'person', many: 'people' }}
-              total={rows.length}
-              shown={table.getRowModel().rows.length}
+              total={total}
+              shown={rows.length}
             >
               <ViewBar
                 objectId={objectId}
@@ -275,7 +354,7 @@ function PeoplePage() {
                 }}
                 selectView={selectView}
                 onFilterChange={vs.setConditions}
-                onSaved={() => router.invalidate()}
+                onSaved={() => void router.invalidate()}
                 canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
               />
             </TableToolbar>
@@ -283,10 +362,17 @@ function PeoplePage() {
               table={table}
               label="People"
               stickyColumnId="name"
+              page={{
+                total,
+                hasMore: records.hasNextPage,
+                loading: records.isFetchingNextPage,
+                step: RECORD_PAGE_SIZE,
+                onLoadMore: () => void records.fetchNextPage(),
+              }}
               addColumn={
                 <AttributeCreateDialog
                   objectKind="person"
-                  onCreated={() => router.invalidate()}
+                  onCreated={refresh}
                   trigger={<AddColumnButton />}
                 />
               }
@@ -306,6 +392,7 @@ function CreatePersonDialog({
   registry: Array<RegistryEntry>
 }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -352,6 +439,8 @@ function CreatePersonDialog({
         toast(`${result.name} added`)
       }
       void router.invalidate()
+      // The rows come from a keyed query now, not from the loader alone.
+      void queryClient.invalidateQueries({ queryKey: ['people-records'] })
     } catch {
       setError('Could not add the person.')
     } finally {
