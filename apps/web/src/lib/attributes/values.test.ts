@@ -357,7 +357,7 @@ describe('setValues', () => {
     const { resolveEntity } = await import('../entities/resolve')
     const { setValues } = await import('./values')
     const { db } = await import('@spaces/db')
-    const { attributeEvent } = await import('@spaces/db/schema')
+    const { attributeEvent, suggestion } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
     const { and, eq } = await import('drizzle-orm')
 
@@ -370,8 +370,21 @@ describe('setValues', () => {
     })
 
     // Accepting a suggestion: the accepter is the actor, the receipt rides
-    // the event — "from p.4 of the deck" survives acceptance.
-    const suggestionId = randomUUID()
+    // the event — "from p.4 of the deck" survives acceptance. The id is a
+    // real row since SPA-46 put the FK on `attribute_event.suggestion_id`.
+    const receipt = (
+      await db
+        .insert(suggestion)
+        .values({
+          entityId: co.entityId,
+          kind: 'attribute_patch',
+          payload: {},
+          proposedByType: 'system',
+        })
+        .returning({ id: suggestion.id })
+    ).at(0)
+    if (!receipt) throw new Error('suggestion insert returned no row')
+    const suggestionId = receipt.id
     await setValues({
       entityId: co.entityId,
       patch: { location: 'Pune' },

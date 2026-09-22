@@ -14,6 +14,8 @@ import {
 } from 'drizzle-orm/pg-core'
 import { entity } from './entities'
 import { integration } from './integrations'
+import { suggestion } from './suggestions'
+import { actorType } from './actors'
 import { objectDef } from './objects'
 import type { IdentityKey } from './objects'
 import { user } from './auth'
@@ -166,16 +168,12 @@ export const attribute = pgTable(
 )
 
 /**
- * Who *attended* to a value — never merely who caused the flow (spec §4,
- * grilled 2026-09). A sync-created value is `integration`, traceable to
- * whoever connected it through the integration's own config; the merge
- * executor's rewrites are `system`. Attio's typed-actor idea without its
- * polymorphic (type, id) pair: `actor_id` stays a real user FK, set iff
- * type = 'user', and `actor_ref` is a real integration FK, set iff
- * type = 'integration' (SPA-70 — the integration table exists now, so the
- * second half of the invariant is a constraint rather than a comment).
+ * `actor_type` lives in `./actors` (SPA-46) so `suggestion` can use it
+ * without importing this module back: `attribute_event.suggestion_id`
+ * references `suggestion`, and a two-way import between the two schema files
+ * would hand one of them an uninitialised enum at module evaluation.
  */
-export const actorType = pgEnum('actor_type', ['user', 'integration', 'system'])
+export { actorType }
 
 /**
  * Which door the value came through — orthogonal to actor_type. A user
@@ -220,11 +218,21 @@ export const attributeEvent = pgTable(
      */
     actorRef: uuid('actor_ref').references(() => integration.id),
     source: attributeEventSource('source').notNull().default('direct'),
-    // No FK yet: the suggestion table lands with the review inbox. Added
-    // then, same pattern as the integration FK on actor.
-    suggestionId: uuid('suggestion_id'),
+    // The accepted suggestion this value came from (SPA-46). `set null` on
+    // delete: a suggestion row only dies with its entity (ENTITY_REFS
+    // `suggestion.entity` cascades), and the event must never be what makes
+    // that delete order-sensitive.
+    suggestionId: uuid('suggestion_id').references(() => suggestion.id, {
+      onDelete: 'set null',
+    }),
     // Citation refs — spec-ai-substrate `ContextItem.ref` ids, or an
     // enrichment_record id. Array of strings; null when there's no receipt.
+    // jsonb here, `text[]` on `suggestion.refs`: this column predates the
+    // suggestion table and is written by every door (enrichment ids, merge,
+    // import), so its shape is a JSON payload decoded at the column; the
+    // suggestion's refs are one flat list of ContextItem ids that the review
+    // queue filters on (`= ANY(refs)`), which is what a native array is for.
+    // Accept copies one into the other unchanged.
     refs: jsonb('refs').$type<Array<string>>(),
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   },
