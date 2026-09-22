@@ -11,6 +11,7 @@ import { FileText, Layers } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { DocumentPreview } from '#/components/document-preview'
+import { GoneMarker, OpenInSourceButton } from '#/components/document-source'
 import { DocumentTile } from '#/components/document-tile'
 import { KIND_ICONS } from '#/components/editor/mention'
 import { EmptyState } from '#/components/empty-state'
@@ -78,6 +79,24 @@ function originText(r: DocumentRow): string {
   if (r.sourceClass === 'integration')
     return r.sourceCapability ?? 'Integration'
   return 'Upload'
+}
+
+/**
+ * The Source column's text (SPA-78, `docs/spec-storage-sources.md` §12).
+ *
+ * Origin alone until a storage source files something; then the provider and
+ * the path it sits at over there, so the row reads the way the user would say
+ * it out loud — "Drive · Data room / Legal". The path is kept verbatim (§5.3)
+ * and printed verbatim: it is a label and a write-back address, and shortening
+ * it here would make the two disagree.
+ *
+ * A null path is the origin on its own, never an empty cell and never a dash —
+ * the column said exactly this before this slice, and every existing row still
+ * gets exactly this.
+ */
+function sourceText(r: DocumentRow): string {
+  const origin = originText(r)
+  return r.sourcePath === null ? origin : `${origin} · ${r.sourcePath}`
 }
 
 /** The status word, and whether it is the bad kind. */
@@ -168,15 +187,39 @@ function DocumentsPage() {
           />
         ),
       }),
-      col.accessor((r) => originText(r), {
-        id: 'origin',
-        header: 'Origin',
-        size: 130,
-        cell: (info) => (
-          <span className="block truncate px-1 text-graphite">
-            {originText(info.row.original)}
-          </span>
-        ),
+      col.accessor((r) => sourceText(r), {
+        id: 'source',
+        header: 'Source',
+        // Renamed from `origin` by SPA-78, and the id is renamed with the
+        // header on purpose: a stored width or hidden flag under the old id
+        // is simply not read, so the column comes back at its default once.
+        // That is the honest outcome — it is a wider column that now answers
+        // a question the old one could not.
+        size: 200,
+        cell: (info) => {
+          const r = info.row.original
+          return (
+            <div className="flex min-w-0 items-center gap-1.5 px-1">
+              <span
+                title={sourceText(r)}
+                className="min-w-0 truncate text-graphite"
+              >
+                {sourceText(r)}
+              </span>
+              {r.externalStatus === 'gone' ? <GoneMarker /> : null}
+              {/* Only a row a source actually linked has somewhere to open:
+                  an upload, a clip and a url have no external URL, so they
+                  get no action rather than a dead one. */}
+              {r.externalUrl === null ? null : (
+                <OpenInSourceButton
+                  url={r.externalUrl}
+                  filename={r.filename}
+                  className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                />
+              )}
+            </div>
+          )
+        },
       }),
       col.accessor((r) => extractionText(r).text, {
         id: 'extraction',

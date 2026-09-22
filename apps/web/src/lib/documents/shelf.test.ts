@@ -181,6 +181,61 @@ describe('listDocumentsProgram', () => {
     expect(rows[0].records.map((r) => r.name)).toEqual([`Survivor ${tag}`])
   })
 
+  it('leaves an ordinary upload with no storage-source provenance', async () => {
+    // The five columns of §11 delta 1 are null on every document until a
+    // storage-source plugin files one (SPA-78), and this row must read
+    // exactly as it read before they existed: three nulls, not three empty
+    // strings and not a placeholder dash — the Source column prints the
+    // origin on its own when `sourcePath` is null.
+    const tag = randomUUID().slice(0, 8)
+    const acme = await aCompany(`Acme ${tag}`)
+    await fileDocument(`upload-${tag}.pdf`, await aBlob(tag), {
+      kind: 'record',
+      entityId: acme,
+    })
+
+    const rows = await shelfTagged(tag)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].sourcePath).toBeNull()
+    expect(rows[0].externalUrl).toBeNull()
+    expect(rows[0].externalStatus).toBeNull()
+    // Unchanged by this slice, and the reason the Source column can fall
+    // back to the origin text at all.
+    expect(rows[0].sourceClass).toBe('manual')
+    expect(rows[0].sourceCapability).toBeNull()
+  })
+
+  it("carries a linked file's path, link and gone status through", async () => {
+    const tag = randomUUID().slice(0, 8)
+    const acme = await aCompany(`Acme ${tag}`)
+    const docId = await fileDocument(`linked-${tag}.pdf`, await aBlob(tag), {
+      kind: 'record',
+      entityId: acme,
+    })
+
+    const { db } = await import('@spaces/db')
+    const { document } = await import('@spaces/db/schema')
+    const { eq } = await import('drizzle-orm')
+    await db
+      .update(document)
+      .set({
+        // Verbatim (§5.3): the shelf prints what the provider called it, so
+        // the row reads the way the user would say it out loud.
+        sourcePath: 'Data room / Legal',
+        externalUrl: 'https://drive.example/file/abc123',
+        externalStatus: 'gone',
+      })
+      .where(eq(document.entityId, docId))
+
+    const rows = await shelfTagged(tag)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].sourcePath).toBe('Data room / Legal')
+    expect(rows[0].externalUrl).toBe('https://drive.example/file/abc123')
+    // Deleted on their side, kept on ours (§7, §8) — the row is still here,
+    // which is the whole point of copy-in.
+    expect(rows[0].externalStatus).toBe('gone')
+  })
+
   it('orders newest first and bounds the snippet at 200 chars', async () => {
     const tag = randomUUID().slice(0, 8)
     const acme = await aCompany(`Acme ${tag}`)

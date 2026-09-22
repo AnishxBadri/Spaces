@@ -18,6 +18,7 @@ import { sql } from 'drizzle-orm'
 import { ltree, tsvector } from './helpers'
 import { entity, sourceClass } from './entities'
 import { integration } from './integrations'
+import { accountConnection } from './vault'
 import { user } from './auth'
 import type { Json } from '../json'
 
@@ -172,6 +173,16 @@ export const extractionStatus = pgEnum('extraction_status', [
   'failed',
 ])
 
+/**
+ * What the provider's copy is doing, for a document that came from one
+ * (`docs/spec-storage-sources.md` §8). `linked` is the live mapping; `gone`
+ * is the file deleted on their side — we keep ours and the row says so,
+ * because a copy-in archive that deletes when Drive deletes is not an
+ * archive. Null for every document nobody linked, which is all of them
+ * until the first storage-source plugin lands.
+ */
+export const externalStatus = pgEnum('external_status', ['linked', 'gone'])
+
 export const document = pgTable(
   'document',
   {
@@ -199,6 +210,32 @@ export const document = pgTable(
     sourceClass: sourceClass('source_class').notNull().default('manual'),
     /** The integration that filed the document; null for every other class. */
     sourceRef: uuid('source_ref').references(() => integration.id),
+    /**
+     * Where the file sits in the provider's own tree, kept **verbatim**
+     * (spec §5.3) — "Data room / Legal", as the user would read it aloud.
+     * It is a label and a write-back address, never a key: retrieval scopes
+     * by `entity_space` and ltree, because the tree is a projection and the
+     * graph is the meaning.
+     */
+    sourcePath: text('source_path'),
+    /**
+     * The provider's own id for the file, and the idempotency key of the
+     * whole sync: §6's write-through must not re-import the file it just
+     * exported, and §8's cursor-expiry full re-list must land on the rows it
+     * already made. Both are `on conflict (connection_id, external_id)`,
+     * which is why the partial unique index below ships with the column
+     * rather than with the first plugin.
+     */
+    externalId: text('external_id'),
+    /** The provider's own link — "Open in source" on the row. */
+    externalUrl: text('external_url'),
+    externalStatus: externalStatus('external_status'),
+    /**
+     * Whose account the file came through. `account_connection.id` is a
+     * plain uuid primary key and not an entity id, so this column takes **no**
+     * `ENTITY_REFS` entry — see the note in migration 0038.
+     */
+    connectionId: uuid('connection_id').references(() => accountConnection.id),
     extractedText: text('extracted_text'),
     // Populated by the extraction worker alongside extracted_text.
     tsv: tsvector('tsv'),
@@ -224,6 +261,15 @@ export const document = pgTable(
       'document_source_ref_invariant',
       sql`(${t.sourceClass} = 'integration') = (${t.sourceRef} IS NOT NULL)`,
     ),
+    // One document per (connection, provider file). Partial, because the
+    // pair is null on every hand-uploaded row and Postgres would otherwise
+    // let exactly one of them exist. This is what makes §6's loop prevention
+    // and §8's cursor-expiry re-list idempotent rather than duplicating.
+    uniqueIndex('document_connection_external_unique')
+      .on(t.connectionId, t.externalId)
+      .where(
+        sql`${t.connectionId} is not null and ${t.externalId} is not null`,
+      ),
   ],
 )
 
