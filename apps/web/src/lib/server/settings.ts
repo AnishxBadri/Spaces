@@ -1,11 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { count } from 'drizzle-orm'
-import { z } from 'zod'
 import { auth } from '../auth'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
-import { storeCredential } from '../vault'
 import { requireUser } from './shared'
 
 export const getSession = createServerFn().handler(async () => {
@@ -75,28 +73,6 @@ export const getOnboardingProgress = createServerFn().handler(async () => {
     invitedPartner: users[0].value > 1 || invites[0].value > 0,
   }
 })
-
-const aiKeyInput = z.object({
-  provider: z.enum(['anthropic', 'openai', 'google', 'openrouter', 'ollama']),
-  key: z.string().min(1).max(500),
-  baseUrl: z.string().url().optional(),
-})
-
-export const saveAiKey = createServerFn({ method: 'POST' })
-  .validator(aiKeyInput)
-  .handler(async ({ data }) => {
-    const u = await requireUser()
-    if (u.role !== 'admin') throw new Error('Admins only')
-    const { display } = await storeCredential({
-      scope: 'workspace',
-      provider: data.provider,
-      kind: 'llm',
-      secret: data.key,
-      meta: data.baseUrl ? { baseUrl: data.baseUrl } : {},
-      createdBy: u.id,
-    })
-    return { display }
-  })
 
 export const listUsers = createServerFn().handler(async () => {
   await requireUser()
