@@ -12,6 +12,7 @@ import { BUILT_LLM_PROVIDERS, PROVIDER_LABEL } from './ids'
 import type { AiKeyInput, LlmProvider } from './ids'
 import { resolveLanguageModel } from './index'
 import { parseHeaderLines, readProviderMeta } from './meta'
+import { routeForProviderProgram } from '../route'
 import { runTestCall } from './test-call'
 import type { TestCallResult } from './test-call'
 
@@ -136,11 +137,30 @@ export const saveAiKeyProgram = Effect.fn('saveAiKey')(function* (
  * One tiny prompt through the saved credential. The verdict and its time are
  * written onto the credential's `meta`; the answer and the provider's error
  * text go back to the admin and are stored nowhere.
+ *
+ * The call goes through `complete()`, so a completed test writes one
+ * `ai_usage` row with the admin as caller. It is recorded under the first
+ * lane routed to this provider and uses that route's model; with no route
+ * naming the provider it is recorded under `classify` with the adapter's
+ * default model.
  */
 export const testAiProviderProgram = Effect.fn('testAiProvider')(function* (
   provider: LlmProvider,
+  actorId: string,
 ): Effect.fn.Return<TestCallResult, AiSettingsWriteFailed> {
-  const resolved = yield* resolveLanguageModel(provider).pipe(
+  const routed = yield* routeForProviderProgram(provider).pipe(
+    Effect.mapError(
+      (e) =>
+        new AiSettingsWriteFailed({
+          message: 'Could not read the AI routing',
+          cause: e.cause,
+        }),
+    ),
+  )
+  const resolved = yield* resolveLanguageModel(
+    provider,
+    routed ? { modelId: routed.model } : {},
+  ).pipe(
     Effect.catchTag('NoCredential', () => Effect.succeed(null)),
     Effect.catchTag('ProviderNotBuilt', () => Effect.succeed(null)),
     Effect.catchTag('CredentialReadFailed', (e) =>
@@ -159,7 +179,11 @@ export const testAiProviderProgram = Effect.fn('testAiProvider')(function* (
       message: `No ${PROVIDER_LABEL[provider]} key is saved`,
     }
 
-  const result = yield* runTestCall(resolved.model)
+  const result = yield* runTestCall(resolved.model, {
+    provider,
+    lane: routed?.lane ?? 'classify',
+    caller: { type: 'user', id: actorId },
+  })
   yield* write('Could not record the test', () =>
     mergeCredentialMeta(resolved.credentialId, {
       lastTestedAt: new Date().toISOString(),
@@ -186,6 +210,6 @@ export async function saveAiKeyHandler(
 export async function testAiProviderHandler(data: {
   provider: LlmProvider
 }): Promise<TestCallResult> {
-  await requireAdmin()
-  return effectFn(testAiProviderProgram)(data.provider)
+  const admin = await requireAdmin()
+  return effectFn(testAiProviderProgram)(data.provider, admin.id)
 }
