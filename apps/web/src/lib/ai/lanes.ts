@@ -39,11 +39,29 @@ void sensitivitiesExact
 
 export type { AiLane, AiSensitivity }
 
-/** `setAiRoute`'s input: one cell of the lane × sensitivity grid. */
-export const aiRouteInput = z.object({
+const aiRouteCell = {
   lane: z.enum(AI_LANES),
   sensitivity: z.enum(AI_SENSITIVITIES),
+}
+
+/** One cell of the lane × sensitivity grid, routed to a provider's model. */
+export const aiRouteSetInput = z.object({
+  ...aiRouteCell,
   provider: z.enum(LLM_PROVIDERS),
   model: z.string().trim().min(1).max(200),
 })
+export type AiRouteSetInput = z.infer<typeof aiRouteSetInput>
+
+/**
+ * `setAiRoute`'s input: a cell set to a provider and model, or cleared with
+ * `provider: null` — which deletes the row, leaving the lane unrouted at that
+ * sensitivity (SPA-69).
+ */
+export const aiRouteInput = z.union([
+  aiRouteSetInput,
+  z.object({ ...aiRouteCell, provider: z.null() }),
+])
 export type AiRouteInput = z.infer<typeof aiRouteInput>
+
+/** `isLaneRouted`'s input: the lane a trigger belongs to. */
+export const aiLaneInput = z.object({ lane: z.enum(AI_LANES) })

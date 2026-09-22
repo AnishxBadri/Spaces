@@ -5,19 +5,28 @@ import {
   SettingsRow,
   SettingsSection,
 } from '#/components/settings/settings-section'
+import { LedgerRow } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { Select } from '#/components/ui/select'
+import type { SelectItem } from '#/components/ui/select'
+import { AI_LANES, AI_SENSITIVITIES } from '#/lib/ai/lanes'
+import type { AiLane, AiSensitivity } from '#/lib/ai/lanes'
 import { PROVIDERS } from '#/lib/ai/providers/ids'
+import type { LlmProvider } from '#/lib/ai/providers/ids'
 import { formatHeaderLines } from '#/lib/ai/providers/meta'
 import {
   getSession,
   listAiProviders,
+  listAiRoutes,
   saveAiKey,
+  setAiRoute,
   testAiProvider,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 type ProviderRow = Awaited<ReturnType<typeof listAiProviders>>[number]
+type RouteRow = Awaited<ReturnType<typeof listAiRoutes>>[number]
 type TestResult = Awaited<ReturnType<typeof testAiProvider>>
 
 /**
@@ -33,14 +42,26 @@ export const Route = createFileRoute('/_app/settings/ai')({
   loader: async () => {
     const session = await getSession()
     const isAdmin = session?.user.role === 'admin'
-    return { isAdmin, providers: isAdmin ? await listAiProviders() : [] }
+    if (!isAdmin) return { isAdmin, providers: [], routes: [] }
+    const [providers, routes] = await Promise.all([
+      listAiProviders(),
+      listAiRoutes(),
+    ])
+    return { isAdmin, providers, routes }
   },
   component: AiRoute,
 })
 
 function AiRoute() {
-  const { isAdmin, providers } = Route.useLoaderData()
-  return <ProvidersSection isAdmin={isAdmin} providers={providers} />
+  const { isAdmin, providers, routes } = Route.useLoaderData()
+  return (
+    <div className="flex flex-col gap-8">
+      <ProvidersSection isAdmin={isAdmin} providers={providers} />
+      {isAdmin ? (
+        <RoutingSection providers={providers} routes={routes} />
+      ) : null}
+    </div>
+  )
 }
 
 /** An ISO instant as the ledger prints it: `2026-09-23 14:02 UTC`, no locale. */
@@ -334,5 +355,184 @@ function ProviderForm({ row }: { row: ProviderRow }) {
         </Button>
       </div>
     </form>
+  )
+}
+
+/** What each lane does, one line — keyed by the lane union, so none is missed. */
+const LANE_ROLE: Record<AiLane, string> = {
+  extract: 'Reads a document into fields — a deck into the company record.',
+  classify: 'Picks a value from a fixed list — a document’s kind.',
+  synthesize: 'Drafts memos, analyses and summaries.',
+  embed: 'Turns text into vectors for search.',
+  vision: 'Reads pages a text extractor cannot — scans and images.',
+  research: 'Looks things up on the live web.',
+}
+
+/** The Unset row's value; no provider id is this word. */
+const UNSET = 'unset'
+type CellValue = LlmProvider | typeof UNSET
+
+/**
+ * Routing (SPA-69, `docs/spec-ai-substrate.md` §9) — the lane × sensitivity
+ * table as a settings ledger (D20, Option 1): one 36px row per lane, the
+ * lane's name and what it does left, then one fixed lane per sensitivity,
+ * each a `Select` of the providers holding an active credential. The
+ * sensitivity lanes are `AI_SENSITIVITIES`, iterated: the grid reads the axis
+ * and never defines it, and the copy line says where a record or a space is
+ * actually marked sensitive.
+ */
+function RoutingSection({
+  providers,
+  routes,
+}: {
+  providers: ProviderRow[]
+  routes: RouteRow[]
+}) {
+  const routable = providers.filter(
+    (p) => p.configured && p.status === 'active',
+  )
+  const cellOf = (lane: AiLane, sensitivity: AiSensitivity) =>
+    routes.find((r) => r.lane === lane && r.sensitivity === sensitivity)
+      ?.target ?? null
+  const routed = routes.filter((r) =>
+    routable.some((p) => p.provider === r.target?.provider),
+  ).length
+
+  return (
+    <SettingsSection
+      title="Routing"
+      blurb="Which provider and model each lane calls, at each sensitivity."
+      crumb="Workspace"
+    >
+      <div className="flex flex-col pt-5">
+        <div className="flex items-baseline gap-3 pb-2">
+          <h3 className="label-caps text-foreground">Lanes</h3>
+          <span className="mono text-micro text-graphite">
+            {routed} of {AI_LANES.length * AI_SENSITIVITIES.length} routed
+          </span>
+        </div>
+        <p className="pb-3 text-label text-graphite">
+          A lane with no model routed hides the features that use it. Sensitive
+          routes must be local (Ollama). Records and spaces are marked sensitive
+          on their own pages, not here.
+        </p>
+
+        <div className="flex h-8 items-center gap-3 border-y border-hairline field-label leading-4 text-graphite">
+          <span className="w-24 shrink-0">Lane</span>
+          <span className="min-w-0 flex-1" />
+          {AI_SENSITIVITIES.map((s) => (
+            <span key={s} className="w-56 shrink-0">
+              {s}
+            </span>
+          ))}
+        </div>
+        <ol>
+          {AI_LANES.map((lane) => (
+            <LedgerRow key={lane}>
+              <span className="w-24 shrink-0 text-ui font-medium capitalize">
+                {lane}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-label text-graphite">
+                {LANE_ROLE[lane]}
+              </span>
+              {AI_SENSITIVITIES.map((sensitivity) => (
+                <RouteCellSelect
+                  key={sensitivity}
+                  lane={lane}
+                  sensitivity={sensitivity}
+                  stored={cellOf(lane, sensitivity)}
+                  routable={routable}
+                />
+              ))}
+            </LedgerRow>
+          ))}
+        </ol>
+
+        <div className="flex h-8 items-center justify-between">
+          <span className="label-caps font-normal text-graphite">
+            lane × sensitivity · admin only
+          </span>
+          <span className="mono text-micro text-graphite">
+            only providers with a saved key are listed
+          </span>
+        </div>
+      </div>
+    </SettingsSection>
+  )
+}
+
+/**
+ * One cell. The value is the stored provider while that provider still holds
+ * an active credential, and nothing otherwise — a cell whose key was deleted
+ * reads `— unset` in graphite, the same as a cell never routed, rather than
+ * naming a provider that cannot answer. Each provider row offers the model
+ * already stored for it, or its descriptor's default.
+ */
+function RouteCellSelect({
+  lane,
+  sensitivity,
+  stored,
+  routable,
+}: {
+  lane: AiLane
+  sensitivity: AiSensitivity
+  stored: RouteRow['target']
+  routable: ProviderRow[]
+}) {
+  const router = useRouter()
+  const [pending, setPending] = useState(false)
+
+  const live =
+    stored !== null && routable.some((p) => p.provider === stored.provider)
+      ? stored.provider
+      : ''
+  const modelFor = (provider: LlmProvider) =>
+    stored?.provider === provider
+      ? stored.model
+      : PROVIDERS[provider].defaultModel
+
+  const items: Array<SelectItem<CellValue>> = [
+    { value: UNSET, label: 'Unset' },
+    ...routable.map((p) => ({
+      value: p.provider,
+      label: `${p.label} · ${modelFor(p.provider)}`,
+    })),
+  ]
+
+  async function choose(value: CellValue) {
+    if (value === (live || UNSET)) return
+    setPending(true)
+    try {
+      if (value === UNSET) {
+        await setAiRoute({ data: { lane, sensitivity, provider: null } })
+        toast(`${lane} · ${sensitivity} unset`)
+      } else {
+        const model = modelFor(value)
+        await setAiRoute({
+          data: { lane, sensitivity, provider: value, model },
+        })
+        toast(`${lane} · ${sensitivity} · ${PROVIDERS[value].label} ${model}`)
+      }
+      void router.invalidate()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not save the route',
+      )
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Select<CellValue>
+      value={live}
+      onChange={(v) => void choose(v)}
+      items={items}
+      width="content"
+      placeholder="— unset"
+      disabled={pending}
+      aria-label={`${lane} lane, ${sensitivity}`}
+      className="w-56 shrink-0"
+    />
   )
 }
