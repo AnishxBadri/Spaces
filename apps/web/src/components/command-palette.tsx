@@ -8,6 +8,7 @@ import {
   LogOut,
   Paperclip,
   Settings,
+  Upload,
   Users,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -25,6 +26,7 @@ import {
 import { authClient } from '#/lib/auth-client'
 import { recordPath } from '#/lib/record-path'
 import { searchAll } from '#/lib/server-fns'
+import { openUploadDialog } from '#/lib/upload-dialog-store'
 
 /**
  * Cmd-K over everything: names, note bodies, and extracted document text,
@@ -79,6 +81,74 @@ function Highlighted({ text }: { text: string }) {
         ),
       )}
     </>
+  )
+}
+
+/**
+ * The palette's **actions** — commands that do something where every other
+ * row goes somewhere (SPA-108). Declared as data for the same reason
+ * `NAV_ITEMS` is: the next action is one row here and no edit to either
+ * branch below, and the group draws itself in both.
+ *
+ * They survive search mode, matched locally on their own words, because
+ * “upload” typed into the palette is an intention and not a search for the
+ * word — the server's ranking has nothing to say about a command that is not
+ * a row in any table.
+ */
+type PaletteAction = {
+  value: string
+  label: string
+  icon: LucideIcon
+  /** Extra words the local match reads — never drawn. */
+  words: string
+  run: () => void
+}
+
+const ACTIONS: Array<PaletteAction> = [
+  {
+    value: 'upload',
+    label: 'Upload a file…',
+    icon: Upload,
+    words: 'upload file document deck attach drop',
+    run: openUploadDialog,
+  },
+]
+
+/** Prefix match on any of an action's words — cmdk's filter is off here. */
+export function matchingActions(query: string): Array<PaletteAction> {
+  const q = query.trim().toLowerCase()
+  if (!q) return ACTIONS
+  return ACTIONS.filter((a) =>
+    `${a.label.toLowerCase()} ${a.words}`
+      .split(/[\s…]+/)
+      .some((w) => w.startsWith(q)),
+  )
+}
+
+function ActionsGroup({
+  actions,
+  onRun,
+}: {
+  actions: Array<PaletteAction>
+  onRun: (action: PaletteAction) => void
+}) {
+  if (actions.length === 0) return null
+  return (
+    <CommandGroup heading="Actions">
+      {actions.map((action) => (
+        <CommandItem
+          key={action.value}
+          value={action.value}
+          onSelect={() => onRun(action)}
+        >
+          <action.icon className="size-3.5" strokeWidth={1.75} />
+          {action.label}
+          <span data-hint className="ml-auto mono text-micro text-graphite">
+            ↵
+          </span>
+        </CommandItem>
+      ))}
+    </CommandGroup>
   )
 }
 
@@ -148,7 +218,18 @@ export function CommandPalette({
     void navigate({ to })
   }
 
+  /**
+   * An action closes the palette and then runs, a tick later: two Radix
+   * dialogs must not overlap, or the palette's unmount lands after the next
+   * sheet has mounted and takes the body's pointer-events with it.
+   */
+  function run(action: PaletteAction) {
+    onOpenChange(false)
+    setTimeout(action.run, 0)
+  }
+
   const searchMode = query.trim().length >= 2
+  const matched = matchingActions(query)
 
   return (
     <CommandDialog
@@ -167,12 +248,17 @@ export function CommandPalette({
       <CommandList>
         {searchMode ? (
           <>
+            {/* An action outranks a hit: “upload” typed into the palette is
+                an intention to upload, not a search for the word. */}
+            <ActionsGroup actions={matched} onRun={run} />
             {hits.length === 0 ? (
-              <CommandEmpty>
-                {searching
-                  ? 'Searching…'
-                  : `Nothing matches “${query.trim()}”.`}
-              </CommandEmpty>
+              matched.length > 0 ? null : (
+                <CommandEmpty>
+                  {searching
+                    ? 'Searching…'
+                    : `Nothing matches “${query.trim()}”.`}
+                </CommandEmpty>
+              )
             ) : (
               <CommandGroup heading={`Results · ${hits.length}`}>
                 {hits.map((hit) => {
@@ -251,6 +337,8 @@ export function CommandPalette({
                 </span>
               </CommandItem>
             </CommandGroup>
+            <CommandSeparator />
+            <ActionsGroup actions={ACTIONS} onRun={run} />
             <CommandSeparator />
             <CommandGroup heading="Session">
               <CommandItem
