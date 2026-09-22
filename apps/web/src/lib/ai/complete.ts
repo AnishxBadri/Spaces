@@ -112,8 +112,6 @@ export function completeMessage(failure: CompleteFailure): string {
       return `Sensitive material is not sent to ${providerLabel(failure.provider)}; route the ${failure.lane} lane to a local model`
     case 'NoCredential':
       return `No ${providerLabel(failure.provider)} key is saved`
-    case 'ProviderNotBuilt':
-      return `${providerLabel(failure.provider)} is not available yet`
     case 'ProviderCallFailed':
       return `${providerLabel(failure.provider)} did not answer`
     case 'RouteReadFailed':

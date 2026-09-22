@@ -16,6 +16,14 @@ import {
 } from './llm/openrouter'
 import { TEST_PROMPT, providerFailure, runTestCall } from './test-call'
 
+// The Test call records under a lane and a caller (SPA-42); these adapter
+// tests assert the wire, not the usage row, so one fixture serves them all.
+const VIA = {
+  provider: 'openai',
+  lane: 'classify',
+  caller: { type: 'system' },
+} as const
+
 /**
  * SPA-39. The four adapters after Anthropic, each asserted against the
  * client it constructs: a stub transport records the one request and answers
@@ -104,7 +112,7 @@ async function send(
 ) {
   const wire = recordingFetch(reply)
   const model = adapter({ ...input, fetch: wire.fetch })
-  const result = await Effect.runPromise(runTestCall(model))
+  const result = await Effect.runPromise(runTestCall(model, VIA))
   expect(wire.calls).toHaveLength(1)
   return { result, call: wire.calls[0] }
 }
@@ -293,7 +301,7 @@ describe('an unreachable base URL', () => {
       meta: { baseUrl: 'http://localhost:11434' },
       fetch: refusedFetch('127.0.0.1:11434'),
     })
-    const result = await Effect.runPromise(runTestCall(model))
+    const result = await Effect.runPromise(runTestCall(model, VIA))
     expect(result).toEqual({
       ok: false,
       status: null,
@@ -308,7 +316,7 @@ describe('an unreachable base URL', () => {
       meta: { baseUrl: 'http://127.0.0.1:9' },
       fetch: refusedFetch('127.0.0.1:9'),
     })
-    const result = await Effect.runPromise(runTestCall(model))
+    const result = await Effect.runPromise(runTestCall(model, VIA))
     expect(result).toMatchObject({ ok: false, status: null })
     if (result.ok) throw new Error('expected a failure')
     expect(result.message).toContain('ECONNREFUSED 127.0.0.1:9')
