@@ -49,39 +49,31 @@ const empty = (j: SQL) => sql`(${j} is null
   or ${j} = '[]'::jsonb)`
 
 /**
- * JS `String(v)`. Scalars print themselves; an array prints its elements
- * joined by commas, with null printing as the empty string — that is
- * `Array.prototype.join`, and `contains` on a multi-select depends on it.
+ * JS `String(v)` — `spaces_json_text(jsonb)`, declared in migration 0041.
+ * Scalars print themselves; an array prints its elements joined by commas,
+ * with null printing as the empty string — that is `Array.prototype.join`,
+ * and `contains` on a multi-select depends on it.
+ *
+ * **Why a function and not the CASE it used to be** (SPA-93). The array
+ * branch needs `jsonb_array_elements`, which is a subquery, and Postgres
+ * refuses a subquery in an index expression — so as long as this was
+ * written inline, no per-attribute index could match what the sort key
+ * emitted, and views-4's whole premise (`filterable`/`sortable` mints an
+ * expression index) was unreachable. An IMMUTABLE function is one node in
+ * both the query and the index definition, so the planner matches them.
+ * The body is this comment's old CASE, character for character.
  */
-const text = (j: SQL) => sql`(case
-  when ${j} is null then null
-  when jsonb_typeof(${j}) = 'null' then 'null'
-  when jsonb_typeof(${j}) = 'array' then (
-    select coalesce(
-      string_agg(
-        case when jsonb_typeof(e.value) = 'null' then '' else e.value #>> '{}' end,
-        ',' order by e.ord),
-      '')
-    from jsonb_array_elements(${j}) with ordinality as e(value, ord))
-  else ${j} #>> '{}'
-end)`
+const text = (j: SQL) => sql`spaces_json_text(${j})`
 
 /**
- * JS `Number(v)`, and never a cast that can throw: a non-numeric string is
- * NaN in the browser and SQL NULL here, so the row simply does not match.
+ * JS `Number(v)` — `spaces_json_number(jsonb)`, same migration, same
+ * reason — and never a cast that can throw: a non-numeric string is NaN in
+ * the browser and SQL NULL here, so the row simply does not match.
  * `Number(null)` is 0, `Number(true)` is 1, `Number('  ')` is 0, and
- * `Number(v)` for anything else is `Number(String(v))` — which is why the
- * last two branches read the text form.
+ * `Number(v)` for anything else is `Number(String(v))`, which is why the
+ * function's last two branches read `spaces_json_text` back.
  */
-const NUMERIC_TEXT = '^[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?$'
-const num = (j: SQL) => sql`(case
-  when ${j} is null then null
-  when jsonb_typeof(${j}) = 'null' then 0
-  when jsonb_typeof(${j}) = 'boolean' then (case when ${j} = 'true'::jsonb then 1 else 0 end)
-  when btrim(${text(j)}) = '' then 0
-  when btrim(${text(j)}) ~ ${NUMERIC_TEXT} then btrim(${text(j)})::numeric
-  else null
-end)`
+const num = (j: SQL) => sql`spaces_json_number(${j})`
 
 /** `filter.ts`'s `asList(v).some((x) => String(x) === lit)`. */
 const someEquals = (j: SQL, lit: string) => sql`(case

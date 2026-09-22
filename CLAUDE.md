@@ -196,6 +196,28 @@ anyway. Don't re-litigate it from the flag list.
 - New system attribute → add to `SYSTEM_ATTRIBUTES` in
   `packages/core/src/attributes/registry.ts`; `pnpm db:migrate:run` reseeds
   insert-if-absent
+- **`attr_idx_*` indexes are the reconciler's, never the journal's** (SPA-93).
+  `entity` carries one expression index per attribute flagged
+  `filterable`/`sortable` — `attr_idx_<attribute id>` on
+  `(object_id, spaces_json_text|number(values -> '<slug>'))` — and that set is
+  a function of _user data_, not of the schema: it changes when somebody ticks
+  "Filter and sort on this". So it is DDL from application code, and the one
+  exception to "schema changed → db:generate". `reconcileValueIndexes()`
+  (`packages/db/src/value-indexes.ts`) diffs `pg_indexes` against the flagged,
+  unarchived attributes and mints/drops `CONCURRENTLY`; it runs at boot beside
+  `seedSystemAttributes()` (`apps/web/src/db/boot.ts`) and from the attribute
+  server fns **after** the write commits — never inside a transaction, which
+  `CREATE INDEX CONCURRENTLY` forbids. A failed mint is logged, the attribute
+  stays usable, and the next boot retries. **Never add one to the drizzle
+  journal, and never `db:push`** — `db:generate` diffs snapshots and cannot
+  see them (verified), but `push`/`pull` introspect a live database and would
+  propose dropping every one of them. The expression is not free-form either:
+  it must be exactly what `compileSortKey` emits
+  (`apps/web/src/lib/views/sql.ts`), which is why the coercions live in two
+  IMMUTABLE SQL functions (migration 0041) and why `resolve.ts` spells the
+  slug as a literal rather than a bind parameter. A mismatch raises nothing —
+  the index just sits there unused; `apps/web/src/lib/views/value-index-plan.test.ts`
+  is the EXPLAIN assertion that catches it.
 - New column referencing an entity → add an entry to `ENTITY_REFS`
   (`packages/db/src/entity-refs.ts`) declaring both the merge strategy and the
   context role; `entity-refs.test.ts` diffs the list against drizzle's FK

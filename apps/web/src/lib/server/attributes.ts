@@ -64,6 +64,11 @@ export const listRegistry = createServerFn()
         isSystem: d.isSystem,
         archived: d.archived,
         sortOrder: d.sortOrder,
+        // One control in the dialog, two columns here (SPA-93) — the edit
+        // dialog reads `filterable` back so a reopened attribute shows the
+        // box as it was left.
+        filterable: d.filterable,
+        sortable: d.sortable,
       }))
     })
 
@@ -118,6 +123,8 @@ export const updateAttributeInput = z.object({
   required: z.boolean().optional(),
   archived: z.boolean().optional(),
   move: z.enum(['up', 'down']).optional(),
+  /** "Filter and sort on this" — sets attribute.filterable and .sortable together */
+  indexed: z.boolean().optional(),
   options: z.array(optionEdit).max(50).optional(),
   config: z
     .object({
@@ -154,7 +161,18 @@ export const updateAttribute = createServerFn({ method: 'POST' })
     await requireAdmin()
     const { updateAttributeProgram } = await import('../attributes/update')
     const { effectFn } = await import('./effect')
-    return effectFn(updateAttributeProgram)(data)
+    const result = await effectFn(updateAttributeProgram)(data)
+    // After the write commits, never inside it: `CREATE INDEX CONCURRENTLY`
+    // cannot run in a transaction (SPA-93). Ticking the box mints the
+    // attribute's `attr_idx_<id>`, unticking it — or archiving the
+    // attribute — drops it, with no restart. A failed mint is logged by the
+    // reconciler and leaves the attribute usable; the next boot retries.
+    if (data.indexed !== undefined || data.archived !== undefined) {
+      const { reconcileAttributeIndexes } =
+        await import('../attributes/reconcile')
+      await reconcileAttributeIndexes()
+    }
+    return result
   })
 
 const ATTRIBUTE_TYPES = [
@@ -207,6 +225,8 @@ export const createAttributeInput = z.object({
     .optional(),
   default: jsonValue.optional(),
   required: z.boolean().optional(),
+  /** "Filter and sort on this" — sets attribute.filterable and .sortable together */
+  indexed: z.boolean().optional(),
 })
 
 export const createAttribute = createServerFn({ method: 'POST' })
@@ -218,5 +238,15 @@ export const createAttribute = createServerFn({ method: 'POST' })
     const u = await requireUser()
     const { createAttributeProgram } = await import('../attributes/create')
     const { effectFn } = await import('./effect')
-    return effectFn(createAttributeProgram)({ ...data, createdBy: u.id })
+    const result = await effectFn(createAttributeProgram)({
+      ...data,
+      createdBy: u.id,
+    })
+    // Same rule as the update path: after the insert commits.
+    if (data.indexed) {
+      const { reconcileAttributeIndexes } =
+        await import('../attributes/reconcile')
+      await reconcileAttributeIndexes()
+    }
+    return result
   })

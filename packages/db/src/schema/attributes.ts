@@ -132,6 +132,26 @@ export const attribute = pgTable(
      * currency → {code}; rating → {max}.
      */
     options: jsonb('options').$type<AttributeOptions>().notNull().default({}),
+    /**
+     * Engine properties, not per-type config (SPA-93). `options` is the bag
+     * `buildOptions` polices — every key in it means something to exactly one
+     * attribute type, and nothing reads it in SQL. These two are the
+     * opposite: they mean the same thing for all fifteen types, and
+     * `reconcileValueIndexes()` reads them in a `select` to decide which
+     * `attr_idx_<id>` expression indexes must exist. A jsonb key would make
+     * that diff a `options ->> 'filterable' = 'true'` string comparison over
+     * a column with no constraint behind it, and would let a typo create an
+     * attribute that is silently unindexed. Real booleans, not-null, default
+     * false: off is the shape of a new attribute, and the reconciler's read
+     * is a column scan the planner understands.
+     *
+     * They are set together by one dialog control today — a user does not
+     * distinguish "filter on this" from "sort on this" — and stay two
+     * columns because the reconciler and any later per-capability UI want
+     * them apart.
+     */
+    filterable: boolean('filterable').notNull().default(false),
+    sortable: boolean('sortable').notNull().default(false),
     // System attrs ship with the product: non-deletable, archivable only.
     // Their *options* stay editable — structure fixed, content free.
     isSystem: boolean('is_system').notNull().default(false),

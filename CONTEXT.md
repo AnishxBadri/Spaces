@@ -2496,12 +2496,40 @@ CSV, virtualization + keyboard-grid, kanban, drawer-over-table, Overview/Highlig
 - ~~**Note vs memo vs document.**~~ **Answered 2026-07: one object.** A memo is a note with
   `kind = 'memo'` — same table, same editor, same links. The kind drives presentation and a
   later PDF export, nothing structural. See _Filed vs referenced_.
-- **`values jsonb` indexing strategy** for kanban group-by, per the data model section.
-  **Re-examined 2026-09-13: moot until server-side filtering exists** — every
-  object list is fetched whole and filtered client-side today (no `values->`
-  SQL anywhere). When pagination lands: per-attribute expression index on
-  `(values->>'slug')` created at attribute creation behind a
-  `filterable`/`sortable` flag, not a GIN over the universe.
+- ~~**`values jsonb` indexing strategy** for kanban group-by, per the data
+  model section.~~ **Answered, and shipped 2026-09-23 (SPA-93).** The
+  2026-09-13 re-examination said: when pagination lands, a per-attribute
+  expression index created at attribute creation behind a
+  `filterable`/`sortable` flag, not a GIN over the universe. That is what
+  shipped, with three things the sketch did not have.
+  - **The flags are real columns**, `attribute.filterable` and
+    `attribute.sortable`, boolean not-null default false — not keys in
+    `attribute.options`. `options` is the per-type bag `buildOptions`
+    polices, every key of which means something to exactly one type and
+    nothing to SQL; these two mean the same thing for all fifteen types and
+    are read in a `select` by the reconciler. One dialog control, "Filter and
+    sort on this", sets both: a reader does not distinguish filtering a list
+    from sorting it, and both want the same btree. Only `deal.stage` is
+    flagged at seed.
+  - **The index is composite, `(object_id, <expression>)`, not partial on a
+    literal object id**, because every list read passes the object id as a
+    bind parameter — and it is `spaces_json_text|number(values -> '<slug>')`,
+    not `(values->>'slug')`, because that is what `compileSortKey` emits.
+    Getting that expression wrong raises nothing: the index simply sits
+    unused. So it is asserted, not assumed —
+    `apps/web/src/lib/views/value-index-plan.test.ts` EXPLAINs the paged
+    query and requires an index scan on `attr_idx_…`, under a forced generic
+    plan as well as a custom one.
+  - **It buys the sort, not the filter.** `compileConditions` wraps every
+    condition in `coalesce(…, false)` so SQL's third truth value cannot leak,
+    and the planner cannot match an index key through a `CoalesceExpr`. The
+    paged list therefore scans the index in sort order and applies the
+    conditions as a filter — which is where the twenty-thousand-row cost was.
+    The set of indexes is a function of user data, so it cannot live in the
+    drizzle journal: `reconcileValueIndexes()` (`packages/db/src/value-indexes.ts`)
+    diffs `pg_indexes` against the flagged, unarchived attributes at boot beside
+    `seedSystemAttributes()` and again after each attribute write commits. See
+    CLAUDE.md, _After specific change kinds_.
 - ~~**Space page shape** — sources and contacts sections.~~ Sources answered
   2026-09-14: documents file into spaces via `entity_space`. Contacts: people
   tagged into the space or reached through its companies, same collapsed

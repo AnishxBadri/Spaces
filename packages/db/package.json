@@ -14,6 +14,7 @@
     "./migrate": "./src/migrate.ts",
     "./downgrade-guard": "./src/downgrade-guard.ts",
     "./json": "./src/json.ts",
+    "./value-indexes": "./src/value-indexes.ts",
     "./test-db": "./src/test-db.ts"
   },
   "//bin": "Migrations only — guard, then `migrate()`, then exit. The boot composition that also seeds is apps/web's (`apps/web/src/db/boot.ts`), and moves to core at mono-9a.",

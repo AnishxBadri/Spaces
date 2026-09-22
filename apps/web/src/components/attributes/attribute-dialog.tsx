@@ -199,6 +199,13 @@ export type EditableAttribute = {
   description?: string | null
   type: AttributeType
   options: AttributeOptions | null
+  /**
+   * Engine flag (SPA-93), not a member of `options` — the reconciler reads
+   * it in SQL and it means the same thing for every type. `sortable` is its
+   * twin column; the dialog sets both from one control, so reading one back
+   * is enough to show the box.
+   */
+  filterable?: boolean
 }
 
 type ObjectChoice = {
@@ -342,6 +349,10 @@ function AttributeForm({
     : ''
   const [multi, setMulti] = useState(stored.multi ?? false)
   const [required, setRequired] = useState(stored.required ?? false)
+  // "Filter and sort on this": one control, two columns (SPA-93). A user
+  // does not distinguish filtering a list from sorting it, and both want
+  // the same btree — `attr_idx_<id>` on `(object_id, <the sort key>)`.
+  const [indexed, setIndexed] = useState(attr?.filterable ?? false)
   const [dflt, setDflt] = useState<unknown>(stored.default ?? null)
   const [relative, setRelative] = useState(isDuration(stored.default))
   const [error, setError] = useState<string | null>(null)
@@ -476,6 +487,7 @@ function AttributeForm({
             },
             ...(defaultValue === null ? {} : { default: defaultValue }),
             required,
+            indexed,
           },
         })
         toast(`${trimmed} added`)
@@ -488,6 +500,7 @@ function AttributeForm({
               ? { description: description.trim() || null }
               : {}),
             ...(required !== Boolean(stored.required) ? { required } : {}),
+            ...(indexed !== Boolean(attr.filterable) ? { indexed } : {}),
             ...(isOptionType ? { options: optionPayload } : {}),
             config: {
               ...(type === 'currency' && code !== (stored.code ?? 'USD')
@@ -803,6 +816,14 @@ function AttributeForm({
               </div>
             ) : null}
           </div>
+
+          <CheckRow
+            id="attr-indexed"
+            checked={indexed}
+            onChange={setIndexed}
+            label="Filter and sort on this"
+            hint="Keeps a long list fast; costs a little on every write"
+          />
 
           {error ? (
             <p
