@@ -10,6 +10,7 @@ import {
   Layers,
   Keyboard,
   LogOut,
+  Paperclip,
   Settings,
   Sunrise,
   Users,
@@ -31,8 +32,9 @@ import { cn } from '#/lib/utils'
 
 /**
  * The chassis (Instrument, 2026-09-10). 232px of bone with a hairline right
- * edge. Three groups: the work (Today, Tasks, Spaces, Notes), the objects
- * (Companies, People, Deals, then customs), capital (Portfolio, Mandate).
+ * edge. Three groups: the work (Today, Tasks, Spaces, Notes, Documents), the
+ * objects (Companies, People, Deals, then customs), capital (Portfolio,
+ * Mandate).
  * Rows are 30px with a 14px mark slot so every label sits on one lane.
  * Current page = paper + rule border + medium weight — never a pine bar
  * (the No-Bar Rule). Settings and the user are pinned to the foot.
@@ -79,6 +81,17 @@ export const NAV_ITEMS = [
   },
   { to: '/spaces', label: 'Spaces', icon: Layers, key: 'G S', group: 'work' },
   { to: '/notes', label: 'Notes', icon: FileText, key: 'G N', group: 'work' },
+  // The shelf joins the work, last after Notes (SPA-82): it is research
+  // material like Notes and Spaces, not a core object and not capital. It
+  // takes L (library) because D is Deals — the only free letter that says
+  // what the page is.
+  {
+    to: '/documents',
+    label: 'Documents',
+    icon: Paperclip,
+    key: 'G L',
+    group: 'work',
+  },
   {
     to: '/companies',
     label: 'Companies',

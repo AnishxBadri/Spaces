@@ -546,9 +546,11 @@ ones.
 ### Navigation — the chassis
 
 232px of bone with a hairline right edge. Three groups: the work (Today, Tasks, Spaces,
-Notes), the objects (Companies, People, Deals, then customs), capital (Portfolio,
-Mandate) — one list (`NAV_ITEMS`), read in the same order by the command palette and
-the keyboard sheet, so the chassis is where nav order is decided. Rows are 30px with a 14px mark slot so every label sits on one lane. Current
+Notes, Documents), the objects (Companies, People, Deals, then customs), capital
+(Portfolio, Mandate) — one list (`NAV_ITEMS`), read in the same order by the command
+palette and the keyboard sheet, so the chassis is where nav order is decided. Documents
+joins the work as the last row after Notes (SPA-82): the shelf is research material like
+Notes and Spaces, neither a core object nor capital. Rows are 30px with a 14px mark slot so every label sits on one lane. Current
 page = paper + rule border + medium weight — never a pine bar. The head row ends on a
 mono `«` that folds the chassis (`⌘\`). The foot is one account row (ink initials
 square, name, email); its menu opens to the right of the chassis — never up into the
@@ -630,7 +632,9 @@ Stage` box appears while dragging over a column.
 - **The keyboard sheet:** `?` opens it (the account menu lists it). Two columns of 26px
   rows on rules — Go, Create, On a deal, In a sheet — with 18px keycaps (hairline, 2px
   foot, mono 10). Only keys that work are printed. Every nav row prints its G-chord in
-  its right lane; chords wait 800ms and every key is off while typing.
+  its right lane; chords wait 800ms and every key is off while typing. Documents takes
+  `G L` (library, the shelf) because `G D` is Deals and L was the one free letter that
+  says what the page is.
 - **Tooltips:** inverted (ink background, paper text), `text-label`, 120/80ms.
 - **Toasts:** sonner, bottom-right, ink.
 
