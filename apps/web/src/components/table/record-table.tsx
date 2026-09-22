@@ -31,12 +31,38 @@ import { cn } from '#/lib/utils'
 const RESIZE_STEP = 16
 const MIN_COLUMN_WIDTH = 64
 
+/**
+ * Grouped, never compact — `Intl.NumberFormat` compact notation prints
+ * differently under Node and Chrome and takes hydration down with it
+ * (CLAUDE.md, traps). The locale is named so the two agree on the separator.
+ */
+const grouped = (n: number) => n.toLocaleString('en-US')
+
+/**
+ * What a paged surface tells its foot (SPA-64). Absent on every unpaged
+ * surface, which keeps reading `getPreFilteredRowModel()` — those tables
+ * hold every row they could show, so the pre-filtered model *is* the truth
+ * there and a server round trip would only be able to agree with it.
+ */
+export type TablePage = {
+  /** The server's `count(*)` over the same `where` the page was cut from. */
+  total: number
+  /** Another page exists after the ones loaded. */
+  hasMore: boolean
+  /** A page is in flight. */
+  loading: boolean
+  /** Rows per page — the number the link offers to add. */
+  step: number
+  onLoadMore: () => void
+}
+
 export function RecordTable<T>({
   table,
   stickyColumnId,
   addColumn,
   label,
   onRowClick,
+  page,
 }: {
   table: Table<T>
   /** Column pinned to the left edge while the rest scrolls under it. */
@@ -57,6 +83,12 @@ export function RecordTable<T>({
    * `stopPropagation()` so a chip click does not also fire this.
    */
   onRowClick?: (row: T) => void
+  /**
+   * Set only where the rows arrive a page at a time. The foot then counts
+   * against the server's total and ends on "load N more" instead of "end" —
+   * the same 32px lane, the same two slots, no second table chrome.
+   */
+  page?: TablePage
 }) {
   const rows = table.getRowModel().rows
 
@@ -130,10 +162,27 @@ export function RecordTable<T>({
               >
                 <div className="flex items-center justify-between">
                   <span className="label-caps font-normal text-graphite">
-                    {rows.length} of{' '}
-                    {table.getPreFilteredRowModel().rows.length}
+                    {grouped(rows.length)} of{' '}
+                    {grouped(
+                      page
+                        ? page.total
+                        : table.getPreFilteredRowModel().rows.length,
+                    )}
                   </span>
-                  <span className="mono text-micro text-graphite">end</span>
+                  {page?.hasMore ? (
+                    <button
+                      type="button"
+                      onClick={page.onLoadMore}
+                      disabled={page.loading}
+                      className="focus-ring mono text-micro text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground disabled:text-graphite"
+                    >
+                      {page.loading
+                        ? 'loading…'
+                        : `load ${grouped(page.step)} more`}
+                    </button>
+                  ) : (
+                    <span className="mono text-micro text-graphite">end</span>
+                  )}
                 </div>
               </td>
             </tr>
