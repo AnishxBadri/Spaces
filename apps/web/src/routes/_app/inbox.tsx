@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
-import { Check, Copy, Search, X } from 'lucide-react'
+import { Check, Inbox, Search, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { EmptyState } from '#/components/empty-state'
+import { SuggestionCard } from '#/components/inbox/suggestion-card'
 import { PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import {
@@ -15,6 +16,7 @@ import type {
   DuplicateCandidateRow,
   InboxKind,
   InboxSide,
+  SuggestionRow,
 } from '#/lib/server-fns'
 import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
@@ -44,6 +46,15 @@ function isDuplicateCandidate(row: QueueRow): row is DuplicateCandidateRow {
   return row.kind === 'duplicate_candidate' && 'a' in row && 'b' in row
 }
 
+function isSuggestionRow(row: QueueRow): row is SuggestionRow {
+  return (
+    row.kind === 'suggestion' &&
+    'record' in row &&
+    'suggestions' in row &&
+    Array.isArray(row.suggestions)
+  )
+}
+
 /**
  * One renderer per row kind. **Add a member to `InboxRow` and a renderer
  * here, never a page** — that is the whole contract of this surface, and
@@ -56,6 +67,12 @@ const RENDERERS: Record<InboxKind, InboxRenderer> = {
   duplicate_candidate: ({ row, index, total }) =>
     isDuplicateCandidate(row) ? (
       <PairCard pair={row} index={index} total={total} />
+    ) : (
+      <PayloadFallback row={row} />
+    ),
+  suggestion: ({ row }) =>
+    isSuggestionRow(row) ? (
+      <SuggestionCard card={row} />
     ) : (
       <PayloadFallback row={row} />
     ),
@@ -95,8 +112,29 @@ function reasonLabel(pair: DuplicateCandidateRow): string {
   return 'Flagged as possibly the same'
 }
 
+/**
+ * The filter over the one queue: All, or one lane. React state only — it
+ * does not survive navigation, and it never changes what the server sends.
+ */
+type Lane = 'all' | InboxKind
+
+const LANES: Array<{ key: Lane; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'suggestion', label: 'Suggestions' },
+  { key: 'duplicate_candidate', label: 'Duplicates' },
+]
+
 function InboxPage() {
   const rows = Route.useLoaderData()
+  const [lane, setLane] = useState<Lane>('all')
+  const visible =
+    lane === 'all' ? rows : rows.filter((row) => row.kind === lane)
+  const countOf = (key: Lane) =>
+    key === 'all' ? rows.length : rows.filter((r) => r.kind === key).length
+  const suggestionCount = rows.reduce(
+    (n, r) => (r.kind === 'suggestion' ? n + r.suggestions.length : n),
+    0,
+  )
 
   return (
     <div className="flex min-h-full flex-col">
@@ -105,27 +143,96 @@ function InboxPage() {
         description={
           <>
             <span>{rows.length} open</span>
+            {suggestionCount > 0 ? (
+              <span>
+                {suggestionCount} suggestion{suggestionCount === 1 ? '' : 's'}
+              </span>
+            ) : null}
             <span>you make the call</span>
-            <span>dismissed pairs never come back</span>
+            <span>rejected and dismissed never come back</span>
           </>
         }
-        action={<ScanAction />}
+        action={
+          <>
+            <ScanAction />
+            {rows.length > 0 ? (
+              <div
+                className="-mb-4 ml-2 flex items-center self-end"
+                role="group"
+              >
+                {LANES.map((l) => (
+                  <HeaderTab
+                    key={l.key}
+                    active={lane === l.key}
+                    onClick={() => setLane(l.key)}
+                  >
+                    {l.label}
+                    <span className="font-normal tracking-normal normal-case">
+                      {countOf(l.key)}
+                    </span>
+                  </HeaderTab>
+                ))}
+              </div>
+            ) : null}
+          </>
+        }
       />
 
       {rows.length === 0 ? (
         <EmptyState
-          icon={Copy}
+          icon={Inbox}
           title="Inbox zero"
-          body="No open duplicate suggestions. New ones appear here when two records claim the same domain or their names look alike."
+          body="Nothing waits on you. Duplicate pairs appear here when two records claim the same domain or their names look alike; suggestions appear when a provider proposes a value."
+        />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon={Inbox}
+          title="Nothing in this lane"
+          body="The other lane still has open items — switch to All to see them."
         />
       ) : (
         <ul className="flex max-w-220 flex-col gap-6 px-8 pt-6 pb-8">
-          {rows.map((row, i) => (
-            <InboxItem key={row.id} row={row} index={i} total={rows.length} />
-          ))}
+          {visible.map((row) => {
+            const same = visible.filter((r) => r.kind === row.kind)
+            return (
+              <InboxItem
+                key={`${row.kind}:${row.id}`}
+                row={row}
+                index={same.indexOf(row)}
+                total={same.length}
+              />
+            )
+          })}
         </ul>
       )}
     </div>
+  )
+}
+
+/** The view-tab treatment of `tasks.tsx`, copied rather than reinvented. */
+function HeaderTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'focus-ring-inset flex h-9 items-center gap-1.5 border-b-2 px-3 label-caps transition-colors duration-150 ease-out-quart',
+        active
+          ? 'border-primary text-foreground'
+          : 'border-transparent text-graphite hover:text-foreground',
+      )}
+    >
+      {children}
+    </button>
   )
 }
 
