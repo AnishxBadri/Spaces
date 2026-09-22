@@ -46,6 +46,12 @@ export type SpaceSource = {
   mime: string | null
   extractionStatus: (typeof document.$inferSelect)['extractionStatus']
   extractionError: string | null
+  /**
+   * The clip's own address (SPA-117), null for every document that arrived
+   * as bytes. It is what lets the row say "fetching…" while a saved link
+   * waits on the worker, where a deck says "extracting text…".
+   */
+  url: string | null
   uploadedByName: string | null
   /** ISO 8601 — compared lexically, the repo convention for dates. */
   createdAt: string
@@ -90,6 +96,7 @@ const sourceColumns = {
   mime: document.mime,
   extractionStatus: document.extractionStatus,
   extractionError: document.extractionError,
+  url: document.url,
   createdAt: document.createdAt,
   uploadedByName: user.name,
   snippet: sql<
@@ -105,6 +112,7 @@ type SourceRow = Pick<
   | 'mime'
   | 'extractionStatus'
   | 'extractionError'
+  | 'url'
   | 'createdAt'
 > & { id: string; uploadedByName: string | null; snippet: string | null }
 
@@ -118,6 +126,7 @@ function toSource(r: SourceRow, now: number): SpaceSource {
     mime: r.mime,
     extractionStatus: r.extractionStatus,
     extractionError: r.extractionError,
+    url: r.url,
     uploadedByName: r.uploadedByName,
     createdAt: r.createdAt.toISOString(),
     sinceMs: now - r.createdAt.getTime(),

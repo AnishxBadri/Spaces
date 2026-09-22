@@ -28,6 +28,7 @@ import {
 } from '@spaces/core/documents'
 import { formatDurationMs, formatSince } from '@spaces/core/format'
 import {
+  clipUrl,
   deleteDocument,
   fileDocument,
   getDocumentDownloadUrl,
@@ -39,6 +40,7 @@ import {
 } from '#/lib/server-fns'
 import type { listRecordDocuments } from '#/lib/server-fns'
 import { uploadDocument } from '#/lib/documents/upload'
+import { droppedUrl } from '#/lib/documents/uri-list'
 import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
 
@@ -113,6 +115,27 @@ export function RecordFiles({
     }
   }
 
+  /**
+   * A link dragged from a browser tab or a bookmark bar — §3.1 entry point 5
+   * (SPA-117). The same gesture the dropzone already accepts, on a payload
+   * that has no bytes: it files as a document with `document.url` set and the
+   * worker fetches it. Same target as a file drop, because a drop here means
+   * this record either way.
+   */
+  async function handleLink(url: string) {
+    try {
+      await clipUrl({
+        data: { url, fileAgainst: [{ kind: 'record', entityId }] },
+      })
+      toast.success('Link saved · fetching the page')
+      void router.invalidate()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not save this link',
+      )
+    }
+  }
+
   return (
     <div
       onDragOver={(e) => {
@@ -123,6 +146,13 @@ export function RecordFiles({
       onDrop={(e) => {
         e.preventDefault()
         setDragging(false)
+        // Read synchronously: `getData` answers the empty string once the
+        // event has been dispatched, so a link read after an await is lost.
+        const link = droppedUrl(e.dataTransfer)
+        if (link !== null) {
+          void handleLink(link)
+          return
+        }
         void handleFiles(e.dataTransfer.files)
       }}
       className="flex flex-col"
@@ -212,7 +242,7 @@ export function RecordFiles({
         <span className="mono text-field text-graphite">
           {dragging
             ? 'they stay on this server'
-            : 'stays on this server · PDF, DOCX, PPTX, XLSX get their text extracted'}
+            : 'stays on this server · files get their text extracted, links get fetched'}
         </span>
       </button>
 
@@ -700,7 +730,14 @@ function SpacePicker({
  */
 function ExtractionNote({ doc }: { doc: Documents[number] }) {
   if (doc.extractionStatus === 'pending') {
-    return <p className="mono text-field text-graphite">extracting text…</p>
+    // A clip has no bytes to extract — it has a page still to be fetched, and
+    // saying "extracting text…" over a URL nobody has read yet would describe
+    // a step that has not started (SPA-117).
+    return (
+      <p className="mono text-field text-graphite">
+        {doc.url === null ? 'extracting text…' : 'fetching…'}
+      </p>
+    )
   }
   if (doc.extractionStatus === 'failed') {
     return (

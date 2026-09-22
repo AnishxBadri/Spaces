@@ -123,6 +123,48 @@ export const finalizeDocumentUpload = createServerFn({ method: 'POST' })
     }
   })
 
+/**
+ * **Save a link** — §3.1 entry point 5, the one arrival with no bytes
+ * (SPA-117). It is not an upload and shares none of the upload's machinery:
+ * no hash, no prepare, no PUT, no storage probe. A URL, a place to file it,
+ * and a row.
+ *
+ * It **returns before any network call**: `clipUrlProgram` validates the URL
+ * against the SSRF table, births the row `pending` and enqueues
+ * `document.clip`. The fetch happens on the worker, so a page that takes
+ * thirty seconds is thirty seconds of a job rather than of this request — and
+ * with the worker down the row simply stays pending.
+ *
+ * `fileAgainst` is the **same array** and the same `filingTarget` validator
+ * the upload uses, because a link filed against a record and a deck filed
+ * against a record are the same filing (§3.4). The writer is
+ * `lib/documents/clip.ts`, reached by a dynamic import inside the handler for
+ * the reason `finalizeDocumentUpload` reaches birth that way: this file is
+ * re-exported to the browser by the server-fns barrel and only handler bodies
+ * are stripped (CLAUDE.md → Traps).
+ */
+export const clipUrl = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      url: z.string().url(),
+      fileAgainst: z.array(filingTarget).min(0),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { clipUrlProgram, clipUrlMessage } = await import('../documents/clip')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(clipUrlProgram)({
+        url: data.url,
+        fileAgainst: data.fileAgainst,
+        actor: { userId: u.id },
+      })
+    } catch (failure) {
+      throw new Error(clipUrlMessage(failure))
+    }
+  })
+
 /** Documents filed against a record — the Files tab. */
 export const listRecordDocuments = createServerFn()
   .validator(z.object({ entityId: z.string().uuid() }))
@@ -139,6 +181,10 @@ export const listRecordDocuments = createServerFn()
         extractionError: document.extractionError,
         createdAt: document.createdAt,
         uploadedBy: document.uploadedBy,
+        // The clip's own address (SPA-117), and the one column that tells a
+        // saved article from a file: the row's pending state reads
+        // "fetching…" rather than "extracting text…" when it is set.
+        url: document.url,
         // The storage-source half of the row (SPA-78,
         // `docs/spec-storage-sources.md` §8): where the provider's copy can
         // be opened, and whether it is still there. Both null on every
