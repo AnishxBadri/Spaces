@@ -57,6 +57,7 @@ export type ViewSnapshot = {
 export function ViewBar({
   objectId,
   registry,
+  filterUnavailable,
   views,
   activeId,
   snapshot,
@@ -73,6 +74,14 @@ export function ViewBar({
    */
   objectId: string | null
   registry: Array<RegistryEntry>
+  /**
+   * Why this surface cannot build conditions yet, when it cannot. /documents
+   * has no attribute registry to draw an attribute → op → value row from
+   * until docsurf-12b (SPA-141), so it passes the reason and the Filter
+   * control renders disabled and titled with it. Omitted by every surface
+   * that can filter, which is the four object lists.
+   */
+  filterUnavailable?: string
   views: Array<ViewRow>
   /** the view the page is currently showing, from `?view=` */
   activeId: string | null
@@ -131,11 +140,27 @@ export function ViewBar({
         />
       ))}
 
-      <FilterPopover
-        registry={registry}
-        conditions={snapshot.filter}
-        onChange={onFilterChange}
-      />
+      {filterUnavailable === undefined ? (
+        <FilterPopover
+          registry={registry}
+          conditions={snapshot.filter}
+          onChange={onFilterChange}
+        />
+      ) : (
+        /*
+          The control stays in place, disabled, rather than vanishing: one bar
+          across every surface, and a button that is simply missing reads as a
+          different bar rather than as a thing that is coming. The title is on
+          the wrapper because a disabled Button takes `pointer-events-none` —
+          the span is the only element the cursor can still reach.
+        */
+        <span title={filterUnavailable} className="inline-flex">
+          <Button size="xs" variant="ghost" disabled>
+            <Filter className="size-3" strokeWidth={2} />
+            Filter
+          </Button>
+        </span>
+      )}
 
       {active && dirty && canEdit(active) ? (
         <Button

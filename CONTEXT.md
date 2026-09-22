@@ -1118,7 +1118,16 @@ ship no ViewBar until asked. `extra` stays legal on any surface. Anything that
 _does_ have an object row uses `surface: 'object'` and is not a new value.
 
 First consumer: docsurf-12a's `/documents` ViewBar, which is where the
-`document` surface gets its UI. No UI ships with the discriminator itself.
+`document` surface gets its UI (shipped 2026-09-23). It is **the same
+`ViewBar`** the four object lists use, not a second bar: the page passes the
+`objectId` the loader hands it — null here — and `viewTarget` turns it back
+into the document key. What a documents view saves is column visibility and
+sort; the conditions editor renders disabled, titled with the reason, because
+the shelf has no attribute registry to build an attribute → op → value row
+from until docsurf-12b. Column _widths_ are not in a view on any surface —
+`view.columns` is `Record<string, boolean>` — so they stay in `useTablePrefs`,
+per browser. `?filed=` stays a bare search param alongside `?view=` until
+docsurf-12b folds it into `extra`.
 
 ### Templates (decided 2026-08)
 

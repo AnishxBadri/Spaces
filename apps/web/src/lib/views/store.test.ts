@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { ViewSnapshot } from '#/components/views/view-bar'
 
 // The 'view store' half of what used to be views/filter.test.ts. The pure
 // condition tests moved to @spaces/core with filter.ts (mono-7); this block
@@ -269,5 +270,67 @@ describe('view store', () => {
     const left = await Effect.runPromise(listViewsProgram(documents, me.id))
     expect(left.map((v) => v.id)).not.toContain(priv.id)
     expect(left.map((v) => v.id)).not.toContain(shared.id)
+  })
+
+  // docsurf-12a: the shelf's half of the round-trip, and the mirror of
+  // 'lists an object view under its object target only' above. /documents
+  // saves the same `ViewSnapshot` the four object lists save — the literal is
+  // typed as one, so the claim that the bar's shape is the store's shape is
+  // the compiler's and not the test's — and reads it back on first paint:
+  // column visibility keyed by the shelf's own column ids, and a sort naming
+  // one of them. Column *widths* are absent by design: `view.columns` is
+  // Record<string, boolean>, so widths stay in useTablePrefs.
+  it('reads back the documents shelf’s columns and sort', async () => {
+    const { Effect } = await import('effect')
+    const { listViewsProgram, saveViewProgram } = await import('./store')
+    const { db } = await import('@spaces/db')
+    const { user } = await import('@spaces/db/schema/auth')
+    const [me] = await db.select({ id: user.id }).from(user).limit(1)
+    const mine = { id: me.id, isAdmin: false }
+    const stranger = {
+      id: '00000000-0000-4000-8000-000000000000',
+      isAdmin: false,
+    }
+
+    // The demo, exactly: hide three columns, sort by size, save it shared.
+    const snapshot: ViewSnapshot = {
+      filter: [],
+      sort: { id: 'size', desc: true },
+      columns: { kind: false, records: false, extraction: false },
+      extra: {},
+    }
+    const saved = await Effect.runPromise(
+      saveViewProgram(
+        {
+          surface: 'document',
+          name: 'Big files',
+          visibility: 'shared',
+          ...snapshot,
+        },
+        mine,
+      ),
+    )
+
+    const onShelf = await Effect.runPromise(
+      listViewsProgram({ surface: 'document' }, me.id),
+    )
+    const found = onShelf.find((v) => v.id === saved.id)
+    expect(found?.sort).toEqual({ id: 'size', desc: true })
+    expect(found?.columns).toEqual({
+      kind: false,
+      records: false,
+      extraction: false,
+    })
+    expect(found?.filter).toEqual([])
+    expect(found?.extra).toEqual({})
+    // Nothing on this surface carries an object row, so `viewTarget(null)` in
+    // the bar rebuilds the document key from what the loader hands it.
+    expect(found?.objectId).toBeNull()
+
+    // And the second user in the demo sees it.
+    const forStranger = await Effect.runPromise(
+      listViewsProgram({ surface: 'document' }, stranger.id),
+    )
+    expect(forStranger.map((v) => v.id)).toContain(saved.id)
   })
 })
