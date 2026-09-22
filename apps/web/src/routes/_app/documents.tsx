@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -6,7 +6,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import type { ColumnDef } from '@tanstack/react-table'
 import { FileText, Layers, Upload } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -25,24 +25,38 @@ import { Button } from '#/components/ui/button'
 import { Segmented } from '#/components/ui/segmented'
 import { RecordTable, TableToolbar } from '#/components/table/record-table'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
+import { useViewState } from '#/components/views/use-view-state'
+import { ViewBar } from '#/components/views/view-bar'
+import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import { formatSince } from '@spaces/core/format'
 import { recordPath } from '#/lib/record-path'
-import { listDocuments } from '#/lib/server-fns'
+import { getSession, listDocuments, listViews } from '#/lib/server-fns'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 
 /**
  * `/documents` — the fund's files as a set (SPA-58).
  *
  * This is **a shelf** (`docs/design-contract.md` §3): a list of things with no
- * object row behind them. So it copies `/portfolio` — hand-declared
- * `createColumnHelper` columns over `RecordTable` + `TableToolbar`, column
- * state in `useTablePrefs` under a frozen key, `EmptyState` at zero — and
- * deliberately not `/companies`: a document has no `entity.values` and no
- * object, so the attribute registry has nothing to generate columns from and
- * `ViewBar`'s saved views address objects this surface does not have. Saved
- * views for the shelf are docsurf-12a, and they will not arrive by way of the
- * registry.
+ * object row behind them. So its columns are hand-declared with
+ * `createColumnHelper` over `RecordTable` + `TableToolbar` like `/portfolio`,
+ * and deliberately not generated from the attribute registry like
+ * `/companies` — a document has no `entity.values` and no object row, so the
+ * registry has nothing here to generate from.
+ *
+ * It nevertheless saves **views** (docsurf-12a), and it saves them in the same
+ * `ViewBar` the four object lists use — no second bar. That is what `D2`
+ * bought: `view.surface` is `document` here and `object_id` is null, so
+ * `listViews({ surface: 'document' })` hands back `objectId: null` and
+ * `viewTarget(null)` inside the bar turns it back into the document key. Column
+ * visibility and sort are the view; the Filter control is present but disabled
+ * until docsurf-12b (SPA-141) gives the shelf a filter model, because there is
+ * no registry to build an attribute → op → value row from.
+ *
+ * **Column widths stay in `useTablePrefs` under a frozen key**, as on every
+ * other list: `view.columns` is `Record<string, boolean>` — visibility only —
+ * so a view cannot carry a width, and a width is about this screen rather than
+ * about the view anyway.
  *
  * A row opens the preview rather than navigating: a document has no page, by
  * decision (`docs/spec-storage-sources.md` §3.2) — inspection, not a
@@ -66,18 +80,53 @@ import { openUploadDialog } from '#/lib/upload-dialog-store'
  * `.catch('all')` rather than a bare default: a hand-typed `?filed=nonsense`
  * should land on the shelf, not on an error boundary.
  */
+/**
+ * `view` is the saved view being shown, and it is **not** in `loaderDeps`:
+ * applying a view is a client-side change of column visibility and sort, so
+ * re-running the loader for it would refetch every row to render the same
+ * rows. `filed` is in, because it changes which rows the server sends.
+ * The two are independent params on purpose — `?filed=unfiled&view=…` is a
+ * legal URL, and every control below writes its own key and leaves the other
+ * alone (docsurf-12b folds `filed` into the view's `extra`; until then it is
+ * a bare param, SPA-124).
+ */
 const documentsSearch = z.object({
   filed: z.enum(['all', 'unfiled']).catch('all').default('all'),
+  view: z.string().optional(),
 })
 
 export const Route = createFileRoute('/_app/documents')({
   validateSearch: documentsSearch,
   loaderDeps: ({ search }) => ({ filed: search.filed }),
-  loader: async ({ deps }) => listDocuments({ data: { filed: deps.filed } }),
+  loader: async ({ deps }) => {
+    const [documents, viewData, session] = await Promise.all([
+      listDocuments({ data: { filed: deps.filed } }),
+      listViews({ data: { surface: 'document' } }),
+      getSession(),
+    ])
+    return {
+      documents,
+      views: viewData.views,
+      // Null by construction on this surface — the `view_surface_object_id`
+      // CHECK says so — and passed through rather than written as `null` here
+      // so the bar reads the server's answer, not the page's assumption.
+      objectId: viewData.objectId,
+      me: session?.user ?? null,
+    }
+  },
   component: DocumentsPage,
 })
 
 type DocumentRow = Awaited<ReturnType<typeof listDocuments>>[number]
+
+/**
+ * The shelf has no attribute registry, and the bar's conditions editor is the
+ * only thing that would read one — it is disabled here. Hoisted so the bar
+ * does not get a fresh array every render.
+ */
+const NO_REGISTRY: Array<RegistryEntry> = []
+
+const FILTER_UNAVAILABLE = 'Filters for documents arrive with the next slice'
 
 const col = createColumnHelper<DocumentRow>()
 // FROZEN: renaming resets saved column layouts with no recovery path.
@@ -141,13 +190,53 @@ function extractionText(r: DocumentRow): { text: string; bad: boolean } {
 }
 
 function DocumentsPage() {
-  const documents = Route.useLoaderData()
-  const { filed } = Route.useSearch()
+  const { documents, views, objectId, me } = Route.useLoaderData()
+  const { filed, view: activeId } = Route.useSearch()
   const navigate = Route.useNavigate()
+  const router = useRouter()
   const [globalFilter, setGlobalFilter] = useState('')
-  const [sorting, setSorting] = useState<SortingState>([])
   const [previewing, setPreviewing] = useState<DocumentRow | null>(null)
   const prefs = useTablePrefs(PREFS_KEY)
+
+  /**
+   * `?view=` on a cold load — a pasted link, a reload, a second user opening
+   * a shared view. `useViewState` pushes a view's columns when the active id
+   * *changes*; arriving already on one is not a change, so the shelf seeds
+   * them itself, once. It runs **during render**, so the first paint is
+   * already the view's layout rather than the browser's last local one — the
+   * sort and conditions come from the hook's own initializers for the same
+   * reason. (The four object lists have the same gap and would want the same
+   * seed lifted into the hook; that is not this slice's file to open.)
+   */
+  const [seeded, setSeeded] = useState(false)
+  if (!seeded) {
+    setSeeded(true)
+    const arriving = views.find((v) => v.id === activeId)
+    if (arriving) prefs.setColumnVisibility(arriving.columns)
+  }
+
+  const vs = useViewState({
+    views,
+    activeId: activeId ?? null,
+    columnVisibility: prefs.columnVisibility,
+    setColumnVisibility: prefs.setColumnVisibility,
+    defaultExtra: {},
+  })
+  const { sorting, setSorting } = vs
+
+  /**
+   * Write the `view` key and leave `filed` where it is. The `filed` toggles
+   * below do the mirror of this, so neither control can clear the other's
+   * param — `?filed=unfiled` survives applying a view, and a view survives
+   * switching to the unfiled inbox.
+   */
+  const selectView = (id: string | null) =>
+    void navigate({
+      search: (prev) => ({
+        filed: prev.filed,
+        ...(id === null ? {} : { view: id }),
+      }),
+    })
 
   const columns = useMemo(() => {
     const defs: Array<ColumnDef<DocumentRow, unknown>> = [
@@ -379,7 +468,11 @@ function DocumentsPage() {
               action={
                 <Button
                   variant="outline"
-                  onClick={() => void navigate({ search: { filed: 'all' } })}
+                  onClick={() =>
+                    void navigate({
+                      search: (prev) => ({ ...prev, filed: 'all' }),
+                    })
+                  }
                 >
                   Show all documents
                 </Button>
@@ -404,6 +497,22 @@ function DocumentsPage() {
               total={documents.length}
               shown={table.getRowModel().rows.length}
             >
+              <ViewBar
+                objectId={objectId}
+                registry={NO_REGISTRY}
+                filterUnavailable={FILTER_UNAVAILABLE}
+                views={views}
+                activeId={activeId ?? null}
+                snapshot={vs.snapshot}
+                onApply={(v) => {
+                  vs.apply(v)
+                  selectView(v?.id ?? null)
+                }}
+                selectView={selectView}
+                onFilterChange={vs.setConditions}
+                onSaved={() => router.invalidate()}
+                canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+              />
               {/* The toggle writes the URL and reads it back — no local
                   state, so a reload, a back button and Today's badge all land
                   on the same view the control is showing. */}
@@ -415,7 +524,11 @@ function DocumentsPage() {
                   { id: 'all', label: 'All' },
                   { id: 'unfiled', label: 'Unfiled' },
                 ]}
-                onChange={(next) => void navigate({ search: { filed: next } })}
+                onChange={(next) =>
+                  void navigate({
+                    search: (prev) => ({ ...prev, filed: next }),
+                  })
+                }
               />
             </TableToolbar>
             <RecordTable
