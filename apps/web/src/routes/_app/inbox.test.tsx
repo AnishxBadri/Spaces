@@ -29,6 +29,8 @@ const kpiRow = {
 }
 /** A kind the map *does* know, arriving without the pair the card needs. */
 const pairlessRow = { kind: 'duplicate_candidate', id: 'x' }
+/** The suggestion lane's kind, arriving without the record or its members. */
+const memberlessRow = { kind: 'suggestion', id: 'y' }
 
 describe('the inbox renderer map', () => {
   it('routes a known kind to its own renderer, not the fallback', () => {
@@ -71,6 +73,97 @@ describe('the inbox renderer map', () => {
     const html = renderToStaticMarkup(
       <ul>
         <InboxItem row={pairlessRow} index={0} total={1} />
+      </ul>,
+    )
+    expect(html).toContain('Unrecognized item')
+  })
+})
+
+/**
+ * SPA-98. The suggestion lane is the second member, and its card is generic
+ * over `suggestion.kind`: a kind with no sub-renderer (every kind but
+ * `attribute_patch` today) prints its payload in the same row shape, so the
+ * later lanes add a body, not a page. Driven over every value of the
+ * database enum, so a kind added there is covered here without an edit.
+ */
+describe('the suggestion card', () => {
+  it('routes the suggestion kind to its own renderer', () => {
+    expect(rendererFor('suggestion')).not.toBe(PayloadFallback)
+  })
+
+  it('renders every suggestion_kind without throwing', async () => {
+    const { suggestionKind } = await import('@spaces/db/schema')
+    const { SuggestionEntry, SUGGESTION_KIND_WORD } =
+      await import('#/components/inbox/suggestion-card')
+    for (const kind of suggestionKind.enumValues) {
+      const html = renderToStaticMarkup(
+        <ul>
+          <SuggestionEntry
+            item={{
+              id: `s-${kind}`,
+              kind,
+              payload: { marker: `payload-of-${kind}` },
+              rationale: `because ${kind}`,
+              citations: [{ ref: 'doc:x#1', label: 'deck.pdf · chunk 1' }],
+              fields: null,
+              createdAt: '2026-09-23T00:00:00.000Z',
+            }}
+            pending={false}
+            onAccept={() => {}}
+            onReject={() => {}}
+          />
+        </ul>,
+      )
+      expect(html).toContain(`because ${kind}`)
+      expect(html).toContain('deck.pdf · chunk 1')
+      expect(html).toContain('Accept')
+      expect(html).toContain('Reject')
+      // No sub-renderer, or a patch whose fields could not be read: the
+      // payload is what the row shows, under the kind's word.
+      expect(html).toContain(`payload-of-${kind}`)
+      expect(html).toContain(SUGGESTION_KIND_WORD[kind])
+    }
+  })
+
+  it('draws an attribute_patch through its fields, not its payload', async () => {
+    const { SuggestionEntry } =
+      await import('#/components/inbox/suggestion-card')
+    const html = renderToStaticMarkup(
+      <ul>
+        <SuggestionEntry
+          item={{
+            id: 's-patch',
+            kind: 'attribute_patch',
+            payload: { founded_year: { value: 2019, refs: [], confidence: 1 } },
+            rationale: null,
+            citations: [],
+            fields: [
+              {
+                slug: 'founded_year',
+                name: 'Founded',
+                type: 'number',
+                options: null,
+                isSystem: true,
+                value: 2019,
+              },
+            ],
+            createdAt: '2026-09-23T00:00:00.000Z',
+          }}
+          pending={false}
+          onAccept={() => {}}
+          onReject={() => {}}
+        />
+      </ul>,
+    )
+    expect(html).toContain('Founded')
+    expect(html).toContain('2019')
+    expect(html).not.toContain('confidence')
+  })
+
+  it('degrades a suggestion row that carries no suggestions', () => {
+    const html = renderToStaticMarkup(
+      <ul>
+        <InboxItem row={memberlessRow} index={0} total={1} />
       </ul>,
     )
     expect(html).toContain('Unrecognized item')
