@@ -36,6 +36,7 @@ export function RecordTable<T>({
   stickyColumnId,
   addColumn,
   label,
+  onRowClick,
 }: {
   table: Table<T>
   /** Column pinned to the left edge while the rest scrolls under it. */
@@ -44,6 +45,18 @@ export function RecordTable<T>({
   addColumn?: ReactNode
   /** Accessible name for the grid, e.g. "Companies". */
   label: string
+  /**
+   * What a click anywhere on the row does, when the row's own subject has no
+   * page to link to — `/documents`, whose rows open a preview modal (a
+   * document has no route, by decision). Optional and off by default: every
+   * other surface routes from an anchor in its sticky cell, which is the
+   * keyboard and middle-click path a bare `onClick` does not give you.
+   *
+   * A surface that sets this **must** still put a real control in the sticky
+   * cell for the keyboard, and any link inside a cell must
+   * `stopPropagation()` so a chip click does not also fire this.
+   */
+  onRowClick?: (row: T) => void
 }) {
   const rows = table.getRowModel().rows
 
@@ -80,7 +93,11 @@ export function RecordTable<T>({
           {rows.map((row) => (
             <tr
               key={row.id}
-              className="group h-row border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-row-hover"
+              onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+              className={cn(
+                'group h-row border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-row-hover',
+                onRowClick && 'cursor-pointer',
+              )}
             >
               {row.getVisibleCells().map((cell) => (
                 <td
