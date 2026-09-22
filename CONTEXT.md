@@ -1083,6 +1083,43 @@ What "lists" then need to become is a **views** design — saved filters plus
 column layout per object, shared or private — which is cheaper than an entry
 engine and covers the watchlist case.
 
+**A view names its surface; only some surfaces are objects (D2, decided
+2026-09-23, shipped views-1).** `view.object_id` was `NOT NULL` with an FK to
+`object`, so a view could only ever address a row of the object registry —
+and `/documents` is a research kind with no object row at all. The answer is a
+**`view.surface` discriminator** (`view_surface` enum, values `object` and
+`document`), `object_id` made nullable, and a CHECK that ties the two
+together: `(surface = 'object') = (object_id is not null)`. An object view
+names its object exactly as before; a document view names none. Existing rows
+backfilled to `object` (migration `0040_view_surface`), so every saved view on
+/companies, /people, /deals and /o/$objectSlug still loads unchanged. The
+server fns take the surface key `{ surface: 'object', kind | objectId } |
+{ surface: 'document' }` — exactly one of `kind`/`objectId` on the object
+surface, so the old refine's silent resolve to `'company'` when given neither
+is now a validation error.
+
+_Rejected: seeding a system object row per non-entity surface._ It would make
+`/o/documents` route to a record page that does not exist, give the attribute
+registry rows for something with no `entity.values`, force dedupe, merge and
+identity-key machinery each to special-case it, and break spec-attribute-engine
+§9's "no fourth system object". It would also pre-empt the still-undecided
+`object.kind` column (see _Open questions_) — settling a CONTEXT question by
+migration instead of by decision. An object row is the carrier of the attribute
+registry, not a generic "thing with a list page". (A second `document_view`
+table was rejected too: two stores, two ViewBars, two save paths, and a third
+for every later surface.)
+
+_The rule for admitting a third surface value._ A surface may carry views when
+it is **a shipped list route that has no object row and saves columns, sort and
+conditions**. Admitting one is a migration adding the value to the
+`view_surface` enum plus a `resolve` branch for that surface's fields — never a
+registry row, and never a second table. Tasks qualify on the definition but
+ship no ViewBar until asked. `extra` stays legal on any surface. Anything that
+_does_ have an object row uses `surface: 'object'` and is not a new value.
+
+First consumer: docsurf-12a's `/documents` ViewBar, which is where the
+`document` surface gets its UI. No UI ships with the discriminator itself.
+
 ### Templates (decided 2026-08)
 
 One mechanism, three kinds — standardized _capture_, never automation.

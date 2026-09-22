@@ -3258,6 +3258,7 @@ async function seedViews(users: {
     ).at(0)
     if (existing) continue
     await db.insert(view).values({
+      surface: 'object',
       objectId,
       name: v.name,
       filter: v.filter,

@@ -65,7 +65,7 @@ export const Route = createFileRoute('/_app/deals')({
       listDealsTable(),
       listRegistry({ data: { kind: 'deal' } }),
       dealFunnelStats(),
-      listViews({ data: { kind: 'deal' } }),
+      listViews({ data: { surface: 'object', kind: 'deal' } }),
       getSession(),
     ])
     return {

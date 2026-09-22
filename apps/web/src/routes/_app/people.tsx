@@ -68,7 +68,7 @@ export const Route = createFileRoute('/_app/people')({
       listPeopleTable(),
       listRegistry({ data: { kind: 'person' } }),
       listCompanies(),
-      listViews({ data: { kind: 'person' } }),
+      listViews({ data: { surface: 'object', kind: 'person' } }),
       getSession(),
     ])
     return {

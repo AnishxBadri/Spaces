@@ -72,7 +72,7 @@ export const Route = createFileRoute('/_app/companies')({
       listCompaniesTable(),
       listRegistry({ data: { kind: 'company' } }),
       countOpenInbox(),
-      listViews({ data: { kind: 'company' } }),
+      listViews({ data: { surface: 'object', kind: 'company' } }),
       getSession(),
     ])
     return {

@@ -36,6 +36,7 @@ import type {
   ConditionValue,
   ViewExtra,
 } from '@spaces/core/views/filter'
+import { viewTarget } from '#/lib/views/target'
 import type { ViewRow, ViewSort } from '#/lib/views/store'
 
 /**
@@ -65,7 +66,12 @@ export function ViewBar({
   onSaved,
   canEdit,
 }: {
-  objectId: string
+  /**
+   * The object row this list's records belong to, or null on a surface that
+   * has none (/documents). `viewTarget` turns it into the surface key the
+   * three view server fns take — D2, 2026-09-23.
+   */
+  objectId: string | null
   registry: Array<RegistryEntry>
   views: Array<ViewRow>
   /** the view the page is currently showing, from `?view=` */
@@ -100,7 +106,7 @@ export function ViewBar({
     visibility: 'shared' | 'private'
   }) {
     const saved = await saveView({
-      data: { ...target, objectId, ...snapshot },
+      data: { ...target, ...viewTarget(objectId), ...snapshot },
     })
     onSaved()
     selectView(saved.id)
@@ -168,7 +174,9 @@ export function ViewBar({
             aria-label={`Delete view ${active.name}`}
             onClick={async () => {
               try {
-                await deleteView({ data: { id: active.id } })
+                await deleteView({
+                  data: { id: active.id, ...viewTarget(objectId) },
+                })
                 toast(`${active.name} deleted`)
                 onApply(null)
                 onSaved()
