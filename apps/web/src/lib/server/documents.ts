@@ -44,21 +44,24 @@ export const prepareDocumentUpload = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ data }) => {
-    await requireUser()
-    const store = storage()
-    // Content-addressed: the same deck sent to both partners is one blob.
-    // Already stored ⇒ skip the transfer entirely.
-    if (await store.exists(data.sha)) {
-      const noUpload: { url: string | null; headers: Record<string, string> } =
-        { url: null, headers: {} }
-      return {
-        uploadUrl: noUpload.url,
-        uploadHeaders: noUpload.headers,
-        alreadyStored: true,
-      }
+    const u = await requireUser()
+    // The decision — already stored, and whether to write the `pending_blob`
+    // row the orphan sweep reads (SPA-54) — is `prepareBlobUploadProgram` in
+    // `#/lib/documents/prepare`, reached by a **dynamic** import inside the
+    // handler so Effect and drizzle stay out of the client bundle, exactly as
+    // `finalizeDocumentUpload` below reaches birth.
+    const { prepareBlobUploadProgram, prepareBlobUploadMessage } =
+      await import('../documents/prepare')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(prepareBlobUploadProgram)({
+        sha: data.sha,
+        sizeBytes: data.sizeBytes,
+        preparedBy: u.id,
+      })
+    } catch (failure) {
+      throw new Error(prepareBlobUploadMessage(failure))
     }
-    const { url, headers } = await store.getUploadUrl(data.sha, 600)
-    return { uploadUrl: url, uploadHeaders: headers, alreadyStored: false }
   })
 
 export const finalizeDocumentUpload = createServerFn({ method: 'POST' })

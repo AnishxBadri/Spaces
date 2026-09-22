@@ -7,6 +7,7 @@ import { startHeartbeat, workerIdentity } from './heartbeat'
 import { pgBossHost, runJob } from './run-job'
 import { ExtractionStore, extractDocument } from './jobs/extract-document'
 import { dedupeSweep } from './jobs/dedupe-sweep'
+import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -72,9 +73,25 @@ async function main() {
     runJob(dedupeSweep, { host, layer: Layer.empty }),
   )
   await boss.work(QUEUES.enrichEntity, stub('entity.enrich'))
+  // The orphan-blob sweep (SPA-54), registered exactly as the dedupe sweep
+  // above: one statement's worth of work per candidate, so the default batch
+  // of one is right, and includeMetadata is what `runJob` reads
+  // retryCount/retryLimit from. No Layer — its I/O is `db` and `storage()`.
+  await boss.work(
+    QUEUES.sweepOrphanBlobs,
+    { includeMetadata: true },
+    runJob(sweepOrphanBlobs, { host, layer: Layer.empty }),
+  )
 
   // Nightly dedupe sweep at 03:30.
   await boss.schedule(QUEUES.dedupeSweep, '30 3 * * *', undefined, {
+    tz: 'Etc/UTC',
+  })
+
+  // And the orphan-blob sweep at 04:10 — after the dedupe sweep rather than
+  // beside it, so the two nightly scans never contend for the same tick on a
+  // single-worker self-host.
+  await boss.schedule(QUEUES.sweepOrphanBlobs, '10 4 * * *', undefined, {
     tz: 'Etc/UTC',
   })
 

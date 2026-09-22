@@ -1,7 +1,13 @@
 import { Effect, Schema } from 'effect'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { document, entity, entitySpace, link } from '@spaces/db/schema'
+import {
+  document,
+  entity,
+  entitySpace,
+  link,
+  pendingBlob,
+} from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue } from '#/lib/queue'
@@ -285,6 +291,31 @@ async function addEdges(
 }
 
 /**
+ * The arrival half of the orphan-blob sweep (SPA-54). `prepareDocumentUpload`
+ * writes a `pending_blob` row for bytes it is about to be sent; the row's
+ * only job is to make an upload that never finished findable, so the moment a
+ * `document` row names the digest the intent is spent and the row goes.
+ *
+ * It is deleted **here**, inside birth's own transaction, and not in the
+ * server fn that called it — birth is the one path every entry point
+ * converges on (§3.1), so the server intake, the URL clip and the Drive sync
+ * inherit the delete without knowing the table exists. In the transaction so
+ * a rolled-back birth leaves the row behind: bytes with no document row are
+ * exactly what the sweep is for.
+ *
+ * Only for a blob-bearing birth. A URL clip keeps no bytes, so there was
+ * never a prepare and there is no row; a `delete … where sha is null` would
+ * be a statement about nothing.
+ */
+async function clearPendingBlob(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  blobSha: string | null,
+): Promise<void> {
+  if (blobSha === null) return
+  await tx.delete(pendingBlob).where(eq(pendingBlob.sha, blobSha))
+}
+
+/**
  * The whole birth, and the only writer of a `document` row outside tests and
  * seeds — asserted by `birth.test.ts`, which fails naming any second writer.
  */
@@ -306,9 +337,14 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
       // one call filing against a record and a space, where only the record
       // already had it, must leave the space edge behind too.
       yield* query(() =>
-        db.transaction((tx) =>
-          addEdges(tx, existing, targets, actorUserId(input.actor)),
-        ),
+        db.transaction(async (tx) => {
+          await addEdges(tx, existing, targets, actorUserId(input.actor))
+          // Deduped is still arrived: the digest is on a document row, so
+          // the pending row has nothing left to describe. Skipping it here
+          // would leave the sweep a row it can never act on (the reference
+          // check says "kept") and never clear.
+          await clearPendingBlob(tx, input.blobSha)
+        }),
       )
       return { id: existing, deduped: true }
     }
@@ -344,6 +380,9 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
         })
 
         await addEdges(tx, ent.id, targets, userId)
+
+        // The upload arrived. See `clearPendingBlob`.
+        await clearPendingBlob(tx, input.blobSha)
 
         // `activity.subject_entity_id` is NOT NULL, so zero targets and N
         // targets both need a subject that is not "the one place this went".
