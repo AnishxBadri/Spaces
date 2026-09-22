@@ -10,6 +10,7 @@ import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { FileText, Layers, Upload } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { z } from 'zod'
 import { DocumentPreview } from '#/components/document-preview'
 import { GoneMarker, OpenInSourceButton } from '#/components/document-source'
 import { DocumentTile } from '#/components/document-tile'
@@ -17,6 +18,7 @@ import { KIND_ICONS } from '#/components/editor/mention'
 import { EmptyState } from '#/components/empty-state'
 import { PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
+import { Segmented } from '#/components/ui/segmented'
 import { RecordTable, TableToolbar } from '#/components/table/record-table'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
@@ -46,9 +48,28 @@ import { openUploadDialog } from '#/lib/upload-dialog-store'
  * The route is addressable by URL from this slice and nothing links to it
  * yet: the nav row and its G-chord are docsurf-5b, and the nav grammar is one
  * row of data in `NAV_ITEMS` when that slice comes.
+ *
+ * `?filed=unfiled` is the unfiled inbox (SPA-124): a filter on the shelf, not
+ * a route — no second table, no second empty state, no second definition of
+ * what a document is. That makes it a **search param**, which is what buys
+ * reload, back/forward and a linkable badge on Today for free; the toolbar's
+ * toggle writes the param and reads it back and holds no state of its own, so
+ * the URL is the one place the answer lives.
  */
+/**
+ * `loaderDeps` is what re-runs the loader when the param changes — a loader
+ * that ignored it would render the previous filter's rows under the new URL.
+ * `.catch('all')` rather than a bare default: a hand-typed `?filed=nonsense`
+ * should land on the shelf, not on an error boundary.
+ */
+const documentsSearch = z.object({
+  filed: z.enum(['all', 'unfiled']).catch('all').default('all'),
+})
+
 export const Route = createFileRoute('/_app/documents')({
-  loader: async () => listDocuments(),
+  validateSearch: documentsSearch,
+  loaderDeps: ({ search }) => ({ filed: search.filed }),
+  loader: async ({ deps }) => listDocuments({ data: { filed: deps.filed } }),
   component: DocumentsPage,
 })
 
@@ -117,6 +138,8 @@ function extractionText(r: DocumentRow): { text: string; bad: boolean } {
 
 function DocumentsPage() {
   const documents = Route.useLoaderData()
+  const { filed } = Route.useSearch()
+  const navigate = Route.useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
   const [sorting, setSorting] = useState<SortingState>([])
   const [previewing, setPreviewing] = useState<DocumentRow | null>(null)
@@ -326,11 +349,32 @@ function DocumentsPage() {
       />
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
         {documents.length === 0 ? (
-          <EmptyState
-            icon={FileText}
-            title="No documents yet"
-            body="Upload one here and leave it unfiled until you know whose it is, or drop it on a company's Files tab."
-          />
+          /* Two empties, because they mean opposite things. An empty
+             workspace is an invitation; an empty *filter* is the inbox being
+             clear, which is good news — and its action is the only way back
+             to the shelf, since the toolbar carrying the toggle is exactly
+             what this branch replaces. */
+          filed === 'unfiled' ? (
+            <EmptyState
+              icon={FileText}
+              title="Nothing unfiled."
+              body="Every document in the workspace is filed against a record or into a space."
+              action={
+                <Button
+                  variant="outline"
+                  onClick={() => void navigate({ search: { filed: 'all' } })}
+                >
+                  Show all documents
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={FileText}
+              title="No documents yet"
+              body="Upload one here and leave it unfiled until you know whose it is, or drop it on a company's Files tab."
+            />
+          )
         ) : (
           <>
             <TableToolbar
@@ -342,7 +386,21 @@ function DocumentsPage() {
               noun={{ one: 'document', many: 'documents' }}
               total={documents.length}
               shown={table.getRowModel().rows.length}
-            />
+            >
+              {/* The toggle writes the URL and reads it back — no local
+                  state, so a reload, a back button and Today's badge all land
+                  on the same view the control is showing. */}
+              <Segmented
+                size="sm"
+                label="Filed"
+                value={filed}
+                options={[
+                  { id: 'all', label: 'All' },
+                  { id: 'unfiled', label: 'Unfiled' },
+                ]}
+                onChange={(next) => void navigate({ search: { filed: next } })}
+              />
+            </TableToolbar>
             <RecordTable
               table={table}
               label="Documents"

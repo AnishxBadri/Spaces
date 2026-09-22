@@ -79,6 +79,14 @@ export type ReadoutCell = {
   /** Colour only when the number is nonzero and means trouble. */
   tone?: ReadoutTone
   to?: string
+  /**
+   * Search params for `to` (SPA-124). A counter whose destination is a
+   * *filtered* list — Today's Unfiled cell pointing at
+   * `/documents?filed=unfiled` — has to carry the filter or the link lands on
+   * a different number than the one it printed. Dropping the link instead
+   * would make that cell the only dead one in the strip.
+   */
+  search?: Record<string, string>
 }
 
 /**
@@ -122,6 +130,11 @@ export function ReadoutStrip({
           <Link
             key={i}
             to={cell.to}
+            // Spread rather than `search={cell.search}`: under
+            // `exactOptionalPropertyTypes` an omitted field is not the same
+            // claim as an explicit `undefined`, and a cell with no filter
+            // must pass no `search` at all.
+            {...(cell.search ? { search: cell.search } : {})}
             className={cn(
               cls,
               'focus-ring-inset transition-colors hover:bg-bone',

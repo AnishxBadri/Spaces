@@ -15,6 +15,7 @@ import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import {
   countOpenInbox,
+  countUnfiledDocuments,
   dealFunnelStats,
   getOnboardingProgress,
   getWorkspaceActivity,
@@ -35,18 +36,29 @@ import { localToday } from '@spaces/core/tasks/parse-due'
  */
 export const Route = createFileRoute('/_app/today')({
   loader: async () => {
-    const [tasks, holdings, funnel, progress, activity, dealRegistry, inbox] =
-      await Promise.all([
-        listTasks(),
-        listHoldings(),
-        dealFunnelStats(),
-        getOnboardingProgress(),
-        getWorkspaceActivity(),
-        listRegistry({ data: { kind: 'deal' } }),
-        // A count, not the list: the readout wants one number, and
-        // `listInbox()` costs four queries per side per pair to produce it.
-        countOpenInbox(),
-      ])
+    const [
+      tasks,
+      holdings,
+      funnel,
+      progress,
+      activity,
+      dealRegistry,
+      inbox,
+      unfiled,
+    ] = await Promise.all([
+      listTasks(),
+      listHoldings(),
+      dealFunnelStats(),
+      getOnboardingProgress(),
+      getWorkspaceActivity(),
+      listRegistry({ data: { kind: 'deal' } }),
+      // A count, not the list: the readout wants one number, and
+      // `listInbox()` costs four queries per side per pair to produce it.
+      countOpenInbox(),
+      // Likewise: one number, from the same predicate the shelf filters
+      // with, so the cell and `/documents?filed=unfiled` cannot disagree.
+      countUnfiledDocuments(),
+    ])
     return {
       tasks,
       holdings,
@@ -55,6 +67,7 @@ export const Route = createFileRoute('/_app/today')({
       activity,
       dealRegistry,
       inboxCount: inbox.open,
+      unfiledCount: unfiled,
     }
   },
   component: TodayPage,
@@ -164,6 +177,7 @@ function TodayPage() {
     activity,
     dealRegistry,
     inboxCount,
+    unfiledCount,
   } = Route.useLoaderData()
   const today = localToday()
   // The spine's composer row reports what it made; nothing the loader
@@ -223,7 +237,10 @@ function TodayPage() {
     idleDeals.length +
     staleHoldings.length +
     missingRates +
-    inboxCount
+    inboxCount +
+    // Bytes that arrived with no target are the one thing on this page that
+    // is lost rather than late — they belong in the headline (SPA-124).
+    unfiledCount
 
   const weekday = WEEKDAY[new Date(`${today}T00:00:00Z`).getUTCDay()]
 
@@ -296,6 +313,12 @@ function TodayPage() {
             to: '/settings/currency',
           },
           { label: 'Review inbox', value: inboxCount, to: '/inbox' },
+          {
+            label: 'Unfiled',
+            value: unfiledCount,
+            to: '/documents',
+            search: { filed: 'unfiled' },
+          },
         ]}
       />
 
