@@ -16,10 +16,19 @@ import {
   NoteEditor,
 } from '#/components/editor/note-editor'
 import { KIND_ICONS } from '#/components/editor/mention'
+import type { DroppedDocument } from '#/components/editor/note-editor'
 import {
   DOCUMENT_PREVIEW_EVENT,
   documentPreviewRequest,
 } from '#/lib/editor/document-preview-event'
+import {
+  fileAgainstForNote,
+  noteDropFailure,
+  noteDropFiledIn,
+  UNFILED_SHELF_LABEL,
+} from '#/lib/documents/note-drop'
+import { uploadDocument } from '#/lib/documents/upload'
+import type { UploadPhase } from '#/lib/documents/upload'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -69,11 +78,19 @@ export const Route = createFileRoute('/_app/notes_/$noteId')({
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved'
 
+/** One toast, rewritten in place, for the three phases of a dropped file. */
+const DROP_PHASES: Record<UploadPhase, string> = {
+  hashing: 'Reading…',
+  uploading: 'Uploading…',
+  filing: 'Filing…',
+}
+
 function NotePage() {
   const { note: initial, allSpaces, terms } = Route.useLoaderData()
   const [title, setTitle] = useState(initial.title)
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const preview = useDocumentPreview()
+  const onFileDrop = useNoteFileDrop(initial.spaces)
 
   const latest = useRef<{
     document: NoteBody
@@ -196,6 +213,7 @@ function NotePage() {
                 latest.current = editor
                 scheduleSave()
               }}
+              onFileDrop={onFileDrop}
             />
           </ClientOnly>
         </div>
@@ -256,6 +274,79 @@ function NotePage() {
           The chip dispatches; this listens. */}
       <DocumentPreview doc={preview.doc} onOpenChange={preview.onOpenChange} />
     </div>
+  )
+}
+
+/**
+ * §3.1 **entry point 4** (SPA-140): a file dropped on the note body becomes a
+ * document filed exactly where the note is filed, and a mention chip where
+ * the pointer let go.
+ *
+ * The editor owns the gesture and the insert; this owns the upload and
+ * everything the reader is told, because the two things that decide both are
+ * facts about the page — which spaces the note is filed in, and that a note
+ * in none of them files the document nowhere rather than guessing one.
+ *
+ * `uploadDocument` is docsurf-6a's one browser lane and the only hasher in
+ * the app (`lib/documents/upload.ts`): the bytes go from the page straight to
+ * storage and only the row is filed through a server fn. One call per file,
+ * carrying **every** space in one `fileAgainst` array — that array is the
+ * whole reason birth takes a list, and the difference between one document
+ * row with N edges and N copies of one deck (§3.4).
+ */
+function useNoteFileDrop(
+  spaces: Array<{ id: string; name: string }>,
+): (file: File) => Promise<DroppedDocument | null> {
+  const navigate = useNavigate()
+
+  // Read once, for the page, not once per file: four files dropped together
+  // inherit the filing the note had when they were dropped, even if a space
+  // chip is removed while the third is still hashing.
+  const fileAgainst = useMemo(() => fileAgainstForNote(spaces), [spaces])
+  const filedIn = useMemo(() => noteDropFiledIn(spaces), [spaces])
+  const unfiled = fileAgainst.length === 0
+
+  return useCallback(
+    async (file: File) => {
+      // One toast per file, rewritten through the three phases and then into
+      // its own outcome, so a four-file drop is four lines and not twelve.
+      const id = toast.loading(`${file.name} · ${DROP_PHASES.hashing}`)
+      try {
+        const born = await uploadDocument({
+          file,
+          fileAgainst,
+          onPhase: (phase) =>
+            toast.loading(`${file.name} · ${DROP_PHASES[phase]}`, { id }),
+        })
+        if (unfiled) {
+          // Not an error — unfiled is a first-class state (§3.2) — but not a
+          // silent success either: the document is real and nobody has said
+          // where it lives, so the line that says so carries the way to it.
+          toast.message(filedIn, {
+            id,
+            description: `${file.name} is on the shelf with no filing of its own.`,
+            action: {
+              label: UNFILED_SHELF_LABEL,
+              onClick: () =>
+                void navigate({
+                  to: '/documents',
+                  search: { filed: 'unfiled' },
+                }),
+            },
+          })
+        } else {
+          toast.success(`${file.name} · ${filedIn}`, { id })
+        }
+        return { entityId: born.id, label: file.name }
+      } catch (err) {
+        // Caught per file and inside the caller's loop: one 300MB deck
+        // refused by the size guard must not take the three good files after
+        // it with it, and returning null is what leaves no chip behind.
+        toast.error(noteDropFailure(file.name, err), { id })
+        return null
+      }
+    },
+    [fileAgainst, filedIn, navigate, unfiled],
   )
 }
 
