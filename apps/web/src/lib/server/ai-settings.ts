@@ -1,5 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { aiKeyInput, aiProviderInput } from '../ai/providers/ids'
+import { aiRouteInput } from '../ai/lanes'
 
 /**
  * Settings → AI (SPA-29). Admin-only, every one: the bodies live in
@@ -31,4 +32,17 @@ export const testAiProvider = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { testAiProviderHandler } = await import('../ai/providers/settings')
     return testAiProviderHandler(data)
+  })
+
+/**
+ * One cell of the lane × sensitivity routing grid (SPA-42), upserted. The
+ * seed path until the Routing grid lands (SPA-69): the demo's "set the
+ * classify lane to Anthropic" is this fn with
+ * `{lane: 'classify', sensitivity: 'normal', provider: 'anthropic', model}`.
+ */
+export const setAiRoute = createServerFn({ method: 'POST' })
+  .validator(aiRouteInput)
+  .handler(async ({ data }) => {
+    const { setAiRouteHandler } = await import('../ai/route')
+    return setAiRouteHandler(data)
   })

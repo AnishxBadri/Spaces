@@ -65,6 +65,13 @@ const wrongKeyReply = () =>
     { status: 401, headers: { 'content-type': 'application/json' } },
   )
 
+/** Who the adapter-level Test calls are recorded as. */
+const VIA = {
+  provider: 'anthropic',
+  lane: 'classify',
+  caller: { type: 'system' },
+} as const
+
 const BASE_URL = 'https://gateway.fund.example/anthropic/v1'
 
 afterEach(() => {
@@ -80,7 +87,7 @@ describe('the Anthropic adapter', () => {
       fetch: wire.fetch,
     })
 
-    const result = await Effect.runPromise(runTestCall(model))
+    const result = await Effect.runPromise(runTestCall(model, VIA))
 
     expect(result).toEqual({ ok: true, text: 'OK' })
     expect(wire.calls).toHaveLength(1)
@@ -103,7 +110,7 @@ describe('the Anthropic adapter', () => {
       meta: {},
       fetch: wire.fetch,
     })
-    await Effect.runPromise(runTestCall(model))
+    await Effect.runPromise(runTestCall(model, VIA))
     expect(wire.calls[0].url).toBe('https://api.anthropic.com/v1/messages')
   })
 
@@ -115,7 +122,7 @@ describe('the Anthropic adapter', () => {
       fetch: wire.fetch,
     })
 
-    const result = await Effect.runPromise(runTestCall(model))
+    const result = await Effect.runPromise(runTestCall(model, VIA))
 
     expect(result).toEqual({
       ok: false,
@@ -153,7 +160,7 @@ describe('resolveLanguageModel', () => {
     vi.stubGlobal('fetch', wire.fetch)
 
     const { model } = await Effect.runPromise(resolveLanguageModel('anthropic'))
-    const result = await Effect.runPromise(runTestCall(model))
+    const result = await Effect.runPromise(runTestCall(model, VIA))
 
     expect(result).toEqual({ ok: true, text: 'OK' })
     expect(wire.calls).toHaveLength(1)
