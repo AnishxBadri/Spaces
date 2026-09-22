@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { aiKeyInput, aiProviderInput } from '../ai/providers/ids'
-import { aiRouteInput } from '../ai/lanes'
+import { aiLaneInput, aiRouteInput } from '../ai/lanes'
 
 /**
  * Settings → AI (SPA-29). Admin-only, every one: the bodies live in
@@ -35,9 +35,9 @@ export const testAiProvider = createServerFn({ method: 'POST' })
   })
 
 /**
- * One cell of the lane × sensitivity routing grid (SPA-42), upserted. The
- * seed path until the Routing grid lands (SPA-69): the demo's "set the
- * classify lane to Anthropic" is this fn with
+ * One cell of the lane × sensitivity routing grid (SPA-42), upserted — or,
+ * with `provider: null`, cleared (SPA-69). The Routing ledger writes through
+ * it; so does a seed: "set the classify lane to Anthropic" is
  * `{lane: 'classify', sensitivity: 'normal', provider: 'anthropic', model}`.
  */
 export const setAiRoute = createServerFn({ method: 'POST' })
@@ -45,4 +45,26 @@ export const setAiRoute = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { setAiRouteHandler } = await import('../ai/route')
     return setAiRouteHandler(data)
+  })
+
+/**
+ * The Routing ledger's read (SPA-69): every stored cell. Admin-only, like the
+ * rest of Settings → AI.
+ */
+export const listAiRoutes = createServerFn().handler(async () => {
+  const { listAiRoutesHandler } = await import('../ai/route')
+  return listAiRoutesHandler()
+})
+
+/**
+ * Whether a lane can run, per sensitivity — the gate every AI trigger on a
+ * record page hides itself on. Any signed-in member may ask; it never
+ * throws, and a lane with no route, or routed to a provider whose credential
+ * is gone, reads `false`.
+ */
+export const isLaneRouted = createServerFn()
+  .validator(aiLaneInput)
+  .handler(async ({ data }) => {
+    const { isLaneRoutedHandler } = await import('../ai/route')
+    return isLaneRoutedHandler(data)
   })
