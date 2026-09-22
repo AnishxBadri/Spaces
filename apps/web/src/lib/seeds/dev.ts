@@ -3089,6 +3089,9 @@ async function seedDocuments(
         createdBy: userId,
       })
       .returning({ id: entity.id })
+    // Exempt from the one-writer rule `lib/documents/birth.test.ts` asserts:
+    // these are backdated, pre-extracted fixtures, and birth would stamp them
+    // with `now()` and enqueue extraction work for text already written here.
     await db.insert(document).values({
       entityId: ent.id,
       blobSha: sha,

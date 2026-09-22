@@ -19,10 +19,11 @@ function stubFile(name: string, size: number): File {
 }
 
 describe('uploadDocument guards', () => {
-  const fileAgainst: FileAgainst = {
-    kind: 'record',
-    entityId: '00000000-0000-4000-8000-000000000001',
-  }
+  // One element: the array is SPA-113's widening, and a record surface still
+  // files in exactly one place.
+  const fileAgainst: FileAgainst = [
+    { kind: 'record', entityId: '00000000-0000-4000-8000-000000000001' },
+  ]
 
   it('refuses an empty file before any network call', async () => {
     const onPhase = vi.fn()

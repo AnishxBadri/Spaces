@@ -294,7 +294,7 @@ export const setDocumentKindProgram = Effect.fn('setDocumentKindProgram')(
  * Ask the worker to read the file again — after a failure, after an
  * extractor improves, or after a scanned deck gets a text layer. The row
  * goes back to `pending` and its error is cleared, which is exactly the
- * state `fileDocumentRow` leaves a fresh upload in, so `useExtractionPolling`
+ * state `birthDocumentProgram` leaves a fresh upload in, so `useExtractionPolling`
  * picks the result up with no reload and no second code path.
  *
  * The enqueue is **outside** the transaction, `finalizeDocumentUpload`'s

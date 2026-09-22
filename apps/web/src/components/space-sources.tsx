@@ -90,8 +90,9 @@ export function SpaceSources({
           file,
           // The one line that differs from the Files tab: a space is filed
           // *into*, through `entity_space`, so the target says `space` and
-          // the writer picks the other edge table (SPA-19).
-          fileAgainst: { kind: 'space', entityId: spaceId },
+          // the writer picks the other edge table (SPA-19). One element, for
+          // the Files tab's reason.
+          fileAgainst: [{ kind: 'space', entityId: spaceId }],
           onPhase: setPhase,
         })
         setPending((p) => p.filter((x) => x.key !== key))

@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// The test databases carry no `pgboss` schema, and the birth of a document
+// enqueues extraction — see `#/test/queue-stub`.
+vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
  * `interaction.source` and `document.origin` as `source_class` + `source_ref`
@@ -75,18 +79,24 @@ describe('document provenance', () => {
     const { db } = await import('@spaces/db')
     const { document } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
-    const { documentProvenance, fileDocumentRow } = await import('./shared')
+    const { documentProvenance } = await import('./shared')
+    const { birthDocumentProgram } = await import('#/lib/documents/birth')
     const tag = randomUUID().slice(0, 8)
 
-    const { id } = await fileDocumentRow({
-      sha: 'b'.repeat(64),
-      filename: `deck-${tag}.pdf`,
-      mime: 'application/pdf',
-      sizeBytes: 1024,
-      kind: 'deck',
-      fileAgainst: { kind: 'record', entityId: await aRecord(tag) },
-      actorId: await actorId(),
-    })
+    const { id } = await Effect.runPromise(
+      birthDocumentProgram({
+        blobSha: 'b'.repeat(64),
+        filename: `deck-${tag}.pdf`,
+        mime: 'application/pdf',
+        sizeBytes: 1024,
+        kind: 'deck',
+        sourceClass: 'manual',
+        sourceRef: null,
+        provenance: {},
+        fileAgainst: [{ kind: 'record', entityId: await aRecord(tag) }],
+        actor: { userId: await actorId() },
+      }),
+    )
 
     const row = (
       await db

@@ -96,8 +96,9 @@ export function RecordFiles({
           file,
           // The Files tab is a record surface: every one of its four routes
           // (company, person, deal, custom record) files through
-          // `link(tagged_in)`.
-          fileAgainst: { kind: 'record', entityId },
+          // `link(tagged_in)`. One element — a drop here means this record
+          // and nowhere else; the array is for the callers with N.
+          fileAgainst: [{ kind: 'record', entityId }],
           onPhase: setPhase,
         })
         setPending((p) => p.filter((x) => x.key !== key))

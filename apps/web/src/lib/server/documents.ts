@@ -6,15 +6,11 @@ import { user } from '@spaces/db/schema/auth'
 import { document, entity, jobRun, link } from '@spaces/db/schema'
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
 import { QUEUES } from '@spaces/core/queue/names'
-import { enqueue } from '../queue'
 import { storage } from '../storage'
 import {
   deleteDocumentWithBlobGc,
   documentFilingEdges,
-  documentFilingRefusal,
   documentProvenance,
-  existingDocumentFiling,
-  fileDocumentRow,
   requireUser,
 } from './shared'
 
@@ -28,6 +24,17 @@ import {
 const shaKey = z
   .string()
   .regex(/^[a-f0-9]{64}$/, 'Blob keys are sha256 hex digests')
+
+/**
+ * Where a document is filed. A record files through `link(tagged_in)`, a
+ * space through `entity_space` — the union is what stops a space ever being a
+ * link target again (SPA-19). One validator, shared by the upload and by
+ * §3.3's re-file, so the two cannot drift.
+ */
+const filingTarget = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('record'), entityId: z.string().uuid() }),
+  z.object({ kind: z.literal('space'), entityId: z.string().uuid() }),
+])
 
 export const prepareDocumentUpload = createServerFn({ method: 'POST' })
   .validator(
@@ -63,66 +70,54 @@ export const finalizeDocumentUpload = createServerFn({ method: 'POST' })
       sizeBytes: z.number().int().nonnegative().max(MAX_UPLOAD_BYTES),
       kind: z.enum(DOCUMENT_KINDS).default('other'),
       /**
-       * Where this document is filed. A record files through
-       * `link(tagged_in)`, a space through `entity_space` — the union is
-       * what stops a space ever being a link target again (SPA-19).
+       * Where this document is filed — **an array** since SPA-113, and
+       * `.min(0)` says so deliberately: zero targets is an unfiled document
+       * (§11.6's inbox), one is a record or a space, N is one row filed in N
+       * places (§3.4). The browser lane passes one element today.
        */
-      fileAgainst: z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('record'), entityId: z.string().uuid() }),
-        z.object({ kind: z.literal('space'), entityId: z.string().uuid() }),
-      ]),
+      fileAgainst: z.array(filingTarget).min(0),
     }),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
 
     // The bytes must actually be in the store: a client that skipped the PUT
-    // would otherwise leave a document row pointing at nothing.
+    // would otherwise leave a document row pointing at nothing. This is the
+    // browser lane's own guard — the bytes were PUT before this call — and
+    // the only thing left here that needs a request.
     if (!(await storage().exists(data.sha))) {
       throw new Error('Upload incomplete — the file never reached storage')
     }
 
-    const fileAgainst = data.fileAgainst
-    const target = (
-      await db
-        .select({ kind: entity.kind, mergedIntoId: entity.mergedIntoId })
-        .from(entity)
-        .where(eq(entity.id, fileAgainst.entityId))
-    ).at(0)
-    if (!target) throw new Error('Record not found')
-    if (target.mergedIntoId) throw new Error('That record has been merged away')
-    // Refused here as well as in the writer, and before the dedupe read: a
-    // mismatched target would otherwise dedupe against the wrong edge table
-    // and answer `{ deduped: true }` for a filing that could never exist.
-    const refusal = documentFilingRefusal(fileAgainst, target.kind)
-    if (refusal) throw new Error(refusal)
-
-    // Same file, same target, twice — one row, for both edge kinds. The
-    // read is `existingDocumentFiling` in server/shared.ts, next to the
-    // writer whose table choice it has to mirror.
-    const existing = await existingDocumentFiling(data.sha, fileAgainst)
-    if (existing) return { id: existing, deduped: true }
-
-    // The rows themselves are `fileDocumentRow` in server/shared.ts: this
-    // file is re-exported to the client by the server-fns barrel (CLAUDE.md
-    // → Traps), so the half a test can call has to live next door. What
-    // stays here is what needs a request — the auth check, the storage
-    // probe, the dedupe read and the enqueue.
-    const { id } = await fileDocumentRow({
-      sha: data.sha,
-      filename: data.filename,
-      mime: data.mime ?? null,
-      sizeBytes: data.sizeBytes,
-      kind: data.kind,
-      fileAgainst,
-      actorId: u.id,
-    })
-
-    // Outside the transaction: a queue that's down must not roll back a
-    // perfectly good upload. The row stays 'pending' and can be re-queued.
-    await enqueue(QUEUES.extractDocument, { documentId: id })
-
-    return { id, deduped: false }
+    // The write itself is `birthDocumentProgram` (§3.1's one server path),
+    // reached by a **dynamic** import inside the handler so Effect and
+    // drizzle stay out of the client bundle: this file is re-exported to the
+    // browser by the server-fns barrel and only handler bodies are stripped
+    // (CLAUDE.md → Traps). `lib/server/objects.ts` reaches `effectFn` the
+    // same way, and `lib/documents/birth.ts` is never in the barrel.
+    const { birthDocumentProgram, documentBirthMessage } =
+      await import('../documents/birth')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(birthDocumentProgram)({
+        blobSha: data.sha,
+        filename: data.filename,
+        mime: data.mime ?? null,
+        sizeBytes: data.sizeBytes,
+        kind: data.kind,
+        // A person dropped a file on a surface we ship, which is the
+        // plainest `manual` write in the product (D1) — and the
+        // biconditional would refuse a ref anyway.
+        sourceClass: 'manual',
+        sourceRef: null,
+        // Nothing to say: no provider tree, no provider id, no connection.
+        provenance: {},
+        fileAgainst: data.fileAgainst,
+        actor: { userId: u.id },
+      })
+    } catch (failure) {
+      throw new Error(documentBirthMessage(failure))
+    }
   })
 
 /** Documents filed against a record — the Files tab. */
@@ -316,7 +311,7 @@ export const getDocumentDownloadUrl = createServerFn({ method: 'POST' })
  * `documents-filing.test.ts` pins.
  *
  * The rows and the blob GC are `deleteDocumentWithBlobGc` in
- * `server/shared.ts`, for the reason `fileDocumentRow` lives there: a test
+ * `server/shared.ts`, for the reason birth lives outside this file: a test
  * has no request, and this handler is the auth check and nothing else.
  */
 export const deleteDocument = createServerFn({ method: 'POST' })
@@ -336,11 +331,9 @@ export const deleteDocument = createServerFn({ method: 'POST' })
  * reject as they are: `Effect.runPromise` rejects with the tagged error
  * itself, and a `Schema.TaggedError` carries no `message`, so "merged away"
  * would otherwise reach the chip row empty (the rule `voidLedgerEvent` set).
+ *
+ * `filingTarget` is declared above, beside the upload that also validates it.
  */
-const filingTarget = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('record'), entityId: z.string().uuid() }),
-  z.object({ kind: z.literal('space'), entityId: z.string().uuid() }),
-])
 
 export const fileDocument = createServerFn({ method: 'POST' })
   .validator(z.object({ documentId: z.string().uuid(), target: filingTarget }))

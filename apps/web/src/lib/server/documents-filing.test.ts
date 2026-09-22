@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// The test databases carry no `pgboss` schema, and the birth of a document
+// enqueues extraction — see `#/test/queue-stub`.
+vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
  * Documents file into spaces through `entity_space` (SPA-19), against the
@@ -12,12 +16,12 @@ import { describe, expect, it } from 'vitest'
  * cannot see a space filing, and a delete that trips over the `entity_space`
  * row it never knew about.
  *
- * The server fns need a request context no test has, so — as
- * `source-class.test.ts` does — these call the helpers they delegate to in
- * `server/shared.ts`, which the client barrel does not re-export. Imports are
- * dynamic for the same reason as the rest of the DB-coupled suite:
- * `@spaces/db` builds its pool from `DATABASE_URL` at import time and
- * `vitest.setup.ts` rewrites it per file.
+ * The server fns need a request context no test has, so these call the write
+ * they delegate to — `birthDocumentProgram` in `#/lib/documents/birth`, which
+ * since SPA-113 is the single writer both edge kinds go through and which the
+ * client barrel does not re-export. Imports are dynamic for the same reason as
+ * the rest of the DB-coupled suite: `@spaces/db` builds its pool from
+ * `DATABASE_URL` at import time and `vitest.setup.ts` rewrites it per file.
  */
 
 async function actorId(): Promise<string> {
@@ -67,17 +71,43 @@ async function file(
   sha: string,
   tag: string,
   target: Target,
-): Promise<{ id: string }> {
-  const { fileDocumentRow } = await import('./shared')
-  return fileDocumentRow({
-    sha,
-    filename: `deck-${tag}.pdf`,
-    mime: 'application/pdf',
-    sizeBytes: 1024,
-    kind: 'deck',
-    fileAgainst: target,
-    actorId: await actorId(),
-  })
+): Promise<{ id: string; deduped: boolean }> {
+  const { Effect } = await import('effect')
+  const { birthDocumentProgram } = await import('#/lib/documents/birth')
+  return Effect.runPromise(
+    birthDocumentProgram({
+      blobSha: sha,
+      filename: `deck-${tag}.pdf`,
+      mime: 'application/pdf',
+      sizeBytes: 1024,
+      kind: 'deck',
+      sourceClass: 'manual',
+      sourceRef: null,
+      provenance: {},
+      fileAgainst: [target],
+      actor: { userId: await actorId() },
+    }),
+  )
+}
+
+/**
+ * The sentence a refused filing is shown. `Effect.runPromise` rejects with
+ * the tagged error itself and a `Schema.TaggedError` carries no `message`, so
+ * `.rejects.toThrow(/…/)` would match nothing — `documentBirthMessage` is the
+ * seam the server fn uses for exactly this reason.
+ */
+async function refusalOf(
+  sha: string,
+  tag: string,
+  target: Target,
+): Promise<string> {
+  const { documentBirthMessage } = await import('#/lib/documents/birth')
+  try {
+    await file(sha, tag, target)
+  } catch (err) {
+    return documentBirthMessage(err)
+  }
+  throw new Error('The filing was accepted; it should have been refused')
 }
 
 /** Both edge tables, for one document. */
@@ -160,57 +190,48 @@ describe('filing a document into a space', () => {
     const spaceId = await aSpace(tag)
     const companyId = await aCompany(tag)
 
-    await expect(
-      file(sha, tag, { kind: 'record', entityId: spaceId }),
-    ).rejects.toThrow(/filed into, not against/)
-    await expect(
-      file(sha, tag, { kind: 'space', entityId: companyId }),
-    ).rejects.toThrow(/entity_space/)
+    expect(
+      await refusalOf(sha, tag, { kind: 'record', entityId: spaceId }),
+    ).toMatch(/filed into, not against/)
+    expect(
+      await refusalOf(sha, tag, { kind: 'space', entityId: companyId }),
+    ).toMatch(/entity_space/)
 
     // A document is not a record either — that edge would be a mention.
     const doc = await file(sha, tag, { kind: 'record', entityId: companyId })
-    await expect(
-      file(sha, tag, { kind: 'record', entityId: doc.id }),
-    ).rejects.toThrow(/not against another document/)
+    expect(
+      await refusalOf(sha, tag, { kind: 'record', entityId: doc.id }),
+    ).toMatch(/not against another document/)
   })
 })
 
 describe('the dedupe guard', () => {
   it('sees a second filing on both edge kinds', async () => {
-    const { existingDocumentFiling } = await import('./shared')
     const tag = randomUUID().slice(0, 8)
     const sha = await aBlob(tag)
 
     const companyId = await aCompany(tag)
     const spaceId = await aSpace(tag)
 
-    expect(
-      await existingDocumentFiling(sha, {
-        kind: 'record',
-        entityId: companyId,
-      }),
-    ).toBe(null)
-
     const onCompany = await file(sha, tag, {
       kind: 'record',
       entityId: companyId,
     })
-    expect(
-      await existingDocumentFiling(sha, {
-        kind: 'record',
-        entityId: companyId,
-      }),
-    ).toBe(onCompany.id)
+    expect(onCompany.deduped).toBe(false)
 
-    // The half that was broken: the old guard joined `link` only, so this
-    // read answered null forever and every re-drop into a space made a row.
-    expect(
-      await existingDocumentFiling(sha, { kind: 'space', entityId: spaceId }),
-    ).toBe(null)
+    // Same bytes, same record: one row, and the second drop says so.
+    const again = await file(sha, tag, { kind: 'record', entityId: companyId })
+    expect(again).toEqual({ id: onCompany.id, deduped: true })
+
+    // The half that was broken: the old guard joined `link` only, so a space
+    // filing never deduped and every re-drop into a space made a row.
     const inSpace = await file(sha, tag, { kind: 'space', entityId: spaceId })
-    expect(
-      await existingDocumentFiling(sha, { kind: 'space', entityId: spaceId }),
-    ).toBe(inSpace.id)
+    expect(inSpace.deduped).toBe(false)
+    expect(inSpace.id).not.toBe(onCompany.id)
+    expect(await file(sha, tag, { kind: 'space', entityId: spaceId })).toEqual({
+      id: inSpace.id,
+      deduped: true,
+    })
   })
 
   it('keeps company-then-space as two rows on one blob (§3.4)', async () => {
