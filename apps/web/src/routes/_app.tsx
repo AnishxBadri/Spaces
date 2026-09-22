@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { AppSidebar, NAV_ITEMS } from '#/components/app-sidebar'
 import { KeyboardHelp } from '#/components/keyboard-help'
 import { CommandPalette } from '#/components/command-palette'
+import { UploadDialog } from '#/components/upload-dialog'
 import { Wordmark } from '#/components/wordmark'
 import { Toaster } from '#/components/ui/sonner'
 import { setChassisCollapsed, useChassisCollapsed } from '#/lib/chassis-store'
@@ -125,6 +126,11 @@ function AppShell() {
       </main>
 
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+      {/* Mounted once, for all three of §3.1 entry point 3's doors (SPA-108).
+          Here rather than in each surface because an upload has to outlive
+          the sheet it was started from: this component never unmounts, so
+          closing the dialog leaves the in-flight files running. */}
+      <UploadDialog />
       <KeyboardHelp open={keyboardOpen} onOpenChange={setKeyboardOpen} />
       <Toaster position="bottom-right" />
     </div>

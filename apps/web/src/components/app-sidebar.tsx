@@ -13,6 +13,7 @@ import {
   Paperclip,
   Settings,
   Sunrise,
+  Upload,
   Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -28,6 +29,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { authClient } from '#/lib/auth-client'
 import { objectIcon } from '#/lib/object-icons'
+import { openUploadDialog } from '#/lib/upload-dialog-store'
 import { cn } from '#/lib/utils'
 
 /**
@@ -41,8 +43,16 @@ import { cn } from '#/lib/utils'
  *
  * The head row ends on a mono `«` that folds the chassis (⌘\); collapsed,
  * it is 48px of marks only — the current page a paper box, names as ink
- * tooltips, the mark at the top the way back out. The foot is one account
- * row whose menu opens to the right and holds Settings (G ,) and Sign out.
+ * tooltips, the mark at the top the way back out. The foot is the Upload row
+ * and then one account row whose menu opens to the right and holds Settings
+ * (G ,) and Sign out.
+ *
+ * **Upload is the chassis' one create affordance** (SPA-108) — there is no
+ * "New note" row for it to sit beside, so it takes the foot above the
+ * account, where a global action belongs and where no G-chord is spent on
+ * it: it opens a dialog rather than going anywhere, so it is not a page and
+ * not a row of `NAV_ITEMS`. Collapsed it is a mark with the same tooltip
+ * every other collapsed row gets.
  *
  * Below is the nav grammar: one row per page, the group and the chord both
  * data on the row, and the three groups derived from it.
@@ -293,6 +303,26 @@ export function AppSidebar({
       </div>
 
       <div className="border-t border-rule">
+        {/* §3.1 entry point 3, on the chassis: the same dialog the
+            /documents header and ⌘K open, reached from wherever you are
+            when the deck lands in your inbox. */}
+        <div className="px-3 py-2">
+          <button
+            type="button"
+            onClick={() => {
+              onNavigate?.()
+              openUploadDialog()
+            }}
+            className={cn(
+              'flex h-[1.875rem] w-full items-center gap-2.5 rounded-md border border-transparent px-2.5 text-ui text-foreground transition-colors',
+              'hover:bg-bone-deep',
+              'focus-ring',
+            )}
+          >
+            <Upload className="size-3.5 shrink-0" strokeWidth={1.75} />
+            <span className="min-w-0 flex-1 truncate text-left">Upload</span>
+          </button>
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger
             className={cn(
@@ -463,6 +493,16 @@ function CollapsedSidebar({
       </div>
 
       <div className="flex flex-col items-center">
+        <IconTip label="Upload a file">
+          <button
+            type="button"
+            onClick={openUploadDialog}
+            aria-label="Upload a file"
+            className="focus-ring-inset flex h-10 w-12 items-center justify-center border-t border-rule text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
+          >
+            <Upload className="size-3.5" strokeWidth={1.75} />
+          </button>
+        </IconTip>
         <DropdownMenu>
           <IconTip label={user.name}>
             <DropdownMenuTrigger

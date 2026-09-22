@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
-import { FileText, Layers } from 'lucide-react'
+import { FileText, Layers, Upload } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { DocumentPreview } from '#/components/document-preview'
@@ -16,12 +16,14 @@ import { DocumentTile } from '#/components/document-tile'
 import { KIND_ICONS } from '#/components/editor/mention'
 import { EmptyState } from '#/components/empty-state'
 import { PageHeader } from '#/components/page-header'
+import { Button } from '#/components/ui/button'
 import { RecordTable, TableToolbar } from '#/components/table/record-table'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import { formatSince } from '@spaces/core/format'
 import { recordPath } from '#/lib/record-path'
 import { listDocuments } from '#/lib/server-fns'
+import { openUploadDialog } from '#/lib/upload-dialog-store'
 
 /**
  * `/documents` — the fund's files as a set (SPA-58).
@@ -312,13 +314,22 @@ function DocumentsPage() {
       <PageHeader
         title="Documents"
         description="Every file in the workspace, with what it is filed against. Kind, filing and space are the three axes a folder tree encodes — there are no folders."
+        action={
+          /* §3.1 entry point 3, on the shelf that lists what it produces.
+             The dialog lives in the app shell — this is one of its three
+             doors, and it opens the same component the chassis and ⌘K do. */
+          <Button onClick={openUploadDialog}>
+            <Upload className="size-3.5" strokeWidth={2} />
+            Upload
+          </Button>
+        }
       />
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
         {documents.length === 0 ? (
           <EmptyState
             icon={FileText}
             title="No documents yet"
-            body="Files live on the records they belong to — upload one from a company's Files tab, or drop it into a space's Sources."
+            body="Upload one here and leave it unfiled until you know whose it is, or drop it on a company's Files tab."
           />
         ) : (
           <>
