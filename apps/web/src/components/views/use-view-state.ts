@@ -73,6 +73,15 @@ export function useViewState<TExtra extends ViewExtra>({
     extra,
   }
 
+  /**
+   * A stable cache key for the condition array (SPA-40). Conditions live in
+   * React state and change without a navigation, so a surface that filters
+   * on the server refetches on this rather than on the URL; `?view=` stays
+   * the only linkable filter state. Serialized because the array identity
+   * changes on every edit and the value is what the server is asked about.
+   */
+  const conditionKey = JSON.stringify(conditions)
+
   const rowMatches = (
     values: Record<string, unknown>,
     typeOf: (slug: string) => string | undefined,
@@ -80,6 +89,7 @@ export function useViewState<TExtra extends ViewExtra>({
 
   return {
     conditions,
+    conditionKey,
     setConditions,
     sorting,
     setSorting,

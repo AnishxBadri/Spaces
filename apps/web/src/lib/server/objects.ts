@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { Effect, Schema } from 'effect'
-import { asc, eq, inArray, sql } from 'drizzle-orm'
+import { asc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { attribute, entity, link, objectDef } from '@spaces/db/schema'
@@ -191,76 +191,52 @@ export const updateObject = createServerFn({ method: 'POST' })
     )
   })
 
-/** The registry-generated list page's rows: name, values, spaces, added. */
+/**
+ * The registry-generated list page's rows: name, values, spaces, added.
+ *
+ * The view's conditions come with the request and are compiled into the
+ * `where` (SPA-40) — the page no longer loads every record to hide most of
+ * them. The read itself is `listRecordsProgram`, which lives outside
+ * `lib/server/` because this module is re-exported by the client-imported
+ * barrel; it is imported inside the handler so it stays out of that graph.
+ */
 export const listObjectRecords = createServerFn()
-  .validator(z.object({ objectId: z.string().uuid() }))
+  .validator(
+    z.object({
+      objectId: z.string().uuid(),
+      conditions: z
+        .array(
+          z.object({
+            slug: z.string().min(1).max(120),
+            op: z.enum([
+              'is',
+              'is_not',
+              'contains',
+              'empty',
+              'not_empty',
+              'gt',
+              'lt',
+            ]),
+            value: z
+              .union([
+                z.string().max(400),
+                z.number(),
+                z.boolean(),
+                z.null(),
+                z.array(z.string().max(400)).max(50),
+              ])
+              .optional(),
+          }),
+        )
+        .max(20)
+        .optional(),
+    }),
+  )
   .handler(async ({ data }) => {
     await requireUser()
-    const { entitySpace } = await import('@spaces/db/schema')
-    const { desc, isNull, and: andOp } = await import('drizzle-orm')
-    const rows = await db
-      .select({
-        id: entity.id,
-        name: entity.canonicalName,
-        values: entity.values,
-        createdAt: entity.createdAt,
-      })
-      .from(entity)
-      .where(
-        andOp(
-          eq(entity.objectId, data.objectId),
-          eq(entity.kind, 'custom'),
-          isNull(entity.mergedIntoId),
-        ),
-      )
-      .orderBy(desc(entity.createdAt))
-    const ids = rows.map((r) => r.id)
-    const tags =
-      ids.length > 0
-        ? await db
-            .select({
-              entityId: entitySpace.entityId,
-              spaceId: entitySpace.spaceId,
-              spaceName: entity.canonicalName,
-            })
-            .from(entitySpace)
-            .innerJoin(entity, eq(entity.id, entitySpace.spaceId))
-            .where(inArray(entitySpace.entityId, ids))
-        : []
-    const spacesBy = new Map<string, Array<{ id: string; name: string }>>()
-    for (const t of tags)
-      spacesBy.set(t.entityId, [
-        ...(spacesBy.get(t.entityId) ?? []),
-        { id: t.spaceId, name: t.spaceName },
-      ])
-    // Names for record-reference values, so cells can render them.
-    const refs =
-      ids.length > 0
-        ? await db
-            .select({ toId: link.toEntityId, name: entity.canonicalName })
-            .from(link)
-            .innerJoin(entity, eq(entity.id, link.toEntityId))
-            .where(
-              andOp(
-                eq(link.relation, 'references'),
-                inArray(link.fromEntityId, ids),
-              ),
-            )
-        : []
-    const users = await db.select({ id: user.id, name: user.name }).from(user)
-    return {
-      rows: rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        values: r.values,
-        spaces: spacesBy.get(r.id) ?? [],
-        createdAt: r.createdAt.toISOString(),
-      })),
-      refNames: {
-        ...Object.fromEntries(refs.map((r) => [r.toId, { name: r.name }])),
-        ...Object.fromEntries(users.map((u) => [u.id, { name: u.name }])),
-      },
-    }
+    const { listRecordsProgram } = await import('../views/records')
+    const { effectFn } = await import('./effect')
+    return effectFn(listRecordsProgram)(data.objectId, data.conditions ?? [])
   })
 
 /** The registry-generated record page's data. */

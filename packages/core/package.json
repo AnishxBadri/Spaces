@@ -11,6 +11,7 @@
     "./glossary/*": "./src/glossary/*.ts",
     "./tasks/*": "./src/tasks/*.ts",
     "./views/filter": "./src/views/filter.ts",
+    "./views/filter.fixtures": "./src/views/filter.fixtures.ts",
     "./documents": "./src/documents/index.ts",
     "./documents/*": "./src/documents/*.ts",
     "./entities/normalize": "./src/entities/normalize.ts",

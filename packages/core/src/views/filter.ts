@@ -82,6 +82,14 @@ export function opsFor(type: string): Array<ConditionOp> {
 /** Ops that take no value. */
 export const isUnary = (op: ConditionOp) => op === 'empty' || op === 'not_empty'
 
+/**
+ * Whether `is` compares numerically rather than by string. The second
+ * evaluator (`apps/web/src/lib/views/sql.ts`) has to branch the same way, and
+ * a second copy of the set would be a divergence the property test could only
+ * report after the fact.
+ */
+export const isNumericType = (type: string) => NUMBER_TYPES.has(type)
+
 const isEmpty = (v: unknown) =>
   v === null ||
   v === undefined ||

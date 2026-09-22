@@ -14,11 +14,15 @@ import {
 import type { ColumnDef } from '@tanstack/react-table'
 import { Layers, Plus } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
-import { matchesConditions } from '@spaces/core/views/filter'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import {
   fieldSpanClass,
@@ -72,21 +76,30 @@ import { cn } from '#/lib/utils'
  */
 export const Route = createFileRoute('/_app/o/$objectSlug')({
   validateSearch: z.object({ view: z.string().optional() }),
-  loader: async ({ params }) => {
+  // `?view=` is the only linkable filter state, so it is the only loader dep:
+  // an ad-hoc condition edit refetches through the query below instead.
+  loaderDeps: ({ search }) => ({ view: search.view ?? null }),
+  loader: async ({ params, deps }) => {
     const object = await getObject({ data: { slug: params.objectSlug } })
     // An archived object hides its routes (§9 lifecycle); records persist.
     if (object.archived || object.isSystem) throw notFound()
-    const [registry, table, viewData, session] = await Promise.all([
+    const [registry, viewData, session] = await Promise.all([
       listRegistry({ data: { objectId: object.id } }),
-      listObjectRecords({ data: { objectId: object.id } }),
       listViews({ data: { objectId: object.id } }),
       getSession(),
     ])
+    // The view's conditions go down with the request (SPA-40), so the first
+    // paint is already filtered — no flash of the rows the view hides.
+    const conditions =
+      viewData.views.find((v) => v.id === deps.view)?.filter ?? []
+    const initial = await listObjectRecords({
+      data: { objectId: object.id, conditions },
+    })
     return {
       object,
       registry,
-      rows: table.rows,
-      refNames: table.refNames,
+      conditions,
+      initial,
       views: viewData.views,
       me: session?.user ?? null,
     }
@@ -98,7 +111,8 @@ type Row = Awaited<ReturnType<typeof listObjectRecords>>['rows'][number]
 const col = createColumnHelper<Row>()
 
 function ObjectListPage() {
-  const { object, registry, rows, refNames, views, me } = Route.useLoaderData()
+  const { object, registry, conditions, initial, views, me } =
+    Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
@@ -113,15 +127,35 @@ function ObjectListPage() {
     defaultExtra: {},
   })
   const { sorting, setSorting } = vs
-  const typeOf = useCallback(
-    (slug: string) => registry.find((d) => d.slug === slug)?.type,
-    [registry],
-  )
-  const visibleRows = useMemo(
-    () =>
-      rows.filter((r) => matchesConditions(r.values, vs.conditions, typeOf)),
-    [rows, vs.conditions, typeOf],
-  )
+  /**
+   * Filtering happens in Postgres now (SPA-40). The loader already asked for
+   * the `?view=` conditions, so the first paint — server-rendered included —
+   * is the filtered set; this query seeds itself from that answer and is
+   * keyed on the condition array, so an ad-hoc edit in the filter bar
+   * refetches without a navigation. `keepPreviousData` is what keeps the
+   * table showing the last answer while the next one is in flight rather
+   * than blanking or falling back to an unfiltered list.
+   */
+  const loaderKey = JSON.stringify(conditions)
+  const records = useQuery({
+    queryKey: ['object-records', object.id, vs.conditionKey],
+    queryFn: () =>
+      listObjectRecords({
+        data: { objectId: object.id, conditions: vs.conditions },
+      }),
+    ...(vs.conditionKey === loaderKey ? { initialData: initial } : {}),
+    placeholderData: keepPreviousData,
+  })
+  const rows = records.data?.rows ?? initial.rows
+  const refNames = records.data?.refNames ?? initial.refNames
+  // The loader is no longer the only thing holding the rows, so a write has
+  // to reach both: the loader for the registry and the views, the query for
+  // whichever condition set is on screen.
+  const queryClient = useQueryClient()
+  const refresh = useCallback(() => {
+    void router.invalidate()
+    void queryClient.invalidateQueries({ queryKey: ['object-records'] })
+  }, [router, queryClient])
   const selectView = (id: string | null) =>
     void navigate({
       to: '/o/$objectSlug',
@@ -141,10 +175,10 @@ function ObjectListPage() {
       const collision = collisionToast(result, object.singular)
       if (collision)
         toast(collision.title, { description: collision.description })
-      void router.invalidate()
+      refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
-      void router.invalidate()
+      refresh()
     }
   }
 
@@ -211,7 +245,7 @@ function ObjectListPage() {
   }, [registry, object.slug, refNames])
 
   const table = useReactTable({
-    data: visibleRows,
+    data: rows,
     columns,
     state: {
       sorting,
@@ -259,7 +293,7 @@ function ObjectListPage() {
         action={createDialog}
       />
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
-        {rows.length === 0 ? (
+        {rows.length === 0 && vs.conditions.length === 0 ? (
           <EmptyState
             icon={Icon}
             title={`No ${noun.many} yet`}
@@ -294,7 +328,7 @@ function ObjectListPage() {
                 }}
                 selectView={selectView}
                 onFilterChange={vs.setConditions}
-                onSaved={() => router.invalidate()}
+                onSaved={() => void router.invalidate()}
                 canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
               />
             </TableToolbar>
@@ -307,7 +341,7 @@ function ObjectListPage() {
                   mode="create"
                   objectId={object.id}
                   objectLabel={object.singular}
-                  onSaved={() => router.invalidate()}
+                  onSaved={refresh}
                   trigger={<AddColumnButton />}
                 />
               }
@@ -330,6 +364,7 @@ function CreateRecordDialog({
   refNames: Record<string, { name: string }>
 }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -365,6 +400,8 @@ function CreateRecordDialog({
         toast(collision.title, { description: collision.description })
       else toast(`${name.trim()} added`)
       void router.invalidate()
+      // The rows come from a keyed query now, not from the loader alone.
+      void queryClient.invalidateQueries({ queryKey: ['object-records'] })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not add it.')
     } finally {
