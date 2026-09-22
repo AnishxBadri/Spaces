@@ -1,0 +1,640 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`schemaFor > compiles the company registry — the deck reader's output type 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "business_model": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "items": {
+            "enum": [
+              "b2b",
+              "b2c",
+              "b2b2c",
+              "marketplace",
+              "hardware",
+              "deep_tech",
+              "services",
+            ],
+            "type": "string",
+          },
+          "maxItems": 50,
+          "type": "array",
+          "uniqueItems": true,
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "Business model",
+      "type": "object",
+    },
+    "description": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "maxLength": 2000,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "Description",
+      "type": "object",
+    },
+    "founded_year": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "type": "number",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "Founded",
+      "type": "object",
+    },
+    "funding_stage": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "enum": [
+            "pre_seed",
+            "seed",
+            "series_a",
+            "series_b_plus",
+            "public",
+            "bootstrapped",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "Funding stage",
+      "type": "object",
+    },
+    "linkedin": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "format": "uri",
+          "maxLength": 500,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "LinkedIn",
+      "type": "object",
+    },
+    "location": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "maxLength": 2000,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "Location",
+      "type": "object",
+    },
+  },
+  "title": "Company",
+  "type": "object",
+}
+`;
+
+exports[`schemaFor > covers all fifteen types, each with a write shape but actor_reference 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contact": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "format": "email",
+          "maxLength": 255,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "contact",
+      "type": "object",
+    },
+    "conviction": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "maximum": 3,
+          "minimum": 1,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "conviction",
+      "type": "object",
+    },
+    "deck_url": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "format": "uri",
+          "maxLength": 500,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "deck url",
+      "type": "object",
+    },
+    "founded": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "founded",
+      "type": "object",
+    },
+    "headcount": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "type": "number",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "headcount",
+      "type": "object",
+    },
+    "lead": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "additionalProperties": false,
+          "properties": {
+            "domain": {
+              "format": "hostname",
+              "maxLength": 255,
+              "type": "string",
+            },
+            "email": {
+              "format": "email",
+              "maxLength": 255,
+              "type": "string",
+            },
+            "name": {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+          ],
+          "type": "object",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "lead",
+      "type": "object",
+    },
+    "phone": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "description": "A phone number, as written",
+          "maxLength": 40,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "phone",
+      "type": "object",
+    },
+    "profitable": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "profitable",
+      "type": "object",
+    },
+    "raise": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "description": "An amount in USD",
+          "type": "number",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "raise",
+      "type": "object",
+    },
+    "sector": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "enum": [
+            "fintech",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "sector",
+      "type": "object",
+    },
+    "stage": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "enum": [
+            "screening",
+            "passed",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "stage",
+      "type": "object",
+    },
+    "summary": {
+      "additionalProperties": false,
+      "description": "One line on what they do",
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "maxLength": 2000,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "summary",
+      "type": "object",
+    },
+    "tags": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "items": {
+            "enum": [
+              "ai",
+              "climate",
+            ],
+            "type": "string",
+          },
+          "maxItems": 50,
+          "type": "array",
+          "uniqueItems": true,
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "tags",
+      "type": "object",
+    },
+    "website": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "format": "hostname",
+          "maxLength": 255,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "website",
+      "type": "object",
+    },
+  },
+  "type": "object",
+}
+`;
