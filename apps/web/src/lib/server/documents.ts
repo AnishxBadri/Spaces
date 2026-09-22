@@ -141,6 +141,13 @@ export const listRecordDocuments = createServerFn()
         extractionError: document.extractionError,
         createdAt: document.createdAt,
         uploadedBy: document.uploadedBy,
+        // The storage-source half of the row (SPA-78,
+        // `docs/spec-storage-sources.md` §8): where the provider's copy can
+        // be opened, and whether it is still there. Both null on every
+        // document until a storage-source plugin files one, and the row
+        // renders nothing extra when they are.
+        externalUrl: document.externalUrl,
+        externalStatus: document.externalStatus,
         // Enough text to prove extraction worked, without hauling a
         // 2MB column into every Files-tab render.
         snippet: sql<string | null>`left(${document.extractedText}, 200)`,

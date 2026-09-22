@@ -65,6 +65,20 @@ export type ShelfDocument = {
   sourceClass: (typeof document.$inferSelect)['sourceClass']
   /** The integration that filed it, named; null for a manual upload. */
   sourceCapability: string | null
+  /**
+   * The three storage-source columns the Source column reads (SPA-78,
+   * `docs/spec-storage-sources.md` §11 delta 1). All three are null on every
+   * document until a storage-source plugin files one, and the column renders
+   * exactly what it rendered before when they are — a null path is not an
+   * empty cell, it is the origin on its own.
+   *
+   * `external_id` and `connection_id` are the other two columns of that delta
+   * and are deliberately not here: they are the sync's idempotency key, not
+   * anything a reader sees, and a shelf row is what the shelf renders.
+   */
+  sourcePath: string | null
+  externalUrl: string | null
+  externalStatus: (typeof document.$inferSelect)['externalStatus']
   uploadedByName: string | null
   /** ISO 8601 — compared lexically, the repo convention for dates. */
   createdAt: string
@@ -102,6 +116,9 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
             extractionError: document.extractionError,
             sourceClass: document.sourceClass,
             sourceCapability: integration.capabilityId,
+            sourcePath: document.sourcePath,
+            externalUrl: document.externalUrl,
+            externalStatus: document.externalStatus,
             uploadedByName: user.name,
             createdAt: document.createdAt,
             snippet: sql<
@@ -162,6 +179,9 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
         extractionError: r.extractionError,
         sourceClass: r.sourceClass,
         sourceCapability: r.sourceCapability,
+        sourcePath: r.sourcePath,
+        externalUrl: r.externalUrl,
+        externalStatus: r.externalStatus,
         uploadedByName: r.uploadedByName,
         createdAt: r.createdAt.toISOString(),
         sinceMs: now - r.createdAt.getTime(),

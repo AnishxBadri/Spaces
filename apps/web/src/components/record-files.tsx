@@ -18,6 +18,7 @@ import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Select } from './ui/select'
 import { DocumentPreview } from './document-preview'
+import { GoneMarker, OpenInSourceButton } from './document-source'
 import { DocumentTile } from './document-tile'
 import { KIND_ICONS } from './editor/mention'
 import {
@@ -271,27 +272,38 @@ function DocumentRow({
         >
           {doc.filename}
         </button>
-        <span className="truncate mono text-field text-graphite">
-          {[
-            DOCUMENT_KIND_LABELS[doc.kind].toLowerCase(),
-            formatBytes(doc.sizeBytes),
-            doc.createdAt.slice(5, 10),
-            doc.uploadedByName,
-            // Named, not classed (SPA-137): the reader installed "gmail" and
-            // that is the word they know — "integration" would tell them
-            // nothing they could act on. A hand-uploaded file gets no suffix
-            // at all, because "via nobody" is noise on every row but the few
-            // a connector filed. The server resolved the ref to the
-            // capability id; this line only prints it.
-            doc.sourceCapability ? `via ${doc.sourceCapability}` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate mono text-field text-graphite">
+            {[
+              DOCUMENT_KIND_LABELS[doc.kind].toLowerCase(),
+              formatBytes(doc.sizeBytes),
+              doc.createdAt.slice(5, 10),
+              doc.uploadedByName,
+              // Named, not classed (SPA-137): the reader installed "gmail" and
+              // that is the word they know — "integration" would tell them
+              // nothing they could act on. A hand-uploaded file gets no suffix
+              // at all, because "via nobody" is noise on every row but the few
+              // a connector filed. The server resolved the ref to the
+              // capability id; this line only prints it.
+              doc.sourceCapability ? `via ${doc.sourceCapability}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          {/* The provider deleted theirs; ours stayed (§8). A marker rather
+              than a word in the line above, because it is a state and not
+              another piece of metadata. */}
+          {doc.externalStatus === 'gone' ? <GoneMarker /> : null}
         </span>
         <ExtractionNote doc={doc} />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <FilingControl doc={doc} />
+        {/* Only a document a storage source linked has anywhere to open —
+            an upload, a clip and a url get no action rather than a dead one. */}
+        {doc.externalUrl === null ? null : (
+          <OpenInSourceButton url={doc.externalUrl} filename={doc.filename} />
+        )}
         <Button
           size="icon-xs"
           variant="ghost"
