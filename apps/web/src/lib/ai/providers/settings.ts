@@ -8,7 +8,7 @@ import {
 import type { CredentialMeta } from '@spaces/db/schema/vault'
 import { effectFn } from '#/lib/server/effect'
 import { requireAdmin } from '#/lib/server/shared'
-import { BUILT_LLM_PROVIDERS, PROVIDER_LABEL } from './ids'
+import { LLM_PROVIDERS, PROVIDERS, PROVIDER_LABEL } from './ids'
 import type { AiKeyInput, LlmProvider } from './ids'
 import { resolveLanguageModel } from './index'
 import { parseHeaderLines, readProviderMeta } from './meta'
@@ -62,7 +62,7 @@ const write = <T>(message: string, f: () => Promise<T>) =>
 export const listAiProvidersProgram = Effect.fn('listAiProviders')(
   function* (): Effect.fn.Return<AiProviderRow[], AiSettingsWriteFailed> {
     const rows: AiProviderRow[] = []
-    for (const provider of BUILT_LLM_PROVIDERS) {
+    for (const provider of LLM_PROVIDERS) {
       const row = yield* write('Could not read the providers', () =>
         readWorkspaceCredential(provider),
       )
@@ -95,7 +95,7 @@ export const saveAiKeyProgram = Effect.fn('saveAiKey')(function* (
   if (!parsed.ok) return yield* new AiSettingsRefused({ message: parsed.error })
   const hasHeaders = Object.keys(parsed.headers).length > 0
 
-  const key = data.key
+  const key = PROVIDERS[data.provider].keyless ? undefined : data.key
   if (key) {
     const display = redact(key)
     const meta: CredentialMeta = { display }
@@ -119,10 +119,34 @@ export const saveAiKeyProgram = Effect.fn('saveAiKey')(function* (
   const existing = yield* write('Could not read the provider', () =>
     readWorkspaceCredential(data.provider),
   )
-  if (!existing)
-    return yield* new AiSettingsRefused({
-      message: `Paste a ${PROVIDER_LABEL[data.provider]} key first`,
-    })
+  if (!existing) {
+    if (!PROVIDERS[data.provider].keyless)
+      return yield* new AiSettingsRefused({
+        message: `Paste a ${PROVIDER_LABEL[data.provider]} key first`,
+      })
+    const meta: CredentialMeta = {}
+    if (data.baseUrl) meta.baseUrl = data.baseUrl
+    if (hasHeaders) meta.headers = parsed.headers
+    yield* write('Could not save the provider', () =>
+      // A keyless provider (Ollama) saves with a base URL and no key, but
+      // `credential.secret_enc` is not null and stays that way: the row
+      // stores the encryption of the empty string, through the same vault
+      // path and AAD as any key, rather than relaxing the column for one
+      // provider. `keyless: true` is what lets the vault accept the empty
+      // secret; nothing reads it back — the Ollama adapter ignores it — and
+      // the ledger shows "no key" because no `display` is written.
+      storeCredential({
+        scope: 'workspace',
+        provider: data.provider,
+        kind: 'llm',
+        secret: '',
+        keyless: true,
+        meta,
+        createdBy: actorId,
+      }),
+    )
+    return { display: null }
+  }
   yield* write('Could not save the provider', () =>
     mergeCredentialMeta(existing.id, {
       baseUrl: data.baseUrl || null,
@@ -142,7 +166,6 @@ export const testAiProviderProgram = Effect.fn('testAiProvider')(function* (
 ): Effect.fn.Return<TestCallResult, AiSettingsWriteFailed> {
   const resolved = yield* resolveLanguageModel(provider).pipe(
     Effect.catchTag('NoCredential', () => Effect.succeed(null)),
-    Effect.catchTag('ProviderNotBuilt', () => Effect.succeed(null)),
     Effect.catchTag('CredentialReadFailed', (e) =>
       Effect.fail(
         new AiSettingsWriteFailed({
@@ -156,7 +179,9 @@ export const testAiProviderProgram = Effect.fn('testAiProvider')(function* (
     return {
       ok: false,
       status: null,
-      message: `No ${PROVIDER_LABEL[provider]} key is saved`,
+      message: PROVIDERS[provider].keyless
+        ? `${PROVIDER_LABEL[provider]} is not saved`
+        : `No ${PROVIDER_LABEL[provider]} key is saved`,
     }
 
   const result = yield* runTestCall(resolved.model)

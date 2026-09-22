@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
 import { credential } from '@spaces/db/schema'
 import { FIXTURE_ACTOR } from '../../../../vitest.seed'
+import { resolveCredential, storeCredential } from '#/lib/vault'
 import {
   listAiProvidersHandler,
   saveAiKeyHandler,
@@ -118,7 +119,14 @@ describe('an admin adding an Anthropic key', () => {
     expect(row?.secretEnc.toString('utf8')).not.toContain(SECRET)
 
     const providers = await listAiProvidersHandler()
-    expect(providers).toEqual([
+    expect(providers.map((p) => p.provider)).toEqual([
+      'anthropic',
+      'openai',
+      'google',
+      'openrouter',
+      'ollama',
+    ])
+    expect(providers.filter((p) => p.configured)).toEqual([
       {
         provider: 'anthropic',
         label: 'Anthropic',
@@ -237,5 +245,187 @@ describe('an admin adding an Anthropic key', () => {
     ).resolves.toEqual({ ok: true, text: 'OK' })
     const [row] = await listAiProvidersHandler()
     expect(row.lastTestOk).toBe(true)
+  })
+})
+
+/** One provider's stored row, the ciphertext and the meta. */
+async function storedRow(provider: string) {
+  return (
+    await db
+      .select({ secretEnc: credential.secretEnc, meta: credential.meta })
+      .from(credential)
+      .where(eq(credential.provider, provider))
+  ).at(0)
+}
+
+const okFromOllama = () =>
+  new Response(
+    JSON.stringify({
+      model: 'llama3.2',
+      created_at: '2026-09-23T12:00:00Z',
+      message: { role: 'assistant', content: 'OK' },
+      done: true,
+      done_reason: 'stop',
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  )
+
+describe('SPA-39: an admin saving Ollama with no key', () => {
+  it('saves with a base URL and an empty secret; the ledger row is configured with no display', async () => {
+    asAdmin()
+    const saved = await saveAiKeyHandler({
+      provider: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      headers: '',
+    })
+    expect(saved).toEqual({ display: null })
+
+    const row = (await listAiProvidersHandler()).find(
+      (p) => p.provider === 'ollama',
+    )
+    expect(row).toEqual({
+      provider: 'ollama',
+      label: 'Ollama',
+      configured: true,
+      status: 'active',
+      display: null,
+      baseUrl: 'http://localhost:11434',
+      headers: {},
+      lastUsedAt: null,
+      lastTestedAt: null,
+      lastTestOk: null,
+    })
+
+    // The column stays not-null: the row holds the encryption of '' — the
+    // 29-byte envelope (version, iv, tag) with no ciphertext after it — and
+    // the vault decrypts it back to ''.
+    const stored = await storedRow('ollama')
+    expect(stored?.secretEnc.length).toBe(1 + 12 + 16)
+    expect((await resolveCredential('ollama'))?.secret).toBe('')
+  })
+
+  it('ignores a key sent for a keyless provider and keeps its headers', async () => {
+    asAdmin()
+    await saveAiKeyHandler({
+      provider: 'ollama',
+      key: 'sk-should-not-be-kept-1234',
+      baseUrl: 'http://localhost:11434',
+      headers: 'X-Proxy-Token: t-1',
+    })
+    expect((await resolveCredential('ollama'))?.secret).toBe('')
+    const row = (await listAiProvidersHandler()).find(
+      (p) => p.provider === 'ollama',
+    )
+    expect(row?.headers).toEqual({ 'X-Proxy-Token': 't-1' })
+    expect(row?.display).toBeNull()
+  })
+
+  it('tests against the saved address and returns the local model answer', async () => {
+    asAdmin()
+    const calls: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL | Request) => {
+      calls.push(input instanceof Request ? input.url : String(input))
+      return okFromOllama()
+    })
+    await expect(
+      testAiProviderHandler({ provider: 'ollama' }),
+    ).resolves.toEqual({ ok: true, text: 'OK' })
+    expect(calls).toEqual(['http://localhost:11434/api/chat'])
+  })
+
+  it('surfaces a refused connection as the transport error and records the failed test', async () => {
+    asAdmin()
+    vi.stubGlobal('fetch', async () => {
+      throw new TypeError('fetch failed', {
+        cause: Object.assign(
+          new Error('connect ECONNREFUSED 127.0.0.1:11434'),
+          { code: 'ECONNREFUSED' },
+        ),
+      })
+    })
+    await expect(
+      testAiProviderHandler({ provider: 'ollama' }),
+    ).resolves.toEqual({
+      ok: false,
+      status: null,
+      message:
+        'Could not reach http://localhost:11434/api/chat: connect ECONNREFUSED 127.0.0.1:11434',
+    })
+    const row = (await listAiProvidersHandler()).find(
+      (p) => p.provider === 'ollama',
+    )
+    expect(row?.lastTestOk).toBe(false)
+  })
+
+  it('the vault still refuses an empty secret that is not declared keyless', async () => {
+    await expect(
+      storeCredential({
+        scope: 'workspace',
+        provider: 'openai',
+        kind: 'llm',
+        secret: '',
+        createdBy: FIXTURE_ACTOR.id,
+      }),
+    ).rejects.toThrow('Secret is required')
+    expect(await storedRow('openai')).toBeUndefined()
+  })
+})
+
+describe('SPA-39: Google and OpenRouter keys through the same row shape', () => {
+  it.each([
+    {
+      provider: 'google' as const,
+      label: 'Google',
+      key: 'AIzaSyD-google-key-7a1b',
+      display: 'AIz…7a1b',
+    },
+    {
+      provider: 'openrouter' as const,
+      label: 'OpenRouter',
+      key: 'sk-or-v1-openrouter-key-5c2d',
+      display: 'sk-…5c2d',
+    },
+  ])('$label round-trips its key, base URL and headers', async (c) => {
+    asAdmin()
+    const saved = await saveAiKeyHandler({
+      provider: c.provider,
+      key: c.key,
+      baseUrl: 'https://gateway.fund.example/v1',
+      headers: 'Helicone-Auth: Bearer hc-1',
+    })
+    expect(saved).toEqual({ display: c.display })
+
+    const row = (await listAiProvidersHandler()).find(
+      (p) => p.provider === c.provider,
+    )
+    expect(row).toEqual({
+      provider: c.provider,
+      label: c.label,
+      configured: true,
+      status: 'active',
+      display: c.display,
+      baseUrl: 'https://gateway.fund.example/v1',
+      headers: { 'Helicone-Auth': 'Bearer hc-1' },
+      lastUsedAt: null,
+      lastTestedAt: null,
+      lastTestOk: null,
+    })
+    expect(JSON.stringify(row)).not.toContain(c.key)
+    expect((await resolveCredential(c.provider))?.secret).toBe(c.key)
+
+    // Saved, a keyless save changes the base URL and keeps the key.
+    await saveAiKeyHandler({ provider: c.provider, baseUrl: '', headers: '' })
+    expect((await resolveCredential(c.provider))?.secret).toBe(c.key)
+    const after = (await listAiProvidersHandler()).find(
+      (p) => p.provider === c.provider,
+    )
+    expect(after).toMatchObject({ display: c.display, baseUrl: null })
+  })
+
+  it('refuses a keyed provider saved for the first time without a key', async () => {
+    asAdmin()
+    await expect(
+      saveAiKeyHandler({ provider: 'openai', baseUrl: '', headers: '' }),
+    ).rejects.toMatchObject({ message: 'Paste a OpenAI key first' })
   })
 })

@@ -24,15 +24,38 @@ export const CREDENTIAL_KINDS = credentialKind.enumValues
  * the database is the backstop, not the validator (CONTEXT.md: Zod stays at
  * the boundaries, hand-written at write-path choke points).
  */
-export const credentialInput = z.object({
-  scope: z.enum(credentialScope.enumValues),
-  userId: z.string().optional(),
-  provider: z.string().min(1),
-  kind: z.enum(CREDENTIAL_KINDS),
-  secret: z.string().min(1).max(4000),
-  meta: z.record(z.string(), jsonValue).optional(),
-  createdBy: z.string().min(1),
-})
+export const credentialInput = z
+  .object({
+    scope: z.enum(credentialScope.enumValues),
+    userId: z.string().optional(),
+    provider: z.string().min(1),
+    kind: z.enum(CREDENTIAL_KINDS),
+    secret: z.string().max(4000),
+    /**
+     * A provider that authenticates nobody (a local Ollama, SPA-39). Its row
+     * still carries `secret_enc` — the column stays not-null — holding the
+     * encryption of the empty string. Saying so is the only way to store an
+     * empty secret: without the flag an empty one is refused, so a blank
+     * paste into a keyed provider's field cannot pass for a key.
+     */
+    keyless: z.literal(true).optional(),
+    meta: z.record(z.string(), jsonValue).optional(),
+    createdBy: z.string().min(1),
+  })
+  .superRefine((input, ctx) => {
+    if (input.keyless && input.secret !== '')
+      ctx.addIssue({
+        code: 'custom',
+        path: ['secret'],
+        message: 'A keyless credential stores no secret',
+      })
+    if (!input.keyless && input.secret === '')
+      ctx.addIssue({
+        code: 'custom',
+        path: ['secret'],
+        message: 'Secret is required',
+      })
+  })
 
 export type CredentialInput = z.infer<typeof credentialInput>
 
