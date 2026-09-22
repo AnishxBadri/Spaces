@@ -121,6 +121,7 @@ export const runTestCall = Effect.fn('runTestCall')(function* (
 ): Effect.fn.Return<TestCallResult> {
   return yield* completeProgram(via.lane, [], undefined, {
     caller: via.caller,
+    // An admin checking a key, not record bytes: nothing to resolve (SPA-61).
     sensitivity: 'normal',
     budgetChars: 1000,
     task: TEST_PROMPT,

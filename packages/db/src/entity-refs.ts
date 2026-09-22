@@ -141,6 +141,9 @@ export type EntityRef = {
   context: ContextRole | null
 }
 
+// `entity.sensitive` (SPA-61) has no entry and needs none: it is a boolean
+// on the entity row itself and references nothing, so there is nothing to
+// repoint on merge and no edge for the context assembler to walk.
 export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
   // --- identity ----------------------------------------------------------
   {

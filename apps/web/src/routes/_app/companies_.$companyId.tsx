@@ -9,6 +9,7 @@ import { Globe, Layers, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { SaveAsTemplateAction } from '#/components/templates'
+import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
@@ -41,6 +42,7 @@ import {
   countOpenSuggestions,
   createNote,
   getCompany,
+  getEntitySensitivity,
   getRecordTimeline,
   listCompanyDeals,
   listRecordDocuments,
@@ -65,6 +67,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       documents,
       notes,
       waiting,
+      sensitivity,
     ] = await Promise.all([
       getCompany({ data: { id: params.companyId } }),
       listSpaces(),
@@ -75,6 +78,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       listRecordDocuments({ data: { entityId: params.companyId } }),
       listRecordNotes({ data: { entityId: params.companyId } }),
       countOpenSuggestions({ data: { entityId: params.companyId } }),
+      getEntitySensitivity({ data: { entityId: params.companyId } }),
     ])
     // Merged-away records redirect to their survivor — stale URLs keep working.
     if (companyData.mergedIntoId) {
@@ -93,6 +97,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       documents,
       notes,
       waiting,
+      sensitivity,
     }
   },
   component: CompanyRecordPage,
@@ -109,6 +114,7 @@ function CompanyRecordPage() {
     documents,
     notes,
     waiting,
+    sensitivity,
   } = Route.useLoaderData()
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
@@ -161,6 +167,7 @@ function CompanyRecordPage() {
         }
         actions={
           <>
+            <SensitiveToggle entityId={company.id} state={sensitivity} />
             <LogInteractionDialog
               seed={{ id: company.id, name: company.name, kind: 'company' }}
               hotkey="l"

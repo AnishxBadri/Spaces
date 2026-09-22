@@ -33,6 +33,7 @@ import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
+import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -46,6 +47,7 @@ import {
   getDeal,
   getRecordTimeline,
   listRecordDocuments,
+  getEntitySensitivity,
   listRecordNotes,
   listRegistry,
   updateRecord,
@@ -53,7 +55,7 @@ import {
 
 export const Route = createFileRoute('/_app/deals_/$dealId')({
   loader: async ({ params }) => {
-    const [deal, registry, timeline, documents, notes, waiting] =
+    const [deal, registry, timeline, documents, notes, waiting, sensitivity] =
       await Promise.all([
         getDeal({ data: { id: params.dealId } }),
         listRegistry({ data: { kind: 'deal' } }),
@@ -61,6 +63,7 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
         listRecordDocuments({ data: { entityId: params.dealId } }),
         listRecordNotes({ data: { entityId: params.dealId } }),
         countOpenSuggestions({ data: { entityId: params.dealId } }),
+        getEntitySensitivity({ data: { entityId: params.dealId } }),
       ])
     if (deal.mergedIntoId) {
       throw redirect({
@@ -68,13 +71,13 @@ export const Route = createFileRoute('/_app/deals_/$dealId')({
         params: { dealId: deal.mergedIntoId },
       })
     }
-    return { deal, registry, timeline, documents, notes, waiting }
+    return { deal, registry, timeline, documents, notes, waiting, sensitivity }
   },
   component: DealRecordPage,
 })
 
 function DealRecordPage() {
-  const { deal, registry, timeline, documents, notes, waiting } =
+  const { deal, registry, timeline, documents, notes, waiting, sensitivity } =
     Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
@@ -197,6 +200,7 @@ function DealRecordPage() {
         }
         actions={
           <>
+            <SensitiveToggle entityId={deal.id} state={sensitivity} />
             <LogInteractionDialog
               seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
               hotkey="l"

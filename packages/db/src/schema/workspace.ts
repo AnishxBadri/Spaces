@@ -11,16 +11,20 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
+import type { AiSensitivity } from './ai'
 import { note } from './kinds'
 import type { Json } from '../json'
 
 /**
- * Workspace-scoped keys. `base_currency` is the only one so far; the index
- * signature keeps the column honest about the rest rather than pretending
- * the set is closed.
+ * Workspace-scoped keys. The index signature keeps the column honest about
+ * the rest rather than pretending the set is closed.
+ *
+ * `sensitivity_default` (SPA-61) is the floor `resolveSensitivity` ORs every
+ * record's own, space and binding inputs over; absent reads as `'normal'`.
  */
 export type WorkspaceSettings = {
   base_currency?: string
+  sensitivity_default?: AiSensitivity
 } & { [k: string]: Json | undefined }
 
 /**

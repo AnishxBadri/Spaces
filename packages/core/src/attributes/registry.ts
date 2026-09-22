@@ -258,6 +258,12 @@ const opt = (
   ...(color ? { color } : {}),
 })
 
+/**
+ * Sensitivity is deliberately not here (SPA-61). `ObjectKind` is
+ * `company | person | deal`, so an attribute can never reach a space or a
+ * document — the two things sensitivity most needs to cover. It is the
+ * `entity.sensitive` column instead, resolved by `resolveSensitivity`.
+ */
 export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
   company: [
     { slug: 'description', name: 'Description', type: 'text' },

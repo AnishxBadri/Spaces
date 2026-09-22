@@ -110,6 +110,20 @@ export const entity = pgTable(
     /** The integration that wrote the row; null for every other class. */
     sourceRef: uuid('source_ref').references(() => integration.id),
     createdBy: text('created_by').references(() => user.id),
+    /**
+     * The record's own sensitivity flag (SPA-61, spec-ai-substrate §9) — one
+     * of the three authored inputs `resolveSensitivity`
+     * (`apps/web/src/lib/ai/sensitivity.ts`) ORs together, and the only one
+     * a record carries. One column covers a space, a company, a deal, a
+     * document and a custom record alike, because a space is an entity.
+     *
+     * An egress flag, never access control: it says where this record's bytes
+     * may travel (a sensitive call goes to a local model or nowhere), never
+     * who may read the row — `canRead` stays the only thing that hides one.
+     * Inheritance from a filed space is resolved at read and never written
+     * here. No `ENTITY_REFS` entry: the column references nothing.
+     */
+    sensitive: boolean('sensitive').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
