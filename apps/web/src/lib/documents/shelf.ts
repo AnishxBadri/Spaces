@@ -1,9 +1,10 @@
 import { Effect, Schema } from 'effect'
-import { desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, count, desc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { document, entity, integration } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { documentFilingEdges } from '#/lib/server/shared'
+import { unfiledPredicate } from '#/lib/documents/unfiled'
 
 /**
  * The shelf behind `/documents` (SPA-58) — every document in the workspace
@@ -27,6 +28,12 @@ import { documentFilingEdges } from '#/lib/server/shared'
  * `documentProvenance`, which would have been a fourth: the join it makes is
  * one `left join integration`, and the first statement is already selecting
  * from `document`.
+ *
+ * The `filed` filter (SPA-124) is one `where` clause on statement one — the
+ * three-statement ceiling above is the design, so the unfiled inbox is a
+ * predicate on the shelf and not a fourth read, and not a route of its own.
+ * The predicate itself is `unfiledPredicate()`, shared with the count Today's
+ * badge reads.
  *
  * It lives outside `lib/server/` for the reason `space-sources.ts` does
  * (CLAUDE.md → Traps, SPA-155): `lib/server/documents.ts` is re-exported by
@@ -95,6 +102,14 @@ export type ShelfDocument = {
 }
 
 /**
+ * Which slice of the shelf to read. `'unfiled'` is the inbox
+ * (`docs/spec-storage-sources.md` §3.2) — arrivals with no edge — and it is a
+ * filter on this list rather than a surface of its own, which is why it is a
+ * parameter and not a second program.
+ */
+export type DocumentFiled = 'all' | 'unfiled'
+
+/**
  * Enough extracted text for the toolbar's filter to reach into a document's
  * contents, and not a byte more: the column runs to 2MB. Same 200 as the
  * Files tab and the space Sources lane.
@@ -102,7 +117,9 @@ export type ShelfDocument = {
 const SNIPPET_CHARS = 200
 
 export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
-  function* (): Effect.fn.Return<Array<ShelfDocument>, DocumentShelfFailed> {
+  function* (input: {
+    filed: DocumentFiled
+  }): Effect.fn.Return<Array<ShelfDocument>, DocumentShelfFailed> {
     const rows = yield* Effect.tryPromise({
       try: () =>
         db
@@ -134,8 +151,13 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
           .leftJoin(user, eq(user.id, document.uploadedBy))
           .leftJoin(integration, eq(integration.id, document.sourceRef))
           // A merged-away document stops being a document: it has a
-          // survivor, and the shelf would otherwise list both.
-          .where(isNull(entity.mergedIntoId))
+          // survivor, and the shelf would otherwise list both. The inbox
+          // rides on the same clause — one statement, two conditions.
+          .where(
+            input.filed === 'unfiled'
+              ? and(isNull(entity.mergedIntoId), unfiledPredicate())
+              : isNull(entity.mergedIntoId),
+          )
           // Newest first by default. The table's own sort is single-column
           // and client-side; this is what it starts from.
           .orderBy(desc(document.createdAt)),
@@ -190,5 +212,35 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
         spaces,
       }
     })
+  },
+)
+
+/**
+ * How many documents are unfiled — Today's badge (SPA-124,
+ * `docs/spec-storage-sources.md` §11 delta 6).
+ *
+ * A count, not the list: the readout wants one number, and the shelf query
+ * above folds edges into every row it returns to produce it. Same reason
+ * `countOpenInbox` exists beside `listInbox`.
+ *
+ * The `merged_into_id` exclusion is the shelf's, restated here because it is
+ * the same definition of "a document" — a badge counting tombstones would
+ * send the reader to a list that does not contain them. The filing half is
+ * `unfiledPredicate()` and is written once.
+ */
+export const countUnfiledProgram = Effect.fn('countUnfiledProgram')(
+  function* (): Effect.fn.Return<number, DocumentShelfFailed> {
+    const rows = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ value: count() })
+          .from(document)
+          .innerJoin(entity, eq(entity.id, document.entityId))
+          .where(and(isNull(entity.mergedIntoId), unfiledPredicate())),
+      catch: (cause) => new DocumentShelfFailed({ cause }),
+    })
+    // `.at(0)` rather than a destructure: an aggregate with no GROUP BY
+    // always returns one row, but the type does not say so.
+    return rows.at(0)?.value ?? 0
   },
 )

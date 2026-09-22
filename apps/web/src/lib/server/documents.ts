@@ -249,14 +249,44 @@ export const listRecordDocuments = createServerFn()
  * query is `#/lib/documents/shelf`, outside `lib/server/` so a test can drive
  * it without a request and so it never reaches the client barrel.
  *
- * No validator: the shelf takes no arguments in this slice. Filters and saved
- * views arrive with docsurf-12a.
+ * One argument since SPA-124: `filed`. `'unfiled'` is the inbox — arrivals
+ * carrying no filing edge (`docs/spec-storage-sources.md` §3.2) — and it is a
+ * filter on this list rather than a route of its own, which is what makes
+ * `/documents?filed=unfiled` the whole feature. It defaults to `'all'`, so
+ * the route's `validateSearch` and this validator agree on the same default
+ * and a call with no `data` still reads the shelf. Saved views are
+ * docsurf-12a.
  */
-export const listDocuments = createServerFn().handler(async () => {
+export const listDocuments = createServerFn()
+  .validator(
+    z
+      .object({ filed: z.enum(['all', 'unfiled']).default('all') })
+      .default({ filed: 'all' }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { listDocumentsProgram } = await import('../documents/shelf')
+    const { effectFn } = await import('./effect')
+    return effectFn(listDocumentsProgram)({ filed: data.filed })
+  })
+
+/**
+ * How many documents are unfiled — one number for Today's readout strip
+ * (SPA-124, `docs/spec-storage-sources.md` §11 delta 6).
+ *
+ * Its own server fn rather than a field on some existing loader's answer,
+ * for the reason `countOpenInbox` is its own: Today reads six counters from
+ * five domains in one `Promise.all`, and a documents count wedged into the
+ * inbox's shape would make one domain's reader answer for another's. The
+ * predicate behind it is `unfiledPredicate()`, the same fragment
+ * `listDocuments({ filed: 'unfiled' })` filters with, so the badge and the
+ * list it links to cannot disagree.
+ */
+export const countUnfiledDocuments = createServerFn().handler(async () => {
   await requireUser()
-  const { listDocumentsProgram } = await import('../documents/shelf')
+  const { countUnfiledProgram } = await import('../documents/shelf')
   const { effectFn } = await import('./effect')
-  return effectFn(listDocumentsProgram)()
+  return effectFn(countUnfiledProgram)()
 })
 
 /**
