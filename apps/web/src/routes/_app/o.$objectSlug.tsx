@@ -79,7 +79,7 @@ export const Route = createFileRoute('/_app/o/$objectSlug')({
     const [registry, table, viewData, session] = await Promise.all([
       listRegistry({ data: { objectId: object.id } }),
       listObjectRecords({ data: { objectId: object.id } }),
-      listViews({ data: { objectId: object.id } }),
+      listViews({ data: { surface: 'object', objectId: object.id } }),
       getSession(),
     ])
     return {

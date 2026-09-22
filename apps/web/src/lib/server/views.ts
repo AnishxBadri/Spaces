@@ -1,6 +1,14 @@
 import { createServerFn } from '@tanstack/react-start'
 import { Effect } from 'effect'
 import { z } from 'zod'
+import {
+  documentKeyFields,
+  exactlyOneObjectRef,
+  exactlyOneObjectRefMessage,
+  objectKeyFields,
+  surfaceKey,
+} from '../views/target'
+import type { SurfaceKey, ViewTarget } from '../views/target'
 import { requireUser } from './shared'
 
 const condition = z.object({
@@ -11,68 +19,95 @@ const condition = z.object({
     .optional(),
 })
 
-const objectKey = z
-  .object({
-    kind: z.enum(['company', 'person', 'deal']).optional(),
-    objectId: z.string().uuid().optional(),
-  })
-  .refine((v) => v.kind || v.objectId, {
-    message: 'Give a kind or an objectId',
-  })
+const viewBody = {
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1).max(80),
+  filter: z.array(condition).max(20),
+  sort: z.object({ id: z.string(), desc: z.boolean() }).nullable(),
+  columns: z.record(z.string(), z.boolean()),
+  extra: z.record(
+    z.string(),
+    z.union([z.string(), z.number(), z.boolean(), z.null()]),
+  ),
+  visibility: z.enum(['shared', 'private']),
+}
 
-const resolveObjectId = async (key: {
-  kind?: 'company' | 'person' | 'deal' | undefined
-  objectId?: string | undefined
-}) => {
-  if (key.objectId) return key.objectId
+const saveKey = z.discriminatedUnion('surface', [
+  z
+    .object({ ...objectKeyFields, ...viewBody })
+    .refine(exactlyOneObjectRef, exactlyOneObjectRefMessage),
+  z.object({ ...documentKeyFields, ...viewBody }),
+])
+
+const deleteKey = z.discriminatedUnion('surface', [
+  z
+    .object({ ...objectKeyFields, id: z.string().uuid() })
+    .refine(exactlyOneObjectRef, exactlyOneObjectRefMessage),
+  z.object({ ...documentKeyFields, id: z.string().uuid() }),
+])
+
+/**
+ * Key → target: the object surface resolves its kind to an object row; every
+ * other surface names none. There is no default kind — a key that supplies
+ * neither kind nor objectId never reaches here, because the validators above
+ * refuse it (D2, views-1).
+ */
+const resolveTarget = async (key: SurfaceKey): Promise<ViewTarget> => {
+  if (key.surface === 'document') return { surface: 'document' }
+  if (key.objectId !== undefined)
+    return { surface: 'object', objectId: key.objectId }
+  if (key.kind === undefined)
+    throw new Error(exactlyOneObjectRefMessage.message)
   const { objectIdForKindAsync } = await import('../attributes/objects')
-  return objectIdForKindAsync(key.kind ?? 'company')
+  return { surface: 'object', objectId: await objectIdForKindAsync(key.kind) }
 }
 
 export const listViews = createServerFn()
-  .validator(objectKey)
+  .validator(surfaceKey)
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { listViewsProgram } = await import('../views/store')
-    const objectId = await resolveObjectId(data)
-    const views = await Effect.runPromise(listViewsProgram(objectId, u.id))
-    return { objectId, views }
+    const target = await resolveTarget(data)
+    const views = await Effect.runPromise(listViewsProgram(target, u.id))
+    // Null on a surface with no object row — the same equivalence the
+    // `view_surface_object_id` CHECK asserts, so the page rebuilds the target
+    // from it with `viewTarget` (lib/views/target.ts).
+    return {
+      objectId: target.surface === 'object' ? target.objectId : null,
+      views,
+    }
   })
 
 export const saveView = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({
-      id: z.string().uuid().optional(),
-      objectId: z.string().uuid(),
-      name: z.string().trim().min(1).max(80),
-      filter: z.array(condition).max(20),
-      sort: z.object({ id: z.string(), desc: z.boolean() }).nullable(),
-      columns: z.record(z.string(), z.boolean()),
-      extra: z.record(
-        z.string(),
-        z.union([z.string(), z.number(), z.boolean(), z.null()]),
-      ),
-      visibility: z.enum(['shared', 'private']),
-    }),
-  )
+  .validator(saveKey)
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { saveViewProgram } = await import('../views/store')
     const { effectFn } = await import('./effect')
-    return effectFn(saveViewProgram)(data, {
-      id: u.id,
-      isAdmin: u.role === 'admin',
-    })
+    const target = await resolveTarget(data)
+    return effectFn(saveViewProgram)(
+      {
+        ...target,
+        id: data.id,
+        name: data.name,
+        filter: data.filter,
+        sort: data.sort,
+        columns: data.columns,
+        extra: data.extra,
+        visibility: data.visibility,
+      },
+      { id: u.id, isAdmin: u.role === 'admin' },
+    )
   })
 
 export const deleteView = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(deleteKey)
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { deleteViewProgram } = await import('../views/store')
     const { effectFn } = await import('./effect')
-    return effectFn(deleteViewProgram)(data.id, {
-      id: u.id,
-      isAdmin: u.role === 'admin',
-    })
+    return effectFn(deleteViewProgram)(
+      { id: data.id, surface: data.surface },
+      { id: u.id, isAdmin: u.role === 'admin' },
+    )
   })

@@ -92,6 +92,7 @@ export async function writeIsolationProbe(tag: string): Promise<void> {
   })
 
   await db.insert(view).values({
+    surface: 'object',
     objectId: object.id,
     name: `Probe ${tag}`,
     createdBy: author.id,

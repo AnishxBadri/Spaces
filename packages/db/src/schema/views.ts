@@ -1,11 +1,14 @@
 import {
+  check,
   index,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 import { user } from './auth'
 import { visibility } from './kinds'
 import { objectDef } from './objects'
@@ -41,21 +44,33 @@ export type ViewExtra = Record<string, string | number | boolean | null>
 export type ViewColumns = Record<string, boolean>
 
 /**
- * A view is a saved way of looking at one object's records (CONTEXT.md
- * "Lists — deferred", 2026-09-07): filter conditions, which columns show,
- * one sort, and any surface-specific extra (the deals stage chips). It
- * holds no values — anything worth saying about a record is an attribute on
- * the record. Keyed on the object row, so core and custom objects get the
- * same thing. Private views belong to their author; shared ones to the
- * workspace.
+ * Which list a view is saved against (D2, decided 2026-09-23). `object` is a
+ * row of the object registry — `object_id` names it. `document` is
+ * /documents, a research kind with no object row and no attribute registry,
+ * so it carries no `object_id` at all. A third value is a migration to this
+ * enum plus a `resolve` branch for its fields, never a registry row: see
+ * CONTEXT.md "Lists — deferred" for the rule that admits one.
+ */
+export const viewSurface = pgEnum('view_surface', ['object', 'document'])
+
+export type ViewSurface = (typeof viewSurface.enumValues)[number]
+
+/**
+ * A view is a saved way of looking at one list (CONTEXT.md "Lists —
+ * deferred", 2026-09-07): filter conditions, which columns show, one sort,
+ * and any surface-specific extra (the deals stage chips). It holds no
+ * values — anything worth saying about a record is an attribute on the
+ * record. `surface` says which list; on the `object` surface `object_id`
+ * keys the object row, so core and custom objects get the same thing.
+ * Private views belong to their author; shared ones to the workspace.
  */
 export const view = pgTable(
   'view',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    objectId: uuid('object_id')
-      .notNull()
-      .references(() => objectDef.id),
+    surface: viewSurface('surface').notNull(),
+    // Null exactly when the surface is not `object` — the check below.
+    objectId: uuid('object_id').references(() => objectDef.id),
     name: text('name').notNull(),
     // Array<{ slug, op, value? }> — see src/lib/views/filter.ts
     filter: jsonb('filter').$type<Array<Condition>>().notNull().default([]),
@@ -76,5 +91,13 @@ export const view = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index('view_object_idx').on(t.objectId)],
+  (t) => [
+    index('view_object_idx').on(t.objectId),
+    // The discriminator and the FK are one fact, asserted by the database:
+    // an object view names an object, every other surface names none.
+    check(
+      'view_surface_object_id',
+      sql`(${t.surface} = 'object') = (${t.objectId} is not null)`,
+    ),
+  ],
 )
