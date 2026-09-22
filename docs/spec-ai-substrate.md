@@ -82,6 +82,18 @@ target providers speak it; AI SDK carries the differences):
 Proposals validate through the same zod validators as human writes. AI
 output is structurally incapable of being malformed or of inventing fields.
 
+**Built (SPA-21, `packages/core/src/ai/schema.ts`).** `schemaFor(registry)`
+emits a draft-2020-12 object schema; `validateProposal` runs each value
+through `valueValidator` with no `held` (a proposal is always a fresh
+assertion); `toPatch` hands `planPatch` the values and holds
+`record_reference` identity claims (`{name, domain?, email?}`, never a uuid)
+aside for resolution. `actor_reference` has no write shape. No property is
+required — a model that cannot find a value omits it. **The envelope is
+settled:** every property is `{value, refs, confidence}`, and the suggestion
+row's `refs[]` is the derived union (`proposalRefs`) — the UI needs "from
+p.4" per field, and a union is recoverable from the split while the split is
+not recoverable from a union.
+
 ## 3. Action contract — propose, never write
 
 The AI layer gets exactly one mutating verb:
