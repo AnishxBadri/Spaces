@@ -104,7 +104,14 @@ describe('the suggestion card', () => {
               kind,
               payload: { marker: `payload-of-${kind}` },
               rationale: `because ${kind}`,
-              citations: [{ ref: 'doc:x#1', label: 'deck.pdf · chunk 1' }],
+              citations: [
+                {
+                  ref: 'doc:x#1',
+                  entityId: 'x',
+                  label: 'deck.pdf · chunk 1',
+                  missing: false,
+                },
+              ],
               fields: null,
               createdAt: '2026-09-23T00:00:00.000Z',
             }}

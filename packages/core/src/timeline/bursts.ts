@@ -26,6 +26,8 @@ export type BurstEventRow = {
   actorRef: string | null
   source: string
   at: Date
+  /** Citation refs (`attribute_event.refs`); null or absent for none. */
+  refs?: ReadonlyArray<string> | null
 }
 
 export type Burst<TRow extends BurstEventRow> = {
@@ -37,7 +39,12 @@ export type Burst<TRow extends BurstEventRow> = {
   actorRef: string | null
   source: TRow['source']
   at: string
-  changes: Array<{ slug: string; to: TRow['to'] }>
+  changes: Array<{
+    slug: string
+    to: TRow['to']
+    /** The event's citation refs, carried through for the reader to resolve. */
+    refs: ReadonlyArray<string>
+  }>
 }
 
 /** Consecutive changes by one attender through one door fold into one entry. */
@@ -72,7 +79,7 @@ export function condenseBursts<TRow extends BurstEventRow>(
       last.source === ev.source &&
       new Date(last.at).getTime() - ev.at.getTime() < gapMs
     ) {
-      last.changes.push({ slug: ev.attrSlug, to: ev.to })
+      last.changes.push({ slug: ev.attrSlug, to: ev.to, refs: ev.refs ?? [] })
     } else {
       bursts.push({
         type: 'attrs',
@@ -81,7 +88,7 @@ export function condenseBursts<TRow extends BurstEventRow>(
         actorRef: ev.actorRef ?? null,
         source: ev.source,
         at: ev.at.toISOString(),
-        changes: [{ slug: ev.attrSlug, to: ev.to }],
+        changes: [{ slug: ev.attrSlug, to: ev.to, refs: ev.refs ?? [] }],
       })
     }
   }

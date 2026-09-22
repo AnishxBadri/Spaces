@@ -150,7 +150,7 @@ describe('listInbox — the suggestion lane', () => {
     expect(note.payload).toEqual({ title: 'Met at demo day' })
 
     // A patch carries its fields against the live registry, and its refs
-    // as citations through `cite.ts`.
+    // as citations resolved through `names.ts`.
     expect(founded.fields).toEqual([
       expect.objectContaining({
         slug: 'founded_year',
@@ -160,7 +160,12 @@ describe('listInbox — the suggestion lane', () => {
       }),
     ])
     expect(founded.citations).toEqual([
-      { ref: `attr:${f.acme}:location`, label: 'Location on Acme Robotics' },
+      {
+        ref: `attr:${f.acme}:location`,
+        entityId: f.acme,
+        label: 'Location on Acme Robotics',
+        missing: false,
+      },
     ])
     expect(founded.rationale).toBe('rationale 1')
   })

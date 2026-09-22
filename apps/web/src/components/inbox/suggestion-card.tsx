@@ -17,6 +17,7 @@ import type {
   SuggestionRow,
 } from '#/lib/server-fns'
 import { recordPath } from '#/lib/record-path'
+import { cn } from '#/lib/utils'
 
 /**
  * The suggestion card (SPA-98, spec-ai-substrate.md §10) — every open
@@ -210,7 +211,10 @@ export function SuggestionEntry({
               <li
                 key={c.ref}
                 title={c.ref}
-                className="max-w-full truncate border border-rule bg-paper px-1.5 py-0.5 mono text-micro text-graphite"
+                className={cn(
+                  'max-w-full truncate border border-rule bg-paper px-1.5 py-0.5 mono text-micro text-graphite',
+                  c.missing && 'italic',
+                )}
               >
                 {c.label}
               </li>

@@ -5,8 +5,7 @@ import type {
   ContextLeak,
   ContextQueryFailed,
 } from './assemble'
-import { cite } from './cite'
-import { citeLookupProgram } from './names'
+import { resolveRefsProgram } from './names'
 import type { ContextKind } from './types'
 
 /**
@@ -24,7 +23,7 @@ export type RecordContextItem = {
   kind: ContextKind
   text: string
   at: string | null
-  /** Human citation — `cite.ts`. */
+  /** Human citation — `resolveRefsProgram` (`names.ts`) over `cite.ts`. */
   cite: string
   /** `asOf − at`, for `formatSince`; null for a timeless fact. */
   sinceMs: number | null
@@ -55,19 +54,19 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
       { entityId: input.entityId },
       { user: input.user, asOf: input.asOf, budgetChars: input.budgetChars },
     )
-    const lookup = yield* citeLookupProgram(result.items.map((i) => i.ref))
+    const resolved = yield* resolveRefsProgram(result.items.map((i) => i.ref))
     const asOfMs = Date.parse(input.asOf)
     return {
       seed: result.seed,
       usedChars: result.usedChars,
-      items: result.items.map((i) => {
+      items: result.items.map((i, n) => {
         const atMs = i.at === null ? Number.NaN : Date.parse(i.at)
         return {
           ref: i.ref,
           kind: i.kind,
           text: i.text,
           at: i.at,
-          cite: cite(i.ref, lookup),
+          cite: resolved[n].label,
           sinceMs: Number.isNaN(atMs) ? null : Math.max(0, asOfMs - atMs),
         }
       }),

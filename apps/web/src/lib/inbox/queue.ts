@@ -13,8 +13,8 @@ import { toObjectKind } from '@spaces/core/attributes/registry'
 import { objectIdForKindAsync } from '#/lib/attributes/objects'
 import { getRegistryByObjectId } from '#/lib/attributes/values'
 import type { SuggestionKind } from '#/lib/ai/propose'
-import { cite } from '#/lib/context/cite'
-import { citeLookupProgram } from '#/lib/context/names'
+import { resolveRefsProgram } from '#/lib/context/names'
+import type { ResolvedRef } from '#/lib/context/names'
 import { jsonRecord } from '#/lib/json'
 import type { Json } from '#/lib/json'
 import { entityContext } from './context'
@@ -82,8 +82,11 @@ export type SuggestionField = {
   value: Json
 }
 
-/** A citation: the stored ref and the words `cite.ts` turns it into. */
-export type SuggestionCitation = { ref: string; label: string }
+/**
+ * A citation: the stored ref resolved server-side (`names.ts`) — the words
+ * `cite.ts` turns it into, the survivor it lands on, or `missing`.
+ */
+export type SuggestionCitation = ResolvedRef
 
 export type SuggestionItem = {
   id: string
@@ -237,9 +240,15 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(
         return reg
       })
 
-    const lookup = yield* citeLookupProgram(open.flatMap((s) => s.refs)).pipe(
-      Effect.mapError((e) => new InboxQueryFailed({ cause: e })),
-    )
+    // Every ref on the lane in one resolve — one query per ref kind, not per
+    // ref — then handed back to each suggestion by position.
+    const resolved = yield* resolveRefsProgram(
+      open.flatMap((s) => s.refs),
+    ).pipe(Effect.mapError((e) => new InboxQueryFailed({ cause: e })))
+    const citationsOf = new Map<string, Array<SuggestionCitation>>()
+    let at = 0
+    for (const s of open)
+      citationsOf.set(s.id, resolved.slice(at, (at += s.refs.length)))
 
     // `open` is newest first, so the first member seen for a record is its
     // newest and Map insertion order is already the queue's order.
@@ -253,7 +262,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(
         kind: s.kind,
         payload: s.payload,
         rationale: s.rationale,
-        citations: s.refs.map((ref) => ({ ref, label: cite(ref, lookup) })),
+        citations: citationsOf.get(s.id) ?? [],
         fields:
           s.kind === 'attribute_patch'
             ? patchFields(s.payload, registry)
