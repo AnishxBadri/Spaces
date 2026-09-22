@@ -69,6 +69,15 @@ export type ShelfDocument = {
   mime: string | null
   extractionStatus: (typeof document.$inferSelect)['extractionStatus']
   extractionError: string | null
+  /**
+   * The two columns that say whether this row has a file behind it or only
+   * an address (docsurf-10b). `blobSha` is null on a clipped article — the
+   * page was read, never stored — and `url` is set on exactly the clips. The
+   * shelf reads the pair to offer "Open source" where there is nothing to
+   * download, rather than a control that throws.
+   */
+  blobSha: string | null
+  url: string | null
   sourceClass: (typeof document.$inferSelect)['sourceClass']
   /** The integration that filed it, named; null for a manual upload. */
   sourceCapability: string | null
@@ -131,6 +140,8 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
             mime: document.mime,
             extractionStatus: document.extractionStatus,
             extractionError: document.extractionError,
+            blobSha: document.blobSha,
+            url: document.url,
             sourceClass: document.sourceClass,
             sourceCapability: integration.capabilityId,
             sourcePath: document.sourcePath,
@@ -199,6 +210,8 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
         mime: r.mime,
         extractionStatus: r.extractionStatus,
         extractionError: r.extractionError,
+        blobSha: r.blobSha,
+        url: r.url,
         sourceClass: r.sourceClass,
         sourceCapability: r.sourceCapability,
         sourcePath: r.sourcePath,

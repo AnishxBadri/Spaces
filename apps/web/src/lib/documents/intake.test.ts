@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { Effect } from 'effect'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MAX_UPLOAD_BYTES } from '@spaces/core/documents'
+import { minimalPdf } from '#/test/minimal-pdf'
 import type { DocumentIntakeInput } from './intake'
 
 /**
@@ -63,35 +64,6 @@ async function anIntegration(tag: string): Promise<string> {
     .values({ capabilityId: `gdrive-${tag}`, version: '1.0.0' })
     .returning({ id: integration.id })
   return row.id
-}
-
-/**
- * A real PDF with a real text layer, built here rather than checked in: the
- * extraction assertion is only worth making against bytes pdf.js actually
- * parses, and a one-page uncompressed PDF with a correct xref table is small
- * enough to write out.
- */
-function minimalPdf(phrase: string): Buffer {
-  const content = `BT /F1 18 Tf 72 700 Td (${phrase}) Tj ET\n`
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
-    `<< /Length ${content.length} >>\nstream\n${content}endstream`,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-  ]
-  let body = '%PDF-1.4\n'
-  const offsets: Array<number> = []
-  objects.forEach((object, i) => {
-    offsets.push(body.length)
-    body += `${i + 1} 0 obj\n${object}\nendobj\n`
-  })
-  const xref = body.length
-  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
-  for (const offset of offsets)
-    body += `${String(offset).padStart(10, '0')} 00000 n \n`
-  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
-  return Buffer.from(body, 'latin1')
 }
 
 function shaOf(bytes: Buffer): string {
@@ -366,9 +338,21 @@ describe('one writer of bytes, per lane', () => {
       .sort()
   }
 
-  it('has exactly one storage().put( outside tests and seeds', () => {
+  /**
+   * Two sites, and the second one is named rather than tolerated
+   * (docsurf-10b). `intake.ts` is the lane for bytes that still need a
+   * document; the clip job's PDF branch has a document already —
+   * `clipUrlProgram` wrote the row before the fetch — so it cannot reuse
+   * intake without minting a second one and orphaning the first. What it
+   * reuses instead is the key: the sha, which is what makes an identical
+   * uploaded deck and a clipped one one file on disk.
+   *
+   * A third entry appearing here is the thing to argue with, not to add.
+   */
+  it('has exactly two storage().put( outside tests and seeds', () => {
     expect(sourcesContaining('storage().put(')).toEqual([
       'lib/documents/intake.ts',
+      'worker/jobs/clip-document.ts',
     ])
   })
 
@@ -385,5 +369,13 @@ describe('one writer of bytes, per lane', () => {
     expect(readFileSync(join(src, 'lib/storage/local.ts'), 'utf8')).toContain(
       'lib/documents/intake.ts',
     )
+    // And the clip's own branch, both ways: why it does not reuse intake,
+    // and — in intake — why intake does not serve it.
+    expect(
+      readFileSync(join(src, 'lib/documents/intake.ts'), 'utf8'),
+    ).toContain('clip-document.ts')
+    expect(
+      readFileSync(join(src, 'worker/jobs/clip-document.ts'), 'utf8'),
+    ).toContain('lib/documents/intake.ts')
   })
 })

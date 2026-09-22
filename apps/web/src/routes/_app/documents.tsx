@@ -12,7 +12,11 @@ import type { LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { z } from 'zod'
 import { DocumentPreview } from '#/components/document-preview'
-import { GoneMarker, OpenInSourceButton } from '#/components/document-source'
+import {
+  GoneMarker,
+  OpenInSourceButton,
+  OpenSourceButton,
+} from '#/components/document-source'
 import { DocumentTile } from '#/components/document-tile'
 import { KIND_ICONS } from '#/components/editor/mention'
 import { EmptyState } from '#/components/empty-state'
@@ -242,6 +246,19 @@ function DocumentsPage() {
                   className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                 />
               )}
+              {/* A clipped article, which has an address and no bytes
+                  (docsurf-10b): "Open source" is the only place to go, since
+                  there is no blob to download and the preview shows the
+                  extracted text. Never rendered beside the button above — a
+                  clip's `external_url` is null by construction
+                  (`lib/documents/clip.ts`). */}
+              {r.blobSha === null && r.url !== null ? (
+                <OpenSourceButton
+                  url={r.url}
+                  filename={r.filename}
+                  className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                />
+              ) : null}
             </div>
           )
         },

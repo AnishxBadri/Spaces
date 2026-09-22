@@ -14,6 +14,7 @@ import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
 import { Button } from './ui/button'
 import { useConfirm } from './ui/confirm-dialog'
 import { DocumentPreview } from './document-preview'
+import { OpenSourceButton } from './document-source'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import { formatSince } from '@spaces/core/format'
 import type {
@@ -364,15 +365,25 @@ function SourceRow({
         >
           <Eye />
         </Button>
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          aria-label={`Download ${source.filename}`}
-          onClick={download}
-          className="text-graphite"
-        >
-          <Download />
-        </Button>
+        {/* Bytes or an address, never both (docsurf-10b). A clipped
+            article has no blob, so Download could only reach
+            `getDocumentDownloadUrl`'s throw; the row offers the page it
+            was read from instead. */}
+        {source.blobSha === null ? (
+          source.url === null ? null : (
+            <OpenSourceButton url={source.url} filename={source.filename} />
+          )
+        ) : (
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label={`Download ${source.filename}`}
+            onClick={download}
+            className="text-graphite"
+          >
+            <Download />
+          </Button>
+        )}
         <Button
           size="icon-xs"
           variant="ghost"
@@ -463,15 +474,25 @@ function InheritedRow({
         >
           <Eye />
         </Button>
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          aria-label={`Download ${source.filename}`}
-          onClick={download}
-          className="text-graphite"
-        >
-          <Download />
-        </Button>
+        {/* Bytes or an address, never both (docsurf-10b). A clipped
+            article has no blob, so Download could only reach
+            `getDocumentDownloadUrl`'s throw; the row offers the page it
+            was read from instead. */}
+        {source.blobSha === null ? (
+          source.url === null ? null : (
+            <OpenSourceButton url={source.url} filename={source.filename} />
+          )
+        ) : (
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label={`Download ${source.filename}`}
+            onClick={download}
+            className="text-graphite"
+          >
+            <Download />
+          </Button>
+        )}
       </div>
       <LedgerFigure tone="muted">{formatBytes(source.sizeBytes)}</LedgerFigure>
     </li>

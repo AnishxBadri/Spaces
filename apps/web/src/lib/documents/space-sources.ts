@@ -47,6 +47,13 @@ export type SpaceSource = {
   extractionStatus: (typeof document.$inferSelect)['extractionStatus']
   extractionError: string | null
   /**
+   * Whether the row has bytes behind it (docsurf-10b). Null on a clipped
+   * article, which was read and never stored, and the row's controls read
+   * it: with no blob there is no download to offer, so the control becomes
+   * "Open source" against the `url` below instead of a button that throws.
+   */
+  blobSha: string | null
+  /**
    * The clip's own address (SPA-117), null for every document that arrived
    * as bytes. It is what lets the row say "fetching…" while a saved link
    * waits on the worker, where a deck says "extracting text…".
@@ -96,6 +103,7 @@ const sourceColumns = {
   mime: document.mime,
   extractionStatus: document.extractionStatus,
   extractionError: document.extractionError,
+  blobSha: document.blobSha,
   url: document.url,
   createdAt: document.createdAt,
   uploadedByName: user.name,
@@ -112,6 +120,7 @@ type SourceRow = Pick<
   | 'mime'
   | 'extractionStatus'
   | 'extractionError'
+  | 'blobSha'
   | 'url'
   | 'createdAt'
 > & { id: string; uploadedByName: string | null; snippet: string | null }
@@ -126,6 +135,7 @@ function toSource(r: SourceRow, now: number): SpaceSource {
     mime: r.mime,
     extractionStatus: r.extractionStatus,
     extractionError: r.extractionError,
+    blobSha: r.blobSha,
     url: r.url,
     uploadedByName: r.uploadedByName,
     createdAt: r.createdAt.toISOString(),

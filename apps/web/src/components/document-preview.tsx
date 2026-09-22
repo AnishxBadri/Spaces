@@ -2,6 +2,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  ExternalLink,
   FileWarning,
   Loader2,
 } from 'lucide-react'
@@ -39,6 +40,15 @@ import { cn } from '#/lib/utils'
  *
  * The one format that must never render inline is SVG: it is a script vector,
  * and `<img>` is the only safe element for it, so it stays download-only.
+ *
+ * **A row with no blob is a fourth case** (docsurf-10b): a clipped article
+ * has an address and readability's text and no bytes at all, so every branch
+ * that fetches a blob is skipped and the text is shown with the URL linked
+ * above it. Download becomes "Open source", which is the honest control —
+ * `getDocumentDownloadUrl` throws for a null `blob_sha` and should, so the
+ * dialog stops offering the button that reaches it rather than softening the
+ * throw. A clipped *PDF* is not this case: it has a blob, and it renders
+ * through `PdfPreview` exactly as an uploaded deck does.
  */
 
 type Doc = {
@@ -48,6 +58,15 @@ type Doc = {
   sizeBytes: number | null
   extractionStatus: string
   extractionError: string | null
+  /**
+   * Null when there are no bytes to fetch — a clipped article (§3.1: a clip
+   * is why `blob_sha` is nullable). Every blob-reading branch below is
+   * gated on it, because `getDocumentDownloadUrl` throws for a null sha and
+   * that throw is correct: the fix is not to reach it.
+   */
+  blobSha: string | null
+  /** The page a clip was read from, and null on every row that had bytes. */
+  url: string | null
 }
 
 /** Raster types only — SVG can carry script and is deliberately absent. */
@@ -98,6 +117,12 @@ export function DocumentPreview({
 function PreviewBody({ doc }: { doc: Doc }) {
   const format = detectFormat(doc.filename, doc.mime)
   const asImage = imageType(doc)
+  // The one question that decides both halves of this dialog (docsurf-10b):
+  // a row with no blob has nothing to download and nothing to render from
+  // bytes, so it gets the article's text and a link to where it came from.
+  // A clipped PDF is *not* this case — it has a blob, and everything below
+  // treats it exactly as an uploaded deck.
+  const blobless = doc.blobSha === null
 
   async function download() {
     const { url } = await getDocumentDownloadUrl({ data: { id: doc.id } })
@@ -121,15 +146,33 @@ function PreviewBody({ doc }: { doc: Doc }) {
                 .join(' · ')}
             </DialogDescription>
           </div>
-          <Button size="xs" variant="outline" onClick={download}>
-            <Download className="size-3" strokeWidth={2} />
-            Download
-          </Button>
+          {blobless ? (
+            doc.url === null ? null : (
+              <Button size="xs" variant="outline" asChild>
+                <a
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={doc.url}
+                >
+                  <ExternalLink className="size-3" strokeWidth={2} />
+                  Open source
+                </a>
+              </Button>
+            )
+          ) : (
+            <Button size="xs" variant="outline" onClick={download}>
+              <Download className="size-3" strokeWidth={2} />
+              Download
+            </Button>
+          )}
         </div>
       </DialogHeader>
 
       <div className="min-h-0 flex-1 overflow-auto bg-bone">
-        {format === 'pdf' ? (
+        {blobless ? (
+          <TextPreview doc={doc} format={format} />
+        ) : format === 'pdf' ? (
           <PdfPreview doc={doc} />
         ) : asImage ? (
           <ImagePreview doc={doc} type={asImage} />
@@ -351,6 +394,13 @@ function ImagePreview({ doc, type }: { doc: Doc; type: string }) {
  * Office files and plain text render from the worker's extraction rather than
  * the original bytes — no viewer to ship, and a spreadsheet comes back as the
  * grid it was, because the extractor keeps tabs as column separators.
+ *
+ * A clipped article arrives here too (docsurf-10b) and for the stronger
+ * reason: the extraction is not a fallback for it, it *is* the document —
+ * there are no original bytes, only readability's text and the address it
+ * came from. So the address is printed above the text: an article read
+ * through a clipper should always be one click from the page it was read
+ * from, and "download it to open" is advice that cannot be taken.
  */
 function TextPreview({
   doc,
@@ -373,15 +423,21 @@ function TextPreview({
       .finally(() => runRef.current === run && setLoading(false))
   }, [doc.id])
 
+  const blobless = doc.blobSha === null
+
   if (doc.extractionStatus === 'pending')
-    return <Spinner label="Extracting text…" />
+    return (
+      <Spinner label={blobless ? 'Fetching the page…' : 'Extracting text…'} />
+    )
   if (loading) return <Spinner label="Loading…" />
 
   if (!text) {
     return (
       <Notice>
         {doc.extractionError ??
-          'No preview for this file type — download it to open.'}
+          (blobless
+            ? 'No text was read from this page — open the source to read it.'
+            : 'No preview for this file type — download it to open.')}
       </Notice>
     )
   }
@@ -390,6 +446,16 @@ function TextPreview({
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-6">
+      {blobless && doc.url !== null ? (
+        <a
+          href={doc.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="focus-ring mb-4 block truncate mono text-field text-primary hover:underline"
+        >
+          {doc.url}
+        </a>
+      ) : null}
       <pre className="text-ui leading-relaxed whitespace-pre-wrap text-foreground">
         {text}
       </pre>

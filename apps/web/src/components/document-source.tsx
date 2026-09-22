@@ -13,6 +13,11 @@ import { cn } from '#/lib/utils'
  * is every document until the first storage-source plugin lands: a null
  * `external_url` is no action, not a disabled one, and a null
  * `external_status` is no marker, not a dash.
+ *
+ * `OpenSourceButton` (docsurf-10b) joined them because it answers the same
+ * shape of question on the same three surfaces — "where did this row come
+ * from, and can I go there" — and a third spelling of an external link on a
+ * document row is how the three would come to look like three things.
  */
 
 /**
@@ -63,6 +68,53 @@ export function OpenInSourceButton({
         rel="noopener noreferrer"
         title={`Open ${filename} in source`}
         aria-label={`Open ${filename} in source`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <ExternalLink />
+      </a>
+    </Button>
+  )
+}
+
+/**
+ * **"Open source"** — a clipped article's own address, where a row with
+ * bytes offers Download (docsurf-10b).
+ *
+ * Not the same control as `OpenInSourceButton` above, and the difference is
+ * the whole point: that one is a *provider's copy* of bytes we also hold, an
+ * extra place to go. This one is the only place there is. A clip stores no
+ * blob (`blob_sha` is null by design — §3.1), so `getDocumentDownloadUrl`
+ * answers "This document has no stored file" for it, correctly; the fix is
+ * not to soften that throw but to stop rendering a control that can only
+ * reach it. The two never appear together — `external_url` is null on every
+ * clip by construction (`lib/documents/clip.ts`).
+ *
+ * `rel="noopener noreferrer"` because the href is a URL a person pasted, so
+ * the opened page gets no handle on this one, and the click stops
+ * propagating because the row behind it opens the preview.
+ */
+export function OpenSourceButton({
+  url,
+  filename,
+  className,
+}: {
+  url: string
+  filename: string
+  className?: string
+}) {
+  return (
+    <Button
+      size="icon-xs"
+      variant="ghost"
+      asChild
+      className={cn('text-graphite', className)}
+    >
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={`Open source — ${url}`}
+        aria-label={`Open source ${filename}`}
         onClick={(e) => e.stopPropagation()}
       >
         <ExternalLink />
