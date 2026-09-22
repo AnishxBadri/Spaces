@@ -11,6 +11,9 @@ import {
   interactionEntity,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
+import type { Json } from '#/lib/json'
+import { resolveRefsProgram } from '#/lib/context/names'
+import type { ResolvedRef } from '#/lib/context/names'
 
 /**
  * Merged timeline: macro activity + attribute_event bursts. Bursts group
@@ -86,6 +89,23 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
         .limit(200),
     )
     const bursts = condenseBursts(events)
+
+    // Every change's receipts, resolved in one pass (`names.ts` — one query
+    // per ref kind) so the timeline ships labels and the component renders
+    // strings. A ref whose target was deleted comes back `missing`.
+    const resolved = yield* resolveRefsProgram(
+      bursts.flatMap((b) => b.changes.flatMap((c) => c.refs)),
+    ).pipe(Effect.mapError((cause) => new TimelineQueryFailed({ cause })))
+    let at = 0
+    const changesOf: Array<
+      Array<{ slug: string; to: Json | null; citations: Array<ResolvedRef> }>
+    > = bursts.map((b) =>
+      b.changes.map((c) => ({
+        slug: c.slug,
+        to: c.to,
+        citations: resolved.slice(at, (at += c.refs.length)),
+      })),
+    )
 
     // Interactions this entity participated in, with co-attendees.
     const myInteractions = yield* query(() =>
@@ -166,7 +186,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           : null,
         source: b.source,
         at: b.at,
-        changes: b.changes,
+        changes: changesOf[i],
       })),
       ...myInteractions.map((i) => ({
         type: 'interaction' as const,

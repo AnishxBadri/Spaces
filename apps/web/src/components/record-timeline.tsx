@@ -302,6 +302,20 @@ function AttrBurst({
               </dt>
               <dd className="min-w-0 truncate text-label">
                 {renderValue(c.slug, c.to)}
+                {c.citations.length > 0 ? (
+                  <span className="ml-2 mono text-micro text-graphite">
+                    {c.citations.map((r, j) => (
+                      <span
+                        key={j}
+                        title={r.ref}
+                        className={cn(r.missing && 'italic')}
+                      >
+                        {j > 0 ? ' · ' : ''}
+                        {r.label}
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
               </dd>
             </div>
           ))}
