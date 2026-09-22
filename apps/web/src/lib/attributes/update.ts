@@ -93,6 +93,15 @@ export type UpdateAttributePatch = {
   description?: string | null | undefined
   /** can't-clear (spec §5); freely toggleable — it never rewrites data */
   required?: boolean | undefined
+  /**
+   * "Filter and sort on this" (SPA-93): both engine flags, set together by
+   * the one dialog control. Freely toggleable — it rewrites no data, it only
+   * changes which `attr_idx_<id>` expression index `reconcileValueIndexes()`
+   * wants to exist. The mint and the drop happen **after** this program's
+   * writes commit, from the server fn, because `CREATE INDEX CONCURRENTLY`
+   * cannot run inside a transaction.
+   */
+  indexed?: boolean | undefined
   archived?: boolean | undefined
   move?: 'up' | 'down' | undefined
   /** select/multi_select/status option list */
@@ -325,6 +334,13 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
         db
           .update(attribute)
           .set({ description: patch.description?.trim() || null })
+          .where(eq(attribute.id, patch.id)),
+      )
+    if (patch.indexed !== undefined)
+      yield* query(() =>
+        db
+          .update(attribute)
+          .set({ filterable: patch.indexed, sortable: patch.indexed })
           .where(eq(attribute.id, patch.id)),
       )
     if (patch.archived !== undefined)

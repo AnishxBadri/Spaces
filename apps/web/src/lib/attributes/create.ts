@@ -67,6 +67,19 @@ export type CreateAttributeInput = {
     | undefined
   default?: Json | undefined
   required?: boolean | undefined
+  /**
+   * The dialog's one "Filter and sort on this" tick (SPA-93) — two columns
+   * because the reconciler and a later per-capability UI want them apart,
+   * one input because a reader does not distinguish them. Not part of
+   * `config`: `buildOptions` polices per-type config and refuses what a type
+   * cannot carry, and these two mean the same thing for all fifteen types.
+   *
+   * The insert only records the intent. The `attr_idx_<id>` index is minted
+   * by `reconcileValueIndexes()` **after** this program's write commits —
+   * `CREATE INDEX CONCURRENTLY` cannot run inside a transaction, and this
+   * program may itself be running inside the caller's (`tx`).
+   */
+  indexed?: boolean | undefined
   createdBy: string
   /**
    * Run inside a caller's transaction instead of on its own connection.
@@ -249,6 +262,8 @@ export const createAttributeProgram = Effect.fn('createAttributeProgram')(
           description: input.description?.trim() || null,
           type: input.type,
           options,
+          filterable: input.indexed ?? false,
+          sortable: input.indexed ?? false,
           isSystem: false,
           sortOrder: maxOrder + 10,
           createdBy: input.createdBy,

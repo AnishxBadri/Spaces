@@ -65,6 +65,12 @@ export async function seedSystemAttributes() {
         name: def.name,
         type: def.type,
         options: def.options ?? {},
+        // Engine flags (SPA-93). Seeded, never re-asserted: like options and
+        // names, they are user-editable content after first boot, so an
+        // operator who unticks the box on `stage` keeps it unticked across
+        // upgrades.
+        filterable: def.filterable ?? false,
+        sortable: def.sortable ?? false,
         isSystem: true,
         sortOrder: (i + 1) * 10,
       })

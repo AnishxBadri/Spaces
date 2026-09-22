@@ -233,6 +233,17 @@ type SeedDef = {
   name: string
   type: AttributeType
   options?: AttributeOptions
+  /**
+   * Engine flags (SPA-93): a seeded attribute the product itself expects
+   * every list to filter and sort on, so its `attr_idx_<id>` expression
+   * index exists from first boot rather than waiting for somebody to tick
+   * a box. Exactly one attribute carries them today — `deal.stage`, which
+   * every board, every saved view and the funnel group by. Everything else
+   * ships off: an index nobody's query needs is a write cost with no read.
+   * The pair is set together because the one dialog control sets both.
+   */
+  filterable?: boolean
+  sortable?: boolean
 }
 
 const opt = (
@@ -298,6 +309,9 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       slug: 'stage',
       name: 'Stage',
       type: 'status',
+      // The one seeded attribute born indexed — see SeedDef.
+      filterable: true,
+      sortable: true,
       options: {
         options: [
           opt('pre_lead', 'Pre-lead', 'active', 'slate'),

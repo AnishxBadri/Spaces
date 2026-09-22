@@ -41,6 +41,16 @@ async function main() {
   // Starter taxonomy: first boot only, so deleted nodes stay deleted.
   const { seedStarterTaxonomy } = await import('#/lib/seeds/taxonomy')
   await seedStarterTaxonomy()
+  // Per-attribute `values` indexes: the same insert-if-absent shape one line
+  // up, for a set of objects drizzle's journal cannot hold because it is a
+  // function of user data rather than of the schema (SPA-93). It runs after
+  // the system seed because the seed is what declares `deal.stage` flagged
+  // on a fresh database, and it is the retry for every mint an earlier boot
+  // or an interrupted `CREATE INDEX CONCURRENTLY` left undone. Never fatal:
+  // an unindexed attribute is a slow list, not a broken one.
+  const { reconcileAttributeIndexes } =
+    await import('#/lib/attributes/reconcile')
+  await reconcileAttributeIndexes()
   process.exit(0)
 }
 

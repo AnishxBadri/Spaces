@@ -16,7 +16,20 @@ import type { FieldResolver } from './sql'
  *
  * `-> `, not `->>`: the compiler wants the jsonb value so an array stays an
  * array and a missing key stays distinguishable from `''`. See `sql.ts`.
+ *
+ * **The slug is a literal, not a bind parameter** (SPA-93). It used to be
+ * `${slug}::text`, which drizzle sends as `$n` — and `values -> $n` is not
+ * the same expression as the `values -> 'stage'::text` that
+ * `attr_idx_<attribute id>` is built on, so the per-attribute index matched
+ * only when the planner happened to fold the parameter in (an unnamed
+ * statement's custom plan). A generic plan, a `PREPARE`, or a pooler that
+ * names statements would have silently gone back to sorting the object, with
+ * no error anywhere. The slug is not user input in the first place: it is
+ * derived by `slugify` and immutable, `[a-z0-9_]` only. The quote-doubling
+ * is belt and braces, not the argument.
  */
+const slugLiteral = (slug: string) => `'${slug.replaceAll("'", "''")}'::text`
+
 export function entityValuesResolver(
   registry: Array<{ slug: string; type: string }>,
 ): FieldResolver {
@@ -24,6 +37,9 @@ export function entityValuesResolver(
   return (slug) => {
     const type = typeOf.get(slug)
     if (type === undefined) return null
-    return { expr: sql`(${entity.values} -> ${slug}::text)`, type }
+    return {
+      expr: sql`(${entity.values} -> ${sql.raw(slugLiteral(slug))})`,
+      type,
+    }
   }
 }
