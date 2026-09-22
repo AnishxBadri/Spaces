@@ -20,10 +20,14 @@ import {
   filingNote,
   uploadTarget,
 } from '#/lib/documents/file-against'
-import type { FilingMode, PickedEntity } from '#/lib/documents/file-against'
+import type {
+  FilingMode,
+  PickedEntity,
+  UploadTarget,
+} from '#/lib/documents/file-against'
 import { uploadDocument } from '#/lib/documents/upload'
 import type { UploadPhase } from '#/lib/documents/upload'
-import { listSpaces, searchEntities } from '#/lib/server-fns'
+import { clipUrl, listSpaces, searchEntities } from '#/lib/server-fns'
 import {
   setUploadDialogOpen,
   useUploadDialogOpen,
@@ -265,6 +269,8 @@ export function UploadDialog() {
               e.target.value = ''
             }}
           />
+
+          <LinkField target={target} />
         </div>
 
         <DialogFooter
@@ -280,6 +286,92 @@ export function UploadDialog() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * **Paste a link** — §3.1 entry point 5 (SPA-117), under the drop zone and
+ * filing against the same answer the drop zone would use. A saved article is
+ * a document like any other: no separate table, readability text into the
+ * same `extracted_text` / `tsv` pipeline, one ⌘K over decks and articles
+ * together.
+ *
+ * It is the drop zone's sibling and not a second dialog because the question
+ * above it — a record, a space, or nowhere — is the same question, and
+ * `fileAgainstFor` is the same translation.
+ *
+ * The call **returns before any network call**: the server writes the row and
+ * hands the fetching to the worker, so this resolves in milliseconds and the
+ * row that appears says "fetching…" until the job lands. A refusal — an
+ * intranet address, a `file://`, a target that will not take a filing — comes
+ * back as the guard's own sentence and is shown as-is.
+ */
+function LinkField({ target }: { target: UploadTarget | null }) {
+  const router = useRouter()
+  const [url, setUrl] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const armed = target !== null && url.trim() !== '' && !saving
+
+  async function save() {
+    if (target === null) return
+    const link = url.trim()
+    if (link === '') return
+    setSaving(true)
+    try {
+      await clipUrl({
+        data: { url: link, fileAgainst: fileAgainstFor(target) },
+      })
+      setUrl('')
+      toast.success(
+        `Saved · ${target.kind === 'unfiled' ? 'Unfiled' : target.name}`,
+      )
+      // Same invalidate the upload does: /documents, a Files tab or a space's
+      // Sources shows the pending row without a reload.
+      void router.invalidate()
+    } catch (err) {
+      // The server fn rethrows `clipUrlMessage(failure)`, which is the guard's
+      // sentence naming the address — worth reading, so it is the toast.
+      toast.error(
+        err instanceof Error ? err.message : 'Could not save this link',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="field-label text-graphite">Or paste a link</p>
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <Input
+            value={url}
+            type="url"
+            inputMode="url"
+            aria-label="Paste a link"
+            placeholder="https://…"
+            disabled={target === null}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter saves. The field is inside a Radix dialog and not a
+              // form, so there is no implicit submit to lean on.
+              if (e.key === 'Enter' && armed) {
+                e.preventDefault()
+                void save()
+              }
+            }}
+          />
+        </div>
+        <Button variant="outline" disabled={!armed} onClick={() => void save()}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+      <p className="text-label text-graphite">
+        The page is fetched in the background and its text is searchable like
+        any other document. Nothing on a private network is fetched.
+      </p>
+    </div>
   )
 }
 

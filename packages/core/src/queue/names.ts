@@ -19,6 +19,13 @@ export const QUEUES = {
   extractDocument: 'document.extract',
   /** extracted_text → chunks + embeddings. */
   embedDocument: 'document.embed',
+  /**
+   * A saved link → readability text on the same `document` row (SPA-117).
+   * `document.` and not `clip.`, because the row it acts on is a document
+   * like every other: no separate source table, one search box over decks
+   * and articles together (CONTEXT.md → "Sources are documents").
+   */
+  clipDocument: 'document.clip',
   /** Nightly pg_trgm sweep → duplicate_candidate rows. */
   dedupeSweep: 'entity.dedupe-sweep',
   /** On-demand enrichment, credit-capped in the worker. */

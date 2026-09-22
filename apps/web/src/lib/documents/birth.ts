@@ -89,6 +89,15 @@ export type DocumentBirthInput = {
   /** Null for a document whose bytes we do not keep — see the enqueue note. */
   blobSha: string | null
   filename: string
+  /**
+   * The page this row **is**, for the one entry point that keeps no bytes:
+   * §3.1's URL clip writes the article's address here and `blobSha` null
+   * (SPA-117). It is not `provenance.externalUrl` — that column is the
+   * provider's copy of a file we also hold, rendered as "Open in source"
+   * (docsurf-11), and a clip has no provider and no second copy. Optional
+   * because eight of the nine entry points have no URL at all.
+   */
+  url?: string | null
   mime: string | null
   sizeBytes: number | null
   kind: DocumentKind
@@ -367,6 +376,7 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
           entityId: ent.id,
           blobSha: input.blobSha,
           filename: input.filename,
+          url: input.url ?? null,
           mime: input.mime,
           sizeBytes: input.sizeBytes,
           kind: input.kind,

@@ -6,6 +6,7 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { startHeartbeat, workerIdentity } from './heartbeat'
 import { pgBossHost, runJob } from './run-job'
 import { ExtractionStore, extractDocument } from './jobs/extract-document'
+import { clipDocument } from './jobs/clip-document'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 
@@ -44,13 +45,15 @@ async function main() {
   // JobDef.retry is the queue's policy, not the wrapper's: JobRetryable just
   // fails the job and lets pg-boss count. updateQueue is how it reaches a
   // queue row that createQueue already created on an earlier boot.
-  const retry = extractDocument.retry
-  if (retry) {
-    await boss.updateQueue(extractDocument.name, {
-      retryLimit: retry.limit,
-      retryDelay: retry.delaySeconds,
-      retryBackoff: retry.backoff,
-    })
+  for (const def of [extractDocument, clipDocument]) {
+    const retry = def.retry
+    if (retry) {
+      await boss.updateQueue(def.name, {
+        retryLimit: retry.limit,
+        retryDelay: retry.delaySeconds,
+        retryBackoff: retry.backoff,
+      })
+    }
   }
 
   // Extraction is the CPU-bound one: a whole batch on one tick would block
@@ -62,6 +65,19 @@ async function main() {
     runJob(extractDocument, { host, layer: ExtractionStore.layer }),
   )
   await boss.work(QUEUES.embedDocument, stub('document.embed'))
+  // The URL clip (SPA-117). `clipUrlProgram` wrote the row and returned
+  // before any network call; this is the half that actually goes out and
+  // fetches, which is why it is on the worker at all — a page that takes
+  // thirty seconds must not be thirty seconds of somebody's request. Batch of
+  // one, because a batch of pages fetched on one tick is a batch of timeouts
+  // sharing a process; includeMetadata is what `runJob` reads
+  // retryCount/retryLimit from, and the job carries no Layer — its I/O is
+  // `db` and one guarded `fetch`.
+  await boss.work(
+    QUEUES.clipDocument,
+    { batchSize: 1, includeMetadata: true },
+    runJob(clipDocument, { host, layer: Layer.empty }),
+  )
   // The nightly sweep (SPA-81), second tenant of the wrapper and the queue
   // the 03:30 schedule below has been firing into a stub since it was
   // registered. One statement per run, so the default batch of one is right;

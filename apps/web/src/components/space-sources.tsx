@@ -21,8 +21,13 @@ import type {
   SpaceSource,
 } from '#/lib/documents/space-sources'
 import { uploadDocument } from '#/lib/documents/upload'
+import { droppedUrl } from '#/lib/documents/uri-list'
 import { recordPath } from '#/lib/record-path'
-import { deleteDocument, getDocumentDownloadUrl } from '#/lib/server-fns'
+import {
+  clipUrl,
+  deleteDocument,
+  getDocumentDownloadUrl,
+} from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
@@ -107,6 +112,26 @@ export function SpaceSources({
     }
   }
 
+  /**
+   * A link dragged onto the section — §3.1 entry point 5 (SPA-117). A space
+   * is filed *into*, so the target is the same `entity_space` one a file drop
+   * uses; what differs is that there are no bytes, and the worker fetches the
+   * page after the row exists.
+   */
+  async function handleLink(url: string) {
+    try {
+      await clipUrl({
+        data: { url, fileAgainst: [{ kind: 'space', entityId: spaceId }] },
+      })
+      toast.success('Link saved · fetching the page')
+      void router.invalidate()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not save this link',
+      )
+    }
+  }
+
   const bytes = sources.reduce((n, s) => n + (s.sizeBytes ?? 0), 0)
 
   return (
@@ -121,6 +146,13 @@ export function SpaceSources({
       onDrop={(e) => {
         e.preventDefault()
         setDragging(false)
+        // Read synchronously: `getData` answers the empty string once the
+        // event has been dispatched, so a link read after an await is lost.
+        const link = droppedUrl(e.dataTransfer)
+        if (link !== null) {
+          void handleLink(link)
+          return
+        }
         void handleFiles(e.dataTransfer.files)
       }}
       /* Drag feedback is the selection wash and nothing else: 1-bit, no
@@ -455,9 +487,11 @@ function InheritedRow({
 function SourceNote({ source }: { source: SpaceSource }) {
   const kind = DOCUMENT_KIND_LABELS[source.kind].toLowerCase()
   if (source.extractionStatus === 'pending') {
+    // A clip has no bytes to extract — it has a page still to be fetched
+    // (SPA-117), which is a different sentence about a different step.
     return (
       <p className="truncate mono text-field text-graphite">
-        {kind} · extracting text…
+        {kind} · {source.url === null ? 'extracting text…' : 'fetching…'}
       </p>
     )
   }
