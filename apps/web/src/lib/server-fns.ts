@@ -9,6 +9,7 @@
  */
 
 export * from './server/settings'
+export * from './server/ai-settings'
 export * from './server/members'
 export * from './server/mandate'
 export * from './server/templates'

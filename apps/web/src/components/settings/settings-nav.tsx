@@ -73,6 +73,14 @@ export const SETTINGS_SECTIONS = [
     group: 'workspace',
     admin: false,
   },
+  {
+    // ai-3a (SPA-29): the vault's LLM keys. Keys are the admin's, so the
+    // row locks for a member and the route's server fns refuse one.
+    to: '/settings/ai',
+    label: 'AI providers',
+    group: 'workspace',
+    admin: true,
+  },
   { to: '/settings/objects', label: 'Objects', group: 'objects', admin: false },
   {
     to: '/settings/currency',

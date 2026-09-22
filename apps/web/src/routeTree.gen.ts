@@ -35,6 +35,7 @@ import { Route as AppOObjectSlugRouteImport } from './routes/_app/o.$objectSlug'
 import { Route as AppPeoplePersonIdRouteImport } from './routes/_app/people_.$personId'
 import { Route as AppPortfolioHoldingIdRouteImport } from './routes/_app/portfolio_.$holdingId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsAiRouteImport } from './routes/_app/settings/ai'
 import { Route as AppSettingsCurrencyRouteImport } from './routes/_app/settings/currency'
 import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
 import { Route as AppSettingsObjectsRouteImport } from './routes/_app/settings/objects'
@@ -175,6 +176,11 @@ const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsAiRoute = AppSettingsAiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsCurrencyRoute = AppSettingsCurrencyRouteImport.update({
   id: '/currency',
   path: '/currency',
@@ -252,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/o/$objectSlug': typeof AppOObjectSlugRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/portfolio/$holdingId': typeof AppPortfolioHoldingIdRoute
+  '/settings/ai': typeof AppSettingsAiRoute
   '/settings/currency': typeof AppSettingsCurrencyRoute
   '/settings/members': typeof AppSettingsMembersRoute
   '/settings/objects': typeof AppSettingsObjectsRoute
@@ -288,6 +295,7 @@ export interface FileRoutesByTo {
   '/o/$objectSlug': typeof AppOObjectSlugRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
   '/portfolio/$holdingId': typeof AppPortfolioHoldingIdRoute
+  '/settings/ai': typeof AppSettingsAiRoute
   '/settings/currency': typeof AppSettingsCurrencyRoute
   '/settings/members': typeof AppSettingsMembersRoute
   '/settings/objects': typeof AppSettingsObjectsRoute
@@ -327,6 +335,7 @@ export interface FileRoutesById {
   '/_app/o/$objectSlug': typeof AppOObjectSlugRoute
   '/_app/people_/$personId': typeof AppPeoplePersonIdRoute
   '/_app/portfolio_/$holdingId': typeof AppPortfolioHoldingIdRoute
+  '/_app/settings/ai': typeof AppSettingsAiRoute
   '/_app/settings/currency': typeof AppSettingsCurrencyRoute
   '/_app/settings/members': typeof AppSettingsMembersRoute
   '/_app/settings/objects': typeof AppSettingsObjectsRoute
@@ -366,6 +375,7 @@ export interface FileRouteTypes {
     | '/o/$objectSlug'
     | '/people/$personId'
     | '/portfolio/$holdingId'
+    | '/settings/ai'
     | '/settings/currency'
     | '/settings/members'
     | '/settings/objects'
@@ -402,6 +412,7 @@ export interface FileRouteTypes {
     | '/o/$objectSlug'
     | '/people/$personId'
     | '/portfolio/$holdingId'
+    | '/settings/ai'
     | '/settings/currency'
     | '/settings/members'
     | '/settings/objects'
@@ -440,6 +451,7 @@ export interface FileRouteTypes {
     | '/_app/o/$objectSlug'
     | '/_app/people_/$personId'
     | '/_app/portfolio_/$holdingId'
+    | '/_app/settings/ai'
     | '/_app/settings/currency'
     | '/_app/settings/members'
     | '/_app/settings/objects'
@@ -648,6 +660,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsIndexRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/ai': {
+      id: '/_app/settings/ai'
+      path: '/ai'
+      fullPath: '/settings/ai'
+      preLoaderRoute: typeof AppSettingsAiRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/currency': {
       id: '/_app/settings/currency'
       path: '/currency'
@@ -722,6 +741,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppSettingsRouteChildren {
+  AppSettingsAiRoute: typeof AppSettingsAiRoute
   AppSettingsCurrencyRoute: typeof AppSettingsCurrencyRoute
   AppSettingsMembersRoute: typeof AppSettingsMembersRoute
   AppSettingsObjectsRoute: typeof AppSettingsObjectsRoute
@@ -731,6 +751,7 @@ interface AppSettingsRouteChildren {
 }
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsAiRoute: AppSettingsAiRoute,
   AppSettingsCurrencyRoute: AppSettingsCurrencyRoute,
   AppSettingsMembersRoute: AppSettingsMembersRoute,
   AppSettingsObjectsRoute: AppSettingsObjectsRoute,
