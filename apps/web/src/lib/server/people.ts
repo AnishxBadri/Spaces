@@ -13,12 +13,8 @@ import {
 import { activity } from '@spaces/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from '../entities/resolve'
 import { jsonString } from '#/lib/json'
-import {
-  groupReferencedBy,
-  lastTouchedMap,
-  referencedByRows,
-  requireUser,
-} from './shared'
+import { groupReferencedBy, referencedByRows, requireUser } from './shared'
+import { pagedListInput, pageOptions } from '#/lib/views/page-input'
 
 export const listPeople = createServerFn().handler(async () => {
   await requireUser()
@@ -69,55 +65,27 @@ export const listPeople = createServerFn().handler(async () => {
 })
 
 /** Table rows for people: values + identity emails + company via contact_at. */
-export const listPeopleTable = createServerFn().handler(async () => {
-  await requireUser()
-  const rows = await db
-    .select({
-      id: entity.id,
-      name: entity.canonicalName,
-      values: entity.values,
-      createdAt: entity.createdAt,
-    })
-    .from(entity)
-    .innerJoin(person, eq(person.entityId, entity.id))
-    .where(isNull(entity.mergedIntoId))
-    .orderBy(desc(entity.createdAt))
-
-  const emails = await db
-    .select({ entityId: entityAlias.entityId, email: entityAlias.valueNorm })
-    .from(entityAlias)
-    .where(and(eq(entityAlias.kind, 'email'), eq(entityAlias.isIdentity, true)))
-  const emailsBy = new Map<string, Array<string>>()
-  for (const e of emails) {
-    emailsBy.set(e.entityId, [...(emailsBy.get(e.entityId) ?? []), e.email])
-  }
-
-  const companies = await db
-    .select({
-      personId: link.fromEntityId,
-      companyId: entity.id,
-      companyName: entity.canonicalName,
-    })
-    .from(link)
-    .innerJoin(entity, eq(entity.id, link.toEntityId))
-    .where(and(eq(link.relation, 'contact_at'), isNull(entity.mergedIntoId)))
-  const companyBy = new Map<string, { id: string; name: string }>()
-  for (const c of companies) {
-    companyBy.set(c.personId, { id: c.companyId, name: c.companyName })
-  }
-
-  const touched = await lastTouchedMap()
-
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    values: r.values,
-    emails: emailsBy.get(r.id) ?? [],
-    company: companyBy.get(r.id) ?? null,
-    lastTouched: touched[r.id] ?? null,
-    createdAt: r.createdAt.toISOString(),
-  }))
-})
+/**
+ * The `/people` table, on views-3's paging contract (SPA-96) — the same
+ * change `listCompaniesTable` took, for the same reason. It selected every
+ * person, then read every email alias and every `contact_at` edge in the
+ * database to decorate them; both side queries run over the page's ids now.
+ *
+ * The read is `listPeoplePageProgram` in `lib/views/directory.ts`, outside
+ * `lib/server/` because this module is re-exported by the client-imported
+ * barrel.
+ */
+export const listPeopleTable = createServerFn()
+  .validator(pagedListInput)
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { listPeoplePageProgram } = await import('../views/directory')
+    const { effectFn } = await import('./effect')
+    return effectFn(listPeoplePageProgram)(
+      data.conditions ?? [],
+      pageOptions(data),
+    )
+  })
 
 const createPersonInput = z.object({
   name: z.string().trim().min(1).max(160),

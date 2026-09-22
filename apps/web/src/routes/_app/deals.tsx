@@ -58,6 +58,25 @@ import { cn } from '#/lib/utils'
 import { jsonRecord, jsonString } from '#/lib/json'
 import type { EntityValues } from '@spaces/db/schema/entities'
 
+/**
+ * **This board does not page, and that is a decision, not an omission
+ * (SPA-96).**
+ *
+ * The company, people and custom-object lists all take views-3's keyset
+ * contract: the server cuts a page, counts the matching set, and the grid
+ * holds only what it asked for. This board cannot. It groups by stage on the
+ * client and draws a chip per group whose count is over **every** deal — and
+ * the stage narrowing itself moves rows between those groups. A page would
+ * make every chip a claim about the fifty rows that happened to load while
+ * reading as a claim about the pipeline, which is the one number a partner
+ * looks at first. `matchesConditions` therefore stays here, filtering rows
+ * this loader really does hold.
+ *
+ * The exit, when the pipeline outgrows one fetch, is a grouped server read —
+ * counts per stage in SQL plus a page per group — not this loader with a
+ * `limit` bolted on. (Portfolio stays whole for the sibling reason: its
+ * metrics are summed across all holdings.)
+ */
 export const Route = createFileRoute('/_app/deals')({
   validateSearch: z.object({ view: z.string().optional() }),
   loader: async () => {
@@ -214,7 +233,8 @@ function DealsPage() {
     })
   }, [deals, groupFilter, stageFilter, stageOptions, vs.conditions, typeOf])
 
-  // Counts per group for the filter chips.
+  // Counts per group for the filter chips — over every deal, which is why
+  // this surface holds them all (see the note on the route above).
   const groupCounts = useMemo(() => {
     const counts: Record<string, number> = { active: 0, parked: 0, closed: 0 }
     for (const d of deals.rows) {

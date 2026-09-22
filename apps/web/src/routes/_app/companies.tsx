@@ -7,18 +7,20 @@ import {
 import {
   createColumnHelper,
   getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Building2, Copy, Globe, Layers, Plus } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
-import { matchesConditions } from '@spaces/core/views/filter'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import {
   fieldSpanClass,
@@ -55,6 +57,7 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { cn } from '#/lib/utils'
 import { jsonRecord } from '#/lib/json'
+import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import {
   countOpenInbox,
   createCompany,
@@ -67,16 +70,30 @@ import {
 
 export const Route = createFileRoute('/_app/companies')({
   validateSearch: z.object({ view: z.string().optional() }),
-  loader: async () => {
-    const [rows, registry, dupes, viewData, session] = await Promise.all([
-      listCompaniesTable(),
+  // `?view=` is the only linkable filter state, so it is the only loader dep:
+  // an ad-hoc condition edit refetches through the query below instead.
+  loaderDeps: ({ search }) => ({ view: search.view ?? null }),
+  loader: async ({ deps }) => {
+    const [registry, dupes, viewData, session] = await Promise.all([
       listRegistry({ data: { kind: 'company' } }),
       countOpenInbox(),
       listViews({ data: { surface: 'object', kind: 'company' } }),
       getSession(),
     ])
+    // The view's conditions and its sort go down with the request (SPA-96,
+    // on views-3's contract), so the first paint is already the filtered,
+    // ordered first page — no flash of the rows the view hides, and no
+    // client sort of a set the client does not hold.
+    const view = viewData.views.find((v) => v.id === deps.view) ?? null
+    const conditions = view?.filter ?? []
+    const sort = view?.sort ?? null
+    const initial = await listCompaniesTable({
+      data: { conditions, sort, limit: RECORD_PAGE_SIZE, cursor: null },
+    })
     return {
-      rows,
+      conditions,
+      sort,
+      initial,
       registry,
       // The banner speaks for one lane of the queue, not the whole of it.
       openDuplicates: dupes.byKind.duplicate_candidate,
@@ -88,18 +105,25 @@ export const Route = createFileRoute('/_app/companies')({
   component: CompaniesPage,
 })
 
-type Row = Awaited<ReturnType<typeof listCompaniesTable>>[number]
+type Row = Awaited<ReturnType<typeof listCompaniesTable>>['rows'][number]
 
 const col = createColumnHelper<Row>()
 // FROZEN: renaming resets saved column layouts with no recovery path.
 const PREFS_KEY = 'dealos.companies-table.v1'
 
 function CompaniesPage() {
-  const { rows, registry, openDuplicates, views, objectId, me } =
-    Route.useLoaderData()
+  const {
+    conditions,
+    sort: loaderSort,
+    initial,
+    registry,
+    openDuplicates,
+    views,
+    objectId,
+    me,
+  } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
-  const [globalFilter, setGlobalFilter] = useState('')
   const prefs = useTablePrefs(PREFS_KEY)
   const { view: activeId } = Route.useSearch()
   const vs = useViewState({
@@ -110,15 +134,82 @@ function CompaniesPage() {
     defaultExtra: {},
   })
   const { sorting, setSorting } = vs
-  const typeOf = useCallback(
-    (slug: string) => registry.find((d) => d.slug === slug)?.type,
-    [registry],
-  )
-  const visibleRows = useMemo(
-    () =>
-      rows.filter((r) => matchesConditions(r.values, vs.conditions, typeOf)),
-    [rows, vs.conditions, typeOf],
-  )
+  /**
+   * The text box is a **server** narrowing now (SPA-96): `ILIKE` on the name
+   * or on any identity domain, debounced. It used to be a client
+   * `globalFilter` over every loaded row, which stopped being able to tell
+   * the truth the moment the table stopped loading every row. Spaces dropped
+   * out of what it matches — they are a join, not a column — so the
+   * placeholder no longer promises them.
+   */
+  const [globalFilter, setGlobalFilter] = useState('')
+  const [q, setQ] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setQ(globalFilter.trim()), 250)
+    return () => clearTimeout(t)
+  }, [globalFilter])
+
+  // Normalised through one builder so the loader's key and the page's key
+  // are the same string for the same sort.
+  const asSort = (s: { id: string; desc: boolean } | null | undefined) =>
+    s ? { id: s.id, desc: s.desc } : null
+  const sort = asSort(sorting[0])
+  const sortKey = JSON.stringify(sort)
+
+  /**
+   * Filtering, sorting, counting and paging all happen in Postgres. The
+   * loader already asked for page one of the `?view=` conditions in the
+   * view's order, so the first paint — server-rendered included — is that
+   * page; this query seeds itself from that answer and is keyed on the
+   * conditions, the sort and the text box, so any of the three changing
+   * refetches page one without a navigation. `keepPreviousData` keeps the
+   * table showing the last answer while the next is in flight.
+   */
+  const loaderKey = JSON.stringify({
+    conditions,
+    sort: asSort(loaderSort),
+    q: '',
+  })
+  const pageOne: string | null = null
+  const records = useInfiniteQuery({
+    queryKey: ['company-records', vs.conditionKey, sortKey, q],
+    // Annotated: the inference otherwise narrows `pageParam` to the literal
+    // type of `initialPageParam` and refuses the cursor a later page carries.
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
+      listCompaniesTable({
+        data: {
+          conditions: vs.conditions,
+          cursor: pageParam,
+          limit: RECORD_PAGE_SIZE,
+          sort,
+          q,
+        },
+      }),
+    initialPageParam: pageOne,
+    getNextPageParam: (last) => last.nextCursor,
+    ...(JSON.stringify({ conditions: vs.conditions, sort, q }) === loaderKey
+      ? { initialData: { pages: [initial], pageParams: [pageOne] } }
+      : {}),
+    placeholderData: keepPreviousData,
+  })
+  const pages = records.data?.pages
+  const loaded = useMemo(() => pages ?? [initial], [pages, initial])
+  const rows = useMemo(() => loaded.flatMap((p) => p.rows), [loaded])
+  const total = loaded.at(-1)?.total ?? 0
+
+  /**
+   * The loader is no longer the only thing holding the rows, so a write has
+   * to reach both: the loader for the registry, the duplicate count and the
+   * views, the query for whichever condition set is on screen. Invalidating
+   * the prefix refetches every loaded page of the active key — which is how
+   * a row edited out of the active filter leaves, and how `total` follows it
+   * down rather than disagreeing with the grid.
+   */
+  const queryClient = useQueryClient()
+  const refresh = useCallback(() => {
+    void router.invalidate()
+    void queryClient.invalidateQueries({ queryKey: ['company-records'] })
+  }, [router, queryClient])
   const selectView = (id: string | null) =>
     void navigate({
       to: '/companies',
@@ -128,10 +219,10 @@ function CompaniesPage() {
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
       await updateRecord({ data: { id: entityId, patch: { [slug]: value } } })
-      void router.invalidate()
+      refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
-      void router.invalidate() // revert the editor to server truth
+      refresh() // revert the editor to server truth
     }
   }
 
@@ -155,6 +246,10 @@ function CompaniesPage() {
         id: 'domains',
         header: 'Domains',
         size: 170,
+        // The sort is a SQL order by over `entity` now, and domains, spaces
+        // and last-touched are all joins; offering the menu would promise an
+        // order nobody can serve (the same call `/o/$objectSlug` made).
+        enableSorting: false,
         cell: (info) =>
           info.row.original.domains.length > 0 ? (
             <MetaCell icon={Globe}>
@@ -167,7 +262,6 @@ function CompaniesPage() {
           id: `attr:${def.slug}`,
           header: def.name,
           size: def.type === 'text' ? 200 : 140,
-          sortUndefined: 'last',
           cell: (info) => (
             <ValueEditor
               def={def}
@@ -182,6 +276,7 @@ function CompaniesPage() {
         id: 'spaces',
         header: 'Spaces',
         size: 180,
+        enableSorting: false,
         cell: (info) => (
           <span className="flex flex-wrap items-center gap-1 px-1">
             {info.row.original.spaces.map((s) => (
@@ -200,7 +295,7 @@ function CompaniesPage() {
         id: 'lastTouched',
         header: 'Last touched',
         size: 120,
-        sortUndefined: 'last',
+        enableSorting: false,
         cell: (info) => <DateCell value={info.row.original.lastTouched} />,
       }),
       col.accessor('createdAt', {
@@ -214,30 +309,28 @@ function CompaniesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registry])
 
+  /**
+   * No `getSortedRowModel` and no `getFilteredRowModel`, deliberately: both
+   * would reorder and narrow the fifty rows that happen to be loaded and
+   * call that the answer. `manualSorting`/`manualFiltering` say so out loud —
+   * `sorting` is still the table's state, so the header menu and the
+   * `aria-sort` on each `th` keep working, but toggling it changes the query
+   * key and Postgres returns page one in the new order.
+   */
   const table = useReactTable({
-    data: visibleRows,
+    data: rows,
     columns,
     state: {
       sorting,
       columnVisibility: prefs.columnVisibility,
       columnSizing: prefs.columnSizing,
-      globalFilter,
     },
     onSortingChange: setSorting,
     onColumnVisibilityChange: prefs.setColumnVisibility,
     onColumnSizingChange: prefs.setColumnSizing,
-    onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: (row, _colId, filter) => {
-      const q = String(filter).toLowerCase()
-      return (
-        row.original.name.toLowerCase().includes(q) ||
-        row.original.domains.some((d) => d.includes(q)) ||
-        row.original.spaces.some((s) => s.name.toLowerCase().includes(q))
-      )
-    },
+    manualSorting: true,
+    manualFiltering: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     columnResizeMode: 'onChange',
   })
 
@@ -261,7 +354,7 @@ function CompaniesPage() {
           </Link>
         ) : null}
 
-        {rows.length === 0 ? (
+        {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (
           <EmptyState
             icon={Building2}
             title="No companies yet"
@@ -274,11 +367,11 @@ function CompaniesPage() {
               table={table}
               filter={globalFilter}
               onFilterChange={setGlobalFilter}
-              filterPlaceholder="Filter by name, domain, space…"
+              filterPlaceholder="Filter by name or domain…"
               filterLabel="Filter companies"
               noun={{ one: 'company', many: 'companies' }}
-              total={rows.length}
-              shown={table.getRowModel().rows.length}
+              total={total}
+              shown={rows.length}
             >
               <ViewBar
                 objectId={objectId}
@@ -292,7 +385,7 @@ function CompaniesPage() {
                 }}
                 selectView={selectView}
                 onFilterChange={vs.setConditions}
-                onSaved={() => router.invalidate()}
+                onSaved={() => void router.invalidate()}
                 canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
               />
             </TableToolbar>
@@ -300,10 +393,17 @@ function CompaniesPage() {
               table={table}
               label="Companies"
               stickyColumnId="name"
+              page={{
+                total,
+                hasMore: records.hasNextPage,
+                loading: records.isFetchingNextPage,
+                step: RECORD_PAGE_SIZE,
+                onLoadMore: () => void records.fetchNextPage(),
+              }}
               addColumn={
                 <AttributeCreateDialog
                   objectKind="company"
-                  onCreated={() => router.invalidate()}
+                  onCreated={refresh}
                   trigger={<AddColumnButton />}
                 />
               }
@@ -317,6 +417,7 @@ function CompaniesPage() {
 
 function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -358,6 +459,9 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
         toast(`${result.name} added`)
       }
       void router.invalidate()
+      // The rows come from a keyed query now, not from the loader alone —
+      // and the dedupe banner's count comes from the loader, so both.
+      void queryClient.invalidateQueries({ queryKey: ['company-records'] })
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not add the company.',

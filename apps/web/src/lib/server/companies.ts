@@ -14,7 +14,8 @@ import {
 import { activity } from '@spaces/db/schema/activity'
 import { addIdentityAlias, resolveEntity } from '../entities/resolve'
 import { jsonString } from '#/lib/json'
-import { lastTouchedMap, requireUser } from './shared'
+import { requireUser } from './shared'
+import { pagedListInput, pageOptions } from '#/lib/views/page-input'
 import type { SetValuesResult } from '../attributes/values'
 
 export const listCompanies = createServerFn().handler(async () => {
@@ -90,60 +91,33 @@ export const createCompany = createServerFn({ method: 'POST' })
     return { ...result, name: row.name }
   })
 
-/** Table rows: entity core + values + domains + spaces, one query batch. */
-export const listCompaniesTable = createServerFn().handler(async () => {
-  await requireUser()
-  const rows = await db
-    .select({
-      id: entity.id,
-      name: entity.canonicalName,
-      values: entity.values,
-      createdAt: entity.createdAt,
-    })
-    .from(entity)
-    .innerJoin(company, eq(company.entityId, entity.id))
-    .where(and(eq(entity.kind, 'company'), isNull(entity.mergedIntoId)))
-    .orderBy(desc(entity.createdAt))
-
-  const domains = await db
-    .select({ entityId: entityAlias.entityId, domain: entityAlias.valueNorm })
-    .from(entityAlias)
-    .where(
-      and(eq(entityAlias.kind, 'domain'), eq(entityAlias.isIdentity, true)),
+/**
+ * The `/companies` table, on views-3's paging contract (SPA-96).
+ *
+ * It selected every company, then ran two side queries with no `where` — one
+ * over every domain alias in the database, one over every space tag — so a
+ * fifty-row screen paid for the whole table three times. It takes
+ * `{conditions, cursor, limit, sort, q}` now and answers
+ * `{rows, nextCursor, total}`: the same keyset cursor, the same page size and
+ * the same server count `/o/$objectSlug` uses, and the side queries run over
+ * the page's ids.
+ *
+ * The read is `listCompaniesPageProgram`, which lives outside `lib/server/`
+ * because this module is re-exported by the client-imported barrel; it is
+ * imported inside the handler so it stays out of that graph, and a test can
+ * call it without a request.
+ */
+export const listCompaniesTable = createServerFn()
+  .validator(pagedListInput)
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { listCompaniesPageProgram } = await import('../views/directory')
+    const { effectFn } = await import('./effect')
+    return effectFn(listCompaniesPageProgram)(
+      data.conditions ?? [],
+      pageOptions(data),
     )
-  const domainsBy = new Map<string, Array<string>>()
-  for (const d of domains) {
-    domainsBy.set(d.entityId, [...(domainsBy.get(d.entityId) ?? []), d.domain])
-  }
-
-  const tags = await db
-    .select({
-      entityId: entitySpace.entityId,
-      spaceId: entitySpace.spaceId,
-      spaceName: entity.canonicalName,
-    })
-    .from(entitySpace)
-    .innerJoin(entity, eq(entity.id, entitySpace.spaceId))
-  const spacesBy = new Map<string, Array<{ id: string; name: string }>>()
-  for (const t of tags) {
-    spacesBy.set(t.entityId, [
-      ...(spacesBy.get(t.entityId) ?? []),
-      { id: t.spaceId, name: t.spaceName },
-    ])
-  }
-
-  const touched = await lastTouchedMap()
-
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    values: r.values,
-    domains: domainsBy.get(r.id) ?? [],
-    spaces: spacesBy.get(r.id) ?? [],
-    lastTouched: touched[r.id] ?? null,
-    createdAt: r.createdAt.toISOString(),
-  }))
-})
+  })
 
 export const getCompany = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
