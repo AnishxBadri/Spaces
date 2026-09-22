@@ -19,6 +19,7 @@ import {
   round,
   roundCoInvestor,
   signal,
+  suggestion,
   taskEntity,
   term,
 } from './schema'
@@ -206,6 +207,18 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     merge: { kind: 'repoint' },
     del: { kind: 'cascade' },
     context: { role: 'item', kind: 'event', hop: 0 },
+  },
+  {
+    key: 'suggestion.entity',
+    table: suggestion,
+    column: suggestion.entityId,
+    // Open ones follow the record so the queue keeps them; decided ones
+    // follow too, beside the attribute_events that cite them.
+    merge: { kind: 'repoint' },
+    del: { kind: 'cascade' }, // a proposal about a deleted record is moot
+    // A suggestion is not yet true, and never enters a prompt (spec §3):
+    // once accepted, the attribute_event it wrote is what the walk sees.
+    context: null,
   },
   {
     key: 'signal.entity',

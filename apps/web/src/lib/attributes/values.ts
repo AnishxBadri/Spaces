@@ -141,7 +141,7 @@ export const planPatch = Effect.fn('planPatch')(function* (
   return changes
 })
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 /** Referenced records must exist, be alive, and match the target kind. */
 async function checkReferences(tx: Tx, change: Change) {
@@ -276,12 +276,19 @@ export type SetValuesResult = {
   identityValues: Record<string, string>
 }
 
-export const setValuesEffect = Effect.fn('setValues')(function* (
+/**
+ * The write itself, inside a transaction the caller owns. `setValuesEffect`
+ * is the usual door and opens its own; a caller whose write must be atomic
+ * with a row of its own passes its transaction here instead — accepting a
+ * suggestion flips `status` and writes the value in one transaction, so two
+ * concurrent accepts cannot both write (`apps/web/src/lib/ai/propose.ts`,
+ * SPA-46). Refusals throw the typed errors (`AttributeValidationError`,
+ * `EntityNotFound`), which roll the caller's transaction back.
+ */
+export async function setValuesInTx(
+  tx: Tx,
   opts: SetValuesInput,
-): Effect.fn.Return<
-  SetValuesResult,
-  AttributeValidationError | EntityNotFound | ValuesWriteFailed
-> {
+): Promise<SetValuesResult> {
   const {
     entityId,
     patch,
@@ -296,178 +303,176 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
   // the column's check constraint enforces rather than trusts.
   const actorRef = actor.type === 'integration' ? actor.id : null
 
-  return yield* Effect.tryPromise({
-    try: () =>
-      db.transaction(async (tx) => {
-        // FOR UPDATE: this is a read-modify-write of the whole values blob.
-        // At READ COMMITTED, two partners editing different attributes of
-        // the same record concurrently would both read the same starting
-        // blob and the second commit would silently erase the first one's
-        // key. The row lock serializes the merges instead.
-        const ent = (
-          await tx
-            .select({
-              id: entity.id,
-              kind: entity.kind,
-              objectId: entity.objectId,
-              values: entity.values,
-            })
-            .from(entity)
-            .where(eq(entity.id, entityId))
-            .for('update')
-        ).at(0)
-        if (!ent)
-          throw new EntityNotFound({ entityId, message: 'Entity not found' })
-        // objectId is the registry key; kind fallback covers rows created
-        // outside the creation server-fns (tests, raw inserts) — core kinds
-        // resolve to their system object row.
-        let objectId = ent.objectId
-        if (objectId === null) {
-          const core = toObjectKind(ent.kind)
-          if (core === null)
-            throw new EntityNotFound({
-              entityId,
-              message: `No attribute registry for kind ${ent.kind}`,
-            })
-          objectId = await objectIdForKindAsync(core)
-        }
-        const registry = await getRegistryByObjectId(objectId)
-        const current = ent.values
+  // FOR UPDATE: this is a read-modify-write of the whole values blob.
+  // At READ COMMITTED, two partners editing different attributes of
+  // the same record concurrently would both read the same starting
+  // blob and the second commit would silently erase the first one's
+  // key. The row lock serializes the merges instead.
+  const ent = (
+    await tx
+      .select({
+        id: entity.id,
+        kind: entity.kind,
+        objectId: entity.objectId,
+        values: entity.values,
+      })
+      .from(entity)
+      .where(eq(entity.id, entityId))
+      .for('update')
+  ).at(0)
+  if (!ent) throw new EntityNotFound({ entityId, message: 'Entity not found' })
+  // objectId is the registry key; kind fallback covers rows created
+  // outside the creation server-fns (tests, raw inserts) — core kinds
+  // resolve to their system object row.
+  let objectId = ent.objectId
+  if (objectId === null) {
+    const core = toObjectKind(ent.kind)
+    if (core === null)
+      throw new EntityNotFound({
+        entityId,
+        message: `No attribute registry for kind ${ent.kind}`,
+      })
+    objectId = await objectIdForKindAsync(core)
+  }
+  const registry = await getRegistryByObjectId(objectId)
+  const current = ent.values
 
-        // Planning is synchronous and pure; a typed failure surfaces as a
-        // throw here and is passed through untouched by the catch below.
-        const changes = Effect.runSync(planPatch(registry, current, patch))
+  // Planning is synchronous and pure; a typed failure surfaces as a
+  // throw here and is passed through untouched by the catch below.
+  const changes = Effect.runSync(planPatch(registry, current, patch))
 
-        // Birth mode: defaults for whatever the patch left blank, planned
-        // against the same registry snapshot and written through their own
-        // door. Supplied values always win — a default never touches a slug
-        // the patch named.
-        if (fillDefaults) {
-          const afterPatch = { ...current }
-          for (const c of changes) {
-            if (c.value === null) delete afterPatch[c.slug]
-            else afterPatch[c.slug] = c.value
-          }
-          const userId = actor.type === 'user' ? actor.id : null
-          const defaultPatch: Record<string, unknown> = {}
-          for (const def of registry) {
-            if (def.slug in patch) continue
-            // Absent and null both mean "blank" — a default fills either.
-            if ((afterPatch[def.slug] ?? null) !== null) continue
-            const v = resolveDefault(def, { now: fillDefaults.now, userId })
-            if (v !== undefined) defaultPatch[def.slug] = v
-          }
-          for (const c of Effect.runSync(
-            planPatch(registry, afterPatch, defaultPatch),
-          ))
-            changes.push({ ...c, door: 'default' })
-        }
+  // Birth mode: defaults for whatever the patch left blank, planned
+  // against the same registry snapshot and written through their own
+  // door. Supplied values always win — a default never touches a slug
+  // the patch named.
+  if (fillDefaults) {
+    const afterPatch = { ...current }
+    for (const c of changes) {
+      if (c.value === null) delete afterPatch[c.slug]
+      else afterPatch[c.slug] = c.value
+    }
+    const userId = actor.type === 'user' ? actor.id : null
+    const defaultPatch: Record<string, unknown> = {}
+    for (const def of registry) {
+      if (def.slug in patch) continue
+      // Absent and null both mean "blank" — a default fills either.
+      if ((afterPatch[def.slug] ?? null) !== null) continue
+      const v = resolveDefault(def, { now: fillDefaults.now, userId })
+      if (v !== undefined) defaultPatch[def.slug] = v
+    }
+    for (const c of Effect.runSync(
+      planPatch(registry, afterPatch, defaultPatch),
+    ))
+      changes.push({ ...c, door: 'default' })
+  }
 
-        const next = { ...current }
-        for (const change of changes) {
-          await checkReferences(tx, change)
-          const { slug, def, before, value } = change
-          if (value === null) delete next[slug]
-          else next[slug] = value
+  const next = { ...current }
+  for (const change of changes) {
+    await checkReferences(tx, change)
+    const { slug, def, before, value } = change
+    if (value === null) delete next[slug]
+    else next[slug] = value
 
-          const viaDefault = change.door === 'default'
-          await tx.insert(attributeEvent).values({
-            entityId,
+    const viaDefault = change.door === 'default'
+    await tx.insert(attributeEvent).values({
+      entityId,
+      attrSlug: slug,
+      from: before,
+      to: value,
+      actorType: actor.type,
+      actorId,
+      actorRef,
+      source: viaDefault ? 'default' : source,
+      suggestionId: viaDefault ? null : (suggestionId ?? null),
+      refs: viaDefault ? null : (refs ?? null),
+    })
+
+    // Materialize record-references into the graph (values
+    // authoritative).
+    if (def.type === 'record_reference') {
+      await tx
+        .delete(link)
+        .where(
+          and(
+            eq(link.fromEntityId, entityId),
+            eq(link.relation, 'references'),
+            eq(link.attrSlug, slug),
+          ),
+        )
+      const ids: Array<string> =
+        value === null
+          ? []
+          : (Array.isArray(value) ? value : [value]).map(String)
+      for (const target of ids) {
+        await tx
+          .insert(link)
+          .values({
+            fromEntityId: entityId,
+            toEntityId: target,
+            relation: 'references',
             attrSlug: slug,
-            from: before,
-            to: value,
-            actorType: actor.type,
-            actorId,
-            actorRef,
-            source: viaDefault ? 'default' : source,
-            suggestionId: viaDefault ? null : (suggestionId ?? null),
-            refs: viaDefault ? null : (refs ?? null),
+            source: 'manual',
+            createdBy: actorId,
           })
+          .onConflictDoNothing()
+      }
+    }
+  }
 
-          // Materialize record-references into the graph (values
-          // authoritative).
-          if (def.type === 'record_reference') {
-            await tx
-              .delete(link)
-              .where(
-                and(
-                  eq(link.fromEntityId, entityId),
-                  eq(link.relation, 'references'),
-                  eq(link.attrSlug, slug),
-                ),
-              )
-            const ids: Array<string> =
-              value === null
-                ? []
-                : (Array.isArray(value) ? value : [value]).map(String)
-            for (const target of ids) {
-              await tx
-                .insert(link)
-                .values({
-                  fromEntityId: entityId,
-                  toEntityId: target,
-                  relation: 'references',
-                  attrSlug: slug,
-                  source: 'manual',
-                  createdBy: actorId,
-                })
-                .onConflictDoNothing()
-            }
-          }
-        }
+  if (changes.length > 0) {
+    await tx.update(entity).set({ values: next }).where(eq(entity.id, entityId))
+  }
 
-        if (changes.length > 0) {
-          await tx
-            .update(entity)
-            .set({ values: next })
-            .where(eq(entity.id, entityId))
-        }
+  // The declaration made flesh (spec §9): an attribute carrying
+  // `options.identityKey` mirrors its value into `entity_alias` as an
+  // identity alias, in this transaction, beside the `attribute_event`
+  // that logged it. The value is the user's field and always lands;
+  // only the *claim* is withheld from the loser of a race, which is a
+  // `duplicate_candidate` and never an error. A change of value
+  // retires the claim the old one made before asserting the new one,
+  // and a clear retires it and asserts nothing — clearing the value
+  // releases the claim (CONTEXT.md, 2026-09-19), so another record may
+  // take the domain.
+  const identity: Record<string, IdentityOutcome> = {}
+  const identityValues: Record<string, string> = {}
+  for (const work of planIdentity(registry, current, patch, changes)) {
+    if (work.held !== null && work.held !== work.value) {
+      await releaseIdentityAlias(tx, entityId, work.key, work.held)
+    }
+    if (work.value === null) {
+      identity[work.slug] = 'released'
+      continue
+    }
+    identity[work.slug] = await claimIdentityAlias(
+      tx,
+      entityId,
+      work.key,
+      work.value,
+      aliasSource(actor, source),
+    )
+    // The normal form the claim was actually compared in — the same
+    // function the alias row was written through, so whoever reports
+    // the collision reports what collided.
+    const norm = normalizeIdentityValue(work.key, work.value)
+    if (norm !== null) identityValues[work.slug] = norm
+  }
 
-        // The declaration made flesh (spec §9): an attribute carrying
-        // `options.identityKey` mirrors its value into `entity_alias` as an
-        // identity alias, in this transaction, beside the `attribute_event`
-        // that logged it. The value is the user's field and always lands;
-        // only the *claim* is withheld from the loser of a race, which is a
-        // `duplicate_candidate` and never an error. A change of value
-        // retires the claim the old one made before asserting the new one,
-        // and a clear retires it and asserts nothing — clearing the value
-        // releases the claim (CONTEXT.md, 2026-09-19), so another record may
-        // take the domain.
-        const identity: Record<string, IdentityOutcome> = {}
-        const identityValues: Record<string, string> = {}
-        for (const work of planIdentity(registry, current, patch, changes)) {
-          if (work.held !== null && work.held !== work.value) {
-            await releaseIdentityAlias(tx, entityId, work.key, work.held)
-          }
-          if (work.value === null) {
-            identity[work.slug] = 'released'
-            continue
-          }
-          identity[work.slug] = await claimIdentityAlias(
-            tx,
-            entityId,
-            work.key,
-            work.value,
-            aliasSource(actor, source),
-          )
-          // The normal form the claim was actually compared in — the same
-          // function the alias row was written through, so whoever reports
-          // the collision reports what collided.
-          const norm = normalizeIdentityValue(work.key, work.value)
-          if (norm !== null) identityValues[work.slug] = norm
-        }
+  return {
+    changed: changes.filter((c) => c.door !== 'default').map((c) => c.slug),
+    defaulted: changes.filter((c) => c.door === 'default').map((c) => c.slug),
+    identity,
+    identityValues,
+  }
+}
 
-        return {
-          changed: changes
-            .filter((c) => c.door !== 'default')
-            .map((c) => c.slug),
-          defaulted: changes
-            .filter((c) => c.door === 'default')
-            .map((c) => c.slug),
-          identity,
-          identityValues,
-        }
-      }),
+export const setValuesEffect = Effect.fn('setValues')(function* (
+  opts: SetValuesInput,
+): Effect.fn.Return<
+  SetValuesResult,
+  AttributeValidationError | EntityNotFound | ValuesWriteFailed
+> {
+  return yield* Effect.tryPromise({
+    try: () => db.transaction((tx) => setValuesInTx(tx, opts)),
     catch: (cause) =>
       cause instanceof AttributeValidationError ||
       cause instanceof EntityNotFound
