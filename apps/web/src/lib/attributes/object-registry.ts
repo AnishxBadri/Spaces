@@ -93,6 +93,7 @@ const RESERVED = new Set([
   'mandate',
   'dedupe',
   'inbox',
+  'documents',
   'o',
   'api',
   'login',

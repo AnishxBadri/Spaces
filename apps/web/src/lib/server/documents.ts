@@ -239,6 +239,22 @@ export const listRecordDocuments = createServerFn()
   })
 
 /**
+ * Every document in the workspace, one row each — the `/documents` shelf
+ * (SPA-58). `requireUser()` plus `effectFn(program)` and nothing else; the
+ * query is `#/lib/documents/shelf`, outside `lib/server/` so a test can drive
+ * it without a request and so it never reaches the client barrel.
+ *
+ * No validator: the shelf takes no arguments in this slice. Filters and saved
+ * views arrive with docsurf-12a.
+ */
+export const listDocuments = createServerFn().handler(async () => {
+  await requireUser()
+  const { listDocumentsProgram } = await import('../documents/shelf')
+  const { effectFn } = await import('./effect')
+  return effectFn(listDocumentsProgram)()
+})
+
+/**
  * Full extracted text for one document, fetched only when a preview opens.
  * The list deliberately carries a 200-char snippet instead — this column runs
  * to 2MB and nothing wants it in every Files-tab render.

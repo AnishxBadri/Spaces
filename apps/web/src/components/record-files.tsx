@@ -18,6 +18,7 @@ import { Input } from './ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Select } from './ui/select'
 import { DocumentPreview } from './document-preview'
+import { DocumentTile } from './document-tile'
 import { KIND_ICONS } from './editor/mention'
 import {
   DOCUMENT_KINDS,
@@ -258,19 +259,9 @@ function DocumentRow({
     }
   }
 
-  const code = KIND_CODES[doc.kind] ?? extCode(doc.filename)
-
   return (
     <li className="group flex min-h-9 items-center gap-2.5 border-t border-rule py-1 text-ui">
-      <span
-        /* Optical sizing, not a type step: a three-letter kind code has to sit
-           inside a 22px square, and the smallest named step (field, 10px)
-           overflows it. DESIGN.md §3's list is for type; this is a glyph. */
-        // eslint-disable-next-line instrument/vocabulary
-        className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper mono text-[0.5rem] leading-[0.625rem] text-foreground"
-      >
-        {code}
-      </span>
+      <DocumentTile kind={doc.kind} filename={doc.filename} />
       <div className="flex min-w-0 flex-1 flex-col">
         <button
           type="button"
@@ -680,19 +671,6 @@ function SpacePicker({
       />
     </div>
   )
-}
-
-/** The three-letter tile: the kind when it says something, else the extension. */
-const KIND_CODES: Record<string, string> = {
-  deck: 'DCK',
-  cap_table: 'CAP',
-  dd: 'DD',
-  legal: 'LGL',
-}
-
-function extCode(filename: string): string {
-  const ext = filename.split('.').pop()?.toUpperCase() ?? ''
-  return ext.length > 0 && ext.length <= 4 ? ext.slice(0, 3) : 'FILE'
 }
 
 /**
