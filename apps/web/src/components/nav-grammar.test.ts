@@ -8,7 +8,9 @@ import { NAV_GROUPS, NAV_GROUP_IDS, NAV_ITEMS } from './app-sidebar'
  * and the ⌘K palette all read this array and nothing else. Two pending
  * slices add a row each (Documents, /inbox), and both were drafted to pick a
  * free chord by hand; this file is what makes that a failing test instead of
- * a silent double binding.
+ * a silent double binding. Documents landed 2026-09-22 (SPA-82) on `G L` in
+ * the work group, and the label snapshot below is what keeps the row that
+ * added it from moving any other row's lane.
  */
 
 /** Where a row sits in the group order, by its `group` field. */
@@ -32,7 +34,8 @@ describe('the nav grammar', () => {
   it('spells every chord as G plus one letter', () => {
     for (const item of NAV_ITEMS) {
       // `G ,` (Settings) is bound by the shell, not by a row, and a
-      // two-letter chord would not survive the 800ms chord window.
+      // two-letter chord would not survive the 800ms chord window. This is
+      // also what keeps a row from claiming the comma and double-binding it.
       expect(`${item.label}: ${item.key}`).toMatch(/^.+: G [A-Z]$/)
     }
   })
@@ -63,6 +66,32 @@ describe('the nav grammar', () => {
       } else reached = rank(item.group)
     }
     expect(misplaced).toEqual([])
+  })
+
+  it('puts Documents last in the work group on G L', () => {
+    // SPA-82. The shelf is research material like Notes and Spaces — not a
+    // core object, not capital — so it joins the work as the last row after
+    // Notes; `G D` is Deals, which is why the letter is L (library).
+    const documents = NAV_ITEMS.find((item) => item.to === '/documents')
+    expect(documents?.key).toBe('G L')
+    expect(documents?.group).toBe('work')
+    expect(NAV_GROUPS.work.at(-1)).toBe(documents)
+  })
+
+  it('keeps every row in the lane it shipped in', () => {
+    // The criterion SPA-82 asked to assert rather than eyeball: adding a row
+    // must not move Companies, People, Deals or anyone else. A snapshot of
+    // the labels per group is the cheapest way to say so, and it fails
+    // naming the group that changed.
+    expect({
+      work: NAV_GROUPS.work.map((item) => item.label),
+      objects: NAV_GROUPS.objects.map((item) => item.label),
+      capital: NAV_GROUPS.capital.map((item) => item.label),
+    }).toEqual({
+      work: ['Today', 'Tasks', 'Spaces', 'Notes', 'Documents'],
+      objects: ['Companies', 'People', 'Deals'],
+      capital: ['Portfolio', 'Mandate'],
+    })
   })
 
   it('draws every row once, in NAV_ITEMS order', () => {
