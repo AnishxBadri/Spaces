@@ -7,6 +7,7 @@ import {
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { PROVIDERS } from '#/lib/ai/providers/ids'
 import { formatHeaderLines } from '#/lib/ai/providers/meta'
 import {
   getSession,
@@ -21,7 +22,10 @@ type TestResult = Awaited<ReturnType<typeof testAiProvider>>
 
 /**
  * Settings → AI → Providers (SPA-29, `docs/spec-ai-substrate.md` §9). The
- * vault's LLM keys, admin-only. The loader asks for the providers only when
+ * vault's LLM keys, admin-only. Five providers (SPA-39), one row and one form
+ * each, both drawn from the provider's descriptor (`PROVIDERS` in
+ * `lib/ai/providers/ids.ts`) — what differs between providers is data there,
+ * never a branch on the id here. The loader asks for the providers only when
  * the reader is an admin — the server fns refuse anyone else, and a member who
  * types the URL reads a sentence instead of an error.
  */
@@ -124,6 +128,13 @@ function ProvidersSection({
   )
 }
 
+/** The Key lane: the redacted display, or what stands in for one. */
+function keyText(row: ProviderRow): string {
+  if (row.display) return row.display
+  if (PROVIDERS[row.provider].keyless && row.configured) return 'no key'
+  return '—'
+}
+
 function ProviderLedgerRow({ row }: { row: ProviderRow }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
@@ -160,9 +171,7 @@ function ProviderLedgerRow({ row }: { row: ProviderRow }) {
         >
           {status}
         </span>
-        <span className="w-28 shrink-0 mono text-label">
-          {row.display ?? '—'}
-        </span>
+        <span className="w-28 shrink-0 mono text-label">{keyText(row)}</span>
         <span className="w-40 shrink-0 mono text-micro text-graphite">
           {stamp(row.lastUsedAt)}
         </span>
@@ -210,6 +219,7 @@ function ProviderLedgerRow({ row }: { row: ProviderRow }) {
 }
 
 function ProviderForm({ row }: { row: ProviderRow }) {
+  const descriptor = PROVIDERS[row.provider]
   const router = useRouter()
   const [key, setKey] = useState('')
   const [baseUrl, setBaseUrl] = useState(row.baseUrl ?? '')
@@ -219,7 +229,7 @@ function ProviderForm({ row }: { row: ProviderRow }) {
 
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!row.configured && !key.trim()) {
+    if (!descriptor.keyless && !row.configured && !key.trim()) {
       setError(`Paste a ${row.label} key.`)
       return
     }
@@ -237,7 +247,9 @@ function ProviderForm({ row }: { row: ProviderRow }) {
       // The field empties: the key is write-only, and what is shown from
       // here on is the redacted display the ledger row reads.
       setKey('')
-      toast(display ? `${row.label} key saved · ${display}` : 'Saved')
+      toast(
+        display ? `${row.label} key saved · ${display}` : `${row.label} saved`,
+      )
       void router.invalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save')
@@ -249,29 +261,39 @@ function ProviderForm({ row }: { row: ProviderRow }) {
   const id = `ai-${row.provider}`
   return (
     <form onSubmit={save} className="flex flex-col">
+      {descriptor.keyless ? null : (
+        <SettingsRow
+          label={
+            row.configured ? `Replace ${row.label} key` : `${row.label} key`
+          }
+          hint={
+            row.configured
+              ? `Saved as ${row.display ?? '••••'}. Leave empty to keep it.`
+              : 'Stored encrypted as the workspace key.'
+          }
+        >
+          <Input
+            id={`${id}-key`}
+            aria-label={`${row.label} API key`}
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            placeholder={
+              row.configured ? '••••••••' : descriptor.keyPlaceholder
+            }
+            className="w-72 mono"
+          />
+        </SettingsRow>
+      )}
       <SettingsRow
-        label={row.configured ? `Replace ${row.label} key` : `${row.label} key`}
+        label={descriptor.keyless ? `${row.label} base URL` : 'Base URL'}
         hint={
-          row.configured
-            ? `Saved as ${row.display ?? '••••'}. Leave empty to keep it.`
-            : 'Stored encrypted as the workspace key.'
+          descriptor.keyless
+            ? `Where ${row.label} listens. No key is needed; empty is ${descriptor.defaultBaseUrl}.`
+            : "Optional. Point the provider at a gateway you run; empty is the provider's own."
         }
-      >
-        <Input
-          id={`${id}-key`}
-          aria-label={`${row.label} API key`}
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          placeholder={row.configured ? '••••••••' : 'sk-ant-…'}
-          className="w-72 mono"
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Base URL"
-        hint="Optional. Point the provider at a gateway you run; empty is the provider's own."
       >
         <Input
           id={`${id}-base-url`}
@@ -279,7 +301,7 @@ function ProviderForm({ row }: { row: ProviderRow }) {
           type="url"
           value={baseUrl}
           onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder="https://api.anthropic.com/v1"
+          placeholder={descriptor.defaultBaseUrl}
           className="w-72 mono"
         />
       </SettingsRow>

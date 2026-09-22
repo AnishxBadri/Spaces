@@ -1,7 +1,8 @@
 import { createAnthropic } from '@ai-sdk/anthropic'
 import type { AnthropicProviderSettings } from '@ai-sdk/anthropic'
 import type { LanguageModel } from 'ai'
-import type { ProviderMeta } from '../meta'
+import { PROVIDERS } from '../ids'
+import type { AdapterInput } from './adapter'
 
 /**
  * The Anthropic LLM adapter (`docs/spec-ai-substrate.md` §9): a vault
@@ -10,29 +11,15 @@ import type { ProviderMeta } from '../meta'
  * `ANTHROPIC_API_KEY` environment fallback can never engage.
  */
 
-/**
- * The model the settings Test call and any caller that names none gets. The
- * one place the id is spelled; routing (`ai-4b`) picks per lane later.
- */
-export const ANTHROPIC_DEFAULT_MODEL = 'claude-opus-5'
+export const ANTHROPIC_DEFAULT_MODEL = PROVIDERS.anthropic.defaultModel
 
-export type AnthropicAdapterInput = {
-  secret: string
-  meta: Pick<ProviderMeta, 'baseUrl' | 'headers'>
-  modelId?: string
-  /**
-   * The transport. Omitted in production (global `fetch`); a test hands in a
-   * stub that records the request, so the constructed client can be asserted
-   * against with no network.
-   */
-  fetch?: AnthropicProviderSettings['fetch']
-}
+export type AnthropicAdapterInput = AdapterInput
 
-export function anthropicLanguageModel(
-  input: AnthropicAdapterInput,
-): LanguageModel {
-  const settings: AnthropicProviderSettings = { apiKey: input.secret }
-  if (input.meta.baseUrl) settings.baseURL = input.meta.baseUrl
+export function anthropicLanguageModel(input: AdapterInput): LanguageModel {
+  const settings: AnthropicProviderSettings = {
+    apiKey: input.secret,
+    baseURL: input.meta.baseUrl ?? PROVIDERS.anthropic.defaultBaseUrl,
+  }
   if (input.meta.headers) settings.headers = input.meta.headers
   if (input.fetch) settings.fetch = input.fetch
   return createAnthropic(settings)(input.modelId ?? ANTHROPIC_DEFAULT_MODEL)
