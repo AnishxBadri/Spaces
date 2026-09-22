@@ -15,6 +15,23 @@ import { requireUser } from './shared'
 
 const byId = z.object({ id: z.string().uuid() })
 
+export type { OpenSuggestionCount } from '../inbox/queue'
+
+/**
+ * Open suggestions on one record, grouped by kind (SPA-114) — the record
+ * rail's "Waiting" chips. One query, called once from each record route's
+ * loader beside its other reads. Empty when nothing waits, and the rail then
+ * draws no section at all.
+ */
+export const countOpenSuggestions = createServerFn()
+  .validator(z.object({ entityId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { countOpenSuggestionsProgram } = await import('../inbox/queue')
+    const { effectFn } = await import('./effect')
+    return effectFn(countOpenSuggestionsProgram)(data.entityId)
+  })
+
 export const acceptSuggestion = createServerFn({ method: 'POST' })
   .validator(byId)
   .handler(async ({ data }) => {

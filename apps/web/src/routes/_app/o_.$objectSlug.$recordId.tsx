@@ -25,12 +25,14 @@ import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
+import { WaitingRail } from '#/components/record/waiting-rail'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { recordPath } from '#/lib/record-path'
 import {
+  countOpenSuggestions,
   createNote,
   getObjectRecord,
   getRecordTimeline,
@@ -64,22 +66,32 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
           recordId: record.mergedIntoId,
         },
       })
-    const [registry, timeline, documents, spaces, notes] = await Promise.all([
-      listRegistry({ data: { objectId: record.object.id } }),
-      getRecordTimeline({ data: { entityId: record.id } }),
-      listRecordDocuments({ data: { entityId: record.id } }),
-      listSpaces(),
-      // A custom record is an entity like any other, so the lanes need only
-      // its id — the object slug is the page's, never the note row's.
-      listRecordNotes({ data: { entityId: record.id } }),
-    ])
-    return { record, registry, timeline, documents, allSpaces: spaces, notes }
+    const [registry, timeline, documents, spaces, notes, waiting] =
+      await Promise.all([
+        listRegistry({ data: { objectId: record.object.id } }),
+        getRecordTimeline({ data: { entityId: record.id } }),
+        listRecordDocuments({ data: { entityId: record.id } }),
+        listSpaces(),
+        // A custom record is an entity like any other, so the lanes need only
+        // its id — the object slug is the page's, never the note row's.
+        listRecordNotes({ data: { entityId: record.id } }),
+        countOpenSuggestions({ data: { entityId: record.id } }),
+      ])
+    return {
+      record,
+      registry,
+      timeline,
+      documents,
+      allSpaces: spaces,
+      notes,
+      waiting,
+    }
   },
   component: ObjectRecordPage,
 })
 
 function ObjectRecordPage() {
-  const { record, registry, timeline, documents, allSpaces, notes } =
+  const { record, registry, timeline, documents, allSpaces, notes, waiting } =
     Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
@@ -154,6 +166,7 @@ function ObjectRecordPage() {
       <RecordBody
         rail={
           <>
+            <WaitingRail entityId={record.id} counts={waiting} />
             <RailSection label="Spaces" meta={`${record.spaces.length}`}>
               {record.spaces.map((s) => (
                 <RailItem key={s.id} className="group">

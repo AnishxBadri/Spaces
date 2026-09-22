@@ -2,6 +2,7 @@ import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { Check, Inbox, Search, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { z } from 'zod'
 import { EmptyState } from '#/components/empty-state'
 import { SuggestionCard } from '#/components/inbox/suggestion-card'
 import { PageHeader } from '#/components/page-header'
@@ -26,8 +27,25 @@ import { cn } from '#/lib/utils'
  * `docs/design-contract.md` §3, and the one surface every later review lane
  * joins (spec-ai-substrate.md §10). `/dedupe` redirects here.
  */
+/**
+ * `record` scopes both lanes to one entity (SPA-114 — the record rail's
+ * "Waiting" chips link here); it is a loader dep, since it changes what the
+ * server sends. `lane` only seeds the tab on arrival and is not a dep: the
+ * tabs stay React state, as they were. `.catch` rather than a failure, so a
+ * hand-typed bad value lands on the whole queue, not an error boundary.
+ */
+const inboxSearch = z.object({
+  record: z.string().uuid().optional().catch(undefined),
+  lane: z
+    .enum(['all', 'suggestions', 'duplicates'])
+    .optional()
+    .catch(undefined),
+})
+
 export const Route = createFileRoute('/_app/inbox')({
-  loader: () => listInbox(),
+  validateSearch: inboxSearch,
+  loaderDeps: ({ search }) => ({ record: search.record ?? null }),
+  loader: ({ deps }) => listInbox({ data: { record: deps.record } }),
   component: InboxPage,
 })
 
@@ -124,9 +142,19 @@ const LANES: Array<{ key: Lane; label: string }> = [
   { key: 'duplicate_candidate', label: 'Duplicates' },
 ]
 
+/** The URL's lane words, onto the tab state they seed. */
+const LANE_PARAM: Record<'all' | 'suggestions' | 'duplicates', Lane> = {
+  all: 'all',
+  suggestions: 'suggestion',
+  duplicates: 'duplicate_candidate',
+}
+
 function InboxPage() {
-  const rows = Route.useLoaderData()
-  const [lane, setLane] = useState<Lane>('all')
+  const { rows, scope } = Route.useLoaderData()
+  const search = Route.useSearch()
+  const [lane, setLane] = useState<Lane>(
+    search.lane ? LANE_PARAM[search.lane] : 'all',
+  )
   const visible =
     lane === 'all' ? rows : rows.filter((row) => row.kind === lane)
   const countOf = (key: Lane) =>
@@ -142,6 +170,7 @@ function InboxPage() {
         title="Review inbox"
         description={
           <>
+            {scope ? <ScopeChip name={scope.name} /> : null}
             <span>{rows.length} open</span>
             {suggestionCount > 0 ? (
               <span>
@@ -206,6 +235,27 @@ function InboxPage() {
         </ul>
       )}
     </div>
+  )
+}
+
+/**
+ * "on <record>" — the queue is narrowed to one record (SPA-114). The chip is
+ * the record-reference chip, and its × clears the param back to the whole
+ * queue; the tab the reader chose stays chosen.
+ */
+function ScopeChip({ name }: { name: string }) {
+  return (
+    <span className="mention-chip cursor-default">
+      on {name}
+      <Link
+        to="/inbox"
+        search={{}}
+        aria-label={`Show the whole queue, not just ${name}`}
+        className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
+      >
+        <X className="size-3" strokeWidth={2} />
+      </Link>
+    </span>
   )
 }
 

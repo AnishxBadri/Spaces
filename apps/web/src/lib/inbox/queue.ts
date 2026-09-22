@@ -1,11 +1,12 @@
 import { Effect, Schema } from 'effect'
-import { count, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   duplicateCandidate,
   entity,
   objectDef,
   suggestion,
+  suggestionKind,
 } from '@spaces/db/schema'
 import type { AttributeOptions } from '@spaces/db/schema/attributes'
 import type { DuplicateReason } from '@spaces/db/schema/entities'
@@ -130,33 +131,50 @@ export type InboxCounts = {
   byKind: Record<InboxKind, number>
 }
 
-const listDuplicateLane = Effect.fn('listDuplicateLane')(
-  function* (): Effect.fn.Return<
-    Array<DuplicateCandidateRow>,
-    InboxQueryFailed
-  > {
-    const rows = yield* query(() =>
-      db
-        .select()
-        .from(duplicateCandidate)
-        .where(eq(duplicateCandidate.status, 'open'))
-        .orderBy(desc(duplicateCandidate.createdAt)),
-    )
-    return yield* query(() =>
-      Promise.all(
-        rows.map(async (r): Promise<DuplicateCandidateRow> => ({
-          kind: 'duplicate_candidate',
-          id: r.id,
-          score: r.score,
-          reason: r.reason,
-          latestAt: r.createdAt.toISOString(),
-          a: await entityContext(r.entityA),
-          b: await entityContext(r.entityB),
-        })),
-      ),
-    )
-  },
-)
+/**
+ * What the queue is narrowed to. `record` set: only rows about that entity —
+ * its suggestion card, and every open pair it is either side of (SPA-114,
+ * the record rail's "Waiting" chips link here). Null: the whole queue.
+ */
+export type InboxScope = { record: string | null }
+
+const ALL: InboxScope = { record: null }
+
+const listDuplicateLane = Effect.fn('listDuplicateLane')(function* (
+  scope: InboxScope,
+): Effect.fn.Return<Array<DuplicateCandidateRow>, InboxQueryFailed> {
+  const open = eq(duplicateCandidate.status, 'open')
+  const rows = yield* query(() =>
+    db
+      .select()
+      .from(duplicateCandidate)
+      .where(
+        scope.record === null
+          ? open
+          : and(
+              open,
+              or(
+                eq(duplicateCandidate.entityA, scope.record),
+                eq(duplicateCandidate.entityB, scope.record),
+              ),
+            ),
+      )
+      .orderBy(desc(duplicateCandidate.createdAt)),
+  )
+  return yield* query(() =>
+    Promise.all(
+      rows.map(async (r): Promise<DuplicateCandidateRow> => ({
+        kind: 'duplicate_candidate',
+        id: r.id,
+        score: r.score,
+        reason: r.reason,
+        latestAt: r.createdAt.toISOString(),
+        a: await entityContext(r.entityA),
+        b: await entityContext(r.entityB),
+      })),
+    ),
+  )
+})
 
 /** The fields of an `attribute_patch` payload, against the live registry. */
 function patchFields(
@@ -189,115 +207,119 @@ function patchFields(
   return fields.length > 0 ? fields : null
 }
 
-const listSuggestionLane = Effect.fn('listSuggestionLane')(
-  function* (): Effect.fn.Return<Array<SuggestionRow>, InboxQueryFailed> {
-    const open = yield* query(() =>
-      db
-        .select()
-        .from(suggestion)
-        .where(eq(suggestion.status, 'open'))
-        .orderBy(desc(suggestion.createdAt), desc(suggestion.id)),
-    )
-    if (open.length === 0) return []
+const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
+  scope: InboxScope,
+): Effect.fn.Return<Array<SuggestionRow>, InboxQueryFailed> {
+  const isOpen = eq(suggestion.status, 'open')
+  const open = yield* query(() =>
+    db
+      .select()
+      .from(suggestion)
+      .where(
+        scope.record === null
+          ? isOpen
+          : and(isOpen, eq(suggestion.entityId, scope.record)),
+      )
+      .orderBy(desc(suggestion.createdAt), desc(suggestion.id)),
+  )
+  if (open.length === 0) return []
 
-    const entityIds = [...new Set(open.map((s) => s.entityId))]
-    const heads = yield* query(() =>
-      db
-        .select({
-          id: entity.id,
-          name: entity.canonicalName,
-          kind: entity.kind,
-          objectId: entity.objectId,
-          objectSlug: objectDef.slug,
-          objectSingular: objectDef.singular,
-        })
-        .from(entity)
-        .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
-        .where(inArray(entity.id, entityIds)),
-    )
-    const headOf = new Map(heads.map((h) => [h.id, h]))
-
-    // One registry per object, not per record: a card draws its patch's
-    // values through the attribute definitions the record's object carries.
-    const registries = new Map<
-      string,
-      Awaited<ReturnType<typeof getRegistryByObjectId>>
-    >()
-    const registryOf = (head: (typeof heads)[number]) =>
-      query(async () => {
-        const core = toObjectKind(head.kind)
-        const objectId =
-          head.objectId ??
-          (core === null ? null : await objectIdForKindAsync(core))
-        if (objectId === null) return []
-        const hit = registries.get(objectId)
-        if (hit) return hit
-        const reg = await getRegistryByObjectId(objectId)
-        registries.set(objectId, reg)
-        return reg
+  const entityIds = [...new Set(open.map((s) => s.entityId))]
+  const heads = yield* query(() =>
+    db
+      .select({
+        id: entity.id,
+        name: entity.canonicalName,
+        kind: entity.kind,
+        objectId: entity.objectId,
+        objectSlug: objectDef.slug,
+        objectSingular: objectDef.singular,
       })
+      .from(entity)
+      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+      .where(inArray(entity.id, entityIds)),
+  )
+  const headOf = new Map(heads.map((h) => [h.id, h]))
 
-    const lookup = yield* citeLookupProgram(open.flatMap((s) => s.refs)).pipe(
-      Effect.mapError((e) => new InboxQueryFailed({ cause: e })),
-    )
+  // One registry per object, not per record: a card draws its patch's
+  // values through the attribute definitions the record's object carries.
+  const registries = new Map<
+    string,
+    Awaited<ReturnType<typeof getRegistryByObjectId>>
+  >()
+  const registryOf = (head: (typeof heads)[number]) =>
+    query(async () => {
+      const core = toObjectKind(head.kind)
+      const objectId =
+        head.objectId ??
+        (core === null ? null : await objectIdForKindAsync(core))
+      if (objectId === null) return []
+      const hit = registries.get(objectId)
+      if (hit) return hit
+      const reg = await getRegistryByObjectId(objectId)
+      registries.set(objectId, reg)
+      return reg
+    })
 
-    // `open` is newest first, so the first member seen for a record is its
-    // newest and Map insertion order is already the queue's order.
-    const cards = new Map<string, SuggestionRow>()
-    for (const s of open) {
-      const head = headOf.get(s.entityId)
-      if (!head) continue
-      const registry = yield* registryOf(head)
-      const item: SuggestionItem = {
-        id: s.id,
-        kind: s.kind,
-        payload: s.payload,
-        rationale: s.rationale,
-        citations: s.refs.map((ref) => ({ ref, label: cite(ref, lookup) })),
-        fields:
-          s.kind === 'attribute_patch'
-            ? patchFields(s.payload, registry)
-            : null,
-        createdAt: s.createdAt.toISOString(),
-      }
-      const card = cards.get(s.entityId)
-      if (card) card.suggestions.push(item)
-      else
-        cards.set(s.entityId, {
-          kind: 'suggestion',
-          id: s.entityId,
-          record: {
-            id: head.id,
-            name: head.name,
-            kind: head.kind,
-            objectSlug: head.objectSlug,
-            objectSingular: head.objectSingular,
-          },
-          suggestions: [item],
-          latestAt: item.createdAt,
-        })
+  const lookup = yield* citeLookupProgram(open.flatMap((s) => s.refs)).pipe(
+    Effect.mapError((e) => new InboxQueryFailed({ cause: e })),
+  )
+
+  // `open` is newest first, so the first member seen for a record is its
+  // newest and Map insertion order is already the queue's order.
+  const cards = new Map<string, SuggestionRow>()
+  for (const s of open) {
+    const head = headOf.get(s.entityId)
+    if (!head) continue
+    const registry = yield* registryOf(head)
+    const item: SuggestionItem = {
+      id: s.id,
+      kind: s.kind,
+      payload: s.payload,
+      rationale: s.rationale,
+      citations: s.refs.map((ref) => ({ ref, label: cite(ref, lookup) })),
+      fields:
+        s.kind === 'attribute_patch' ? patchFields(s.payload, registry) : null,
+      createdAt: s.createdAt.toISOString(),
     }
-    return [...cards.values()]
-  },
-)
+    const card = cards.get(s.entityId)
+    if (card) card.suggestions.push(item)
+    else
+      cards.set(s.entityId, {
+        kind: 'suggestion',
+        id: s.entityId,
+        record: {
+          id: head.id,
+          name: head.name,
+          kind: head.kind,
+          objectSlug: head.objectSlug,
+          objectSingular: head.objectSingular,
+        },
+        suggestions: [item],
+        latestAt: item.createdAt,
+      })
+  }
+  return [...cards.values()]
+})
 
 /**
  * The whole queue, newest first by each card's most recent member — a
  * suggestion card by its newest suggestion, a pair by when it was proposed.
- * ISO instants compare lexically.
+ * ISO instants compare lexically. A `record` scope narrows both lanes to
+ * that one entity; omitted, it is the whole queue.
  */
-export const listInboxProgram = Effect.fn('listInboxProgram')(
-  function* (): Effect.fn.Return<Array<InboxRow>, InboxQueryFailed> {
-    const [pairs, suggestions] = yield* Effect.all([
-      listDuplicateLane(),
-      listSuggestionLane(),
-    ])
-    const rows: Array<InboxRow> = [...suggestions, ...pairs]
-    return rows.sort((x, y) =>
-      x.latestAt === y.latestAt ? 0 : x.latestAt < y.latestAt ? 1 : -1,
-    )
-  },
-)
+export const listInboxProgram = Effect.fn('listInboxProgram')(function* (
+  scope: InboxScope = ALL,
+): Effect.fn.Return<Array<InboxRow>, InboxQueryFailed> {
+  const [pairs, suggestions] = yield* Effect.all([
+    listDuplicateLane(scope),
+    listSuggestionLane(scope),
+  ])
+  const rows: Array<InboxRow> = [...suggestions, ...pairs]
+  return rows.sort((x, y) =>
+    x.latestAt === y.latestAt ? 0 : x.latestAt < y.latestAt ? 1 : -1,
+  )
+})
 
 /**
  * One round trip, one `UNION ALL` of the same two columns per lane — never
@@ -337,3 +359,59 @@ export const countOpenInboxProgram = Effect.fn('countOpenInboxProgram')(
     return { open, byKind }
   },
 )
+
+/** The record the inbox is scoped to, named for the header's chip. */
+export type InboxScopeRecord = { id: string; name: string }
+
+/**
+ * The scoped record's name, read once for the header — the rows cannot be
+ * trusted to carry it, since a record whose last suggestion was just
+ * accepted still scopes an empty queue. Null for an id that is not a record.
+ */
+export const inboxScopeRecordProgram = Effect.fn('inboxScopeRecordProgram')(
+  function* (
+    id: string,
+  ): Effect.fn.Return<InboxScopeRecord | null, InboxQueryFailed> {
+    const row = yield* query(() =>
+      db
+        .select({ id: entity.id, name: entity.canonicalName })
+        .from(entity)
+        .where(eq(entity.id, id))
+        .limit(1),
+    )
+    return row.at(0) ?? null
+  },
+)
+
+/** One kind of open suggestion on one record, and how many are waiting. */
+export type OpenSuggestionCount = { kind: SuggestionKind; count: number }
+
+/** The enum's declared order — the order the rail draws its chips in. */
+const KIND_ORDER: ReadonlyArray<SuggestionKind> = suggestionKind.enumValues
+
+/**
+ * The record rail's "Waiting" lane (SPA-114): open suggestions on one
+ * record, grouped by kind, in one query — a record page calls it once from
+ * its loader, never once per rail section. `GROUP BY` answers no row for a
+ * kind with nothing open, so a record with nothing waiting is an empty
+ * array, and the rail draws no section at all. Only `open` counts: a
+ * rejected suggestion never comes back, as a dismissed pair never does.
+ */
+export const countOpenSuggestionsProgram = Effect.fn(
+  'countOpenSuggestionsProgram',
+)(function* (
+  entityId: string,
+): Effect.fn.Return<Array<OpenSuggestionCount>, InboxQueryFailed> {
+  const rows = yield* query(() =>
+    db
+      .select({ kind: suggestion.kind, count: count() })
+      .from(suggestion)
+      .where(
+        and(eq(suggestion.entityId, entityId), eq(suggestion.status, 'open')),
+      )
+      .groupBy(suggestion.kind),
+  )
+  return rows
+    .filter((r) => r.count > 0)
+    .sort((x, y) => KIND_ORDER.indexOf(x.kind) - KIND_ORDER.indexOf(y.kind))
+})

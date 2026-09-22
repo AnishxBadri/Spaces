@@ -32,6 +32,7 @@ import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
+import { WaitingRail } from '#/components/record/waiting-rail'
 import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -40,6 +41,7 @@ import { localToday } from '@spaces/core/tasks/parse-due'
 import { useHotkey } from '#/lib/use-hotkey'
 import { jsonString } from '#/lib/json'
 import {
+  countOpenSuggestions,
   createNote,
   getDeal,
   getRecordTimeline,
@@ -51,26 +53,29 @@ import {
 
 export const Route = createFileRoute('/_app/deals_/$dealId')({
   loader: async ({ params }) => {
-    const [deal, registry, timeline, documents, notes] = await Promise.all([
-      getDeal({ data: { id: params.dealId } }),
-      listRegistry({ data: { kind: 'deal' } }),
-      getRecordTimeline({ data: { entityId: params.dealId } }),
-      listRecordDocuments({ data: { entityId: params.dealId } }),
-      listRecordNotes({ data: { entityId: params.dealId } }),
-    ])
+    const [deal, registry, timeline, documents, notes, waiting] =
+      await Promise.all([
+        getDeal({ data: { id: params.dealId } }),
+        listRegistry({ data: { kind: 'deal' } }),
+        getRecordTimeline({ data: { entityId: params.dealId } }),
+        listRecordDocuments({ data: { entityId: params.dealId } }),
+        listRecordNotes({ data: { entityId: params.dealId } }),
+        countOpenSuggestions({ data: { entityId: params.dealId } }),
+      ])
     if (deal.mergedIntoId) {
       throw redirect({
         to: '/deals/$dealId',
         params: { dealId: deal.mergedIntoId },
       })
     }
-    return { deal, registry, timeline, documents, notes }
+    return { deal, registry, timeline, documents, notes, waiting }
   },
   component: DealRecordPage,
 })
 
 function DealRecordPage() {
-  const { deal, registry, timeline, documents, notes } = Route.useLoaderData()
+  const { deal, registry, timeline, documents, notes, waiting } =
+    Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [moveOpen, setMoveOpen] = useState(false)
@@ -304,6 +309,7 @@ function DealRecordPage() {
       <RecordBody
         rail={
           <>
+            <WaitingRail entityId={deal.id} counts={waiting} />
             <RailSection
               label="Pipeline"
               meta={

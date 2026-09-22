@@ -378,6 +378,19 @@ ends — the row leaves, the list does not flinch. Opacity only; the row keeps i
 until it unmounts, so nothing below it jumps. Anything irreversible-feeling pairs the
 exit with an undo in the toast; anything actually irreversible (delete) asks first.
 
+**Waiting chip** (2026-09-23, SPA-114; D44). Open suggestions on a record show as
+chips in a `Waiting` rail section at the top of the company, person, deal and
+custom-record rails — one chip per suggestion kind, the reference chip's shape
+(`.mention-chip`: 20px, bone, rule edge going hairline on hover), a `Sparkles` mark, a
+mono count and a sans word (`5 proposed`, `2 notes`). It is a **pointer, never a verb**:
+the chip is a link into `/inbox?record=<id>&lane=suggestions`, and accept and reject
+live only there, so the bulk accept (SPA-110) keeps one path. Grouping by kind caps the
+lane at five chips however many suggestions wait, and a record with none draws no
+section and no zero (`apps/web/src/components/record/waiting-rail.tsx`). SPA-72's
+`proposed` table cell and SPA-103's pending space tags inherit this chip: same shape,
+same mark, same rule that pending machine output points at the inbox rather than
+carrying its own accept.
+
 ### The Page Shell (2026-09, one mode since 2026-09-11)
 
 **One page mode, Field.** Every route's outermost container is
