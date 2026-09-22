@@ -23,6 +23,12 @@ export const QUEUES = {
   dedupeSweep: 'entity.dedupe-sweep',
   /** On-demand enrichment, credit-capped in the worker. */
   enrichEntity: 'entity.enrich',
+  /**
+   * Nightly reclaim of bytes a `prepare` promised and no `finalize` ever
+   * named (SPA-54). `blob.` and not `document.`, because the rows it acts on
+   * are precisely the ones that never became documents.
+   */
+  sweepOrphanBlobs: 'blob.sweep-orphans',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

@@ -1,5 +1,5 @@
 import { getRequest } from '@tanstack/react-start/server'
-import { and, asc, count, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { auth } from '../auth'
 import { db } from '@spaces/db'
 import {
@@ -483,12 +483,12 @@ export async function deleteDocumentWithBlobGc(
 
   if (row.blobSha) {
     // Content addressing means one file can back several rows: the deck sent
-    // to both partners, or the same deck filed on a company and a space.
-    const [{ value: remaining }] = await db
-      .select({ value: count() })
-      .from(document)
-      .where(eq(document.blobSha, row.blobSha))
-    if (remaining === 0) {
+    // to both partners, or the same deck filed on a company and a space. The
+    // count itself is `blobIsReferenced` since SPA-54, because the orphan
+    // sweep asks the same question from the other direction and two copies
+    // of it would be two definitions of "still referenced".
+    const { blobIsReferenced } = await import('#/lib/documents/blob-refs')
+    if (!(await blobIsReferenced(row.blobSha))) {
       const { storage } = await import('#/lib/storage')
       await storage().delete(row.blobSha)
     }
