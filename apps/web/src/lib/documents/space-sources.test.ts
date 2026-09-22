@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// The test databases carry no `pgboss` schema, and the birth of a document
+// enqueues extraction — see `#/test/queue-stub`.
+vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
  * The space page's Sources lane (SPA-44), against the test database.
@@ -44,16 +48,22 @@ async function fileIntoSpace(
   filename: string,
   sha: string,
 ): Promise<string> {
-  const { fileDocumentRow } = await import('#/lib/server/shared')
-  const { id } = await fileDocumentRow({
-    sha,
-    filename,
-    mime: 'application/pdf',
-    sizeBytes: 2048,
-    kind: 'deck',
-    fileAgainst: { kind: 'space', entityId: spaceId },
-    actorId: await actorId(),
-  })
+  const { Effect } = await import('effect')
+  const { birthDocumentProgram } = await import('./birth')
+  const { id } = await Effect.runPromise(
+    birthDocumentProgram({
+      blobSha: sha,
+      filename,
+      mime: 'application/pdf',
+      sizeBytes: 2048,
+      kind: 'deck',
+      sourceClass: 'manual',
+      sourceRef: null,
+      provenance: {},
+      fileAgainst: [{ kind: 'space', entityId: spaceId }],
+      actor: { userId: await actorId() },
+    }),
+  )
   return id
 }
 
@@ -92,16 +102,22 @@ async function fileAgainstRecord(
   filename: string,
   sha: string,
 ): Promise<string> {
-  const { fileDocumentRow } = await import('#/lib/server/shared')
-  const { id } = await fileDocumentRow({
-    sha,
-    filename,
-    mime: 'application/pdf',
-    sizeBytes: 2048,
-    kind: 'deck',
-    fileAgainst: { kind: 'record', entityId },
-    actorId: await actorId(),
-  })
+  const { Effect } = await import('effect')
+  const { birthDocumentProgram } = await import('./birth')
+  const { id } = await Effect.runPromise(
+    birthDocumentProgram({
+      blobSha: sha,
+      filename,
+      mime: 'application/pdf',
+      sizeBytes: 2048,
+      kind: 'deck',
+      sourceClass: 'manual',
+      sourceRef: null,
+      provenance: {},
+      fileAgainst: [{ kind: 'record', entityId }],
+      actor: { userId: await actorId() },
+    }),
+  )
   return id
 }
 
@@ -196,7 +212,8 @@ describe('spaceSourcesProgram', () => {
   it('does not see a document filed against a record', async () => {
     const { db } = await import('@spaces/db')
     const { company, entity } = await import('@spaces/db/schema')
-    const { fileDocumentRow } = await import('#/lib/server/shared')
+    const { Effect } = await import('effect')
+    const { birthDocumentProgram } = await import('./birth')
     const tag = randomUUID().slice(0, 8)
 
     const spaceId = await aSpace(tag)
@@ -206,15 +223,20 @@ describe('spaceSourcesProgram', () => {
       .returning({ id: entity.id })
     await db.insert(company).values({ entityId: ent.id })
 
-    await fileDocumentRow({
-      sha: await aBlob(tag),
-      filename: `deck-${tag}.pdf`,
-      mime: 'application/pdf',
-      sizeBytes: 2048,
-      kind: 'deck',
-      fileAgainst: { kind: 'record', entityId: ent.id },
-      actorId: await actorId(),
-    })
+    await Effect.runPromise(
+      birthDocumentProgram({
+        blobSha: await aBlob(tag),
+        filename: `deck-${tag}.pdf`,
+        mime: 'application/pdf',
+        sizeBytes: 2048,
+        kind: 'deck',
+        sourceClass: 'manual',
+        sourceRef: null,
+        provenance: {},
+        fileAgainst: [{ kind: 'record', entityId: ent.id }],
+        actor: { userId: await actorId() },
+      }),
+    )
 
     // `link(tagged_in)` is the record's edge and never a space's: a lane
     // keyed on it would have shown this row here.

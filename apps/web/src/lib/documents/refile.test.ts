@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// The test databases carry no `pgboss` schema, and the birth of a document
+// enqueues extraction — see `#/test/queue-stub`.
+vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
  * Re-filing a document (SPA-50), against the test database.
@@ -64,16 +68,21 @@ async function aBlob(tag: string): Promise<string> {
 }
 
 async function aFiledDeck(tag: string, companyId: string): Promise<string> {
-  const { fileDocumentRow } = await import('#/lib/server/shared')
-  const { id } = await fileDocumentRow({
-    sha: await aBlob(tag),
-    filename: `deck-${tag}.pdf`,
-    mime: 'application/pdf',
-    sizeBytes: 1024,
-    kind: 'deck',
-    fileAgainst: { kind: 'record', entityId: companyId },
-    actorId: await actorId(),
-  })
+  const { birthDocumentProgram } = await import('./birth')
+  const { id } = await Effect.runPromise(
+    birthDocumentProgram({
+      blobSha: await aBlob(tag),
+      filename: `deck-${tag}.pdf`,
+      mime: 'application/pdf',
+      sizeBytes: 1024,
+      kind: 'deck',
+      sourceClass: 'manual',
+      sourceRef: null,
+      provenance: {},
+      fileAgainst: [{ kind: 'record', entityId: companyId }],
+      actor: { userId: await actorId() },
+    }),
+  )
   return id
 }
 

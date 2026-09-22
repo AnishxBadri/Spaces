@@ -35,10 +35,14 @@ import { finalizeDocumentUpload, prepareDocumentUpload } from '#/lib/server-fns'
 type FinalizeInput = Parameters<typeof finalizeDocumentUpload>[0]['data']
 
 /**
- * Where the document is filed. A record files through `link(tagged_in)`, a
- * space through `entity_space`; the union is what stops a space ever being a
- * link target again (SPA-19). Read off the server fn rather than re-declared,
- * so the two cannot drift.
+ * Where the document is filed — **an array** of targets since SPA-113. A
+ * record files through `link(tagged_in)`, a space through `entity_space`; the
+ * union is what stops a space ever being a link target again (SPA-19), and
+ * the array is what lets one row be filed in N places without copying (§3.4).
+ * Both browser surfaces pass one element; the empty array is the unfiled
+ * document the global upload dialog will offer.
+ *
+ * Read off the server fn rather than re-declared, so the two cannot drift.
  */
 export type FileAgainst = FinalizeInput['fileAgainst']
 

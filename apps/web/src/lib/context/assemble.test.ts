@@ -137,6 +137,8 @@ describe('assembleProgram', () => {
       .values({ kind: 'document', canonicalName: `CtxDoc ${tag}` })
       .returning({ id: entity.id })
     ids.doc = docEnt.id
+    // Exempt from the one-writer rule: a test fixture, wanting a row with
+    // `extraction_status: 'done'` and extracted text already in it.
     await db.insert(document).values({
       entityId: docEnt.id,
       filename: 'seed-deck.pdf',
