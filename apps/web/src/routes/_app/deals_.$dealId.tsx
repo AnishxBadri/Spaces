@@ -30,6 +30,7 @@ import {
 } from '#/components/record/record-parts'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
+import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
 import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
@@ -413,6 +414,8 @@ function DealRecordPage() {
         >
           <RecordFiles entityId={deal.id} documents={documents} />
         </RecordSection>
+
+        <RecordContext entityId={deal.id} />
       </RecordBody>
     </div>
   )

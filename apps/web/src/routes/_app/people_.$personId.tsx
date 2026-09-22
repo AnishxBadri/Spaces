@@ -28,6 +28,7 @@ import {
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
+import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
 import { recordPath } from '#/lib/record-path'
 import {
@@ -440,6 +441,8 @@ function PersonRecordPage() {
         >
           <RecordFiles entityId={person.id} documents={documents} />
         </RecordSection>
+
+        <RecordContext entityId={person.id} />
       </RecordBody>
     </div>
   )

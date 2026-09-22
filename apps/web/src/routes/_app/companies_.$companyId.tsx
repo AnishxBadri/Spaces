@@ -32,6 +32,7 @@ import { OptionChip, optionLabel } from '#/components/attributes/value-editor'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
+import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import {
@@ -390,6 +391,8 @@ function CompanyRecordPage() {
         >
           <RecordFiles entityId={company.id} documents={documents} />
         </RecordSection>
+
+        <RecordContext entityId={company.id} />
       </RecordBody>
     </div>
   )
