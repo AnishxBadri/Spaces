@@ -25,6 +25,7 @@ import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
+import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
 import { collisionToast } from '#/lib/attributes/collision-toast'
@@ -35,6 +36,7 @@ import {
   getObjectRecord,
   getRecordTimeline,
   listRecordDocuments,
+  getEntitySensitivity,
   listRecordNotes,
   listRegistry,
   listSpaces,
@@ -64,23 +66,40 @@ export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
           recordId: record.mergedIntoId,
         },
       })
-    const [registry, timeline, documents, spaces, notes] = await Promise.all([
-      listRegistry({ data: { objectId: record.object.id } }),
-      getRecordTimeline({ data: { entityId: record.id } }),
-      listRecordDocuments({ data: { entityId: record.id } }),
-      listSpaces(),
-      // A custom record is an entity like any other, so the lanes need only
-      // its id — the object slug is the page's, never the note row's.
-      listRecordNotes({ data: { entityId: record.id } }),
-    ])
-    return { record, registry, timeline, documents, allSpaces: spaces, notes }
+    const [registry, timeline, documents, spaces, notes, sensitivity] =
+      await Promise.all([
+        listRegistry({ data: { objectId: record.object.id } }),
+        getRecordTimeline({ data: { entityId: record.id } }),
+        listRecordDocuments({ data: { entityId: record.id } }),
+        listSpaces(),
+        // A custom record is an entity like any other, so the lanes need only
+        // its id — the object slug is the page's, never the note row's.
+        listRecordNotes({ data: { entityId: record.id } }),
+        getEntitySensitivity({ data: { entityId: record.id } }),
+      ])
+    return {
+      record,
+      registry,
+      timeline,
+      documents,
+      allSpaces: spaces,
+      notes,
+      sensitivity,
+    }
   },
   component: ObjectRecordPage,
 })
 
 function ObjectRecordPage() {
-  const { record, registry, timeline, documents, allSpaces, notes } =
-    Route.useLoaderData()
+  const {
+    record,
+    registry,
+    timeline,
+    documents,
+    allSpaces,
+    notes,
+    sensitivity,
+  } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const Icon = objectIcon(record.object)
@@ -126,9 +145,12 @@ function ObjectRecordPage() {
           </>
         }
         actions={
-          <Button variant="outline" onClick={newNoteAboutThis}>
-            Note about this
-          </Button>
+          <>
+            <SensitiveToggle entityId={record.id} state={sensitivity} />
+            <Button variant="outline" onClick={newNoteAboutThis}>
+              Note about this
+            </Button>
+          </>
         }
         mark={
           <span className="flex size-7 shrink-0 items-center justify-center border border-hairline bg-paper">

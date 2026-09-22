@@ -27,11 +27,13 @@ import { SpaceSources } from '#/components/space-sources'
 import { TagCompanyRow } from '#/components/space-tag-row'
 import { TasksRail } from '#/components/tasks-rail'
 import { SaveAsTemplateAction } from '#/components/templates'
+import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import {
   createNote,
   createSpace,
+  getEntitySensitivity,
   getSpace,
   listTerms,
   saveSpaceAsTemplate,
@@ -50,11 +52,12 @@ import { cn } from '#/lib/utils'
  */
 export const Route = createFileRoute('/_app/spaces_/$spaceId')({
   loader: async ({ params }) => {
-    const [spc, terms] = await Promise.all([
+    const [spc, terms, sensitivity] = await Promise.all([
       getSpace({ data: { id: params.spaceId } }),
       listTerms({ data: { spaceId: params.spaceId } }),
+      getEntitySensitivity({ data: { entityId: params.spaceId } }),
     ])
-    return { spc, terms }
+    return { spc, terms, sensitivity }
   },
   component: SpacePage,
 })
@@ -66,7 +69,7 @@ type Company = Space['companies'][number]
 const EXIT_MS = 150
 
 function SpacePage() {
-  const { spc, terms } = Route.useLoaderData()
+  const { spc, terms, sensitivity } = Route.useLoaderData()
   const navigate = useNavigate()
   const router = useRouter()
   // Companies mid-untag: faded until the write lands and the row unmounts.
@@ -165,6 +168,7 @@ function SpacePage() {
         }
         actions={
           <>
+            <SensitiveToggle entityId={spc.id} state={sensitivity} />
             <SaveAsTemplateAction
               entityLabel="space"
               defaultName={`${spc.name} breakdown`}

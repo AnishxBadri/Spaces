@@ -1,0 +1,1 @@
+ALTER TABLE "entity" ADD COLUMN "sensitive" boolean DEFAULT false NOT NULL;

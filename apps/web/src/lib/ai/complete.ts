@@ -12,6 +12,7 @@ import { renderPrompt } from './prompt'
 import { aiRouteProgram, isLocalProvider } from './route'
 import type { AiTarget, LaneNotRouted, RouteReadFailed } from './route'
 import type { AiLane, AiSensitivity } from './lanes'
+import type { SensitivityVia } from './sensitivity'
 
 /**
  * `complete(lane, items, schema?, opts)` — half of the provider contract
@@ -21,7 +22,10 @@ import type { AiLane, AiSensitivity } from './lanes'
  * blocks (`./prompt.ts`) so the output can cite, calls the model once, and
  * writes one `ai_usage` row for the completed call.
  *
- * Sensitivity is an **input**: the caller supplies it (ai-26 resolves it).
+ * Sensitivity is an **input**: the caller supplies it, from
+ * `sensitivityFor(subject)` (`./sensitivity-for.ts`, SPA-61), spreading its
+ * `{sensitivity, via}` into the options so a refusal can name the space the
+ * record inherited from.
  * A `sensitive` call whose target is not a local provider fails
  * `SensitiveRouteRefused` — there is no fallback to cloud, by construction:
  * the check runs against the one target this call has, after it is chosen
@@ -44,6 +48,8 @@ export type Caller =
 export type CompleteOptions = {
   caller: Caller
   sensitivity: AiSensitivity
+  /** Which input made it sensitive — `sensitivityFor`'s answer, carried to the refusal. */
+  via?: SensitivityVia
   /** The rendered prompt's ceiling, task included (`renderPrompt`). */
   budgetChars: number
   /** What to do with the context — rendered after it. */
@@ -69,8 +75,37 @@ export type CompleteResult = {
 /** A `sensitive` call routed to a provider that is not local. */
 export class SensitiveRouteRefused extends Schema.TaggedError<SensitiveRouteRefused>()(
   'SensitiveRouteRefused',
-  { lane: Schema.String, provider: Schema.String },
+  {
+    lane: Schema.String,
+    provider: Schema.String,
+    via: Schema.optionalKey(
+      Schema.Union([
+        Schema.Struct({ kind: Schema.Literal('own') }),
+        Schema.Struct({ kind: Schema.Literal('space'), name: Schema.String }),
+        Schema.Struct({
+          kind: Schema.Literal('binding'),
+          name: Schema.optionalKey(Schema.String),
+        }),
+        Schema.Struct({ kind: Schema.Literal('default') }),
+      ]),
+    ),
+  },
 ) {}
+
+/** Where a refusal's sensitivity came from, as the tail of its sentence. */
+const viaClause = (via: SensitivityVia | undefined): string => {
+  if (via === undefined) return ''
+  switch (via.kind) {
+    case 'own':
+      return ''
+    case 'space':
+      return ` (sensitivity inherited from ${via.name})`
+    case 'binding':
+      return ` (sensitivity inherited from ${via.name ?? 'its storage binding'})`
+    case 'default':
+      return ' (the workspace default is sensitive)'
+  }
+}
 
 /**
  * The provider answered with an error, or could not be reached. `cause` is
@@ -109,7 +144,7 @@ export function completeMessage(failure: CompleteFailure): string {
     case 'LaneNotRouted':
       return `No model is routed for the ${failure.lane} lane${failure.sensitivity === 'sensitive' ? ' at sensitive scope' : ''}`
     case 'SensitiveRouteRefused':
-      return `Sensitive material is not sent to ${providerLabel(failure.provider)}; route the ${failure.lane} lane to a local model`
+      return `Sensitive material is not sent to ${providerLabel(failure.provider)}${viaClause(failure.via)}; route the ${failure.lane} lane to a local model`
     case 'NoCredential':
       return `No ${providerLabel(failure.provider)} key is saved`
     case 'ProviderCallFailed':
@@ -141,7 +176,11 @@ export const completeProgram = Effect.fn('complete')(function* (
 ): Effect.fn.Return<CompleteResult, CompleteFailure> {
   const target = opts.route ?? (yield* aiRouteProgram(lane, opts.sensitivity))
   if (opts.sensitivity === 'sensitive' && !isLocalProvider(target.provider))
-    return yield* new SensitiveRouteRefused({ lane, provider: target.provider })
+    return yield* new SensitiveRouteRefused({
+      lane,
+      provider: target.provider,
+      ...(opts.via === undefined ? {} : { via: opts.via }),
+    })
 
   const model =
     opts.model ??

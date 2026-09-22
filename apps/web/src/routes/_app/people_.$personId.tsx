@@ -26,6 +26,7 @@ import {
   RecordSection,
 } from '#/components/record/record-parts'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
@@ -34,6 +35,7 @@ import { recordPath } from '#/lib/record-path'
 import {
   addPersonContact,
   createNote,
+  getEntitySensitivity,
   getPerson,
   getRecordTimeline,
   listCompanies,
@@ -57,6 +59,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       timeline,
       documents,
       notes,
+      sensitivity,
     ] = await Promise.all([
       getPerson({ data: { id: params.personId } }),
       listCompanies(),
@@ -65,6 +68,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       getRecordTimeline({ data: { entityId: params.personId } }),
       listRecordDocuments({ data: { entityId: params.personId } }),
       listRecordNotes({ data: { entityId: params.personId } }),
+      getEntitySensitivity({ data: { entityId: params.personId } }),
     ])
     if (personData.mergedIntoId) {
       throw redirect({
@@ -80,6 +84,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       timeline,
       documents,
       notes,
+      sensitivity,
     }
   },
   component: PersonRecordPage,
@@ -94,6 +99,7 @@ function PersonRecordPage() {
     timeline,
     documents,
     notes,
+    sensitivity,
   } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
@@ -138,6 +144,7 @@ function PersonRecordPage() {
         }
         actions={
           <>
+            <SensitiveToggle entityId={person.id} state={sensitivity} />
             <LogInteractionDialog
               seed={{ id: person.id, name: person.name, kind: 'person' }}
               hotkey="l"

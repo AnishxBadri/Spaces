@@ -32,6 +32,7 @@ import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
+import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -44,6 +45,7 @@ import {
   getDeal,
   getRecordTimeline,
   listRecordDocuments,
+  getEntitySensitivity,
   listRecordNotes,
   listRegistry,
   updateRecord,
@@ -51,26 +53,29 @@ import {
 
 export const Route = createFileRoute('/_app/deals_/$dealId')({
   loader: async ({ params }) => {
-    const [deal, registry, timeline, documents, notes] = await Promise.all([
-      getDeal({ data: { id: params.dealId } }),
-      listRegistry({ data: { kind: 'deal' } }),
-      getRecordTimeline({ data: { entityId: params.dealId } }),
-      listRecordDocuments({ data: { entityId: params.dealId } }),
-      listRecordNotes({ data: { entityId: params.dealId } }),
-    ])
+    const [deal, registry, timeline, documents, notes, sensitivity] =
+      await Promise.all([
+        getDeal({ data: { id: params.dealId } }),
+        listRegistry({ data: { kind: 'deal' } }),
+        getRecordTimeline({ data: { entityId: params.dealId } }),
+        listRecordDocuments({ data: { entityId: params.dealId } }),
+        listRecordNotes({ data: { entityId: params.dealId } }),
+        getEntitySensitivity({ data: { entityId: params.dealId } }),
+      ])
     if (deal.mergedIntoId) {
       throw redirect({
         to: '/deals/$dealId',
         params: { dealId: deal.mergedIntoId },
       })
     }
-    return { deal, registry, timeline, documents, notes }
+    return { deal, registry, timeline, documents, notes, sensitivity }
   },
   component: DealRecordPage,
 })
 
 function DealRecordPage() {
-  const { deal, registry, timeline, documents, notes } = Route.useLoaderData()
+  const { deal, registry, timeline, documents, notes, sensitivity } =
+    Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [moveOpen, setMoveOpen] = useState(false)
@@ -192,6 +197,7 @@ function DealRecordPage() {
         }
         actions={
           <>
+            <SensitiveToggle entityId={deal.id} state={sensitivity} />
             <LogInteractionDialog
               seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
               hotkey="l"
