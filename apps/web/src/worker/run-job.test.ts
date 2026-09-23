@@ -33,7 +33,13 @@ type Settlement =
   | { call: 'complete'; queue: string; jobId: string; output: JobOutcome }
   | { call: 'fail'; queue: string; jobId: string; output: JobOutcome }
   | { call: 'failTerminal'; queue: string; jobId: string; output: JobOutcome }
-  | { call: 'send'; queue: string; data: object; startAfter: Date }
+  | {
+      call: 'send'
+      queue: string
+      data: object
+      startAfter: Date
+      singletonKey: string | null
+    }
 
 function fakeHost(): { host: JobHost; calls: Array<Settlement> } {
   const calls: Array<Settlement> = []
@@ -49,8 +55,14 @@ function fakeHost(): { host: JobHost; calls: Array<Settlement> } {
       failTerminal: async (queue, jobId, output) => {
         calls.push({ call: 'failTerminal', queue, jobId, output })
       },
-      send: async (queue, data, startAfter) => {
-        calls.push({ call: 'send', queue, data, startAfter })
+      send: async (queue, data, startAfter, options) => {
+        calls.push({
+          call: 'send',
+          queue,
+          data,
+          startAfter,
+          singletonKey: options?.singletonKey ?? null,
+        })
       },
     },
   }
@@ -231,6 +243,34 @@ describe('runJob — typed outcomes', () => {
     const done = calls[1]
     if (done.call !== 'complete') throw new Error('unreachable')
     expect(done.output.kind).toBe('rate-limited')
+    expect(sent.singletonKey).toBeNull()
+  })
+
+  it('settles a keyed rate-limited job first, then re-sends it holding its key', async () => {
+    // SPA-136: on an `exclusive` queue the active job holds its key, so a
+    // send before the settle would be refused as a duplicate.
+    const { host, calls } = fakeHost()
+    const handler = runJob(
+      def(() =>
+        Effect.fail(
+          new JobRateLimited({
+            reason: "Today's AI cap is reached",
+            retryAfterMs: 3_600_000,
+          }),
+        ),
+      ),
+      { host, layer: nothing, ledger: noLedger },
+    )
+
+    const before = Date.now()
+    await handler([{ ...fakeJob('k', { n: 1 }), singletonKey: 'the-key' }])
+
+    expect(calls.map((c) => c.call)).toEqual(['complete', 'send'])
+    const sent = calls[1]
+    if (sent.call !== 'send') throw new Error('unreachable')
+    expect(sent.singletonKey).toBe('the-key')
+    expect(sent.data).toEqual({ n: 1 })
+    expect(sent.startAfter.getTime()).toBeGreaterThanOrEqual(before + 3_600_000)
   })
 
   it('fails a JobPermanent immediately, with no retry', async () => {

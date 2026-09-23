@@ -13,21 +13,38 @@ import {
   needsRepinNote,
   pinLockedMessage,
 } from './providers/embed/ids'
-import type { EmbeddingPinView, EmbeddingTarget } from './providers/embed/ids'
+import type {
+  EmbeddingModelInfo,
+  EmbeddingPinView,
+  EmbeddingTarget,
+} from './providers/embed/ids'
 
 /**
  * The embedding pin (SPA-51, `docs/spec-ai-substrate.md` §9):
- * `workspace.settings.embedding = {provider, model, dims, pinned_at}`, set
- * once. Absent is "no embedding model", and then nothing anywhere changes —
+ * `workspace.settings.embedding = {provider, model, dims, pinned_at}`.
+ * Absent is "no embedding model", and then nothing anywhere changes —
  * search stays lexical + trigram, and `embed()` refuses `EmbeddingNotPinned`.
  *
- * **A pin does not move.** Every stored vector is the pinned model's; another
- * model's vectors in the same column are silently garbage (CONTEXT.md,
- * "the dimension trap"). Re-pin — ALTER COLUMN TYPE, index rebuild, full
- * re-embed — is not built, and even a same-width swap needs the backfill job
- * (ai-13) to re-embed what is stored. So a second pin naming another model
- * fails `PinLocked` with the sentence the section shows, and the write is
- * conditional on the key's absence, so two admins pinning at once cannot
+ * **The width does not move; the model may (SPA-136).** Every stored vector
+ * is `vector(768)`, and another model's vectors in the same column are
+ * silently garbage to a query embedded by this one (CONTEXT.md, "the
+ * dimension trap"). A swap to another model that also emits 768 needs no
+ * DDL, only a re-embed, so it is allowed: the new pin is written and every
+ * stored chunk is stale **by construction** — the semantic lane
+ * (`lib/search/query.ts`) keeps only rows whose `embedding_model` is the
+ * pin's, so no column is touched and search stops using the old vectors the
+ * moment the pin changes. The backfill job (`./embed-backfill.ts`) is what
+ * re-embeds them, and it is offered, not started: it costs money and asks
+ * first.
+ *
+ * A change of **width** stays refused `PinLocked`. The unbuilt half of
+ * re-pin is `ALTER TABLE chunk ALTER COLUMN embedding TYPE vector(N)` (every
+ * stored vector nulled or dropped first, since no cast between widths
+ * exists) plus rebuilding the HNSW index over the new column — DDL on the
+ * largest table, one explicit job, not a settings click.
+ *
+ * Every write is conditional on the pin it replaces — absent for a first
+ * pin, the model it read for a swap — so two admins pinning at once cannot
  * both win.
  */
 
@@ -41,7 +58,7 @@ export class EmbeddingPinWriteFailed extends Schema.TaggedError<EmbeddingPinWrit
   { message: Schema.String, cause: Schema.Defect() },
 ) {}
 
-/** The workspace is already pinned to another model; the message says why it stays. */
+/** The pin cannot move to that model: a different width. The message says why. */
 export class PinLocked extends Schema.TaggedError<PinLocked>()('PinLocked', {
   provider: Schema.String,
   model: Schema.String,
@@ -100,11 +117,41 @@ export const readEmbeddingPinProgram = Effect.fn('readEmbeddingPin')(
   },
 )
 
+/** The catalogue row for `target`, or the refusal an unknown model gets. */
+const knownModel = Effect.fn('pinEmbedding.knownModel')(function* (
+  target: EmbeddingTarget,
+): Effect.fn.Return<EmbeddingModelInfo, PinRefused> {
+  const model = findEmbeddingModel(target.provider, target.model)
+  if (!model)
+    return yield* new PinRefused({
+      message: `${EMBEDDING_PROVIDER_INFO[target.provider].label} ${target.model} is not an embedding model this version knows`,
+    })
+  return model
+})
+
+/** A pin names a provider whose embedding key is saved, or it is refused. */
+const requireKey = Effect.fn('pinEmbedding.requireKey')(function* (
+  target: EmbeddingTarget,
+): Effect.fn.Return<void, PinRefused | EmbeddingPinReadFailed> {
+  const key = yield* Effect.tryPromise({
+    try: () =>
+      readWorkspaceCredential(embeddingCredentialProvider(target.provider)),
+    catch: (cause) => new EmbeddingPinReadFailed({ cause }),
+  })
+  if (!key || key.status !== 'active')
+    return yield* new PinRefused({
+      message: `Save a ${EMBEDDING_PROVIDER_INFO[target.provider].label} embedding key before pinning`,
+    })
+})
+
 /**
  * Pins the workspace to one model at `PIN_DIMS`. Idempotent for the model
- * already pinned (it answers the stored pin, unchanged); `PinLocked` for any
- * other; `PinRefused` for a model the catalogue greys, or one whose provider
- * has no embedding key saved yet.
+ * already pinned (it answers the stored pin, unchanged). With another model
+ * pinned, a target that also emits `PIN_DIMS` **swaps** the pin (SPA-136) and
+ * one that cannot is `PinLocked`; with none pinned, a model the catalogue
+ * greys is `PinRefused`, as is any target whose provider has no embedding
+ * key saved yet. Nothing here enqueues the backfill — the swap only offers
+ * it.
  */
 export const pinEmbeddingProgram = Effect.fn('pinEmbedding')(function* (
   target: EmbeddingTarget,
@@ -113,39 +160,25 @@ export const pinEmbeddingProgram = Effect.fn('pinEmbedding')(function* (
   PinLocked | PinRefused | EmbeddingPinReadFailed | EmbeddingPinWriteFailed
 > {
   const existing = yield* readEmbeddingPinProgram()
-  if (existing) {
-    if (
-      existing.provider === target.provider &&
-      existing.model === target.model
-    )
-      return existing
+  if (
+    existing &&
+    existing.provider === target.provider &&
+    existing.model === target.model
+  )
+    return existing
+
+  const model = yield* knownModel(target)
+  if (existing && (!model.emitsPin || existing.dims !== PIN_DIMS))
     return yield* new PinLocked({
       provider: existing.provider,
       model: existing.model,
-      message: pinLockedMessage(existing),
-    })
-  }
-
-  const label = EMBEDDING_PROVIDER_INFO[target.provider].label
-  const model = findEmbeddingModel(target.provider, target.model)
-  if (!model)
-    return yield* new PinRefused({
-      message: `${label} ${target.model} is not an embedding model this version knows`,
+      message: pinLockedMessage(existing, model),
     })
   if (!model.emitsPin)
     return yield* new PinRefused({
-      message: `${label} ${model.id} ${needsRepinNote(model)}`,
+      message: `${EMBEDDING_PROVIDER_INFO[target.provider].label} ${model.id} ${needsRepinNote(model)}`,
     })
-
-  const key = yield* Effect.tryPromise({
-    try: () =>
-      readWorkspaceCredential(embeddingCredentialProvider(target.provider)),
-    catch: (cause) => new EmbeddingPinReadFailed({ cause }),
-  })
-  if (!key || key.status !== 'active')
-    return yield* new PinRefused({
-      message: `Save a ${label} embedding key before pinning`,
-    })
+  yield* requireKey(target)
 
   const pinnedAt = new Date(yield* Clock.currentTimeMillis).toISOString()
   const setting: EmbeddingPinSetting = {
@@ -154,6 +187,12 @@ export const pinEmbeddingProgram = Effect.fn('pinEmbedding')(function* (
     dims: PIN_DIMS,
     pinned_at: pinnedAt,
   }
+  // The pin this write replaces, exactly: absent for a first pin, the
+  // provider and model read above for a swap.
+  const replaces = existing
+    ? sql`(${workspace.settings} -> 'embedding' ->> 'provider') = ${existing.provider}
+        and (${workspace.settings} -> 'embedding' ->> 'model') = ${existing.model}`
+    : sql`(${workspace.settings} -> 'embedding') is null`
   const written = yield* Effect.tryPromise({
     try: () =>
       db
@@ -162,12 +201,7 @@ export const pinEmbeddingProgram = Effect.fn('pinEmbedding')(function* (
           settings: sql`${workspace.settings} || ${JSON.stringify({ embedding: setting })}::jsonb`,
           updatedAt: new Date(pinnedAt),
         })
-        .where(
-          and(
-            eq(workspace.id, 1),
-            sql`(${workspace.settings} -> 'embedding') is null`,
-          ),
-        )
+        .where(and(eq(workspace.id, 1), replaces))
         .returning({ id: workspace.id }),
     catch: (cause) =>
       new EmbeddingPinWriteFailed({
@@ -183,19 +217,20 @@ export const pinEmbeddingProgram = Effect.fn('pinEmbedding')(function* (
       pinnedAt,
     }
 
-  // Nothing matched: the singleton is missing, or another admin pinned
-  // between the read above and this write. Read again to say which.
+  // Nothing matched: the singleton is missing, or another admin moved the
+  // pin between the read above and this write. Read again to say which.
   const raced = yield* readEmbeddingPinProgram()
   if (raced === null)
     return yield* new EmbeddingPinWriteFailed({
-      message: 'The workspace is not set up yet',
+      message: existing
+        ? 'The pin changed while this was saved; choose again'
+        : 'The workspace is not set up yet',
       cause: null,
     })
   if (raced.provider === target.provider && raced.model === target.model)
     return raced
-  return yield* new PinLocked({
-    provider: raced.provider,
-    model: raced.model,
-    message: pinLockedMessage(raced),
+  return yield* new EmbeddingPinWriteFailed({
+    message: `The pin moved to ${EMBEDDING_PROVIDER_INFO[raced.provider].label} ${raced.model} while this was saved; choose again`,
+    cause: null,
   })
 })

@@ -12,6 +12,7 @@ import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 import { readDeck } from './jobs/read-deck'
 import { embedDocument } from './jobs/embed-document'
 import { embedSource } from './jobs/embed-source'
+import { embedBackfill, embedBackfillRetry } from './jobs/embed-backfill'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -66,6 +67,29 @@ async function main() {
     QUEUES.embedSource,
     { batchSize: 1, includeMetadata: true },
     runJob(embedSource, { host, layer: Layer.empty }),
+  )
+  // The corpus backfill (SPA-136): `exclusive` with one fixed singletonKey,
+  // so one run is queued, active or paused for the AI cap at a time — and it
+  // is created here, before the loop below, for the same reason as the deck
+  // reader's. A run can take hours, so the 15-minute default expiry is
+  // replaced by a heartbeat: pg-boss refreshes it while the handler runs and
+  // retries the job within a minute of a dead worker, and the resumed run
+  // skips every chunk already on the pin. Batch of one; no Layer — its I/O
+  // is `db` and `embed()`.
+  await boss
+    .createQueue(QUEUES.embedBackfill, {
+      policy: 'exclusive',
+      expireInSeconds: 24 * 60 * 60,
+      heartbeatSeconds: 60,
+      retryLimit: embedBackfillRetry.limit,
+      retryDelay: embedBackfillRetry.delaySeconds,
+      retryBackoff: embedBackfillRetry.backoff,
+    })
+    .catch(() => {})
+  await boss.work(
+    QUEUES.embedBackfill,
+    { batchSize: 1, includeMetadata: true },
+    runJob(embedBackfill, { host, layer: Layer.empty }),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots

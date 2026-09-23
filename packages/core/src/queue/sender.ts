@@ -47,6 +47,12 @@ export type QueuedJob = {
   state: 'created' | 'retry' | 'active' | 'completed' | 'cancelled' | 'failed'
   output: object | null
   createdOn: Date
+  /**
+   * When a queued job becomes eligible to run. pg-boss always answers it; a
+   * test's fake may leave it out. SPA-136's backfill status reads it to tell
+   * a run paused until the AI cap resets from one queued to run now.
+   */
+  startAfter?: Date
 }
 
 /**

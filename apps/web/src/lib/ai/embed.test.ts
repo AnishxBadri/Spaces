@@ -337,35 +337,30 @@ describe('the embedding pin', () => {
     })
   })
 
-  it('refuses to change an existing pin with the re-pin explanation, and leaves it as it was', async () => {
+  it('refuses to change the pin to another width with the re-pin explanation, and leaves it as it was', async () => {
+    // A same-width swap is allowed since SPA-136 (`worker/jobs/embed-backfill.test.ts`);
+    // a change of width is still the unbuilt half of re-pin.
     await saveKey('openai', 'sk-embed-test-0000')
-    await saveKey('google', 'AIza-embed-test-0000')
     const first = await pin('openai', 'text-embedding-3-small')
 
     const failure = await Effect.runPromise(
       Effect.flip(
         pinEmbeddingProgram({
-          provider: 'google',
-          model: 'text-embedding-004',
+          provider: 'openai',
+          model: 'text-embedding-ada-002',
         }),
       ),
     )
     expect(failure._tag).toBe('PinLocked')
     expect(failure.message).toBe(
-      'Embeddings are pinned to OpenAI text-embedding-3-small. Switching models means re-embedding every chunk, which this version cannot do yet. A swap to another 768-wide model arrives with the backfill job.',
+      'Embeddings are pinned to OpenAI text-embedding-3-small at 768 dimensions. text-embedding-ada-002 emits 1536; changing the width means altering the vector column and rebuilding its index, which this version cannot do yet.',
     )
-    expect(failure.message).toBe(pinLockedMessage(first))
-
-    // Another OpenAI model at the same width is refused the same way.
-    const sameVendor = await Effect.runPromise(
-      Effect.flip(
-        pinEmbeddingProgram({
-          provider: 'openai',
-          model: 'text-embedding-3-large',
-        }),
-      ),
+    const ada = modelsFor('openai').find(
+      (m) => m.id === 'text-embedding-ada-002',
     )
-    expect(sameVendor._tag).toBe('PinLocked')
+    if (!ada) throw new Error('ada-002 is not in the catalogue')
+    expect(failure.message).toBe(pinLockedMessage(first, ada))
+    expect(await Effect.runPromise(readEmbeddingPinProgram())).toEqual(first)
 
     // Pinning the pinned model again is a no-op, not a new pin.
     expect(await pin('openai', 'text-embedding-3-small')).toEqual(first)

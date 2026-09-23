@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { formatNumber } from '@spaces/core/format'
 
 /**
  * Embedding providers, their models and the pin's copy, with nothing
@@ -70,6 +71,12 @@ export type EmbeddingModelInfo = {
   nativeDims: number
   /** Whether it can be made to emit `PIN_DIMS`, natively or by request. */
   emitsPin: boolean
+  /**
+   * The provider's list price per million input tokens, in US dollars — what
+   * the backfill's pre-flight estimate multiplies by (SPA-136). An estimate,
+   * never a bill: the catalogue's note says where each figure came from.
+   */
+  usdPerMillionTokens: number
 }
 
 /**
@@ -85,6 +92,17 @@ export type EmbeddingModelInfo = {
  *   but only one of 256, 512, 1024 or 2048 — 768 is not among them → greyed.
  *   Listed anyway so the admin sees why rather than wondering where Voyage
  *   went; the adapter is built so a same-width model is a table row away.
+ *
+ * `usdPerMillionTokens` (SPA-136) is each provider's published list price
+ * for input tokens **as of 2026-09-23**, written down by hand, and every
+ * figure is an estimate: the backfill's pre-flight line is its only reader
+ * and says so. None was read from an installed package — the provider SDKs
+ * carry no pricing. OpenAI's three ($0.02, $0.13, $0.10) and Voyage's two
+ * ($0.06, $0.02) are long-standing list prices; Google's
+ * `gemini-embedding-001` ($0.15) is its paid-tier price. `text-embedding-004`
+ * ($0.10) is **unverified** — the Gemini API has listed it free on some
+ * tiers, so this errs high. A local model (SPA-83's slot) reads "free" by its
+ * provider's `local` flag, not by a zero here.
  */
 export const EMBEDDING_MODELS: ReadonlyArray<EmbeddingModelInfo> = [
   {
@@ -92,37 +110,49 @@ export const EMBEDDING_MODELS: ReadonlyArray<EmbeddingModelInfo> = [
     id: 'text-embedding-3-small',
     nativeDims: 1536,
     emitsPin: true,
+    usdPerMillionTokens: 0.02,
   },
   {
     provider: 'openai',
     id: 'text-embedding-3-large',
     nativeDims: 3072,
     emitsPin: true,
+    usdPerMillionTokens: 0.13,
   },
   {
     provider: 'openai',
     id: 'text-embedding-ada-002',
     nativeDims: 1536,
     emitsPin: false,
+    usdPerMillionTokens: 0.1,
   },
   {
     provider: 'google',
     id: 'text-embedding-004',
     nativeDims: 768,
     emitsPin: true,
+    usdPerMillionTokens: 0.1,
   },
   {
     provider: 'google',
     id: 'gemini-embedding-001',
     nativeDims: 3072,
     emitsPin: true,
+    usdPerMillionTokens: 0.15,
   },
-  { provider: 'voyage', id: 'voyage-3.5', nativeDims: 1024, emitsPin: false },
+  {
+    provider: 'voyage',
+    id: 'voyage-3.5',
+    nativeDims: 1024,
+    emitsPin: false,
+    usdPerMillionTokens: 0.06,
+  },
   {
     provider: 'voyage',
     id: 'voyage-3.5-lite',
     nativeDims: 1024,
     emitsPin: false,
+    usdPerMillionTokens: 0.02,
   },
 ]
 
@@ -172,12 +202,72 @@ export type EmbeddingPinView = {
 export const pinHeadline = (pin: EmbeddingPinView): string =>
   `Pinned to ${EMBEDDING_PROVIDER_INFO[pin.provider].label} ${pin.model} at ${pin.dims} dimensions since ${pin.pinnedAt.slice(0, 10)}.`
 
-/** Why an existing pin will not move. */
-export const pinLockedMessage = (pin: {
-  provider: EmbeddingProvider
-  model: string
-}): string =>
-  `Embeddings are pinned to ${EMBEDDING_PROVIDER_INFO[pin.provider].label} ${pin.model}. Switching models means re-embedding every chunk, which this version cannot do yet. A swap to another ${PIN_DIMS}-wide model arrives with the backfill job.`
+/**
+ * Why an existing pin will not move to `target`: a different width. A
+ * same-width swap is allowed since SPA-136 (`pinSwapNote`); a change of
+ * width is the unbuilt half of re-pin, and the sentence says what it needs.
+ */
+export const pinLockedMessage = (
+  pin: { provider: EmbeddingProvider; model: string; dims: number },
+  target: EmbeddingModelInfo,
+): string =>
+  `Embeddings are pinned to ${EMBEDDING_PROVIDER_INFO[pin.provider].label} ${pin.model} at ${pin.dims} dimensions. ${target.id} emits ${target.emitsPin ? PIN_DIMS : target.nativeDims}; changing the width means altering the vector column and rebuilding its index, which this version cannot do yet.`
+
+/** What a same-width swap does to what is stored, said before it is made. */
+export const pinSwapNote = (
+  pin: { model: string },
+  target: { provider: EmbeddingProvider; model: string },
+): string =>
+  `Swapping to ${EMBEDDING_PROVIDER_INFO[target.provider].label} ${target.model} keeps the ${PIN_DIMS}-wide column. Every stored vector is ${pin.model}'s, so search leaves them out until a backfill re-embeds them.`
+
+// The backfill's pre-flight estimate (SPA-136). The one place in the product
+// that asks before it embeds, so the figure is shown before anything runs.
+
+/** What the estimate needs to know about the pinned model. */
+export type BackfillPricing = {
+  /** The provider runs on the operator's box: nothing is billed. */
+  local: boolean
+  usdPerMillionTokens: number
+}
+
+export const pricingOf = (
+  provider: EmbeddingProvider,
+  model: EmbeddingModelInfo,
+): BackfillPricing => ({
+  local: EMBEDDING_PROVIDER_INFO[provider].local,
+  usdPerMillionTokens: model.usdPerMillionTokens,
+})
+
+/**
+ * The cost half of the estimate: "free — local model" for a local provider,
+ * whatever its catalogue row says; otherwise tokens × the list price, never
+ * compact, and a sub-cent figure said as one rather than rounded to $0.00.
+ */
+export function backfillCostLabel(
+  tokens: number,
+  pricing: BackfillPricing,
+): string {
+  if (pricing.local) return 'free — local model'
+  const usd = (tokens / 1_000_000) * pricing.usdPerMillionTokens
+  if (usd === 0) return '$0.00'
+  if (usd < 0.01) return 'under $0.01'
+  return `~$${formatNumber(usd, 2)}`
+}
+
+export type BackfillEstimate = {
+  /** Chunks not yet carrying the pinned model's vector. */
+  chunks: number
+  /** Their characters ÷ 4, the cap's own rule (`estimateTokens`). */
+  tokens: number
+  /** `backfillCostLabel`'s answer. */
+  cost: string
+}
+
+export const backfillEstimateLine = (e: BackfillEstimate): string =>
+  `${formatNumber(e.chunks, 0)} ${e.chunks === 1 ? 'chunk' : 'chunks'} · ~${formatNumber(e.tokens, 0)} tokens · ${e.cost}`
+
+export const backfillProgressLine = (embedded: number, total: number): string =>
+  `embedded ${formatNumber(embedded, 0)} of ${formatNumber(total, 0)}`
 
 // The server fns' inputs.
 

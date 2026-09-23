@@ -29,6 +29,14 @@ export const QUEUES = {
    */
   embedSource: 'chunk.embed',
   /**
+   * The corpus backfill (SPA-136): every chunk not yet carrying the pinned
+   * model's vector, in batches, stopped by the AI cap and resumed after its
+   * reset. `chunk.` and not `document.`, because note and attribute chunks
+   * are in it too. Created `exclusive` and sent with one fixed
+   * `singletonKey`, so there is only ever one run queued or active.
+   */
+  embedBackfill: 'chunk.embed-backfill',
+  /**
    * A saved link → readability text on the same `document` row (SPA-117).
    * `document.` and not `clip.`, because the row it acts on is a document
    * like every other: no separate source table, one search box over decks

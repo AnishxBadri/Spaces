@@ -129,8 +129,10 @@ export const testEmbedding = createServerFn({ method: 'POST' })
   })
 
 /**
- * Pins the workspace to one model at 768 dimensions. Refused — `PinLocked`,
- * with the re-pin explanation — when another model is already pinned.
+ * Pins the workspace to one model at 768 dimensions, or swaps a pinned one
+ * for another 768-wide model (SPA-136) — which offers the backfill and does
+ * not start it. Refused — `PinLocked`, with the re-pin explanation — when the
+ * new model would change the width.
  */
 export const pinEmbedding = createServerFn({ method: 'POST' })
   .validator(embeddingTargetInput)
@@ -139,3 +141,26 @@ export const pinEmbedding = createServerFn({ method: 'POST' })
       await import('../ai/providers/embed/settings')
     return pinEmbeddingHandler(data)
   })
+
+/**
+ * Settings → Embeddings · Backfill (SPA-136): the pending count, the
+ * pre-flight estimate and where the run stands — database reads and a queue
+ * read, never a provider call. Admin-only; the body opens with
+ * `requireAdmin()`.
+ */
+export const getEmbedBackfill = createServerFn().handler(async () => {
+  const { getEmbedBackfillHandler } = await import('../ai/embed-backfill')
+  return getEmbedBackfillHandler()
+})
+
+/**
+ * Enqueues the one backfill run, keyed, once the admin has confirmed the
+ * estimate. A second press while a run is queued, running or paused for the
+ * cap's reset answers `already-queued`.
+ */
+export const startEmbedBackfill = createServerFn({ method: 'POST' }).handler(
+  async () => {
+    const { startEmbedBackfillHandler } = await import('../ai/embed-backfill')
+    return startEmbedBackfillHandler()
+  },
+)

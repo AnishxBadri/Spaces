@@ -156,10 +156,15 @@ export interface JobHost {
     jobId: string,
     output: JobOutcome,
   ) => Promise<void>
+  /**
+   * Re-sends a job for later. `singletonKey` carries the original's key, so
+   * a keyed job on an `exclusive` queue comes back still holding it (SPA-136).
+   */
   readonly send: (
     queue: string,
     data: object,
     startAfter: Date,
+    options?: { singletonKey: string },
   ) => Promise<void>
 }
 
@@ -185,8 +190,8 @@ export function pgBossHost(boss: PgBoss): JobHost {
       await boss.fail(queue, jobId, { ...output })
       await boss.cancel(queue, jobId)
     },
-    send: async (queue, data, startAfter) => {
-      await boss.send(queue, data, { startAfter })
+    send: async (queue, data, startAfter, options) => {
+      await boss.send(queue, data, { startAfter, ...options })
     },
   }
 }
@@ -365,7 +370,10 @@ function recordSettlement(
       await host.failTerminal(queue, jobId, output)
       note(output)
     },
-    send: (queue, data, startAfter) => host.send(queue, data, startAfter),
+    send: (queue, data, startAfter, options) =>
+      options === undefined
+        ? host.send(queue, data, startAfter)
+        : host.send(queue, data, startAfter, options),
   }
 }
 
@@ -552,12 +560,28 @@ async function resolveFailure(
       console.warn(
         `[worker] ${queue} ${job.id}: ${failure.reason} — re-sent for ${startAfter.toISOString()}`,
       )
-      await host.send(queue, job.data, startAfter)
+      const key = job.singletonKey
+      if (key === null) {
+        await host.send(queue, job.data, startAfter)
+        await host.complete(
+          queue,
+          job.id,
+          outcome('rate-limited', failure.reason),
+        )
+        return
+      }
+      // A keyed job re-sends with its key (SPA-136's backfill), and on an
+      // `exclusive` queue this job holds that key until it leaves `active` —
+      // a send first would be refused as a duplicate and the job would
+      // vanish. So it is settled first and re-sent after; the cost is that a
+      // failed send now loses the job rather than leaving it to expire, which
+      // for a keyed job is a press of its button away.
       await host.complete(
         queue,
         job.id,
         outcome('rate-limited', failure.reason),
       )
+      await host.send(queue, job.data, startAfter, { singletonKey: key })
       return
     }
     case 'JobPermanent': {

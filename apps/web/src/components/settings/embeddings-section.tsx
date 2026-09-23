@@ -1,9 +1,11 @@
 import { useRouter } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { backfillConfirmOptions, confirmThenStart } from './embed-backfill-flow'
 import { SettingsRow, SettingsSection } from './settings-section'
 import { Button } from '#/components/ui/button'
+import { useConfirm } from '#/components/ui/confirm-dialog'
 import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
 import type { SelectItem } from '#/components/ui/select'
@@ -12,21 +14,30 @@ import {
   EMBEDDING_PROVIDER_INFO,
   NO_PIN_HEADLINE,
   PIN_DIMS,
+  backfillEstimateLine,
+  backfillProgressLine,
   modelsFor,
   needsRepinNote,
   pinHeadline,
-  pinLockedMessage,
+  pinSwapNote,
 } from '#/lib/ai/providers/embed/ids'
 import type {
   EmbeddingModelInfo,
   EmbeddingProvider,
 } from '#/lib/ai/providers/embed/ids'
 import type { getEmbeddingSettings } from '#/lib/server-fns'
-import { pinEmbedding, saveEmbeddingKey, testEmbedding } from '#/lib/server-fns'
+import {
+  getEmbedBackfill,
+  pinEmbedding,
+  saveEmbeddingKey,
+  startEmbedBackfill,
+  testEmbedding,
+} from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 type EmbeddingSettings = Awaited<ReturnType<typeof getEmbeddingSettings>>
 type TestResult = Awaited<ReturnType<typeof testEmbedding>>
+type BackfillView = Awaited<ReturnType<typeof getEmbedBackfill>>
 
 /**
  * Settings → AI · Embeddings (SPA-51, `docs/spec-ai-substrate.md` §9) — the
@@ -39,15 +50,25 @@ type TestResult = Awaited<ReturnType<typeof testEmbedding>>
  * workspace's 768 stays in the ledger, greyed on bone-deep with its note
  * ("needs re-pin — emits 1536, this workspace stores 768") and no control,
  * so the admin sees why rather than wondering where it went. Once pinned,
- * choosing any other model puts the refusal in the action row and holds
- * Pin; the server refuses the same change `PinLocked` regardless.
+ * choosing another 768-wide model is a swap (SPA-136): the action row says
+ * what it does to the stored vectors, the button reads Swap and asks first,
+ * and the swap offers the backfill below rather than starting it. A model
+ * of another width is never choosable here, and the server refuses it
+ * `PinLocked` regardless.
+ *
+ * The Backfill block (SPA-136) shows how many chunks carry the pinned model
+ * and what embedding the rest would cost; its button asks with that
+ * estimate before anything is queued.
  */
 export function EmbeddingsSection({
   settings,
+  backfill,
 }: {
   settings: EmbeddingSettings
+  backfill: BackfillView
 }) {
   const router = useRouter()
+  const { confirm, confirmDialog } = useConfirm()
   const { pin, keys } = settings
   const [provider, setProvider] = useState<EmbeddingProvider>(
     pin?.provider ?? 'openai',
@@ -64,8 +85,8 @@ export function EmbeddingsSection({
   const chosen = models.find((m) => m.id === model && m.emitsPin)
   const isPinned =
     pin !== null && pin.provider === provider && pin.model === model
-  // The pin another model would have to move: the refusal names it.
-  const lockedTo =
+  // The pin a chosen same-width model would replace: the note names it.
+  const swapFrom =
     pin !== null && chosen !== undefined && !isPinned ? pin : null
   const canCall = chosen !== undefined && keyRow?.configured === true
 
@@ -129,13 +150,25 @@ export function EmbeddingsSection({
 
   async function pinIt() {
     if (!chosen) return
+    if (swapFrom) {
+      const ok = await confirm({
+        title: `Swap to ${chosen.id}?`,
+        body: pinSwapNote(swapFrom, { provider, model: chosen.id }),
+        action: 'Swap',
+      })
+      if (!ok) return
+    }
     setPending('pin')
     setError(null)
     try {
       const pinned = await pinEmbedding({
         data: { provider, model: chosen.id },
       })
-      toast(pinHeadline(pinned))
+      toast(
+        swapFrom
+          ? `${pinHeadline(pinned)} Backfill re-embeds what is stored.`
+          : pinHeadline(pinned),
+      )
       void router.invalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not pin')
@@ -147,7 +180,7 @@ export function EmbeddingsSection({
   return (
     <SettingsSection
       title="Embeddings"
-      blurb="Which model turns text into vectors for search. Pinned once: every stored vector is that model's."
+      blurb="Which model turns text into vectors for search. Search reads only the pinned model's vectors."
       crumb="Workspace"
     >
       <div className="flex flex-col pt-5">
@@ -233,17 +266,17 @@ export function EmbeddingsSection({
         </SettingsRow>
 
         <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule py-2">
-          {lockedTo ? (
-            <p role="status" className="mr-auto text-label text-warning">
-              {pinLockedMessage(lockedTo)}
-            </p>
-          ) : error ? (
+          {error ? (
             <span
               role="alert"
               className="mr-auto mono text-micro text-destructive"
             >
               {error}
             </span>
+          ) : swapFrom ? (
+            <p role="status" className="mr-auto text-label text-warning">
+              {pinSwapNote(swapFrom, { provider, model })}
+            </p>
           ) : null}
           <Button
             size="sm"
@@ -256,11 +289,9 @@ export function EmbeddingsSection({
           <Button
             size="sm"
             onClick={() => void pinIt()}
-            disabled={
-              pending !== null || !canCall || lockedTo !== null || isPinned
-            }
+            disabled={pending !== null || !canCall || isPinned}
           >
-            {isPinned ? 'Pinned' : 'Pin'}
+            {isPinned ? 'Pinned' : swapFrom ? 'Swap' : 'Pin'}
           </Button>
         </div>
 
@@ -297,8 +328,136 @@ export function EmbeddingsSection({
             a test embeds one word · its vector is not stored
           </span>
         </div>
+
+        {backfill.pin ? (
+          <Backfill initial={backfill} confirm={confirm} />
+        ) : null}
       </div>
+      {confirmDialog}
     </SettingsSection>
+  )
+}
+
+type PinnedBackfill = Extract<BackfillView, { pin: object }>
+
+/** The run's state, said in the instrument's own lowercase mono. */
+function runLine(view: PinnedBackfill): string {
+  const progress = backfillProgressLine(view.embedded, view.total)
+  switch (view.run.state) {
+    case 'running':
+      return `running · ${progress}`
+    case 'queued':
+      return `queued · ${progress}`
+    case 'paused':
+      return `paused by the AI cap · resumes ${view.run.resumesAt.slice(0, 16).replace('T', ' ')} utc · ${progress}`
+    case 'failed':
+    case 'idle':
+      return progress
+  }
+}
+
+/**
+ * The Backfill block: progress, the estimate for what is left, and the one
+ * button. The button opens the confirm with the estimate on it; only a yes
+ * calls `startEmbedBackfill`. While a run is queued or running the block
+ * polls `getEmbedBackfill` — a count and a queue read, no provider call.
+ */
+function Backfill({
+  initial,
+  confirm,
+}: {
+  initial: PinnedBackfill
+  confirm: ReturnType<typeof useConfirm>['confirm']
+}) {
+  const [view, setView] = useState<BackfillView>(initial)
+  const [starting, setStarting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // A swap or a pin re-runs the loader; the block follows it.
+  useEffect(() => setView(initial), [initial])
+
+  const refresh = useCallback(async () => {
+    setView(await getEmbedBackfill())
+  }, [])
+
+  const live =
+    view.pin !== null &&
+    (view.run.state === 'queued' || view.run.state === 'running')
+  useEffect(() => {
+    if (!live) return
+    const timer = setInterval(() => {
+      void refresh().catch(() => undefined)
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [live, refresh])
+
+  if (view.pin === null) return null
+  const { estimate, run } = view
+  const busy =
+    run.state === 'queued' || run.state === 'running' || run.state === 'paused'
+
+  async function start() {
+    if (view.pin === null) return
+    setError(null)
+    setStarting(true)
+    try {
+      const started = await confirmThenStart(
+        confirm,
+        backfillConfirmOptions(estimate, view.pin.model),
+        () => startEmbedBackfill(),
+      )
+      if (started === null) return
+      if (started.status === 'queue-unavailable')
+        setError('The worker queue is unreachable; try again shortly')
+      if (started.status === 'already-queued') toast.message('Already queued')
+      if (started.status === 'nothing-to-do')
+        toast.message('Every chunk already carries the pinned model')
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start')
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-baseline gap-3 border-b border-hairline pt-5 pb-2">
+        <h3 className="label-caps text-foreground">Backfill</h3>
+        <span className="tabular mono text-micro text-graphite">
+          {runLine(view)}
+        </span>
+      </div>
+      <SettingsRow
+        label="Embed what is stored"
+        hint={
+          estimate.chunks === 0
+            ? `Every chunk carries ${view.pin.model}. New ones are embedded as they arrive.`
+            : 'Asks with this estimate first. Sensitive records are left out.'
+        }
+      >
+        {estimate.chunks > 0 ? (
+          <span className="tabular mono text-micro text-graphite">
+            {backfillEstimateLine(estimate)}
+          </span>
+        ) : null}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void start()}
+          disabled={starting || busy || estimate.chunks === 0}
+        >
+          Backfill
+        </Button>
+      </SettingsRow>
+      {error || run.state === 'failed' ? (
+        <div className="flex min-h-9 items-center border-b border-rule py-2">
+          <span role="alert" className="mono text-micro text-destructive">
+            {error ?? (run.state === 'failed' ? run.reason : null)}
+          </span>
+        </div>
+      ) : null}
+    </>
   )
 }
 

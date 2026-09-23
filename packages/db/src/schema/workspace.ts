@@ -30,8 +30,10 @@ import type { Json } from '../json'
  * `embedding` (SPA-51) is the workspace's embedding pin — the provider and
  * model every vector is made with, the width they all have, and when it was
  * set; the key absent is no embedding model, and search is lexical only.
- * `apps/web/src/lib/ai/embedding-pin.ts` writes it once and refuses to move
- * it: re-pin (ALTER COLUMN TYPE, index rebuild, full re-embed) is not built.
+ * `apps/web/src/lib/ai/embedding-pin.ts` writes it; since SPA-136 it moves
+ * to another model of the same width (the backfill re-embeds) and refuses a
+ * change of width — that re-pin (ALTER COLUMN TYPE, index rebuild, full
+ * re-embed) is not built.
  */
 export type AiCapsSetting = {
   daily_tokens?: number
