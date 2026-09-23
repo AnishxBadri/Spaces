@@ -1,5 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import {
+  BookA,
   Boxes,
   Building2,
   CheckSquare,
@@ -47,6 +48,7 @@ const KIND_ICONS: Record<string, LucideIcon> = {
   note: FileText,
   document: Paperclip,
   custom: Boxes,
+  term: BookA,
 }
 
 /**
@@ -75,7 +77,7 @@ export function hrefFor(hit: Hit): string | null {
  * snippet is rendered as text, never as HTML — extracted deck text is not
  * something to hand to a parser.
  */
-function Highlighted({ text }: { text: string }) {
+export function Highlighted({ text }: { text: string }) {
   return (
     <>
       {text.split(/(«[^»]*»)/).map((part, i) =>

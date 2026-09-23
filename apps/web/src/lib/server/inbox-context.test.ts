@@ -71,13 +71,13 @@ describe('entityContext — the noun and the link', () => {
     expect(recordPath(side)).toBe(`/o/funds/${record.id}`)
   })
 
-  it('answers null for a kind with no object row, and no page', async () => {
+  it('answers null for a kind with no object row — a term, whose page is its own', async () => {
     const { db } = await import('@spaces/db')
     const { entity } = await import('@spaces/db/schema')
     const { entityContext } = await import('#/lib/inbox/context')
     const { recordPath } = await import('#/lib/record-path')
 
-    // A research kind: no object row to join, so no noun and no route. The
+    // A research kind: no object row to join, so no noun. The
     // row goes in directly — `resolveEntity` only births the object kinds.
     const [term] = await db
       .insert(entity)
@@ -87,8 +87,8 @@ describe('entityContext — the noun and the link', () => {
 
     expect(side.objectSingular).toBeNull()
     expect(side.objectSlug).toBeNull()
-    // `sideName` renders plain text here rather than a broken link.
-    expect(recordPath(side)).toBeNull()
+    // No object row, but a page since SPA-75: a term is a concept node.
+    expect(recordPath(side)).toBe(`/terms/${term.id}`)
   })
 })
 

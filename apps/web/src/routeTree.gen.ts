@@ -43,6 +43,7 @@ import { Route as AppSettingsObjectsRouteImport } from './routes/_app/settings/o
 import { Route as AppSettingsTemplatesRouteImport } from './routes/_app/settings/templates'
 import { Route as AppSettingsWorkspaceRouteImport } from './routes/_app/settings/workspace'
 import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
+import { Route as AppTermsTermIdRouteImport } from './routes/_app/terms.$termId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
@@ -217,6 +218,11 @@ const AppSpacesSpaceIdRoute = AppSpacesSpaceIdRouteImport.update({
   path: '/spaces/$spaceId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppTermsTermIdRoute = AppTermsTermIdRouteImport.update({
+  id: '/terms/$termId',
+  path: '/terms/$termId',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/settings/templates': typeof AppSettingsTemplatesRoute
   '/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
+  '/terms/$termId': typeof AppTermsTermIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
   '/settings/': typeof AppSettingsIndexRoute
@@ -310,6 +317,7 @@ export interface FileRoutesByTo {
   '/settings/templates': typeof AppSettingsTemplatesRoute
   '/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
+  '/terms/$termId': typeof AppTermsTermIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
   '/settings': typeof AppSettingsIndexRoute
@@ -351,6 +359,7 @@ export interface FileRoutesById {
   '/_app/settings/templates': typeof AppSettingsTemplatesRoute
   '/_app/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
+  '/_app/terms/$termId': typeof AppTermsTermIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
@@ -392,6 +401,7 @@ export interface FileRouteTypes {
     | '/settings/templates'
     | '/settings/workspace'
     | '/spaces/$spaceId'
+    | '/terms/$termId'
     | '/api/auth/$'
     | '/api/blob/$key'
     | '/settings/'
@@ -430,6 +440,7 @@ export interface FileRouteTypes {
     | '/settings/templates'
     | '/settings/workspace'
     | '/spaces/$spaceId'
+    | '/terms/$termId'
     | '/api/auth/$'
     | '/api/blob/$key'
     | '/settings'
@@ -470,6 +481,7 @@ export interface FileRouteTypes {
     | '/_app/settings/templates'
     | '/_app/settings/workspace'
     | '/_app/spaces_/$spaceId'
+    | '/_app/terms/$termId'
     | '/api/auth/$'
     | '/api/blob/$key'
     | '/_app/settings/'
@@ -728,6 +740,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSpacesSpaceIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/terms/$termId': {
+      id: '/_app/terms/$termId'
+      path: '/terms/$termId'
+      fullPath: '/terms/$termId'
+      preLoaderRoute: typeof AppTermsTermIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -806,6 +825,7 @@ interface AppRouteChildren {
   AppPeoplePersonIdRoute: typeof AppPeoplePersonIdRoute
   AppPortfolioHoldingIdRoute: typeof AppPortfolioHoldingIdRoute
   AppSpacesSpaceIdRoute: typeof AppSpacesSpaceIdRoute
+  AppTermsTermIdRoute: typeof AppTermsTermIdRoute
   AppOObjectSlugRecordIdRoute: typeof AppOObjectSlugRecordIdRoute
   AppSettingsObjectsObjectSlugRoute: typeof AppSettingsObjectsObjectSlugRoute
 }
@@ -831,6 +851,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPeoplePersonIdRoute: AppPeoplePersonIdRoute,
   AppPortfolioHoldingIdRoute: AppPortfolioHoldingIdRoute,
   AppSpacesSpaceIdRoute: AppSpacesSpaceIdRoute,
+  AppTermsTermIdRoute: AppTermsTermIdRoute,
   AppOObjectSlugRecordIdRoute: AppOObjectSlugRecordIdRoute,
   AppSettingsObjectsObjectSlugRoute: AppSettingsObjectsObjectSlugRoute,
 }
