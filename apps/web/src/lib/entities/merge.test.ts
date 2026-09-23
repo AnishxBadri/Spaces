@@ -340,6 +340,77 @@ describe('mergeEntities', () => {
     }
   })
 
+  it('repoints chunks from loser to winner (SPA-102)', async () => {
+    const { resolveEntity } = await import('./resolve')
+    const { mergeEntities } = await import('./merge')
+    const { db } = await import('@spaces/db')
+    const { chunk, mergeEvent } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+    const { eq } = await import('drizzle-orm')
+
+    const tag = randomUUID().slice(0, 8)
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    expect(actor).toBeTruthy()
+
+    const winner = await resolveEntity({
+      kind: 'company',
+      name: `ChunkCo ${tag} W`,
+      keys: { domain: `chunkco-w-${tag}.com` },
+      source: { class: 'manual' },
+    })
+    const loser = await resolveEntity({
+      kind: 'company',
+      name: `ChunkCo ${tag} L`,
+      keys: { domain: `chunkco-l-${tag}.com` },
+      source: { class: 'manual' },
+    })
+
+    // The loser's chunked attribute text — the shape a close_reason chunk
+    // takes on a deal, on a kind the executor merges today.
+    const loserChunks = await db
+      .insert(chunk)
+      .values(
+        ['Passed: too early.', 'Revisit at Series A.'].map((text, idx) => ({
+          entityId: loser.entityId,
+          sourceKind: 'attribute' as const,
+          sourceKey: 'description',
+          idx,
+          text,
+        })),
+      )
+      .returning({ id: chunk.id })
+
+    const { mergeEventId } = await mergeEntities({
+      winnerId: winner.entityId,
+      loserId: loser.entityId,
+      mergedBy: actor.id,
+    })
+
+    const onLoser = await db
+      .select({ id: chunk.id })
+      .from(chunk)
+      .where(eq(chunk.entityId, loser.entityId))
+    expect(onLoser).toEqual([])
+    const onWinner = await db
+      .select({ id: chunk.id, idx: chunk.idx })
+      .from(chunk)
+      .where(eq(chunk.entityId, winner.entityId))
+    expect(onWinner.map((c) => c.id).sort()).toEqual(
+      loserChunks.map((c) => c.id).sort(),
+    )
+
+    const [event] = await db
+      .select({ snapshot: mergeEvent.snapshot })
+      .from(mergeEvent)
+      .where(eq(mergeEvent.id, mergeEventId))
+    expect(
+      event.snapshot
+        .filter((e) => e.table === 'chunk')
+        .map((e) => e.action)
+        .sort(),
+    ).toEqual(['repointed', 'repointed'])
+  })
+
   it('repoints referred_by on every deal that named the loser', async () => {
     const { resolveEntity } = await import('./resolve')
     const { mergeEntities } = await import('./merge')

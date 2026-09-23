@@ -4,8 +4,8 @@ import { db } from '@spaces/db'
 import {
   attribute,
   attributeEvent,
+  chunk,
   document,
-  documentChunk,
   entity,
   entityAlias,
   entitySpace,
@@ -452,16 +452,23 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
     ? yield* query(() =>
         db
           .select({
-            docId: documentChunk.documentId,
-            idx: documentChunk.idx,
-            text: documentChunk.text,
+            docId: chunk.entityId,
+            idx: chunk.idx,
+            text: chunk.text,
             lex: opts.taskText
-              ? sql<number>`ts_rank(to_tsvector('english', ${documentChunk.text}), plainto_tsquery('english', ${opts.taskText}))`
+              ? sql<number>`ts_rank(to_tsvector('english', ${chunk.text}), plainto_tsquery('english', ${opts.taskText}))`
               : sql<number>`0`,
           })
-          .from(documentChunk)
-          .where(inArray(documentChunk.documentId, docIds))
-          .orderBy(asc(documentChunk.documentId), asc(documentChunk.idx)),
+          .from(chunk)
+          // A document's chunks only: note and attribute chunks (SPA-102)
+          // are the semantic lane's, and render as their own kinds.
+          .where(
+            and(
+              inArray(chunk.entityId, docIds),
+              eq(chunk.sourceKind, 'document'),
+            ),
+          )
+          .orderBy(asc(chunk.entityId), asc(chunk.idx)),
       )
     : []
   // lexical lane: rank chunks with a positive score; ties by doc, idx

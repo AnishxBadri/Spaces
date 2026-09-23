@@ -274,24 +274,82 @@ export const document = pgTable(
 )
 
 /**
+ * What a chunk was cut from (docs/spec-ai-substrate.md §7: the semantic lane
+ * extends from documents to notes and close_reasons). `close_reason` is a
+ * deal *attribute* (slug `close_reason`, type text), not a column, so the
+ * third kind is the general `attribute` with the slug in `source_key` rather
+ * than a bespoke `close_reason` value.
+ */
+export const chunkSourceKind = pgEnum('chunk_source_kind', [
+  'document',
+  'note',
+  'attribute',
+])
+
+/**
+ * The retrieval grain for every AI-visible text (SPA-102, generalized from
+ * `document_chunk` before anything writes a vector). `entity_id` is the
+ * entity the text belongs to — the document, the note, or the record whose
+ * attribute was chunked (a deal for `close_reason`) — so it references
+ * `entity.id` directly, and merge repoints it (see ENTITY_REFS `chunk.entity`).
+ *
+ * `source_key` names the part of that entity the text came from: the
+ * attribute slug for `attribute`, and `''` for `document` / `note`, whose
+ * whole body is the one source. Not null so the unique index below holds for
+ * every row (a nullable key would let two `(doc, 'document', NULL, 0)` rows
+ * coexist); the check keeps the empty key and the attribute kind honest.
+ *
  * One embedding model per deployment (pgvector dimension is baked into the
  * column). embedding_model is recorded so a model change can enqueue a full
  * re-embed instead of silently corrupting search. 768 dims fits both
- * nomic-embed-text (Ollama path) and bge-base.
+ * nomic-embed-text (Ollama path) and bge-base. The HNSW index on `embedding`
+ * is hand-written SQL (migrations 0002, then 0045 for this table) because
+ * drizzle-kit cannot express the operator class.
+ *
+ * No `space_path` column, although §9 lists the space ltree path among what a
+ * chunk carries: a document can be filed in many spaces and one ltree column
+ * cannot hold that, so space filtering joins `entity_space` (and `space.path`)
+ * at query time. Denormalizing the path set onto the chunk is a later
+ * optimization, to be taken only if EXPLAIN on the semantic CTE demands it.
  */
-export const documentChunk = pgTable(
-  'document_chunk',
+export const chunk = pgTable(
+  'chunk',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    documentId: uuid('document_id')
+    entityId: uuid('entity_id')
       .notNull()
-      .references(() => document.entityId),
+      .references(() => entity.id),
+    sourceKind: chunkSourceKind('source_kind').notNull(),
+    sourceKey: text('source_key').notNull().default(''),
     idx: integer('idx').notNull(),
     text: text('text').notNull(),
     embedding: vector('embedding', { dimensions: 768 }),
     embeddingModel: text('embedding_model'),
+    /** 1-based page (PDF/PPTX) or sheet the chunk was cut from, when known. */
+    page: integer('page'),
+    /**
+     * A derived cache of the sensitivity resolver (ai-26), so retrieval can
+     * filter inside SQL "before scoring" (§9) without calling a resolver per
+     * row. Exactly one writer: `stampSensitivity(scope)`, arriving in
+     * storage-18. Nothing in SPA-102 writes it, and no second author may
+     * appoint themselves. The routing boundary never reads this column — it
+     * resolves live through `apps/web/src/lib/ai/sensitivity.ts`, because a
+     * stale cache at the point bytes leave the box is a leak.
+     */
+    sensitive: boolean('sensitive').notNull().default(false),
   },
-  (t) => [uniqueIndex('chunk_document_idx_unique').on(t.documentId, t.idx)],
+  (t) => [
+    uniqueIndex('chunk_entity_source_idx_unique').on(
+      t.entityId,
+      t.sourceKind,
+      t.sourceKey,
+      t.idx,
+    ),
+    check(
+      'chunk_source_key_invariant',
+      sql`(${t.sourceKind} = 'attribute') = (${t.sourceKey} <> '')`,
+    ),
+  ],
 )
 
 // ---------- glossary ----------

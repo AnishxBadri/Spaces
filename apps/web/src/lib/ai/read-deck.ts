@@ -2,7 +2,7 @@ import { Effect, Schema } from 'effect'
 import { and, asc, eq, isNull } from 'drizzle-orm'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
-import { document, documentChunk, entity, link } from '@spaces/db/schema'
+import { chunk, document, entity, link } from '@spaces/db/schema'
 import {
   proposalRefs,
   schemaFor,
@@ -39,7 +39,7 @@ import type {
  * Per filed record, the same path with a different registry:
  *
  *   1. context — the deck's own text first (`doc:<id>#n` per chunk where
- *      `document_chunk` rows exist, else the extracted text whole as
+ *      `chunk` rows of `source_kind: document` exist, else the extracted text whole as
  *      `doc:<id>#0`), then `recordContextProgram` on the record, which brings
  *      the space memos, the mandate and the glossary for free;
  *   2. `sensitivityFor(record)` — live, never cached — spread into the call;
@@ -170,10 +170,12 @@ const deckItems = Effect.fn('readDeck.deckItems')(function* (
 ): Effect.fn.Return<Array<ContextItem>, ReadDeckQueryFailed> {
   const chunks = yield* query(() =>
     db
-      .select({ idx: documentChunk.idx, text: documentChunk.text })
-      .from(documentChunk)
-      .where(eq(documentChunk.documentId, documentId))
-      .orderBy(asc(documentChunk.idx)),
+      .select({ idx: chunk.idx, text: chunk.text })
+      .from(chunk)
+      .where(
+        and(eq(chunk.entityId, documentId), eq(chunk.sourceKind, 'document')),
+      )
+      .orderBy(asc(chunk.idx)),
   )
   if (chunks.length > 0)
     return chunks.map((c) => ({

@@ -173,22 +173,23 @@ describe('resolveRefs — re-chunk', () => {
     const d = await deps()
     const docId = await d.newDocument('rechunked.pdf')
     const chunk = (idx: number, text: string) => ({
-      documentId: docId,
+      entityId: docId,
+      sourceKind: 'document' as const,
       idx,
       text,
     })
     await d.db
-      .insert(d.schema.documentChunk)
+      .insert(d.schema.chunk)
       .values([0, 1, 2, 3, 4].map((i) => chunk(i, `first pass ${String(i)}`)))
     const stored = d.ref.doc(docId, 3)
     const before = await d.resolve([stored])
 
     // The re-chunk: every chunk gone, new boundaries in their place.
     await d.db
-      .delete(d.schema.documentChunk)
-      .where(d.eq(d.schema.documentChunk.documentId, docId))
+      .delete(d.schema.chunk)
+      .where(d.eq(d.schema.chunk.entityId, docId))
     await d.db
-      .insert(d.schema.documentChunk)
+      .insert(d.schema.chunk)
       .values([0, 1, 2, 3].map((i) => chunk(i, `second pass ${String(i)}`)))
     const after = await d.resolve([stored])
 

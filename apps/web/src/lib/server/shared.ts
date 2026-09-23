@@ -440,7 +440,7 @@ export function documentFilingRefusal(
  *
  * The rows are the registry's answer, not this file's: `deleteEntityProgram`
  * walks `ENTITY_REFS`, which is what already clears `entity_space` alongside
- * `document_chunk`, `link` and `activity` — the hand-list that used to live
+ * `chunk`, `link` and `activity` — the hand-list that used to live
  * in `deleteDocument` missed exactly that table, which is why a
  * space-filed document could not be deleted before SPA-77.
  *

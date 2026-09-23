@@ -20,8 +20,8 @@ describe('assembleProgram', () => {
     const { db } = await import('@spaces/db')
     const {
       attributeEvent,
+      chunk,
       document,
-      documentChunk,
       entity,
       entitySpace,
       link,
@@ -147,15 +147,18 @@ describe('assembleProgram', () => {
       extractionStatus: 'done',
       createdAt: new Date('2026-08-20T00:00:00Z'),
     })
-    await db
-      .insert(documentChunk)
-      .values(
-        [
-          'Problem: edge DCs run hot.',
-          'Team: Priya Rao, ex-Tata Power.',
-          'Pilot: 40% PUE improvement.',
-        ].map((text, idx) => ({ documentId: docEnt.id, idx, text })),
-      )
+    await db.insert(chunk).values(
+      [
+        'Problem: edge DCs run hot.',
+        'Team: Priya Rao, ex-Tata Power.',
+        'Pilot: 40% PUE improvement.',
+      ].map((text, idx) => ({
+        entityId: docEnt.id,
+        sourceKind: 'document' as const,
+        idx,
+        text,
+      })),
+    )
     await db.insert(link).values({
       fromEntityId: docEnt.id,
       toEntityId: co.entityId,

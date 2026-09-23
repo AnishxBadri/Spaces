@@ -2,7 +2,7 @@ import type { PgColumn, PgTable } from 'drizzle-orm/pg-core'
 import {
   activity,
   attributeEvent,
-  documentChunk,
+  chunk,
   duplicateCandidate,
   enrichmentRecord,
   entity,
@@ -105,6 +105,14 @@ export type DeleteStrategy =
 /**
  * ContextItem kinds. The spec's seven plus `interaction` and `task`: both
  * are citation targets and neither is an entity (decided 2026-09-09).
+ *
+ * No kind for the note and attribute chunk sources `chunk` gained in SPA-102
+ * (decided there). A chunk is the *retrieval* grain, not the citation grain:
+ * a note chunk renders as `note` (ref `note:<id>`), a close_reason chunk as
+ * `attribute` (the attribute's ref), because the semantic lane only ranks
+ * which note or value surfaces. Neither renders as `doc_chunk` — that kind
+ * means a `doc:<id>#<idx>` ref, and the ranker's per-document cap
+ * (`rank.ts`, `docOfRef`) reads it so.
  */
 export type ContextKind =
   | 'attribute'
@@ -338,11 +346,24 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
 
   // --- research kinds (one step removed via a side-table PK) -------------
   {
-    key: 'document_chunk.document',
-    table: documentChunk,
-    column: documentChunk.documentId,
-    merge: { kind: 'none', why: 'document kind is not mergeable' },
+    // Was `document_chunk.document` (merge `none`) until SPA-102 widened the
+    // table: a chunk now points at a document, a note, or the record whose
+    // attribute was chunked (a deal's `close_reason`). Notes and documents
+    // are not mergeable but companies and deals are, so the rows must follow
+    // the record. `repoint` is plain: the unique index is on
+    // (entity_id, source_kind, source_key, idx), and a winner already holding
+    // the same attribute's chunks would collide — unreachable while nothing
+    // writes attribute chunks and deals are not mergeable; the chunk writer
+    // (ai-10b) owns re-chunking a merged record.
+    key: 'chunk.entity',
+    table: chunk,
+    column: chunk.entityId,
+    merge: { kind: 'repoint' },
     del: { kind: 'cascade' },
+    // One kind per column: a document's chunks are `doc_chunk` items one hop
+    // out (record → filed document → chunk), the only source written today.
+    // Note and attribute chunks render as their source's own kind (`note`,
+    // `attribute`) — see ContextKind above.
     context: { role: 'item', kind: 'doc_chunk', hop: 1 },
   },
   {

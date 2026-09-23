@@ -7,8 +7,8 @@ import { db } from '@spaces/db'
 import {
   aiUsage,
   attribute,
+  chunk,
   document,
-  documentChunk,
   entity,
   link,
   suggestion,
@@ -105,15 +105,18 @@ async function deckOnCompany(opts: { chunks?: boolean } = {}) {
     extractedText: 'Deckco builds B2B cooling for edge DCs. Berlin. Seed.',
   })
   if (opts.chunks !== false)
-    await db
-      .insert(documentChunk)
-      .values(
-        [
-          'Deckco: liquid cooling for edge data centres.',
-          'Business model: B2B, sold to operators.',
-          'Raising a seed round. HQ Berlin.',
-        ].map((text, idx) => ({ documentId: docEnt.id, idx, text })),
-      )
+    await db.insert(chunk).values(
+      [
+        'Deckco: liquid cooling for edge data centres.',
+        'Business model: B2B, sold to operators.',
+        'Raising a seed round. HQ Berlin.',
+      ].map((text, idx) => ({
+        entityId: docEnt.id,
+        sourceKind: 'document' as const,
+        idx,
+        text,
+      })),
+    )
   await db.insert(link).values({
     fromEntityId: docEnt.id,
     toEntityId: company.entityId,
