@@ -122,10 +122,14 @@ const invalid = (issues: ReadonlyArray<ProposalIssue>) =>
     issues: issues.map((i) => ({ slug: i.slug, message: i.message })),
   })
 
-type Reader = Tx | typeof db
+export type Reader = Tx | typeof db
 
-/** The live registry of the object this record belongs to. */
-async function registryFor(
+/**
+ * The live registry of the object this record belongs to. Exported for the
+ * deck reader (SPA-90), which compiles the same registry into the schema it
+ * hands the model — so the schema and the validator here never disagree.
+ */
+export async function registryFor(
   reader: Reader,
   entityId: string,
 ): Promise<Array<AttributeDef>> {

@@ -1,7 +1,13 @@
 import { createSender } from '@spaces/core/queue/sender'
 import { requireEnv } from './server/env'
 import type { QueueName } from '@spaces/core/queue/names'
-import type { Sender } from '@spaces/core/queue/sender'
+import type {
+  EnqueueOptions,
+  QueuedJob,
+  Sender,
+} from '@spaces/core/queue/sender'
+
+export type { EnqueueOptions, QueuedJob }
 
 /**
  * The web process's sender. Everything the seam does lives in
@@ -17,19 +23,41 @@ import type { Sender } from '@spaces/core/queue/sender'
 
 let sender: Sender | null = null
 
-export async function enqueue(
-  queue: QueueName,
-  data: Record<string, unknown>,
-): Promise<string | null> {
+function senderOrNull(queue: QueueName): Sender | null {
   try {
     sender ??= createSender({ connectionString: requireEnv('DATABASE_URL') })
+    return sender
   } catch (err) {
     // An unset DATABASE_URL used to surface as a rejected connect promise
     // inside the sender and so came back as `null` like any other queue
     // failure. It is read out here now, so the same answer is given here —
     // a misconfigured deployment must not turn a completed upload into a 500.
-    console.error(`[queue] could not enqueue ${queue}`, err)
+    console.error(`[queue] could not reach ${queue}`, err)
     return null
   }
-  return sender.enqueue(queue, data)
+}
+
+export async function enqueue(
+  queue: QueueName,
+  data: Record<string, unknown>,
+  options?: EnqueueOptions,
+): Promise<string | null> {
+  const s = senderOrNull(queue)
+  if (s === null) return null
+  return options === undefined
+    ? s.enqueue(queue, data)
+    : s.enqueue(queue, data, options)
+}
+
+/**
+ * The jobs on `queue` keyed `key`, any state, or `null` when the queue cannot
+ * be read (SPA-90's `readDeckStatus`).
+ */
+export async function jobsByKey(
+  queue: QueueName,
+  key: string,
+): Promise<Array<QueuedJob> | null> {
+  const s = senderOrNull(queue)
+  if (s === null) return null
+  return s.jobsByKey(queue, key)
 }

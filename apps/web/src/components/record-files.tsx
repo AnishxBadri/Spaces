@@ -36,7 +36,11 @@ import {
   deleteDocument,
   fileDocument,
   getDocumentDownloadUrl,
+  getEntitySensitivity,
+  isLaneRouted,
   listSpaces,
+  readDeck,
+  readDeckStatus,
   reExtractDocument,
   searchEntities,
   setDocumentKind,
@@ -45,6 +49,7 @@ import {
 import type { listRecordDocuments } from '#/lib/server-fns'
 import { uploadDocument } from '#/lib/documents/upload'
 import { droppedUrl } from '#/lib/documents/uri-list'
+import { offersReadDeck } from '#/lib/documents/read-deck-gate'
 import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
 
@@ -60,6 +65,11 @@ import { cn } from '#/lib/utils'
  */
 
 type Documents = Awaited<ReturnType<typeof listRecordDocuments>>
+
+type DeckStatus = Awaited<ReturnType<typeof readDeckStatus>>[string]
+
+/** What a row needs to draw Read deck; null when the row gets no button. */
+type DeckReader = { reading: boolean; onRead: () => void }
 
 /** In-flight uploads, shown alongside the filed rows. */
 type Pending = {
@@ -89,6 +99,7 @@ export function RecordFiles({
   const [previewing, setPreviewing] = useState<Documents[number] | null>(null)
 
   useExtractionPolling(documents, router)
+  const deckReaderFor = useDeckReader(entityId, documents)
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -222,6 +233,7 @@ export function RecordFiles({
             <DocumentRow
               key={doc.id}
               doc={doc}
+              reader={deckReaderFor(doc)}
               onPreview={() => setPreviewing(doc)}
             />
           ))}
@@ -260,9 +272,11 @@ export function RecordFiles({
 
 function DocumentRow({
   doc,
+  reader,
   onPreview,
 }: {
   doc: Documents[number]
+  reader: DeckReader | null
   onPreview: () => void
 }) {
   const router = useRouter()
@@ -333,6 +347,17 @@ function DocumentRow({
         <ExtractionNote doc={doc} />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
+        {reader === null ? null : (
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={reader.reading}
+            onClick={reader.onRead}
+            className="mr-1"
+          >
+            {reader.reading ? 'reading…' : 'Read deck'}
+          </Button>
+        )}
         <FilingControl doc={doc} />
         {/* Only a document a storage source linked has anywhere to open —
             an upload, a clip and a url get no action rather than a dead one. */}
@@ -830,4 +855,120 @@ function useExtractionPolling(
     }, 2500)
     return () => clearTimeout(timer)
   }, [waiting, attempts, router])
+}
+
+/**
+ * Read deck (SPA-90). The gate is asked once per Files tab, not per row:
+ * the extract lane must be routed — with a live credential, and to a local
+ * model when the record resolves sensitive — at this record's sensitivity,
+ * or no row shows the button. A row shows it when its document's kind is
+ * `deck` and its text is extracted, and on nothing else: however the kind
+ * was set — the filename guesser, a bound folder, an accepted classify
+ * suggestion — the row reads `kind` alone.
+ *
+ * The read runs on the worker. While any deck is reading the tab polls
+ * `readDeckStatus`; a read that settles says so in a toast — the suggestions
+ * are in the inbox, or the job's own failure sentence — and the button
+ * comes back.
+ */
+/** A document's read state; a deck the tab has not asked about is idle. */
+function stateOf(
+  statuses: Record<string, DeckStatus>,
+  id: string,
+): DeckStatus['state'] {
+  return Object.hasOwn(statuses, id) ? statuses[id].state : 'idle'
+}
+
+function useDeckReader(
+  entityId: string,
+  documents: Documents,
+): (doc: Documents[number]) => DeckReader | null {
+  const [routed, setRouted] = useState(false)
+  const [statuses, setStatuses] = useState<Record<string, DeckStatus>>({})
+  const [pressed, setPressed] = useState<Array<string>>([])
+  const previous = useRef<Record<string, DeckStatus>>({})
+
+  const deckIds = documents
+    .filter((d) => offersReadDeck(d, true))
+    .map((d) => d.id)
+  const deckKey = deckIds.join(',')
+
+  useEffect(() => {
+    const live = { current: true }
+    void (async () => {
+      try {
+        const [lane, sensitivity] = await Promise.all([
+          isLaneRouted({ data: { lane: 'extract' } }),
+          getEntitySensitivity({ data: { entityId } }),
+        ])
+        if (live.current) setRouted(lane[sensitivity.sensitivity])
+      } catch {
+        // A gate that cannot tell is closed: no button rather than a toast.
+        if (live.current) setRouted(false)
+      }
+    })()
+    return () => {
+      live.current = false
+    }
+  }, [entityId])
+
+  const refresh = useCallback(async () => {
+    const ids = deckKey === '' ? [] : deckKey.split(',')
+    if (ids.length === 0) return
+    const next = await readDeckStatus({ data: { documentIds: ids } })
+    for (const [id, status] of Object.entries(next)) {
+      if (stateOf(previous.current, id) !== 'reading') continue
+      if (status.state === 'failed') toast.error(status.message)
+      if (status.state === 'done')
+        toast.success('Deck read · the suggestions are in the inbox')
+    }
+    previous.current = next
+    setStatuses(next)
+    setPressed((p) => p.filter((id) => stateOf(next, id) === 'reading'))
+  }, [deckKey])
+
+  useEffect(() => {
+    if (!routed) return
+    void refresh().catch(() => undefined)
+  }, [routed, refresh])
+
+  const anyReading =
+    pressed.length > 0 ||
+    Object.values(statuses).some((s) => s.state === 'reading')
+
+  useEffect(() => {
+    if (!anyReading) return
+    const timer = setInterval(() => {
+      void refresh().catch(() => undefined)
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [anyReading, refresh])
+
+  async function read(documentId: string) {
+    setPressed((p) => [...p, documentId])
+    previous.current = {
+      ...previous.current,
+      [documentId]: { state: 'reading' },
+    }
+    try {
+      const result = await readDeck({ data: { documentId } })
+      if (result.status === 'already-reading') toast.message('Already reading')
+      if (result.status === 'queue-unavailable') {
+        toast.error('The worker queue is unreachable; try again shortly')
+        setPressed((p) => p.filter((id) => id !== documentId))
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not read deck')
+      setPressed((p) => p.filter((id) => id !== documentId))
+    }
+  }
+
+  return (doc) => {
+    if (!offersReadDeck(doc, routed)) return null
+    return {
+      reading:
+        pressed.includes(doc.id) || stateOf(statuses, doc.id) === 'reading',
+      onRead: () => void read(doc.id),
+    }
+  }
 }

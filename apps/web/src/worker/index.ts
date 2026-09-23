@@ -9,6 +9,7 @@ import { ExtractionStore, extractDocument } from './jobs/extract-document'
 import { clipDocument } from './jobs/clip-document'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
+import { readDeck } from './jobs/read-deck'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -38,6 +39,13 @@ async function main() {
     for (const job of jobs) console.log(`[worker] ${label} (stub)`, job.id)
   }
 
+  // The deck reader's queue is `exclusive` (SPA-90): with `singletonKey` set
+  // to the document id, pg-boss refuses a second job for a deck while one is
+  // queued or active. Created before the loop below, whose plain create would
+  // otherwise make it `standard` first; a queue's policy is fixed at create.
+  await boss
+    .createQueue(QUEUES.readDeck, { policy: 'exclusive' })
+    .catch(() => {})
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots
   }
@@ -45,7 +53,7 @@ async function main() {
   // JobDef.retry is the queue's policy, not the wrapper's: JobRetryable just
   // fails the job and lets pg-boss count. updateQueue is how it reaches a
   // queue row that createQueue already created on an earlier boot.
-  for (const def of [extractDocument, clipDocument]) {
+  for (const def of [extractDocument, clipDocument, readDeck]) {
     const retry = def.retry
     if (retry) {
       await boss.updateQueue(def.name, {
@@ -89,6 +97,13 @@ async function main() {
     runJob(dedupeSweep, { host, layer: Layer.empty }),
   )
   await boss.work(QUEUES.enrichEntity, stub('entity.enrich'))
+  // The deck reader (SPA-90). A model call per filed record, so a batch of
+  // one: two decks on one tick would be two providers' latency in series.
+  await boss.work(
+    QUEUES.readDeck,
+    { batchSize: 1, includeMetadata: true },
+    runJob(readDeck, { host, layer: Layer.empty }),
+  )
   // The orphan-blob sweep (SPA-54), registered exactly as the dedupe sweep
   // above: one statement's worth of work per candidate, so the default batch
   // of one is right, and includeMetadata is what `runJob` reads

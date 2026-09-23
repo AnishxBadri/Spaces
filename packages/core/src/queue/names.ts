@@ -26,6 +26,13 @@ export const QUEUES = {
    * and articles together (CONTEXT.md → "Sources are documents").
    */
   clipDocument: 'document.clip',
+  /**
+   * The deck reader (SPA-90): a `kind: deck` document → one `attribute_patch`
+   * suggestion per record it is filed against. Created with the `exclusive`
+   * policy and sent with `singletonKey = documentId`, so a second press while
+   * one is queued or active is refused by pg-boss rather than by a table.
+   */
+  readDeck: 'document.read-deck',
   /** Nightly pg_trgm sweep → duplicate_candidate rows. */
   dedupeSweep: 'entity.dedupe-sweep',
   /** On-demand enrichment, credit-capped in the worker. */

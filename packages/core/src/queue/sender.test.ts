@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ConstructorOptions } from 'pg-boss'
 import { createSender, senderOptions } from './sender'
 import { QUEUES } from './names'
-import type { QueueClient } from './sender'
+import type { EnqueueOptions, QueueClient } from './sender'
 
 /**
  * Two properties, both of which the web app depends on and neither of which
@@ -20,14 +20,20 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+type Sent = {
+  name: string
+  data: Record<string, unknown>
+  options?: EnqueueOptions
+}
+
 /** A client that records what it was constructed with and never connects. */
 function recorder(): {
   options: Array<ConstructorOptions>
   factory: (options: ConstructorOptions) => QueueClient
-  sent: Array<{ name: string; data: Record<string, unknown> }>
+  sent: Array<Sent>
 } {
   const options: Array<ConstructorOptions> = []
-  const sent: Array<{ name: string; data: Record<string, unknown> }> = []
+  const sent: Array<Sent> = []
   return {
     options,
     sent,
@@ -36,10 +42,15 @@ function recorder(): {
       return {
         on: () => undefined,
         start: () => Promise.resolve(undefined),
-        send: (name, data) => {
-          sent.push({ name, data })
+        send: (name, data, sendOptions) => {
+          sent.push(
+            sendOptions === undefined
+              ? { name, data }
+              : { name, data, options: sendOptions },
+          )
           return Promise.resolve('job-1')
         },
+        findJobs: () => Promise.resolve([]),
       }
     },
   }
@@ -76,6 +87,30 @@ describe('the queue sender', () => {
     })
   })
 
+  it('hands a singletonKey through to pg-boss, and only when asked', async () => {
+    const spy = recorder()
+    const sender = createSender({
+      connectionString: CLOSED_PORT,
+      client: spy.factory,
+    })
+    await sender.enqueue(
+      QUEUES.readDeck,
+      { documentId: 'd1' },
+      {
+        singletonKey: 'd1',
+      },
+    )
+    await sender.enqueue(QUEUES.extractDocument, { documentId: 'd1' })
+    expect(spy.sent).toEqual([
+      {
+        name: 'document.read-deck',
+        data: { documentId: 'd1' },
+        options: { singletonKey: 'd1' },
+      },
+      { name: 'document.extract', data: { documentId: 'd1' } },
+    ])
+  })
+
   it('starts once and reuses the connection', async () => {
     const spy = recorder()
     const sender = createSender({
@@ -107,6 +142,7 @@ describe('the queue sender', () => {
             : Promise.resolve(undefined)
         },
         send: () => Promise.resolve('job-2'),
+        findJobs: () => Promise.resolve([]),
       }),
     })
 
