@@ -97,12 +97,16 @@ describe('the settings nav grammar', () => {
     // None of the five sections moved by SPA-26 is admin-only at the route:
     // every one of them a member can read today, and the move changed no
     // guard. The lane exists for the admin-only sections (storage-1's OAuth
-    // still pending; ai-3a's providers, SPA-29), which declare `admin: true`
+    // still pending; ai-3a's providers, SPA-29; ai-9a's embeddings, SPA-51),
+    // which declare `admin: true`
     // and get the graphite row with `admin` in the right lane instead of a
     // dead link.
     const lockedForAMember = SETTINGS_SECTIONS.filter((row) =>
       sectionLocked(row, false),
     )
-    expect(lockedForAMember.map((row) => row.label)).toEqual(['AI providers'])
+    expect(lockedForAMember.map((row) => row.label)).toEqual([
+      'AI providers',
+      'Embeddings',
+    ])
   })
 })
