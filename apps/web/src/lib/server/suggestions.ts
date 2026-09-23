@@ -46,6 +46,48 @@ export const acceptSuggestion = createServerFn({ method: 'POST' })
     return { ok: true }
   })
 
+export type { BatchOutcome } from '../ai/propose'
+
+/**
+ * The two bulk verbs (SPA-110, spec §10): "accept all on this record" and
+ * "accept this column". Each item goes through `acceptProgram` on its own,
+ * never one transaction, and the answer is one outcome per item — a failed
+ * item carries `suggestionMessage()`'s sentence, and its row stays open.
+ */
+export const acceptSuggestionsForRecord = createServerFn({ method: 'POST' })
+  .validator(z.object({ entityId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { acceptRecordProgram, suggestionMessage } =
+      await import('../ai/propose')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(acceptRecordProgram)({
+        entityId: data.entityId,
+        actorId: u.id,
+      })
+    } catch (err) {
+      throw new Error(suggestionMessage(err))
+    }
+  })
+
+export const acceptSuggestionColumn = createServerFn({ method: 'POST' })
+  .validator(z.object({ attributeSlug: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { acceptColumnProgram, suggestionMessage } =
+      await import('../ai/propose')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(acceptColumnProgram)({
+        attributeSlug: data.attributeSlug,
+        actorId: u.id,
+      })
+    } catch (err) {
+      throw new Error(suggestionMessage(err))
+    }
+  })
+
 export const rejectSuggestion = createServerFn({ method: 'POST' })
   .validator(byId)
   .handler(async ({ data }) => {

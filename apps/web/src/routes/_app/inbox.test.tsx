@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
+import type { BatchOutcome, SuggestionItem } from '#/lib/server-fns'
 import { InboxItem, PayloadFallback, rendererFor } from './inbox.tsx'
 
 /**
@@ -174,5 +175,106 @@ describe('the suggestion card', () => {
       </ul>,
     )
     expect(html).toContain('Unrecognized item')
+  })
+})
+
+/**
+ * SPA-110. The two bulk verbs: "Accept all" on the card header, "Accept
+ * column" on each field row, and a failed field's message inline under it.
+ */
+describe('bulk accept on the suggestion card', () => {
+  const patch: SuggestionItem = {
+    id: 's-bulk',
+    kind: 'attribute_patch',
+    payload: {},
+    rationale: null,
+    citations: [],
+    fields: [
+      {
+        slug: 'location',
+        name: 'Location',
+        type: 'text',
+        options: null,
+        isSystem: true,
+        value: 'Oslo',
+      },
+      {
+        slug: 'founded_year',
+        name: 'Founded',
+        type: 'number',
+        options: null,
+        isSystem: true,
+        value: 2021,
+      },
+    ],
+    createdAt: '2026-09-23T00:00:00.000Z',
+  }
+
+  it('draws Accept all on the card header', async () => {
+    const { AcceptAllButton } =
+      await import('#/components/inbox/suggestion-card')
+    const html = renderToStaticMarkup(
+      <AcceptAllButton pending={false} onClick={() => {}} />,
+    )
+    expect(html).toContain('Accept all')
+    expect(html).not.toContain('disabled=""')
+  })
+
+  it('draws Accept column per field and the failed field message inline', async () => {
+    const { SuggestionEntry } =
+      await import('#/components/inbox/suggestion-card')
+    const html = renderToStaticMarkup(
+      <ul>
+        <SuggestionEntry
+          item={patch}
+          pending={false}
+          onAccept={() => {}}
+          onReject={() => {}}
+          actions={{
+            pending: false,
+            failureOf: (id, slug) =>
+              id === 's-bulk' && slug === 'founded_year'
+                ? 'founded_year: Expected number'
+                : null,
+            onAcceptColumn: () => {},
+          }}
+        />
+      </ul>,
+    )
+    expect(html.match(/Accept column/g)).toHaveLength(2)
+    expect(html).toContain('founded_year: Expected number')
+    expect(html.match(/role="alert"/g)).toHaveLength(1)
+  })
+
+  it('draws no column affordance without actions', async () => {
+    const { SuggestionEntry } =
+      await import('#/components/inbox/suggestion-card')
+    const html = renderToStaticMarkup(
+      <ul>
+        <SuggestionEntry
+          item={patch}
+          pending={false}
+          onAccept={() => {}}
+          onReject={() => {}}
+        />
+      </ul>,
+    )
+    expect(html).not.toContain('Accept column')
+  })
+
+  it('summarises a batch, and says so when nothing applied', async () => {
+    const { batchSummary } = await import('#/components/inbox/suggestion-card')
+    const ok: BatchOutcome = { suggestionId: 'a', slug: 'x', ok: true }
+    const bad: BatchOutcome = {
+      suggestionId: 'a',
+      slug: 'y',
+      ok: false,
+      message: 'y: no',
+    }
+    expect(batchSummary([ok, ok, ok, ok, bad])).toBe('4 applied, 1 failed')
+    expect(batchSummary([ok])).toBe('1 applied')
+    expect(batchSummary([bad, bad])).toBe(
+      'Nothing applied — 2 failed, all still open',
+    )
   })
 })

@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
-import { Boxes, Check, X } from 'lucide-react'
+import { Boxes, Check, CheckCheck, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { OptionChip } from '#/components/attributes/value-editor'
@@ -9,8 +9,14 @@ import { Button } from '#/components/ui/button'
 import { checkboxClasses } from '#/components/ui/checkbox'
 import { formatDate, formatNumber } from '@spaces/core/format'
 import { fmtMoney } from '@spaces/core/portfolio/format'
-import { acceptSuggestion, rejectSuggestion } from '#/lib/server-fns'
+import {
+  acceptSuggestion,
+  acceptSuggestionColumn,
+  acceptSuggestionsForRecord,
+  rejectSuggestion,
+} from '#/lib/server-fns'
 import type {
+  BatchOutcome,
   SuggestionField,
   SuggestionItem,
   SuggestionKind,
@@ -41,7 +47,19 @@ export const SUGGESTION_KIND_WORD: Record<SuggestionKind, string> = {
   document_kind: 'Document type',
 }
 
-type BodyProps = { item: SuggestionItem }
+/**
+ * What a field row can do beyond showing its value (SPA-110): accept its
+ * attribute on every record that proposes it, and show why the last batch
+ * could not apply it. Null where the row is drawn read-only.
+ */
+export type FieldActions = {
+  pending: boolean
+  /** The last batch's refusal for this field of this suggestion, if any. */
+  failureOf: (suggestionId: string, slug: string) => string | null
+  onAcceptColumn: (field: SuggestionField) => void
+}
+
+type BodyProps = { item: SuggestionItem; actions: FieldActions | null }
 type SuggestionBody = (props: BodyProps) => React.ReactNode
 
 /**
@@ -49,11 +67,15 @@ type SuggestionBody = (props: BodyProps) => React.ReactNode
  * `PayloadBody` exists for, never a crash.
  */
 const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
-  attribute_patch: ({ item }) =>
+  attribute_patch: ({ item, actions }) =>
     item.fields ? (
-      <PatchBody fields={item.fields} />
+      <PatchBody
+        suggestionId={item.id}
+        fields={item.fields}
+        actions={actions}
+      />
     ) : (
-      <PayloadBody item={item} />
+      <PayloadBody item={item} actions={actions} />
     ),
 }
 
@@ -75,17 +97,49 @@ export function PayloadBody({ item }: BodyProps): React.ReactNode {
   )
 }
 
-function PatchBody({ fields }: { fields: Array<SuggestionField> }) {
+function PatchBody({
+  suggestionId,
+  fields,
+  actions,
+}: {
+  suggestionId: string
+  fields: Array<SuggestionField>
+  actions: FieldActions | null
+}) {
   return (
     <dl className="flex min-w-0 flex-col gap-2">
-      {fields.map((f) => (
-        <div key={f.slug} className="flex min-w-0 flex-col gap-0.5">
-          <dt className="field-label text-graphite">{f.name}</dt>
-          <dd className="flex min-w-0 items-center text-ui">
-            <ProposedValue field={f} />
-          </dd>
-        </div>
-      ))}
+      {fields.map((f) => {
+        const failure = actions?.failureOf(suggestionId, f.slug) ?? null
+        return (
+          <div key={f.slug} className="flex min-w-0 flex-col gap-0.5">
+            <dt className="flex min-w-0 items-center justify-between gap-2">
+              <span className="truncate field-label text-graphite">
+                {f.name}
+              </span>
+              {actions ? (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  disabled={actions.pending}
+                  title={`Accept ${f.name} on every record that proposes it`}
+                  onClick={() => actions.onAcceptColumn(f)}
+                >
+                  <CheckCheck className="size-3" strokeWidth={2} />
+                  Accept column
+                </Button>
+              ) : null}
+            </dt>
+            <dd className="flex min-w-0 items-center text-ui">
+              <ProposedValue field={f} />
+            </dd>
+            {failure ? (
+              <dd role="alert" className="text-label text-destructive">
+                {failure}
+              </dd>
+            ) : null}
+          </div>
+        )
+      })}
     </dl>
   )
 }
@@ -189,17 +243,28 @@ export function SuggestionEntry({
   pending,
   onAccept,
   onReject,
+  actions = null,
+  failure = null,
 }: {
   item: SuggestionItem
   pending: boolean
   onAccept: () => void
   onReject: () => void
+  /** The field rows' bulk affordances; omitted, they draw read-only. */
+  actions?: FieldActions | null
+  /** The last batch's refusal for the suggestion as a whole (not a patch). */
+  failure?: string | null
 }): React.ReactNode {
   const Body = suggestionBodyFor(item.kind)
   return (
     <li className="flex flex-col gap-3 border-b border-rule px-5 py-3 last:border-b-0 sm:flex-row sm:items-start sm:gap-5">
-      <div className="min-w-0 sm:w-56 sm:shrink-0">
-        <Body item={item} />
+      <div className="flex min-w-0 flex-col gap-1 sm:w-64 sm:shrink-0">
+        <Body item={item} actions={actions} />
+        {failure ? (
+          <p role="alert" className="text-label text-destructive">
+            {failure}
+          </p>
+        ) : null}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <p className="text-ui text-graphite">
@@ -255,10 +320,89 @@ function RecordChip({ record }: { record: SuggestionRow['record'] }) {
   )
 }
 
+/**
+ * The toast a batch ends with. "4 applied, 1 failed"; an all-failed batch
+ * says nothing was applied, so an unchanged queue never reads as success.
+ */
+export function batchSummary(outcomes: ReadonlyArray<BatchOutcome>): string {
+  const applied = outcomes.filter((o) => o.ok).length
+  const failed = outcomes.length - applied
+  if (outcomes.length === 0) return 'Nothing left to accept'
+  if (applied === 0) return `Nothing applied — ${failed} failed, all still open`
+  return failed === 0
+    ? `${applied} applied`
+    : `${applied} applied, ${failed} failed`
+}
+
+/** Key for one item's refusal: the suggestion, and its field if it had one. */
+const failureKey = (suggestionId: string, slug?: string) =>
+  slug === undefined ? suggestionId : `${suggestionId}:${slug}`
+
+/**
+ * The card header's bulk verb. Pure over its props, like the entry, so the
+ * route test can render it without a router.
+ */
+export function AcceptAllButton({
+  pending,
+  onClick,
+}: {
+  pending: boolean
+  onClick: () => void
+}): React.ReactNode {
+  return (
+    <Button
+      size="xs"
+      className="ml-auto"
+      disabled={pending}
+      title="Accept every open suggestion on this record, field by field"
+      onClick={onClick}
+    >
+      <CheckCheck className="size-3" strokeWidth={2} />
+      Accept all
+    </Button>
+  )
+}
+
 export function SuggestionCard({ card }: { card: SuggestionRow }) {
   const router = useRouter()
   const [pending, setPending] = useState<string | null>(null)
+  // The last batch's refusals, by `failureKey` — drawn inline under the
+  // field (or the suggestion) they belong to, until the next batch.
+  const [failures, setFailures] = useState<ReadonlyMap<string, string>>(
+    () => new Map(),
+  )
   const n = card.suggestions.length
+
+  async function runBatch(run: () => Promise<Array<BatchOutcome>>) {
+    setPending('batch')
+    try {
+      const outcomes = await run()
+      setFailures(
+        new Map(
+          outcomes.flatMap((o) =>
+            o.ok ? [] : [[failureKey(o.suggestionId, o.slug), o.message]],
+          ),
+        ),
+      )
+      const summary = batchSummary(outcomes)
+      if (outcomes.some((o) => o.ok)) toast(summary)
+      else toast.error(summary)
+      void router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Action failed')
+    } finally {
+      setPending(null)
+    }
+  }
+
+  const actions: FieldActions = {
+    pending: pending !== null,
+    failureOf: (id, slug) => failures.get(failureKey(id, slug)) ?? null,
+    onAcceptColumn: (f) =>
+      void runBatch(() =>
+        acceptSuggestionColumn({ data: { attributeSlug: f.slug } }),
+      ),
+  }
 
   async function decide(id: string, verb: 'accept' | 'reject') {
     setPending(id)
@@ -285,6 +429,16 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
         <RecordChip record={card.record} />
         <span className="label-caps text-graphite">Suggestions</span>
         <span className="mono text-micro text-graphite">{n}</span>
+        <AcceptAllButton
+          pending={pending !== null}
+          onClick={() =>
+            void runBatch(() =>
+              acceptSuggestionsForRecord({
+                data: { entityId: card.record.id },
+              }),
+            )
+          }
+        />
       </div>
       <ul className="flex flex-col">
         {card.suggestions.map((s) => (
@@ -294,6 +448,8 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
             pending={pending !== null}
             onAccept={() => void decide(s.id, 'accept')}
             onReject={() => void decide(s.id, 'reject')}
+            actions={actions}
+            failure={failures.get(failureKey(s.id)) ?? null}
           />
         ))}
       </ul>
