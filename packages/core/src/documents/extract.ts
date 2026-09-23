@@ -154,17 +154,28 @@ function normalize(text: string): string {
 
 // ---------- pdf ----------
 
+/**
+ * Page-wise, under `[Page N]` markers in the shape fromPptx gives
+ * `[Slide N]`: the page is what a citation names and what a chunk is cut on
+ * (spec-ai-substrate §9). N is the page's real number, so a page with no
+ * text layer is skipped rather than renumbering the rest — and a PDF that
+ * is all scan comes back empty, which the caller reports as `unsupported`,
+ * not as a column of bare markers.
+ */
 async function fromPdf(bytes: Uint8Array): Promise<string> {
   // Dynamic import: unpdf pulls in a pdf.js build, and the web process must
   // never load it — extraction is the worker's job.
   const { extractText, getDocumentProxy } = await import('unpdf')
   // getDocumentProxy transfers the buffer, so hand it a copy.
   const pdf = await getDocumentProxy(new Uint8Array(bytes))
-  const result = await extractText(pdf, { mergePages: true })
-  // mergePages narrows this to a string, but the runtime shape has changed
-  // across unpdf versions — widen and handle both rather than trust it.
-  const text: string | Array<string> = result.text
-  return Array.isArray(text) ? text.join('\n\n') : text
+  const { text: pages } = await extractText(pdf, { mergePages: false })
+
+  const out: Array<string> = []
+  pages.forEach((page, i) => {
+    const body = page.trim()
+    if (body) out.push(`[Page ${i + 1}]\n${body}`)
+  })
+  return out.join('\n\n')
 }
 
 // ---------- docx ----------

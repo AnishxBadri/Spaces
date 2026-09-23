@@ -21,6 +21,49 @@ function slide(...runs: Array<string>): string {
     .join('')}</p:spTree></p:cSld></p:sld>`
 }
 
+/**
+ * A minimal, valid PDF: one page per entry, each drawing its lines in
+ * Helvetica — or nothing at all for `null`, which is a page with no text
+ * layer (what a scanned page looks like to a text extractor). Built by hand
+ * for the same reason as the OOXML fixtures, and the xref offsets are real
+ * so pdf.js reads it without falling back to reconstruction. The type is
+ * 1pt because pdf.js drops glyphs that fall off the page: at 1pt a line
+ * holds ~900 characters and a page ~500 lines, enough to fill the column.
+ */
+function pdf(pages: Array<Array<string> | null>): Uint8Array {
+  const escape = (s: string) => s.replace(/[\\()]/g, (c) => `\\${c}`)
+  const objects: Array<string> = []
+  const pageIds = pages.map((_, i) => 4 + i * 2)
+  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>'
+  objects[2] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pages.length} >>`
+  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+  pages.forEach((lines, i) => {
+    const pageId = pageIds[i]
+    const stream = lines
+      ? `BT /F1 1 Tf 1.2 TL 36 756 Td ${lines.map((l) => `(${escape(l)}) Tj T*`).join(' ')} ET`
+      : '0 0 1 rg 72 72 200 200 re f'
+    objects[pageId] =
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ` +
+      `/Resources << /Font << /F1 3 0 R >> >> /Contents ${pageId + 1} 0 R >>`
+    objects[pageId + 1] =
+      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`
+  })
+
+  let body = '%PDF-1.4\n'
+  const offsets: Array<number> = []
+  for (let id = 1; id < objects.length; id++) {
+    offsets[id] = body.length
+    body += `${id} 0 obj\n${objects[id]}\nendobj\n`
+  }
+  const xref = body.length
+  body += `xref\n0 ${objects.length}\n0000000000 65535 f \n`
+  for (let id = 1; id < objects.length; id++) {
+    body += `${String(offsets[id]).padStart(10, '0')} 00000 n \n`
+  }
+  body += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  return strToU8(body)
+}
+
 describe('detectFormat', () => {
   it('prefers the extension — browsers mislabel real decks', () => {
     expect(detectFormat('deck.pptx', 'application/octet-stream')).toBe('pptx')
@@ -93,6 +136,72 @@ describe('pptx', () => {
     })
     const out = await extractDocumentText({ bytes, filename: 'deck.pptx' })
     expect(out.status === 'done' && out.text).toContain('R&D <40% of spend>')
+  })
+})
+
+describe('pdf', () => {
+  it('marks each page in the shape pptx marks each slide', async () => {
+    const bytes = pdf([
+      ['Vayu Orbital', 'Seed round'],
+      ['Traction', 'ARR is $1.2M'],
+      ['Team'],
+    ])
+    const out = await extractDocumentText({ bytes, filename: 'deck.pdf' })
+    expect(out).toMatchObject({ status: 'done', format: 'pdf' })
+    const text = out.status === 'done' ? out.text : ''
+    expect(text).toMatch(
+      /^\[Page 1\]\nVayu Orbital\nSeed round\n\n\[Page 2\]\nTraction\nARR is \$1\.2M\n\n\[Page 3\]\nTeam$/,
+    )
+  })
+
+  it('still marks a one-page PDF', async () => {
+    const out = await extractDocumentText({
+      bytes: pdf([['Term sheet']]),
+      filename: 'terms.pdf',
+    })
+    expect(out.status === 'done' && out.text).toBe('[Page 1]\nTerm sheet')
+  })
+
+  it('keeps real page numbers across a page with no text layer', async () => {
+    const out = await extractDocumentText({
+      bytes: pdf([['Cover'], null, ['Market']]),
+      filename: 'deck.pdf',
+    })
+    const text = out.status === 'done' ? out.text : ''
+    expect(text).toContain('[Page 3]\nMarket')
+    expect(text).not.toContain('[Page 2]')
+  })
+
+  it('reports a PDF with no text layer as unsupported, not a column of markers', async () => {
+    const out = await extractDocumentText({
+      bytes: pdf([null, null, null]),
+      filename: 'scan.pdf',
+    })
+    expect(out).toMatchObject({ status: 'unsupported', format: 'pdf' })
+  })
+
+  it('does not let whitespace normalization fold the markers', async () => {
+    const out = await extractDocumentText({
+      bytes: pdf([['Moat:    patents', '', '', ''], ['   Ask   ']]),
+      filename: 'deck.pdf',
+    })
+    expect(out.status === 'done' && out.text).toBe(
+      '[Page 1]\nMoat: patents\n\n[Page 2]\nAsk',
+    )
+  })
+
+  it('truncates after the markers are in, so a long deck cannot blow the column', async () => {
+    // ~450k characters a page: four and a bit pages fill 2,000,000.
+    const page = Array.from({ length: 500 }, () => 'x'.repeat(900))
+    const out = await extractDocumentText({
+      bytes: pdf(Array.from({ length: 6 }, () => page)),
+      filename: 'long.pdf',
+    })
+    const text = out.status === 'done' ? out.text : ''
+    expect(text).toHaveLength(2_000_000)
+    expect(text.startsWith('[Page 1]\n')).toBe(true)
+    expect(text).toContain('\n\n[Page 5]\n')
+    expect(text).not.toContain('[Page 6]')
   })
 })
 
