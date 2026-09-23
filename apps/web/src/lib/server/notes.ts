@@ -332,66 +332,19 @@ export const saveNote = createServerFn({ method: 'POST' })
   .validator(saveNoteInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
-
-    // Shared notes are team-editable; private ones are the author's alone.
-    const existing = (
-      await db
-        .select({ authorId: note.authorId, visibility: note.visibility })
-        .from(note)
-        .where(eq(note.entityId, data.id))
-    ).at(0)
-    if (!existing || !canRead(u, existing)) throw new Error('Note not found')
-
-    await db.transaction(async (tx) => {
-      await tx
-        .update(note)
-        .set({
-          title: data.title,
-          updatedAt: new Date(),
-          ...(data.body
-            ? { bodyJson: data.body.bodyJson, bodyMd: data.body.bodyMd }
-            : {}),
-        })
-        .where(eq(note.entityId, data.id))
-      await tx
-        .update(entity)
-        .set({ canonicalName: data.title || 'Untitled' })
-        .where(eq(entity.id, data.id))
-
-      if (!data.body) return
-
-      // Diff-sync mention links (only rows this sync owns: extracted).
-      const existingLinks = await tx
-        .select({ id: link.id, toEntityId: link.toEntityId })
-        .from(link)
-        .where(
-          and(
-            eq(link.fromEntityId, data.id),
-            eq(link.relation, 'mentions'),
-            eq(link.source, 'extracted'),
-          ),
-        )
-      const wanted = new Set(data.body.mentionIds.filter((m) => m !== data.id))
-      const current = new Set(existingLinks.map((e) => e.toEntityId))
-      for (const row of existingLinks) {
-        if (!wanted.has(row.toEntityId)) {
-          await tx.delete(link).where(eq(link.id, row.id))
-        }
-      }
-      for (const target of wanted) {
-        if (!current.has(target)) {
-          await tx
-            .insert(link)
-            .values({
-              fromEntityId: data.id,
-              toEntityId: target,
-              relation: 'mentions',
-              source: 'extracted',
-              createdBy: u.id,
-            })
-            .onConflictDoNothing()
-        }
-      }
-    })
-    return { savedAt: new Date().toISOString() }
+    // The write — and the diff-sync of the note's extracted `mentions`
+    // edges, `[[mention]]` chips and glossary terms together (SPA-34) —
+    // is `lib/notes/save.ts`.
+    const { saveNoteProgram, noteSaveMessage } = await import('../notes/save')
+    const { effectFn } = await import('./effect')
+    try {
+      const { savedAt } = await effectFn(saveNoteProgram)(u.id, {
+        id: data.id,
+        title: data.title,
+        ...(data.body ? { body: data.body } : {}),
+      })
+      return { savedAt }
+    } catch (failure) {
+      throw new Error(noteSaveMessage(failure))
+    }
   })

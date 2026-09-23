@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
 import { storage } from '#/lib/storage'
+import { linkTermMentionsInTx } from '#/lib/glossary/link-terms'
 import { extractDocumentText } from '@spaces/core/documents/extract'
 import { QUEUES } from '@spaces/core/queue/names'
 import { JobContext, JobPermanent, JobRetryable } from '../run-job'
@@ -122,21 +123,32 @@ export class ExtractionStore extends Context.Service<
         }),
       markExtracted: (documentId, text) =>
         Effect.tryPromise({
-          try: async () => {
-            await db
-              .update(document)
-              .set({
-                extractedText: text,
-                // 'english' matches the tsvector config used by the search
-                // indexes; changing it here alone would make writes and
-                // queries disagree.
-                tsv: sql`to_tsvector('english', ${text})`,
-                extractionStatus: 'done',
-                extractionError: null,
-                extractedAt: new Date(),
+          try: () =>
+            db.transaction(async (tx) => {
+              await tx
+                .update(document)
+                .set({
+                  extractedText: text,
+                  // 'english' matches the tsvector config used by the search
+                  // indexes; changing it here alone would make writes and
+                  // queries disagree.
+                  tsv: sql`to_tsvector('english', ${text})`,
+                  extractionStatus: 'done',
+                  extractionError: null,
+                  extractedAt: new Date(),
+                })
+                .where(eq(document.entityId, documentId))
+              // Glossary terms the text mentions become
+              // `link(document → term, mentions, extracted)` (SPA-34), in
+              // the same transaction so the text and its concept edges
+              // never disagree. A re-extraction of unchanged text writes no
+              // edge — the sync is a diff.
+              await linkTermMentionsInTx(tx, {
+                fromId: documentId,
+                text,
+                actorId: null,
               })
-              .where(eq(document.entityId, documentId))
-          },
+            }),
           catch: (err) =>
             new StoreUnavailable({
               operation: 'markExtracted',

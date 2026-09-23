@@ -1,8 +1,9 @@
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import { buildAutomaton, findMatches } from '@spaces/core/glossary/aho-corasick'
-import type { Automaton, Pattern } from '@spaces/core/glossary/aho-corasick'
+import { findMatches } from '@spaces/core/glossary/aho-corasick'
+import type { Automaton } from '@spaces/core/glossary/aho-corasick'
+import { termAutomaton } from '@spaces/core/glossary/terms'
 
 /**
  * Glossary auto-linking, as decorations rather than document content.
@@ -25,15 +26,6 @@ export type GlossaryTerm = {
 }
 
 export const glossaryPluginKey = new PluginKey('dealos-glossary')
-
-function patternsOf(terms: Array<GlossaryTerm>): Array<Pattern> {
-  const out: Array<Pattern> = []
-  for (const t of terms) {
-    out.push({ id: t.id, text: t.name })
-    for (const alias of t.aliases) out.push({ id: t.id, text: alias })
-  }
-  return out
-}
 
 /**
  * Decorate each text node independently. Doing it per text node rather than
@@ -70,7 +62,9 @@ function decorate(
 }
 
 export function createGlossaryExtension(terms: Array<GlossaryTerm>) {
-  const automaton = buildAutomaton(patternsOf(terms))
+  // The same builder the server link sync uses (SPA-34): what highlights
+  // here is what `link(note → term, mentions)` records.
+  const automaton = termAutomaton(terms)
   const byId = new Map(terms.map((t) => [t.id, t]))
 
   return Extension.create({
