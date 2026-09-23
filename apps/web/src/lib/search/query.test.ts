@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { recordPath } from '../record-path'
 
@@ -7,22 +8,27 @@ import { recordPath } from '../record-path'
  * parent lane, a task lane, a vector lane — and each must keep these four
  * invariants. A rewrite that drops one fails here, not in the palette:
  *
- *   1. One RRF over one id space, with k = 60, in one place. Every lane
- *      ranks entity ids; the final select sums 1 / (60 + rank) over them,
- *      and nothing else scores. A second k, or a lane fused in Node, is a
- *      regression.
+ *   1. One RRF, with k = 60, in one place. The final select sums
+ *      1 / (60 + rank) per fused key, and nothing else scores. A second k,
+ *      or a lane fused in Node, is a regression. The key is
+ *      `(row_kind, id)` since the task lane (SPA-55): name, note and
+ *      document lanes rank entity ids, the task lane ranks task ids, and
+ *      the two id spaces never sum into one row.
  *   2. Snippets are marked «like this» (`HEADLINE_OPTIONS`) and the palette
  *      renders them as text, never as HTML — no `<b>`, no
  *      dangerouslySetInnerHTML, one headline options string.
  *   3. Each lane is limited to 40 rows; the fused answer to 20.
  *   4. canRead is in the SQL, on every lane that can reach a note
  *      (`canReadNoteSql`). A teammate's private note never enters the
- *      fusion; the searcher's own private note does.
+ *      fusion; the searcher's own private note does. The task lane cannot
+ *      reach a note and tasks carry no visibility flag, so it takes none.
  *
  * The file's database was truncated and reseeded before it was imported
  * (SPA-145), so the fixtures below are the whole corpus the words they use
- * can reach. Imports are dynamic: `@spaces/db` builds its pool from
- * `DATABASE_URL`, which `vitest.setup.ts` rewrites per file.
+ * can reach — and nothing here cleans up after itself, `task` rows
+ * included: the next file starts from the same truncate. Imports are
+ * dynamic: `@spaces/db` builds its pool from `DATABASE_URL`, which
+ * `vitest.setup.ts` rewrites per file.
  */
 
 async function deps() {
@@ -132,6 +138,27 @@ async function deps() {
       .values({ entityId: documentId, spaceId, createdBy: me.id })
   }
 
+  /** A task as the composer writes it; `tsv` is generated (migration 0046). */
+  const newTask = async (
+    content: string,
+    opts: {
+      id?: string
+      dueDate?: string
+      doneAt?: Date
+      userId?: string
+    } = {},
+  ) => {
+    const { userId = me.id, ...rest } = opts
+    const row = (
+      await db
+        .insert(schema.task)
+        .values({ content, assigneeId: userId, createdBy: userId, ...rest })
+        .returning({ id: schema.task.id })
+    ).at(0)
+    if (!row) throw new Error('task insert returned nothing')
+    return row.id
+  }
+
   const search = (q: string, userId = me.id) =>
     Effect.runPromise(searchAllProgram({ userId, q }))
   const fused = (q: string, userId = me.id) =>
@@ -146,6 +173,7 @@ async function deps() {
     fileOn,
     newSpace,
     fileInSpace,
+    newTask,
     search,
     fused,
   }
@@ -361,5 +389,166 @@ describe('searchAllProgram', () => {
     await newEntity('company', 'X Labs')
 
     expect(await search(' x ')).toEqual([])
+  })
+})
+
+describe('the task lane (SPA-55)', () => {
+  it('returns a task alongside a company of the same name, each marked with its row kind', async () => {
+    const { newEntity, newTask, search } = await deps()
+    const company = await newEntity('company', 'Runway')
+    const task = await newTask(
+      'Ask the founders how much runway is left after the bridge',
+      { dueDate: '2026-10-01' },
+    )
+
+    const hits = await search('runway')
+
+    expect(hits.find((h) => h.id === company)).toMatchObject({
+      rowKind: 'entity',
+      kind: 'company',
+      name: 'Runway',
+      task: null,
+    })
+    const hit = hits.find((h) => h.rowKind === 'task' && h.id === task)
+    expect(hit).toMatchObject({
+      rowKind: 'task',
+      kind: 'task',
+      name: 'Ask the founders how much runway is left after the bridge',
+      objectSlug: null,
+      matchedIn: 'task',
+      parent: null,
+      task: { dueDate: '2026-10-01', done: false },
+    })
+    expect(hit?.snippet).toContain('«runway»')
+    expect(hit?.snippet).not.toMatch(/<\/?b>/)
+  })
+
+  it('keeps two tasks and a company apart — three rows, each once, even when a task shares the company id', async () => {
+    const { newEntity, newTask, search } = await deps()
+    const company = await newEntity('company', 'Pellucid Tidewater')
+    // The same uuid in both id spaces: fused on `id` alone these two would
+    // sum into one row and one of them would vanish.
+    const twin = await newTask('Send Pellucid the revised term sheet', {
+      id: company,
+    })
+    const other = await newTask('Pellucid reference call with the CFO')
+    expect(twin).toBe(company)
+
+    const hits = await search('pellucid')
+
+    expect(hits).toHaveLength(3)
+    const keys = hits.map((h) => `${h.rowKind}:${h.id}`)
+    expect(new Set(keys).size).toBe(3)
+    expect(keys.sort()).toEqual(
+      [`entity:${company}`, `task:${twin}`, `task:${other}`].sort(),
+    )
+    expect(hits.find((h) => h.rowKind === 'entity')?.name).toBe(
+      'Pellucid Tidewater',
+    )
+  })
+
+  it('still matches a completed task and says it is done', async () => {
+    const { newTask, search } = await deps()
+    const open = await newTask('Chase the Quorlane data room access')
+    const done = await newTask('Book the Quorlane site visit', {
+      doneAt: new Date('2026-09-01T12:00:00Z'),
+    })
+
+    const hits = await search('quorlane')
+
+    expect(hits.find((h) => h.id === done)?.task).toEqual({
+      dueDate: null,
+      done: true,
+    })
+    expect(hits.find((h) => h.id === open)?.task).toEqual({
+      dueDate: null,
+      done: false,
+    })
+  })
+
+  it("shows a teammate's task but not their private note, and a space-filed deck still routes to its space", async () => {
+    const {
+      me,
+      teammate,
+      newNote,
+      newTask,
+      newDeck,
+      newSpace,
+      fileInSpace,
+      search,
+    } = await deps()
+    const other = await teammate()
+    const privateNote = await newNote({
+      title: 'Diligence scratch',
+      body: 'Marrowgate churn looks worse than the deck admits.',
+      authorId: other,
+      visibility: 'private',
+    })
+    const theirTask = await newTask('Pull the Marrowgate cohort data', {
+      userId: other,
+    })
+    const space = await newSpace('Vertical SaaS')
+    const deck = await newDeck(
+      'Marrowgate seed deck.pdf',
+      'Marrowgate automates compliance filings for regional lenders.',
+    )
+    await fileInSpace(deck, space)
+
+    const hits = await search('marrowgate', me)
+
+    expect(hits.map((h) => h.id)).not.toContain(privateNote)
+    expect(hits.find((h) => h.id === theirTask)).toMatchObject({
+      rowKind: 'task',
+    })
+    expect(hits.find((h) => h.id === deck)?.parent).toMatchObject({
+      id: space,
+      kind: 'space',
+    })
+  })
+
+  it('sums one RRF across all four lanes: each lane scores 1/(60+r), a task at rank 1 as much as a note', async () => {
+    const { me, newDeck, newNote, newTask, fused } = await deps()
+    const deck = await newDeck(
+      'Glimmerfen overview.pdf',
+      'Glimmerfen builds peat-free substrates for vertical farms.',
+    )
+    const note = await newNote({
+      title: 'Partner meeting',
+      body: 'Discussed the glimmerfen pilot with the grower.',
+      authorId: me,
+      visibility: 'shared',
+    })
+    const task = await newTask('Glimmerfen: send the grower intro')
+
+    const rows = await fused('glimmerfen')
+
+    const sources = new Set(rows.flatMap((r) => r.sources))
+    expect([...sources].sort()).toEqual(['document', 'name', 'note', 'task'])
+    const taskRow = rows.find((r) => r.row_kind === 'task' && r.id === task)
+    expect(taskRow?.sources).toEqual(['task'])
+    expect(Number(taskRow?.score)).toBeCloseTo(1 / (60 + 1), 12)
+    const noteRow = rows.find((r) => r.id === note)
+    expect(Number(noteRow?.score)).toBeCloseTo(Number(taskRow?.score), 12)
+    const deckRow = rows.find((r) => r.id === deck)
+    expect(Number(deckRow?.score)).toBeCloseTo(2 / (60 + 1), 12)
+  })
+
+  it('spells k = 60 once, limits each of the four lanes to 40 and the answer to 20', () => {
+    // Read from source: the per-lane limit is invisible behind the final 20,
+    // and "one k" is a claim about the statement, not about any one answer.
+    const source = readFileSync(new URL('./query.ts', import.meta.url), 'utf8')
+    expect(source.match(/\b60 \+/g)).toHaveLength(1)
+    expect(source.match(/limit 40\b/g)).toHaveLength(4)
+    expect(source.match(/limit 20\b/g)).toHaveLength(1)
+  })
+
+  it('answers at most 20 hits when tasks alone match', async () => {
+    const { newTask, search } = await deps()
+    for (let i = 1; i <= 25; i++)
+      await newTask(`Follow up with Vornholt contact ${i}`)
+
+    const hits = await search('vornholt')
+    expect(hits).toHaveLength(20)
+    expect(hits.every((h) => h.rowKind === 'task')).toBe(true)
   })
 })

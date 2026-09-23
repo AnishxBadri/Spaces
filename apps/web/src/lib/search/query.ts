@@ -11,11 +11,16 @@ import { entity, entitySpace, link, objectDef } from '@spaces/db/schema'
  * from `lib/server/search.ts`, Effect-first per CONTEXT.md "Backend
  * paradigm", so a test can call it without a request).
  *
- * Everything searchable is an entity, so the three sources rank the *same*
- * id space and reciprocal rank fusion is the honest way to combine them:
- * scores from trigram similarity and ts_rank are not comparable, but ranks
- * are. RRF also generalises — when the pgvector half lands (CONTEXT.md →
- * Search is hybrid), it joins as a fourth CTE and nothing else changes.
+ * Names, notes and documents are entities, so those three sources rank the
+ * *same* id space and reciprocal rank fusion is the honest way to combine
+ * them: scores from trigram similarity and ts_rank are not comparable, but
+ * ranks are. Tasks are the exception (SPA-55): deliberately not entities
+ * (CONTEXT.md 15b), so the fourth lane ranks a second id space. Every fused
+ * row therefore carries a `row_kind` discriminator — 'entity' | 'task' — and
+ * the fusion keys on `(row_kind, id)`, so a task can never fuse with an
+ * entity that happens to share its uuid. The pgvector half (CONTEXT.md →
+ * Search is hybrid) joins as one more lane under the same key and extends
+ * `SearchHit` rather than reshaping it.
  *
  * k = 60 is the standard RRF constant: large enough that a top hit in one
  * source doesn't automatically beat two decent hits across two sources. It
@@ -23,8 +28,10 @@ import { entity, entitySpace, link, objectDef } from '@spaces/db/schema'
  * `lib/context/rank.ts`), and it appears once, in the final select.
  *
  * canRead is enforced in SQL on every lane that can reach a note — a
- * teammate's private note never enters the fusion. `query.test.ts` pins the
- * invariants a rewrite of this module must keep.
+ * teammate's private note never enters the fusion. The task lane takes no
+ * such clause: tasks carry no visibility flag, and any member sees any task
+ * (the rule /tasks enforces). `query.test.ts` pins the invariants a rewrite
+ * of this module must keep.
  */
 
 export class SearchQueryFailed extends Schema.TaggedError<SearchQueryFailed>()(
@@ -69,8 +76,16 @@ export const canReadNoteSql = (userId: string): SQL => sql`not exists (
 
 export type SearchAllInput = { userId: string; q: string }
 
-/** One fused row, as Postgres returns it — `score` is `numeric`, a string. */
+/** Which id space a fused row's `id` belongs to. */
+export type SearchRowKind = 'entity' | 'task'
+
+/**
+ * One fused row, as Postgres returns it — `score` is `numeric`, a string.
+ * `kind` is the entity kind, or `'task'` for a task row; `due_date` and
+ * `done` are null for every entity row.
+ */
 export type FusedRow = {
+  row_kind: SearchRowKind
   id: string
   kind: string
   name: string
@@ -78,24 +93,41 @@ export type FusedRow = {
   snippet: string | null
   sources: Array<string>
   score: string
+  due_date: string | null
+  done: boolean | null
 }
 
-export type SearchHit = {
+/** A document's destination: the record or space it is filed against. */
+export type SearchParent = {
+  id: string
+  kind: (typeof entity.$inferSelect)['kind']
+  name: string
+  objectSlug: string | null
+}
+
+/** What a task hit carries that an entity hit has no use for. */
+export type SearchTask = { dueDate: string | null; done: boolean }
+
+/**
+ * The hit contract (SPA-55) — one shape for every lane, pinned here so a
+ * later lane extends it instead of reshaping it. `task` is non-null exactly
+ * when `rowKind` is 'task'; `parent` is only ever set on a document.
+ */
+type SearchHitFields = {
   id: string
   kind: string
   name: string
   objectSlug: string | null
   snippet: string | null
   matchedIn: string
-  parent: {
-    id: string
-    kind: (typeof entity.$inferSelect)['kind']
-    name: string
-    objectSlug: string | null
-  } | null
+  parent: SearchParent | null
 }
 
-/** The fused statement: three lanes, one RRF, top 20. */
+export type SearchHit =
+  | (SearchHitFields & { rowKind: 'entity'; task: null })
+  | (SearchHitFields & { rowKind: 'task'; task: SearchTask })
+
+/** The fused statement: four lanes, one RRF, top 20. */
 export const fusedRowsProgram = Effect.fn('fusedRowsProgram')(function* ({
   userId,
   q,
@@ -165,33 +197,64 @@ export const fusedRowsProgram = Effect.fn('fusedRowsProgram')(function* ({
         limit 40
       ),
 
+      -- Tasks: a plain table, not an entity (CONTEXT.md 15b), so this lane
+      -- ranks task ids, not entity ids. No canRead clause, unlike the
+      -- private-note carve-out in the two lanes above, and on purpose: a
+      -- task carries no visibility flag — any member sees any task, the
+      -- rule /tasks already enforces — so there is nothing to carve out.
+      -- Nor does it filter on done_at: a finished task is still a thing you
+      -- may be looking for, and the hit says it is done.
+      task_hits as (
+        select t.id,
+               row_number() over (order by ts_rank(t.tsv, (select tsq from q)) desc) as rnk,
+               ts_headline('english', t.content, (select tsq from q),
+                 ${headlineOptions}
+               ) as snippet
+        from task t
+        where t.tsv @@ (select tsq from q)
+        limit 40
+      ),
+
+      -- row_kind keeps the two id spaces apart: a task id and an entity id
+      -- are both uuids, and the fusion below keys on (row_kind, id) so they
+      -- can never sum into one row.
       fused as (
-        select id, 'name' as source, rnk, null::text as snippet from name_hits
+        select 'entity' as row_kind, id, 'name' as source, rnk, null::text as snippet from name_hits
         union all
-        select id, 'note', rnk, snippet from note_hits
+        select 'entity', id, 'note', rnk, snippet from note_hits
         union all
-        select id, 'document', rnk, snippet from doc_hits
+        select 'entity', id, 'document', rnk, snippet from doc_hits
+        union all
+        select 'task', id, 'task', rnk, snippet from task_hits
       )
 
-      select f.id,
-             e.kind,
-             e.canonical_name as name,
+      -- Each join is gated on row_kind, and both are left joins: a task row
+      -- finds no entity and supplies its own name, due date and done state.
+      -- The columns grouped after (row_kind, id) are one value per key —
+      -- they ride along for the select list and split nothing.
+      select f.row_kind,
+             f.id,
+             coalesce(e.kind::text, 'task') as kind,
+             coalesce(e.canonical_name, t.content) as name,
              o.slug as object_slug,
              (array_remove(array_agg(f.snippet order by f.rnk), null))[1] as snippet,
              array_agg(distinct f.source) as sources,
-             sum(1.0 / (60 + f.rnk)) as score
+             sum(1.0 / (60 + f.rnk)) as score,
+             t.due_date::text as due_date,
+             case when t.id is null then null else t.done_at is not null end as done
       from fused f
-      join entity e on e.id = f.id
+      left join entity e on f.row_kind = 'entity' and e.id = f.id
+      left join task t on f.row_kind = 'task' and t.id = f.id
       left join object o on o.id = e.object_id
-      group by f.id, e.kind, e.canonical_name, o.slug
-      order by score desc, e.canonical_name
+      group by f.row_kind, f.id,
+               e.kind, e.canonical_name, o.slug,
+               t.id, t.content, t.due_date, t.done_at
+      order by score desc, name
       limit 20
     `),
   )
   return rows.rows
 })
-
-export type SearchParent = NonNullable<SearchHit['parent']>
 
 /**
  * Where each document hit sends you. Documents have no page of their own —
@@ -268,7 +331,10 @@ export const documentParentsProgram = Effect.fn('documentParentsProgram')(
   },
 )
 
-/** What Cmd-K shows: the fused rows, each document carrying where it is filed. */
+/**
+ * What Cmd-K shows: the fused rows, each document carrying where it is
+ * filed and each task its due date and done state.
+ */
 export const searchAllProgram = Effect.fn('searchAllProgram')(function* ({
   userId,
   q: raw,
@@ -280,16 +346,32 @@ export const searchAllProgram = Effect.fn('searchAllProgram')(function* ({
   if (hits.length === 0) return []
 
   const parents = yield* documentParentsProgram(
-    hits.filter((h) => h.kind === 'document').map((h) => h.id),
+    hits
+      .filter((h) => h.row_kind === 'entity' && h.kind === 'document')
+      .map((h) => h.id),
   )
 
-  return hits.map((h) => ({
-    id: h.id,
-    kind: h.kind,
-    name: h.name,
-    objectSlug: h.object_slug,
-    snippet: h.snippet?.replace(/\s+/g, ' ').trim() ?? null,
-    matchedIn: h.sources.includes('name') ? 'name' : (h.sources[0] ?? 'name'),
-    parent: parents.get(h.id) ?? null,
-  }))
+  return hits.map((h): SearchHit => {
+    const fields = {
+      id: h.id,
+      kind: h.kind,
+      name: h.name,
+      objectSlug: h.object_slug,
+      snippet: h.snippet?.replace(/\s+/g, ' ').trim() ?? null,
+      matchedIn: h.sources.includes('name') ? 'name' : (h.sources[0] ?? 'name'),
+    }
+    return h.row_kind === 'task'
+      ? {
+          ...fields,
+          rowKind: 'task',
+          parent: null,
+          task: { dueDate: h.due_date, done: h.done === true },
+        }
+      : {
+          ...fields,
+          rowKind: 'entity',
+          parent: parents.get(h.id) ?? null,
+          task: null,
+        }
+  })
 })

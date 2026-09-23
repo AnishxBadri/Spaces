@@ -2,6 +2,7 @@ import { useNavigate } from '@tanstack/react-router'
 import {
   Boxes,
   Building2,
+  CheckSquare,
   FileText,
   Kanban,
   Layers,
@@ -27,12 +28,13 @@ import { authClient } from '#/lib/auth-client'
 import { recordPath } from '#/lib/record-path'
 import { searchAll } from '#/lib/server-fns'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
+import { cn } from '#/lib/utils'
 
 /**
- * Cmd-K over everything: names, note bodies, and extracted document text,
- * fused and ranked in Postgres (see searchAll). cmdk's own filtering is off
- * — the server already ranked these, and re-filtering client-side would drop
- * the typo matches trigram search exists to catch.
+ * Cmd-K over everything: names, note bodies, extracted document text and
+ * tasks, fused and ranked in Postgres (see searchAll). cmdk's own filtering
+ * is off — the server already ranked these, and re-filtering client-side
+ * would drop the typo matches trigram search exists to catch.
  */
 
 type Hit = Awaited<ReturnType<typeof searchAll>>[number]
@@ -47,8 +49,13 @@ const KIND_ICONS: Record<string, LucideIcon> = {
   custom: Boxes,
 }
 
-/** Documents have no page — a hit lands on the record it is filed against. */
-function hrefFor(hit: Hit): string | null {
+/**
+ * Documents have no page — a hit lands on the record it is filed against.
+ * Tasks have no page either: a task hit lands on /tasks (focusing the row
+ * is clean-6's).
+ */
+export function hrefFor(hit: Hit): string | null {
+  if (hit.rowKind === 'task') return '/tasks'
   const target =
     hit.kind === 'document'
       ? hit.parent
@@ -80,6 +87,57 @@ function Highlighted({ text }: { text: string }) {
           <span key={i}>{part}</span>
         ),
       )}
+    </>
+  )
+}
+
+/** What the mono lane says: where the match came from, or when a task is due. */
+function hitMeta(hit: Hit): string {
+  if (hit.rowKind === 'task') return hit.task.dueDate ?? 'no date'
+  if (hit.kind === 'document' && hit.parent) return `in ${hit.parent.name}`
+  return hit.matchedIn === 'name'
+    ? (hit.objectSlug ?? hit.kind)
+    : `${hit.objectSlug ?? hit.kind} · text`
+}
+
+/**
+ * One result row's content, inside its `CommandItem`. A task reads as a
+ * task — checkbox icon, its due date in the mono lane, struck through once
+ * done (the /tasks row's treatment) — because the lane does not drop
+ * finished tasks and the row has to say which it is.
+ */
+export function HitLine({ hit }: { hit: Hit }) {
+  const Icon =
+    hit.rowKind === 'task' ? CheckSquare : (KIND_ICONS[hit.kind] ?? FileText)
+  const done = hit.rowKind === 'task' && hit.task.done
+  return (
+    <>
+      <Icon
+        className="mt-0.5 size-4 shrink-0 text-graphite"
+        strokeWidth={1.75}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline gap-2">
+          <span
+            className={cn(
+              'min-w-0 truncate',
+              done && 'text-graphite line-through',
+            )}
+          >
+            {hit.name || 'Untitled'}
+          </span>
+          {/* Where the match came from, because "why is this here" is the
+              first question a fuzzy hit raises. */}
+          <span className="shrink-0 mono text-micro text-graphite">
+            {hitMeta(hit)}
+          </span>
+        </span>
+        {hit.snippet ? (
+          <span className="mt-0.5 block truncate text-label text-graphite">
+            <Highlighted text={hit.snippet} />
+          </span>
+        ) : null}
+      </span>
     </>
   )
 }
@@ -262,41 +320,19 @@ export function CommandPalette({
             ) : (
               <CommandGroup heading={`Results · ${hits.length}`}>
                 {hits.map((hit) => {
-                  const Icon = KIND_ICONS[hit.kind] ?? FileText
                   const href = hrefFor(hit)
+                  // Task ids and entity ids are two id spaces; the key and
+                  // cmdk's value carry the row kind so they cannot collide.
+                  const key = `${hit.rowKind}:${hit.id}`
                   return (
                     <CommandItem
-                      key={hit.id}
-                      value={hit.id}
+                      key={key}
+                      value={key}
                       disabled={!href}
                       onSelect={() => href && go(href)}
                       className="items-start gap-2.5"
                     >
-                      <Icon
-                        className="mt-0.5 size-4 shrink-0 text-graphite"
-                        strokeWidth={1.75}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-baseline gap-2">
-                          <span className="min-w-0 truncate">
-                            {hit.name || 'Untitled'}
-                          </span>
-                          {/* Where the match came from, because "why is this
-                              here" is the first question a fuzzy hit raises. */}
-                          <span className="shrink-0 mono text-micro text-graphite">
-                            {hit.kind === 'document' && hit.parent
-                              ? `in ${hit.parent.name}`
-                              : hit.matchedIn === 'name'
-                                ? (hit.objectSlug ?? hit.kind)
-                                : `${hit.objectSlug ?? hit.kind} · text`}
-                          </span>
-                        </span>
-                        {hit.snippet ? (
-                          <span className="mt-0.5 block truncate text-label text-graphite">
-                            <Highlighted text={hit.snippet} />
-                          </span>
-                        ) : null}
-                      </span>
+                      <HitLine hit={hit} />
                       <span data-hint className="mono text-micro text-graphite">
                         ↵
                       </span>
