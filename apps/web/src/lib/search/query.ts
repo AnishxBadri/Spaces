@@ -4,6 +4,9 @@ import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { unionAll } from 'drizzle-orm/pg-core'
 import { entity, entitySpace, link, objectDef } from '@spaces/db/schema'
+import type { EmbeddingModel } from 'ai'
+import { queryVectorOrNullProgram } from './query-embedding'
+import type { QueryVector } from './query-embedding'
 
 /**
  * Unified search — one box over names, note bodies, and extracted document
@@ -19,8 +22,12 @@ import { entity, entitySpace, link, objectDef } from '@spaces/db/schema'
  * row therefore carries a `row_kind` discriminator — 'entity' | 'task' — and
  * the fusion keys on `(row_kind, id)`, so a task can never fuse with an
  * entity that happens to share its uuid. The pgvector half (CONTEXT.md →
- * Search is hybrid) joins as one more lane under the same key and extends
- * `SearchHit` rather than reshaping it.
+ * Search is hybrid, SPA-129) is the fifth lane, `sem_hits`, under the same
+ * key: it ranks entity ids by their nearest `chunk`, and `SearchHit` gains
+ * one `matchedIn` value, 'semantic', rather than a new shape. It is emitted
+ * only when the caller hands the builder a query vector — the palette's
+ * second wave, with a model pinned — so the per-keystroke statement is the
+ * four-lane one whether or not a model is pinned, and embeds nothing.
  *
  * k = 60 is the standard RRF constant: large enough that a top hit in one
  * source doesn't automatically beat two decent hits across two sources. It
@@ -74,7 +81,22 @@ export const canReadNoteSql = (userId: string): SQL => sql`not exists (
               and pn.author_id <> ${userId}
           )`
 
-export type SearchAllInput = { userId: string; q: string }
+/**
+ * `semantic` is the palette's second wave (SPA-129): the same fused query
+ * plus the vector lane, asked for 600ms after the last keystroke. Omitted,
+ * the statement is lexical and nothing is embedded.
+ */
+export type SearchAllInput = { userId: string; q: string; semantic?: boolean }
+
+/** What the builder takes: the query vector, when the second wave has one. */
+export type FusedRowsInput = {
+  userId: string
+  q: string
+  vector?: QueryVector
+}
+
+/** `model` replaces the embedding wire in tests; see `query-embedding.ts`. */
+export type SearchSeam = { model?: EmbeddingModel }
 
 /** Which id space a fused row's `id` belongs to. */
 export type SearchRowKind = 'entity' | 'task'
@@ -127,13 +149,77 @@ export type SearchHit =
   | (SearchHitFields & { rowKind: 'entity'; task: null })
   | (SearchHitFields & { rowKind: 'task'; task: SearchTask })
 
-/** The fused statement: four lanes, one RRF, top 20. */
-export const fusedRowsProgram = Effect.fn('fusedRowsProgram')(function* ({
-  userId,
-  q,
-}: SearchAllInput): Effect.fn.Return<Array<FusedRow>, SearchQueryFailed> {
-  const rows = yield* query(() =>
-    db.execute<FusedRow>(sql`
+/**
+ * The semantic lane (SPA-129) — the fifth CTE, and the only one that exists
+ * conditionally: no query vector, no fragment, so a workspace with no pin
+ * (or a keystroke that has not paused) sends exactly the four-lane
+ * statement.
+ *
+ * It joins `chunk` on `entity_id` and **never filters `source_kind`**: a
+ * document's chunks, a note's and an attribute's (a deal's close_reason) all
+ * rank here the moment something writes them, with no further search edit.
+ * What it does filter:
+ *
+ * - `embedding_model` must be the pin's. A row embedded by another model is
+ *   garbage in this vector space (the dimension trap's quieter cousin), so
+ *   it is skipped even when it is the closest — search never mixes models
+ *   mid-migration (spec-ai-substrate §9).
+ * - canRead, the same predicate the lexical note lane takes. For a
+ *   note-sourced chunk `e` is the note itself (a note chunk's entity is the
+ *   note), so `canReadNoteSql` joins `note` and holds a teammate's private
+ *   note out by meaning exactly as it is held out by words. An
+ *   attribute-sourced chunk joins nothing extra: its entity is the record
+ *   the attribute belongs to, and records carry no visibility flag — any
+ *   member reads any record's attributes on its page — so the predicate is
+ *   vacuous for it, as it is for a document.
+ *
+ * The shape is for the HNSW index (`chunk_embedding_hnsw_idx`, 0045):
+ * pgvector only walks it for a bare `order by embedding <=> <constant>
+ * limit n`, so the inner subquery is exactly that, and the model and canRead
+ * filters apply to its answer. The query vector sits in its own CTE, `qv`,
+ * so it is sent once and reaches the index as an init-plan constant. The
+ * inner limit is above 40 because several chunks of one record collapse into
+ * one row; pgvector's `hnsw.ef_search` (40 by default) still bounds how many
+ * the index hands back, which is plenty for a palette of 20.
+ *
+ * The snippet is the nearest chunk's text, whitespace-collapsed, cut to 160
+ * characters, with any « » removed: nothing matched a word, so nothing is
+ * marked, and `Highlighted` renders it as plain text.
+ */
+function semanticLane(userId: string, { vector, model }: QueryVector): SQL {
+  const literal = `[${vector.join(',')}]`
+  return sql`
+      qv as (
+        select ${literal}::vector as v
+      ),
+
+      sem_hits as (
+        select c.entity_id as id,
+               row_number() over (order by min(c.distance), c.entity_id) as rnk,
+               left(btrim(regexp_replace(translate(
+                 (array_agg(c.text order by c.distance))[1], '«»', ''),
+                 '[[:space:]]+', ' ', 'g')), 160) as snippet
+        from (
+          select ch.entity_id, ch.embedding_model, ch.text,
+                 ch.embedding <=> (select v from qv) as distance
+          from chunk ch
+          order by ch.embedding <=> (select v from qv)
+          limit 100
+        ) c
+        join entity e on e.id = c.entity_id and e.merged_into_id is null
+        where c.embedding_model = ${model}
+          and ${canReadNoteSql(userId)}
+        group by c.entity_id
+        order by rnk
+        limit 40
+      ),
+`
+}
+
+/** The fused statement: four lanes (five with a query vector), one RRF, top 20. */
+export function fusedStatement({ userId, q, vector }: FusedRowsInput): SQL {
+  const semantic = vector === undefined ? null : semanticLane(userId, vector)
+  return sql`
       with q as (
         select
           websearch_to_tsquery('english', ${q}) as tsq,
@@ -214,6 +300,7 @@ export const fusedRowsProgram = Effect.fn('fusedRowsProgram')(function* ({
         where t.tsv @@ (select tsq from q)
         limit 40
       ),
+${semantic ?? sql``}
 
       -- row_kind keeps the two id spaces apart: a task id and an entity id
       -- are both uuids, and the fusion below keys on (row_kind, id) so they
@@ -226,18 +313,27 @@ export const fusedRowsProgram = Effect.fn('fusedRowsProgram')(function* ({
         select 'entity', id, 'document', rnk, snippet from doc_hits
         union all
         select 'task', id, 'task', rnk, snippet from task_hits
+        ${
+          semantic === null
+            ? sql``
+            : sql`union all
+        select 'entity', id, 'semantic', rnk, snippet from sem_hits`
+        }
       )
 
       -- Each join is gated on row_kind, and both are left joins: a task row
       -- finds no entity and supplies its own name, due date and done state.
       -- The columns grouped after (row_kind, id) are one value per key —
-      -- they ride along for the select list and split nothing.
+      -- they ride along for the select list and split nothing. A lexical
+      -- snippet outranks a semantic one: a row that matched words shows
+      -- the words, marked; the plain nearest-chunk cut is for a row found
+      -- by meaning alone.
       select f.row_kind,
              f.id,
              coalesce(e.kind::text, 'task') as kind,
              coalesce(e.canonical_name, t.content) as name,
              o.slug as object_slug,
-             (array_remove(array_agg(f.snippet order by f.rnk), null))[1] as snippet,
+             (array_remove(array_agg(f.snippet order by f.source = 'semantic', f.rnk), null))[1] as snippet,
              array_agg(distinct f.source) as sources,
              sum(1.0 / (60 + f.rnk)) as score,
              t.due_date::text as due_date,
@@ -251,8 +347,13 @@ export const fusedRowsProgram = Effect.fn('fusedRowsProgram')(function* ({
                t.id, t.content, t.due_date, t.done_at
       order by score desc, name
       limit 20
-    `),
-  )
+    `
+}
+
+export const fusedRowsProgram = Effect.fn('fusedRowsProgram')(function* (
+  input: FusedRowsInput,
+): Effect.fn.Return<Array<FusedRow>, SearchQueryFailed> {
+  const rows = yield* query(() => db.execute<FusedRow>(fusedStatement(input)))
   return rows.rows
 })
 
@@ -334,15 +435,32 @@ export const documentParentsProgram = Effect.fn('documentParentsProgram')(
 /**
  * What Cmd-K shows: the fused rows, each document carrying where it is
  * filed and each task its due date and done state.
+ *
+ * The second wave (`semantic: true`) embeds the query — once per (text,
+ * model), `query-embedding.ts` — and adds the vector lane. No pin, or an
+ * embed that fails (a cap reached, a provider down), and the wave is the
+ * lexical statement again: the user's list stays as it was, and the failure
+ * is one log line, never an error per pause.
  */
-export const searchAllProgram = Effect.fn('searchAllProgram')(function* ({
-  userId,
-  q: raw,
-}: SearchAllInput): Effect.fn.Return<Array<SearchHit>, SearchQueryFailed> {
+export const searchAllProgram = Effect.fn('searchAllProgram')(function* (
+  { userId, q: raw, semantic = false }: SearchAllInput,
+  seam: SearchSeam = {},
+): Effect.fn.Return<Array<SearchHit>, SearchQueryFailed> {
   const q = raw.trim()
   if (q.length < 2) return []
 
-  const hits = yield* fusedRowsProgram({ userId, q })
+  const vector = semantic
+    ? yield* queryVectorOrNullProgram(q, {
+        caller: { type: 'user', id: userId },
+        ...(seam.model === undefined ? {} : { model: seam.model }),
+      })
+    : null
+
+  const hits = yield* fusedRowsProgram({
+    userId,
+    q,
+    ...(vector === null ? {} : { vector }),
+  })
   if (hits.length === 0) return []
 
   const parents = yield* documentParentsProgram(

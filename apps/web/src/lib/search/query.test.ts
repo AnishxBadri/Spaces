@@ -4,24 +4,31 @@ import { describe, expect, it } from 'vitest'
 import { recordPath } from '../record-path'
 
 /**
- * Cmd-K's fused query (SPA-148). Three slices are queued to rewrite it — a
- * parent lane, a task lane, a vector lane — and each must keep these four
- * invariants. A rewrite that drops one fails here, not in the palette:
+ * Cmd-K's fused query (SPA-148). Three slices rewrote it — a parent lane, a
+ * task lane (SPA-55), a vector lane (SPA-129) — and each kept these four
+ * invariants; the next must too. A rewrite that drops one fails here, not
+ * in the palette:
  *
  *   1. One RRF, with k = 60, in one place. The final select sums
  *      1 / (60 + rank) per fused key, and nothing else scores. A second k,
  *      or a lane fused in Node, is a regression. The key is
- *      `(row_kind, id)` since the task lane (SPA-55): name, note and
- *      document lanes rank entity ids, the task lane ranks task ids, and
- *      the two id spaces never sum into one row.
+ *      `(row_kind, id)` since the task lane (SPA-55): name, note, document
+ *      and semantic lanes rank entity ids, the task lane ranks task ids,
+ *      and the two id spaces never sum into one row.
  *   2. Snippets are marked «like this» (`HEADLINE_OPTIONS`) and the palette
  *      renders them as text, never as HTML — no `<b>`, no
- *      dangerouslySetInnerHTML, one headline options string.
- *   3. Each lane is limited to 40 rows; the fused answer to 20.
+ *      dangerouslySetInnerHTML, one headline options string. The semantic
+ *      lane's snippet matched no word, so it carries no marks at all.
+ *   3. Each lane is limited to 40 rows — five lanes when the second wave
+ *      carries a query vector, four otherwise; the fused answer to 20.
  *   4. canRead is in the SQL, on every lane that can reach a note
- *      (`canReadNoteSql`). A teammate's private note never enters the
+ *      (`canReadNoteSql`) — the semantic lane included, since a note's
+ *      chunks are in `chunk`. A teammate's private note never enters the
  *      fusion; the searcher's own private note does. The task lane cannot
  *      reach a note and tasks carry no visibility flag, so it takes none.
+ *
+ * The semantic lane's own behaviour — pin, stale models, the query-embedding
+ * cache, EXPLAIN on the HNSW index — is `semantic-lane.test.ts`.
  *
  * The file's database was truncated and reseeded before it was imported
  * (SPA-145), so the fixtures below are the whole corpus the words they use
@@ -533,12 +540,12 @@ describe('the task lane (SPA-55)', () => {
     expect(Number(deckRow?.score)).toBeCloseTo(2 / (60 + 1), 12)
   })
 
-  it('spells k = 60 once, limits each of the four lanes to 40 and the answer to 20', () => {
+  it('spells k = 60 once, limits each of the five lanes to 40 and the answer to 20', () => {
     // Read from source: the per-lane limit is invisible behind the final 20,
     // and "one k" is a claim about the statement, not about any one answer.
     const source = readFileSync(new URL('./query.ts', import.meta.url), 'utf8')
     expect(source.match(/\b60 \+/g)).toHaveLength(1)
-    expect(source.match(/limit 40\b/g)).toHaveLength(4)
+    expect(source.match(/limit 40\b/g)).toHaveLength(5)
     expect(source.match(/limit 20\b/g)).toHaveLength(1)
   })
 
@@ -583,14 +590,27 @@ describe('terms are findable (SPA-75)', () => {
     }
   })
 
-  it('needed no new lane: the statement keeps its four lanes and one fusion', () => {
+  it('needed no new lane: terms ride name_hits, and the statement keeps one fusion', () => {
+    // The semantic lane (SPA-129) and the query vector it reads are the
+    // only CTEs outside the four-lane statement, spelled in their own
+    // fragment; the union below gains exactly its one arm.
     const source = readFileSync(new URL('./query.ts', import.meta.url), 'utf8')
     expect(source.match(/^\s+\w+ as \($/gm)?.map((s) => s.trim())).toEqual([
+      'qv as (',
+      'sem_hits as (',
       'name_hits as (',
       'note_hits as (',
       'doc_hits as (',
       'task_hits as (',
       'fused as (',
+    ])
+    expect(
+      source.match(/select '(entity|task)', id, '\w+', rnk, snippet from \w+/g),
+    ).toEqual([
+      "select 'entity', id, 'note', rnk, snippet from note_hits",
+      "select 'entity', id, 'document', rnk, snippet from doc_hits",
+      "select 'task', id, 'task', rnk, snippet from task_hits",
+      "select 'entity', id, 'semantic', rnk, snippet from sem_hits",
     ])
   })
 })

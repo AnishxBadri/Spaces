@@ -42,12 +42,20 @@ export const searchEntities = createServerFn()
  * Unified search — Cmd-K's one box. The fused query and every invariant it
  * keeps live in `lib/search/query.ts` (SPA-148), outside `lib/server/` so a
  * test can call it without a request; this is the request half only.
+ * `semantic` is the palette's second wave (SPA-129): the same query plus
+ * the vector lane, which embeds the query text as the searching user.
  */
 export const searchAll = createServerFn()
-  .validator(z.object({ q: z.string().max(200) }))
+  .validator(
+    z.object({ q: z.string().max(200), semantic: z.boolean().optional() }),
+  )
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { searchAllProgram } = await import('#/lib/search/query')
     const { effectFn } = await import('./effect')
-    return effectFn(searchAllProgram)({ userId: u.id, q: data.q })
+    return effectFn(searchAllProgram)({
+      userId: u.id,
+      q: data.q,
+      semantic: data.semantic === true,
+    })
   })

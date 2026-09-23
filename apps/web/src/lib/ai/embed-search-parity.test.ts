@@ -11,11 +11,13 @@ import { saveEmbeddingKeyProgram } from './providers/embed/settings'
 
 /**
  * SPA-51, acceptance: with no embedding provider configured nothing changes
- * anywhere — and, since this slice adds no vector lane (SPA-129 does),
- * pinning one changes nothing in search either. The statement
- * `fusedRowsProgram` sends is captured off `db.execute` and compiled to its
- * text and parameters, then compared with the pin unset and set, as are
- * the hits a fixture search returns.
+ * anywhere — and pinning one changes nothing in the per-keystroke search
+ * either. SPA-129's vector lane rides only the palette's second wave
+ * (`semantic: true`, `semantic-lane.test.ts`); the lexical wave this file
+ * sends is the same statement pinned or not, and embeds nothing. The
+ * statement `fusedRowsProgram` sends is captured off `db.execute` and
+ * compiled to its text and parameters, then compared with the pin unset and
+ * set, as are the hits a fixture search returns.
  */
 
 const dialect = new PgDialect()

@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import type { SearchHit } from '#/lib/search/query'
-import { HitLine, hrefFor } from './command-palette'
+import { HitLine, hitMeta, hrefFor } from './command-palette'
 
 /**
  * The palette's task branch (SPA-55). Asserted over the row's content and
@@ -75,5 +76,67 @@ describe('the palette task row', () => {
     expect(html).toContain('lucide-building')
     expect(html).not.toContain('lucide-square-check')
     expect(html).toMatch(/class="[^"]*mono[^"]*">company</)
+  })
+})
+
+/**
+ * A row the second wave found by meaning alone (SPA-129): `matchedIn:
+ * 'semantic'`, a plain 160-character cut of the nearest chunk, and a meta
+ * lane that says why it is here.
+ */
+const meaningSnippet =
+  'Our direct-to-chip liquid loop moves thermal load off the server floor. Cold plates sit on each accelerator and the warm water leaves the building through a'
+
+const deckByMeaning: SearchHit = {
+  rowKind: 'entity',
+  id: '5f0c1a52-3e0b-4a8e-9b61-000000000002',
+  kind: 'document',
+  name: 'Coldplate Series A.pdf',
+  objectSlug: null,
+  snippet: meaningSnippet,
+  matchedIn: 'semantic',
+  parent: {
+    id: '5f0c1a52-3e0b-4a8e-9b61-000000000003',
+    kind: 'company',
+    name: 'Coldplate Systems',
+    objectSlug: null,
+  },
+  task: null,
+}
+
+describe('the palette row for a hit found by meaning', () => {
+  it('reads · meaning in the mono lane, beside the record it is filed on', () => {
+    expect(hitMeta(deckByMeaning)).toBe('in Coldplate Systems · meaning')
+    expect(
+      hitMeta({
+        ...companyHit,
+        kind: 'note',
+        matchedIn: 'semantic',
+      }),
+    ).toBe('note · meaning')
+    // The lexical lanes read as they did.
+    expect(hitMeta({ ...companyHit, kind: 'note', matchedIn: 'note' })).toBe(
+      'note · text',
+    )
+    expect(hitMeta({ ...deckByMeaning, matchedIn: 'document' })).toBe(
+      'in Coldplate Systems',
+    )
+  })
+
+  it('renders the plain snippet as text: one span, nothing set as a match', () => {
+    const html = renderToStaticMarkup(<HitLine hit={deckByMeaning} />)
+    expect(html).toMatch(
+      /class="[^"]*mono[^"]*">in Coldplate Systems · meaning</,
+    )
+    expect(html).toContain(`<span>${meaningSnippet}</span>`)
+    expect(html).not.toContain('font-medium text-foreground')
+  })
+
+  it("keeps cmdk's own filter off, so the second wave's rows are shown as ranked", () => {
+    const source = readFileSync(
+      new URL('./command-palette.tsx', import.meta.url),
+      'utf8',
+    )
+    expect(source).toContain('shouldFilter={false}')
   })
 })

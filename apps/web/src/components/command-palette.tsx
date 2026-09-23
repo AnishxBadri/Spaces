@@ -28,6 +28,7 @@ import {
 import { authClient } from '#/lib/auth-client'
 import { recordPath } from '#/lib/record-path'
 import { searchAll } from '#/lib/server-fns'
+import { searchWaves, takesTheList } from '#/lib/search/waves'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 import { cn } from '#/lib/utils'
 
@@ -36,6 +37,12 @@ import { cn } from '#/lib/utils'
  * tasks, fused and ranked in Postgres (see searchAll). cmdk's own filtering
  * is off — the server already ranked these, and re-filtering client-side
  * would drop the typo matches trigram search exists to catch.
+ *
+ * Two waves per query (SPA-129, `lib/search/waves.ts`): the lexical one on
+ * the 180ms debounce, and 600ms after the last keystroke the same query
+ * with the vector lane, whose answer replaces the list — unless the user
+ * has already moved the selection or pressed Enter. The second wave draws
+ * nothing of its own; a row it found by meaning alone says `· meaning`.
  */
 
 type Hit = Awaited<ReturnType<typeof searchAll>>[number]
@@ -93,13 +100,18 @@ export function Highlighted({ text }: { text: string }) {
   )
 }
 
-/** What the mono lane says: where the match came from, or when a task is due. */
-function hitMeta(hit: Hit): string {
+/**
+ * What the mono lane says: where the match came from, or when a task is due.
+ * A hit found by meaning alone says so — none of its words were typed, and
+ * "why is this here" is the question it raises most.
+ */
+export function hitMeta(hit: Hit): string {
   if (hit.rowKind === 'task') return hit.task.dueDate ?? 'no date'
-  if (hit.kind === 'document' && hit.parent) return `in ${hit.parent.name}`
-  return hit.matchedIn === 'name'
-    ? (hit.objectSlug ?? hit.kind)
-    : `${hit.objectSlug ?? hit.kind} · text`
+  const meaning = hit.matchedIn === 'semantic' ? ' · meaning' : ''
+  if (hit.kind === 'document' && hit.parent)
+    return `in ${hit.parent.name}${meaning}`
+  if (hit.matchedIn === 'name') return hit.objectSlug ?? hit.kind
+  return `${hit.objectSlug ?? hit.kind}${meaning || ' · text'}`
 }
 
 /**
@@ -223,6 +235,21 @@ export function CommandPalette({
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<Array<Hit>>([])
   const [searching, setSearching] = useState(false)
+  // One scheduler per palette; the setters it closes over are stable.
+  const [waves] = useState(() =>
+    searchWaves<Array<Hit>>({
+      fetch: (q, wave) =>
+        searchAll({ data: { q, semantic: wave === 'semantic' } }),
+      show: (rows) => {
+        setHits(rows)
+        setSearching(false)
+      },
+      fail: () => {
+        setHits([])
+        setSearching(false)
+      },
+    }),
+  )
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -238,40 +265,22 @@ export function CommandPalette({
   // Reset between openings — reopening onto a stale result list reads as a bug.
   useEffect(() => {
     if (!open) {
+      waves.stop()
       setQuery('')
       setHits([])
       setSearching(false)
     }
-  }, [open])
+  }, [open, waves])
 
   useEffect(() => {
-    const q = query.trim()
-    if (q.length < 2) {
+    waves.type(query)
+    if (query.trim().length < 2) {
       setHits([])
       setSearching(false)
-      return
-    }
-    setSearching(true)
-    let cancelled = false
-    const timer = setTimeout(() => {
-      void (async () => {
-        try {
-          const rows = await searchAll({ data: { q } })
-          // Out-of-order responses would otherwise show results for a query the
-          // user has already typed past.
-          if (!cancelled) setHits(rows)
-        } catch {
-          if (!cancelled) setHits([])
-        } finally {
-          if (!cancelled) setSearching(false)
-        }
-      })()
-    }, 180)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [query])
+    } else setSearching(true)
+  }, [query, waves])
+
+  useEffect(() => () => waves.stop(), [waves])
 
   function go(to: string) {
     onOpenChange(false)
@@ -310,6 +319,9 @@ export function CommandPalette({
         placeholder="Search or jump to…"
         value={query}
         onValueChange={setQuery}
+        onKeyDown={(e) => {
+          if (takesTheList(e)) waves.engage()
+        }}
       />
       <CommandList>
         {searchMode ? (
@@ -326,7 +338,12 @@ export function CommandPalette({
                 </CommandEmpty>
               )
             ) : (
-              <CommandGroup heading={`Results · ${hits.length}`}>
+              <CommandGroup
+                heading={`Results · ${hits.length}`}
+                // cmdk moves the selection to whatever row the pointer
+                // crosses, so a pointer over the rows has taken the list.
+                onPointerMove={waves.engage}
+              >
                 {hits.map((hit) => {
                   const href = hrefFor(hit)
                   // Task ids and entity ids are two id spaces; the key and

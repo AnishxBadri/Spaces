@@ -642,6 +642,10 @@ Stage` box appears while dragging over a column.
   bone, 150/100ms.
 - **Command palette:** 640px; a pine `›` prompt, `↑↓ move · ↵ open` on the right, caps
   group labels, 32px rows, the `↵` hint on the highlighted row, a 32px bone foot.
+  With an embedding model pinned, a second query with the meaning lane runs 600ms after
+  the last keystroke and replaces the list — no spinner, no entrance, and never once
+  the selection has moved or ↵ is pressed (SPA-129). A row found by meaning alone
+  reads `· meaning` in its mono lane, and its snippet is a plain cut with nothing set.
 - **The keyboard sheet:** `?` opens it (the account menu lists it). Two columns of 26px
   rows on rules — Go, Create, On a deal, In a sheet — with 18px keycaps (hairline, 2px
   foot, mono 10). Only keys that work are printed. Every nav row prints its G-chord in
