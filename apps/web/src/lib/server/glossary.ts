@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, entitySpace, space, term } from '@spaces/db/schema'
+import { entity, space, term } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { requireUser } from './shared'
 
@@ -59,43 +59,18 @@ export const listTerms = createServerFn()
 
 /**
  * The term set in scope for a note: everything from the spaces it is filed
- * in, plus global terms. Filing a note into Aerospace is what opts it into
- * the aerospace vocabulary — the same act that puts it on the space page.
+ * in and their ancestors, plus global terms. Filing a note into Aerospace is
+ * what opts it into the aerospace vocabulary — the same act that puts it on
+ * the space page. The query is `termsVisibleFrom`, the one the server-side
+ * link sync matches against (SPA-34), so what the editor highlights and what
+ * the graph links are drawn from the same set.
  */
 export const listTermsForNote = createServerFn()
   .validator(z.object({ noteId: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const spaceIds = (
-      await db
-        .select({ spaceId: entitySpace.spaceId })
-        .from(entitySpace)
-        .where(eq(entitySpace.entityId, data.noteId))
-    ).map((r) => r.spaceId)
-
-    return db
-      .select({
-        id: term.entityId,
-        name: term.name,
-        aliases: term.aliases,
-        definitionMd: term.definitionMd,
-      })
-      .from(term)
-      .where(
-        spaceIds.length > 0
-          ? // Ancestors too: a note filed in Immersion cooling should know
-            // the vocabulary of Cooling and of Data centers above it.
-            or(
-              isNull(term.spaceId),
-              sql`${term.spaceId} in (
-                select anc.entity_id from space anc
-                join space self on self.entity_id = any(${sql.param(spaceIds)}::uuid[])
-                where anc.path @> self.path
-              )`,
-            )
-          : isNull(term.spaceId),
-      )
-      .orderBy(asc(term.name))
+    const { termsVisibleFrom } = await import('../glossary/link-terms')
+    return termsVisibleFrom(db, data.noteId)
   })
 
 export const createTerm = createServerFn({ method: 'POST' })
