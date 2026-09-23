@@ -2,7 +2,8 @@ import { Effect, Schema } from 'effect'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { entity, link, objectDef } from '@spaces/db/schema'
+import { unionAll } from 'drizzle-orm/pg-core'
+import { entity, entitySpace, link, objectDef } from '@spaces/db/schema'
 
 /**
  * Unified search — one box over names, note bodies, and extracted document
@@ -190,7 +191,84 @@ export const fusedRowsProgram = Effect.fn('fusedRowsProgram')(function* ({
   return rows.rows
 })
 
-/** What Cmd-K shows: the fused rows, each deck carrying the record it is filed on. */
+export type SearchParent = NonNullable<SearchHit['parent']>
+
+/**
+ * Where each document hit sends you. Documents have no page of their own —
+ * they are filed against a record (`link(tagged_in)`) or into a space
+ * (`entity_space`, spec-storage-sources §2), so a result has to send you to
+ * one of those or it is a dead end.
+ *
+ * Both edge kinds come back in one statement, and the winner is chosen in
+ * SQL rather than by whichever row the driver happened to return first:
+ *
+ *   1. a record parent always beats a space parent;
+ *   2. among edges of one kind the earliest wins — `created_at` asc, then
+ *      the edge's own id asc (`link.id`; `entity_space` has no id of its
+ *      own, so its `space_id`).
+ *
+ * A space parent comes back as `{ kind: 'space' }`, which `recordPath`
+ * already routes to `/spaces/<id>`, so the palette needs no branch for it.
+ */
+export const documentParentsProgram = Effect.fn('documentParentsProgram')(
+  function* (
+    documentIds: ReadonlyArray<string>,
+  ): Effect.fn.Return<Map<string, SearchParent>, SearchQueryFailed> {
+    if (documentIds.length === 0) return new Map()
+
+    const filed = db
+      .select({
+        documentId: link.fromEntityId,
+        parentId: link.toEntityId,
+        precedence: sql<number>`0`.as('precedence'),
+        filedAt: link.createdAt,
+        tiebreak: link.id,
+      })
+      .from(link)
+      .where(
+        and(
+          inArray(link.fromEntityId, [...documentIds]),
+          eq(link.relation, 'tagged_in'),
+        ),
+      )
+    const spaced = db
+      .select({
+        documentId: entitySpace.entityId,
+        parentId: entitySpace.spaceId,
+        precedence: sql<number>`1`.as('precedence'),
+        filedAt: entitySpace.createdAt,
+        tiebreak: entitySpace.spaceId,
+      })
+      .from(entitySpace)
+      .where(inArray(entitySpace.entityId, [...documentIds]))
+    const edges = unionAll(filed, spaced).as('edges')
+
+    const rows = yield* query(() =>
+      db
+        .selectDistinctOn([edges.documentId], {
+          documentId: edges.documentId,
+          id: entity.id,
+          kind: entity.kind,
+          name: entity.canonicalName,
+          objectSlug: objectDef.slug,
+        })
+        .from(edges)
+        .innerJoin(entity, eq(entity.id, edges.parentId))
+        .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+        .orderBy(
+          edges.documentId,
+          edges.precedence,
+          edges.filedAt,
+          edges.tiebreak,
+        ),
+    )
+    return new Map(
+      rows.map(({ documentId, ...parent }) => [documentId, parent] as const),
+    )
+  },
+)
+
+/** What Cmd-K shows: the fused rows, each document carrying where it is filed. */
 export const searchAllProgram = Effect.fn('searchAllProgram')(function* ({
   userId,
   q: raw,
@@ -201,49 +279,17 @@ export const searchAllProgram = Effect.fn('searchAllProgram')(function* ({
   const hits = yield* fusedRowsProgram({ userId, q })
   if (hits.length === 0) return []
 
-  // Documents have no page of their own — they are filed against a record,
-  // so a result has to send you to that record or it is a dead end.
-  const documentIds = hits.filter((h) => h.kind === 'document').map((h) => h.id)
-  const parents =
-    documentIds.length > 0
-      ? yield* query(() =>
-          db
-            .select({
-              documentId: link.fromEntityId,
-              parentId: entity.id,
-              parentKind: entity.kind,
-              parentName: entity.canonicalName,
-              parentObjectSlug: objectDef.slug,
-            })
-            .from(link)
-            .innerJoin(entity, eq(entity.id, link.toEntityId))
-            .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
-            .where(
-              and(
-                inArray(link.fromEntityId, documentIds),
-                eq(link.relation, 'tagged_in'),
-              ),
-            ),
-        )
-      : []
+  const parents = yield* documentParentsProgram(
+    hits.filter((h) => h.kind === 'document').map((h) => h.id),
+  )
 
-  return hits.map((h) => {
-    const parent = parents.find((p) => p.documentId === h.id)
-    return {
-      id: h.id,
-      kind: h.kind,
-      name: h.name,
-      objectSlug: h.object_slug,
-      snippet: h.snippet?.replace(/\s+/g, ' ').trim() ?? null,
-      matchedIn: h.sources.includes('name') ? 'name' : (h.sources[0] ?? 'name'),
-      parent: parent
-        ? {
-            id: parent.parentId,
-            kind: parent.parentKind,
-            name: parent.parentName,
-            objectSlug: parent.parentObjectSlug,
-          }
-        : null,
-    }
-  })
+  return hits.map((h) => ({
+    id: h.id,
+    kind: h.kind,
+    name: h.name,
+    objectSlug: h.object_slug,
+    snippet: h.snippet?.replace(/\s+/g, ' ').trim() ?? null,
+    matchedIn: h.sources.includes('name') ? 'name' : (h.sources[0] ?? 'name'),
+    parent: parents.get(h.id) ?? null,
+  }))
 })
