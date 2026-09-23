@@ -411,6 +411,102 @@ describe('mergeEntities', () => {
     ).toEqual(['repointed', 'repointed'])
   })
 
+  it("keeps the winner's chunks of a source both sides hold, drops the loser's, and moves the rest (SPA-132)", async () => {
+    const { resolveEntity } = await import('./resolve')
+    const { mergeEntities } = await import('./merge')
+    const { db } = await import('@spaces/db')
+    const { chunk, mergeEvent } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+    const { asc, eq } = await import('drizzle-orm')
+
+    const tag = randomUUID().slice(0, 8)
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    const winner = await resolveEntity({
+      kind: 'company',
+      name: `ClashCo ${tag} W`,
+      keys: { domain: `clashco-w-${tag}.com` },
+      source: { class: 'manual' },
+    })
+    const loser = await resolveEntity({
+      kind: 'company',
+      name: `ClashCo ${tag} L`,
+      keys: { domain: `clashco-l-${tag}.com` },
+      source: { class: 'manual' },
+    })
+    const attrChunk = (
+      entityId: string,
+      sourceKey: string,
+      idx: number,
+      text: string,
+    ) => ({
+      entityId,
+      sourceKind: 'attribute' as const,
+      sourceKey,
+      idx,
+      text,
+    })
+
+    // Both sides chunked the same attribute — a plain repoint would put two
+    // (winner, attribute, 'description', 0) rows on the unique index.
+    const [kept] = await db
+      .insert(chunk)
+      .values(attrChunk(winner.entityId, 'description', 0, 'Winner says.'))
+      .returning({ id: chunk.id })
+    const clashing = await db
+      .insert(chunk)
+      .values([
+        attrChunk(loser.entityId, 'description', 0, 'Loser says.'),
+        attrChunk(loser.entityId, 'description', 1, 'Loser goes on.'),
+      ])
+      .returning({ id: chunk.id })
+    // …and one only the loser has, which fills the gap like its value does.
+    const [moved] = await db
+      .insert(chunk)
+      .values(attrChunk(loser.entityId, 'thesis', 0, 'Only the loser.'))
+      .returning({ id: chunk.id })
+
+    const { mergeEventId } = await mergeEntities({
+      winnerId: winner.entityId,
+      loserId: loser.entityId,
+      mergedBy: actor.id,
+    })
+
+    const onWinner = await db
+      .select({ id: chunk.id, key: chunk.sourceKey, text: chunk.text })
+      .from(chunk)
+      .where(eq(chunk.entityId, winner.entityId))
+      .orderBy(asc(chunk.sourceKey), asc(chunk.idx))
+    expect(onWinner).toEqual([
+      { id: kept.id, key: 'description', text: 'Winner says.' },
+      { id: moved.id, key: 'thesis', text: 'Only the loser.' },
+    ])
+    expect(
+      await db
+        .select({ id: chunk.id })
+        .from(chunk)
+        .where(eq(chunk.entityId, loser.entityId)),
+    ).toEqual([])
+
+    const [event] = await db
+      .select({ snapshot: mergeEvent.snapshot })
+      .from(mergeEvent)
+      .where(eq(mergeEvent.id, mergeEventId))
+    const chunkEntries = event.snapshot.filter((e) => e.table === 'chunk')
+    expect(
+      chunkEntries
+        .filter((e) => e.action === 'dropped')
+        .map((e) => e.pk.id)
+        .sort(),
+    ).toEqual(clashing.map((c) => c.id).sort())
+    expect(
+      chunkEntries.filter((e) => e.action === 'repointed').map((e) => e.pk.id),
+    ).toEqual([moved.id])
+    // The dropped row is kept for the record, text and all.
+    expect(chunkEntries.find((e) => e.action === 'dropped')?.old).toMatchObject(
+      { entityId: loser.entityId, sourceKey: 'description' },
+    )
+  })
+
   it('repoints referred_by on every deal that named the loser', async () => {
     const { resolveEntity } = await import('./resolve')
     const { mergeEntities } = await import('./merge')

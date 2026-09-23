@@ -349,16 +349,18 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     // Was `document_chunk.document` (merge `none`) until SPA-102 widened the
     // table: a chunk now points at a document, a note, or the record whose
     // attribute was chunked (a deal's `close_reason`). Notes and documents
-    // are not mergeable but companies and deals are, so the rows must follow
-    // the record. `repoint` is plain: the unique index is on
-    // (entity_id, source_kind, source_key, idx), and a winner already holding
-    // the same attribute's chunks would collide — unreachable while nothing
-    // writes attribute chunks and deals are not mergeable; the chunk writer
-    // (ai-10b) owns re-chunking a merged record.
+    // are not mergeable but records are, so the rows must follow the record.
+    // `custom` since SPA-132 started writing attribute chunks: the unique
+    // index is on (entity_id, source_kind, source_key, idx), so a winner
+    // already holding chunks of the same source would collide with a plain
+    // repoint. The section in merge.ts takes the values rule — the winner
+    // keeps its value, the loser only fills a gap — per source: a source the
+    // winner already has chunks for drops the loser's; any other source's
+    // chunks move, matching the value the merge filled in with them.
     key: 'chunk.entity',
     table: chunk,
     column: chunk.entityId,
-    merge: { kind: 'repoint' },
+    merge: { kind: 'custom', handler: 'chunks' },
     del: { kind: 'cascade' },
     // One kind per column: a document's chunks are `doc_chunk` items one hop
     // out (record → filed document → chunk), the only source written today.

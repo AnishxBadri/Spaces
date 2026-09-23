@@ -1,18 +1,15 @@
 import { Effect, Schema } from 'effect'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { EmbeddingModel } from 'ai'
 import { db } from '@spaces/db'
-import { chunk, document } from '@spaces/db/schema'
+import { document } from '@spaces/db/schema'
 import { chunk as cutChunks } from '@spaces/core/documents/chunk'
 import { detectFormat } from '@spaces/core/documents/extract'
-import { embedMessage, embedProgram } from './embed'
-import type { EmbedFailure, EmbedOptions } from './embed'
-import { sensitivityFor } from './sensitivity-for'
+import { replaceChunks } from './embed-chunks'
 import type {
   SensitivityEntityNotFound,
   SensitivityReadFailed,
 } from './sensitivity-for'
-import { stampSensitivity } from './stamp-sensitivity'
 import type { StampWriteFailed } from './stamp-sensitivity'
 
 /**
@@ -40,14 +37,15 @@ import type { StampWriteFailed } from './stamp-sensitivity'
  * deleted and the new cut inserted in one transaction, the same transaction
  * `stampSensitivity` writes `sensitive` in — so the unique index
  * `(entity_id, source_kind, source_key, idx)` never sees two cuts, and no
- * reader ever sees the new rows unstamped.
+ * reader ever sees the new rows unstamped. That half is `replaceChunks`
+ * (`./embed-chunks.ts`), shared since SPA-132 with notes and embeddable
+ * attributes (`./embed-source.ts`); this file is the document's reader.
  *
  * `model` is the test seam, passed straight through to `embed()`: the pin
  * is still read and every check still applies; only the wire is replaced.
  */
 
-/** Texts per `embed()` call — under every provider's per-request input cap. */
-export const EMBED_BATCH = 96
+export { EMBED_BATCH } from './embed-chunks'
 
 export type EmbedDocumentInput = {
   documentId: string
@@ -86,38 +84,6 @@ export type EmbedDocumentFailure =
   | SensitivityEntityNotFound
   | StampWriteFailed
 
-type Vectors = {
-  vectors: Array<Array<number>>
-  model: string
-}
-
-/**
- * Every text through `embed()` in batches of EMBED_BATCH, all or nothing: a
- * failure in any batch leaves the whole document unembedded rather than
- * half-vectored, and is answered as a value so the chunks are still written.
- */
-const embedAll = Effect.fn('embedDocument.embedAll')(function* (
-  texts: ReadonlyArray<string>,
-  opts: Pick<EmbedOptions, 'sensitivity' | 'via' | 'model'>,
-): Effect.fn.Return<{ ok: Vectors | null; failure: EmbedFailure | null }> {
-  const vectors: Array<Array<number>> = []
-  let model: string | null = null
-  for (let at = 0; at < texts.length; at += EMBED_BATCH) {
-    const r = yield* Effect.result(
-      embedProgram(texts.slice(at, at + EMBED_BATCH), {
-        caller: { type: 'system' },
-        ...opts,
-      }),
-    )
-    if (r._tag === 'Failure') return { ok: null, failure: r.failure }
-    vectors.push(...r.success.vectors)
-    model = r.success.target.model
-  }
-  return model === null
-    ? { ok: null, failure: null }
-    : { ok: { vectors, model }, failure: null }
-})
-
 export const embedDocumentProgram = Effect.fn('embedDocument')(function* (
   input: EmbedDocumentInput,
 ): Effect.fn.Return<EmbedDocumentResult, EmbedDocumentFailure> {
@@ -138,71 +104,19 @@ export const embedDocumentProgram = Effect.fn('embedDocument')(function* (
     return { chunks: 0, embeddingModel: null, skipped: 'no-text' }
 
   const format = detectFormat(row.filename, row.mime) ?? 'text'
-  const pieces = cutChunks(row.text, format)
-
-  // Live, as every egress boundary is: this answer decides what `embed()`
-  // may send. `stampSensitivity` below reads it again for the column.
-  const resolved = yield* sensitivityFor(documentId)
-
-  const embedded: { ok: Vectors | null; failure: EmbedFailure | null } =
-    pieces.length === 0
-      ? { ok: null, failure: null }
-      : yield* embedAll(
-          pieces.map((p) => p.text),
-          {
-            sensitivity: resolved.sensitivity,
-            ...(resolved.sensitivity === 'sensitive'
-              ? { via: resolved.via }
-              : {}),
-            ...(input.model === undefined ? {} : { model: input.model }),
-          },
-        )
-
-  const vectors = embedded.ok
-  const rows = pieces.map((p, i): typeof chunk.$inferInsert => ({
-    entityId: documentId,
-    sourceKind: 'document',
-    sourceKey: '',
-    idx: p.idx,
-    text: p.text,
-    page: p.page,
-    embedding: vectors === null ? null : vectors.vectors[i],
-    embeddingModel: vectors === null ? null : vectors.model,
-  }))
-
-  yield* stampSensitivity(documentId, {
-    within: async (tx) => {
-      await tx
-        .delete(chunk)
-        .where(
-          and(eq(chunk.entityId, documentId), eq(chunk.sourceKind, 'document')),
-        )
-      if (rows.length > 0) await tx.insert(chunk).values(rows)
-    },
-  })
-
-  const failure = embedded.failure
-  if (failure !== null) {
-    switch (failure._tag) {
-      case 'EmbeddingNotPinned':
-        return { chunks: rows.length, embeddingModel: null, skipped: 'no-pin' }
-      case 'SensitiveRouteRefused':
-        return {
-          chunks: rows.length,
-          embeddingModel: null,
-          skipped: 'sensitive',
-        }
-      default:
-        return yield* new EmbedDocumentFailed({
-          chunks: rows.length,
-          cause: failure._tag,
-          reason: embedMessage(failure),
-        })
-    }
-  }
+  const written = yield* replaceChunks(
+    { entityId: documentId, sourceKind: 'document', sourceKey: '' },
+    cutChunks(row.text, format),
+    input.model === undefined ? {} : { model: input.model },
+  )
+  if (written.failure !== null)
+    return yield* new EmbedDocumentFailed({
+      chunks: written.chunks,
+      ...written.failure,
+    })
   return {
-    chunks: rows.length,
-    embeddingModel: vectors === null ? null : vectors.model,
-    skipped: null,
+    chunks: written.chunks,
+    embeddingModel: written.embeddingModel,
+    skipped: written.skipped,
   }
 })

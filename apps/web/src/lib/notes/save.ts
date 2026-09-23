@@ -10,6 +10,7 @@ import {
 import type { MentionDiff } from '#/lib/glossary/link-terms'
 import { NoteNotFound, NoteQueryFailed } from '#/lib/notes/delete'
 import { canRead } from '#/lib/notes/visibility'
+import { enqueueSourceEmbed, noteSource } from '#/lib/ai/chunk-sources'
 
 /**
  * Saving a note (converted to Effect by SPA-34, which opened it to run the
@@ -22,6 +23,12 @@ import { canRead } from '#/lib/notes/visibility'
  * Two diffs over the same rows would each delete the other's, so the wanted
  * set is their union. A manual `mentions` row is never touched — see the
  * edge rule in `link-terms.ts`.
+ *
+ * Once that commits, the note's chunks are queued for replacement (SPA-132,
+ * docs/spec-ai-substrate.md §9: embed on note save, silently, pin or no
+ * pin). Every save queues — the title is part of the chunked text — and
+ * `chunk.embed` coalesces a burst of autosaves into one queued job. Private
+ * notes are chunked too; the read rule lives where chunks are read.
  */
 
 export type SaveNoteInput = {
@@ -95,6 +102,8 @@ export const saveNoteProgram = Effect.fn('saveNoteProgram')(function* (
       })
     }),
   )
+
+  yield* Effect.promise(() => enqueueSourceEmbed(noteSource(input.id)))
 
   return { savedAt: new Date().toISOString(), mentions }
 })

@@ -20,6 +20,15 @@ export const QUEUES = {
   /** extracted_text → chunks + embeddings. */
   embedDocument: 'document.embed',
   /**
+   * A note's body or an embeddable attribute value → its chunks, with
+   * vectors when a model is pinned (SPA-132) — `document.embed`'s
+   * replace-stamp-embed for the sources that are not documents. `chunk.`
+   * and not `note.`, because the row it writes is the chunk and the source
+   * rides the payload. Created `stately` and sent with a per-source
+   * `singletonKey`, so a burst of note autosaves is one queued job.
+   */
+  embedSource: 'chunk.embed',
+  /**
    * A saved link → readability text on the same `document` row (SPA-117).
    * `document.` and not `clip.`, because the row it acts on is a document
    * like every other: no separate source table, one search box over decks

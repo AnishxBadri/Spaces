@@ -13,6 +13,13 @@ import {
   releaseIdentityAlias,
 } from '../entities/resolve'
 import type { IdentityOutcome, ResolveSource } from '../entities/resolve'
+import {
+  attributeSource,
+  deleteSourceChunks,
+  enqueueSourceEmbed,
+  isEmbeddableAttribute,
+} from '../ai/chunk-sources'
+import type { EmbedSource } from '../ai/chunk-sources'
 import { toObjectKind, valueValidator } from '@spaces/core/attributes/registry'
 import type {
   AttributeDef,
@@ -274,6 +281,13 @@ export type SetValuesResult = {
   defaulted: Array<string>
   identity: Record<string, IdentityOutcome>
   identityValues: Record<string, string>
+  /**
+   * The embeddable values this write set (SPA-132), to be chunked once it
+   * has committed. `setValuesEffect` enqueues them; a caller that owns the
+   * transaction owns that step too. A clear is not here: its chunks were
+   * deleted inside the write.
+   */
+  reembed: Array<EmbedSource>
 }
 
 /**
@@ -457,7 +471,21 @@ export async function setValuesInTx(
     if (norm !== null) identityValues[work.slug] = norm
   }
 
+  // Embeddable values (`EMBEDDABLE_ATTRIBUTES`; a deal's close_reason) are
+  // chunked for the semantic lane. A clear deletes the chunks here, in the
+  // transaction that cleared the value, so no search ever finds a reason
+  // the record no longer gives; a set is handed back for the embed job,
+  // which must not be queued before this commits — it reads the value.
+  const reembed: Array<EmbedSource> = []
+  for (const change of changes) {
+    if (!isEmbeddableAttribute(ent.kind, change.slug)) continue
+    const chunked = attributeSource(entityId, change.slug)
+    if (change.value === null) await deleteSourceChunks(tx, chunked)
+    else reembed.push(chunked)
+  }
+
   return {
+    reembed,
     changed: changes.filter((c) => c.door !== 'default').map((c) => c.slug),
     defaulted: changes.filter((c) => c.door === 'default').map((c) => c.slug),
     identity,
@@ -471,7 +499,7 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
   SetValuesResult,
   AttributeValidationError | EntityNotFound | ValuesWriteFailed
 > {
-  return yield* Effect.tryPromise({
+  const result = yield* Effect.tryPromise({
     try: () => db.transaction((tx) => setValuesInTx(tx, opts)),
     catch: (cause) =>
       cause instanceof AttributeValidationError ||
@@ -479,6 +507,11 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
         ? cause
         : new ValuesWriteFailed({ cause }),
   })
+  // After commit, silently (spec-ai-substrate §9: "automatic once enabled"):
+  // the job runs with or without a pin, and an enqueue never throws.
+  for (const source of result.reembed)
+    yield* Effect.promise(() => enqueueSourceEmbed(source))
+  return result
 })
 
 /** Promise seam for server-fns and tests; new Effect code composes `setValuesEffect`. */

@@ -11,6 +11,7 @@ import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 import { readDeck } from './jobs/read-deck'
 import { embedDocument } from './jobs/embed-document'
+import { embedSource } from './jobs/embed-source'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -47,6 +48,25 @@ async function main() {
   await boss
     .createQueue(QUEUES.readDeck, { policy: 'exclusive' })
     .catch(() => {})
+  // Notes and embeddable attributes → chunks (SPA-132): `document.embed`'s
+  // replace-stamp-embed for the sources that are not documents. One block,
+  // before the plain create loop below, because the queue must be born
+  // `stately` — one queued and one active per `singletonKey` — so a burst of
+  // note autosaves is one queued job that reads the latest body when it runs.
+  await boss
+    .createQueue(QUEUES.embedSource, { policy: 'stately' })
+    .catch(() => {})
+  if (embedSource.retry)
+    await boss.updateQueue(QUEUES.embedSource, {
+      retryLimit: embedSource.retry.limit,
+      retryDelay: embedSource.retry.delaySeconds,
+      retryBackoff: embedSource.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.embedSource,
+    { batchSize: 1, includeMetadata: true },
+    runJob(embedSource, { host, layer: Layer.empty }),
+  )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots
   }

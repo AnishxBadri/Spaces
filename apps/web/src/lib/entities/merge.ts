@@ -6,6 +6,7 @@ import { ENTITY_REFS } from '@spaces/db/entity-refs'
 import type { EntityRef } from '@spaces/db/entity-refs'
 import {
   attributeEvent,
+  chunk,
   duplicateCandidate,
   entity,
   entityAlias,
@@ -96,6 +97,7 @@ const CUSTOM_HANDLERS = new Set([
   'links',
   'holdings',
   'candidates',
+  'chunks',
 ])
 for (const ref of ENTITY_REFS) {
   if (ref.merge.kind === 'custom' && !CUSTOM_HANDLERS.has(ref.merge.handler))
@@ -290,6 +292,63 @@ export async function mergeEntities(opts: {
     for (const ref of ENTITY_REFS) {
       if (ref.merge.kind === 'repoint' || ref.merge.kind === 'repoint-or-drop')
         await repointGeneric(tx, ref, loserId, winnerId, snapshot)
+    }
+
+    // --- chunks: follow the record; the winner's source wins -------------
+    // Per source (source_kind, source_key), the values rule below said
+    // ahead of it: a source the winner already has chunks for is the
+    // winner's value, which the merge keeps, so the loser's chunks of it are
+    // dropped rather than colliding on (entity_id, source_kind, source_key,
+    // idx); any other source moves whole, because its value is the gap the
+    // loser fills. A dropped chunk is derived text — re-embedding the value
+    // it was cut from rebuilds it — so the snapshot keeps the row without
+    // its vector.
+    {
+      const winnerSources = new Set(
+        (
+          await tx
+            .selectDistinct({
+              sourceKind: chunk.sourceKind,
+              sourceKey: chunk.sourceKey,
+            })
+            .from(chunk)
+            .where(eq(chunk.entityId, winnerId))
+        ).map((c) => `${c.sourceKind}\u0000${c.sourceKey}`),
+      )
+      const loserChunks = await tx
+        .select({
+          id: chunk.id,
+          sourceKind: chunk.sourceKind,
+          sourceKey: chunk.sourceKey,
+          idx: chunk.idx,
+          text: chunk.text,
+          page: chunk.page,
+          embeddingModel: chunk.embeddingModel,
+        })
+        .from(chunk)
+        .where(eq(chunk.entityId, loserId))
+      for (const c of loserChunks) {
+        if (winnerSources.has(`${c.sourceKind}\u0000${c.sourceKey}`)) {
+          snapshot.push({
+            table: 'chunk',
+            action: 'dropped',
+            pk: { id: c.id },
+            old: { ...c, entityId: loserId },
+          })
+          await tx.delete(chunk).where(eq(chunk.id, c.id))
+        } else {
+          snapshot.push({
+            table: 'chunk',
+            action: 'repointed',
+            pk: { id: c.id },
+            old: { entityId: loserId },
+          })
+          await tx
+            .update(chunk)
+            .set({ entityId: winnerId })
+            .where(eq(chunk.id, c.id))
+        }
+      }
     }
 
     // --- attribute values: winner keeps, loser fills the gaps -------------
