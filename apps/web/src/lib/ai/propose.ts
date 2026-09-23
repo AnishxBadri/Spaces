@@ -1,8 +1,9 @@
 import { Effect, Schema } from 'effect'
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, suggestion } from '@spaces/db/schema'
 import type { suggestionKind } from '@spaces/db/schema'
+import { jsonRecord } from '#/lib/json'
 import type { Json } from '#/lib/json'
 import { proposalRefs, toPatch, validateProposal } from '@spaces/core/ai/schema'
 import type { ProposalIssue } from '@spaces/core/ai/schema'
@@ -28,13 +29,14 @@ import type { Actor, SetValuesResult, Tx } from '#/lib/attributes/values'
  * on every `attribute_event`. `rejectProgram` closes a row and writes nothing
  * else.
  *
- * Accept flips the status and writes the value in **one** transaction, and
- * the flip is the guard: `update … set status = 'accepted' where id = $1 and
- * status = 'open' returning *`. Two accepts racing on one row serialize on
- * its lock, the second re-reads `status` after the first commits, matches
- * nothing and is refused — so one accept, one set of events. Any refusal
- * after the flip (an invalid payload, an unsupported kind) rolls the flip
- * back with it, and the row stays `open` for the queue.
+ * Accept locks the row, writes the value and flips the status in **one**
+ * transaction. The guard is `select … for update` refusing anything not
+ * `open`: two accepts racing on one row serialize on its lock, the second
+ * reads the status after the first commits and is refused — so one accept,
+ * one set of events. Any refusal (an invalid payload, an unsupported kind)
+ * rolls the whole transaction back, and the row stays `open` for the queue.
+ * A partial accept (SPA-110) is the same transaction ending in a shrunk
+ * payload rather than a flip; `acceptProgram` says the rule.
  */
 
 export type SuggestionKind = (typeof suggestionKind.enumValues)[number]
@@ -241,21 +243,95 @@ async function close(
 
 export type Accepted = { suggestion: Suggestion; write: SetValuesResult }
 
+/**
+ * Lock one row for its accept and refuse it unless it is still `open`. The
+ * `for update` is what serializes two accepts on one row: the second waits
+ * for the first to commit, then reads the status — or the shrunk payload —
+ * the first left behind.
+ */
+async function lockOpen(tx: Tx, id: string): Promise<Suggestion> {
+  const row = (
+    await tx
+      .select()
+      .from(suggestion)
+      .where(eq(suggestion.id, id))
+      .for('update')
+  ).at(0)
+  if (!row) throw new SuggestionNotFound({ id })
+  if (row.status !== 'open')
+    throw new SuggestionNotOpen({ id, status: row.status })
+  return row
+}
+
+/** A partial accept: the row stays `open`, holding only what is left. */
+async function shrink(
+  tx: Tx,
+  id: string,
+  rest: { [slug: string]: Json },
+): Promise<Suggestion> {
+  const row = (
+    await tx
+      .update(suggestion)
+      .set({ payload: rest })
+      .where(and(eq(suggestion.id, id), eq(suggestion.status, 'open')))
+      .returning()
+  ).at(0)
+  if (!row) throw new SuggestionNotFound({ id })
+  return row
+}
+
+/**
+ * Accept a suggestion, whole or in part.
+ *
+ * `fields` omitted: every field of the patch, and the row closes
+ * `accepted`. `fields` given (the bulk verbs below, SPA-110): only those
+ * slugs are validated and written, and the rule for the row is —
+ *
+ * - no field left once these are applied → it closes `accepted`, the same
+ *   guarded flip as a whole accept;
+ * - fields left → it stays `open` with the accepted slugs **removed from
+ *   its payload**. What was accepted is not lost: every `attribute_event`
+ *   the write made carries this row's id as its receipt, so the payload is
+ *   exactly what the queue should still show.
+ *
+ * A refused field rolls its whole transaction back, so the row keeps that
+ * field and its `open` status — which is what lets a batch where every item
+ * fails leave every suggestion as it found it.
+ */
 export const acceptProgram = Effect.fn('acceptProgram')(function* (
   id: string,
   actor: Decider,
+  fields?: ReadonlyArray<string>,
 ): Effect.fn.Return<Accepted, SuggestionFailure> {
   return yield* Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
-        const row = await close(tx, id, 'accepted', actor)
+        const row = await lockOpen(tx, id)
         if (row.kind !== 'attribute_patch')
           throw new UnsupportedSuggestionKind({ id, kind: row.kind })
+
+        let picked: Json = row.payload
+        let rest: { [slug: string]: Json } = {}
+        if (fields !== undefined) {
+          const envelope = jsonRecord(row.payload)
+          const absent = fields.filter((slug) => !(slug in envelope))
+          if (fields.length === 0 || absent.length > 0)
+            throw invalid(
+              (fields.length === 0 ? ['fields'] : absent).map((slug) => ({
+                slug,
+                message: `${slug}: not proposed by this suggestion`,
+              })),
+            )
+          const chosen = new Set(fields)
+          const entries = Object.entries(envelope)
+          picked = Object.fromEntries(entries.filter(([s]) => chosen.has(s)))
+          rest = Object.fromEntries(entries.filter(([s]) => !chosen.has(s)))
+        }
 
         // Validated again: the registry the proposal was checked against
         // may have moved (an option archived, an attribute retired).
         const registry = await registryFor(tx, row.entityId)
-        const checked = validateProposal(registry, row.payload)
+        const checked = validateProposal(registry, picked)
         if (!checked.ok) throw invalid(checked.issues)
         const { patch, claims } = toPatch(registry, checked.proposal)
         // A record_reference is proposed as an identity claim, not an id;
@@ -278,11 +354,135 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
           suggestionId: row.id,
           refs: row.refs,
         })
-        return { suggestion: row, write }
+        const decided =
+          Object.keys(rest).length === 0
+            ? await close(tx, id, 'accepted', actor)
+            : await shrink(tx, id, rest)
+        return { suggestion: decided, write }
       }),
     catch: asFailure,
   })
 })
+
+// ---------- bulk accept (SPA-110, spec §10 "bulk accept per column/list") ----------
+
+/**
+ * One item of a batch: one field of a suggestion, or — for a kind that is
+ * not a patch — the whole suggestion, when `slug` is absent.
+ */
+export type BatchOutcome =
+  | { suggestionId: string; slug?: string; ok: true }
+  | { suggestionId: string; slug?: string; ok: false; message: string }
+
+type BatchItem = { suggestionId: string; slug?: string }
+
+/**
+ * Accept each item through `acceptProgram`, one at a time, each in its own
+ * transaction.
+ *
+ * **Never one transaction around the batch.** A partial accept is a real
+ * outcome the queue must be able to show: four fields that validate are
+ * four values the person asked for, and one option archived since the
+ * proposal must neither roll them back nor abort the fields after it. One
+ * transaction would make the batch all-or-nothing — the behaviour this verb
+ * exists to replace. Sequential rather than concurrent because two items
+ * are often fields of one row and would queue on its lock anyway.
+ */
+const acceptEach = Effect.fn('acceptEach')(function* (
+  items: ReadonlyArray<BatchItem>,
+  actor: Decider,
+): Effect.fn.Return<Array<BatchOutcome>> {
+  return yield* Effect.forEach(items, (item) =>
+    Effect.result(
+      acceptProgram(
+        item.suggestionId,
+        actor,
+        item.slug === undefined ? undefined : [item.slug],
+      ),
+    ).pipe(
+      Effect.map((r): BatchOutcome => {
+        const base: BatchItem =
+          item.slug === undefined
+            ? { suggestionId: item.suggestionId }
+            : { suggestionId: item.suggestionId, slug: item.slug }
+        return r._tag === 'Success'
+          ? { ...base, ok: true }
+          : { ...base, ok: false, message: suggestionMessage(r.failure) }
+      }),
+    ),
+  )
+})
+
+const read = <T>(run: () => Promise<T>) =>
+  Effect.tryPromise({ try: run, catch: asFailure })
+
+/**
+ * "Accept all on this record": every open suggestion on it, oldest first
+ * (a later proposal for the same field lands last, and wins), field by
+ * field for a patch — so one bad field is one failed item and the others
+ * land. A kind with no accept path is one item, refused by name.
+ */
+export const acceptRecordProgram = Effect.fn('acceptRecordProgram')(
+  function* (input: {
+    entityId: string
+    actorId: string
+  }): Effect.fn.Return<Array<BatchOutcome>, SuggestionFailure> {
+    const rows = yield* read(() =>
+      db
+        .select({
+          id: suggestion.id,
+          kind: suggestion.kind,
+          payload: suggestion.payload,
+        })
+        .from(suggestion)
+        .where(
+          and(
+            eq(suggestion.entityId, input.entityId),
+            eq(suggestion.status, 'open'),
+          ),
+        )
+        .orderBy(asc(suggestion.createdAt), asc(suggestion.id)),
+    )
+    const items = rows.flatMap((r): Array<BatchItem> => {
+      const slugs =
+        r.kind === 'attribute_patch' ? Object.keys(jsonRecord(r.payload)) : []
+      return slugs.length > 0
+        ? slugs.map((slug) => ({ suggestionId: r.id, slug }))
+        : [{ suggestionId: r.id }]
+    })
+    return yield* acceptEach(items, { type: 'user', id: input.actorId })
+  },
+)
+
+/**
+ * "Accept this column": one attribute across every open patch that
+ * proposes it, whatever record it is on. Only that field of each row is
+ * accepted; the row's other fields stay open for their own decision.
+ */
+export const acceptColumnProgram = Effect.fn('acceptColumnProgram')(
+  function* (input: {
+    attributeSlug: string
+    actorId: string
+  }): Effect.fn.Return<Array<BatchOutcome>, SuggestionFailure> {
+    const rows = yield* read(() =>
+      db
+        .select({ id: suggestion.id })
+        .from(suggestion)
+        .where(
+          and(
+            eq(suggestion.status, 'open'),
+            eq(suggestion.kind, 'attribute_patch'),
+            sql`(${suggestion.payload} -> ${input.attributeSlug}) is not null`,
+          ),
+        )
+        .orderBy(asc(suggestion.createdAt), asc(suggestion.id)),
+    )
+    return yield* acceptEach(
+      rows.map((r) => ({ suggestionId: r.id, slug: input.attributeSlug })),
+      { type: 'user', id: input.actorId },
+    )
+  },
+)
 
 export const rejectProgram = Effect.fn('rejectProgram')(function* (
   id: string,

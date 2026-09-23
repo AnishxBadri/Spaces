@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
+import type { Json } from '#/lib/json'
 import type { Decider } from './propose'
 
 /**
@@ -269,5 +270,259 @@ describe('propose → accept', () => {
       Effect.flip(acceptProgram(note.id, decider)),
     )
     expect(again).toBeInstanceOf(SuggestionNotOpen)
+  })
+})
+
+/**
+ * SPA-110 — bulk accept. Each item goes through `acceptProgram` in its own
+ * transaction; one bad field is one failed item, never an aborted batch.
+ */
+describe('bulk accept', () => {
+  const FIVE: Json = {
+    description: { value: 'Batteries', refs: ['doc:deck#p1'], confidence: 1 },
+    location: { value: 'Oslo', refs: ['doc:deck#p1'], confidence: 1 },
+    founded_year: { value: 2021, refs: ['doc:deck#p2'], confidence: 1 },
+    funding_stage: { value: 'seed', refs: ['doc:deck#p3'], confidence: 1 },
+    business_model: { value: ['b2b'], refs: ['doc:deck#p3'], confidence: 1 },
+  }
+
+  /** Archive the `seed` option of `funding_stage`; returns the undo. */
+  async function archiveSeed() {
+    const { db } = await import('@spaces/db')
+    const { attribute } = await import('@spaces/db/schema')
+    const { objectIdForKindAsync } = await import('#/lib/attributes/objects')
+    const { and, eq } = await import('drizzle-orm')
+    const where = and(
+      eq(attribute.objectId, await objectIdForKindAsync('company')),
+      eq(attribute.slug, 'funding_stage'),
+    )
+    const def = (await db.select().from(attribute).where(where)).at(0)
+    if (!def) throw new Error('no funding_stage attribute')
+    await db
+      .update(attribute)
+      .set({
+        options: {
+          ...def.options,
+          options: (def.options.options ?? []).map((o) =>
+            o.id === 'seed' ? { ...o, archived: true } : o,
+          ),
+        },
+      })
+      .where(where)
+    return async () => {
+      await db.update(attribute).set({ options: def.options }).where(where)
+    }
+  }
+
+  async function propose(entityId: string, payload: Json) {
+    const { Effect } = await import('effect')
+    const { proposeProgram } = await import('./propose')
+    return Effect.runPromise(
+      proposeProgram({
+        entityId,
+        kind: 'attribute_patch',
+        payload,
+        proposedBy: { type: 'system' },
+      }),
+    )
+  }
+
+  async function rowOf(id: string) {
+    const { db } = await import('@spaces/db')
+    const { suggestion } = await import('@spaces/db/schema')
+    const { eq } = await import('drizzle-orm')
+    return (await db.select().from(suggestion).where(eq(suggestion.id, id))).at(
+      0,
+    )
+  }
+
+  async function valuesOf(entityId: string) {
+    const { db } = await import('@spaces/db')
+    const { entity } = await import('@spaces/db/schema')
+    const { eq } = await import('drizzle-orm')
+    return (
+      await db
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, entityId))
+    ).at(0)?.values
+  }
+
+  const keysOf = (payload: Json | undefined) =>
+    payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+      ? Object.keys(payload)
+      : []
+
+  it('accepts a record field by field: four land, the archived option fails and stays open', async () => {
+    const { Effect } = await import('effect')
+    const { acceptRecordProgram } = await import('./propose')
+    const { accepter, entityId } = await setup()
+    const proposed = await propose(entityId, FIVE)
+
+    const restore = await archiveSeed()
+    try {
+      const outcomes = await Effect.runPromise(
+        acceptRecordProgram({ entityId, actorId: accepter.id }),
+      )
+      expect(outcomes).toHaveLength(5)
+      expect(outcomes.filter((o) => o.ok)).toHaveLength(4)
+      const failed = outcomes.flatMap((o) => (o.ok ? [] : [o]))
+      expect(failed).toHaveLength(1)
+      expect(failed[0]?.suggestionId).toBe(proposed.id)
+      expect(failed[0]?.slug).toBe('funding_stage')
+      // The validator's own `slug: detail`, not a generic sentence.
+      expect(failed[0]?.message).toMatch(/^funding_stage: /)
+    } finally {
+      await restore()
+    }
+
+    const values = await valuesOf(entityId)
+    expect(values?.description).toBe('Batteries')
+    expect(values?.location).toBe('Oslo')
+    expect(values?.founded_year).toBe(2021)
+    expect(values?.business_model).toEqual(['b2b'])
+    expect(values?.funding_stage).toBeUndefined()
+
+    // The rule: a row with a field left stays open, holding only that field.
+    const row = await rowOf(proposed.id)
+    expect(row?.status).toBe('open')
+    expect(row?.decidedBy).toBeNull()
+    expect(keysOf(row?.payload)).toEqual(['funding_stage'])
+
+    // Once the option is live again, the last field closes the row.
+    const again = await Effect.runPromise(
+      acceptRecordProgram({ entityId, actorId: accepter.id }),
+    )
+    expect(again).toEqual([
+      { suggestionId: proposed.id, slug: 'funding_stage', ok: true },
+    ])
+    const closed = await rowOf(proposed.id)
+    expect(closed?.status).toBe('accepted')
+    expect(closed?.decidedBy).toBe(accepter.id)
+  })
+
+  it('accepts one column across three records, leaving the other fields open', async () => {
+    const { Effect } = await import('effect')
+    const { acceptColumnProgram } = await import('./propose')
+    const records = [await setup(), await setup(), await setup()]
+    const accepter = records[0].accepter
+    const rows = []
+    for (const [i, r] of records.entries())
+      rows.push(
+        await propose(r.entityId, {
+          location: { value: `City ${i}`, refs: [], confidence: 1 },
+          founded_year: { value: 2000 + i, refs: [], confidence: 1 },
+        }),
+      )
+    // A suggestion that does not carry the column is not touched.
+    const other = await propose(records[0].entityId, {
+      description: { value: 'Untouched', refs: [], confidence: 1 },
+    })
+
+    const outcomes = await Effect.runPromise(
+      acceptColumnProgram({ attributeSlug: 'location', actorId: accepter.id }),
+    )
+    // A column is global: an earlier test in this file may have left an open
+    // `location` of its own, so read only this test's rows out of the batch.
+    const ours = new Set(rows.map((r) => r.id))
+    expect(outcomes.filter((o) => ours.has(o.suggestionId))).toEqual(
+      rows.map((r) => ({ suggestionId: r.id, slug: 'location', ok: true })),
+    )
+    expect(outcomes.some((o) => o.suggestionId === other.id)).toBe(false)
+    for (const [i, r] of records.entries()) {
+      const values = await valuesOf(r.entityId)
+      expect(values?.location).toBe(`City ${i}`)
+      expect(values?.founded_year).toBeUndefined()
+    }
+    for (const r of rows) {
+      const row = await rowOf(r.id)
+      expect(row?.status).toBe('open')
+      expect(keysOf(row?.payload)).toEqual(['founded_year'])
+    }
+    const untouched = await rowOf(other.id)
+    expect(untouched?.status).toBe('open')
+    expect(untouched?.payload).toEqual(other.payload)
+  })
+
+  it('leaves every suggestion open and reports each failure when all fail', async () => {
+    const { Effect } = await import('effect')
+    const { acceptColumnProgram } = await import('./propose')
+    const a = await setup()
+    const b = await setup()
+    const rows = [
+      await propose(a.entityId, {
+        funding_stage: { value: 'seed', refs: [], confidence: 1 },
+      }),
+      await propose(b.entityId, {
+        funding_stage: { value: 'seed', refs: [], confidence: 1 },
+        location: { value: 'Rome', refs: [], confidence: 1 },
+      }),
+    ]
+    const restore = await archiveSeed()
+    try {
+      const outcomes = await Effect.runPromise(
+        acceptColumnProgram({
+          attributeSlug: 'funding_stage',
+          actorId: a.accepter.id,
+        }),
+      )
+      expect(outcomes).toHaveLength(2)
+      expect(outcomes.every((o) => !o.ok)).toBe(true)
+    } finally {
+      await restore()
+    }
+    for (const r of rows) {
+      const row = await rowOf(r.id)
+      expect(row?.status).toBe('open')
+      expect(row?.payload).toEqual(r.payload)
+    }
+    expect((await valuesOf(b.entityId))?.location).toBeUndefined()
+  })
+
+  it('runs each item in its own transaction — items before and after a failure land', async () => {
+    const { Effect } = await import('effect')
+    const { vi } = await import('vitest')
+    const { acceptRecordProgram } = await import('./propose')
+    const { db } = await import('@spaces/db')
+    const { accepter, entityId } = await setup()
+    // Four suggestions, oldest first: the third's only field is refused.
+    const first = await propose(entityId, {
+      location: { value: 'Paris', refs: [], confidence: 1 },
+    })
+    const second = await propose(entityId, {
+      founded_year: { value: 2018, refs: [], confidence: 1 },
+    })
+    const third = await propose(entityId, {
+      funding_stage: { value: 'seed', refs: [], confidence: 1 },
+    })
+    const fourth = await propose(entityId, {
+      description: { value: 'After', refs: [], confidence: 1 },
+    })
+
+    const restore = await archiveSeed()
+    const spy = vi.spyOn(db, 'transaction')
+    try {
+      const outcomes = await Effect.runPromise(
+        acceptRecordProgram({ entityId, actorId: accepter.id }),
+      )
+      expect(outcomes.map((o) => [o.suggestionId, o.ok])).toEqual([
+        [first.id, true],
+        [second.id, true],
+        [third.id, false],
+        [fourth.id, true],
+      ])
+      // One transaction per item, never one around the batch.
+      expect(spy).toHaveBeenCalledTimes(4)
+    } finally {
+      spy.mockRestore()
+      await restore()
+    }
+    const values = await valuesOf(entityId)
+    expect(values?.location).toBe('Paris')
+    expect(values?.founded_year).toBe(2018)
+    expect(values?.description).toBe('After')
+    expect((await rowOf(second.id))?.status).toBe('accepted')
+    expect((await rowOf(third.id))?.status).toBe('open')
+    expect((await rowOf(fourth.id))?.status).toBe('accepted')
   })
 })
