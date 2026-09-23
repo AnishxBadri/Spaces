@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { aiKeyInput, aiProviderInput } from '../ai/providers/ids'
 import { aiLaneInput, aiRouteInput } from '../ai/lanes'
+import { aiCapsInput } from '../ai/caps-input'
 
 /**
  * Settings → AI (SPA-29). Admin-only, every one: the bodies live in
@@ -68,3 +69,27 @@ export const isLaneRouted = createServerFn()
     const { isLaneRoutedHandler } = await import('../ai/route')
     return isLaneRoutedHandler(data)
   })
+
+/**
+ * Settings → AI · Caps (SPA-73): the workspace token caps, admin-only like
+ * the rest of Settings → AI. The bodies live in `lib/ai/caps.ts`, whose
+ * handlers open with `requireAdmin()`.
+ */
+export const getAiCaps = createServerFn().handler(async () => {
+  const { getAiCapsHandler } = await import('../ai/caps')
+  return getAiCapsHandler()
+})
+
+/** Both ceilings at once; a null is no cap on that axis. */
+export const setAiCaps = createServerFn({ method: 'POST' })
+  .validator(aiCapsInput)
+  .handler(async ({ data }) => {
+    const { setAiCapsHandler } = await import('../ai/caps')
+    return setAiCapsHandler(data)
+  })
+
+/** Tokens in + out recorded in `ai_usage` since 00:00 UTC. */
+export const getAiUsageToday = createServerFn().handler(async () => {
+  const { getAiUsageTodayHandler } = await import('../ai/caps')
+  return getAiUsageTodayHandler()
+})
