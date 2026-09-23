@@ -330,9 +330,16 @@ export const chunk = pgTable(
     /**
      * A derived cache of the sensitivity resolver (ai-26), so retrieval can
      * filter inside SQL "before scoring" (§9) without calling a resolver per
-     * row. Exactly one writer: `stampSensitivity(scope)`, arriving in
-     * storage-18. Nothing in SPA-102 writes it, and no second author may
-     * appoint themselves. The routing boundary never reads this column — it
+     * row. Exactly one writer: `stampSensitivity(entityId)` in
+     * `apps/web/src/lib/ai/stamp-sensitivity.ts`, created by SPA-121 for the
+     * embed job (which inserts chunks at the default and stamps them in the
+     * same transaction) and the function storage-18 will call on binding and
+     * filing changes. No second author may appoint themselves; an insert
+     * leaves the default for it to correct. (Migration 0045's
+     * `COMMENT ON COLUMN` still names storage-18 as the home; the intent is
+     * unchanged — one writer — only its address moved, and the comment is
+     * corrected the next time a migration touches `chunk`.) The routing
+     * boundary never reads this column — it
      * resolves live through `apps/web/src/lib/ai/sensitivity.ts`, because a
      * stale cache at the point bytes leave the box is a leak.
      */

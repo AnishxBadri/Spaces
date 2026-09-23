@@ -4,6 +4,7 @@ import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
+import { enqueue } from '#/lib/queue'
 import { storage } from '#/lib/storage'
 import { linkTermMentionsInTx } from '#/lib/glossary/link-terms'
 import { extractDocumentText } from '@spaces/core/documents/extract'
@@ -91,6 +92,12 @@ export class ExtractionStore extends Context.Service<
       status: 'unsupported' | 'failed',
       reason: string,
     ) => Effect.Effect<void, StoreUnavailable>
+    /**
+     * Hand the stored text on to `document.embed` (SPA-121). `enqueue`
+     * answers `null` rather than throwing when the queue is unreachable, so
+     * this cannot fail the extraction whose text is already committed.
+     */
+    readonly enqueueEmbed: (documentId: string) => Effect.Effect<void>
   }
 >()('spaces/worker/ExtractionStore') {
   static readonly layer = Layer.succeed(
@@ -173,6 +180,10 @@ export class ExtractionStore extends Context.Service<
               message: messageOf(err),
             }),
         }),
+      enqueueEmbed: (documentId) =>
+        Effect.promise(() =>
+          enqueue(QUEUES.embedDocument, { documentId }),
+        ).pipe(Effect.asVoid),
     }),
   )
 }
@@ -235,6 +246,9 @@ const program = Effect.fn('extractDocument')(function* (
   }
 
   yield* store.markExtracted(documentId, outcome.text)
+  // Chunking runs with or without an embedding pin, so every stored text is
+  // handed on — the lexical chunk lane needs the rows even on a keyless box.
+  yield* store.enqueueEmbed(documentId)
 
   console.log(
     `[worker] extracted ${outcome.text.length} chars from ${row.filename ?? documentId} (${outcome.format})`,

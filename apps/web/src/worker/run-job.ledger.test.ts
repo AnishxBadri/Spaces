@@ -17,6 +17,10 @@ import type { JobHost, JobOutcome } from './run-job'
  * that to this worker's database before the file runs.
  */
 
+// The real ExtractionStore enqueues `document.embed` after a successful
+// extraction (SPA-121); the test databases carry no pgboss schema.
+vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
+
 const epoch = new Date(0)
 
 function fakeJob(

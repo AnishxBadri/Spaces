@@ -52,6 +52,7 @@ function fakeHost(): { host: JobHost; calls: Array<Settlement> } {
 
 type Write =
   | { op: 'extracted'; documentId: string; text: string }
+  | { op: 'embed-enqueued'; documentId: string }
   | {
       op: 'failed'
       documentId: string
@@ -91,6 +92,10 @@ function fakeStore(options: {
       markFailed: (documentId, status, reason) =>
         Effect.sync(() => {
           writes.push({ op: 'failed', documentId, status, reason })
+        }),
+      enqueueEmbed: (documentId) =>
+        Effect.sync(() => {
+          writes.push({ op: 'embed-enqueued', documentId })
         }),
     }),
   )
@@ -169,19 +174,21 @@ afterEach(() => {
 })
 
 describe('extractDocument — the happy path still completes', () => {
-  it('writes the extracted text and completes the job', async () => {
+  it('writes the extracted text, hands it to document.embed, and completes the job', async () => {
     const store = fakeStore({
       row: { blobSha: sha, filename: 'terms.txt', mime: 'text/plain' },
       bytes,
     })
     const { calls, writes } = await run(store)
 
+    // SPA-121: the embed job is enqueued only once the text is stored.
     expect(writes).toEqual([
       {
         op: 'extracted',
         documentId,
         text: 'Series A term sheet. 20% discount.',
       },
+      { op: 'embed-enqueued', documentId },
     ])
     expect(calls.map((c) => c.call)).toEqual(['complete'])
   })

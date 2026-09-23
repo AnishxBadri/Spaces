@@ -10,6 +10,7 @@ import { clipDocument } from './jobs/clip-document'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 import { readDeck } from './jobs/read-deck'
+import { embedDocument } from './jobs/embed-document'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -53,7 +54,7 @@ async function main() {
   // JobDef.retry is the queue's policy, not the wrapper's: JobRetryable just
   // fails the job and lets pg-boss count. updateQueue is how it reaches a
   // queue row that createQueue already created on an earlier boot.
-  for (const def of [extractDocument, clipDocument, readDeck]) {
+  for (const def of [extractDocument, embedDocument, clipDocument, readDeck]) {
     const retry = def.retry
     if (retry) {
       await boss.updateQueue(def.name, {
@@ -72,7 +73,16 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(extractDocument, { host, layer: ExtractionStore.layer }),
   )
-  await boss.work(QUEUES.embedDocument, stub('document.embed'))
+  // Chunking + embedding (SPA-121), enqueued by extraction once the text is
+  // stored. Runs with or without an embedding pin — no pin writes chunks
+  // with null vectors for the lexical lane. Batch of one: a document's
+  // embed calls are one provider's latency, and two in series on one tick
+  // would be two. No Layer — its I/O is `db` and `embed()`.
+  await boss.work(
+    QUEUES.embedDocument,
+    { batchSize: 1, includeMetadata: true },
+    runJob(embedDocument, { host, layer: Layer.empty }),
+  )
   // The URL clip (SPA-117). `clipUrlProgram` wrote the row and returned
   // before any network call; this is the half that actually goes out and
   // fetches, which is why it is on the worker at all — a page that takes
