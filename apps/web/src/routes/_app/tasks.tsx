@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { CheckSquare, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { z } from 'zod'
 import { EmptyState } from '#/components/empty-state'
 import {
   LedgerFigure,
@@ -16,11 +17,21 @@ import { useConfirm } from '#/components/ui/confirm-dialog'
 import { useBornRows } from '#/lib/born-rows'
 import { recordPath } from '#/lib/record-path'
 import { deleteTask, listTasks, setTaskDone } from '#/lib/server-fns'
+import { focusTab } from '#/lib/tasks/focus'
 import { localToday } from '@spaces/core/tasks/parse-due'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/tasks')({
-  loader: () => listTasks({ data: { includeDone: true } }),
+  // `?task=` is the row a Cmd-K hit lands on (CONTEXT.md 15b). A malformed
+  // id catches to undefined: the page renders unfocused, with no error.
+  validateSearch: z.object({
+    task: z.string().uuid().optional().catch(undefined),
+  }),
+  // The focused id is a loader dep because Done is a 50-row window: a hit on
+  // a task closed long ago is fetched by id, not hoped for in the window.
+  loaderDeps: ({ search }) => ({ task: search.task }),
+  loader: ({ deps }) =>
+    listTasks({ data: { includeDone: true, focus: deps.task } }),
   component: TasksPage,
 })
 
@@ -147,8 +158,36 @@ const EXIT_MS = 150
 
 function TasksPage() {
   const data = Route.useLoaderData()
+  const { task: focusId } = Route.useSearch()
+  const navigate = Route.useNavigate()
   const router = useRouter()
-  const [showDone, setShowDone] = useState(false)
+  // A focused task picks the tab it lives on: a closed one opens Done
+  // instead of rendering nothing.
+  const [showDone, setShowDone] = useState(
+    () => focusTab(focusId, data) === 'done',
+  )
+  // A new focus on a page already mounted — Cmd-K from /tasks itself — picks
+  // its tab during render, so the wrong tab never paints first.
+  const [tabFocus, setTabFocus] = useState(focusId)
+  if (tabFocus !== focusId) {
+    setTabFocus(focusId)
+    const tab = focusTab(focusId, data)
+    if (tab !== null) setShowDone(tab === 'done')
+  }
+
+  /**
+   * The first interaction spends the focus: the param leaves the history
+   * entry (replace, not push), so back/forward never re-focuses a row the
+   * user has moved past, and the page keeps its scroll.
+   */
+  function clearFocus() {
+    if (focusId === undefined) return
+    void navigate({
+      search: (prev) => ({ ...prev, task: undefined }),
+      replace: true,
+      resetScroll: false,
+    })
+  }
   // Rows mid-exit. The write waits for the transition so completing a task
   // reads as the row leaving, not as the list flinching.
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
@@ -182,6 +221,7 @@ function TasksPage() {
   }
 
   function toggle(id: string, done: boolean) {
+    clearFocus()
     setLeaving((s) => new Set(s).add(id))
     window.setTimeout(() => {
       void write(id, done)
@@ -209,6 +249,7 @@ function TasksPage() {
   }
 
   async function remove(t: TaskRow) {
+    clearFocus()
     const ok = await confirm({
       title: 'Delete this task?',
       body: `"${t.content}" leaves the workspace. This cannot be undone.`,
@@ -240,10 +281,22 @@ function TasksPage() {
         action={
           data.done.length > 0 ? (
             <div className="-mb-4 flex items-center" role="group">
-              <HeaderTab active={!viewDone} onClick={() => setShowDone(false)}>
+              <HeaderTab
+                active={!viewDone}
+                onClick={() => {
+                  clearFocus()
+                  setShowDone(false)
+                }}
+              >
                 Open
               </HeaderTab>
-              <HeaderTab active={viewDone} onClick={() => setShowDone(true)}>
+              <HeaderTab
+                active={viewDone}
+                onClick={() => {
+                  clearFocus()
+                  setShowDone(true)
+                }}
+              >
                 Done
                 <span className="font-normal tracking-normal normal-case">
                   {data.done.length}
@@ -262,6 +315,7 @@ function TasksPage() {
         <TaskComposer
           variant="band"
           onCreated={(id) => {
+            clearFocus()
             bear(id)
             setShowDone(false)
           }}
@@ -302,6 +356,7 @@ function TasksPage() {
                       : whenFigure(t.dueDate, today, g.key)
                   }
                   done={viewDone}
+                  focused={t.id === focusId}
                   overdue={g.key === 'overdue'}
                   leaving={leaving.has(t.id)}
                   wash={washes(t.id)}
@@ -350,6 +405,7 @@ function HeaderTab({
 function TaskItem({
   task: t,
   done,
+  focused,
   overdue,
   figure,
   last,
@@ -360,6 +416,8 @@ function TaskItem({
 }: {
   task: TaskRow
   done?: boolean
+  /** The `?task=` row: scrolls into view and takes focus on its checkbox. */
+  focused?: boolean
   overdue?: boolean
   figure: string
   last?: boolean | undefined
@@ -370,6 +428,22 @@ function TaskItem({
   onToggle: () => void
   onDelete: () => void
 }) {
+  const box = useRef<HTMLButtonElement>(null)
+  // Focus lands on the row's own checkbox, so its `focus-ring` reticle is
+  // the whole treatment — no highlight of its own. A frame late: the
+  // palette's dialog hands focus back to its trigger as it unmounts, and
+  // the row must be the last to take it.
+  useEffect(() => {
+    if (!focused) return
+    const frame = requestAnimationFrame(() => {
+      const el = box.current
+      if (!el) return
+      el.scrollIntoView({ block: 'center' })
+      el.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [focused])
+
   return (
     // The row reads check → what → where → who → when; the date holds the
     // right lane alone. A leaving row fades on opacity only — the list
@@ -383,6 +457,7 @@ function TaskItem({
       )}
     >
       <Checkbox
+        ref={box}
         checked={!!done !== !!leaving}
         onCheckedChange={onToggle}
         aria-label={done ? 'Reopen task' : 'Complete task'}

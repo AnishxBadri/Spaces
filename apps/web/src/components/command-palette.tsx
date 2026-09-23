@@ -51,8 +51,8 @@ const KIND_ICONS: Record<string, LucideIcon> = {
 
 /**
  * Documents have no page — a hit lands on the record it is filed against.
- * Tasks have no page either: a task hit lands on /tasks (focusing the row
- * is clean-6's).
+ * Tasks have no page either: a task hit lands on /tasks, and selecting it
+ * carries `?task=<id>` so the row takes focus (`goTask`).
  */
 export function hrefFor(hit: Hit): string | null {
   if (hit.rowKind === 'task') return '/tasks'
@@ -276,6 +276,12 @@ export function CommandPalette({
     void navigate({ to })
   }
 
+  /** A task hit lands on /tasks with its row focused (CONTEXT.md 15b). */
+  function goTask(id: string) {
+    onOpenChange(false)
+    void navigate({ to: '/tasks', search: { task: id } })
+  }
+
   /**
    * An action closes the palette and then runs, a tick later: two Radix
    * dialogs must not overlap, or the palette's unmount lands after the next
@@ -329,7 +335,11 @@ export function CommandPalette({
                       key={key}
                       value={key}
                       disabled={!href}
-                      onSelect={() => href && go(href)}
+                      onSelect={() =>
+                        hit.rowKind === 'task'
+                          ? goTask(hit.id)
+                          : href && go(href)
+                      }
                       className="items-start gap-2.5"
                     >
                       <HitLine hit={hit} />

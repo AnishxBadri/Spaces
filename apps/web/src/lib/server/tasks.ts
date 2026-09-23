@@ -1,8 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, objectDef } from '@spaces/db/schema'
 import { task, taskEntity } from '@spaces/db/schema/tasks'
 import { user } from '@spaces/db/schema/auth'
 import { requireUser } from './shared'
@@ -48,83 +47,29 @@ export const createTask = createServerFn({ method: 'POST' })
   })
 
 /**
- * The records a task is linked to. `objectSlug` travels with every row —
- * a custom record's page lives under its object's slug, and `recordPath`
- * needs it to build `/o/:slug/:id` instead of dropping the link.
+ * Open tasks, and — with `includeDone` — the Done window. `focus` is the
+ * task a `/tasks?task=<id>` link lands on; the payload carries it even when
+ * it closed too long ago to sit in the window. The read and its invariants
+ * live in `lib/tasks/list.ts`, outside `lib/server/` so a test can call it
+ * without a request; this is the request half only.
  */
-type LinkedEntity = {
-  id: string
-  name: string
-  kind: string
-  objectSlug: string | null
-}
-
-async function linkedEntities(taskIds: Array<string>) {
-  if (taskIds.length === 0) return new Map<string, Array<LinkedEntity>>()
-  const rows = await db
-    .select({
-      taskId: taskEntity.taskId,
-      id: entity.id,
-      name: entity.canonicalName,
-      kind: entity.kind,
-      objectSlug: objectDef.slug,
-    })
-    .from(taskEntity)
-    .innerJoin(entity, eq(entity.id, taskEntity.entityId))
-    .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
-    .where(inArray(taskEntity.taskId, taskIds))
-  const map = new Map<string, Array<LinkedEntity>>()
-  for (const r of rows) {
-    const list = map.get(r.taskId) ?? []
-    list.push({
-      id: r.id,
-      name: r.name,
-      kind: r.kind,
-      objectSlug: r.objectSlug,
-    })
-    map.set(r.taskId, list)
-  }
-  return map
-}
-
-const taskColumns = {
-  id: task.id,
-  content: task.content,
-  dueDate: task.dueDate,
-  assigneeId: task.assigneeId,
-  assigneeName: user.name,
-  doneAt: task.doneAt,
-  createdAt: task.createdAt,
-}
-
 export const listTasks = createServerFn()
-  .validator(z.object({ includeDone: z.boolean().optional() }).optional())
+  .validator(
+    z
+      .object({
+        includeDone: z.boolean().optional(),
+        focus: z.string().uuid().optional(),
+      })
+      .optional(),
+  )
   .handler(async ({ data }) => {
     await requireUser()
-    const open = await db
-      .select(taskColumns)
-      .from(task)
-      .innerJoin(user, eq(user.id, task.assigneeId))
-      .where(isNull(task.doneAt))
-      .orderBy(asc(task.dueDate), asc(task.createdAt))
-    const done = data?.includeDone
-      ? await db
-          .select(taskColumns)
-          .from(task)
-          .innerJoin(user, eq(user.id, task.assigneeId))
-          .where(isNotNull(task.doneAt))
-          .orderBy(desc(task.doneAt))
-          .limit(50)
-      : []
-    const all = [...open, ...done]
-    const links = await linkedEntities(all.map((t) => t.id))
-    const serialize = (t: (typeof all)[number]) => ({
-      ...t,
-      doneAt: t.doneAt?.toISOString() ?? null,
-      createdAt: t.createdAt.toISOString(),
-      entities: links.get(t.id) ?? [],
+    const { listTasksProgram } = await import('#/lib/tasks/list')
+    const { effectFn } = await import('./effect')
+    return effectFn(listTasksProgram)({
+      includeDone: data?.includeDone,
+      focus: data?.focus,
     })
-    return { open: open.map(serialize), done: done.map(serialize) }
   })
 
 export const listEntityTasks = createServerFn()
