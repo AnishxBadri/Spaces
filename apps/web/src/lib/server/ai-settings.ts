@@ -2,6 +2,10 @@ import { createServerFn } from '@tanstack/react-start'
 import { aiKeyInput, aiProviderInput } from '../ai/providers/ids'
 import { aiLaneInput, aiRouteInput } from '../ai/lanes'
 import { aiCapsInput } from '../ai/caps-input'
+import {
+  embeddingKeyInput,
+  embeddingTargetInput,
+} from '../ai/providers/embed/ids'
 
 /**
  * Settings → AI (SPA-29). Admin-only, every one: the bodies live in
@@ -93,3 +97,45 @@ export const getAiUsageToday = createServerFn().handler(async () => {
   const { getAiUsageTodayHandler } = await import('../ai/caps')
   return getAiUsageTodayHandler()
 })
+
+/**
+ * Settings → AI · Embeddings (SPA-51): the pin, the embedding keys, the Test
+ * call. Admin-only like the rest of Settings → AI; the bodies live in
+ * `lib/ai/providers/embed/settings.ts`, whose handlers open with
+ * `requireAdmin()`.
+ */
+export const getEmbeddingSettings = createServerFn().handler(async () => {
+  const { getEmbeddingSettingsHandler } =
+    await import('../ai/providers/embed/settings')
+  return getEmbeddingSettingsHandler()
+})
+
+/** Stores the workspace embedding key (`kind: 'embedding'`); returns only the redacted display. */
+export const saveEmbeddingKey = createServerFn({ method: 'POST' })
+  .validator(embeddingKeyInput)
+  .handler(async ({ data }) => {
+    const { saveEmbeddingKeyHandler } =
+      await import('../ai/providers/embed/settings')
+    return saveEmbeddingKeyHandler(data)
+  })
+
+/** Embeds "Spaces" with one model: the width, the first four values, the model id. */
+export const testEmbedding = createServerFn({ method: 'POST' })
+  .validator(embeddingTargetInput)
+  .handler(async ({ data }) => {
+    const { testEmbeddingHandler } =
+      await import('../ai/providers/embed/settings')
+    return testEmbeddingHandler(data)
+  })
+
+/**
+ * Pins the workspace to one model at 768 dimensions. Refused — `PinLocked`,
+ * with the re-pin explanation — when another model is already pinned.
+ */
+export const pinEmbedding = createServerFn({ method: 'POST' })
+  .validator(embeddingTargetInput)
+  .handler(async ({ data }) => {
+    const { pinEmbeddingHandler } =
+      await import('../ai/providers/embed/settings')
+    return pinEmbeddingHandler(data)
+  })

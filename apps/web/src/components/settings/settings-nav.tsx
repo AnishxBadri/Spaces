@@ -81,6 +81,14 @@ export const SETTINGS_SECTIONS = [
     group: 'workspace',
     admin: true,
   },
+  {
+    // ai-9a (SPA-51): the embedding pin and its key, admin-only like the
+    // provider keys.
+    to: '/settings/embeddings',
+    label: 'Embeddings',
+    group: 'workspace',
+    admin: true,
+  },
   { to: '/settings/objects', label: 'Objects', group: 'objects', admin: false },
   {
     to: '/settings/currency',
