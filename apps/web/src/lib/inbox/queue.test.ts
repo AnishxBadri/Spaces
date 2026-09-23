@@ -227,6 +227,7 @@ describe('reject and accept leave the queue', () => {
     const accepted = await Effect.runPromise(
       acceptProgram(f.acmeFounded, { type: 'user', id: f.me }),
     )
+    if (accepted.kind !== 'attribute_patch') throw new Error('not a patch')
     expect(accepted.write.changed).toEqual(['founded_year'])
 
     const rows = await Effect.runPromise(listInboxProgram())

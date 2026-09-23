@@ -1,12 +1,13 @@
 import { Effect, Schema } from 'effect'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { entity, suggestion } from '@spaces/db/schema'
+import { entity, link, suggestion } from '@spaces/db/schema'
 import type { suggestionKind } from '@spaces/db/schema'
 import { jsonRecord } from '#/lib/json'
 import type { Json } from '#/lib/json'
 import { proposalRefs, toPatch, validateProposal } from '@spaces/core/ai/schema'
 import type { ProposalIssue } from '@spaces/core/ai/schema'
+import { identityPayloadSchema } from '@spaces/core/ai/identity'
 import { toObjectKind } from '@spaces/core/attributes/registry'
 import type { AttributeDef } from '@spaces/core/attributes/registry'
 import { objectIdForKindAsync } from '#/lib/attributes/objects'
@@ -17,6 +18,9 @@ import {
   setValuesInTx,
 } from '#/lib/attributes/values'
 import type { Actor, SetValuesResult, Tx } from '#/lib/attributes/values'
+import { resolveEntity } from '#/lib/entities/resolve'
+import type { ResolveResult } from '#/lib/entities/resolve'
+import { canonicalId } from '#/lib/entities/sweep'
 
 /**
  * The AI layer's one mutating verb (docs/spec-ai-substrate.md §3, §10).
@@ -37,6 +41,10 @@ import type { Actor, SetValuesResult, Tx } from '#/lib/attributes/values'
  * rolls the whole transaction back, and the row stays `open` for the queue.
  * A partial accept (SPA-110) is the same transaction ending in a shrunk
  * payload rather than a flip; `acceptProgram` says the rule.
+ *
+ * Two kinds accept today: `attribute_patch` (a value, through the one write
+ * path) and `identity` (SPA-105: a person, through `resolveEntity`, plus a
+ * `contact_at` link to the record). Every other kind is refused by name.
  */
 
 export type SuggestionKind = (typeof suggestionKind.enumValues)[number]
@@ -55,7 +63,10 @@ export class SuggestionNotOpen extends Schema.TaggedError<SuggestionNotOpen>()(
   { id: Schema.String, status: Schema.String },
 ) {}
 
-/** Refused: this kind has no accept path yet. Only `attribute_patch` does. */
+/**
+ * Refused: this kind has no accept path yet. `attribute_patch` and
+ * `identity` do.
+ */
 export class UnsupportedSuggestionKind extends Schema.TaggedError<UnsupportedSuggestionKind>()(
   'UnsupportedSuggestionKind',
   { id: Schema.String, kind: Schema.String },
@@ -192,6 +203,9 @@ export const proposeProgram = Effect.fn('proposeProgram')(function* (
         if (!checked.ok) throw invalid(checked.issues)
         refs = input.refs ?? proposalRefs(checked.proposal)
       }
+      // An identity is held to its shape now for the same reason: the card
+      // draws it field by field, and the accept path resolves from it.
+      if (input.kind === 'identity') identityOf(input.payload)
       const row = (
         await db
           .insert(suggestion)
@@ -245,7 +259,104 @@ async function close(
   throw new SuggestionNotOpen({ id, status: held.status })
 }
 
-export type Accepted = { suggestion: Suggestion; write: SetValuesResult }
+export type Accepted =
+  | { kind: 'attribute_patch'; suggestion: Suggestion; write: SetValuesResult }
+  | {
+      kind: 'identity'
+      suggestion: Suggestion
+      /** What `resolveEntity` did: attached to a known person, or created one. */
+      resolved: ResolveResult
+      /** False when the person was already `contact_at` the record. */
+      linked: boolean
+    }
+
+/** An identity payload, decoded — or the validator's refusal, by field. */
+function identityOf(payload: Json) {
+  const parsed = identityPayloadSchema.safeParse(payload)
+  if (parsed.success) return parsed.data
+  throw invalid(
+    parsed.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'identity'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
+}
+
+/**
+ * Accept an identity (SPA-105, spec §11): the person a document named walks
+ * through `resolveEntity` — the one door every creator uses — and is linked
+ * `contact_at` the record the suggestion sits on.
+ *
+ * - An exact email or LinkedIn match **attaches**: no new entity, and the
+ *   name the document used becomes a name alias of the person already held.
+ * - No match **creates** the person, and `resolveEntity`'s inline trigram
+ *   sweep files a `duplicate_candidate` for every near-miss name — the pair
+ *   the /inbox pair card already draws. Fuzzy never merges.
+ *
+ * `resolveEntity` is Promise-shaped and writes on `db`, not on this
+ * transaction, so the person it creates commits on its own connection
+ * before the link and the flip below. The row lock this transaction holds
+ * is what still serializes two accepts of one row: the second waits, then
+ * reads `accepted`. If the link or the flip then fails, the person stays and
+ * the suggestion stays open; a retry attaches by key or files the pair —
+ * the one door's own doctrine, not a second person silently welded.
+ */
+async function acceptIdentityInTx(
+  tx: Tx,
+  row: Suggestion,
+  actor: Decider,
+): Promise<{ resolved: ResolveResult; linked: boolean }> {
+  const claim = identityOf(row.payload)
+  const recordId = await canonicalId(row.entityId, tx)
+  const record = (
+    await tx
+      .select({ kind: entity.kind })
+      .from(entity)
+      .where(eq(entity.id, recordId))
+  ).at(0)
+  if (!record)
+    throw new EntityNotFound({
+      entityId: row.entityId,
+      message: 'Record not found',
+    })
+
+  const resolved = await resolveEntity({
+    kind: 'person',
+    name: claim.name,
+    keys: {
+      ...(claim.email === undefined ? {} : { email: claim.email }),
+      ...(claim.linkedin === undefined ? {} : { linkedin: claim.linkedin }),
+    },
+    // `entity_source` has no value meaning "extracted from a document", and
+    // adding one would collide with clean's source_class collapse. `import`
+    // it is until clean's source_class/source_ref work gives this birth its
+    // real provenance; until then the provenance rides the suggestion row —
+    // its refs cite the deck, and `decided_by` names who accepted it.
+    source: { class: 'import' },
+    // The accepter, never a machine: a person decided this person exists.
+    createdBy: actor.id,
+    // The role the document gave them, as a birth value only: on an attach
+    // the person already held keeps the title they have.
+    ...(claim.role === undefined ? {} : { values: { job_title: claim.role } }),
+  })
+  if (resolved.entityId === recordId)
+    throw invalid([
+      { slug: 'identity', message: 'A person cannot be a contact at itself' },
+    ])
+
+  const inserted = await tx
+    .insert(link)
+    .values({
+      fromEntityId: resolved.entityId,
+      toEntityId: recordId,
+      relation: 'contact_at',
+      source: 'extracted',
+      createdBy: actor.id,
+    })
+    .onConflictDoNothing()
+    .returning({ id: link.id })
+  return { resolved, linked: inserted.length > 0 }
+}
 
 /**
  * Lock one row for its accept and refuse it unless it is still `open`. The
@@ -301,6 +412,9 @@ async function shrink(
  * A refused field rolls its whole transaction back, so the row keeps that
  * field and its `open` status — which is what lets a batch where every item
  * fails leave every suggestion as it found it.
+ *
+ * An `identity` accepts whole: it has no fields, so a `fields` argument is
+ * refused as invalid rather than read as "all of it".
  */
 export const acceptProgram = Effect.fn('acceptProgram')(function* (
   id: string,
@@ -311,6 +425,23 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
     try: () =>
       db.transaction(async (tx) => {
         const row = await lockOpen(tx, id)
+        if (row.kind === 'identity') {
+          if (fields !== undefined)
+            throw invalid([
+              {
+                slug: 'fields',
+                message: 'fields: an identity is accepted whole, not by field',
+              },
+            ])
+          const { resolved, linked } = await acceptIdentityInTx(tx, row, actor)
+          const decided = await close(tx, id, 'accepted', actor)
+          return {
+            kind: 'identity',
+            suggestion: decided,
+            resolved,
+            linked,
+          } satisfies Accepted
+        }
         if (row.kind !== 'attribute_patch')
           throw new UnsupportedSuggestionKind({ id, kind: row.kind })
 
@@ -362,7 +493,11 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
           Object.keys(rest).length === 0
             ? await close(tx, id, 'accepted', actor)
             : await shrink(tx, id, rest)
-        return { suggestion: decided, write }
+        return {
+          kind: 'attribute_patch',
+          suggestion: decided,
+          write,
+        } satisfies Accepted
       }),
     catch: asFailure,
   })
@@ -424,7 +559,8 @@ const read = <T>(run: () => Promise<T>) =>
  * "Accept all on this record": every open suggestion on it, oldest first
  * (a later proposal for the same field lands last, and wins), field by
  * field for a patch — so one bad field is one failed item and the others
- * land. A kind with no accept path is one item, refused by name.
+ * land. An identity is one item, accepted whole; a kind with no accept path
+ * is one item, refused by name.
  */
 export const acceptRecordProgram = Effect.fn('acceptRecordProgram')(
   function* (input: {

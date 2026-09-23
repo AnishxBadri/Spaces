@@ -77,6 +77,7 @@ describe('propose → accept', () => {
     const accepted = await Effect.runPromise(
       acceptProgram(proposed.id, { type: 'user', id: accepter.id }),
     )
+    if (accepted.kind !== 'attribute_patch') throw new Error('not a patch')
     expect(accepted.write.changed.sort()).toEqual(['founded_year', 'location'])
 
     const after = (

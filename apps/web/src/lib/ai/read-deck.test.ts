@@ -335,6 +335,76 @@ describe('readDeck', () => {
       expect(row.rationale).toMatch(/2 model calls were made/)
   })
 
+  it('turns the founders the deck names into identity suggestions on the deal, after its patch', async () => {
+    // SPA-105: a claim on a person reference (`people`) is no longer held
+    // back — each person becomes one `identity` row on the same record,
+    // citing the field's refs, and nothing is resolved until accepted.
+    await routeExtract()
+    const { documentId, tag } = await deckOnCompany()
+    const dealId = await fileOnDeal(documentId, tag)
+    const model = mockModel((prompt) =>
+      prompt.includes('about the deal')
+        ? {
+            stage: {
+              value: 'screening',
+              refs: [`doc:${documentId}#2`],
+              confidence: 0.5,
+            },
+            people: {
+              value: [
+                {
+                  name: 'Ada Founder',
+                  role: 'CEO',
+                  email: `ada-${tag}@deckco.example`,
+                },
+                { name: 'Bo Cofounder', role: 'CTO' },
+              ],
+              refs: [`doc:${documentId}#0`],
+              confidence: 0.9,
+            },
+          }
+        : COMPANY_ANSWER(documentId),
+    )
+    const entitiesBefore = (
+      await db.select({ value: count() }).from(entity)
+    ).at(0)?.value
+
+    const result = await Effect.runPromise(
+      readDeckProgram({ documentId, userId: USER, model }),
+    )
+    expect(result.suggestions).toHaveLength(4)
+
+    const onDeal = await suggestionsOn(dealId)
+    const patch = onDeal.filter((r) => r.kind === 'attribute_patch')
+    const identities = onDeal.filter((r) => r.kind === 'identity')
+    expect(patch).toHaveLength(1)
+    // The claim is not a field of the patch, and not held back any more.
+    expect(Object.keys(jsonRecord(patch[0].payload))).toEqual(['stage'])
+    expect(patch[0].rationale).toMatch(/2 people named in the deck/)
+    expect(patch[0].rationale).not.toMatch(/Held back/)
+
+    expect(identities.map((r) => r.payload)).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'Ada Founder',
+          role: 'CEO',
+          email: `ada-${tag}@deckco.example`,
+        },
+        { name: 'Bo Cofounder', role: 'CTO' },
+      ]),
+    )
+    for (const row of identities) {
+      expect(row.status).toBe('open')
+      expect(row.refs).toEqual([`doc:${documentId}#0`])
+      expect(row.proposedById).toBe(USER)
+      expect(row.rationale).toMatch(/Named in deck-/)
+    }
+    // Proposing resolved nobody.
+    expect(
+      (await db.select({ value: count() }).from(entity)).at(0)?.value,
+    ).toBe(entitiesBefore)
+  })
+
   it('fails with the provider’s words and writes no suggestion when the provider is unreachable', async () => {
     await routeExtract()
     const { companyId, documentId, tag } = await deckOnCompany()

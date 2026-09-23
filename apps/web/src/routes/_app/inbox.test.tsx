@@ -168,6 +168,47 @@ describe('the suggestion card', () => {
     expect(html).not.toContain('confidence')
   })
 
+  it('draws an identity as the person the deck named, not its payload', async () => {
+    // SPA-105: the claim's rows in the patch body's label/value shape.
+    const { SuggestionEntry } =
+      await import('#/components/inbox/suggestion-card')
+    const html = renderToStaticMarkup(
+      <ul>
+        <SuggestionEntry
+          item={{
+            id: 's-identity',
+            kind: 'identity',
+            payload: {
+              name: 'Ada Founder',
+              role: 'CEO',
+              email: 'ada@deckco.example',
+              linkedin: 'https://linkedin.com/in/ada',
+            },
+            rationale: 'Named in deck.pdf as CEO',
+            citations: [],
+            fields: null,
+            createdAt: '2026-09-23T00:00:00.000Z',
+          }}
+          pending={false}
+          onAccept={() => {}}
+          onReject={() => {}}
+        />
+      </ul>,
+    )
+    for (const text of [
+      'Person',
+      'Ada Founder',
+      'Role',
+      'CEO',
+      'ada@deckco.example',
+      'LinkedIn',
+      'https://linkedin.com/in/ada',
+    ])
+      expect(html).toContain(text)
+    // Drawn, not dumped: no JSON key quoting.
+    expect(html).not.toContain('&quot;name&quot;')
+  })
+
   it('degrades a suggestion row that carries no suggestions', () => {
     const html = renderToStaticMarkup(
       <ul>

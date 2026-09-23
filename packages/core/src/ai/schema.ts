@@ -57,7 +57,15 @@ export const JSON_SCHEMA_DRAFT = 'https://json-schema.org/draft/2020-12/schema'
  * reading a deck knows "Sequoia, sequoiacap.com", not a row id. The claim is
  * resolved at accept time through the identity write path.
  */
-export type IdentityClaim = { name: string; domain?: string; email?: string }
+export type IdentityClaim = {
+  name: string
+  domain?: string
+  email?: string
+  /** A person's LinkedIn URL — an identity key `resolveEntity` matches on. */
+  linkedin?: string
+  /** A person's role as the context states it ("CEO") — shown, never matched. */
+  role?: string
+}
 
 /** One proposed field — the envelope every property wears. */
 export type ProposedField = {
@@ -127,10 +135,16 @@ function writeShape(def: SchemaAttribute): JsonSchema | null {
           }
         : null
     }
-    case 'record_reference':
+    case 'record_reference': {
+      // A person is claimed by the keys a person has (SPA-105): email and
+      // LinkedIn, which `resolveEntity` matches on, and the role the deck
+      // gives them. Every other target keeps the company-shaped claim.
+      const claim =
+        def.options.targetKind === 'person' ? PERSON_CLAIM_SCHEMA : CLAIM_SCHEMA
       return def.options.multi
-        ? { type: 'array', items: CLAIM_SCHEMA, maxItems: 100 }
-        : CLAIM_SCHEMA
+        ? { type: 'array', items: claim, maxItems: 100 }
+        : claim
+    }
     case 'actor_reference':
       return null
   }
@@ -142,6 +156,22 @@ const CLAIM_SCHEMA: JsonSchema = {
     name: { type: 'string', minLength: 1, maxLength: 500 },
     domain: { type: 'string', format: 'hostname', maxLength: 255 },
     email: { type: 'string', format: 'email', maxLength: 255 },
+  },
+  required: ['name'],
+  additionalProperties: false,
+}
+
+const PERSON_CLAIM_SCHEMA: JsonSchema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', minLength: 1, maxLength: 500 },
+    role: {
+      type: 'string',
+      maxLength: 200,
+      description: 'Their role or title, as the context states it',
+    },
+    email: { type: 'string', format: 'email', maxLength: 255 },
+    linkedin: { type: 'string', format: 'uri', maxLength: 500 },
   },
   required: ['name'],
   additionalProperties: false,
@@ -198,6 +228,8 @@ const claimValidator = z
     name: z.string().trim().min(1).max(500),
     domain: z.string().max(255).optional(),
     email: z.string().email().max(255).optional(),
+    linkedin: z.string().trim().min(1).max(500).optional(),
+    role: z.string().trim().min(1).max(200).optional(),
   })
   .strict()
 
@@ -313,6 +345,8 @@ const stripClaim = (c: z.infer<typeof claimValidator>): IdentityClaim => ({
   name: c.name,
   ...(c.domain === undefined ? {} : { domain: c.domain }),
   ...(c.email === undefined ? {} : { email: c.email }),
+  ...(c.linkedin === undefined ? {} : { linkedin: c.linkedin }),
+  ...(c.role === undefined ? {} : { role: c.role }),
 })
 
 /** The suggestion row's `refs[]`: the union of every field's, first-seen order. */

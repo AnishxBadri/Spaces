@@ -163,6 +163,26 @@ describe('schemaFor', () => {
     expect(people?.items?.required).toEqual(['name'])
   })
 
+  it('claims a person by name, role, email and LinkedIn — never a domain (SPA-105)', () => {
+    const founders = valueOf(
+      schemaFor([
+        def('founders', 'record_reference', {
+          targetKind: 'person',
+          multi: true,
+        }),
+      ]),
+      'founders',
+    )
+    expect(founders?.type).toBe('array')
+    expect(founders?.items?.required).toEqual(['name'])
+    expect(Object.keys(founders?.items?.properties ?? {})).toEqual([
+      'name',
+      'role',
+      'email',
+      'linkedin',
+    ])
+  })
+
   it('leaves out archived attributes', () => {
     const s = schemaFor([def('gone', 'text', {}, { archived: true })])
     expect(s.properties).toEqual({})
@@ -249,6 +269,21 @@ describe('validateProposal', () => {
 })
 
 describe('toPatch', () => {
+  it('keeps a person claim’s role and LinkedIn for the identity row', () => {
+    const reg = [
+      def('people', 'record_reference', { targetKind: 'person', multi: true }),
+    ]
+    const r = validateProposal(reg, {
+      people: field([
+        { name: 'Ada', role: 'CEO', linkedin: 'linkedin.com/in/ada' },
+      ]),
+    })
+    if (!r.ok) throw new Error(JSON.stringify(r.issues))
+    expect(toPatch(reg, r.proposal).claims).toEqual({
+      people: [{ name: 'Ada', role: 'CEO', linkedin: 'linkedin.com/in/ada' }],
+    })
+  })
+
   it('splits values from identity claims, and unions refs for the suggestion row', () => {
     const r = validateProposal(everyType, {
       headcount: field(40, ['doc:1#p2']),

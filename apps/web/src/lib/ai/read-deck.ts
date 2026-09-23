@@ -9,7 +9,8 @@ import {
   toPatch,
   validateProposal,
 } from '@spaces/core/ai/schema'
-import type { Proposal } from '@spaces/core/ai/schema'
+import type { IdentityClaim, Proposal } from '@spaces/core/ai/schema'
+import { identityPayloadOf } from '@spaces/core/ai/identity'
 import type { AttributeDef } from '@spaces/core/attributes/registry'
 import { QUEUES } from '@spaces/core/queue/names'
 import { recordContextProgram } from '#/lib/context/record'
@@ -46,8 +47,12 @@ import type {
  *   4. per-field `validateProposal`: a field naming an option id absent from
  *      the live enum (or anything else the registry refuses) is dropped and
  *      counted in the rationale, never written and never failing the run;
- *   5. `toPatch` — identity claims (`record_reference`) are held back with a
- *      rationale line; founders are SPA-105's.
+ *   5. `toPatch` — a claim on a person-targeted `record_reference` (a
+ *      deal's `people`, `referred_by`) becomes one `suggestion(kind:
+ *      'identity')` per person on the same record, citing that field's refs
+ *      (SPA-105); accepting one is `resolveEntity` plus a `contact_at` link.
+ *      A claim on any other target (a deal's `company`) is held back with a
+ *      rationale line — no accept path resolves it yet.
  *
  * Every model call runs before any suggestion is written, so a provider that
  * fails on the second record leaves no half-read deck in the inbox. A person
@@ -143,12 +148,17 @@ export type ReadDeckResult = {
 
 type Target = { id: string; kind: string; name: string }
 
+/** A person the deck named, off one person-targeted reference field. */
+type PersonClaim = { slug: string; claim: IdentityClaim; refs: Array<string> }
+
 type Read = {
   target: Target
   registry: Array<AttributeDef>
   proposal: Proposal
   dropped: Array<string>
-  claims: Array<string>
+  people: Array<PersonClaim>
+  /** Reference slugs held back: claims on a target that is not a person. */
+  heldBack: Array<string>
 }
 
 /** Deck text as context items — the chunks, or the extracted text whole. */
@@ -326,42 +336,60 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
       answered.output.kind === 'object' ? answered.output.object : undefined
     const { proposal, dropped } = keepValid(registry, raw)
     const { claims } = toPatch(registry, proposal)
-    for (const slug of Object.keys(claims))
+    const people: Array<PersonClaim> = []
+    const heldBack: Array<string> = []
+    for (const [slug, list] of Object.entries(claims)) {
+      const { refs } = proposal[slug]
       Reflect.deleteProperty(proposal, slug)
-    reads.push({
-      target,
-      registry,
-      proposal,
-      dropped,
-      claims: Object.keys(claims),
-    })
+      const def = registry.find((d) => d.slug === slug)
+      if (def?.options.targetKind === 'person')
+        for (const claim of list) people.push({ slug, claim, refs })
+      else heldBack.push(slug)
+    }
+    reads.push({ target, registry, proposal, dropped, people, heldBack })
   }
 
   const suggestions: Array<Suggestion> = []
   for (const read of reads) {
-    if (Object.keys(read.proposal).length === 0) {
+    if (Object.keys(read.proposal).length === 0 && read.people.length === 0) {
       skipped.push({
         entityId: read.target.id,
         reason: `Nothing in ${filename} held for ${read.target.name}`,
       })
       continue
     }
-    // The values came off the wire as JSON and passed the validators, so this
-    // decode is the type's claim made once, not a filter that bites.
-    const payload = jsonValue.safeParse(read.proposal)
-    if (!payload.success)
-      return yield* new ReadDeckRefused({
-        message: 'The model answered with something that is not JSON',
-      })
-    const row = yield* proposeProgram({
-      entityId: read.target.id,
-      kind: 'attribute_patch',
-      payload: payload.data,
-      rationale: rationaleFor(read, reads, filename, skipped),
-      refs: proposalRefs(read.proposal),
-      proposedBy: { type: 'user', id: input.userId },
-    })
-    suggestions.push(row)
+    if (Object.keys(read.proposal).length > 0) {
+      // The values came off the wire as JSON and passed the validators, so
+      // this decode is the type's claim made once, not a filter that bites.
+      const payload = jsonValue.safeParse(read.proposal)
+      if (!payload.success)
+        return yield* new ReadDeckRefused({
+          message: 'The model answered with something that is not JSON',
+        })
+      suggestions.push(
+        yield* proposeProgram({
+          entityId: read.target.id,
+          kind: 'attribute_patch',
+          payload: payload.data,
+          rationale: rationaleFor(read, reads, filename, skipped),
+          refs: proposalRefs(read.proposal),
+          proposedBy: { type: 'user', id: input.userId },
+        }),
+      )
+    }
+    // After the patch, on the same record: one identity per person named,
+    // each its own decision in the inbox, accepted or rejected alone.
+    for (const person of read.people)
+      suggestions.push(
+        yield* proposeProgram({
+          entityId: read.target.id,
+          kind: 'identity',
+          payload: identityPayloadOf(person.claim),
+          rationale: identityRationale(person, read, filename),
+          refs: person.refs,
+          proposedBy: { type: 'user', id: input.userId },
+        }),
+      )
   }
   return { suggestions, skipped }
 })
@@ -389,12 +417,41 @@ function rationaleFor(
     lines.push(
       `${String(read.dropped.length)} proposed field${read.dropped.length === 1 ? ' was' : 's were'} dropped at validation: ${read.dropped.join('; ')}.`,
     )
-  if (read.claims.length > 0)
+  if (read.people.length > 0)
     lines.push(
-      `Held back ${read.claims.join(', ')}: a proposed record reference is not written yet.`,
+      `${String(read.people.length)} ${read.people.length === 1 ? 'person' : 'people'} named in the deck ${read.people.length === 1 ? 'is' : 'are'} proposed separately, as identities.`,
+    )
+  if (read.heldBack.length > 0)
+    lines.push(
+      `Held back ${read.heldBack.join(', ')}: a proposed reference to a record that is not a person is not written yet.`,
     )
   for (const s of skipped) lines.push(`${s.reason}.`)
   return lines.join('\n')
+}
+
+/**
+ * Why an identity is on this record: who named them, where, as what. The
+ * provenance `entity_source: 'import'` cannot carry lives here and in the
+ * row's refs (SPA-105).
+ */
+function identityRationale(
+  person: PersonClaim,
+  read: Read,
+  filename: string,
+): string {
+  const def = read.registry.find((d) => d.slug === person.slug)
+  const kind = KIND_LABEL[read.target.kind] ?? 'record'
+  const as = person.claim.role === undefined ? '' : ` as ${person.claim.role}`
+  const keys = [
+    person.claim.email === undefined ? null : 'email',
+    person.claim.linkedin === undefined ? null : 'LinkedIn',
+  ].filter((k) => k !== null)
+  return [
+    `Named in ${filename}${as}, read against the ${kind} field ${def?.name ?? person.slug}.`,
+    keys.length > 0
+      ? `Accepting matches an existing person by ${keys.join(' or ')}, else creates one and links them contact at ${read.target.name}.`
+      : `No email or LinkedIn given: accepting creates a person and links them contact at ${read.target.name}; a near-identical name already held is filed as a duplicate candidate.`,
+  ].join('\n')
 }
 
 // ---------- trigger + status (the Files tab's two server fns) ----------

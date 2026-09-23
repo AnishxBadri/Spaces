@@ -7,6 +7,8 @@ import { KIND_ICONS } from '#/components/editor/mention'
 import { ChipLink } from '#/components/table/cells'
 import { Button } from '#/components/ui/button'
 import { checkboxClasses } from '#/components/ui/checkbox'
+import { readIdentityPayload } from '@spaces/core/ai/identity'
+import type { IdentityPayload } from '@spaces/core/ai/identity'
 import { formatDate, formatNumber } from '@spaces/core/format'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import {
@@ -34,8 +36,8 @@ import { cn } from '#/lib/utils'
  *
  * Generic over `suggestion.kind`: a kind with a body in `SUGGESTION_BODIES`
  * draws it, every other kind prints its payload in the same row shape. The
- * later lanes (note, ledger_event, identity, document_kind) add a body here,
- * not a page.
+ * later lanes (note, ledger_event, document_kind) add a body here, not a
+ * page; `identity` has one (SPA-105).
  */
 
 /** The word a person reads for each kind. Exhaustive by type. */
@@ -77,6 +79,14 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
     ) : (
       <PayloadBody item={item} actions={actions} />
     ),
+  identity: ({ item, actions }) => {
+    const claim = readIdentityPayload(item.payload)
+    return claim ? (
+      <IdentityBody claim={claim} />
+    ) : (
+      <PayloadBody item={item} actions={actions} />
+    )
+  },
 }
 
 export function suggestionBodyFor(kind: SuggestionKind): SuggestionBody {
@@ -94,6 +104,44 @@ export function PayloadBody({ item }: BodyProps): React.ReactNode {
         {JSON.stringify(item.payload, null, 2)}
       </pre>
     </div>
+  )
+}
+
+/**
+ * A person the document named (SPA-105): the claim as the deck gave it, in
+ * the patch body's label/value rows. Accepting resolves it — attach on an
+ * email or LinkedIn match, else a new person, whose near-miss names land in
+ * this same queue as a pair card.
+ */
+function IdentityBody({ claim }: { claim: IdentityPayload }) {
+  const rows: Array<{ label: string; value: string; mono: boolean }> = [
+    { label: 'Person', value: claim.name, mono: false },
+    ...(claim.role === undefined
+      ? []
+      : [{ label: 'Role', value: claim.role, mono: false }]),
+    ...(claim.email === undefined
+      ? []
+      : [{ label: 'Email', value: claim.email, mono: true }]),
+    ...(claim.linkedin === undefined
+      ? []
+      : [{ label: 'LinkedIn', value: claim.linkedin, mono: true }]),
+  ]
+  return (
+    <dl className="flex min-w-0 flex-col gap-2">
+      {rows.map((r) => (
+        <div key={r.label} className="flex min-w-0 flex-col gap-0.5">
+          <dt className="truncate field-label text-graphite">{r.label}</dt>
+          <dd
+            className={cn(
+              'min-w-0 truncate text-ui',
+              r.mono && 'mono text-label',
+            )}
+          >
+            {r.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 
