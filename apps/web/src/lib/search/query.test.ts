@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
+import { recordPath } from '../record-path'
 
 /**
  * Cmd-K's fused query (SPA-148). Three slices are queued to rewrite it — a
@@ -36,7 +37,7 @@ async function deps() {
   if (!me) throw new Error('the test seed has no user')
 
   const newEntity = async (
-    kind: 'company' | 'note' | 'document',
+    kind: 'company' | 'note' | 'document' | 'space',
     name: string,
   ) => {
     const row = (
@@ -100,12 +101,35 @@ async function deps() {
     return id
   }
 
-  const fileOn = async (documentId: string, recordId: string) => {
+  const fileOn = async (
+    documentId: string,
+    recordId: string,
+    edge: { id?: string; createdAt?: Date } = {},
+  ) => {
     await db.insert(schema.link).values({
       fromEntityId: documentId,
       toEntityId: recordId,
       relation: 'tagged_in',
+      ...edge,
     })
+  }
+
+  const newSpace = async (name: string) => {
+    const id = await newEntity('space', name)
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+    await db.insert(schema.space).values({
+      entityId: id,
+      slug,
+      path: slug,
+    })
+    return id
+  }
+
+  /** The row docsurf-1a's `{ kind: 'space' }` filing branch writes. */
+  const fileInSpace = async (documentId: string, spaceId: string) => {
+    await db
+      .insert(schema.entitySpace)
+      .values({ entityId: documentId, spaceId, createdBy: me.id })
   }
 
   const search = (q: string, userId = me.id) =>
@@ -120,6 +144,8 @@ async function deps() {
     newNote,
     newDeck,
     fileOn,
+    newSpace,
+    fileInSpace,
     search,
     fused,
   }
@@ -178,6 +204,84 @@ describe('searchAllProgram', () => {
       parent: { id: company, kind: 'company', name: 'Helios Foundry' },
     })
     expect(hit?.snippet).toContain('«cryoweave»')
+  })
+
+  it('sends a deck filed only into a space to that space', async () => {
+    const { newDeck, newSpace, fileInSpace, search } = await deps()
+    const space = await newSpace('Grid Storage')
+    const deck = await newDeck(
+      'Flow battery primer.pdf',
+      'Vanadium brinecast stacks trade energy density for cycle life.',
+    )
+    await fileInSpace(deck, space)
+
+    const hit = (await search('brinecast')).find((h) => h.id === deck)
+    expect(hit?.parent).toEqual({
+      id: space,
+      kind: 'space',
+      name: 'Grid Storage',
+      objectSlug: null,
+    })
+    // The palette's destination is `recordPath` over the parent — `hrefFor`
+    // (command-palette.tsx) builds exactly this target for a document hit
+    // and adds no branch of its own, so a non-null path is an enabled row.
+    // Its meta lane is `in ${parent.name}`.
+    if (!hit?.parent) throw new Error('the deck resolved no parent')
+    const { id, kind, objectSlug } = hit.parent
+    expect(recordPath({ kind, id, objectSlug })).toBe(`/spaces/${space}`)
+    expect(`in ${hit.parent.name}`).toBe('in Grid Storage')
+  })
+
+  it('prefers the record a deck is filed on over a space it is also in', async () => {
+    const { newEntity, newDeck, newSpace, fileOn, fileInSpace, search } =
+      await deps()
+    const company = await newEntity('company', 'Ferrovane Systems')
+    const space = await newSpace('Heavy Industry')
+    const deck = await newDeck(
+      'Ferrovane seed deck.pdf',
+      'Our quenchline furnace retrofit halves coke use in blast furnaces.',
+    )
+    // The space edge is the older one: precedence is by kind, not by age.
+    await fileInSpace(deck, space)
+    await fileOn(deck, company)
+
+    const hit = (await search('quenchline')).find((h) => h.id === deck)
+    expect(hit?.parent).toMatchObject({ id: company, kind: 'company' })
+  })
+
+  it('sends a deck filed on two records to the one it was filed on first', async () => {
+    const { newEntity, newDeck, fileOn, search } = await deps()
+    const first = await newEntity('company', 'Aldermoor Labs')
+    const second = await newEntity('company', 'Brackwater Energy')
+    const deck = await newDeck(
+      'Joint venture memo.pdf',
+      'The tidewright turbine program is shared between both companies.',
+    )
+    // Written newest-first, so heap order and filing order disagree.
+    await fileOn(deck, second, { createdAt: new Date('2026-03-02T00:00:00Z') })
+    await fileOn(deck, first, { createdAt: new Date('2026-03-01T00:00:00Z') })
+
+    for (let i = 0; i < 3; i++) {
+      const hit = (await search('tidewright')).find((h) => h.id === deck)
+      expect(hit?.parent).toMatchObject({ id: first, name: 'Aldermoor Labs' })
+    }
+
+    // Filed in the same instant, the lower edge id wins.
+    const other = await newDeck(
+      'Consortium update.pdf',
+      'Brineweld pilot results from the consortium partners.',
+    )
+    const at = new Date('2026-04-01T00:00:00Z')
+    await fileOn(other, first, {
+      id: 'ffffffff-ffff-4fff-bfff-ffffffffffff',
+      createdAt: at,
+    })
+    await fileOn(other, second, {
+      id: '00000000-0000-4000-8000-000000000000',
+      createdAt: at,
+    })
+    const tied = (await search('brineweld')).find((h) => h.id === other)
+    expect(tied?.parent).toMatchObject({ id: second })
   })
 
   it("never returns a teammate's private note, and does return the searcher's own", async () => {
