@@ -21,10 +21,21 @@ import type { Json } from '../json'
  *
  * `sensitivity_default` (SPA-61) is the floor `resolveSensitivity` ORs every
  * record's own, space and binding inputs over; absent reads as `'normal'`.
+ *
+ * `ai_caps` (SPA-73) is the workspace's AI token cap — `daily_tokens` per
+ * UTC day and `per_run_tokens` per call, each absent for no cap on that
+ * axis; the key absent is no cap at all. `@spaces/core/ai/caps` is the
+ * predicate that reads it.
  */
+export type AiCapsSetting = {
+  daily_tokens?: number
+  per_run_tokens?: number
+}
+
 export type WorkspaceSettings = {
   base_currency?: string
   sensitivity_default?: AiSensitivity
+  ai_caps?: AiCapsSetting
 } & { [k: string]: Json | undefined }
 
 /**

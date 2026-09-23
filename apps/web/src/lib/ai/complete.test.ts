@@ -1,9 +1,10 @@
 import { Effect } from 'effect'
 import { MockLanguageModelV4 } from 'ai/test'
-import { count, desc, ne } from 'drizzle-orm'
+import { count, desc, lte, ne } from 'drizzle-orm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
-import { aiRoute, aiUsage } from '@spaces/db/schema'
+import { aiRoute, aiUsage, workspace } from '@spaces/db/schema'
+import type { AiCapsSetting } from '@spaces/db/schema/workspace'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { storeCredential } from '#/lib/vault'
 import type { ContextItem } from '#/lib/context/types'
@@ -12,6 +13,7 @@ import type { CompleteOptions } from './complete'
 import { setAiRouteProgram } from './route'
 import { runTestCall } from './providers/test-call'
 import { testAiProviderProgram } from './providers/settings'
+import { setAiCapsProgram, usageTodayProgram } from './caps'
 
 /**
  * SPA-42. `complete()` through an injected model — `MockLanguageModelV4`
@@ -355,5 +357,159 @@ describe('the Providers Test call through complete()', () => {
       message: 'invalid x-api-key',
     })
     expect(await usageRows()).toBe(before)
+  })
+})
+
+/** Sets `workspace.settings.ai_caps`, creating the singleton if absent. */
+async function capAt(aiCaps: AiCapsSetting | null) {
+  const settings = aiCaps === null ? {} : { ai_caps: aiCaps }
+  await db
+    .insert(workspace)
+    .values({ id: 1, name: 'Fund', settings })
+    .onConflictDoUpdate({ target: workspace.id, set: { settings } })
+}
+
+/** Every usage row the earlier tests in this file wrote, so a day starts at 0. */
+const clearUsage = () => db.delete(aiUsage).where(lte(aiUsage.at, new Date()))
+
+const ROUTE = { provider: 'anthropic', model: 'claude-haiku-4-5' } as const
+
+describe('the AI cap (SPA-73)', () => {
+  it('refuses with CapExceeded before any model call once the day is at the ceiling, naming it and the reset', async () => {
+    await clearUsage()
+    await capAt({ daily_tokens: 20 })
+    await db.insert(aiUsage).values({
+      lane: 'classify',
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5',
+      tokensIn: 15,
+      tokensOut: 5,
+      callerType: 'system',
+    })
+    const model = mockModel()
+    const failure = await Effect.runPromise(
+      Effect.flip(
+        completeProgram(
+          'extract',
+          ITEMS,
+          undefined,
+          opts({ model, route: ROUTE }),
+        ),
+      ),
+    )
+    expect(failure._tag).toBe('CapExceeded')
+    if (failure._tag !== 'CapExceeded') throw new Error('unreachable')
+    expect(failure.ceiling).toBe(20)
+    expect(failure.used).toBe(20)
+    expect(failure.resetsAt).toMatch(/T00:00:00\.000Z$/)
+    expect(completeMessage(failure)).toBe(
+      "Today's AI cap of 20 tokens is reached; resets at 00:00 UTC",
+    )
+    expect(model.doGenerateCalls).toHaveLength(0)
+    expect(await usageRows()).toBe(1)
+  })
+
+  it('the demo: a low daily cap, Test pressed twice — the first runs and is recorded past the ceiling, the second refuses', async () => {
+    await clearUsage()
+    await capAt(null)
+    await Effect.runPromise(
+      setAiCapsProgram({ dailyTokens: 10, perRunTokens: null }),
+    )
+    const via = {
+      provider: 'anthropic',
+      lane: 'classify',
+      caller: USER,
+    } as const
+
+    // Under the ceiling when it starts, so it runs to completion and its
+    // 15 tokens are recorded even though they carry the day past 10.
+    const first = mockModel('OK', 12, 3)
+    expect(await Effect.runPromise(runTestCall(first, via))).toEqual({
+      ok: true,
+      text: 'OK',
+    })
+    expect(first.doGenerateCalls).toHaveLength(1)
+    const today = await Effect.runPromise(usageTodayProgram(new Date()))
+    expect((today.tokensIn ?? 0) + (today.tokensOut ?? 0)).toBe(15)
+
+    const second = mockModel('OK', 12, 3)
+    expect(await Effect.runPromise(runTestCall(second, via))).toEqual({
+      ok: false,
+      status: null,
+      message: "Today's AI cap of 10 tokens is reached; resets at 00:00 UTC",
+    })
+    expect(second.doGenerateCalls).toHaveLength(0)
+    expect(await usageRows()).toBe(1)
+  })
+
+  it("does not count yesterday's usage against today's cap", async () => {
+    await clearUsage()
+    await capAt({ daily_tokens: 20 })
+    await db.insert(aiUsage).values({
+      lane: 'classify',
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5',
+      tokensIn: 500,
+      tokensOut: 500,
+      callerType: 'system',
+      at: new Date(Date.now() - 36 * 60 * 60 * 1000),
+    })
+    const model = mockModel()
+    await Effect.runPromise(
+      completeProgram(
+        'extract',
+        ITEMS,
+        undefined,
+        opts({ model, route: ROUTE }),
+      ),
+    )
+    expect(model.doGenerateCalls).toHaveLength(1)
+  })
+
+  it('refuses a call whose budget estimate is over the per-run cap', async () => {
+    await capAt({ per_run_tokens: 100 })
+    const model = mockModel()
+    const failure = await Effect.runPromise(
+      Effect.flip(
+        completeProgram(
+          'extract',
+          ITEMS,
+          undefined,
+          opts({ model, route: ROUTE, budgetChars: 4000 }),
+        ),
+      ),
+    )
+    expect(completeMessage(failure)).toBe(
+      "This call's estimated 1,000 tokens is over the per-run AI cap of 100",
+    )
+    expect(model.doGenerateCalls).toHaveLength(0)
+  })
+
+  it('never refuses with no cap configured', async () => {
+    await capAt({ daily_tokens: 5 })
+    await Effect.runPromise(
+      setAiCapsProgram({ dailyTokens: null, perRunTokens: null }),
+    )
+    const [ws] = await db.select().from(workspace)
+    expect(ws.settings).not.toHaveProperty('ai_caps')
+    await db.insert(aiUsage).values({
+      lane: 'classify',
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5',
+      tokensIn: 1_000_000,
+      tokensOut: 1_000_000,
+      callerType: 'system',
+    })
+    const model = mockModel()
+    const result = await Effect.runPromise(
+      completeProgram(
+        'extract',
+        ITEMS,
+        undefined,
+        opts({ model, route: ROUTE }),
+      ),
+    )
+    expect(result.output).toEqual({ kind: 'text', text: 'Series A' })
+    expect(model.doGenerateCalls).toHaveLength(1)
   })
 })

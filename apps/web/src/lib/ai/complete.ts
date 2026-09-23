@@ -10,6 +10,8 @@ import type { ResolveModelFailure } from './providers'
 import { PROVIDER_LABEL } from './providers/ids'
 import { renderPrompt } from './prompt'
 import { aiRouteProgram, isLocalProvider } from './route'
+import { capMessage, checkCapProgram } from './caps'
+import type { CapExceeded, CapReadFailed } from './caps'
 import type { AiTarget, LaneNotRouted, RouteReadFailed } from './route'
 import type { AiLane, AiSensitivity } from './lanes'
 import type { SensitivityVia } from './sensitivity'
@@ -30,6 +32,12 @@ import type { SensitivityVia } from './sensitivity'
  * `SensitiveRouteRefused` — there is no fallback to cloud, by construction:
  * the check runs against the one target this call has, after it is chosen
  * and before any model is built.
+ *
+ * The workspace AI cap (SPA-73, `./caps.ts`) is checked next, before any
+ * model is built or called: a day whose tokens are at the ceiling, or a call
+ * whose `budgetChars` estimate is over the per-run cap, fails `CapExceeded`.
+ * The check is per call, never mid-stream — a call already in flight when
+ * the ceiling is crossed completes and writes its `ai_usage` row.
  *
  * `opts.model` is the test seam every AI test uses: an injected AI SDK
  * `LanguageModel` (`MockLanguageModelV4` from `ai/test`) replaces the vault
@@ -130,6 +138,8 @@ export type CompleteFailure =
   | ResolveModelFailure
   | ProviderCallFailed
   | UsageWriteFailed
+  | CapExceeded
+  | CapReadFailed
 
 const providerLabel = (provider: string): string =>
   Object.entries(PROVIDER_LABEL).find(([id]) => id === provider)?.[1] ??
@@ -155,6 +165,10 @@ export function completeMessage(failure: CompleteFailure): string {
       return 'Could not read the credential'
     case 'UsageWriteFailed':
       return 'Could not record the AI usage'
+    case 'CapExceeded':
+      return capMessage(failure)
+    case 'CapReadFailed':
+      return 'Could not read the AI cap'
   }
 }
 
@@ -181,6 +195,11 @@ export const completeProgram = Effect.fn('complete')(function* (
       provider: target.provider,
       ...(opts.via === undefined ? {} : { via: opts.via }),
     })
+
+  // Before the model is built, let alone called. Per call, not mid-stream:
+  // once this passes, the call runs to completion and is recorded below even
+  // if its tokens carry the day past the ceiling — the next call refuses.
+  yield* checkCapProgram(opts.budgetChars)
 
   const model =
     opts.model ??

@@ -15,11 +15,15 @@ import type { AiLane, AiSensitivity } from '#/lib/ai/lanes'
 import { PROVIDERS } from '#/lib/ai/providers/ids'
 import type { LlmProvider } from '#/lib/ai/providers/ids'
 import { formatHeaderLines } from '#/lib/ai/providers/meta'
+import { formatNumber } from '@spaces/core/format'
 import {
+  getAiCaps,
+  getAiUsageToday,
   getSession,
   listAiProviders,
   listAiRoutes,
   saveAiKey,
+  setAiCaps,
   setAiRoute,
   testAiProvider,
 } from '#/lib/server-fns'
@@ -28,6 +32,8 @@ import { cn } from '#/lib/utils'
 type ProviderRow = Awaited<ReturnType<typeof listAiProviders>>[number]
 type RouteRow = Awaited<ReturnType<typeof listAiRoutes>>[number]
 type TestResult = Awaited<ReturnType<typeof testAiProvider>>
+type CapsView = Awaited<ReturnType<typeof getAiCaps>>
+type UsageToday = Awaited<ReturnType<typeof getAiUsageToday>>
 
 /**
  * Settings → AI → Providers (SPA-29, `docs/spec-ai-substrate.md` §9). The
@@ -42,24 +48,27 @@ export const Route = createFileRoute('/_app/settings/ai')({
   loader: async () => {
     const session = await getSession()
     const isAdmin = session?.user.role === 'admin'
-    if (!isAdmin) return { isAdmin, providers: [], routes: [] }
-    const [providers, routes] = await Promise.all([
+    if (!isAdmin) return { isAdmin, providers: [], routes: [], caps: null }
+    const [providers, routes, caps, usage] = await Promise.all([
       listAiProviders(),
       listAiRoutes(),
+      getAiCaps(),
+      getAiUsageToday(),
     ])
-    return { isAdmin, providers, routes }
+    return { isAdmin, providers, routes, caps: { caps, usage } }
   },
   component: AiRoute,
 })
 
 function AiRoute() {
-  const { isAdmin, providers, routes } = Route.useLoaderData()
+  const { isAdmin, providers, routes, caps } = Route.useLoaderData()
   return (
     <div className="flex flex-col gap-8">
       <ProvidersSection isAdmin={isAdmin} providers={providers} />
       {isAdmin ? (
         <RoutingSection providers={providers} routes={routes} />
       ) : null}
+      {caps ? <CapsSection caps={caps.caps} usage={caps.usage} /> : null}
     </div>
   )
 }
@@ -534,5 +543,161 @@ function RouteCellSelect({
       aria-label={`${lane} lane, ${sensitivity}`}
       className="w-56 shrink-0"
     />
+  )
+}
+
+/** A token count as the ledger prints it: grouped, never compact. */
+const tokens = (n: number) => formatNumber(n, 0)
+
+/** A blank field is no cap; anything else must be a positive whole number. */
+function parseCeiling(raw: string): number | null | 'invalid' {
+  const trimmed = raw.trim()
+  if (trimmed === '') return null
+  const n = Number(trimmed)
+  return Number.isSafeInteger(n) && n > 0 ? n : 'invalid'
+}
+
+/**
+ * Caps (SPA-73, `docs/spec-ai-substrate.md` §9) — the workspace's AI token
+ * ceilings, in the settings-ledger shape: a caps head with a mono readout,
+ * one 48px row per ceiling with its field right, the save row, then the
+ * read-only Used today row read from `ai_usage`. A blank field is no cap,
+ * and with neither set the head says so rather than leaving two empty
+ * fields to explain themselves. `complete()` refuses a call once the day is
+ * at the daily ceiling (`lib/ai/caps.ts`); this section only sets the
+ * numbers and shows the count.
+ */
+function CapsSection({ caps, usage }: { caps: CapsView; usage: UsageToday }) {
+  const router = useRouter()
+  const [daily, setDaily] = useState(
+    caps.dailyTokens === null ? '' : String(caps.dailyTokens),
+  )
+  const [perRun, setPerRun] = useState(
+    caps.perRunTokens === null ? '' : String(caps.perRunTokens),
+  )
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+
+  const uncapped = caps.dailyTokens === null && caps.perRunTokens === null
+  const readout = uncapped
+    ? 'No cap — every lane spends freely'
+    : [
+        caps.dailyTokens === null ? null : `${tokens(caps.dailyTokens)} a day`,
+        caps.perRunTokens === null
+          ? null
+          : `${tokens(caps.perRunTokens)} a call`,
+      ]
+        .filter((part) => part !== null)
+        .join(' · ')
+  const reached = caps.dailyTokens !== null && usage.used >= caps.dailyTokens
+
+  async function save(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const dailyTokens = parseCeiling(daily)
+    const perRunTokens = parseCeiling(perRun)
+    if (dailyTokens === 'invalid' || perRunTokens === 'invalid') {
+      setError('A cap is a whole number of tokens, or blank for none.')
+      return
+    }
+    setPending(true)
+    setError(null)
+    try {
+      await setAiCaps({ data: { dailyTokens, perRunTokens } })
+      toast(
+        dailyTokens === null && perRunTokens === null
+          ? 'AI caps cleared'
+          : 'AI caps saved',
+      )
+      void router.invalidate()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <SettingsSection
+      title="Caps"
+      blurb="How many tokens the workspace may spend on AI, counted from every call's usage."
+      crumb="Workspace"
+    >
+      <form onSubmit={save} className="flex flex-col pt-5">
+        <div className="flex items-baseline gap-3 border-b border-hairline pb-2">
+          <h3 className="label-caps text-foreground">Ceilings</h3>
+          <span className="mono text-micro text-graphite">{readout}</span>
+        </div>
+        <SettingsRow
+          label="Daily tokens"
+          hint="Tokens in and out across every lane, per UTC day. Blank is no cap."
+        >
+          <Input
+            id="ai-cap-daily"
+            aria-label="Daily token cap"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            value={daily}
+            onChange={(e) => setDaily(e.target.value)}
+            placeholder="No cap"
+            className="w-40 mono"
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Per-run tokens"
+          hint="The largest prompt one call may send, estimated at four characters a token. Blank is no cap."
+        >
+          <Input
+            id="ai-cap-per-run"
+            aria-label="Per-run token cap"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            value={perRun}
+            onChange={(e) => setPerRun(e.target.value)}
+            placeholder="No cap"
+            className="w-40 mono"
+          />
+        </SettingsRow>
+        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule py-2">
+          {error ? (
+            <span
+              role="alert"
+              className="mr-auto mono text-micro text-destructive"
+            >
+              {error}
+            </span>
+          ) : null}
+          <Button type="submit" size="sm" disabled={pending}>
+            Save
+          </Button>
+        </div>
+        <SettingsRow
+          label="Used today"
+          hint={`Since 00:00 UTC, from the AI usage ledger. ${reached ? 'Calls are refused until' : 'The day resets at'} 00:00 UTC.`}
+        >
+          <span
+            className={cn(
+              'mono text-label',
+              reached ? 'text-destructive' : 'text-graphite',
+            )}
+          >
+            {caps.dailyTokens === null
+              ? `${tokens(usage.used)} tokens · no cap`
+              : `${tokens(usage.used)} of ${tokens(caps.dailyTokens)} tokens`}
+          </span>
+        </SettingsRow>
+        <div className="flex h-8 items-center justify-between">
+          <span className="label-caps font-normal text-graphite">
+            tokens per workspace · admin only
+          </span>
+          <span className="mono text-micro text-graphite">
+            checked before each call · a call in flight finishes
+          </span>
+        </div>
+      </form>
+    </SettingsSection>
   )
 }
