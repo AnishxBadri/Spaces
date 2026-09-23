@@ -1,4 +1,5 @@
 import { Effect } from 'effect'
+import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
 import { assembleProgram } from './assemble'
 import type {
   ContextEntityNotFound,
@@ -27,12 +28,19 @@ export type RecordContextItem = {
   cite: string
   /** `asOf − at`, for `formatSince`; null for a timeless fact. */
   sinceMs: number | null
+  /** From the judgment-memory lane: another record's, not this one's. */
+  similar: boolean
 }
 
 export type RecordContext = {
   seed: { id: string; kind: string; name: string }
   items: Array<RecordContextItem>
   usedChars: number
+  /**
+   * Whether the judgment-memory mode can say anything: an embedding model is
+   * pinned. The readout shows its toggle only when this is true.
+   */
+  similarAvailable: boolean
 }
 
 export type RecordContextInput = {
@@ -41,6 +49,8 @@ export type RecordContextInput = {
   /** ISO 8601 — the only clock. */
   asOf: string
   budgetChars: number
+  /** The judgment-memory mode — `AssembleOptions.similar`. */
+  similar?: boolean | undefined
 }
 
 export const recordContextProgram = Effect.fn('recordContextProgram')(
@@ -52,13 +62,24 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
   > {
     const result = yield* assembleProgram(
       { entityId: input.entityId },
-      { user: input.user, asOf: input.asOf, budgetChars: input.budgetChars },
+      {
+        user: input.user,
+        asOf: input.asOf,
+        budgetChars: input.budgetChars,
+        similar: input.similar,
+      },
+    )
+    // A pin that cannot be read only hides the toggle; the mode itself,
+    // asked for, still fails loudly through the assembler.
+    const pin = yield* readEmbeddingPinProgram().pipe(
+      Effect.orElseSucceed(() => null),
     )
     const resolved = yield* resolveRefsProgram(result.items.map((i) => i.ref))
     const asOfMs = Date.parse(input.asOf)
     return {
       seed: result.seed,
       usedChars: result.usedChars,
+      similarAvailable: pin !== null,
       items: result.items.map((i, n) => {
         const atMs = i.at === null ? Number.NaN : Date.parse(i.at)
         return {
@@ -68,6 +89,7 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
           at: i.at,
           cite: resolved[n].label,
           sinceMs: Number.isNaN(atMs) ? null : Math.max(0, asOfMs - atMs),
+          similar: i.hop === 'similar',
         }
       }),
     }

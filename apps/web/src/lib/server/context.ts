@@ -18,6 +18,8 @@ export const getRecordContext = createServerFn()
     z.object({
       entityId: z.string().uuid(),
       budgetChars: z.number().int().min(500).max(100_000).optional(),
+      /** The judgment-memory mode (SPA-139); off unless the readout asks. */
+      similar: z.boolean().optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -29,5 +31,6 @@ export const getRecordContext = createServerFn()
       user: { id: u.id },
       asOf: new Date().toISOString(),
       budgetChars: data.budgetChars ?? DEFAULT_BUDGET_CHARS,
+      similar: data.similar === true,
     })
   })

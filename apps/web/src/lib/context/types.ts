@@ -13,6 +13,16 @@ import type { ContextHop, ContextKind } from '@spaces/db/entity-refs'
  */
 export type { ContextHop, ContextKind }
 
+/**
+ * Where an assembled item sits: a hop from the seed, a standing source, or
+ * `similar` — the judgment-memory lane (SPA-139), which does not walk out
+ * from the seed at all but reaches sideways to other records' close_reasons
+ * and terminal-stage notes by embedding distance. Kept out of `ContextHop`
+ * on purpose: that type is the registry's (`ENTITY_REFS` declares the hop a
+ * column contributes), and no column contributes a sideways item.
+ */
+export type AssembledHop = ContextHop | 'similar'
+
 /** How an item at hop ≥ 1 was reached; modulates the hop weight. */
 export type ContextEdge =
   | 'references'

@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { Effect } from 'effect'
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
@@ -30,9 +30,15 @@ import { task, taskEntity } from '@spaces/db/schema/tasks'
 import type { AttributeDef } from '@spaces/core/attributes/registry'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { canRead } from '#/lib/server/shared'
+import {
+  ContextEntityNotFound,
+  ContextLeak,
+  ContextQueryFailed,
+} from './errors'
 import { rank } from './rank'
 import type { Candidate, RankResult } from './rank'
 import { ref } from './ref'
+import { SIMILAR_TOP_N, similarCandidatesProgram } from './similar'
 import { renderAttribute, renderEvent, truncate } from './render'
 import type { ContextEdge } from './types'
 
@@ -50,20 +56,7 @@ import type { ContextEdge } from './types'
  * ordered so the ranker's first-wins dedupe sees a stable input.
  */
 
-export class ContextQueryFailed extends Schema.TaggedError<ContextQueryFailed>()(
-  'ContextQueryFailed',
-  { cause: Schema.Defect() },
-) {}
-
-export class ContextEntityNotFound extends Schema.TaggedError<ContextEntityNotFound>()(
-  'ContextEntityNotFound',
-  { id: Schema.String, message: Schema.String },
-) {}
-
-export class ContextLeak extends Schema.TaggedError<ContextLeak>()(
-  'ContextLeak',
-  { ref: Schema.String, message: Schema.String },
-) {}
+export { ContextEntityNotFound, ContextLeak, ContextQueryFailed }
 
 const query = <T>(run: () => Promise<T>) =>
   Effect.tryPromise({
@@ -80,6 +73,13 @@ export type AssembleOptions = {
   budgetChars: number
   /** Task text; enables the lexical lane and glossary matching. */
   taskText?: string | undefined
+  /**
+   * The judgment-memory mode (SPA-139, spec §1): add the `similar` lane —
+   * the nearest close_reasons and terminal-stage notes of *other* records
+   * (`similar.ts`). Off unless asked for, so a default assembly sends the
+   * same statements and returns the same items it always did.
+   */
+  similar?: boolean | undefined
 }
 
 export type AssembleResult = RankResult & {
@@ -726,6 +726,35 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       at: null,
       hop: 'standing',
     })
+  }
+
+  // ---------- sideways: judgment memory (mode `similar` only) ----------
+  if (opts.similar === true) {
+    // A company's deals are where its judgments live, so they anchor with
+    // it — and, being this record's own history, never rank as "similar".
+    const anchorIds =
+      seed.kind === 'company'
+        ? [seedId, ...otherIds.filter((id) => others.get(id)?.kind === 'deal')]
+        : [seedId]
+    const present = new Set(candidates.map((c) => c.ref))
+    let taken = 0
+    for (const { noteRow, ...c } of yield* similarCandidatesProgram({
+      userId,
+      anchorIds,
+    })) {
+      if (taken >= SIMILAR_TOP_N) break
+      // Dedupe by ref against the lanes above: a note the walk already
+      // reached is context about this record, not a sideways precedent.
+      if (present.has(c.ref)) continue
+      present.add(c.ref)
+      if (noteRow)
+        noteRows.set(noteRow.entityId, {
+          visibility: noteRow.visibility,
+          authorId: noteRow.authorId,
+        })
+      candidates.push(c)
+      taken += 1
+    }
   }
 
   // ---------- rank ----------

@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
+import { Switch } from '#/components/ui/switch'
 import { formatSince } from '@spaces/core/format'
 import type { ContextKind } from '#/lib/context/types'
 import type { RecordContextItem } from '#/lib/context/record'
@@ -17,6 +18,12 @@ import { getRecordContext } from '#/lib/server-fns'
  * closed one. Nothing is fetched until the reader opens it — the loaders do
  * not call `getRecordContext`, so a record page pays nothing for a section
  * nobody expanded.
+ *
+ * `Similar judgments` (SPA-139) switches on the assembler's judgment-memory
+ * mode: other deals' close_reasons and terminal-stage notes that read like
+ * this record, listed in their own group after this record's own items. Off
+ * on every mount and held in component state only — a sideways look you ask
+ * for, never the default view, and nothing remembers it past the page.
  */
 
 const BUDGET_CHARS = 8000
@@ -36,11 +43,17 @@ const GROUPS: ReadonlyArray<{ kind: ContextKind; label: string }> = [
 
 export function RecordContext({ entityId }: { entityId: string }) {
   const [opened, setOpened] = useState(false)
+  const [similar, setSimilar] = useState(false)
   const query = useQuery({
-    queryKey: ['record-context', entityId],
+    queryKey: ['record-context', entityId, similar],
     queryFn: () =>
-      getRecordContext({ data: { entityId, budgetChars: BUDGET_CHARS } }),
+      getRecordContext({
+        data: { entityId, budgetChars: BUDGET_CHARS, similar },
+      }),
     enabled: opened,
+    // Flipping the switch keeps the current list (and the switch) on screen
+    // while the other assembly loads, instead of blanking to "Assembling…".
+    placeholderData: keepPreviousData,
   })
   const items = query.data?.items
 
@@ -67,6 +80,20 @@ export function RecordContext({ entityId }: { entityId: string }) {
             />
             what the assembler sees, ranked
           </summary>
+          {/* No pin, no switch: the lane has no vector space to look in and
+              never falls back to words (lib/context/similar.ts), so a switch
+              that could only ever return nothing is not offered. */}
+          {query.data?.similarAvailable === true ? (
+            <div className="flex h-row items-center border-b border-rule">
+              <Switch
+                checked={similar}
+                disabled={query.isFetching}
+                onCheckedChange={setSimilar}
+              >
+                Similar judgments
+              </Switch>
+            </div>
+          ) : null}
           <ol>
             <ContextBody
               status={query.status}
@@ -117,28 +144,42 @@ function ContextBody({
     )
   return (
     <>
-      {GROUPS.map((g) => {
-        const rows = items.filter((i) => i.kind === g.kind)
-        if (rows.length === 0) return null
-        return (
-          <li key={g.kind}>
-            <div className="flex h-row items-end gap-3 border-b border-rule pb-1">
-              <span className="label-caps text-label text-graphite">
-                {g.label}
-              </span>
-              <span className="mono text-micro text-graphite">
-                {rows.length}
-              </span>
-            </div>
-            <ol>
-              {rows.map((i) => (
-                <ContextRow key={i.ref} item={i} />
-              ))}
-            </ol>
-          </li>
-        )
-      })}
+      {GROUPS.map((g) => (
+        <ContextGroup
+          key={g.kind}
+          label={g.label}
+          rows={items.filter((i) => i.kind === g.kind && !i.similar)}
+        />
+      ))}
+      <ContextGroup
+        label="Similar judgments"
+        rows={items.filter((i) => i.similar)}
+      />
     </>
+  )
+}
+
+/** One group: caps head with its count, then its rows. Absent when empty. */
+function ContextGroup({
+  label,
+  rows,
+}: {
+  label: string
+  rows: Array<RecordContextItem>
+}) {
+  if (rows.length === 0) return null
+  return (
+    <li>
+      <div className="flex h-row items-end gap-3 border-b border-rule pb-1">
+        <span className="label-caps text-label text-graphite">{label}</span>
+        <span className="mono text-micro text-graphite">{rows.length}</span>
+      </div>
+      <ol>
+        {rows.map((i) => (
+          <ContextRow key={i.ref} item={i} />
+        ))}
+      </ol>
+    </li>
   )
 }
 

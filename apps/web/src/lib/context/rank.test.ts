@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_WEIGHTS, rank } from './rank'
+import { DEFAULT_WEIGHTS, SIMILAR_SHARE, rank } from './rank'
 import type { Candidate } from './rank'
 import { ref } from './ref'
 
@@ -285,6 +285,82 @@ describe('rank', () => {
       },
     })
     expect(order(r)).toEqual(['event:new', 'event:old', 'event:a', 'event:b'])
+  })
+
+  describe('the similar lane (SPA-139)', () => {
+    const similar = (id: string, similarity: number, len = 100): Candidate => ({
+      ref: ref.attr(`deal-${id}`, 'close_reason'),
+      kind: 'attribute',
+      text: 'x'.repeat(len),
+      entityIds: [`deal-${id}`],
+      at: null,
+      hop: 'similar',
+      similarity,
+    })
+    const lane = [similar('a', 0.7), similar('b', 0.9), similar('c', 0.8)]
+    const flood: ReadonlyArray<Candidate> = Array.from(
+      { length: 40 },
+      (_, n) => ({
+        ref: ref.event(`flood-${String(n)}`),
+        kind: 'event',
+        text: 'e'.repeat(100),
+        entityIds: [CO],
+        at: '2026-09-09T00:00:00Z',
+        hop: 0,
+      }),
+    )
+
+    it('adds nothing and moves nothing when the lane is empty', () => {
+      const opts = { asOf: ASOF, budgetChars: 600 }
+      expect(rank(fixture, { ...opts, similarShare: 0.5 })).toEqual(
+        rank(fixture, opts),
+      )
+    })
+
+    it('scores prior × similarity, below every hop-0 attribute', () => {
+      const r = rank([...fixture, ...lane], { asOf: ASOF, budgetChars: 8000 })
+      const got = r.items.filter((i) => i.hop === 'similar')
+      expect(got.map((i) => i.ref)).toEqual([
+        'attr:deal-b:close_reason',
+        'attr:deal-c:close_reason',
+        'attr:deal-a:close_reason',
+      ])
+      expect(got[0].score).toBeCloseTo(DEFAULT_WEIGHTS.similar * 0.9, 9)
+      expect(DEFAULT_WEIGHTS.similar).toBeLessThan(DEFAULT_WEIGHTS.hop[0])
+      // appended after the graph
+      expect(r.items.slice(-3)).toEqual(got)
+    })
+
+    it('takes its slice after the hop-0 floor and never more than its share', () => {
+      const budgetChars = 1000
+      const r = rank([...lane, ...fixture, ...flood], {
+        asOf: ASOF,
+        budgetChars,
+      })
+      // every hop-0 attribute survives
+      for (const c of fixture.filter(
+        (x) => x.hop === 0 && x.kind === 'attribute',
+      ))
+        expect(r.items.map((i) => i.ref)).toContain(c.ref)
+      // the flood cannot starve the lane: one item fits its 150-char slice
+      const got = r.items.filter((i) => i.hop === 'similar')
+      expect(got.map((i) => i.ref)).toEqual(['attr:deal-b:close_reason'])
+      expect(got.reduce((n, i) => n + i.text.length, 0)).toBeLessThanOrEqual(
+        Math.floor(budgetChars * SIMILAR_SHARE),
+      )
+      expect(
+        r.dropped.filter((d) => d.reason === 'similar_budget').length,
+      ).toBe(2)
+      expect(r.usedChars).toBeLessThanOrEqual(budgetChars)
+    })
+
+    it('yields to the hop-0 floor when the floor uses the whole budget', () => {
+      const r = rank([...lane, ...fixture], { asOf: ASOF, budgetChars: 120 })
+      expect(r.items.filter((i) => i.hop === 'similar')).toEqual([])
+      expect(r.items.some((i) => i.hop === 0 && i.kind === 'attribute')).toBe(
+        true,
+      )
+    })
   })
 
   it('refuses a non-date asOf', () => {

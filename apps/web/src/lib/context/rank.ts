@@ -1,4 +1,9 @@
-import type { ContextEdge, ContextHop, ContextItem, ContextKind } from './types'
+import type {
+  AssembledHop,
+  ContextEdge,
+  ContextItem,
+  ContextKind,
+} from './types'
 import { docOfRef } from './ref'
 
 /**
@@ -16,22 +21,38 @@ import { docOfRef } from './ref'
  * Standing sources (mandate, glossary) are not ranked against the graph:
  * they take a reserved slice of the budget. Attributes at hop 0 are taken
  * first. One chunk per document lands before any document's second.
+ *
+ * The judgment-memory lane (`hop: 'similar'`, SPA-139) is ranked apart from
+ * the graph as well: its items are other records', so hop × edge means
+ * nothing for them. Each scores `similar` prior × its embedding similarity,
+ * and the lane takes its own capped slice of the budget right after the
+ * hop-0 attribute floor — so it can never crowd those out, and the rest of
+ * the graph can never crowd it out either. With no similar candidates the
+ * slice is empty and the budget is exactly what it was before the lane.
  */
 
 // ---------- input ----------
 
 export type Candidate = ContextItem & {
-  hop: ContextHop
+  hop: AssembledHop
   /** Edge the walk took to reach this item (hop ≥ 1). */
   edge?: ContextEdge
   /** 1-based rank in the lexical lane, when the task carried text. */
   lexicalRank?: number | undefined
+  /** `1 − cosine distance` to the anchor; only a `similar` item has one. */
+  similarity?: number | undefined
 }
 
 export type Weights = {
   hop: Record<0 | 1 | 2, number>
   edge: Record<ContextEdge, number>
   prior: Record<Exclude<ContextKind, 'mandate' | 'glossary'>, number>
+  /**
+   * The judgment-memory lane's prior, in place of hop × edge × kind: another
+   * record's close_reason is never as much about this record as this
+   * record's own hop-0 facts (weight 1), so it sits below them.
+   */
+  similar: number
   /** Half-life in days; null = no decay. */
   halfLifeDays: Record<ContextKind, number | null>
   /** RRF constant. */
@@ -70,6 +91,7 @@ export const DEFAULT_WEIGHTS: Weights = {
     mandate: null,
     glossary: null,
   },
+  similar: 0.5,
   rrfK: 60,
 }
 
@@ -80,20 +102,28 @@ export type RankOptions = {
   budgetChars: number
   /** Share of budget reserved for standing sources. Default 0.2. */
   standingShare?: number
+  /**
+   * Most of the budget the similar lane may take. Default
+   * {@link SIMILAR_SHARE}. Unused, it returns to the pool.
+   */
+  similarShare?: number
   weights?: Partial<Weights>
 }
 
 // ---------- output ----------
 
 export type RankedItem = ContextItem & {
-  hop: ContextHop
+  hop: AssembledHop
   /** hop × edge × prior × recency; null for standing items. */
   structural: number | null
   /** Final ordering key: structural, or the RRF sum when a lexical lane ran. */
   score: number | null
 }
 
-export type DropReason = 'budget' | 'standing_budget'
+export type DropReason = 'budget' | 'standing_budget' | 'similar_budget'
+
+/** The similar lane's cap, as a share of `budgetChars` (SPA-139). */
+export const SIMILAR_SHARE = 0.15
 
 export type RankResult = {
   /** Standing items first (mandate, then glossary), then ranked. */
@@ -122,6 +152,7 @@ function recency(
 function structural(c: Candidate, asOfMs: number, w: Weights): number {
   if (c.hop === 'standing') return 0
   if (c.kind === 'mandate' || c.kind === 'glossary') return 0
+  if (c.hop === 'similar') return w.similar * (c.similarity ?? 0)
   const edge = c.hop === 0 ? 1 : c.edge ? w.edge[c.edge] : 1
   return (
     w.hop[c.hop] * edge * w.prior[c.kind] * recency(c.kind, c.at, asOfMs, w)
@@ -163,7 +194,12 @@ export function rank(
     (c) =>
       c.hop === 'standing' || c.kind === 'mandate' || c.kind === 'glossary',
   )
-  const graph = unique.filter((c) => !standing.includes(c))
+  const similar = unique.filter(
+    (c) => c.hop === 'similar' && !standing.includes(c),
+  )
+  const graph = unique.filter(
+    (c) => !standing.includes(c) && !similar.includes(c),
+  )
 
   // Structural lane.
   const lexical = new Map<string, number>()
@@ -186,6 +222,13 @@ export function rank(
     })
     scored.sort(compare)
   }
+
+  // Similar: its own lane, never fused with the graph's.
+  const similarRanked: Array<RankedItem> = similar.map((c) => {
+    const s = structural(c, asOfMs, w)
+    return { ...strip(c), hop: c.hop, structural: s, score: s }
+  })
+  similarRanked.sort(compare)
 
   // Standing: mandate first, then glossary; within a kind by ref.
   const standingRanked: Array<RankedItem> = standing
@@ -240,6 +283,25 @@ export function rank(
     } else rest.push(c)
   }
 
+  // The similar lane's slice, capped at its share and at what the floor
+  // left. Reserved here, before the rest of the graph, so the graph cannot
+  // starve it; appended after the graph, so it reads as what it is — the
+  // sideways look, after everything about this record.
+  const similarOut: Array<RankedItem> = []
+  const similarBudget = Math.min(
+    Math.floor(opts.budgetChars * (opts.similarShare ?? SIMILAR_SHARE)),
+    remaining(),
+  )
+  let similarUsed = 0
+  for (const c of similarRanked) {
+    const n = c.text.length
+    if (similarUsed + n <= similarBudget) {
+      similarOut.push(c)
+      similarUsed += n
+    } else dropped.push({ ref: c.ref, reason: 'similar_budget' })
+  }
+  used += similarUsed
+
   // Floor 2: one chunk per document before any document's second. Greedy
   // skip-and-continue so a small item after a big one still fits.
   const docsSeen = new Set<string>()
@@ -259,6 +321,7 @@ export function rank(
     if (c.text.length <= remaining()) take(c)
     else dropped.push({ ref: c.ref, reason: 'budget' })
   }
+  out.push(...similarOut)
 
   return {
     items: out,
