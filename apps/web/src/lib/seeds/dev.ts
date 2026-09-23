@@ -3539,7 +3539,7 @@ const DATA_TABLES = [
   'interaction',
   'signal',
   'enrichment_record',
-  'document_chunk',
+  'chunk',
   'document',
   'mandate',
   'note',

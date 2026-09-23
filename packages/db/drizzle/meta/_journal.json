@@ -316,6 +316,13 @@
       "when": 1790115425353,
       "tag": "0044_entity_sensitive",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1790149191818,
+      "tag": "0045_chunk_table",
+      "breakpoints": true
     }
   ]
 }
