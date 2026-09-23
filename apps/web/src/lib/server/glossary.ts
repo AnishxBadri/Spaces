@@ -3,7 +3,6 @@ import { asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { entity, space, term } from '@spaces/db/schema'
-import { activity } from '@spaces/db/schema/activity'
 import { requireUser } from './shared'
 
 /**
@@ -73,28 +72,22 @@ export const listTermsForNote = createServerFn()
     return termsVisibleFrom(db, data.noteId)
   })
 
+/**
+ * Create and update run through `lib/glossary/write-term.ts` (SPA-75), which
+ * also diff-syncs the aliases into `entity_alias` so search finds a term by
+ * its abbreviation. This is the request half only.
+ */
 export const createTerm = createServerFn({ method: 'POST' })
   .validator(termInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    return db.transaction(async (tx) => {
-      const [ent] = await tx
-        .insert(entity)
-        .values({ kind: 'term', canonicalName: data.name, createdBy: u.id })
-        .returning({ id: entity.id })
-      await tx.insert(term).values({
-        entityId: ent.id,
-        name: data.name,
-        aliases: data.aliases,
-        definitionMd: data.definitionMd,
-        spaceId: data.spaceId ?? null,
-      })
-      await tx.insert(activity).values({
-        actorId: u.id,
-        verb: 'term.created',
-        subjectEntityId: ent.id,
-      })
-      return { id: ent.id }
+    const { createTermProgram } = await import('../glossary/write-term')
+    const { effectFn } = await import('./effect')
+    return effectFn(createTermProgram)(u.id, {
+      name: data.name,
+      aliases: data.aliases,
+      definitionMd: data.definitionMd,
+      spaceId: data.spaceId ?? null,
     })
   })
 
@@ -102,28 +95,15 @@ export const updateTerm = createServerFn({ method: 'POST' })
   .validator(termInput.partial().extend({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    await db.transaction(async (tx) => {
-      await tx
-        .update(term)
-        .set({
-          ...(data.name ? { name: data.name } : {}),
-          ...(data.aliases ? { aliases: data.aliases } : {}),
-          ...(data.definitionMd !== undefined
-            ? { definitionMd: data.definitionMd }
-            : {}),
-          ...(data.spaceId !== undefined
-            ? { spaceId: data.spaceId ?? null }
-            : {}),
-        })
-        .where(eq(term.entityId, data.id))
-      if (data.name) {
-        await tx
-          .update(entity)
-          .set({ canonicalName: data.name })
-          .where(eq(entity.id, data.id))
-      }
+    const { updateTermProgram } = await import('../glossary/write-term')
+    const { effectFn } = await import('./effect')
+    return effectFn(updateTermProgram)({
+      id: data.id,
+      name: data.name,
+      aliases: data.aliases,
+      definitionMd: data.definitionMd,
+      ...(data.spaceId !== undefined ? { spaceId: data.spaceId } : {}),
     })
-    return { ok: true }
   })
 
 /**
@@ -140,4 +120,18 @@ export const deleteTerm = createServerFn({ method: 'POST' })
     const { effectFn } = await import('./effect')
     await effectFn(deleteEntityProgram)(data.id)
     return { ok: true }
+  })
+
+/**
+ * The term page's load — definition, mentions with snippets, companies
+ * reached and co-mentioned terms, canRead applied in SQL. The query lives in
+ * `lib/glossary/term-page.ts` (SPA-75); null means no such term.
+ */
+export const getTermPage = createServerFn()
+  .validator(z.object({ termId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { termPageProgram } = await import('../glossary/term-page')
+    const { effectFn } = await import('./effect')
+    return effectFn(termPageProgram)(u.id, data.termId)
   })

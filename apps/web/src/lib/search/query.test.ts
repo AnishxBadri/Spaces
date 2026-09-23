@@ -552,3 +552,45 @@ describe('the task lane (SPA-55)', () => {
     expect(hits.every((h) => h.rowKind === 'task')).toBe(true)
   })
 })
+
+describe('terms are findable (SPA-75)', () => {
+  it('ranks a term through name_hits by its name and by an alias, and lands on /terms/<id>', async () => {
+    const { me, search } = await deps()
+    const { Effect } = await import('effect')
+    const { createTermProgram } = await import('#/lib/glossary/write-term')
+    // Written through the term write path, which syncs the alias into
+    // entity_alias — the table name_hits already reads.
+    const { id } = await Effect.runPromise(
+      createTermProgram(me, {
+        name: 'Power Usage Effectiveness',
+        aliases: ['PUE'],
+        definitionMd: 'Total facility power over IT power.',
+        spaceId: null,
+      }),
+    )
+
+    for (const q of ['usage effectiveness', 'PUE']) {
+      const hit = (await search(q)).find((h) => h.id === id)
+      expect(hit).toMatchObject({
+        rowKind: 'entity',
+        kind: 'term',
+        matchedIn: 'name',
+        snippet: null,
+        parent: null,
+      })
+      // The palette row is enabled because it has somewhere to go.
+      expect(hit ? recordPath(hit) : null).toBe(`/terms/${id}`)
+    }
+  })
+
+  it('needed no new lane: the statement keeps its four lanes and one fusion', () => {
+    const source = readFileSync(new URL('./query.ts', import.meta.url), 'utf8')
+    expect(source.match(/^\s+\w+ as \($/gm)?.map((s) => s.trim())).toEqual([
+      'name_hits as (',
+      'note_hits as (',
+      'doc_hits as (',
+      'task_hits as (',
+      'fused as (',
+    ])
+  })
+})
