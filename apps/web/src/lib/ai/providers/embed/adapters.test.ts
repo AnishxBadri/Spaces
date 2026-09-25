@@ -1,8 +1,15 @@
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { fakeOllama } from '#/test/fake-ollama'
 import { providerFailure } from '../test-call'
 import { embedCallFor } from './index'
-import { EMBEDDING_MODELS, EMBEDDING_PROVIDERS, PIN_DIMS } from './ids'
+import {
+  EMBEDDING_MODELS,
+  EMBEDDING_PROVIDERS,
+  EMBEDDING_PROVIDER_INFO,
+  PIN_DIMS,
+  embeddingCredentialProvider,
+} from './ids'
 
 /**
  * SPA-51. The three embedding adapters, each asserted against the request it
@@ -56,6 +63,7 @@ describe('the catalogue', () => {
       'openai/text-embedding-3-large',
       'google/text-embedding-004',
       'google/gemini-embedding-001',
+      'ollama/nomic-embed-text',
     ])
     expect(PIN_DIMS).toBe(768)
   })
@@ -184,5 +192,61 @@ describe('Voyage', () => {
     )
     const failure = await Effect.runPromise(Effect.flip(call(['Spaces'])))
     expect(failure._tag).toBe('ProviderCallFailed')
+  })
+})
+
+describe('Ollama (SPA-83)', () => {
+  it('is local and keyless, and reads the LLM row rather than an embed: row of its own', () => {
+    expect(EMBEDDING_PROVIDER_INFO.ollama).toMatchObject({
+      local: true,
+      keyless: true,
+    })
+    expect(
+      EMBEDDING_PROVIDERS.filter((p) => EMBEDDING_PROVIDER_INFO[p].local),
+    ).toEqual(['ollama'])
+    expect(embeddingCredentialProvider('ollama')).toBe('ollama')
+    expect(embeddingCredentialProvider('openai')).toBe('embed:openai')
+  })
+
+  it('posts to /api/embed under the stored root with no key and no width, and answers 768 floats', async () => {
+    const ollama = fakeOllama({ pulled: ['nomic-embed-text'] })
+    const call = embedCallFor(
+      'ollama',
+      // The keyless LLM credential: an empty secret and a typed address.
+      { secret: '', meta: { baseUrl: 'http://ollama:11434/' } },
+      'nomic-embed-text',
+      PIN_DIMS,
+      ollama.fetch,
+    )
+    const answer = await Effect.runPromise(call(['Spaces', 'Orbital']))
+    expect(answer.embeddings).toHaveLength(2)
+    expect(answer.embeddings.every((v) => v.length === 768)).toBe(true)
+    expect(answer.tokens).toBe(6)
+    expect(ollama.calls).toEqual([
+      {
+        url: 'http://ollama:11434/api/embed',
+        body: { model: 'nomic-embed-text', input: ['Spaces', 'Orbital'] },
+      },
+    ])
+  })
+
+  it("fails ProviderCallFailed on a model the server has not pulled, carrying Ollama's 404 and words", async () => {
+    const ollama = fakeOllama({ pulled: [] })
+    const call = embedCallFor(
+      'ollama',
+      { secret: '', meta: {} },
+      'nomic-embed-text',
+      PIN_DIMS,
+      ollama.fetch,
+      0,
+    )
+    const failure = await Effect.runPromise(Effect.flip(call(['Spaces'])))
+    expect(failure._tag).toBe('ProviderCallFailed')
+    expect(providerFailure(failure.cause)).toEqual({
+      status: 404,
+      message: 'model "nomic-embed-text" not found, try pulling it first',
+    })
+    // No base URL saved: the default address, resolved to its API root.
+    expect(ollama.calls[0]?.url).toBe('http://localhost:11434/api/embed')
   })
 })

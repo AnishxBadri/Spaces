@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
-import { eq } from 'drizzle-orm'
-import { describe, expect, it, vi } from 'vitest'
+import { eq, isNotNull } from 'drizzle-orm'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
-import { chunk, entity, note } from '@spaces/db/schema'
+import { aiUsage, chunk, entity, note, workspace } from '@spaces/db/schema'
+import type { WorkspaceSettings } from '@spaces/db/schema/workspace'
+import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
+import { storeCredential } from '#/lib/vault'
+import { fakeOllama } from '#/test/fake-ollama'
 import { QUEUES } from '@spaces/core/queue/names'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { JobPermanent } from '../run-job'
@@ -108,5 +112,104 @@ describe('chunk.embed', () => {
         .from(chunk)
         .where(eq(chunk.entityId, deal)),
     ).toEqual([])
+  })
+})
+
+describe('chunk.embed and the sensitive slot (SPA-83)', () => {
+  const PIN = {
+    provider: 'openai',
+    model: 'text-embedding-3-small',
+    dims: PIN_DIMS,
+    pinned_at: '2026-09-20T00:00:00.000Z',
+  }
+  const SLOT = {
+    provider: 'ollama',
+    model: 'nomic-embed-text',
+    dims: PIN_DIMS,
+    set_at: '2026-09-25T00:00:00.000Z',
+  }
+
+  async function setSettings(settings: WorkspaceSettings) {
+    await db
+      .insert(workspace)
+      .values({ id: 1, name: 'Fund', settings })
+      .onConflictDoUpdate({ target: workspace.id, set: { settings } })
+  }
+
+  /** A sensitive note, and Ollama saved as the Providers section saves it. */
+  async function sensitiveNote() {
+    await storeCredential({
+      scope: 'workspace',
+      provider: 'ollama',
+      kind: 'llm',
+      secret: '',
+      keyless: true,
+      meta: { baseUrl: 'http://ollama:11434' },
+      createdBy: FIXTURE_ACTOR.id,
+    })
+    const id = await newEntity('note', 'Partner call')
+    await db.update(entity).set({ sensitive: true }).where(eq(entity.id, id))
+    await db.insert(note).values({
+      entityId: id,
+      title: 'Partner call',
+      bodyMd: 'The LP wants out of the fund before the close.',
+      authorId: FIXTURE_ACTOR.id,
+      visibility: 'shared',
+    })
+    return id
+  }
+
+  const rowsOf = (id: string) =>
+    db
+      .select({
+        embedding: chunk.embedding,
+        model: chunk.embeddingModel,
+        sensitive: chunk.sensitive,
+      })
+      .from(chunk)
+      .where(eq(chunk.entityId, id))
+
+  afterEach(async () => {
+    vi.unstubAllGlobals()
+    await db.delete(aiUsage).where(isNotNull(aiUsage.id))
+  })
+
+  it('embeds a sensitive note through the slot and writes its vectors', async () => {
+    await setSettings({ embedding: { ...PIN, sensitive: SLOT } })
+    const id = await sensitiveNote()
+    const ollama = fakeOllama({ pulled: ['nomic-embed-text'] })
+    vi.stubGlobal('fetch', ollama.fetch)
+
+    await Effect.runPromise(
+      runEmbedSource({ entityId: id, sourceKind: 'note', sourceKey: '' }),
+    )
+
+    const rows = await rowsOf(id)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.embedding).toHaveLength(PIN_DIMS)
+    expect(rows[0]).toMatchObject({
+      model: 'nomic-embed-text',
+      sensitive: true,
+    })
+    expect(ollama.calls.map((c) => c.url)).toEqual([
+      'http://ollama:11434/api/embed',
+    ])
+  })
+
+  it('with no slot, refuses as before: no vectors and no call anywhere', async () => {
+    await setSettings({ embedding: PIN })
+    const id = await sensitiveNote()
+    const ollama = fakeOllama({ pulled: ['nomic-embed-text'] })
+    vi.stubGlobal('fetch', ollama.fetch)
+
+    await Effect.runPromise(
+      runEmbedSource({ entityId: id, sourceKind: 'note', sourceKey: '' }),
+    )
+
+    expect(await rowsOf(id)).toEqual([
+      { embedding: null, model: null, sensitive: true },
+    ])
+    expect(ollama.calls).toHaveLength(0)
+    expect(await db.select({ id: aiUsage.id }).from(aiUsage)).toEqual([])
   })
 })

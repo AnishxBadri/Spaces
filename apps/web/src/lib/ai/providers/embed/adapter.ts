@@ -22,6 +22,8 @@ export type EmbedAdapterInput = {
   dims: number
   /** The transport; a test hands in a stub, production uses global `fetch`. */
   fetch?: typeof fetch
+  /** The SDK's retries; the settings Test asks for 0 — one attempt. */
+  maxRetries?: number
 }
 
 export type EmbedAnswer = {
@@ -51,6 +53,10 @@ export function sdkDimensionOptions(
     case 'google':
       return { google: { outputDimensionality: dims } }
     case 'voyage':
+      return {}
+    // Ollama's `dimensions` truncates only for models trained for it; the
+    // one pinnable model emits 768 natively, so nothing is asked for.
+    case 'ollama':
       return {}
   }
 }

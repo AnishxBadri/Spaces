@@ -37,5 +37,17 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Optional local model server — not started by `docker compose up`, which
+  # stays at two containers. `docker compose --profile ollama up -d`, then
+  # `docker compose exec ollama ollama pull nomic-embed-text`, then save
+  # Ollama at http://ollama:11434 under Settings → AI · Providers.
+  ollama:
+    image: ollama/ollama
+    profiles: ['ollama']
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
 volumes:
   spaces_pgdata:
+  ollama_models:

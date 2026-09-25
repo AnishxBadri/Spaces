@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Effect, Logger } from 'effect'
 import { MockEmbeddingModelV4 } from 'ai/test'
-import { SQL, count, sql } from 'drizzle-orm'
+import { SQL, count, eq, sql } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
@@ -18,7 +18,7 @@ import { user } from '@spaces/db/schema/auth'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { pinEmbeddingProgram } from '#/lib/ai/embedding-pin'
 import { saveEmbeddingKeyProgram } from '#/lib/ai/providers/embed/settings'
-import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
+import { PIN_DIMS, slotSearchNote } from '#/lib/ai/providers/embed/ids'
 import { recordPath } from '../record-path'
 import { fusedStatement, searchAllProgram } from './query'
 import { clearQueryEmbeddingCache } from './query-embedding'
@@ -507,5 +507,75 @@ describe('the semantic lane, pinned', () => {
     expect(plan).toMatch(/Index Scan using chunk_embedding_hnsw_idx on chunk/)
     expect(plan).toMatch(/Order By: \(embedding <=> \(InitPlan \d+\)\.col1\)/)
     expect(plan).toMatch(/Filter: \(c\.embedding_model = /)
+  })
+})
+
+describe('the sensitive slot and the lane (SPA-83)', () => {
+  const SLOT_MODEL = 'nomic-embed-text'
+  const SLOT = {
+    provider: 'ollama',
+    model: SLOT_MODEL,
+    dims: PIN_DIMS,
+    set_at: '2026-09-25T00:00:00.000Z',
+  }
+
+  /** A sensitive deck whose one chunk the slot embedded, nearest the query. */
+  async function slotEmbeddedDeck() {
+    const deck = await newDeck('Vault memo.pdf', COOLING_TEXT)
+    await db.update(entity).set({ sensitive: true }).where(eq(entity.id, deck))
+    await db.insert(chunk).values({
+      entityId: deck,
+      sourceKind: 'document',
+      sourceKey: '',
+      idx: 0,
+      text: COOLING_TEXT,
+      embedding: toward(0),
+      embeddingModel: SLOT_MODEL,
+      sensitive: true,
+    })
+    return deck
+  }
+
+  it("filters on the pin's model: a chunk the slot embedded on another model of the same width is not found, and the readout says so", async () => {
+    await pin()
+    const stored = (
+      await db.select({ s: workspace.settings }).from(workspace)
+    ).at(0)?.s
+    const embedding = stored?.embedding
+    if (!embedding) throw new Error('expected a pin')
+    await setSettings({
+      ...stored,
+      embedding: { ...embedding, sensitive: SLOT },
+    })
+    const deck = await slotEmbeddedDeck()
+    const { model } = countingModel()
+
+    const { text, hits } = await observe(QUERY, { semantic: true }, model)
+    expect(text).toContain('sem_hits')
+    expect(hits.map((h) => h.id)).not.toContain(deck)
+    expect(slotSearchNote({ model: MODEL }, { model: SLOT_MODEL })).toBe(
+      "Search reads only text-embedding-3-small's vectors, so sensitive records embedded by nomic-embed-text stay out of semantic search — the same width is not the same model.",
+    )
+  })
+
+  it("finds it once the slot's model is the pin's model", async () => {
+    await setSettings({
+      embedding: {
+        provider: 'ollama',
+        model: SLOT_MODEL,
+        dims: PIN_DIMS,
+        pinned_at: '2026-09-25T00:00:00.000Z',
+      },
+    })
+    const deck = await slotEmbeddedDeck()
+    const { model } = countingModel()
+
+    const hits = await search(QUERY, {}, model)
+    expect(hits.find((h) => h.id === deck)).toMatchObject({
+      matchedIn: 'semantic',
+    })
+    expect(slotSearchNote({ model: SLOT_MODEL }, { model: SLOT_MODEL })).toBe(
+      'Search reads these vectors: the slot and the pin are both nomic-embed-text.',
+    )
   })
 })

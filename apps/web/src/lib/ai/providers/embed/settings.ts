@@ -9,8 +9,10 @@ import { effectFn } from '#/lib/server/effect'
 import { requireAdmin } from '#/lib/server/shared'
 import { embedMessage, embedProgram } from '../../embed'
 import {
+  clearSensitiveSlotProgram,
   pinEmbeddingProgram,
-  readEmbeddingPinProgram,
+  readEmbeddingSetupProgram,
+  setSensitiveSlotProgram,
 } from '../../embedding-pin'
 import { readProviderMeta } from '../meta'
 import { providerFailure } from '../test-call'
@@ -20,11 +22,13 @@ import {
   embeddingCredentialProvider,
   findEmbeddingModel,
   needsRepinNote,
+  ollamaNotPulledMessage,
 } from './ids'
 import type {
   EmbeddingKeyInput,
   EmbeddingPinView,
   EmbeddingProvider,
+  EmbeddingSlotView,
   EmbeddingTarget,
 } from './ids'
 
@@ -40,7 +44,9 @@ import type {
  * `embed:<id>` (`embeddingCredentialProvider`) — never the LLM key of the
  * same vendor, which it would otherwise overwrite. As with the LLM keys, the
  * secret goes in and never comes back out: the section reads the redacted
- * `display`.
+ * `display`. Ollama (SPA-83) has no key and no row of its own: its row here
+ * is the LLM provider's keyless credential, read for its base URL, and the
+ * embed Test writes only its own verdict keys onto it (`embedTest*`).
  */
 
 /** A read or write behind the section failed; `message` is what it is shown. */
@@ -54,12 +60,18 @@ export type EmbeddingKeyRow = {
   label: string
   configured: boolean
   display: string | null
+  /** The saved base URL; for Ollama, the address the embed calls go to. */
+  baseUrl: string | null
   lastTestedAt: string | null
   lastTestOk: boolean | null
+  /** The model the last embed Test ran against. */
+  testedModel: string | null
 }
 
 export type EmbeddingSettingsView = {
   pin: EmbeddingPinView | null
+  /** The sensitive slot beside the pin (SPA-83); null when unset. */
+  slot: EmbeddingSlotView | null
   keys: EmbeddingKeyRow[]
 }
 
@@ -82,7 +94,7 @@ export const getEmbeddingSettingsProgram = Effect.fn('getEmbeddingSettings')(
     EmbeddingSettingsView,
     EmbeddingSettingsFailed
   > {
-    const pin = yield* readEmbeddingPinProgram().pipe(
+    const { pin, slot } = yield* readEmbeddingSetupProgram().pipe(
       Effect.mapError(
         (e) =>
           new EmbeddingSettingsFailed({
@@ -100,11 +112,13 @@ export const getEmbeddingSettingsProgram = Effect.fn('getEmbeddingSettings')(
         label: EMBEDDING_PROVIDER_INFO[provider].label,
         configured: row !== undefined && row.status === 'active',
         display: meta?.display ?? null,
-        lastTestedAt: meta?.lastTestedAt ?? null,
-        lastTestOk: meta?.lastTestOk ?? null,
+        baseUrl: meta?.baseUrl ?? null,
+        lastTestedAt: meta?.embedTestedAt ?? null,
+        lastTestOk: meta?.embedTestOk ?? null,
+        testedModel: meta?.embedTestModel ?? null,
       })
     }
-    return { pin, keys }
+    return { pin, slot, keys }
   },
 )
 
@@ -129,6 +143,22 @@ export const saveEmbeddingKeyProgram = Effect.fn('saveEmbeddingKey')(function* (
   return { display }
 })
 
+/**
+ * What the Test shows for a provider's refusal: its own words, except that
+ * Ollama's 404 for a model the server has not pulled becomes the one command
+ * that fixes it. An unreachable address already reads "Could not reach
+ * <url>: …" (`providerFailure`), which names the URL.
+ */
+export function embedProviderFailure(
+  target: EmbeddingTarget,
+  cause: unknown,
+): { status: number | null; message: string } {
+  const failure = providerFailure(cause)
+  if (target.provider === 'ollama' && failure.status === 404)
+    return { status: 404, message: ollamaNotPulledMessage(target.model) }
+  return failure
+}
+
 /** The word the Test call embeds. */
 export const EMBED_TEST_TEXT = 'Spaces'
 
@@ -139,7 +169,9 @@ export const EMBED_TEST_TEXT = 'Spaces'
  * writes one `ai_usage` row with the admin as caller. It never fails: a
  * refusal is the answer the admin asked for. A greyed model is refused
  * before any call — it cannot emit the width, and asking would spend tokens
- * to learn what the catalogue already says.
+ * to learn what the catalogue already says. The verdict and the model are
+ * recorded on the credential (`embedTest*`); a green local model is what
+ * the sensitive slot is offered on.
  */
 export const testEmbeddingProgram = Effect.fn('testEmbedding')(function* (
   actorId: string,
@@ -172,7 +204,7 @@ export const testEmbeddingProgram = Effect.fn('testEmbedding')(function* (
     Effect.catch((error) =>
       Effect.succeed<EmbeddingTestResult>(
         error._tag === 'ProviderCallFailed'
-          ? { ok: false, ...providerFailure(error.cause) }
+          ? { ok: false, ...embedProviderFailure(target, error.cause) }
           : { ok: false, status: null, message: embedMessage(error) },
       ),
     ),
@@ -183,8 +215,9 @@ export const testEmbeddingProgram = Effect.fn('testEmbedding')(function* (
     yield* Effect.tryPromise({
       try: () =>
         mergeCredentialMeta(key.id, {
-          lastTestedAt: new Date().toISOString(),
-          lastTestOk: result.ok,
+          embedTestedAt: new Date().toISOString(),
+          embedTestOk: result.ok,
+          embedTestModel: target.model,
         }),
       catch: (cause) =>
         new EmbeddingSettingsFailed({
@@ -237,4 +270,34 @@ export async function pinEmbeddingHandler(
       ),
     ),
   )(data)
+}
+
+// The sensitive slot (SPA-83). `requireAdmin()` first, like the rest.
+
+/**
+ * Sets the slot, or refuses: `SlotRefused` carries the sentence the section
+ * shows (a width that is not the pin's names both numbers). A read failure
+ * is given one here, since its tag carries none.
+ */
+export async function setSensitiveSlotHandler(
+  data: EmbeddingTarget,
+): Promise<EmbeddingSlotView> {
+  await requireAdmin()
+  return effectFn((target: EmbeddingTarget) =>
+    setSensitiveSlotProgram(target).pipe(
+      Effect.catchTag('EmbeddingPinReadFailed', (e) =>
+        Effect.fail(
+          new EmbeddingSettingsFailed({
+            message: 'Could not read the embedding pin',
+            cause: e.cause,
+          }),
+        ),
+      ),
+    ),
+  )(data)
+}
+
+export async function clearSensitiveSlotHandler(): Promise<void> {
+  await requireAdmin()
+  return effectFn(clearSensitiveSlotProgram)()
 }

@@ -6,14 +6,18 @@ import { SensitiveRouteRefused, UsageWriteFailed } from './complete'
 import type { Caller, ProviderCallFailed } from './complete'
 import { capMessage, checkCapProgram } from './caps'
 import type { CapExceeded, CapReadFailed } from './caps'
-import { readEmbeddingPinProgram } from './embedding-pin'
+import { readEmbeddingSetupProgram } from './embedding-pin'
 import type { EmbeddingPinReadFailed } from './embedding-pin'
 import type { AiSensitivity } from './lanes'
 import type { SensitivityVia } from './sensitivity'
 import type { ResolveModelFailure } from './providers'
 import { resolveEmbedCall } from './providers/embed'
 import { sdkDimensionOptions, sdkEmbedCall } from './providers/embed/adapter'
-import { EMBEDDING_PROVIDER_INFO, PIN_DIMS } from './providers/embed/ids'
+import {
+  EMBEDDING_PROVIDER_INFO,
+  PIN_DIMS,
+  isEmbeddingProvider,
+} from './providers/embed/ids'
 import type { EmbeddingTarget } from './providers/embed/ids'
 
 /**
@@ -30,12 +34,16 @@ import type { EmbeddingTarget } from './providers/embed/ids'
  * Postgres would always raise; it is the dimension trap, and this is where
  * it is sprung.
  *
- * The signature carries `sensitivity` although only one branch of it is
- * reachable (D11): today every embedding provider is cloud, so a `sensitive`
- * call is always refused `SensitiveRouteRefused` and the record is left
- * unembedded — skip, never leak (`./sensitivity.ts`). The branch becomes
- * reachable for a sensitive record only once SPA-83 adds the local slot (a
- * same-width local model); that is additive, not a change to every caller.
+ * The signature carries `sensitivity` (D11) so the local slot is additive.
+ * A `sensitive` call goes to a local provider or nowhere: the pin itself
+ * when it is local (Ollama), else the **sensitive slot** beside a cloud pin
+ * (SPA-83, `./embedding-pin.ts`), else it is refused `SensitiveRouteRefused`
+ * and the record is left unembedded — skip, never leak
+ * (`./sensitivity.ts`). There is no cloud fallback, by construction: a
+ * refused sensitive embed is never downgraded to the pin. What comes back
+ * names the target that made the vectors, so a caller stores the slot's
+ * model as `embedding_model`, and the semantic lane — which reads the pin's
+ * model only — does not mistake them for the pin's.
  *
  * `opts.model` is the test seam, as `complete()`'s is: an injected AI SDK
  * `EmbeddingModel` (`MockEmbeddingModelV4` from `ai/test`) replaces the vault
@@ -116,7 +124,10 @@ export function embedMessage(failure: EmbedFailure): string {
     case 'CapReadFailed':
       return 'Could not read the AI cap'
     case 'NoCredential':
-      return `No ${label(failure.provider)} embedding key is saved`
+      return isEmbeddingProvider(failure.provider) &&
+        EMBEDDING_PROVIDER_INFO[failure.provider].keyless
+        ? `No ${label(failure.provider)} address is saved`
+        : `No ${label(failure.provider)} embedding key is saved`
     case 'CredentialReadFailed':
       return 'Could not read the credential'
     case 'ProviderCallFailed':
@@ -134,25 +145,31 @@ export const embedProgram = Effect.fn('embed')(function* (
   texts: ReadonlyArray<string>,
   opts: EmbedOptions,
 ): Effect.fn.Return<EmbedResult, EmbedFailure> {
-  const pinned = opts.target ? null : yield* readEmbeddingPinProgram()
-  const target = opts.target
+  const setup = opts.target ? null : yield* readEmbeddingSetupProgram()
+  const pinned = setup?.pin ?? null
+  const pinTarget = opts.target
     ? { ...opts.target, dims: PIN_DIMS }
     : pinned
       ? { provider: pinned.provider, model: pinned.model, dims: pinned.dims }
       : null
-  if (target === null) return yield* new EmbeddingNotPinned()
+  if (pinTarget === null) return yield* new EmbeddingNotPinned()
 
-  // No local embedding provider exists until SPA-83, so this refuses every
-  // sensitive call today. There is no cloud fallback, by construction.
+  // A sensitive call to a cloud pin goes to the local slot beside it, or is
+  // refused. Never the pin: that would be the downgrade D11 forbids.
+  let target = pinTarget
   if (
     opts.sensitivity === 'sensitive' &&
-    !EMBEDDING_PROVIDER_INFO[target.provider].local
-  )
-    return yield* new SensitiveRouteRefused({
-      lane: 'embed',
-      provider: target.provider,
-      ...(opts.via === undefined ? {} : { via: opts.via }),
-    })
+    !EMBEDDING_PROVIDER_INFO[pinTarget.provider].local
+  ) {
+    const slot = setup?.slot ?? null
+    if (slot === null)
+      return yield* new SensitiveRouteRefused({
+        lane: 'embed',
+        provider: pinTarget.provider,
+        ...(opts.via === undefined ? {} : { via: opts.via }),
+      })
+    target = { provider: slot.provider, model: slot.model, dims: slot.dims }
+  }
 
   if (texts.length === 0) return { vectors: [], target, usage: { tokens: 0 } }
 
@@ -169,6 +186,9 @@ export const embedProgram = Effect.fn('embed')(function* (
         modelId: target.model,
         dims: target.dims,
         ...(opts.caller.type === 'user' ? { userId: opts.caller.id } : {}),
+        ...(opts.maxRetries === undefined
+          ? {}
+          : { maxRetries: opts.maxRetries }),
       })).call
 
   const answer = yield* call(texts)

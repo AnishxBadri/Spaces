@@ -21,9 +21,11 @@ import type { StampWriteFailed } from './stamp-sensitivity'
  * source held before.
  *
  * - **With or without a pin.** No pin (`EmbeddingNotPinned`) and a sensitive
- *   record (`SensitiveRouteRefused`) both write the rows with a null
- *   `embedding` and a null `embedding_model` — the designed outcome, reported
- *   in `skipped`. Any other embed failure still writes the rows without
+ *   record with no local route (`SensitiveRouteRefused`) both write the rows
+ *   with a null `embedding` and a null `embedding_model` — the designed
+ *   outcome, reported in `skipped`. With the sensitive slot set (SPA-83),
+ *   `embed()` routes a sensitive record's pieces to it and the rows carry
+ *   the slot's model as `embedding_model`. Any other embed failure still writes the rows without
  *   vectors and comes back in `failure`, for the caller to turn into its own
  *   typed error.
  * - **Replace, never append.** The source's rows — `(entity_id, source_kind,

@@ -34,10 +34,25 @@ import type { Json } from '../json'
  * to another model of the same width (the backfill re-embeds) and refuses a
  * change of width — that re-pin (ALTER COLUMN TYPE, index rebuild, full
  * re-embed) is not built.
+ *
+ * `embedding.sensitive` (SPA-83, D11) is the sensitive slot: a second,
+ * local provider stored beside the pin, at the pin's width, that
+ * `embed(texts, {sensitivity: 'sensitive'})` routes to when the pin is a
+ * cloud provider. Absent, a sensitive embed is refused and the record is
+ * left unembedded. It lives inside `embedding` so it goes where the pin goes
+ * — a pin swap merges into the object rather than replacing it.
  */
 export type AiCapsSetting = {
   daily_tokens?: number
   per_run_tokens?: number
+}
+
+export type EmbeddingSlotSetting = {
+  provider: string
+  model: string
+  dims: number
+  /** ISO instant. */
+  set_at: string
 }
 
 export type EmbeddingPinSetting = {
@@ -46,6 +61,7 @@ export type EmbeddingPinSetting = {
   dims: number
   /** ISO instant. */
   pinned_at: string
+  sensitive?: EmbeddingSlotSetting
 }
 
 export type WorkspaceSettings = {

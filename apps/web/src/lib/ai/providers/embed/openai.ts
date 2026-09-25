@@ -22,5 +22,6 @@ export function openaiEmbedCall(input: EmbedAdapterInput): EmbedCall {
     'openai',
     createOpenAI(settings).embedding(input.modelId),
     sdkDimensionOptions('openai', input.dims),
+    input.maxRetries,
   )
 }
