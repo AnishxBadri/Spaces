@@ -34,6 +34,7 @@ import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
+import { SummarizeRecordButton } from '#/components/summarize'
 import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -201,6 +202,7 @@ function DealRecordPage() {
         actions={
           <>
             <SensitiveToggle entityId={deal.id} state={sensitivity} />
+            <SummarizeRecordButton recordId={deal.id} />
             <LogInteractionDialog
               seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
               hotkey="l"

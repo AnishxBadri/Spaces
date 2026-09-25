@@ -250,25 +250,26 @@ describe('propose → accept', () => {
     const { accepter, entityId } = await setup()
     const decider: Decider = { type: 'user', id: accepter.id }
 
-    const note = await Effect.runPromise(
+    // `ledger_event` has no accept path yet (`note` gained one in SPA-66).
+    const ledger = await Effect.runPromise(
       proposeProgram({
         entityId,
-        kind: 'note',
-        payload: { body: 'Met the founders' },
+        kind: 'ledger_event',
+        payload: { kind: 'mark', fairValue: 1000 },
         proposedBy: { type: 'system' },
       }),
     )
     const refused = await Effect.runPromise(
-      Effect.flip(acceptProgram(note.id, decider)),
+      Effect.flip(acceptProgram(ledger.id, decider)),
     )
     expect(refused).toBeInstanceOf(UnsupportedSuggestionKind)
 
-    const rejected = await Effect.runPromise(rejectProgram(note.id, decider))
+    const rejected = await Effect.runPromise(rejectProgram(ledger.id, decider))
     expect(rejected.status).toBe('rejected')
     expect(rejected.decidedBy).toBe(accepter.id)
 
     const again = await Effect.runPromise(
-      Effect.flip(acceptProgram(note.id, decider)),
+      Effect.flip(acceptProgram(ledger.id, decider)),
     )
     expect(again).toBeInstanceOf(SuggestionNotOpen)
   })

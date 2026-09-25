@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
+import { SummarizeRecordButton } from '#/components/summarize'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
@@ -168,6 +169,7 @@ function CompanyRecordPage() {
         actions={
           <>
             <SensitiveToggle entityId={company.id} state={sensitivity} />
+            <SummarizeRecordButton recordId={company.id} />
             <LogInteractionDialog
               seed={{ id: company.id, name: company.name, kind: 'company' }}
               hotkey="l"

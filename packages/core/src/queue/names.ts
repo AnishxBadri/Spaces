@@ -68,6 +68,15 @@ export const QUEUES = {
    * are precisely the ones that never became documents.
    */
   sweepOrphanBlobs: 'blob.sweep-orphans',
+  /**
+   * Summarize (SPA-66): a document or a record → one `suggestion(kind:
+   * 'note')` on the record the button was pressed on, through the
+   * synthesize lane. `entity.` because the scope is either kind. Created
+   * `exclusive` and sent with `singletonKey = <record>:<source>`, the deck
+   * reader's policy: a second press while one is queued or active is
+   * refused by pg-boss.
+   */
+  summarize: 'entity.summarize',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

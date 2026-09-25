@@ -22,6 +22,8 @@ import type { Actor, SetValuesResult, Tx } from '#/lib/attributes/values'
 import { resolveEntity } from '#/lib/entities/resolve'
 import type { ResolveResult } from '#/lib/entities/resolve'
 import { canonicalId } from '#/lib/entities/sweep'
+import { notePayloadSchema } from '@spaces/core/ai/note'
+import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
 
 /**
  * The AI layer's one mutating verb (docs/spec-ai-substrate.md §3, §10).
@@ -211,6 +213,9 @@ export const proposeProgram = Effect.fn('proposeProgram')(function* (
       if (input.kind === 'identity') identityOf(input.payload)
       // A document kind likewise (SPA-62): never `other`, never off-enum.
       if (input.kind === 'document_kind') documentKindOf(input.payload)
+      // A note (SPA-66) likewise: the card draws its title and body, and
+      // the accept path renders the body into the note it writes.
+      if (input.kind === 'note') noteOf(input.payload)
       const row = (
         await db
           .insert(suggestion)
@@ -288,6 +293,12 @@ export type Accepted =
       /** The kind the document had, and the kind it has now. */
       from: string
       to: string
+    }
+  | {
+      kind: 'note'
+      suggestion: Suggestion
+      /** The note the accept wrote (SPA-66). */
+      noteId: string
     }
 
 /** An identity payload, decoded — or the validator's refusal, by field. */
@@ -520,6 +531,62 @@ async function acceptDocumentKindInTx(
   return { from: held.kind, to: kind }
 }
 
+// ---------- note (SPA-66) ----------
+
+/** A note payload, decoded — or the validator's refusal, by field. */
+function noteOf(payload: Json) {
+  const parsed = notePayloadSchema.safeParse(payload)
+  if (parsed.success) return parsed.data
+  throw invalid(
+    parsed.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'note'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
+}
+
+/**
+ * Accept a note (SPA-66, spec §11 "Summarize"): the drafted body becomes a
+ * real note — `bodyJson` and `bodyMd` both — with the accepter as author,
+ * filed `tagged_in` the record the suggestion sits on and `derived_from`
+ * the source it was drafted from (`lib/notes/from-suggestion.ts`), in this
+ * transaction. Both ends are followed through a merge; a source deleted
+ * since the proposal refuses the accept rather than writing a note that
+ * claims a provenance it no longer has.
+ */
+async function acceptNoteInTx(
+  tx: Tx,
+  row: Suggestion,
+  actor: Decider,
+): Promise<{ noteId: string }> {
+  const payload = noteOf(row.payload)
+  const recordId = await canonicalId(row.entityId, tx)
+  const sourceId = await canonicalId(payload.sourceId, tx)
+  const found = await tx
+    .select({ id: entity.id })
+    .from(entity)
+    .where(sql`${entity.id} in (${recordId}, ${sourceId})`)
+  const has = (id: string) => found.some((f) => f.id === id)
+  if (!has(recordId))
+    throw new EntityNotFound({
+      entityId: row.entityId,
+      message: 'Record not found',
+    })
+  if (!has(sourceId))
+    throw invalid([
+      {
+        slug: 'sourceId',
+        message: 'sourceId: what this note was drafted from no longer exists',
+      },
+    ])
+  return writeSuggestedNoteInTx(tx, {
+    payload,
+    recordId,
+    sourceId,
+    actorId: actor.id,
+  })
+}
+
 /**
  * Lock one row for its accept and refuse it unless it is still `open`. The
  * `for update` is what serializes two accepts on one row: the second waits
@@ -625,6 +692,22 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
             suggestion: decided,
             from,
             to,
+          } satisfies Accepted
+        }
+        if (row.kind === 'note') {
+          if (fields !== undefined)
+            throw invalid([
+              {
+                slug: 'fields',
+                message: 'fields: a note is accepted whole, not by field',
+              },
+            ])
+          const { noteId } = await acceptNoteInTx(tx, row, actor)
+          const decided = await close(tx, id, 'accepted', actor)
+          return {
+            kind: 'note',
+            suggestion: decided,
+            noteId,
           } satisfies Accepted
         }
         if (row.kind !== 'attribute_patch')

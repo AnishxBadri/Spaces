@@ -10,6 +10,7 @@ import { clipDocument } from './jobs/clip-document'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 import { readDeck } from './jobs/read-deck'
+import { summarize } from './jobs/summarize'
 import { embedDocument } from './jobs/embed-document'
 import { embedSource } from './jobs/embed-source'
 import { embedBackfill, embedBackfillRetry } from './jobs/embed-backfill'
@@ -111,6 +112,27 @@ async function main() {
     QUEUES.classifyDocument,
     { batchSize: 1, includeMetadata: true },
     runJob(classifyDocument, { host, layer: Layer.empty }),
+  )
+  // Summarize (SPA-66): the deck reader's shape — `exclusive`, so pg-boss
+  // refuses a second press on one (record, source) key while one is queued
+  // or active, and no retries, since every failure is permanent and every
+  // retry a frontier call. One block, before the plain create loop below,
+  // which would otherwise make it `standard` first — a queue's policy is
+  // fixed at create; `updateQueue` carries the retry policy to a queue an
+  // earlier boot made.
+  await boss
+    .createQueue(QUEUES.summarize, { policy: 'exclusive' })
+    .catch(() => {})
+  if (summarize.retry)
+    await boss.updateQueue(QUEUES.summarize, {
+      retryLimit: summarize.retry.limit,
+      retryDelay: summarize.retry.delaySeconds,
+      retryBackoff: summarize.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.summarize,
+    { batchSize: 1, includeMetadata: true },
+    runJob(summarize, { host, layer: Layer.empty }),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots

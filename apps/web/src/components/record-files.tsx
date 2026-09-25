@@ -25,6 +25,8 @@ import {
 } from './document-source'
 import { DocumentTile } from './document-tile'
 import { KIND_ICONS } from './editor/mention'
+import { SummarizeRowButton, useSummarizer } from './summarize'
+import type { Summarizer } from './summarize'
 import {
   DOCUMENT_KINDS,
   DOCUMENT_KIND_LABELS,
@@ -100,6 +102,11 @@ export function RecordFiles({
 
   useExtractionPolling(documents, router)
   const deckReaderFor = useDeckReader(entityId, documents)
+  // Summarize (SPA-66): any document whose text is extracted.
+  const summarizerFor = useSummarizer(
+    entityId,
+    documents.filter((d) => d.extractionStatus === 'done').map((d) => d.id),
+  )
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -234,6 +241,9 @@ export function RecordFiles({
               key={doc.id}
               doc={doc}
               reader={deckReaderFor(doc)}
+              summarizer={
+                doc.extractionStatus === 'done' ? summarizerFor(doc.id) : null
+              }
               onPreview={() => setPreviewing(doc)}
             />
           ))}
@@ -273,10 +283,12 @@ export function RecordFiles({
 function DocumentRow({
   doc,
   reader,
+  summarizer,
   onPreview,
 }: {
   doc: Documents[number]
   reader: DeckReader | null
+  summarizer: Summarizer | null
   onPreview: () => void
 }) {
   const router = useRouter()
@@ -347,6 +359,9 @@ function DocumentRow({
         <ExtractionNote doc={doc} />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
+        {summarizer === null ? null : (
+          <SummarizeRowButton summarizer={summarizer} />
+        )}
         {reader === null ? null : (
           <Button
             size="xs"

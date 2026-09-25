@@ -27,6 +27,7 @@ import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
+import { SummarizeRecordButton } from '#/components/summarize'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
 import { collisionToast } from '#/lib/attributes/collision-toast'
@@ -152,6 +153,7 @@ function ObjectRecordPage() {
         actions={
           <>
             <SensitiveToggle entityId={record.id} state={sensitivity} />
+            <SummarizeRecordButton recordId={record.id} />
             <Button variant="outline" onClick={newNoteAboutThis}>
               Note about this
             </Button>

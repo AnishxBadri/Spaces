@@ -64,7 +64,11 @@ async function world() {
     'attribute_patch',
     patch('location', 'Lisbon'),
   )
-  const acmeNote = await propose(acme, 'note', { title: 'Met at demo day' })
+  const acmeNote = await propose(acme, 'note', {
+    title: 'Met at demo day',
+    markdown: 'Met at demo day.',
+    sourceId: acme,
+  })
   const boltLocation = await propose(
     bolt,
     'attribute_patch',

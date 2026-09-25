@@ -75,7 +75,7 @@ async function world() {
   const acmeNote = await propose(
     acme,
     'note',
-    { title: 'Met at demo day' },
+    { title: 'Met at demo day', markdown: 'Met at demo day.', sourceId: acme },
     5,
     [],
   )
@@ -143,11 +143,15 @@ describe('listInbox — the suggestion lane', () => {
     ])
     expect(acme.latestAt).toBe('2026-09-23T09:05:00.000Z')
 
-    // A kind with no sub-renderer carries its payload and no fields.
+    // A kind that is not a patch carries its payload and no fields.
     const [note, founded] = acme.suggestions
     expect(note.kind).toBe('note')
     expect(note.fields).toBeNull()
-    expect(note.payload).toEqual({ title: 'Met at demo day' })
+    expect(note.payload).toEqual({
+      title: 'Met at demo day',
+      markdown: 'Met at demo day.',
+      sourceId: f.acme,
+    })
 
     // A patch carries its fields against the live registry, and its refs
     // as citations resolved through `names.ts`.

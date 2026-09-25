@@ -9,6 +9,8 @@ import { Button } from '#/components/ui/button'
 import { checkboxClasses } from '#/components/ui/checkbox'
 import { readIdentityPayload } from '@spaces/core/ai/identity'
 import type { IdentityPayload } from '@spaces/core/ai/identity'
+import { readNotePayload } from '@spaces/core/ai/note'
+import type { NotePayload } from '@spaces/core/ai/note'
 import { readDocumentKindPayload } from '@spaces/core/ai/document-kind'
 import type { DocumentKindPayload } from '@spaces/core/ai/document-kind'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
@@ -98,6 +100,14 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
       <PayloadBody item={item} actions={actions} />
     )
   },
+  note: ({ item, actions }) => {
+    const draft = readNotePayload(item.payload)
+    return draft ? (
+      <NoteDraftBody draft={draft} />
+    ) : (
+      <PayloadBody item={item} actions={actions} />
+    )
+  },
 }
 
 export function suggestionBodyFor(kind: SuggestionKind): SuggestionBody {
@@ -179,6 +189,25 @@ function DocumentKindBody({ proposed }: { proposed: DocumentKindPayload }) {
         </div>
       )}
     </dl>
+  )
+}
+
+/**
+ * A drafted note (SPA-66): its title and its body as the note will hold it,
+ * citations and all. Markdown, read as text — the card is where a person
+ * decides whether to keep it, and the editor is where it is formatted.
+ */
+function NoteDraftBody({ draft }: { draft: NotePayload }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="field-label text-graphite">Note</span>
+      <span className="min-w-0 truncate text-ui font-medium">
+        {draft.title}
+      </span>
+      <div className="max-h-48 overflow-auto border border-rule bg-bone px-2 py-1.5 text-label break-words whitespace-pre-wrap">
+        {draft.markdown}
+      </div>
+    </div>
   )
 }
 

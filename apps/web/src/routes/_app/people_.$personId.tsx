@@ -27,6 +27,7 @@ import {
 } from '#/components/record/record-parts'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
+import { SummarizeRecordButton } from '#/components/summarize'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
@@ -151,6 +152,7 @@ function PersonRecordPage() {
         actions={
           <>
             <SensitiveToggle entityId={person.id} state={sensitivity} />
+            <SummarizeRecordButton recordId={person.id} />
             <LogInteractionDialog
               seed={{ id: person.id, name: person.name, kind: 'person' }}
               hotkey="l"
