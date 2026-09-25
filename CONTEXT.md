@@ -1529,6 +1529,15 @@ silently garbage** — search degrades quietly rather than erroring. This bites 
   pinned dimension, sensitivity routing, and being a dependency of core
   search all require the substrate to own them. Detail:
   `docs/spec-ai-substrate.md` §9.
+- **Local slot ordering, 2026-09-25: Ollama first, transformers.js second.**
+  Ollama is an HTTP server both processes already call (the LLM adapter's
+  keyless URL credential), so the embed adapter and the sensitive slot ship
+  as `ai-9b` (SPA-83) with no new dependency or seam. The in-process
+  transformers.js model is `ai-9c`, behind it, because query-time embedding
+  runs in **web** (`lib/search/query-embedding.ts`) and the model would live
+  in the **worker** — how web gets a vector from it is D50, open, answered
+  in that slice before it is built. LM Studio is out of scope until asked
+  for: it is a desktop app, and Ollama covers the server case.
 
 ### Enrichment
 
@@ -1784,10 +1793,23 @@ archive.
 - Needs noise filtering — not every thread is a deal. Heuristics + cheap classifier, else the
   pipeline fills with garbage.
 
+- **Threads reach a deal by derivation, never by an edge written on arrival
+  (D49, 2026-09-25).** Arrival edges a thread to the people (address alias)
+  and companies (domain alias) among its participants; a deal's threads are
+  those edged to its company or to one of its contacts, past and future. One
+  explicit `interaction_entity` edge to a deal — pin in, or exclude — is the
+  only manual act. A reply on a thread that already carries edges inherits
+  them; a true forward is matched on the Forwarded-message block's headers,
+  not the forwarder's. Attio's shape.
+- **Deck links stay links (owner, 2026-09-23).** No headless browser, no
+  renderer port, no snapshot container; D32 superseded, SPA-138 cancelled.
+
 ### Privacy default (decide deliberately — get it wrong and partner #2 never connects their mailbox)
 
 - Thread **metadata** (participants, subject, timestamps) -> shared. Powers the graph.
 - Thread **bodies** -> visible to the connecting user only, until they attach the thread to a deal.
+  **Scoped 2026-09-25 (D49): this is the _synced_-mailbox default (arrival-10). A
+  _forwarded_ body is born `shared` — forwarding is the consent (D31).**
 - Per-connection exclude list: domains/labels never synced. Ship a default blocklist.
 - Make it a settings toggle — some funds want everything shared.
 

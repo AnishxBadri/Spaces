@@ -194,3 +194,40 @@ Four of the ten are not just ratifications — they change what gets built:
 - **D11** pins `embed(input, { sensitivity })` and `aiRoute('embed', sensitivity)` in the first embedding slice even though only one branch is reachable, so the local slot is additive rather than a signature change across every caller.
 
 - **D30 + D31** together define the forwarding lane: an IMAP poll of an operator-owned mailbox, bodies stored as notes via `interaction.note_id` born `private` to the connecting user and flipped to `shared` when the thread is attached. One visibility model, reusing the private-note carve-out already enforced in SQL.
+
+---
+
+## Addenda — 2026-09-25
+
+_Three changes after the week closed, all the owner's. They are recorded here rather than by editing the closed entries above, so the ledger still reads as it was ratified._
+
+### D32-headless-browser — superseded
+
+**Owner, 2026-09-23:** no headless browser, no renderer port, no optional snapshot container. A DocSend or Pitch link in a forwarded mail stays a link on the interaction; nothing renders it. The two-implementation port D32 traded for is not built. `arrival-4` (SPA-138) is cancelled and leaves project 13; `docsurf-10a`'s link-kind dispatch table stays as it is, with no renderer registered against it.
+
+### D49-deal-threads-derived
+
+**How does an email thread reach a deal, and when is a forwarded body shared?**
+
+Threads are edged on arrival to the people whose address matches an alias and the companies whose domain matches one, in `interaction_entity`. Nothing about a deal is known at arrival, a company can carry several deals, and D30 made sharing a body the consequence of attaching its thread — which left the common case (every thread on the company belongs on the deal) needing a manual act per thread, and a reply next week needing it again.
+
+**Answered:** Option 1, the Attio shape with one explicit edge kept.
+
+- **A deal's threads are derived** — every thread edged to the deal's company or to one of its contacts, past and future, no write at the deal. One explicit `interaction_entity` edge to a deal — pin in, or exclude — is the only manual act, for the two-open-deals case. _Reversal cost:_ Additive; the edge already exists as a table.
+- **Forwarded bodies are born `shared`.** Forwarding is the consent (D31), so D30's private-until-attached default applies to the synced mailbox (arrival-10) only, where a connected inbox carries mail nobody chose to share. _Reversal cost:_ Copy plus a visibility backfill.
+- **A message on a thread that already carries edges inherits them** at write time, so a reply is on the same records without re-matching.
+- **A true forward is parsed for its Forwarded-message block**, and the original sender, recipients and date are what get matched — a BCC carries its headers, a forward carries them only in the body.
+
+_Carried by_ `arrival-1` (SPA-56) · `arrival-2` (SPA-86). _Blocks_ `arrival-10`.
+
+### D50-local-embedding-seam — open
+
+**When the local embedding model lives inside the worker, how does the web process get a query vector while the user types?**
+
+Query-time embedding runs in web (`apps/web/src/lib/search/query-embedding.ts`), a transformers.js model is memory inside the process that loaded it, and the worker-only rule forbids web from loading it. Ollama has no such problem — it is an HTTP server both processes call — which is why SPA-83 was resequenced on 2026-09-25 to Ollama-plus-sensitive-slot first, with the in-process model split into `ai-9c`.
+
+- **Worker opens an internal HTTP listener, one `/embed` route, web calls `WORKER_URL`** (compose default `http://worker:3001`) — cleanest latency; one optional env; a new surface inside the compose network. _Reversal cost:_ Low.
+- **Request/reply over Postgres `LISTEN`/`NOTIFY`**, reply written to a row and its id notified — no port, no env; tens of ms plus inference; the 8 KB payload cap rules out the vector itself in the notification. _Reversal cost:_ Low.
+- **Web loads the model lazily when the pin is local** — simplest; kills the worker-only rule; +300 MB resident on web and inference on its loop. _Reversal cost:_ Moderate.
+
+**Not answered.** Carried by `ai-9c`, `hitl`, which records the answer in CONTEXT.md §Embeddings before building the seam. pg-boss round trips are seconds and are not an option.

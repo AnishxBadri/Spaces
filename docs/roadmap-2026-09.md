@@ -426,9 +426,9 @@ The cheapest inbound channel CONTEXT sequences first, finally sliced: BCC an add
 
 **▸ Deck links — a DocSend before it expires** — Paste a DocSend, Pitch or Notion link into a deal's upload box and get a searchable PDF of the deck in the document pipeline, still readable after the link dies — registered as a renderer on the clip job's link-kind table rather than a second branch inside a guarded fetch.
 
-| slice       |      |     | title                                                                | blocked by                                 |
-| ----------- | ---- | --- | -------------------------------------------------------------------- | ------------------------------------------ |
-| `arrival-4` | hitl | M   | Deck links — a DocSend or Pitch link becomes a PDF before it expires | `docsurf-10a`, `docsurf-10b`, `storage-6a` |
+| slice       |      |     | title                                                                                                                                                | blocked by                                 |
+| ----------- | ---- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `arrival-4` | hitl | M   | ~~Deck links — a DocSend or Pitch link becomes a PDF before it expires~~ **cancelled 2026-09-25 (owner; D32 superseded — a deck link stays a link)** | `docsurf-10a`, `docsurf-10b`, `storage-6a` |
 
 **▸ A door with a spec on it** — One versioned external namespace on the HttpApi already in the pinned package, one handshake procedure, and $APP_URL/api/v1/openapi.json importable into Postman or n8n before a single credential exists. Then the read half: n8n pages through records and the object registry as the token's user with canRead applied in SQL — no filter dialect, no second search, no write path.
 
