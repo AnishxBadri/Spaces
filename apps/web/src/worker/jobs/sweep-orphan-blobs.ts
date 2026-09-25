@@ -3,9 +3,8 @@ import { eq, lt } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { pendingBlob } from '@spaces/db/schema'
-import { storage } from '#/lib/storage'
 import { QUEUES } from '@spaces/core/queue/names'
-import { blobIsReferenced } from '#/lib/documents/blob-refs'
+import { reclaimBlobIfOrphaned } from '#/lib/documents/blob-refs'
 import { JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 
@@ -141,14 +140,13 @@ export const sweepOrphanBlobsProgram = Effect.fn('sweepOrphanBlobs')(function* (
   let reclaimed = 0
   let kept = 0
   for (const { sha } of due) {
-    const referenced = yield* query(() => blobIsReferenced(sha))
-    if (referenced) {
+    // `reclaimBlobIfOrphaned` asks `blobIsReferenced` and, only on a no,
+    // drops the bytes and what was derived from them (SPA-74).
+    if (yield* query(() => reclaimBlobIfOrphaned(sha))) reclaimed += 1
+    else {
       // A document row names these bytes, so they are not ours to take.
       // The row is spent either way — birth should have cleared it.
       kept += 1
-    } else {
-      yield* query(() => storage().delete(sha))
-      reclaimed += 1
     }
     yield* query(() => db.delete(pendingBlob).where(eq(pendingBlob.sha, sha)))
   }

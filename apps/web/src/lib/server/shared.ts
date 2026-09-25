@@ -467,12 +467,10 @@ export async function deleteDocumentWithBlobGc(
     // to both partners, or the same deck filed on a company and a space. The
     // count itself is `blobIsReferenced` since SPA-54, because the orphan
     // sweep asks the same question from the other direction and two copies
-    // of it would be two definitions of "still referenced".
-    const { blobIsReferenced } = await import('#/lib/documents/blob-refs')
-    if (!(await blobIsReferenced(row.blobSha))) {
-      const { storage } = await import('#/lib/storage')
-      await storage().delete(row.blobSha)
-    }
+    // of it would be two definitions of "still referenced". The reclaim
+    // takes the blob's derived rows with it (the extraction cache, SPA-74).
+    const { reclaimBlobIfOrphaned } = await import('#/lib/documents/blob-refs')
+    await reclaimBlobIfOrphaned(row.blobSha)
   }
   return { ok: true }
 }

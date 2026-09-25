@@ -205,6 +205,43 @@ describe('a prepare followed by a finalize', () => {
     await deleteDocumentWithBlobGc(second.id)
     expect(await storage().exists(sha)).toBe(false)
   })
+
+  it('takes the blob’s cached extractions with the bytes, and leaves a filed blob’s alone', async () => {
+    // SPA-74: answers keyed by the sha go through the same reclaim the
+    // bytes do, so neither direction of GC can strand one.
+    const { db } = await import('@spaces/db')
+    const { extractionCache } = await import('@spaces/db/schema')
+    const { eq } = await import('drizzle-orm')
+    const { storage } = await import('#/lib/storage')
+    const cached = (sha: string) =>
+      db
+        .select({ sha: extractionCache.blobSha })
+        .from(extractionCache)
+        .where(eq(extractionCache.blobSha, sha))
+    const answer = (sha: string) =>
+      db
+        .insert(extractionCache)
+        .values({ blobSha: sha, schemaKey: 'k', modelId: 'm', patch: {} })
+
+    const tag = randomUUID().slice(0, 8)
+    const orphan = await prepareAndPut(`o-${tag}`)
+    const filed = await prepareAndPut(`f-${tag}`)
+    await fileIt(filed.sha, `f-${tag}`, await aCompany(`f-${tag}`))
+    await answer(orphan.sha)
+    await answer(filed.sha)
+    // Birth clears its own pending row; put it back so the sweep examines
+    // the filed blob too and must decide to keep it.
+    await prepareAndPut(`f-${tag}`)
+    await agePendingBy(orphan.sha, 25 * 60 * 60 * 1000)
+    await agePendingBy(filed.sha, 25 * 60 * 60 * 1000)
+
+    const result = await sweep()
+    expect(result).toMatchObject({ reclaimed: 1 })
+    expect(await storage().exists(orphan.sha)).toBe(false)
+    expect(await cached(orphan.sha)).toEqual([])
+    expect(await storage().exists(filed.sha)).toBe(true)
+    expect(await cached(filed.sha)).toEqual([{ sha: filed.sha }])
+  })
 })
 
 describe('the alreadyStored short circuit', () => {

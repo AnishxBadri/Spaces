@@ -3,14 +3,17 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
   uuid,
 } from 'drizzle-orm/pg-core'
 import { actorType } from './actors'
+import type { Json } from '../json'
 
 /**
  * The provider contract's two tables (docs/spec-ai-substrate.md §4, §9).
@@ -99,4 +102,43 @@ export const aiUsage = pgTable(
       sql`(${t.callerType} = 'system') = (${t.callerId} IS NULL)`,
     ),
   ],
+)
+
+/**
+ * **The extraction cache** (SPA-74; docs/spec-storage-sources.md §9, the
+ * derived-layer stack): what one extract-lane call answered for one blob,
+ * one compiled schema and one model, so asking again is free.
+ *
+ * Keyed by the **blob**, never the document: the same deck filed twice is
+ * two `document` rows over one sha, and both read one row here. Keyed by
+ * `model_id` (`<provider>:<model>` as the lane routed it), so re-routing the
+ * lane re-asks instead of serving another model's answer. And keyed by
+ * `schema_key`, a digest of the compiled registry schema
+ * (`schemaFor`, `@spaces/core/ai/schema`), so an attribute added to the
+ * object misses rather than replaying a shape that no longer validates.
+ *
+ * `patch` is the model's structured output as it came back; the caller
+ * validates it against the live registry on every read, hit or miss. The
+ * reading document's own citations are stored with its id replaced by a
+ * placeholder, so a second document over the same blob cites itself.
+ *
+ * It is a cache and nothing more: truncating it costs provider calls, never
+ * behaviour. Rows go with their blob — `reclaimBlobIfOrphaned`
+ * (`apps/web/src/lib/documents/blob-refs.ts`) drops them when the last
+ * document row on the sha is gone. `blob_sha` is a digest, not an entity
+ * reference, so there is no `ENTITY_REFS` entry.
+ *
+ * `apps/web/src/lib/ai/extraction-cache.ts` is the only reader and writer
+ * besides that reclaim.
+ */
+export const extractionCache = pgTable(
+  'extraction_cache',
+  {
+    blobSha: text('blob_sha').notNull(),
+    schemaKey: text('schema_key').notNull(),
+    modelId: text('model_id').notNull(),
+    patch: jsonb('patch').$type<Json>().notNull(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.blobSha, t.schemaKey, t.modelId] })],
 )

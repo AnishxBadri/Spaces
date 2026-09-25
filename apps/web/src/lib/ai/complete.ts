@@ -43,8 +43,10 @@ import type { SensitivityVia } from './sensitivity'
  * `LanguageModel` (`MockLanguageModelV4` from `ai/test`) replaces the vault
  * lookup, so no test reaches a network. The route is still read, and the
  * sensitivity check still applies — the seam replaces the transport, not the
- * policy. `opts.route` replaces the table lookup with an explicit target;
- * only the settings Test call, which tests one provider, uses it.
+ * policy. `opts.route` replaces the table lookup with an explicit target:
+ * the settings Test call, which tests one provider, and the extraction cache,
+ * which has already read the route to key on its model and hands the same
+ * target on so the model it keyed is the model called.
  */
 
 /** Who asked. The same typed actor as `attribute_event` / `suggestion`. */
@@ -182,12 +184,21 @@ const tokens = (usage: LanguageModelUsage) => ({
   tokensOut: usage.outputTokens ?? null,
 })
 
-export const completeProgram = Effect.fn('complete')(function* (
+/**
+ * The one target a call to `lane` at this sensitivity goes to, with the
+ * sensitive-to-cloud refusal already applied — the policy half of
+ * `complete()`, before any cap, model or prompt. Exported for the extraction
+ * cache (`./extraction-cache.ts`, SPA-74), which must key on the routed model
+ * before deciding whether to call, and must refuse a sensitive read to the
+ * cloud even when the answer is already on disk.
+ */
+export const laneTargetProgram = Effect.fn('laneTarget')(function* (
   lane: AiLane,
-  items: ReadonlyArray<ContextItem>,
-  schema: JsonSchema | undefined,
-  opts: CompleteOptions,
-): Effect.fn.Return<CompleteResult, CompleteFailure> {
+  opts: Pick<CompleteOptions, 'sensitivity' | 'via' | 'route'>,
+): Effect.fn.Return<
+  AiTarget,
+  LaneNotRouted | RouteReadFailed | SensitiveRouteRefused
+> {
   const target = opts.route ?? (yield* aiRouteProgram(lane, opts.sensitivity))
   if (opts.sensitivity === 'sensitive' && !isLocalProvider(target.provider))
     return yield* new SensitiveRouteRefused({
@@ -195,6 +206,16 @@ export const completeProgram = Effect.fn('complete')(function* (
       provider: target.provider,
       ...(opts.via === undefined ? {} : { via: opts.via }),
     })
+  return target
+})
+
+export const completeProgram = Effect.fn('complete')(function* (
+  lane: AiLane,
+  items: ReadonlyArray<ContextItem>,
+  schema: JsonSchema | undefined,
+  opts: CompleteOptions,
+): Effect.fn.Return<CompleteResult, CompleteFailure> {
+  const target = yield* laneTargetProgram(lane, opts)
 
   // Before the model is built, let alone called. Per call, not mid-stream:
   // once this passes, the call runs to completion and is recorded below even

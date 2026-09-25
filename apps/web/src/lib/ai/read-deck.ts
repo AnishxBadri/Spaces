@@ -19,8 +19,9 @@ import type { ContextItem } from '#/lib/context/types'
 import { jsonValue } from '#/lib/json'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
-import { completeMessage, completeProgram } from './complete'
+import { completeMessage } from './complete'
 import type { CompleteFailure } from './complete'
+import { cachedExtractProgram } from './extraction-cache'
 import { proposeProgram, registryFor, suggestionMessage } from './propose'
 import type { Suggestion, SuggestionFailure } from './propose'
 import { providerFailure } from './providers/test-call'
@@ -43,7 +44,12 @@ import type {
  *      `doc:<id>#0`), then `recordContextProgram` on the record, which brings
  *      the space memos, the mandate and the glossary for free;
  *   2. `sensitivityFor(record)` — live, never cached — spread into the call;
- *   3. `completeProgram('extract', items, schemaFor(registry), …)`;
+ *   3. `cachedExtractProgram` (`./extraction-cache.ts`, SPA-74) — the
+ *      extraction cache keyed on (blob, compiled schema, routed model), which
+ *      answers a re-read or a second document over the same bytes from disk
+ *      and otherwise calls `completeProgram('extract', items,
+ *      schemaFor(registry), …)` and stores the answer; a hit says `cached` in
+ *      the rationale and writes no `ai_usage` row;
  *   4. per-field `validateProposal`: a field naming an option id absent from
  *      the live enum (or anything else the registry refuses) is dropped and
  *      counted in the rationale, never written and never failing the run;
@@ -66,6 +72,11 @@ import type {
  */
 
 export const READ_DECK_CONTEXT_CHARS = 12_000
+/**
+ * The extraction cache's purpose for this reader. Bump the version when the
+ * task prompt changes what a stored answer would mean.
+ */
+export const READ_DECK_PURPOSE = 'read-deck/v1'
 export const READ_DECK_BUDGET_CHARS = 24_000
 
 const KIND_LABEL: Record<string, string> = {
@@ -161,6 +172,8 @@ type Read = {
   people: Array<PersonClaim>
   /** Reference slugs held back: claims on a target that is not a person. */
   heldBack: Array<string>
+  /** Set when the extraction cache answered: who read it, and when. */
+  cached: { model: string; at: string } | null
 }
 
 /** Deck text as context items — the chunks, or the extracted text whole. */
@@ -215,7 +228,17 @@ function keepValid(
   const dropped: Array<string> = []
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw))
     return { proposal, dropped }
-  for (const [slug, entry] of Object.entries(raw)) {
+  // In registry order, not the answer's: an answer read back from the
+  // extraction cache's jsonb comes with its keys reordered, and the
+  // suggestion's refs (the union, in field order) must not depend on which.
+  const rank = (slug: string) => {
+    const i = registry.findIndex((d) => d.slug === slug)
+    return i < 0 ? registry.length : i
+  }
+  const entries = Object.entries(raw).sort(
+    ([a], [b]) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0),
+  )
+  for (const [slug, entry] of entries) {
     const checked = validateProposal(registry, { [slug]: entry })
     if (checked.ok) Object.assign(proposal, checked.proposal)
     else dropped.push(...checked.issues.map((i) => i.message))
@@ -240,6 +263,7 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
         kind: document.kind,
         status: document.extractionStatus,
         text: document.extractedText,
+        blobSha: document.blobSha,
         createdAt: document.createdAt,
         name: entity.canonicalName,
       })
@@ -301,6 +325,8 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
   const reads: Array<Read> = []
   // Sequential on purpose: each call is its own `ai_usage` row and its own
   // provider request, and nothing is written until every one has answered.
+  // Sequential also lets a second record over the same schema hit the cache
+  // row the first one's call just stored.
   for (const target of targets) {
     const registry = yield* query(() => registryFor(db, target.id))
     const context = yield* recordContextProgram({
@@ -320,8 +346,12 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
       })),
     ]
     const sensitivity = yield* sensitivityFor(target.id)
-    const answered = yield* completeProgram(
-      'extract',
+    const answered = yield* cachedExtractProgram(
+      {
+        blobSha: doc.blobSha,
+        documentId: input.documentId,
+        purpose: READ_DECK_PURPOSE,
+      },
       items,
       schemaFor(registry, `${KIND_LABEL[target.kind] ?? 'record'} fields`),
       {
@@ -350,7 +380,18 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
         for (const claim of list) people.push({ slug, claim, refs })
       else heldBack.push(slug)
     }
-    reads.push({ target, registry, proposal, dropped, people, heldBack })
+    reads.push({
+      target,
+      registry,
+      proposal,
+      dropped,
+      people,
+      heldBack,
+      cached:
+        answered.cachedAt === null
+          ? null
+          : { model: answered.target.model, at: answered.cachedAt },
+    })
   }
 
   const suggestions: Array<Suggestion> = []
@@ -409,12 +450,19 @@ function rationaleFor(
   const lines = [
     `Read from ${filename} against the ${kind} fields: ${String(fields)} field${fields === 1 ? '' : 's'} proposed.`,
   ]
+  if (read.cached !== null)
+    lines.push(
+      `Answered from the extraction cache (cached): ${read.cached.model} read these bytes against these fields at ${read.cached.at}, so no provider call was made and no usage was recorded.`,
+    )
   if (reads.length > 1) {
     const others = reads
       .filter((r) => r !== read)
       .map((r) => `${KIND_LABEL[r.target.kind] ?? 'record'} ${r.target.name}`)
+    const cachedReads = reads.filter((r) => r.cached !== null).length
     lines.push(
-      `${String(reads.length)} model calls were made — one per filed record, each against its own fields; the others read ${others.join(', ')}.`,
+      cachedReads === 0
+        ? `${String(reads.length)} model calls were made — one per filed record, each against its own fields; the others read ${others.join(', ')}.`
+        : `${String(reads.length)} reads were made — one per filed record, each against its own fields, ${String(reads.length - cachedReads)} by a model call and ${String(cachedReads)} from the extraction cache; the others read ${others.join(', ')}.`,
     )
   }
   if (read.dropped.length > 0)

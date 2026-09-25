@@ -1,6 +1,7 @@
 import { count, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { document } from '@spaces/db/schema'
+import { document, extractionCache } from '@spaces/db/schema'
+import { storage } from '#/lib/storage'
 
 /**
  * **Is any document row still on this digest?** — the one question both
@@ -33,4 +34,25 @@ export async function blobIsReferenced(sha: string): Promise<boolean> {
       .where(eq(document.blobSha, sha))
   ).at(0)
   return (row?.value ?? 0) > 0
+}
+
+/**
+ * **The last row went: drop the bytes and everything derived from them.**
+ * Both directions of blob GC end here once `blobIsReferenced` says no — the
+ * delete path (`deleteDocumentWithBlobGc`) and the orphan sweep — so what
+ * "goes with the blob" is listed once.
+ *
+ * Today that is the extraction cache (SPA-74, `extraction_cache`): answers
+ * keyed by the sha rather than by a document, so no entity delete reaches
+ * them, and a deleted deck must leave no answers behind. The derived rows go
+ * before the bytes: a store that throws leaves the bytes for the next run,
+ * and a cache emptied early costs nothing but a call.
+ *
+ * Returns whether it reclaimed — false when a row still names the digest.
+ */
+export async function reclaimBlobIfOrphaned(sha: string): Promise<boolean> {
+  if (await blobIsReferenced(sha)) return false
+  await db.delete(extractionCache).where(eq(extractionCache.blobSha, sha))
+  await storage().delete(sha)
+  return true
 }
