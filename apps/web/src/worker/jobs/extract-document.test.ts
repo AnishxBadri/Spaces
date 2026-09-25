@@ -52,7 +52,7 @@ function fakeHost(): { host: JobHost; calls: Array<Settlement> } {
 
 type Write =
   | { op: 'extracted'; documentId: string; text: string }
-  | { op: 'embed-enqueued'; documentId: string }
+  | { op: 'on-extracted'; documentId: string }
   | {
       op: 'failed'
       documentId: string
@@ -93,9 +93,9 @@ function fakeStore(options: {
         Effect.sync(() => {
           writes.push({ op: 'failed', documentId, status, reason })
         }),
-      enqueueEmbed: (documentId) =>
+      onExtracted: (documentId) =>
         Effect.sync(() => {
-          writes.push({ op: 'embed-enqueued', documentId })
+          writes.push({ op: 'on-extracted', documentId })
         }),
     }),
   )
@@ -174,21 +174,22 @@ afterEach(() => {
 })
 
 describe('extractDocument — the happy path still completes', () => {
-  it('writes the extracted text, hands it to document.embed, and completes the job', async () => {
+  it('writes the extracted text, hands it to onDocumentExtracted, and completes the job', async () => {
     const store = fakeStore({
       row: { blobSha: sha, filename: 'terms.txt', mime: 'text/plain' },
       bytes,
     })
     const { calls, writes } = await run(store)
 
-    // SPA-121: the embed job is enqueued only once the text is stored.
+    // SPA-121, SPA-62: the follow-on lanes (document.embed first among
+    // them) are handed the document only once the text is stored.
     expect(writes).toEqual([
       {
         op: 'extracted',
         documentId,
         text: 'Series A term sheet. 20% discount.',
       },
-      { op: 'embed-enqueued', documentId },
+      { op: 'on-extracted', documentId },
     ])
     expect(calls.map((c) => c.call)).toEqual(['complete'])
   })

@@ -1,13 +1,14 @@
 import { Effect, Schema } from 'effect'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { entity, link, suggestion } from '@spaces/db/schema'
+import { activity, document, entity, link, suggestion } from '@spaces/db/schema'
 import type { suggestionKind } from '@spaces/db/schema'
 import { jsonRecord } from '#/lib/json'
 import type { Json } from '#/lib/json'
 import { proposalRefs, toPatch, validateProposal } from '@spaces/core/ai/schema'
 import type { ProposalIssue } from '@spaces/core/ai/schema'
 import { identityPayloadSchema } from '@spaces/core/ai/identity'
+import { documentKindPayloadSchema } from '@spaces/core/ai/document-kind'
 import { toObjectKind } from '@spaces/core/attributes/registry'
 import type { AttributeDef } from '@spaces/core/attributes/registry'
 import { objectIdForKindAsync } from '#/lib/attributes/objects'
@@ -208,6 +209,8 @@ export const proposeProgram = Effect.fn('proposeProgram')(function* (
       // An identity is held to its shape now for the same reason: the card
       // draws it field by field, and the accept path resolves from it.
       if (input.kind === 'identity') identityOf(input.payload)
+      // A document kind likewise (SPA-62): never `other`, never off-enum.
+      if (input.kind === 'document_kind') documentKindOf(input.payload)
       const row = (
         await db
           .insert(suggestion)
@@ -278,6 +281,13 @@ export type Accepted =
        * already holds somebody else.
        */
       filed: string | null
+    }
+  | {
+      kind: 'document_kind'
+      suggestion: Suggestion
+      /** The kind the document had, and the kind it has now. */
+      from: string
+      to: string
     }
 
 /** An identity payload, decoded — or the validator's refusal, by field. */
@@ -455,6 +465,61 @@ async function fileIntoReference(
   return slug
 }
 
+/** A document-kind payload, decoded — or the validator's refusal. */
+function documentKindOf(payload: Json) {
+  const parsed = documentKindPayloadSchema.safeParse(payload)
+  if (parsed.success) return parsed.data
+  throw invalid(
+    parsed.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'document_kind'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
+}
+
+/**
+ * Accept a classification (SPA-62, spec §11's first row): the document's
+ * `kind` is set to the proposed one and one `document.reclassified`
+ * activity row is written on the document's own stream, attributed to the
+ * accepter, `from` and `to` in its meta — as `setDocumentKindProgram`'s
+ * `document.kind_changed` does for a hand edit, with the suggestion's id as
+ * the receipt. The document row is locked first, so the `from` is the kind
+ * this write replaced.
+ *
+ * Nothing is enqueued. Accepting `deck` is what makes Read deck appear on
+ * the Files tab; a person presses it (spec §4, manual and pull-based).
+ */
+async function acceptDocumentKindInTx(
+  tx: Tx,
+  row: Suggestion,
+  actor: Decider,
+): Promise<{ from: string; to: string }> {
+  const { kind } = documentKindOf(row.payload)
+  const held = (
+    await tx
+      .select({ kind: document.kind })
+      .from(document)
+      .where(eq(document.entityId, row.entityId))
+      .for('update')
+  ).at(0)
+  if (!held)
+    throw new EntityNotFound({
+      entityId: row.entityId,
+      message: 'Document not found',
+    })
+  await tx
+    .update(document)
+    .set({ kind })
+    .where(eq(document.entityId, row.entityId))
+  await tx.insert(activity).values({
+    actorId: actor.id,
+    verb: 'document.reclassified',
+    subjectEntityId: row.entityId,
+    meta: { from: held.kind, to: kind, suggestionId: row.id },
+  })
+  return { from: held.kind, to: kind }
+}
+
 /**
  * Lock one row for its accept and refuse it unless it is still `open`. The
  * `for update` is what serializes two accepts on one row: the second waits
@@ -542,6 +607,24 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
             resolved,
             linked,
             filed,
+          } satisfies Accepted
+        }
+        if (row.kind === 'document_kind') {
+          if (fields !== undefined)
+            throw invalid([
+              {
+                slug: 'fields',
+                message:
+                  'fields: a document kind is accepted whole, not by field',
+              },
+            ])
+          const { from, to } = await acceptDocumentKindInTx(tx, row, actor)
+          const decided = await close(tx, id, 'accepted', actor)
+          return {
+            kind: 'document_kind',
+            suggestion: decided,
+            from,
+            to,
           } satisfies Accepted
         }
         if (row.kind !== 'attribute_patch')

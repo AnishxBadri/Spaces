@@ -50,6 +50,14 @@ export const QUEUES = {
    * one is queued or active is refused by pg-boss rather than by a table.
    */
   readDeck: 'document.read-deck',
+  /**
+   * Kind classify (SPA-62): a document still at `other` once its text is
+   * extracted → one `document_kind` suggestion. Enqueued by
+   * `onDocumentExtracted` and nothing else, only when the classify lane is
+   * routed. Created `exclusive` and sent with `singletonKey = documentId`,
+   * so a re-extraction while one is queued adds nothing.
+   */
+  classifyDocument: 'document.classify',
   /** Nightly pg_trgm sweep → duplicate_candidate rows. */
   dedupeSweep: 'entity.dedupe-sweep',
   /** On-demand enrichment, credit-capped in the worker. */

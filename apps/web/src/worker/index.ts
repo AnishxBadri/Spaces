@@ -13,6 +13,7 @@ import { readDeck } from './jobs/read-deck'
 import { embedDocument } from './jobs/embed-document'
 import { embedSource } from './jobs/embed-source'
 import { embedBackfill, embedBackfillRetry } from './jobs/embed-backfill'
+import { classifyDocument } from './jobs/classify-document'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -90,6 +91,26 @@ async function main() {
     QUEUES.embedBackfill,
     { batchSize: 1, includeMetadata: true },
     runJob(embedBackfill, { host, layer: Layer.empty }),
+  )
+  // Kind classify (SPA-62): enqueued only by `onDocumentExtracted`, with
+  // `singletonKey = documentId` — `exclusive`, so a re-extraction while one
+  // is queued or active adds nothing. Created before the plain create loop
+  // below for the deck reader's reason; a queue's policy is fixed at create.
+  // A model call per document, so a batch of one; never retried
+  // (`classifyDocument.retry`). No Layer — its I/O is `db` and `complete()`.
+  await boss
+    .createQueue(QUEUES.classifyDocument, { policy: 'exclusive' })
+    .catch(() => {})
+  if (classifyDocument.retry)
+    await boss.updateQueue(QUEUES.classifyDocument, {
+      retryLimit: classifyDocument.retry.limit,
+      retryDelay: classifyDocument.retry.delaySeconds,
+      retryBackoff: classifyDocument.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.classifyDocument,
+    { batchSize: 1, includeMetadata: true },
+    runJob(classifyDocument, { host, layer: Layer.empty }),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots

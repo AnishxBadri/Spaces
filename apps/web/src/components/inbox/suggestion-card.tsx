@@ -9,6 +9,9 @@ import { Button } from '#/components/ui/button'
 import { checkboxClasses } from '#/components/ui/checkbox'
 import { readIdentityPayload } from '@spaces/core/ai/identity'
 import type { IdentityPayload } from '@spaces/core/ai/identity'
+import { readDocumentKindPayload } from '@spaces/core/ai/document-kind'
+import type { DocumentKindPayload } from '@spaces/core/ai/document-kind'
+import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
 import { formatDate, formatNumber } from '@spaces/core/format'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import {
@@ -87,6 +90,14 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
       <PayloadBody item={item} actions={actions} />
     )
   },
+  document_kind: ({ item, actions }) => {
+    const proposed = readDocumentKindPayload(item.payload)
+    return proposed ? (
+      <DocumentKindBody proposed={proposed} />
+    ) : (
+      <PayloadBody item={item} actions={actions} />
+    )
+  },
 }
 
 export function suggestionBodyFor(kind: SuggestionKind): SuggestionBody {
@@ -141,6 +152,32 @@ function IdentityBody({ claim }: { claim: IdentityPayload }) {
           </dd>
         </div>
       ))}
+    </dl>
+  )
+}
+
+/**
+ * A classification (SPA-62): the kind the document looks like, in the
+ * patch body's label/value rows. Accepting sets the document's kind and
+ * nothing else — a deck's Read deck button appears; nobody presses it here.
+ */
+function DocumentKindBody({ proposed }: { proposed: DocumentKindPayload }) {
+  return (
+    <dl className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <dt className="truncate field-label text-graphite">Looks like</dt>
+        <dd className="min-w-0 truncate text-ui">
+          {DOCUMENT_KIND_LABELS[proposed.kind]}
+        </dd>
+      </div>
+      {proposed.confidence === undefined ? null : (
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <dt className="truncate field-label text-graphite">Confidence</dt>
+          <dd className="tabular min-w-0 truncate mono text-label">
+            {Math.round(proposed.confidence * 100)}%
+          </dd>
+        </div>
+      )}
     </dl>
   )
 }

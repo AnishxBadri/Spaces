@@ -4,7 +4,7 @@ import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
-import { enqueue } from '#/lib/queue'
+import { onDocumentExtracted } from '#/lib/documents/on-extracted'
 import { storage } from '#/lib/storage'
 import { linkTermMentionsInTx } from '#/lib/glossary/link-terms'
 import { extractDocumentText } from '@spaces/core/documents/extract'
@@ -93,11 +93,12 @@ export class ExtractionStore extends Context.Service<
       reason: string,
     ) => Effect.Effect<void, StoreUnavailable>
     /**
-     * Hand the stored text on to `document.embed` (SPA-121). `enqueue`
-     * answers `null` rather than throwing when the queue is unreachable, so
-     * this cannot fail the extraction whose text is already committed.
+     * `document.extracted` (SPA-62): hand the stored text on to whichever
+     * follow-on lanes are routed — `document.embed` always (SPA-121),
+     * `document.classify` for a document still at `other`. It never fails,
+     * so it cannot fail the extraction whose text is already committed.
      */
-    readonly enqueueEmbed: (documentId: string) => Effect.Effect<void>
+    readonly onExtracted: (documentId: string) => Effect.Effect<void>
   }
 >()('spaces/worker/ExtractionStore') {
   static readonly layer = Layer.succeed(
@@ -180,10 +181,9 @@ export class ExtractionStore extends Context.Service<
               message: messageOf(err),
             }),
         }),
-      enqueueEmbed: (documentId) =>
-        Effect.promise(() =>
-          enqueue(QUEUES.embedDocument, { documentId }),
-        ).pipe(Effect.asVoid),
+      // The one call site of `onDocumentExtracted`; a lane that runs after
+      // extraction registers there, not here.
+      onExtracted: (documentId) => onDocumentExtracted(documentId),
     }),
   )
 }
@@ -246,9 +246,9 @@ const program = Effect.fn('extractDocument')(function* (
   }
 
   yield* store.markExtracted(documentId, outcome.text)
-  // Chunking runs with or without an embedding pin, so every stored text is
-  // handed on — the lexical chunk lane needs the rows even on a keyless box.
-  yield* store.enqueueEmbed(documentId)
+  // The success path's one hand-off: every follow-on lane is enqueued by
+  // `onDocumentExtracted`, never from this job.
+  yield* store.onExtracted(documentId)
 
   console.log(
     `[worker] extracted ${outcome.text.length} chars from ${row.filename ?? documentId} (${outcome.format})`,
