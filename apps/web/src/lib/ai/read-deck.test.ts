@@ -392,8 +392,9 @@ describe('readDeck', () => {
           name: 'Ada Founder',
           role: 'CEO',
           email: `ada-${tag}@deckco.example`,
+          attribute: 'people',
         },
-        { name: 'Bo Cofounder', role: 'CTO' },
+        { name: 'Bo Cofounder', role: 'CTO', attribute: 'people' },
       ]),
     )
     for (const row of identities) {
@@ -401,6 +402,70 @@ describe('readDeck', () => {
       expect(row.refs).toEqual([`doc:${documentId}#0`])
       expect(row.proposedById).toBe(USER)
       expect(row.rationale).toMatch(/Named in deck-/)
+    }
+    // Proposing resolved nobody.
+    expect(
+      (await db.select({ value: count() }).from(entity)).at(0)?.value,
+    ).toBe(entitiesBefore)
+  })
+
+  it('turns the founders a deck names into identity suggestions on a company filed alone', async () => {
+    // SPA-160: `founders` is a person reference on the company registry, so
+    // a deck filed on a bare company — no deal — proposes its founders too,
+    // each naming the field accepting will write them into.
+    await routeExtract()
+    const { companyId, documentId, tag } = await deckOnCompany()
+    const model = mockModel(() => ({
+      ...COMPANY_ANSWER(documentId),
+      founders: {
+        value: [
+          {
+            name: 'Ada Founder',
+            role: 'CEO',
+            email: `ada-${tag}@deckco.example`,
+          },
+          { name: 'Bo Cofounder', role: 'CTO' },
+        ],
+        refs: [`doc:${documentId}#0`],
+        confidence: 0.9,
+      },
+    }))
+    const entitiesBefore = (
+      await db.select({ value: count() }).from(entity)
+    ).at(0)?.value
+
+    const result = await Effect.runPromise(
+      readDeckProgram({ documentId, userId: USER, model }),
+    )
+    expect(model.doGenerateCalls).toHaveLength(1)
+    // The schema the model was handed asks for founders.
+    expect(JSON.stringify(model.doGenerateCalls[0].responseFormat)).toContain(
+      'founders',
+    )
+    expect(result.suggestions).toHaveLength(3)
+
+    const onCompany = await suggestionsOn(companyId)
+    const patch = onCompany.filter((r) => r.kind === 'attribute_patch')
+    const identities = onCompany.filter((r) => r.kind === 'identity')
+    expect(patch).toHaveLength(1)
+    expect(Object.keys(jsonRecord(patch[0].payload))).not.toContain('founders')
+    expect(patch[0].rationale).toMatch(/2 people named in the deck/)
+    expect(identities.map((r) => r.payload)).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'Ada Founder',
+          role: 'CEO',
+          email: `ada-${tag}@deckco.example`,
+          attribute: 'founders',
+        },
+        { name: 'Bo Cofounder', role: 'CTO', attribute: 'founders' },
+      ]),
+    )
+    expect(identities).toHaveLength(2)
+    for (const row of identities) {
+      expect(row.status).toBe('open')
+      expect(row.refs).toEqual([`doc:${documentId}#0`])
+      expect(row.rationale).toMatch(/company field Founders/)
     }
     // Proposing resolved nobody.
     expect(

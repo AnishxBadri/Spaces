@@ -12,6 +12,18 @@ describe('the identity payload', () => {
     ).toEqual({ name: 'Ada', linkedin: 'linkedin.com/in/ada' })
   })
 
+  it('carries the field the claim was read off (SPA-160)', () => {
+    expect(identityPayloadOf({ name: 'Ada' }, 'founders')).toEqual({
+      name: 'Ada',
+      attribute: 'founders',
+    })
+    expect(readIdentityPayload({ name: 'Ada', attribute: 'people' })).toEqual({
+      name: 'Ada',
+      attribute: 'people',
+    })
+    expect(readIdentityPayload({ name: 'Ada', attribute: '' })).toBeNull()
+  })
+
   it('refuses anything that is not an identity', () => {
     expect(readIdentityPayload({ name: '' })).toBeNull()
     expect(readIdentityPayload({ name: 'Ada', domain: 'x.com' })).toBeNull()

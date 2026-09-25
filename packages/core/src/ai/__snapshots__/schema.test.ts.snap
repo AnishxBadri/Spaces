@@ -101,6 +101,63 @@ exports[`schemaFor > compiles the company registry — the deck reader's output 
       "title": "Founded",
       "type": "object",
     },
+    "founders": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "format": "email",
+                "maxLength": 255,
+                "type": "string",
+              },
+              "linkedin": {
+                "format": "uri",
+                "maxLength": 500,
+                "type": "string",
+              },
+              "name": {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string",
+              },
+              "role": {
+                "description": "Their role or title, as the context states it",
+                "maxLength": 200,
+                "type": "string",
+              },
+            },
+            "required": [
+              "name",
+            ],
+            "type": "object",
+          },
+          "maxItems": 100,
+          "type": "array",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "Founders",
+      "type": "object",
+    },
     "funding_stage": {
       "additionalProperties": false,
       "properties": {

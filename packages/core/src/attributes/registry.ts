@@ -301,6 +301,23 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
     { slug: 'location', name: 'Location', type: 'text' },
     { slug: 'founded_year', name: 'Founded', type: 'number' },
     { slug: 'linkedin', name: 'LinkedIn', type: 'url' },
+    {
+      // The people who started it (SPA-160). A company deck names its
+      // founders, and without a person reference on the company registry
+      // the deck reader had nowhere to put them: only a deal's `people` /
+      // `referred_by` turned into identity suggestions, so a deck filed on
+      // a bare company proposed none. Accepting such an identity writes the
+      // person here and links them `contact_at` the company.
+      //
+      // Appended, never slotted: `seedSystemAttributes` derives sortOrder
+      // from the array index and only inserts what is missing (see
+      // `referred_by` below). Not filterable by default, like every seeded
+      // attribute but `deal.stage`.
+      slug: 'founders',
+      name: 'Founders',
+      type: 'record_reference',
+      options: { targetKind: 'person', multi: true },
+    },
   ],
   person: [
     { slug: 'job_title', name: 'Job title', type: 'text' },

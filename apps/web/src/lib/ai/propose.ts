@@ -44,7 +44,9 @@ import { canonicalId } from '#/lib/entities/sweep'
  *
  * Two kinds accept today: `attribute_patch` (a value, through the one write
  * path) and `identity` (SPA-105: a person, through `resolveEntity`, plus a
- * `contact_at` link to the record). Every other kind is refused by name.
+ * `contact_at` link to the record and — SPA-160 — the person written into
+ * the reference field the claim came from). Every other kind is refused by
+ * name.
  */
 
 export type SuggestionKind = (typeof suggestionKind.enumValues)[number]
@@ -268,6 +270,14 @@ export type Accepted =
       resolved: ResolveResult
       /** False when the person was already `contact_at` the record. */
       linked: boolean
+      /**
+       * The person-reference attribute that holds the person after this
+       * accept (SPA-160) — written now or already held. Null when the
+       * payload names no field (a row proposed before SPA-160), when the
+       * field no longer takes a person, or when it is single-valued and
+       * already holds somebody else.
+       */
+      filed: string | null
     }
 
 /** An identity payload, decoded — or the validator's refusal, by field. */
@@ -300,12 +310,21 @@ function identityOf(payload: Json) {
  * reads `accepted`. If the link or the flip then fails, the person stays and
  * the suggestion stays open; a retry attaches by key or files the pair —
  * the one door's own doctrine, not a second person silently welded.
+ *
+ * Then the person is written into the field the claim was read off
+ * (SPA-160; `fileIntoReference` below) — `founders` on a company, `people`
+ * or `referred_by` on a deal — through the one write path, in this
+ * transaction, so the link, the value and the flip commit together.
  */
 async function acceptIdentityInTx(
   tx: Tx,
   row: Suggestion,
   actor: Decider,
-): Promise<{ resolved: ResolveResult; linked: boolean }> {
+): Promise<{
+  resolved: ResolveResult
+  linked: boolean
+  filed: string | null
+}> {
   const claim = identityOf(row.payload)
   const recordId = await canonicalId(row.entityId, tx)
   const record = (
@@ -355,7 +374,85 @@ async function acceptIdentityInTx(
     })
     .onConflictDoNothing()
     .returning({ id: link.id })
-  return { resolved, linked: inserted.length > 0 }
+  // A row proposed before SPA-160 names no field: it accepts as the link
+  // alone, which is all an identity used to write.
+  const filed =
+    claim.attribute === undefined
+      ? null
+      : await fileIntoReference(tx, {
+          row,
+          recordId,
+          slug: claim.attribute,
+          personId: resolved.entityId,
+          actor,
+        })
+  return { resolved, linked: inserted.length > 0, filed }
+}
+
+/**
+ * Add the accepted person to a person-reference attribute on the record,
+ * through `setValuesInTx` — validated, logged as an `attribute_event` with
+ * the suggestion as its receipt, and linked `references` like any other
+ * reference write. Returns the slug when the record holds the person there
+ * afterwards, else null.
+ *
+ * - **multi** (`founders`, `people`): appended. A person already held is not
+ *   added twice — two suggestions naming one person, accepted one after the
+ *   other, leave one entry — and every other entry stays as it was.
+ * - **single** (`referred_by`): set only when empty. A slot already holding
+ *   somebody else is the operator's to change; an accept never overwrites it.
+ * - A field retired, retyped or no longer aimed at people since the proposal
+ *   is skipped rather than refused: the person and the link still stand.
+ *
+ * The record's row is locked before its value is read, so two identities
+ * accepted concurrently on one record append in turn rather than each
+ * writing its own one-person list over the other's.
+ */
+async function fileIntoReference(
+  tx: Tx,
+  input: {
+    row: Suggestion
+    recordId: string
+    slug: string
+    personId: string
+    actor: Decider
+  },
+): Promise<string | null> {
+  const { row, recordId, slug, personId, actor } = input
+  const def = (await registryFor(tx, recordId)).find((d) => d.slug === slug)
+  if (
+    def === undefined ||
+    def.type !== 'record_reference' ||
+    def.options.targetKind !== 'person'
+  )
+    return null
+  const held = (
+    await tx
+      .select({ values: entity.values })
+      .from(entity)
+      .where(eq(entity.id, recordId))
+      .for('update')
+  ).at(0)?.values[slug]
+
+  let next: string | Array<string>
+  if (def.options.multi) {
+    const ids = Array.isArray(held) ? held.map(String) : []
+    if (ids.includes(personId)) return slug
+    next = [...ids, personId]
+  } else {
+    if (held === personId) return slug
+    if (held !== undefined && held !== null) return null
+    next = personId
+  }
+  await setValuesInTx(tx, {
+    entityId: recordId,
+    patch: { [slug]: next },
+    actor,
+    source: 'suggestion',
+    suggestionId: row.id,
+    refs: row.refs,
+  })
+  return slug
 }
 
 /**
@@ -433,13 +530,18 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
                 message: 'fields: an identity is accepted whole, not by field',
               },
             ])
-          const { resolved, linked } = await acceptIdentityInTx(tx, row, actor)
+          const { resolved, linked, filed } = await acceptIdentityInTx(
+            tx,
+            row,
+            actor,
+          )
           const decided = await close(tx, id, 'accepted', actor)
           return {
             kind: 'identity',
             suggestion: decided,
             resolved,
             linked,
+            filed,
           } satisfies Accepted
         }
         if (row.kind !== 'attribute_patch')

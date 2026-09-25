@@ -48,9 +48,11 @@ import type {
  *      the live enum (or anything else the registry refuses) is dropped and
  *      counted in the rationale, never written and never failing the run;
  *   5. `toPatch` — a claim on a person-targeted `record_reference` (a
- *      deal's `people`, `referred_by`) becomes one `suggestion(kind:
- *      'identity')` per person on the same record, citing that field's refs
- *      (SPA-105); accepting one is `resolveEntity` plus a `contact_at` link.
+ *      company's `founders`, a deal's `people`, `referred_by`) becomes one
+ *      `suggestion(kind: 'identity')` per person on the same record, citing
+ *      that field's refs and naming the field (SPA-105, SPA-160); accepting
+ *      one is `resolveEntity`, a `contact_at` link, and the person written
+ *      into that field.
  *      A claim on any other target (a deal's `company`) is held back with a
  *      rationale line — no accept path resolves it yet.
  *
@@ -386,7 +388,7 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
         yield* proposeProgram({
           entityId: read.target.id,
           kind: 'identity',
-          payload: identityPayloadOf(person.claim),
+          payload: identityPayloadOf(person.claim, person.slug),
           rationale: identityRationale(person, read, filename),
           refs: person.refs,
           proposedBy: { type: 'user', id: input.userId },
@@ -451,8 +453,8 @@ function identityRationale(
   return [
     `Named in ${filename}${as}, read against the ${kind} field ${def?.name ?? person.slug}.`,
     keys.length > 0
-      ? `Accepting matches an existing person by ${keys.join(' or ')}, else creates one and links them contact at ${read.target.name}.`
-      : `No email or LinkedIn given: accepting creates a person and links them contact at ${read.target.name}; a near-identical name already held is filed as a duplicate candidate.`,
+      ? `Accepting matches an existing person by ${keys.join(' or ')}, else creates one, links them contact at ${read.target.name} and sets them in ${def?.name ?? person.slug}.`
+      : `No email or LinkedIn given: accepting creates a person, links them contact at ${read.target.name} and sets them in ${def?.name ?? person.slug}; a near-identical name already held is filed as a duplicate candidate.`,
   ].join('\n')
 }
 

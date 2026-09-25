@@ -4,6 +4,7 @@ import { and, count, eq, or } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import {
+  attributeEvent,
   duplicateCandidate,
   entity,
   entityAlias,
@@ -281,6 +282,217 @@ describe('accepting an identity', () => {
       ),
     )
     expect(refused).toBeInstanceOf(SuggestionInvalid)
+  })
+})
+
+/** The record's value at `slug`, read back as the one write path left it. */
+async function valueOf(entityId: string, slug: string): Promise<unknown> {
+  const row = (
+    await db
+      .select({ values: entity.values })
+      .from(entity)
+      .where(eq(entity.id, entityId))
+  ).at(0)
+  return row?.values[slug]
+}
+
+async function eventsOn(entityId: string, slug: string) {
+  return db
+    .select()
+    .from(attributeEvent)
+    .where(
+      and(
+        eq(attributeEvent.entityId, entityId),
+        eq(attributeEvent.attrSlug, slug),
+      ),
+    )
+}
+
+/**
+ * SPA-160 — the field the claim was read off. Accepting writes the resolved
+ * person into it, through the one write path, beside the `contact_at` link.
+ */
+describe('accepting an identity into its field', () => {
+  it('sets a company founder into `founders` and writes the contact_at link', async () => {
+    const { companyId, tag } = await company()
+    const proposed = await proposeIdentity(companyId, {
+      name: `Ada Founder ${tag}`,
+      role: 'CEO',
+      email: `ada-${tag}@foundry.example`,
+      attribute: 'founders',
+    })
+    const accepted = await Effect.runPromise(
+      acceptProgram(proposed.id, ACCEPTER),
+    )
+    if (accepted.kind !== 'identity') throw new Error('not an identity')
+    const personId = accepted.resolved.entityId
+    expect(accepted.filed).toBe('founders')
+    expect(accepted.linked).toBe(true)
+
+    expect(await valueOf(companyId, 'founders')).toEqual([personId])
+    expect(await contactLinks(personId, companyId)).toHaveLength(1)
+
+    // Through the one write path: an event with the suggestion as receipt,
+    // and the reference materialized as a `references` link.
+    const events = await eventsOn(companyId, 'founders')
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      source: 'suggestion',
+      suggestionId: proposed.id,
+      refs: ['doc:deck#0'],
+      actorId: FIXTURE_ACTOR.id,
+      to: [personId],
+    })
+    const refs = await db
+      .select()
+      .from(link)
+      .where(
+        and(
+          eq(link.fromEntityId, companyId),
+          eq(link.toEntityId, personId),
+          eq(link.relation, 'references'),
+          eq(link.attrSlug, 'founders'),
+        ),
+      )
+    expect(refs).toHaveLength(1)
+  })
+
+  it('appends a second founder, leaving the first in place', async () => {
+    const { companyId, tag } = await company()
+    const first = await proposeIdentity(companyId, {
+      name: `First ${tag}`,
+      email: `first-${tag}@foundry.example`,
+      attribute: 'founders',
+    })
+    const second = await proposeIdentity(companyId, {
+      name: `Second ${tag}`,
+      email: `second-${tag}@foundry.example`,
+      attribute: 'founders',
+    })
+    const a = await Effect.runPromise(acceptProgram(first.id, ACCEPTER))
+    const b = await Effect.runPromise(acceptProgram(second.id, ACCEPTER))
+    if (a.kind !== 'identity' || b.kind !== 'identity')
+      throw new Error('not an identity')
+    expect(await valueOf(companyId, 'founders')).toEqual([
+      a.resolved.entityId,
+      b.resolved.entityId,
+    ])
+  })
+
+  it('holds one entry when two suggestions name one person', async () => {
+    const { companyId, tag } = await company()
+    const email = `once-${tag}@foundry.example`
+    const first = await proposeIdentity(companyId, {
+      name: 'Once Founder',
+      email,
+      attribute: 'founders',
+    })
+    const second = await proposeIdentity(companyId, {
+      name: 'O. Founder',
+      email,
+      attribute: 'founders',
+    })
+    const a = await Effect.runPromise(acceptProgram(first.id, ACCEPTER))
+    const b = await Effect.runPromise(acceptProgram(second.id, ACCEPTER))
+    if (a.kind !== 'identity' || b.kind !== 'identity')
+      throw new Error('not an identity')
+    expect(b.resolved.entityId).toBe(a.resolved.entityId)
+    expect(b.filed).toBe('founders')
+    expect(await valueOf(companyId, 'founders')).toEqual([a.resolved.entityId])
+    // The second accept wrote nothing: no second event, one link.
+    expect(await eventsOn(companyId, 'founders')).toHaveLength(1)
+    expect(await contactLinks(a.resolved.entityId, companyId)).toHaveLength(1)
+  })
+
+  it('writes a deal-sourced claim into the deal’s `people`', async () => {
+    const tag = randomUUID().slice(0, 8)
+    const deal = (
+      await db
+        .insert(entity)
+        .values({ kind: 'deal', canonicalName: `Foundry seed ${tag}` })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!deal) throw new Error('no deal')
+    const proposed = await proposeIdentity(deal.id, {
+      name: `Deal Person ${tag}`,
+      role: 'CTO',
+      attribute: 'people',
+    })
+    const accepted = await Effect.runPromise(
+      acceptProgram(proposed.id, ACCEPTER),
+    )
+    if (accepted.kind !== 'identity') throw new Error('not an identity')
+    expect(accepted.filed).toBe('people')
+    expect(await valueOf(deal.id, 'people')).toEqual([
+      accepted.resolved.entityId,
+    ])
+    expect(
+      await contactLinks(accepted.resolved.entityId, deal.id),
+    ).toHaveLength(1)
+  })
+
+  it('fills an empty single-valued `referred_by`, and never overwrites a held one', async () => {
+    const tag = randomUUID().slice(0, 8)
+    const deal = (
+      await db
+        .insert(entity)
+        .values({ kind: 'deal', canonicalName: `Referral ${tag}` })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!deal) throw new Error('no deal')
+    const first = await proposeIdentity(deal.id, {
+      name: `Referrer ${tag}`,
+      email: `ref-${tag}@example.org`,
+      attribute: 'referred_by',
+    })
+    const other = await proposeIdentity(deal.id, {
+      name: `Other ${tag}`,
+      email: `other-${tag}@example.org`,
+      attribute: 'referred_by',
+    })
+    const a = await Effect.runPromise(acceptProgram(first.id, ACCEPTER))
+    const b = await Effect.runPromise(acceptProgram(other.id, ACCEPTER))
+    if (a.kind !== 'identity' || b.kind !== 'identity')
+      throw new Error('not an identity')
+    expect(a.filed).toBe('referred_by')
+    expect(b.filed).toBeNull()
+    expect(await valueOf(deal.id, 'referred_by')).toBe(a.resolved.entityId)
+    // The second person is still a contact: only the slot stays as it was.
+    expect(await contactLinks(b.resolved.entityId, deal.id)).toHaveLength(1)
+  })
+
+  it('writes only the link for a row that names no field (proposed before SPA-160)', async () => {
+    const { companyId, tag } = await company()
+    const proposed = await proposeIdentity(companyId, {
+      name: `Legacy ${tag}`,
+      email: `legacy-${tag}@foundry.example`,
+    })
+    const accepted = await Effect.runPromise(
+      acceptProgram(proposed.id, ACCEPTER),
+    )
+    if (accepted.kind !== 'identity') throw new Error('not an identity')
+    expect(accepted.filed).toBeNull()
+    expect(await valueOf(companyId, 'founders')).toBeUndefined()
+    expect(
+      await contactLinks(accepted.resolved.entityId, companyId),
+    ).toHaveLength(1)
+  })
+
+  it('skips a field that does not take a person, keeping the link', async () => {
+    const { companyId, tag } = await company()
+    const proposed = await proposeIdentity(companyId, {
+      name: `Misfiled ${tag}`,
+      attribute: 'location',
+    })
+    const accepted = await Effect.runPromise(
+      acceptProgram(proposed.id, ACCEPTER),
+    )
+    if (accepted.kind !== 'identity') throw new Error('not an identity')
+    expect(accepted.filed).toBeNull()
+    expect(await valueOf(companyId, 'location')).toBeUndefined()
+    expect(
+      await contactLinks(accepted.resolved.entityId, companyId),
+    ).toHaveLength(1)
   })
 })
 
