@@ -9,6 +9,7 @@ import { proposalRefs, toPatch, validateProposal } from '@spaces/core/ai/schema'
 import type { ProposalIssue } from '@spaces/core/ai/schema'
 import { identityPayloadSchema } from '@spaces/core/ai/identity'
 import { documentKindPayloadSchema } from '@spaces/core/ai/document-kind'
+import { spaceTagPayloadSchema } from '@spaces/core/ai/space-tag'
 import { toObjectKind } from '@spaces/core/attributes/registry'
 import type { AttributeDef } from '@spaces/core/attributes/registry'
 import { objectIdForKindAsync } from '#/lib/attributes/objects'
@@ -24,6 +25,7 @@ import type { ResolveResult } from '#/lib/entities/resolve'
 import { canonicalId } from '#/lib/entities/sweep'
 import { notePayloadSchema } from '@spaces/core/ai/note'
 import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
+import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'
 
 /**
  * The AI layer's one mutating verb (docs/spec-ai-substrate.md §3, §10).
@@ -111,6 +113,7 @@ const KIND_LABEL: Record<SuggestionKind, string> = {
   ledger_event: 'ledger event',
   identity: 'identity',
   document_kind: 'document type',
+  space_tag: 'space tag',
 }
 
 const isKind = (k: string): k is SuggestionKind => k in KIND_LABEL
@@ -216,6 +219,8 @@ export const proposeProgram = Effect.fn('proposeProgram')(function* (
       // A note (SPA-66) likewise: the card draws its title and body, and
       // the accept path renders the body into the note it writes.
       if (input.kind === 'note') noteOf(input.payload)
+      // A space tag likewise (SPA-103): a space id and the path it was read as.
+      if (input.kind === 'space_tag') spaceTagOf(input.payload)
       const row = (
         await db
           .insert(suggestion)
@@ -299,6 +304,13 @@ export type Accepted =
       suggestion: Suggestion
       /** The note the accept wrote (SPA-66). */
       noteId: string
+    }
+  | {
+      kind: 'space_tag'
+      suggestion: Suggestion
+      spaceId: string
+      /** False when the record was already in the space: its row stands. */
+      tagged: boolean
     }
 
 /** An identity payload, decoded — or the validator's refusal, by field. */
@@ -587,6 +599,62 @@ async function acceptNoteInTx(
   })
 }
 
+// ---------- space tag (SPA-103) ----------
+
+/** A space-tag payload, decoded — or the validator's refusal. */
+function spaceTagOf(payload: Json) {
+  const parsed = spaceTagPayloadSchema.safeParse(payload)
+  if (parsed.success) return parsed.data
+  throw invalid(
+    parsed.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'space_tag'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
+}
+
+/**
+ * Accept a space tag (SPA-103): the record is tagged into the proposed
+ * space through `insertSpaceTag` — the one `entity_space` insert, the one
+ * `tagIntoSpace` uses — with `source: 'ai'`, the model's confidence and the
+ * **accepter** as `created_by`. A model proposes; a person tags.
+ *
+ * A record merged since the proposal is tagged on its survivor, as an
+ * identity accept links its survivor. A space merged or gone since is
+ * refused, and the row stays open. A record already in the space (tagged by
+ * hand between the proposal and now) keeps the row it has; the suggestion
+ * still closes accepted, and no second `space.tagged` is written.
+ */
+async function acceptSpaceTagInTx(
+  tx: Tx,
+  row: Suggestion,
+  actor: Decider,
+): Promise<{ spaceId: string; tagged: boolean }> {
+  const { spaceId, confidence } = spaceTagOf(row.payload)
+  if (!(await isLiveSpace(tx, spaceId)))
+    throw new EntityNotFound({
+      entityId: spaceId,
+      message: 'That space no longer exists',
+    })
+  const recordId = await canonicalId(row.entityId, tx)
+  const tagged = await insertSpaceTag(tx, {
+    entityId: recordId,
+    spaceId,
+    source: 'ai',
+    confidence: confidence ?? null,
+    createdBy: actor.id,
+  })
+  if (tagged)
+    await tx.insert(activity).values({
+      actorId: actor.id,
+      verb: 'space.tagged',
+      subjectEntityId: recordId,
+      objectEntityId: spaceId,
+      meta: { suggestionId: row.id, source: 'ai' },
+    })
+  return { spaceId, tagged }
+}
+
 /**
  * Lock one row for its accept and refuse it unless it is still `open`. The
  * `for update` is what serializes two accepts on one row: the second waits
@@ -708,6 +776,23 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
             kind: 'note',
             suggestion: decided,
             noteId,
+          } satisfies Accepted
+        }
+        if (row.kind === 'space_tag') {
+          if (fields !== undefined)
+            throw invalid([
+              {
+                slug: 'fields',
+                message: 'fields: a space tag is accepted whole, not by field',
+              },
+            ])
+          const { spaceId, tagged } = await acceptSpaceTagInTx(tx, row, actor)
+          const decided = await close(tx, id, 'accepted', actor)
+          return {
+            kind: 'space_tag',
+            suggestion: decided,
+            spaceId,
+            tagged,
           } satisfies Accepted
         }
         if (row.kind !== 'attribute_patch')

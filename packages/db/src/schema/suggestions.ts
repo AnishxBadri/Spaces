@@ -35,6 +35,9 @@ export const suggestionKind = pgEnum('suggestion_kind', [
   'ledger_event',
   'identity',
   'document_kind',
+  // SPA-103: a space the record may belong in — accepting writes
+  // `entity_space(source: 'ai')` through the one tag insert.
+  'space_tag',
 ])
 
 export const suggestionStatus = pgEnum('suggestion_status', [

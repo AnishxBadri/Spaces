@@ -58,6 +58,14 @@ export const QUEUES = {
    * so a re-extraction while one is queued adds nothing.
    */
   classifyDocument: 'document.classify',
+  /**
+   * Space-tag suggestions (SPA-103): a record → one `space_tag` suggestion
+   * per space of the live tree the classify lane places it in. Enqueued by
+   * the Spaces rail's "Suggest spaces" and nothing else. Created `exclusive`
+   * and sent with `singletonKey = entityId`, so a second press while one is
+   * queued or active is refused by pg-boss.
+   */
+  suggestSpaces: 'entity.suggest-spaces',
   /** Nightly pg_trgm sweep → duplicate_candidate rows. */
   dedupeSweep: 'entity.dedupe-sweep',
   /** On-demand enrichment, credit-capped in the worker. */

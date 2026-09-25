@@ -15,6 +15,7 @@ import { embedDocument } from './jobs/embed-document'
 import { embedSource } from './jobs/embed-source'
 import { embedBackfill, embedBackfillRetry } from './jobs/embed-backfill'
 import { classifyDocument } from './jobs/classify-document'
+import { suggestSpaces } from './jobs/suggest-spaces'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -133,6 +134,25 @@ async function main() {
     QUEUES.summarize,
     { batchSize: 1, includeMetadata: true },
     runJob(summarize, { host, layer: Layer.empty }),
+  )
+  // Space-tag suggestions (SPA-103): pressed on a record's Spaces rail,
+  // with `singletonKey = entityId` — `exclusive`, so a second press while
+  // one is queued or active adds nothing. Created before the plain create
+  // loop below for the deck reader's reason. One model call per record, a
+  // batch of one, never retried (`suggestSpaces.retry`). No Layer.
+  await boss
+    .createQueue(QUEUES.suggestSpaces, { policy: 'exclusive' })
+    .catch(() => {})
+  if (suggestSpaces.retry)
+    await boss.updateQueue(QUEUES.suggestSpaces, {
+      retryLimit: suggestSpaces.retry.limit,
+      retryDelay: suggestSpaces.retry.delaySeconds,
+      retryBackoff: suggestSpaces.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.suggestSpaces,
+    { batchSize: 1, includeMetadata: true },
+    runJob(suggestSpaces, { host, layer: Layer.empty }),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots

@@ -290,15 +290,15 @@ export const tagIntoSpace = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    await db
-      .insert(entitySpace)
-      .values({
-        entityId: data.entityId,
-        spaceId: data.spaceId,
-        source: 'manual',
-        createdBy: u.id,
-      })
-      .onConflictDoNothing()
+    // The one entity_space insert (SPA-103), shared with the space_tag accept.
+    const { insertSpaceTag } = await import('../spaces/tag')
+    await insertSpaceTag(db, {
+      entityId: data.entityId,
+      spaceId: data.spaceId,
+      source: 'manual',
+      confidence: null,
+      createdBy: u.id,
+    })
     await db.insert(activity).values({
       actorId: u.id,
       verb: 'space.tagged',

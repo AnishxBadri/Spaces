@@ -23,6 +23,7 @@ const WORD: Record<SuggestionKind, [one: string, many: string]> = {
   ledger_event: ['ledger event', 'ledger events'],
   identity: ['identity', 'identities'],
   document_kind: ['document kind', 'document kinds'],
+  space_tag: ['space', 'spaces'],
 }
 
 export function suggestionChipWord(kind: SuggestionKind, n: number): string {

@@ -26,6 +26,7 @@ import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
+import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
 import { Button } from '#/components/ui/button'
@@ -234,6 +235,7 @@ function ObjectRecordPage() {
                   className="mt-1 h-7 rounded-none bg-paper px-2 text-label text-graphite"
                 />
               ) : null}
+              <SuggestSpacesAction entityId={record.id} />
             </RailSection>
 
             <RailSection

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."suggestion_kind" ADD VALUE 'space_tag';

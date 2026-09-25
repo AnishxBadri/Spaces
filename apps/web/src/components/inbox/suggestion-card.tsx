@@ -11,6 +11,8 @@ import { readIdentityPayload } from '@spaces/core/ai/identity'
 import type { IdentityPayload } from '@spaces/core/ai/identity'
 import { readNotePayload } from '@spaces/core/ai/note'
 import type { NotePayload } from '@spaces/core/ai/note'
+import { readSpaceTagPayload } from '@spaces/core/ai/space-tag'
+import type { SpaceTagPayload } from '@spaces/core/ai/space-tag'
 import { readDocumentKindPayload } from '@spaces/core/ai/document-kind'
 import type { DocumentKindPayload } from '@spaces/core/ai/document-kind'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
@@ -52,6 +54,7 @@ export const SUGGESTION_KIND_WORD: Record<SuggestionKind, string> = {
   ledger_event: 'Ledger event',
   identity: 'Identity',
   document_kind: 'Document type',
+  space_tag: 'Space',
 }
 
 /**
@@ -104,6 +107,14 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
     const draft = readNotePayload(item.payload)
     return draft ? (
       <NoteDraftBody draft={draft} />
+    ) : (
+      <PayloadBody item={item} actions={actions} />
+    )
+  },
+  space_tag: ({ item, actions }) => {
+    const proposed = readSpaceTagPayload(item.payload)
+    return proposed ? (
+      <SpaceTagBody proposed={proposed} />
     ) : (
       <PayloadBody item={item} actions={actions} />
     )
@@ -208,6 +219,32 @@ function NoteDraftBody({ draft }: { draft: NotePayload }) {
         {draft.markdown}
       </div>
     </div>
+  )
+}
+
+/**
+ * A space tag (SPA-103): the space of the tree the record looks like it
+ * belongs in, by its path, in the patch body's label/value rows. Accepting
+ * tags the record into it (`source: ai`, this confidence, by the accepter).
+ */
+function SpaceTagBody({ proposed }: { proposed: SpaceTagPayload }) {
+  return (
+    <dl className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <dt className="truncate field-label text-graphite">Belongs in</dt>
+        <dd className="min-w-0 truncate text-ui" title={proposed.label}>
+          {proposed.label}
+        </dd>
+      </div>
+      {proposed.confidence === undefined ? null : (
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <dt className="truncate field-label text-graphite">Confidence</dt>
+          <dd className="tabular min-w-0 truncate mono text-label">
+            {Math.round(proposed.confidence * 100)}%
+          </dd>
+        </div>
+      )}
+    </dl>
   )
 }
 

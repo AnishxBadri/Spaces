@@ -37,6 +37,7 @@ import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
 import { RecordTimeline } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
+import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import {
   addCompanyDomain,
@@ -310,6 +311,7 @@ function CompanyRecordPage() {
                   className="mt-1 h-7 rounded-none bg-paper px-2 text-label text-graphite"
                 />
               ) : null}
+              <SuggestSpacesAction entityId={company.id} />
             </RailSection>
 
             <RailSection label="People" meta={`${company.people.length}`}>
