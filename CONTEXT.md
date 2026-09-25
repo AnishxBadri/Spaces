@@ -1741,7 +1741,9 @@ suggestions). No category needs a new lane; that's the design check.
     critical (every prospective user has deal flow in a spreadsheet today).
 11. **Outbound** — MCP server (AI agents), generic webhooks/API (n8n
     automation), digest delivery channel (Monday brief → Slack/Telegram/
-    email; pull-based doctrine, delivered somewhere).
+    email; pull-based doctrine, delivered somewhere). The digest is banked:
+    ARCHITECTURE.md §12 _Banked_ holds what composes it and its trigger, and
+    D28 settles its transport as the optional `SMTP_URL`, nothing POSTed out.
 12. **Feeds (RSS/Atom)** — deliberated 2026-09-02 on the "future" branch,
     recorded 2026-09-07. A feed poller capability: `feed(url, scope,
 cadence, muted)` + `feed_item(feed_id, guid, url, title, summary,
@@ -1981,7 +1983,8 @@ the BYOK AI phase: **meeting-prep brief** (one-pager from record + filed notes +
 interactions ahead of a calendar event — our research half makes this richer than
 Affinity's), **pass-letter drafting** from the recorded pass reason (Edda's Decision
 Writer), and deck-reader autofill (already implied by extraction + AI-autofill
-attributes).
+attributes). The meeting-prep brief, pass-letter drafting and deal scorecards are
+registered with the Monday digest in ARCHITECTURE.md §12 _Banked_, with their triggers.
 
 ---
 
@@ -2412,7 +2415,9 @@ over the deal graph (approved 2026-08, explicitly last — a self-hosted graph y
 AI tools can query is stronger under BYOK than under a cloud CRM), then integrations
 (each independent): Google Calendar first, Gmail (forward-only), Apollo enrichment (Exa
 alongside as a second `Enricher`), BYOK AI features — each adds its own wizard step when
-it lands.
+it lands. The features banked as compositions of shipped primitives are not restated
+here: ARCHITECTURE.md §12 _Banked_ is the one list, with what composes each and the
+trigger that revives it.
 
 Standing debt:
 
