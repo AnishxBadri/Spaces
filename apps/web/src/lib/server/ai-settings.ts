@@ -164,3 +164,26 @@ export const startEmbedBackfill = createServerFn({ method: 'POST' }).handler(
     return startEmbedBackfillHandler()
   },
 )
+
+/**
+ * Settings → Embeddings · Sensitive slot (SPA-83, D11): a local model beside
+ * a cloud pin that sensitive records embed through. Refused — `SlotRefused`,
+ * with the reason — unless the model is local, Test-green and the pin's
+ * width. Admin-only; the bodies open with `requireAdmin()`.
+ */
+export const setSensitiveSlot = createServerFn({ method: 'POST' })
+  .validator(embeddingTargetInput)
+  .handler(async ({ data }) => {
+    const { setSensitiveSlotHandler } =
+      await import('../ai/providers/embed/settings')
+    return setSensitiveSlotHandler(data)
+  })
+
+/** Clears the slot: sensitive records are refused again and left unembedded. */
+export const clearSensitiveSlot = createServerFn({ method: 'POST' }).handler(
+  async () => {
+    const { clearSensitiveSlotHandler } =
+      await import('../ai/providers/embed/settings')
+    return clearSensitiveSlotHandler()
+  },
+)

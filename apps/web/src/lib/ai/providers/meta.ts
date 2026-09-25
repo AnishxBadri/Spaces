@@ -15,6 +15,10 @@ import type { Json } from '#/lib/json'
  *   never decrypts to draw a row.
  * - `lastTestedAt` / `lastTestOk` — the Test call's verdict. Never the
  *   model's answer and never the provider's error text.
+ * - `embedTestedAt` / `embedTestOk` / `embedTestModel` — the embedding Test's
+ *   verdict and the model it tested (SPA-83). Its own keys because Ollama's
+ *   embedding half reuses the LLM row, and one Test must not answer for the
+ *   other; the sensitive slot is offered on a green one.
  */
 export const providerMeta = z.object({
   baseUrl: z.string().url().optional().catch(undefined),
@@ -22,6 +26,9 @@ export const providerMeta = z.object({
   display: z.string().optional().catch(undefined),
   lastTestedAt: z.string().optional().catch(undefined),
   lastTestOk: z.boolean().optional().catch(undefined),
+  embedTestedAt: z.string().optional().catch(undefined),
+  embedTestOk: z.boolean().optional().catch(undefined),
+  embedTestModel: z.string().optional().catch(undefined),
 })
 
 export type ProviderMeta = z.infer<typeof providerMeta>

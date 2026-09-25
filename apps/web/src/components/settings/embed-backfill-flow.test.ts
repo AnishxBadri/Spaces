@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   EMBEDDING_MODELS,
+  EMBEDDING_PROVIDER_INFO,
   backfillCostLabel,
   backfillEstimateLine,
   backfillProgressLine,
   pricingOf,
+  sensitiveEstimateLine,
 } from '#/lib/ai/providers/embed/ids'
 import type { BackfillEstimate } from '#/lib/ai/providers/embed/ids'
 import { backfillRunOf } from '#/lib/ai/embed-backfill'
@@ -32,6 +34,32 @@ describe('the confirm', () => {
       { name: 'Cost, at list price', meta: '~$0.05' },
     ])
     expect(options.action).toBe('Backfill')
+  })
+
+  it('puts the sensitive chunks a local slot will take on the sheet, priced free (SPA-83)', () => {
+    const sensitive: BackfillEstimate = {
+      chunks: 12,
+      tokens: 3_000,
+      cost: 'free — local model',
+    }
+    const options = backfillConfirmOptions(ESTIMATE, 'text-embedding-3-small', {
+      estimate: sensitive,
+      model: 'nomic-embed-text',
+    })
+    expect(options.title).toBe('Backfill 4,212 chunks?')
+    expect(options.body).toContain(
+      'every sensitive chunk not yet on nomic-embed-text, which never leaves your box',
+    )
+    expect(options.rows).toEqual([
+      { name: 'Chunks', meta: '4,200' },
+      { name: 'Tokens, estimated', meta: '~2,520,000' },
+      { name: 'Cost, at list price', meta: '~$0.05' },
+      { name: 'Sensitive chunks, local', meta: '12' },
+      { name: 'Sensitive cost', meta: 'free — local model' },
+    ])
+    expect(sensitiveEstimateLine(sensitive)).toBe(
+      '12 sensitive chunks · ~3,000 tokens · free — local model',
+    )
   })
 
   it('makes no call when cancelled', async () => {
@@ -90,9 +118,13 @@ describe('the cost', () => {
     ).toBe('~$130.00')
   })
 
-  it('prices every catalogue row', () => {
+  it('prices every cloud catalogue row, and reads every local one free by its flag', () => {
     for (const m of EMBEDDING_MODELS)
-      expect(m.usdPerMillionTokens).toBeGreaterThan(0)
+      if (EMBEDDING_PROVIDER_INFO[m.provider].local)
+        expect(backfillCostLabel(1_000_000, pricingOf(m.provider, m))).toBe(
+          'free — local model',
+        )
+      else expect(m.usdPerMillionTokens).toBeGreaterThan(0)
   })
 
   it('spells the estimate and the progress in one line each', () => {

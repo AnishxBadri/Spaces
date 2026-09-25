@@ -13,16 +13,21 @@ import { capMessage, readAiCapsProgram } from './caps'
 import type { CapReadFailed } from './caps'
 import { embedMessage, embedProgram } from './embed'
 import { EMBED_BATCH } from './embed-chunks'
-import { readEmbeddingPinProgram } from './embedding-pin'
-import type { EmbeddingPinReadFailed } from './embedding-pin'
+import { readEmbeddingSetupProgram } from './embedding-pin'
+import type { EmbeddingPinReadFailed, EmbeddingSetup } from './embedding-pin'
 import { sensitivityFor } from './sensitivity-for'
 import type { SensitivityReadFailed } from './sensitivity-for'
 import {
+  EMBEDDING_PROVIDER_INFO,
   backfillCostLabel,
   findEmbeddingModel,
   pricingOf,
 } from './providers/embed/ids'
-import type { BackfillEstimate, EmbeddingPinView } from './providers/embed/ids'
+import type {
+  BackfillEstimate,
+  EmbeddingPinView,
+  EmbeddingProvider,
+} from './providers/embed/ids'
 
 /**
  * The corpus backfill (SPA-136, ai-13; `docs/spec-ai-substrate.md` §9) —
@@ -36,10 +41,20 @@ import type { BackfillEstimate, EmbeddingPinView } from './providers/embed/ids'
  * not the pin's — a keyless install's lexical-only chunks, a sensitive
  * record's chunks once a local model can take them, and after a same-width
  * swap (`./embedding-pin.ts`) every chunk the old model embedded. Rows whose
- * `sensitive` stamp is set are left out of the count and the run, and every
+ * `sensitive` stamp is set are left out of the pin's count and run (see
+ * below for where they go once a local route exists), and every
  * batch still resolves sensitivity **live** per record before a byte leaves
  * (`sensitivityFor`): the column is a cache, and a cache is not an egress
  * decision.
+ *
+ * **Sensitive chunks, once a local route exists (SPA-83).** With the
+ * sensitive slot set beside a cloud pin — or the pin itself local — the
+ * chunks stamped `sensitive` are no longer skipped: a second pass embeds
+ * every one not yet on the local route's model, through `embed()` with
+ * `sensitivity: 'sensitive'`, which routes them to that model and nowhere
+ * else. That pass needs no live check — its only destination is local,
+ * the stricter route. The estimate counts them apart and prices them by the
+ * route provider's `local` flag: "free — local model", never a zero price.
  *
  * **Resumable by construction.** The run walks the pending set in `id`
  * order, `EMBED_BATCH` at a time (SPA-121's 96), and commits each batch's
@@ -127,15 +142,35 @@ const read = <T>(f: () => Promise<T>, message = 'Could not read the chunks') =>
     catch: (cause) => new BackfillReadFailed({ message, cause }),
   })
 
-/** Chunks a backfill may send, i.e. not stamped sensitive. */
-const eligible = eq(chunk.sensitive, false)
+/**
+ * Which half of the corpus a pass walks: `normal` is every chunk not stamped
+ * sensitive, sent to the pin; `sensitive` is the stamped ones, sent only to
+ * the local route (`sensitiveRouteOf`).
+ */
+type Pass = 'normal' | 'sensitive'
 
-/** An eligible chunk not yet carrying `model`'s vector. */
-const pendingFor = (model: string) =>
+const stampedAs = (pass: Pass) => eq(chunk.sensitive, pass === 'sensitive')
+
+/** A chunk of `pass` not yet carrying `model`'s vector. */
+const pendingFor = (pass: Pass, model: string) =>
   and(
-    eligible,
+    stampedAs(pass),
     or(isNull(chunk.embeddingModel), ne(chunk.embeddingModel, model)),
   )
+
+/**
+ * Where sensitive chunks may be embedded: the pin itself when it is local,
+ * else the sensitive slot beside it, else nowhere (null).
+ */
+export function sensitiveRouteOf(
+  setup: EmbeddingSetup,
+): { provider: EmbeddingProvider; model: string } | null {
+  if (setup.pin && EMBEDDING_PROVIDER_INFO[setup.pin.provider].local)
+    return { provider: setup.pin.provider, model: setup.pin.model }
+  return setup.slot
+    ? { provider: setup.slot.provider, model: setup.slot.model }
+    : null
+}
 
 type BackfillCounts = {
   /** Eligible chunks. */
@@ -148,6 +183,7 @@ type BackfillCounts = {
 
 const countChunks = Effect.fn('embedBackfill.count')(function* (
   model: string,
+  pass: Pass = 'normal',
 ): Effect.fn.Return<BackfillCounts, BackfillReadFailed> {
   const isPending = sql`${chunk.embeddingModel} is distinct from ${model}`
   const row = (yield* read(() =>
@@ -163,7 +199,7 @@ const countChunks = Effect.fn('embedBackfill.count')(function* (
           ),
       })
       .from(chunk)
-      .where(eligible),
+      .where(stampedAs(pass)),
   )).at(0)
   return {
     total: row?.total ?? 0,
@@ -179,12 +215,13 @@ const countChunks = Effect.fn('embedBackfill.count')(function* (
  * no provider call.
  */
 export const backfillEstimateProgram = Effect.fn('backfillEstimate')(function* (
-  pin: EmbeddingPinView,
+  pin: { provider: EmbeddingProvider; model: string },
+  pass: Pass = 'normal',
 ): Effect.fn.Return<
   { counts: BackfillCounts; estimate: BackfillEstimate },
   BackfillReadFailed
 > {
-  const counts = yield* countChunks(pin.model)
+  const counts = yield* countChunks(pin.model, pass)
   const model = findEmbeddingModel(pin.provider, pin.model)
   if (!model)
     return yield* new BackfillReadFailed({
@@ -229,109 +266,121 @@ export const embedBackfillProgram = Effect.fn('embedBackfill')(function* (
     caps.perRunTokens === undefined
       ? Number.POSITIVE_INFINITY
       : caps.perRunTokens * 4
-  let cursor: string | null = null
   let embedded = 0
   let skipped = 0
   let model: string | null = null
 
-  for (;;) {
-    // Read each batch, not once: the pin can move under a long run, and the
-    // pending set is always "not on the pin as it is now".
-    const pin = yield* readEmbeddingPinProgram()
-    if (pin === null) return { embedded, skipped, model }
-    const after = cursor
-    const rows: Array<PendingChunk> = yield* read(() =>
-      db
-        .select({ id: chunk.id, entityId: chunk.entityId, text: chunk.text })
-        .from(chunk)
-        .where(
-          and(
-            pendingFor(pin.model),
-            after === null ? undefined : gt(chunk.id, after),
-          ),
-        )
-        .orderBy(asc(chunk.id))
-        .limit(EMBED_BATCH),
-    )
-    if (rows.length === 0) return { embedded, skipped, model }
+  // The normal half to the pin, then the sensitive half to the local route
+  // (none → that pass has nothing to walk).
+  for (const pass of ['normal', 'sensitive'] as const) {
+    let cursor: string | null = null
+    for (;;) {
+      // Read each batch, not once: the pin or the slot can move under a long
+      // run, and the pending set is always "not on the route as it is now".
+      const setup = yield* readEmbeddingSetupProgram()
+      if (setup.pin === null) return { embedded, skipped, model }
+      const routeModel =
+        pass === 'normal' ? setup.pin.model : sensitiveRouteOf(setup)?.model
+      if (routeModel === undefined) break
+      const after = cursor
+      const rows: Array<PendingChunk> = yield* read(() =>
+        db
+          .select({ id: chunk.id, entityId: chunk.entityId, text: chunk.text })
+          .from(chunk)
+          .where(
+            and(
+              pendingFor(pass, routeModel),
+              after === null ? undefined : gt(chunk.id, after),
+            ),
+          )
+          .orderBy(asc(chunk.id))
+          .limit(EMBED_BATCH),
+      )
+      if (rows.length === 0) break
 
-    // Live, per batch, per record: the egress decision is never the cache's.
-    const normal = new Map<string, boolean>()
-    const batch: Array<PendingChunk> = []
-    let chars = 0
-    for (const row of rows) {
-      let ok = normal.get(row.entityId)
-      if (ok === undefined) {
-        ok = yield* sensitivityFor(row.entityId).pipe(
-          Effect.map((s) => s.sensitivity === 'normal'),
-          Effect.catchTag('SensitivityEntityNotFound', () =>
-            Effect.succeed(false),
-          ),
-        )
-        normal.set(row.entityId, ok)
-      }
-      if (!ok) {
-        skipped += 1
+      // Live, per batch, per record: the egress decision is never the
+      // cache's. The sensitive pass goes only to a local model, so it has no
+      // egress to decide.
+      const normal = new Map<string, boolean>()
+      const batch: Array<PendingChunk> = []
+      let chars = 0
+      for (const row of rows) {
+        if (pass === 'normal') {
+          let ok = normal.get(row.entityId)
+          if (ok === undefined) {
+            ok = yield* sensitivityFor(row.entityId).pipe(
+              Effect.map((s) => s.sensitivity === 'normal'),
+              Effect.catchTag('SensitivityEntityNotFound', () =>
+                Effect.succeed(false),
+              ),
+            )
+            normal.set(row.entityId, ok)
+          }
+          if (!ok) {
+            skipped += 1
+            cursor = row.id
+            continue
+          }
+        }
+        if (batch.length > 0 && chars + row.text.length > charBudget) break
+        batch.push(row)
+        chars += row.text.length
         cursor = row.id
-        continue
       }
-      if (batch.length > 0 && chars + row.text.length > charBudget) break
-      batch.push(row)
-      chars += row.text.length
-      cursor = row.id
-    }
-    if (batch.length === 0) continue
+      if (batch.length === 0) continue
 
-    const answer = yield* Effect.result(
-      embedProgram(
-        batch.map((c) => c.text),
-        {
-          caller: { type: 'system' },
-          sensitivity: 'normal',
-          ...(input.model === undefined ? {} : { model: input.model }),
-        },
-      ),
-    )
-    if (answer._tag === 'Failure') {
-      const failure = answer.failure
-      switch (failure._tag) {
-        case 'EmbeddingNotPinned':
+      const answer = yield* Effect.result(
+        embedProgram(
+          batch.map((c) => c.text),
+          {
+            caller: { type: 'system' },
+            sensitivity: pass,
+            ...(input.model === undefined ? {} : { model: input.model }),
+          },
+        ),
+      )
+      if (answer._tag === 'Failure') {
+        const failure = answer.failure
+        if (failure._tag === 'EmbeddingNotPinned')
           return { embedded, skipped, model }
-        case 'CapExceeded':
+        // The slot was cleared between the read above and the call: the
+        // sensitive half has nowhere to go, which is not a failure.
+        if (failure._tag === 'SensitiveRouteRefused') break
+        if (failure._tag === 'CapExceeded')
           return yield* new BackfillCapped({
             embedded,
             kind: failure.kind,
             resetsAt: failure.resetsAt,
             reason: capMessage(failure),
           })
-        default:
-          return yield* new BackfillEmbedFailed({
-            embedded,
-            cause: failure._tag,
-            reason: embedMessage(failure),
-          })
+        return yield* new BackfillEmbedFailed({
+          embedded,
+          cause: failure._tag,
+          reason: embedMessage(failure),
+        })
       }
-    }
 
-    const { vectors, target } = answer.success
-    yield* Effect.tryPromise({
-      try: () =>
-        db.transaction(async (tx) => {
-          for (const [i, c] of batch.entries())
-            await tx
-              .update(chunk)
-              .set({ embedding: vectors[i], embeddingModel: target.model })
-              .where(eq(chunk.id, c.id))
-        }),
-      catch: (cause) =>
-        new BackfillWriteFailed({
-          message: 'Could not write the vectors',
-          cause,
-        }),
-    })
-    embedded += batch.length
-    model = target.model
+      const { vectors, target } = answer.success
+      yield* Effect.tryPromise({
+        try: () =>
+          db.transaction(async (tx) => {
+            for (const [i, c] of batch.entries())
+              await tx
+                .update(chunk)
+                .set({ embedding: vectors[i], embeddingModel: target.model })
+                .where(eq(chunk.id, c.id))
+          }),
+        catch: (cause) =>
+          new BackfillWriteFailed({
+            message: 'Could not write the vectors',
+            cause,
+          }),
+      })
+      embedded += batch.length
+      model = target.model
+    }
   }
+  return { embedded, skipped, model }
 })
 
 // ---------- trigger + status (the Embeddings section's two server fns) ----------
@@ -345,7 +394,7 @@ export type BackfillStarted =
 const inFlight = (j: QueuedJob): boolean =>
   j.state === 'created' || j.state === 'retry' || j.state === 'active'
 
-const pinForServer = readEmbeddingPinProgram().pipe(
+const setupForServer = readEmbeddingSetupProgram().pipe(
   Effect.catchTag('EmbeddingPinReadFailed', (e) =>
     Effect.fail(
       new BackfillReadFailed({
@@ -366,13 +415,20 @@ export const startEmbedBackfillProgram = Effect.fn('startEmbedBackfill')(
     BackfillStarted,
     BackfillRefused | BackfillReadFailed
   > {
-    const pin = yield* pinForServer
+    const setup = yield* setupForServer
+    const pin = setup.pin
     if (pin === null)
       return yield* new BackfillRefused({
         message: 'Pin an embedding model before backfilling',
       })
     const counts = yield* countChunks(pin.model)
-    if (counts.pending === 0) return { status: 'nothing-to-do' }
+    const route = sensitiveRouteOf(setup)
+    const sensitivePending =
+      route === null
+        ? 0
+        : (yield* countChunks(route.model, 'sensitive')).pending
+    if (counts.pending === 0 && sensitivePending === 0)
+      return { status: 'nothing-to-do' }
     const jobId = yield* read(
       () =>
         enqueue(QUEUES.embedBackfill, {}, { singletonKey: EMBED_BACKFILL_KEY }),
@@ -449,15 +505,41 @@ export type EmbedBackfillView =
       /** Of those, the ones carrying the pinned model's vector. */
       embedded: number
       estimate: BackfillEstimate
+      /**
+       * The chunks stamped sensitive, once a local route can take them
+       * (SPA-83): counted apart and priced by the route's `local` flag.
+       * Null while there is no local route — they are skipped, as before.
+       */
+      sensitive: BackfillSensitiveView | null
       run: BackfillRun
     }
+
+export type BackfillSensitiveView = {
+  /** The local model they are embedded with — the slot's, or a local pin's. */
+  model: string
+  total: number
+  embedded: number
+  estimate: BackfillEstimate
+}
 
 /** The Backfill row: progress, the estimate, and where the run stands. */
 export const embedBackfillStatusProgram = Effect.fn('embedBackfillStatus')(
   function* (): Effect.fn.Return<EmbedBackfillView, BackfillReadFailed> {
-    const pin = yield* pinForServer
+    const setup = yield* setupForServer
+    const pin = setup.pin
     if (pin === null) return { pin: null }
     const { counts, estimate } = yield* backfillEstimateProgram(pin)
+    const route = sensitiveRouteOf(setup)
+    let sensitive: BackfillSensitiveView | null = null
+    if (route !== null) {
+      const s = yield* backfillEstimateProgram(route, 'sensitive')
+      sensitive = {
+        model: route.model,
+        total: s.counts.total,
+        embedded: s.counts.total - s.counts.pending,
+        estimate: s.estimate,
+      }
+    }
     const jobs = yield* read(
       () => jobsByKey(QUEUES.embedBackfill, EMBED_BACKFILL_KEY),
       'Could not reach the worker queue',
@@ -468,6 +550,7 @@ export const embedBackfillStatusProgram = Effect.fn('embedBackfillStatus')(
       total: counts.total,
       embedded: counts.total - counts.pending,
       estimate,
+      sensitive,
       run: jobs === null ? { state: 'idle' } : backfillRunOf(jobs, now),
     }
   },

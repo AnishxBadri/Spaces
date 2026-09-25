@@ -8,12 +8,14 @@ import { embeddingCredentialProvider } from './ids'
 import type { EmbeddingProvider } from './ids'
 import type { EmbedAdapterInput, EmbedCall } from './adapter'
 import { googleEmbedCall } from './google'
+import { ollamaEmbedCall } from './ollama'
 import { openaiEmbedCall } from './openai'
 import { voyageEmbedCall } from './voyage'
 
 /**
  * Embedding providers: vault credential (`kind: 'embedding'`, stored under
- * `embed:<provider>`) → adapter → `EmbedCall`. Server-only: it reads the
+ * `embed:<provider>`; for keyless Ollama, the LLM row `ollama` — see
+ * `embeddingCredentialProvider`) → adapter → `EmbedCall`. Server-only: it reads the
  * vault. The ids and the model catalogue live in `./ids`, client-safe.
  */
 
@@ -25,6 +27,7 @@ const ADAPTERS: Record<
   openai: openaiEmbedCall,
   google: googleEmbedCall,
   voyage: voyageEmbedCall,
+  ollama: ollamaEmbedCall,
 }
 
 /** The adapter for one provider, from an already-resolved credential. */
@@ -34,6 +37,7 @@ export function embedCallFor(
   modelId: string,
   dims: number,
   fetch?: typeof globalThis.fetch,
+  maxRetries?: number,
 ): EmbedCall {
   const meta = readProviderMeta(credential.meta)
   return ADAPTERS[provider]({
@@ -45,6 +49,7 @@ export function embedCallFor(
     modelId,
     dims,
     ...(fetch === undefined ? {} : { fetch }),
+    ...(maxRetries === undefined ? {} : { maxRetries }),
   })
 }
 
@@ -54,7 +59,12 @@ export function embedCallFor(
  */
 export const resolveEmbedCall = Effect.fn('resolveEmbedCall')(function* (
   provider: EmbeddingProvider,
-  opts: { modelId: string; dims: number; userId?: string },
+  opts: {
+    modelId: string
+    dims: number
+    userId?: string
+    maxRetries?: number
+  },
 ): Effect.fn.Return<
   { call: EmbedCall; credentialId: string },
   ResolveModelFailure
@@ -66,7 +76,14 @@ export const resolveEmbedCall = Effect.fn('resolveEmbedCall')(function* (
   })
   if (!credential) return yield* new NoCredential({ provider })
   return {
-    call: embedCallFor(provider, credential, opts.modelId, opts.dims),
+    call: embedCallFor(
+      provider,
+      credential,
+      opts.modelId,
+      opts.dims,
+      undefined,
+      opts.maxRetries,
+    ),
     credentialId: credential.id,
   }
 })

@@ -23,6 +23,8 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { recordContextProgram } from '#/lib/context/record'
 import { EMBED_BATCH } from '#/lib/ai/embed-document'
 import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
+import { storeCredential } from '#/lib/vault'
+import { fakeOllama } from '#/test/fake-ollama'
 import { JobContext, JobPermanent } from '../run-job'
 import { ExtractionStore, extractDocument } from './extract-document'
 import { embedDocument, runEmbedDocument } from './embed-document'
@@ -389,5 +391,74 @@ describe('the JobDef', () => {
     expect(embedDocument.retry?.limit).toBe(2)
     const documentId = randomUUID()
     expect(embedDocument.refs?.({ documentId }).entityId).toBe(documentId)
+  })
+})
+
+describe('document.embed and the sensitive slot (SPA-83)', () => {
+  const SLOT = {
+    provider: 'ollama',
+    model: 'nomic-embed-text',
+    dims: PIN_DIMS,
+    set_at: '2026-09-25T00:00:00.000Z',
+  }
+
+  /** Ollama as the Providers section saves it: keyless, an address. */
+  async function saveOllama() {
+    await storeCredential({
+      scope: 'workspace',
+      provider: 'ollama',
+      kind: 'llm',
+      secret: '',
+      keyless: true,
+      meta: { baseUrl: 'http://ollama:11434' },
+      createdBy: FIXTURE_ACTOR.id,
+    })
+  }
+
+  it('embeds a sensitive document through the slot: vectors, the slot model stamped, the cloud pin never called', async () => {
+    await saveOllama()
+    await setSettings({ embedding: { ...PIN, sensitive: SLOT } })
+    const id = await mkDocument('deck.pdf', deckText(3))
+    await db.update(entity).set({ sensitive: true }).where(eq(entity.id, id))
+    const ollama = fakeOllama({ pulled: ['nomic-embed-text'] })
+    vi.stubGlobal('fetch', ollama.fetch)
+
+    // No model seam: the real vault → Ollama adapter → the fake.
+    await runJob(id)
+
+    const rows = await chunksOf(id)
+    expect(rows).toHaveLength(3)
+    for (const r of rows) {
+      expect(r.embedding).toHaveLength(PIN_DIMS)
+      expect(r.embeddingModel).toBe('nomic-embed-text')
+      expect(r.sensitive).toBe(true)
+    }
+    // Every call went to Ollama; nothing to OpenAI.
+    expect(ollama.calls.map((c) => c.url)).toEqual([
+      'http://ollama:11434/api/embed',
+    ])
+    const usage = await db
+      .select({ provider: aiUsage.provider })
+      .from(aiUsage)
+      .where(isNotNull(aiUsage.id))
+    expect(usage).toEqual([{ provider: 'ollama' }])
+  })
+
+  it('with no slot, still leaves it unembedded and sends nothing — not to Ollama, not to the cloud pin', async () => {
+    await saveOllama()
+    await setSettings({ embedding: PIN })
+    const id = await mkDocument('deck.pdf', deckText(2))
+    await db.update(entity).set({ sensitive: true }).where(eq(entity.id, id))
+    const ollama = fakeOllama({ pulled: ['nomic-embed-text'] })
+    vi.stubGlobal('fetch', ollama.fetch)
+
+    await runJob(id)
+
+    const rows = await chunksOf(id)
+    expect(rows).toHaveLength(2)
+    expect(rows.every((r) => r.embedding === null && r.sensitive)).toBe(true)
+    expect(ollama.calls).toHaveLength(0)
+    const usage = await db.select({ n: count() }).from(aiUsage)
+    expect(usage.at(0)?.n).toBe(0)
   })
 })

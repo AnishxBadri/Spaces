@@ -22,5 +22,6 @@ export function googleEmbedCall(input: EmbedAdapterInput): EmbedCall {
     'google',
     createGoogle(settings).embedding(input.modelId),
     sdkDimensionOptions('google', input.dims),
+    input.maxRetries,
   )
 }

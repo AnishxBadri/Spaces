@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { formatNumber } from '@spaces/core/format'
+import { PROVIDERS } from '../ids'
 
 /**
  * Embedding providers, their models and the pin's copy, with nothing
@@ -19,13 +20,27 @@ import { formatNumber } from '@spaces/core/format'
 /** The width every stored vector has. `chunk.embedding` is `vector(768)`. */
 export const PIN_DIMS = 768
 
-export const EMBEDDING_PROVIDERS = ['openai', 'google', 'voyage'] as const
+export const EMBEDDING_PROVIDERS = [
+  'openai',
+  'google',
+  'voyage',
+  'ollama',
+] as const
 export type EmbeddingProvider = (typeof EMBEDDING_PROVIDERS)[number]
 
+/** The providers that take a pasted key — every one but Ollama. */
+export const KEYED_EMBEDDING_PROVIDERS = [
+  'openai',
+  'google',
+  'voyage',
+] as const satisfies ReadonlyArray<EmbeddingProvider>
+
 /**
- * - `local` — runs on the operator's box. None does yet: the local slot
- *   (Ollama, transformers.js) is SPA-83's, so today a `sensitive` embed has
- *   nowhere to go and is refused.
+ * - `local` — runs on a box the operator runs (Ollama, SPA-83). A
+ *   `sensitive` embed may go to a local provider and to nothing else: the
+ *   pin itself when it is local, else the sensitive slot, else refused.
+ * - `keyless` — authenticates nobody, and has no embedding key of its own:
+ *   it reuses the LLM provider's credential (`embeddingCredentialProvider`).
  * - `defaultBaseUrl` — passed to the SDK explicitly, so an SDK's environment
  *   fallback never decides where text is sent.
  */
@@ -33,6 +48,7 @@ export type EmbeddingProviderDescriptor = {
   id: EmbeddingProvider
   label: string
   local: boolean
+  keyless: boolean
   defaultBaseUrl: string
   keyPlaceholder: string
 }
@@ -45,6 +61,7 @@ export const EMBEDDING_PROVIDER_INFO: Record<
     id: 'openai',
     label: 'OpenAI',
     local: false,
+    keyless: false,
     defaultBaseUrl: 'https://api.openai.com/v1',
     keyPlaceholder: 'sk-…',
   },
@@ -52,6 +69,7 @@ export const EMBEDDING_PROVIDER_INFO: Record<
     id: 'google',
     label: 'Google',
     local: false,
+    keyless: false,
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     keyPlaceholder: 'AIza…',
   },
@@ -59,8 +77,17 @@ export const EMBEDDING_PROVIDER_INFO: Record<
     id: 'voyage',
     label: 'Voyage',
     local: false,
+    keyless: false,
     defaultBaseUrl: 'https://api.voyageai.com/v1',
     keyPlaceholder: 'pa-…',
+  },
+  ollama: {
+    id: 'ollama',
+    label: 'Ollama',
+    local: true,
+    keyless: true,
+    defaultBaseUrl: PROVIDERS.ollama.defaultBaseUrl,
+    keyPlaceholder: '',
   },
 }
 
@@ -103,6 +130,11 @@ export type EmbeddingModelInfo = {
  * ($0.10) is **unverified** — the Gemini API has listed it free on some
  * tiers, so this errs high. A local model (SPA-83's slot) reads "free" by its
  * provider's `local` flag, not by a zero here.
+ *
+ * - Ollama (SPA-83) `nomic-embed-text` is 768 natively → pinnable, and the
+ *   model a sensitive slot is built for. `mxbai-embed-large` is 1024 and
+ *   Ollama truncates nothing for it → greyed. Their price is 0 only because
+ *   the field is a number; the estimate never reads it for a local provider.
  */
 export const EMBEDDING_MODELS: ReadonlyArray<EmbeddingModelInfo> = [
   {
@@ -154,6 +186,20 @@ export const EMBEDDING_MODELS: ReadonlyArray<EmbeddingModelInfo> = [
     emitsPin: false,
     usdPerMillionTokens: 0.02,
   },
+  {
+    provider: 'ollama',
+    id: 'nomic-embed-text',
+    nativeDims: 768,
+    emitsPin: true,
+    usdPerMillionTokens: 0,
+  },
+  {
+    provider: 'ollama',
+    id: 'mxbai-embed-large',
+    nativeDims: 1024,
+    emitsPin: false,
+    usdPerMillionTokens: 0,
+  },
 ]
 
 export const modelsFor = (
@@ -177,9 +223,39 @@ export const isEmbeddingProvider = (
  * key stored as `openai` would overwrite the OpenAI LLM key in place. The
  * prefix gives the embedding key its own row — and its own AAD, which is
  * `scope:provider` — while `kind: 'embedding'` says what the row holds.
+ *
+ * **A keyless provider reuses the LLM row** (SPA-83): Ollama's credential
+ * is a base URL and no secret, so there is no key to keep apart, and a
+ * second `embed:ollama` row would be a second address for one server that
+ * could drift from the first. The embedding adapter reads the row the
+ * Providers section writes (`kind: 'llm'`, provider `ollama`), and nothing
+ * here writes to it but the embed Test's own verdict keys.
  */
 export const embeddingCredentialProvider = (provider: EmbeddingProvider) =>
-  `embed:${provider}`
+  EMBEDDING_PROVIDER_INFO[provider].keyless ? provider : `embed:${provider}`
+
+/**
+ * Where to point an embedding provider's address, said once for the
+ * Embeddings section: the three deployments Ollama is run in beside Spaces.
+ */
+export const OLLAMA_URL_GUIDANCE =
+  'http://ollama:11434 for the compose sidecar, http://host.docker.internal:11434 for Ollama on the host, a LAN address for a shared box.'
+
+/** No credential for `provider`: what to save, and where, before `doing`. */
+export const missingCredentialMessage = (
+  provider: EmbeddingProvider,
+  doing: string,
+): string =>
+  EMBEDDING_PROVIDER_INFO[provider].keyless
+    ? `Save the ${EMBEDDING_PROVIDER_INFO[provider].label} address under Settings → AI · Providers before ${doing}`
+    : `Save a ${EMBEDDING_PROVIDER_INFO[provider].label} embedding key before ${doing}`
+
+/**
+ * Ollama answers 404 for a model the server has not pulled. The Test call
+ * turns that into the one command that fixes it.
+ */
+export const ollamaNotPulledMessage = (model: string): string =>
+  `${model} is not pulled on this Ollama server — run "ollama pull ${model}" there, then test again`
 
 // The copy. The wording is the safety mechanism (SPA-51), so each sentence
 // is spelled once, here, and the server and the section both read it.
@@ -219,6 +295,51 @@ export const pinSwapNote = (
   target: { provider: EmbeddingProvider; model: string },
 ): string =>
   `Swapping to ${EMBEDDING_PROVIDER_INFO[target.provider].label} ${target.model} keeps the ${PIN_DIMS}-wide column. Every stored vector is ${pin.model}'s, so search leaves them out until a backfill re-embeds them.`
+
+// The sensitive slot (SPA-83, D11): a local provider beside the pin, at the
+// pin's width, that sensitive records are embedded through.
+
+export type EmbeddingSlotView = {
+  provider: EmbeddingProvider
+  model: string
+  dims: number
+  /** ISO instant. */
+  setAt: string
+}
+
+/** The width a catalogue model would store: the pin's, or its own. */
+export const storedDims = (model: EmbeddingModelInfo): number =>
+  model.emitsPin ? PIN_DIMS : model.nativeDims
+
+export const NO_SLOT_HEADLINE =
+  'No sensitive slot — sensitive records are left unembedded.'
+
+export const LOCAL_PIN_HEADLINE =
+  'The pin runs locally — sensitive records embed through it.'
+
+export const slotHeadline = (slot: EmbeddingSlotView): string =>
+  `Sensitive records embed through ${EMBEDDING_PROVIDER_INFO[slot.provider].label} ${slot.model} at ${slot.dims} dimensions.`
+
+/** Why a slot model is refused: its width is not the pin's. Both numbers. */
+export const slotDimsMessage = (
+  pin: { dims: number },
+  model: EmbeddingModelInfo,
+): string =>
+  `${EMBEDDING_PROVIDER_INFO[model.provider].label} ${model.id} emits ${storedDims(model)}; the pin stores ${pin.dims}. The sensitive slot must match the pin's width.`
+
+/**
+ * What search does with the slot's vectors. The semantic lane keeps rows
+ * whose `embedding_model` is the pin's, and one model's vectors are noise to
+ * another's query even at the same width — so a slot on another model
+ * embeds sensitive records that semantic search then cannot reach.
+ */
+export const slotSearchNote = (
+  pin: { model: string },
+  slot: { model: string },
+): string =>
+  slot.model === pin.model
+    ? `Search reads these vectors: the slot and the pin are both ${pin.model}.`
+    : `Search reads only ${pin.model}'s vectors, so sensitive records embedded by ${slot.model} stay out of semantic search — the same width is not the same model.`
 
 // The backfill's pre-flight estimate (SPA-136). The one place in the product
 // that asks before it embeds, so the figure is shown before anything runs.
@@ -266,6 +387,10 @@ export type BackfillEstimate = {
 export const backfillEstimateLine = (e: BackfillEstimate): string =>
   `${formatNumber(e.chunks, 0)} ${e.chunks === 1 ? 'chunk' : 'chunks'} · ~${formatNumber(e.tokens, 0)} tokens · ${e.cost}`
 
+/** The sensitive half of the estimate: chunks only a local model may take. */
+export const sensitiveEstimateLine = (e: BackfillEstimate): string =>
+  `${formatNumber(e.chunks, 0)} sensitive ${e.chunks === 1 ? 'chunk' : 'chunks'} · ~${formatNumber(e.tokens, 0)} tokens · ${e.cost}`
+
 export const backfillProgressLine = (embedded: number, total: number): string =>
   `embedded ${formatNumber(embedded, 0)} of ${formatNumber(total, 0)}`
 
@@ -276,7 +401,7 @@ export const embeddingProviderInput = z.object({
 })
 
 export const embeddingKeyInput = z.object({
-  provider: z.enum(EMBEDDING_PROVIDERS),
+  provider: z.enum(KEYED_EMBEDDING_PROVIDERS),
   key: z.string().trim().min(1).max(4000),
 })
 export type EmbeddingKeyInput = z.infer<typeof embeddingKeyInput>

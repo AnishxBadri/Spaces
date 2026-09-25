@@ -29,6 +29,8 @@ import {
 } from '#/lib/ai/embedding-pin'
 import { saveEmbeddingKeyProgram } from '#/lib/ai/providers/embed/settings'
 import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
+import { storeCredential } from '#/lib/vault'
+import { fakeOllama } from '#/test/fake-ollama'
 import { RESUME_SLACK_MS, runEmbedBackfill } from './embed-backfill'
 
 /**
@@ -507,5 +509,118 @@ describe('a same-width model swap', () => {
         'Embeddings are pinned to OpenAI text-embedding-3-small at 768 dimensions. text-embedding-ada-002 emits 1536; changing the width means altering the vector column and rebuilding its index, which this version cannot do yet.',
     })
     expect(await Effect.runPromise(readEmbeddingPinProgram())).toEqual(first)
+  })
+})
+
+describe('sensitive chunks and the slot (SPA-83)', () => {
+  const SLOT_MODEL = 'nomic-embed-text'
+
+  /** A sensitive deck with `n` chunks stamped sensitive and no vectors. */
+  async function sensitiveDeck(n: number) {
+    const deck = await newDeck('Vault memo.pdf')
+    await db.update(entity).set({ sensitive: true }).where(eq(entity.id, deck))
+    await db.insert(chunk).values(
+      Array.from({ length: n }, (_, i) => ({
+        entityId: deck,
+        sourceKind: 'document' as const,
+        sourceKey: '',
+        idx: 100 + i,
+        text: `Sensitive ${String(i)}`,
+        sensitive: true,
+      })),
+    )
+    return deck
+  }
+
+  /** The slot beside the pin, and Ollama saved as Providers saves it. */
+  async function setSlot() {
+    await storeCredential({
+      scope: 'workspace',
+      provider: 'ollama',
+      kind: 'llm',
+      secret: '',
+      keyless: true,
+      meta: { baseUrl: 'http://ollama:11434' },
+      createdBy: FIXTURE_ACTOR.id,
+    })
+    const settings = (await db.select().from(workspace)).at(0)?.settings ?? {}
+    const embedding = settings.embedding
+    if (!embedding) throw new Error('expected a pin')
+    await setSettings({
+      ...settings,
+      embedding: {
+        ...embedding,
+        sensitive: {
+          provider: 'ollama',
+          model: SLOT_MODEL,
+          dims: PIN_DIMS,
+          set_at: '2026-09-25T00:00:00.000Z',
+        },
+      },
+    })
+  }
+
+  it('skips them before the slot, counts them priced "free — local model" after it, and the run embeds them through the slot', async () => {
+    await pinTo(SMALL)
+    await sensitiveDeck(3)
+    // The normal half is already on the pin, so only the slot has work.
+    await db.insert(chunk).values({
+      entityId: await newDeck('Open.pdf'),
+      sourceKind: 'document',
+      sourceKey: '',
+      idx: 0,
+      text: 'Already embedded.',
+      embedding: toward(4),
+      embeddingModel: SMALL,
+    })
+
+    expect(await status()).toMatchObject({
+      total: 1,
+      embedded: 1,
+      estimate: { chunks: 0 },
+      sensitive: null,
+    })
+    expect(await Effect.runPromise(startEmbedBackfillProgram())).toEqual({
+      status: 'nothing-to-do',
+    })
+
+    await setSlot()
+    const chars = 'Sensitive 0'.length * 3
+    expect(await status()).toMatchObject({
+      estimate: { chunks: 0 },
+      sensitive: {
+        model: SLOT_MODEL,
+        total: 3,
+        embedded: 0,
+        estimate: {
+          chunks: 3,
+          tokens: Math.ceil(chars / 4),
+          cost: 'free — local model',
+        },
+      },
+    })
+    // Pricing read no provider and wrote no usage.
+    expect(fetches).toBe(0)
+    expect(await usageRows()).toBe(0)
+    expect(await Effect.runPromise(startEmbedBackfillProgram())).toEqual({
+      status: 'queued',
+    })
+
+    const ollama = fakeOllama({ pulled: [SLOT_MODEL] })
+    vi.stubGlobal('fetch', ollama.fetch)
+    await Effect.runPromise(runEmbedBackfill({}))
+
+    expect(ollama.calls).toHaveLength(1)
+    expect(ollama.calls[0]?.url).toBe('http://ollama:11434/api/embed')
+    const rows = await db
+      .select({ model: chunk.embeddingModel, embedding: chunk.embedding })
+      .from(chunk)
+      .where(eq(chunk.sensitive, true))
+    expect(rows).toHaveLength(3)
+    expect(rows.every((r) => r.model === SLOT_MODEL)).toBe(true)
+    expect(rows.every((r) => r.embedding?.length === PIN_DIMS)).toBe(true)
+    expect(await status()).toMatchObject({
+      sensitive: { total: 3, embedded: 3, estimate: { chunks: 0 } },
+    })
   })
 })

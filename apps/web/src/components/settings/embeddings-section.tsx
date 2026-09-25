@@ -1,4 +1,4 @@
-import { useRouter } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -12,7 +12,11 @@ import type { SelectItem } from '#/components/ui/select'
 import {
   EMBEDDING_PROVIDERS,
   EMBEDDING_PROVIDER_INFO,
+  KEYED_EMBEDDING_PROVIDERS,
+  LOCAL_PIN_HEADLINE,
   NO_PIN_HEADLINE,
+  NO_SLOT_HEADLINE,
+  OLLAMA_URL_GUIDANCE,
   PIN_DIMS,
   backfillEstimateLine,
   backfillProgressLine,
@@ -20,22 +24,29 @@ import {
   needsRepinNote,
   pinHeadline,
   pinSwapNote,
+  sensitiveEstimateLine,
+  slotHeadline,
+  slotSearchNote,
 } from '#/lib/ai/providers/embed/ids'
 import type {
   EmbeddingModelInfo,
+  EmbeddingPinView,
   EmbeddingProvider,
 } from '#/lib/ai/providers/embed/ids'
 import type { getEmbeddingSettings } from '#/lib/server-fns'
 import {
+  clearSensitiveSlot,
   getEmbedBackfill,
   pinEmbedding,
   saveEmbeddingKey,
+  setSensitiveSlot,
   startEmbedBackfill,
   testEmbedding,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 type EmbeddingSettings = Awaited<ReturnType<typeof getEmbeddingSettings>>
+type EmbeddingKeyRow = EmbeddingSettings['keys'][number]
 type TestResult = Awaited<ReturnType<typeof testEmbedding>>
 type BackfillView = Awaited<ReturnType<typeof getEmbedBackfill>>
 
@@ -56,9 +67,16 @@ type BackfillView = Awaited<ReturnType<typeof getEmbedBackfill>>
  * of another width is never choosable here, and the server refuses it
  * `PinLocked` regardless.
  *
+ * Ollama (SPA-83) is a provider row like the rest, flagged local, with no
+ * key of its own: its key row is the address it borrows from Settings → AI ·
+ * Providers, with where to point it. Once a local model has tested green,
+ * the Sensitive slot block offers it beside a cloud pin, and says in its
+ * readout what search will and will not read.
+ *
  * The Backfill block (SPA-136) shows how many chunks carry the pinned model
  * and what embedding the rest would cost; its button asks with that
- * estimate before anything is queued.
+ * estimate before anything is queued. With a local route it counts the
+ * sensitive chunks apart and prices them "free — local model".
  */
 export function EmbeddingsSection({
   settings,
@@ -69,7 +87,7 @@ export function EmbeddingsSection({
 }) {
   const router = useRouter()
   const { confirm, confirmDialog } = useConfirm()
-  const { pin, keys } = settings
+  const { pin, slot, keys } = settings
   const [provider, setProvider] = useState<EmbeddingProvider>(
     pin?.provider ?? 'openai',
   )
@@ -110,6 +128,8 @@ export function EmbeddingsSection({
   }
 
   async function saveKey() {
+    const keyed = KEYED_EMBEDDING_PROVIDERS.find((p) => p === provider)
+    if (keyed === undefined) return
     if (!key.trim()) {
       setError(`Paste a ${descriptor.label} key.`)
       return
@@ -118,7 +138,7 @@ export function EmbeddingsSection({
     setError(null)
     try {
       const { display } = await saveEmbeddingKey({
-        data: { provider, key: key.trim() },
+        data: { provider: keyed, key: key.trim() },
       })
       setKey('')
       toast(`${descriptor.label} embedding key saved · ${display}`)
@@ -193,7 +213,11 @@ export function EmbeddingsSection({
 
         <SettingsRow
           label="Provider"
-          hint="Where text is sent to be embedded. Every provider here is cloud."
+          hint={
+            descriptor.local
+              ? `${descriptor.label} runs on a box you run; nothing leaves it.`
+              : 'Where text is sent to be embedded. Ollama is local; the rest are cloud.'
+          }
         >
           <Select<EmbeddingProvider>
             value={provider}
@@ -230,40 +254,61 @@ export function EmbeddingsSection({
           )}
         </ol>
 
-        <SettingsRow
-          label={
-            keyRow?.configured
-              ? `Replace ${descriptor.label} embedding key`
-              : `${descriptor.label} embedding key`
-          }
-          hint={
-            keyRow?.configured
-              ? `Saved as ${keyRow.display ?? '••••'}. Its own key, apart from the ${descriptor.label} provider key.`
-              : 'Stored encrypted as the workspace embedding key, apart from any provider key.'
-          }
-        >
-          <Input
-            id={`embed-${provider}-key`}
-            aria-label={`${descriptor.label} embedding API key`}
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder={
-              keyRow?.configured ? '••••••••' : descriptor.keyPlaceholder
+        {descriptor.keyless ? (
+          <SettingsRow
+            label={`${descriptor.label} address`}
+            hint={
+              keyRow?.configured
+                ? `The ${descriptor.label} provider's address, from Settings → AI · Providers. ${OLLAMA_URL_GUIDANCE}`
+                : `Add ${descriptor.label} under Settings → AI · Providers first — no key, only its address. ${OLLAMA_URL_GUIDANCE}`
             }
-            className="w-72 mono"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void saveKey()}
-            disabled={pending !== null}
           >
-            Save key
-          </Button>
-        </SettingsRow>
+            {keyRow?.configured ? (
+              <span className="mono text-micro text-graphite">
+                {keyRow.baseUrl ?? descriptor.defaultBaseUrl}
+              </span>
+            ) : (
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/settings/ai">Providers</Link>
+              </Button>
+            )}
+          </SettingsRow>
+        ) : (
+          <SettingsRow
+            label={
+              keyRow?.configured
+                ? `Replace ${descriptor.label} embedding key`
+                : `${descriptor.label} embedding key`
+            }
+            hint={
+              keyRow?.configured
+                ? `Saved as ${keyRow.display ?? '••••'}. Its own key, apart from the ${descriptor.label} provider key.`
+                : 'Stored encrypted as the workspace embedding key, apart from any provider key.'
+            }
+          >
+            <Input
+              id={`embed-${provider}-key`}
+              aria-label={`${descriptor.label} embedding API key`}
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder={
+                keyRow?.configured ? '••••••••' : descriptor.keyPlaceholder
+              }
+              className="w-72 mono"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void saveKey()}
+              disabled={pending !== null}
+            >
+              Save key
+            </Button>
+          </SettingsRow>
+        )}
 
         <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule py-2">
           {error ? (
@@ -329,6 +374,8 @@ export function EmbeddingsSection({
           </span>
         </div>
 
+        {pin ? <SensitiveSlot pin={pin} slot={slot} keys={keys} /> : null}
+
         {backfill.pin ? (
           <Backfill initial={backfill} confirm={confirm} />
         ) : null}
@@ -392,7 +439,8 @@ function Backfill({
   }, [live, refresh])
 
   if (view.pin === null) return null
-  const { estimate, run } = view
+  const { estimate, run, sensitive } = view
+  const pendingChunks = estimate.chunks + (sensitive?.estimate.chunks ?? 0)
   const busy =
     run.state === 'queued' || run.state === 'running' || run.state === 'paused'
 
@@ -403,7 +451,13 @@ function Backfill({
     try {
       const started = await confirmThenStart(
         confirm,
-        backfillConfirmOptions(estimate, view.pin.model),
+        backfillConfirmOptions(
+          estimate,
+          view.pin.model,
+          sensitive === null
+            ? null
+            : { estimate: sensitive.estimate, model: sensitive.model },
+        ),
         () => startEmbedBackfill(),
       )
       if (started === null) return
@@ -431,21 +485,32 @@ function Backfill({
       <SettingsRow
         label="Embed what is stored"
         hint={
-          estimate.chunks === 0
+          pendingChunks === 0
             ? `Every chunk carries ${view.pin.model}. New ones are embedded as they arrive.`
-            : 'Asks with this estimate first. Sensitive records are left out.'
+            : sensitive === null
+              ? 'Asks with this estimate first. Sensitive records are left out.'
+              : `Asks with this estimate first. Sensitive records go only to ${sensitive.model}.`
         }
       >
-        {estimate.chunks > 0 ? (
-          <span className="tabular mono text-micro text-graphite">
-            {backfillEstimateLine(estimate)}
+        {pendingChunks > 0 ? (
+          <span className="flex flex-col items-end">
+            {estimate.chunks > 0 ? (
+              <span className="tabular mono text-micro text-graphite">
+                {backfillEstimateLine(estimate)}
+              </span>
+            ) : null}
+            {sensitive !== null && sensitive.estimate.chunks > 0 ? (
+              <span className="tabular mono text-micro text-graphite">
+                {sensitiveEstimateLine(sensitive.estimate)}
+              </span>
+            ) : null}
           </span>
         ) : null}
         <Button
           size="sm"
           variant="outline"
           onClick={() => void start()}
-          disabled={starting || busy || estimate.chunks === 0}
+          disabled={starting || busy || pendingChunks === 0}
         >
           Backfill
         </Button>
@@ -454,6 +519,122 @@ function Backfill({
         <div className="flex min-h-9 items-center border-b border-rule py-2">
           <span role="alert" className="mono text-micro text-destructive">
             {error ?? (run.state === 'failed' ? run.reason : null)}
+          </span>
+        </div>
+      ) : null}
+    </>
+  )
+}
+
+/**
+ * The sensitive slot (SPA-83, D11): a head whose readout says where
+ * sensitive records go, then — beside a cloud pin — one row for the local
+ * model that has tested green, with Set or Clear. Nothing is offered until a
+ * local model is Test-green; with the pin itself local there is nothing to
+ * set. The row's hint is the search readout: the semantic lane reads the
+ * pin's model only, so a slot on another model embeds sensitive records
+ * that semantic search then cannot reach.
+ */
+function SensitiveSlot({
+  pin,
+  slot,
+  keys,
+}: {
+  pin: EmbeddingPinView
+  slot: EmbeddingSettings['slot']
+  keys: ReadonlyArray<EmbeddingKeyRow>
+}) {
+  const router = useRouter()
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const pinLocal = EMBEDDING_PROVIDER_INFO[pin.provider].local
+  const green = keys.flatMap((k) =>
+    EMBEDDING_PROVIDER_INFO[k.provider].local &&
+    k.configured &&
+    k.lastTestOk === true &&
+    k.testedModel !== null
+      ? [{ provider: k.provider, model: k.testedModel }]
+      : [],
+  )
+  const candidate = slot ?? green.at(0) ?? null
+
+  async function set() {
+    if (candidate === null) return
+    setPending(true)
+    setError(null)
+    try {
+      const saved = await setSensitiveSlot({
+        data: { provider: candidate.provider, model: candidate.model },
+      })
+      toast(slotHeadline(saved))
+      void router.invalidate()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not set the slot')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  async function clear() {
+    setPending(true)
+    setError(null)
+    try {
+      await clearSensitiveSlot()
+      toast(NO_SLOT_HEADLINE)
+      void router.invalidate()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not clear the slot')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-baseline gap-3 border-b border-hairline pt-5 pb-2">
+        <h3 className="label-caps text-foreground">Sensitive slot</h3>
+        <span className="mono text-micro text-graphite">
+          {pinLocal
+            ? LOCAL_PIN_HEADLINE
+            : slot
+              ? slotHeadline(slot)
+              : NO_SLOT_HEADLINE}
+        </span>
+      </div>
+      {pinLocal ? null : candidate === null ? (
+        <SettingsRow
+          label="Local model"
+          hint="Offered once a local model tests green above. Until then sensitive records stay unembedded; nothing is sent to the cloud pin."
+        />
+      ) : (
+        <SettingsRow
+          label={`${EMBEDDING_PROVIDER_INFO[candidate.provider].label} ${candidate.model}`}
+          hint={slotSearchNote(pin, candidate)}
+        >
+          <span className="tabular mono text-micro text-graphite">
+            {slot ? `slot · ${PIN_DIMS}` : `tested · ${PIN_DIMS}`}
+          </span>
+          {slot ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void clear()}
+              disabled={pending}
+            >
+              Clear
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => void set()} disabled={pending}>
+              Set
+            </Button>
+          )}
+        </SettingsRow>
+      )}
+      {error ? (
+        <div className="flex min-h-9 items-center border-b border-rule py-2">
+          <span role="alert" className="mono text-micro text-destructive">
+            {error}
           </span>
         </div>
       ) : null}
