@@ -27,6 +27,8 @@ import { DocumentTile } from './document-tile'
 import { KIND_ICONS } from './editor/mention'
 import { SummarizeRowButton, useSummarizer } from './summarize'
 import type { Summarizer } from './summarize'
+import { KeyTermsRowButton, useKeyTermsExtractor } from './key-terms'
+import type { KeyTermsExtractor } from './key-terms'
 import {
   DOCUMENT_KINDS,
   DOCUMENT_KIND_LABELS,
@@ -107,6 +109,8 @@ export function RecordFiles({
     entityId,
     documents.filter((d) => d.extractionStatus === 'done').map((d) => d.id),
   )
+  // Extract key terms (SPA-91): a legal or diligence document on a deal.
+  const keyTermsFor = useKeyTermsExtractor(entityId, documents)
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -241,6 +245,7 @@ export function RecordFiles({
               key={doc.id}
               doc={doc}
               reader={deckReaderFor(doc)}
+              keyTerms={keyTermsFor(doc)}
               summarizer={
                 doc.extractionStatus === 'done' ? summarizerFor(doc.id) : null
               }
@@ -283,11 +288,13 @@ export function RecordFiles({
 function DocumentRow({
   doc,
   reader,
+  keyTerms,
   summarizer,
   onPreview,
 }: {
   doc: Documents[number]
   reader: DeckReader | null
+  keyTerms: KeyTermsExtractor | null
   summarizer: Summarizer | null
   onPreview: () => void
 }) {
@@ -362,6 +369,7 @@ function DocumentRow({
         {summarizer === null ? null : (
           <SummarizeRowButton summarizer={summarizer} />
         )}
+        {keyTerms === null ? null : <KeyTermsRowButton extractor={keyTerms} />}
         {reader === null ? null : (
           <Button
             size="xs"

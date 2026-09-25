@@ -21,10 +21,12 @@ import type { Json } from '#/lib/json'
  *
  * The block types are the ones a summary uses: paragraph, heading (1–6) and
  * bullet list (nested by indentation), with inline links and the bold,
- * italic and code text styles. Anything else in the markdown — a numbered
- * list, a quote, a fence, a table — lands as paragraph text, never dropped:
- * a line the renderer does not know is still a line somebody can read and
- * edit.
+ * italic and code text styles — and, since SPA-91's key terms, a GFM pipe
+ * table (a header row, a `---` delimiter row, body rows), which becomes
+ * BlockNote's own `table` block with the first row as its header. Anything
+ * else in the markdown — a numbered list, a quote, a fence — lands as
+ * paragraph text, never dropped: a line the renderer does not know is still
+ * a line somebody can read and edit.
  *
  * The block shape is BlockNote's own document JSON with its default props
  * spelled out, minus `id`: BlockNote mints ids when it loads a document
@@ -77,8 +79,35 @@ export type NoteBlock =
       content: Array<InlineContent>
       children: Array<NoteBlock>
     }
+  | {
+      type: 'table'
+      props: { textColor: 'default' }
+      content: TableContent
+      children: Array<NoteBlock>
+    }
 
 export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6
+
+/**
+ * BlockNote's table content, as its editor stores it: one header row, every
+ * cell an explicit `tableCell` with its default props. `columnWidths` is one
+ * `null` per column — unset, the width the editor picks — spelled `null`
+ * rather than `undefined` because the column is JSON.
+ */
+export type TableContent = {
+  type: 'tableContent'
+  columnWidths: Array<null>
+  headerRows: 1
+  rows: Array<{ cells: Array<TableCell> }>
+}
+
+export type TableCell = {
+  type: 'tableCell'
+  props: BaseProps & { colspan: 1; rowspan: 1 }
+  content: Array<InlineContent>
+}
+
+type ListItemBlock = Extract<NoteBlock, { type: 'bulletListItem' }>
 
 const BASE_PROPS: BaseProps = {
   backgroundColor: 'default',
@@ -192,13 +221,79 @@ const paragraph = (text: string): NoteBlock => ({
   children: [],
 })
 
-type OpenItem = { indent: number; block: NoteBlock; text: string }
+type OpenItem = { indent: number; block: ListItemBlock; text: string }
+
+/**
+ * A table row's cells: the outer pipes dropped, split on every `|` that is
+ * not escaped. A backslash pair is kept whole — `parseInline` unescapes it —
+ * so `\|` stays inside its cell and `\\` does not escape the pipe after it.
+ */
+function splitRow(line: string): Array<string> {
+  const cells: Array<string> = []
+  let cell = ''
+  const body = line.trim().replace(/^\|/, '')
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i]
+    if (c === '\\' && i + 1 < body.length) {
+      cell += c + body[i + 1]
+      i++
+    } else if (c === '|') {
+      cells.push(cell.trim())
+      cell = ''
+    } else cell += c
+  }
+  // A trailing pipe closes the last cell; text after the last pipe is one.
+  if (cell.trim() !== '' || !body.trimEnd().endsWith('|'))
+    cells.push(cell.trim())
+  return cells
+}
+
+const DELIMITER_CELL = /^:?-+:?$/
+
+/** Whether `line` opens a table whose delimiter row is `next`. */
+function tableHead(line: string, next: string | undefined): number | null {
+  if (next === undefined || !/(^|[^\\])\|/.test(line)) return null
+  const head = splitRow(line)
+  const delim = splitRow(next)
+  if (
+    head.length === 0 ||
+    delim.length !== head.length ||
+    !delim.every((d) => DELIMITER_CELL.test(d))
+  )
+    return null
+  return head.length
+}
+
+const cell = (text: string): TableCell => ({
+  type: 'tableCell',
+  props: { ...BASE_PROPS, colspan: 1, rowspan: 1 },
+  content: parseInline(text),
+})
+
+/** Rows of cells → one table block, every row padded or cut to `width`. */
+function table(rows: Array<Array<string>>, width: number): NoteBlock {
+  return {
+    type: 'table',
+    props: { textColor: 'default' },
+    content: {
+      type: 'tableContent',
+      columnWidths: Array.from({ length: width }, () => null),
+      headerRows: 1,
+      rows: rows.map((r) => ({
+        cells: Array.from({ length: width }, (_, i) => cell(r.at(i) ?? '')),
+      })),
+    },
+    children: [],
+  }
+}
 
 /**
  * Markdown → blocks. Line-oriented: a blank line ends a paragraph, a `#`
  * line is a heading, a `-`/`*`/`+` line is a bullet whose indentation
- * against the open items above it decides its parent, and a line indented
- * under an item continues that item's text.
+ * against the open items above it decides its parent, a line indented
+ * under an item continues that item's text, and a piped line followed by a
+ * matching `---` delimiter row opens a table that runs to the first line
+ * with no pipe.
  */
 export function markdownToBlocks(markdown: string): Array<NoteBlock> {
   const blocks: Array<NoteBlock> = []
@@ -219,10 +314,27 @@ export function markdownToBlocks(markdown: string): Array<NoteBlock> {
     finishItems()
   }
 
-  for (const raw of markdown.replace(/\r\n?/g, '\n').split('\n')) {
-    const line = raw.replace(/[ \t]+$/, '')
+  const lines = markdown
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((raw) => raw.replace(/[ \t]+$/, ''))
+  for (let at = 0; at < lines.length; at++) {
+    const line = lines[at]
     if (line.trim() === '') {
       flushPara()
+      continue
+    }
+    const width = tableHead(line, lines.at(at + 1))
+    if (width !== null) {
+      flushAll()
+      const rows = [splitRow(line)]
+      at += 2
+      while (at < lines.length && lines[at].includes('|')) {
+        rows.push(splitRow(lines[at]))
+        at++
+      }
+      at--
+      blocks.push(table(rows, width))
       continue
     }
     if (FENCE.test(line) || RULE.test(line)) {
@@ -248,7 +360,7 @@ export function markdownToBlocks(markdown: string): Array<NoteBlock> {
     if (bullet) {
       flushPara()
       const indent = columns(bullet[1])
-      const block: NoteBlock = {
+      const block: ListItemBlock = {
         type: 'bulletListItem',
         props: { ...BASE_PROPS },
         content: [],
@@ -349,8 +461,42 @@ function inlineToMarkdown(content: Json | undefined): string {
 const guardLead = (s: string): string =>
   s.replace(/^(#{1,6}[ \t]|[-+][ \t])/, '\\$1')
 
+/** A table cell's markdown: one line, and its own pipes escaped. */
+const cellText = (content: Json | undefined): string =>
+  inlineToMarkdown(content)
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/\|/g, '\\|')
+    .trim()
+
+/**
+ * A table as GFM: its first row is the header, whatever `headerRows` says —
+ * GFM has no headerless table — and every row is padded to the widest. A
+ * cell is a `tableCell` or, in BlockNote's older shape, the bare inline
+ * array.
+ */
+function tableLines(content: Json | undefined): Array<string> {
+  if (!isRecord(content)) return []
+  const rows = arrayOf(content.rows).map((row) =>
+    isRecord(row)
+      ? arrayOf(row.cells).map((c) =>
+          cellText(isRecord(c) ? c.content : Array.isArray(c) ? c : []),
+        )
+      : [],
+  )
+  const width = Math.max(0, ...rows.map((r) => r.length))
+  if (rows.length === 0 || width === 0) return []
+  const line = (cells: Array<string>) =>
+    `| ${Array.from({ length: width }, (_, i) => cells.at(i) ?? '').join(' | ')} |`
+  return [
+    line(rows[0]),
+    line(Array.from({ length: width }, () => '---')),
+    ...rows.slice(1).map(line),
+  ]
+}
+
 function blockLines(block: Json, depth: number): Array<string> {
   if (!isRecord(block)) return []
+  if (block.type === 'table') return tableLines(block.content)
   const pad = '  '.repeat(depth)
   const text = inlineToMarkdown(block.content)
   const children = arrayOf(block.children).flatMap((c) =>
@@ -376,7 +522,8 @@ function blockLines(block: Json, depth: number): Array<string> {
 
 /**
  * Blocks → markdown: a heading per `#` line, a bullet per `- ` line nested
- * two spaces a level, a blank line between blocks and none inside a list.
+ * two spaces a level, a table as GFM pipe rows, a blank line between blocks
+ * and none inside a list.
  * The inverse of `markdownToBlocks` over the blocks it writes — which is
  * what makes `body_md` a function of `body_json`.
  */

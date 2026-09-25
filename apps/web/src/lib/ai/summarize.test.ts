@@ -20,6 +20,7 @@ import { readNotePayload } from '@spaces/core/ai/note'
 import { QUEUES } from '@spaces/core/queue/names'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { enqueued } from '#/test/queue-stub'
+import { editorBlocks } from '#/test/note-blocks'
 import { jsonValue } from '#/lib/json'
 import type { Json } from '#/lib/json'
 import { resolveEntity } from '#/lib/entities/resolve'
@@ -307,7 +308,9 @@ describe('summarize a document', () => {
     if (!payload) throw new Error('no note payload')
     const rendered = noteBodyFromMarkdown(payload.markdown).bodyJson
     expect(row.bodyJson).toEqual(stored(rendered))
-    const editor = BlockNoteEditor.create({ initialContent: rendered })
+    const editor = BlockNoteEditor.create({
+      initialContent: editorBlocks(rendered),
+    })
     const opened = stored(editor.document)
     expect(withoutIds(opened)).toEqual(row.bodyJson)
     expect(opened.map(typeOf)).toEqual([

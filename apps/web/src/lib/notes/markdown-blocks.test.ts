@@ -8,6 +8,7 @@ import {
   noteBodyFromMarkdown,
   parseInline,
 } from './markdown-blocks'
+import { editorBlocks } from '#/test/note-blocks'
 
 /**
  * SPA-66. The server's markdown → BlockNote renderer, pure: nothing here
@@ -210,7 +211,9 @@ describe('blocksToMarkdown', () => {
 describe('noteBodyFromMarkdown → the editor', () => {
   it('opens populated in BlockNote, and bodyMd is the markdown of what opened', () => {
     const { bodyJson, bodyMd } = noteBodyFromMarkdown(SUMMARY)
-    const editor = BlockNoteEditor.create({ initialContent: bodyJson })
+    const editor = BlockNoteEditor.create({
+      initialContent: editorBlocks(bodyJson),
+    })
     const opened = stored(editor.document)
 
     // What the editor holds is exactly what was stored, ids aside.
@@ -218,5 +221,90 @@ describe('noteBodyFromMarkdown → the editor', () => {
     // And the stored markdown is the markdown of that document.
     expect(blocksToMarkdown(opened)).toBe(bodyMd)
     expect(bodyMd).toContain('(acme\\_dd.pdf, p.12)')
+  })
+})
+
+/** SPA-91: the key-terms note is a term / value / citation table. */
+const TERMS = [
+  'Read from the term sheet.',
+  '',
+  '| Term | Value | Citation |',
+  '| --- | --- | --- |',
+  '| Liquidation preference | 1x **non-participating** | term\\_sheet.pdf, p.2 |',
+  '| Pro-rata | Major investors \\| above $1M | term\\_sheet.pdf, p.3 |',
+  '| Governing law | England |',
+].join('\n')
+
+const C = { ...P, colspan: 1, rowspan: 1 }
+const cell = (...content: Array<ReturnType<typeof text>>) => ({
+  type: 'tableCell',
+  props: C,
+  content,
+})
+
+describe('tables', () => {
+  it('reads a pipe table into one BlockNote table, header first, rows padded', () => {
+    const blocks = markdownToBlocks(TERMS)
+    expect(blocks.map((b) => b.type)).toEqual(['paragraph', 'table'])
+    expect(blocks[1]).toEqual({
+      type: 'table',
+      props: { textColor: 'default' },
+      content: {
+        type: 'tableContent',
+        columnWidths: [null, null, null],
+        headerRows: 1,
+        rows: [
+          {
+            cells: [
+              cell(text('Term')),
+              cell(text('Value')),
+              cell(text('Citation')),
+            ],
+          },
+          {
+            cells: [
+              cell(text('Liquidation preference')),
+              cell(text('1x '), text('non-participating', { bold: true })),
+              cell(text('term_sheet.pdf, p.2')),
+            ],
+          },
+          {
+            cells: [
+              cell(text('Pro-rata')),
+              cell(text('Major investors | above $1M')),
+              cell(text('term_sheet.pdf, p.3')),
+            ],
+          },
+          {
+            cells: [cell(text('Governing law')), cell(text('England')), cell()],
+          },
+        ],
+      },
+      children: [],
+    })
+  })
+
+  it('leaves a piped line with no delimiter row as paragraph text', () => {
+    expect(markdownToBlocks('a | b\nc | d').map((b) => b.type)).toEqual([
+      'paragraph',
+    ])
+  })
+
+  it('writes a table back as GFM that reads back as itself', () => {
+    const blocks = markdownToBlocks(TERMS)
+    const md = blocksToMarkdown(blocks)
+    expect(md).toContain('| Term | Value | Citation |\n| --- | --- | --- |\n')
+    expect(md).toContain('| Major investors \\| above $1M |')
+    expect(markdownToBlocks(md)).toEqual(blocks)
+  })
+
+  it('opens in BlockNote as itself, and bodyMd is the markdown of what opened', () => {
+    const { bodyJson, bodyMd } = noteBodyFromMarkdown(TERMS)
+    const editor = BlockNoteEditor.create({
+      initialContent: editorBlocks(bodyJson),
+    })
+    const opened = stored(editor.document)
+    expect(withoutIds(opened)).toEqual(stored(bodyJson))
+    expect(blocksToMarkdown(opened)).toBe(bodyMd)
   })
 })

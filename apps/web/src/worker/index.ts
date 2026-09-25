@@ -16,6 +16,7 @@ import { embedSource } from './jobs/embed-source'
 import { embedBackfill, embedBackfillRetry } from './jobs/embed-backfill'
 import { classifyDocument } from './jobs/classify-document'
 import { suggestSpaces } from './jobs/suggest-spaces'
+import { extractKeyTerms } from './jobs/extract-key-terms'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -153,6 +154,27 @@ async function main() {
     QUEUES.suggestSpaces,
     { batchSize: 1, includeMetadata: true },
     runJob(suggestSpaces, { host, layer: Layer.empty }),
+  )
+  // Key terms (SPA-91): the deck reader's shape — `exclusive` with
+  // `singletonKey = documentId`, so a second press while one is queued or
+  // active is refused by pg-boss; no retries, since every failure is
+  // permanent and every retry a model call. Created before the plain create
+  // loop below, which would otherwise make it `standard` first — a queue's
+  // policy is fixed at create. A batch of one; no Layer — its I/O is `db`
+  // and `complete()`.
+  await boss
+    .createQueue(QUEUES.extractKeyTerms, { policy: 'exclusive' })
+    .catch(() => {})
+  if (extractKeyTerms.retry)
+    await boss.updateQueue(QUEUES.extractKeyTerms, {
+      retryLimit: extractKeyTerms.retry.limit,
+      retryDelay: extractKeyTerms.retry.delaySeconds,
+      retryBackoff: extractKeyTerms.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.extractKeyTerms,
+    { batchSize: 1, includeMetadata: true },
+    runJob(extractKeyTerms, { host, layer: Layer.empty }),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots

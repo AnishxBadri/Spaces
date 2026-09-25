@@ -1,0 +1,413 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`keyTermsSchema > is the diligence output type 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "change_of_control": {
+      "additionalProperties": false,
+      "description": "Change-of-control, assignment or termination clauses an investment or a sale would trigger",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Change of control",
+      "type": "object",
+    },
+    "ip_ownership": {
+      "additionalProperties": false,
+      "description": "Whether the company owns its IP: invention assignment from founders, employees and contractors, and any gap found",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "IP ownership",
+      "type": "object",
+    },
+    "key_person": {
+      "additionalProperties": false,
+      "description": "Reliance on named individuals, vesting and leaver terms for founders",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Key-person dependency",
+      "type": "object",
+    },
+    "litigation": {
+      "additionalProperties": false,
+      "description": "Pending or threatened disputes, claims or proceedings",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Litigation",
+      "type": "object",
+    },
+    "material_contracts": {
+      "additionalProperties": false,
+      "description": "The contracts the business depends on, and any unusual term in them",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Material contracts",
+      "type": "object",
+    },
+    "open_items": {
+      "additionalProperties": false,
+      "description": "Diligence items still outstanding, and red flags the document raises",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Open items",
+      "type": "object",
+    },
+    "regulatory": {
+      "additionalProperties": false,
+      "description": "Licences, data protection and other regulatory findings or exposures",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Regulatory",
+      "type": "object",
+    },
+  },
+  "title": "Key diligence findings",
+  "type": "object",
+}
+`;
+
+exports[`keyTermsSchema > is the legal output type 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "anti_dilution": {
+      "additionalProperties": false,
+      "description": "The anti-dilution protection: full ratchet, or broad-based or narrow-based weighted average",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Anti-dilution",
+      "type": "object",
+    },
+    "board_composition": {
+      "additionalProperties": false,
+      "description": "Board size, who appoints each seat, observers, and any independent director",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Board composition",
+      "type": "object",
+    },
+    "exclusivity": {
+      "additionalProperties": false,
+      "description": "A no-shop or exclusivity period: its length and what it forbids",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Exclusivity",
+      "type": "object",
+    },
+    "governing_law": {
+      "additionalProperties": false,
+      "description": "The governing law and the jurisdiction for disputes",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Governing law",
+      "type": "object",
+    },
+    "information_rights": {
+      "additionalProperties": false,
+      "description": "What reporting investors receive, how often, and any ownership threshold for it",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Information rights",
+      "type": "object",
+    },
+    "liquidation_preference": {
+      "additionalProperties": false,
+      "description": "The multiple, whether participating or non-participating, any cap, and seniority against other series",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Liquidation preference",
+      "type": "object",
+    },
+    "pro_rata": {
+      "additionalProperties": false,
+      "description": "Pre-emption or pro-rata rights in future rounds: who holds them, any threshold, and how long they last",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Pro-rata",
+      "type": "object",
+    },
+    "protective_provisions": {
+      "additionalProperties": false,
+      "description": "Investor consent or veto rights: the matters listed and the majority needed",
+      "properties": {
+        "refs": {
+          "description": "Refs of the context items this term was read from",
+          "items": {
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "value": {
+          "description": "The term as the document states it, briefly",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+      ],
+      "title": "Protective provisions",
+      "type": "object",
+    },
+  },
+  "title": "Key legal terms",
+  "type": "object",
+}
+`;

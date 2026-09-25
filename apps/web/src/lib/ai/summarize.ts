@@ -136,8 +136,11 @@ export type SummarizeInput = {
 
 type Source = { id: string; name: string; what: string }
 
-/** A document's own text as context items, one per chunk, page-labelled. */
-const documentItems = Effect.fn('summarize.documentItems')(function* (
+/**
+ * A document's own text as context items, one per chunk, page-labelled.
+ * Also the key-terms reader's context (SPA-91, `./key-terms.ts`).
+ */
+export const documentItems = Effect.fn('summarize.documentItems')(function* (
   documentId: string,
   label: string,
   extractedText: string | null,
@@ -184,8 +187,9 @@ const where = (page: number | null, idx: number): string =>
  * and page ("DD pack.pdf, p.4") — the page, not `cite.ts`'s chunk index,
  * because a person checks a citation against the PDF. Everything else is
  * `resolveRefsProgram`'s label; a missing target gets none, and is dropped.
+ * The key-terms table's citation column reads the same words (SPA-91).
  */
-const citationLabels = Effect.fn('summarize.citationLabels')(function* (
+export const citationLabels = Effect.fn('summarize.citationLabels')(function* (
   refs: ReadonlyArray<string>,
 ): Effect.fn.Return<Map<string, string>, SummarizeQueryFailed> {
   const labels = new Map<string, string>()

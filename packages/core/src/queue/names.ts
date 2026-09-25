@@ -85,6 +85,15 @@ export const QUEUES = {
    * refused by pg-boss.
    */
   summarize: 'entity.summarize',
+  /**
+   * Key terms (SPA-91): a `legal` or `dd` document filed on a deal → one
+   * `suggestion(kind: 'note')` per deal, its body a term / value / citation
+   * table. `document.` because the job reads one document. Created
+   * `exclusive` and sent with `singletonKey = documentId`, the deck reader's
+   * policy: a second press while one is queued or active is refused by
+   * pg-boss.
+   */
+  extractKeyTerms: 'document.key-terms',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
