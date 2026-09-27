@@ -21,6 +21,8 @@ import { cachedExtractProgram } from './extraction-cache'
 import { proposeProgram, suggestionMessage } from './propose'
 import type { Suggestion, SuggestionFailure } from './propose'
 import { providerFailure } from './providers/test-call'
+import { callStep, suggestionOutputRef, withRun } from './run'
+import type { RunScope } from './run'
 import { sensitivityFor } from './sensitivity-for'
 import type {
   SensitivityEntityNotFound,
@@ -132,6 +134,8 @@ export type KeyTermsInput = {
   /** The test seam: an injected model replaces the vault lookup. */
   model?: LanguageModel
   jobRunId?: string
+  /** A run this is a step of (SPA-100); absent, it opens its own. */
+  runId?: string
 }
 
 export type KeyTermsResult = {
@@ -173,6 +177,22 @@ const TASK = (kind: KeyTermKind, filename: string) =>
 
 export const keyTermsProgram = Effect.fn('keyTerms')(function* (
   input: KeyTermsInput,
+): Effect.fn.Return<KeyTermsResult, KeyTermsFailure> {
+  return yield* withRun(
+    input.runId,
+    {
+      task: 'Extract key terms',
+      entityId: input.documentId,
+      startedBy: { type: 'user', id: input.userId },
+    },
+    (run) => keyTermsInRun(input, run),
+    keyTermsMessage,
+  )
+})
+
+const keyTermsInRun = Effect.fn('keyTerms.inRun')(function* (
+  input: KeyTermsInput,
+  run: RunScope,
 ): Effect.fn.Return<KeyTermsResult, KeyTermsFailure> {
   const doc = (yield* query(() =>
     db
@@ -225,6 +245,7 @@ export const keyTermsProgram = Effect.fn('keyTerms')(function* (
     }
   }
 
+  const runId = yield* run.id
   const answered = yield* cachedExtractProgram(
     {
       blobSha: doc.blobSha,
@@ -242,8 +263,19 @@ export const keyTermsProgram = Effect.fn('keyTerms')(function* (
       task: TASK(kind, filename),
       ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
+      runId,
     },
   )
+  const step = (outputRef: string | null) =>
+    run.step(
+      callStep(
+        'extract',
+        items.map((i) => i.ref),
+        answered,
+        outputRef,
+        input.jobRunId,
+      ),
+    )
   const raw =
     answered.output.kind === 'object' ? answered.output.object : undefined
   const { terms, dropped } = readKeyTerms(kind, raw)
@@ -265,10 +297,12 @@ export const keyTermsProgram = Effect.fn('keyTerms')(function* (
     if (words !== '')
       rows.push({ term: t.term, value: t.value, citation: words, refs: t.refs })
   }
-  if (rows.length === 0)
+  if (rows.length === 0) {
+    yield* step(null)
     return yield* new KeyTermsRefused({
       message: `No key terms found in ${filename}`,
     })
+  }
 
   const payload: NotePayload = {
     title: `Key terms: ${filename}`.slice(0, 300),
@@ -310,9 +344,12 @@ export const keyTermsProgram = Effect.fn('keyTerms')(function* (
         payload,
         rationale,
         refs,
+        runId,
         proposedBy: { type: 'user', id: input.userId },
       }),
     )
+  const out = suggestions.at(0)
+  yield* step(out === undefined ? null : suggestionOutputRef(out.id))
   return { suggestions, terms: rows.length }
 })
 

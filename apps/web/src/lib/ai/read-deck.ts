@@ -25,6 +25,8 @@ import { cachedExtractProgram } from './extraction-cache'
 import { proposeProgram, registryFor, suggestionMessage } from './propose'
 import type { Suggestion, SuggestionFailure } from './propose'
 import { providerFailure } from './providers/test-call'
+import { callStep, suggestionOutputRef, withRun } from './run'
+import type { RunScope, RunStepInput } from './run'
 import { sensitivityFor } from './sensitivity-for'
 import type {
   SensitivityEntityNotFound,
@@ -151,6 +153,12 @@ export type ReadDeckInput = {
   /** ISO 8601; defaults to now. */
   asOf?: string
   jobRunId?: string
+  /**
+   * The run this read is a step of (SPA-100) — "Read deck and summarize"
+   * opens one and hands it here. Absent, the read opens and closes its own
+   * one-step run ("Read deck").
+   */
+  runId?: string
 }
 
 export type ReadDeckResult = {
@@ -174,6 +182,8 @@ type Read = {
   heldBack: Array<string>
   /** Set when the extraction cache answered: who read it, and when. */
   cached: { model: string; at: string } | null
+  /** The run step this read is, its output filled in once it has proposed. */
+  step: RunStepInput
 }
 
 /** Deck text as context items — the chunks, or the extracted text whole. */
@@ -256,6 +266,22 @@ const TASK = (target: Target, filename: string) =>
 export const readDeckProgram = Effect.fn('readDeck')(function* (
   input: ReadDeckInput,
 ): Effect.fn.Return<ReadDeckResult, ReadDeckFailure> {
+  return yield* withRun(
+    input.runId,
+    {
+      task: 'Read deck',
+      entityId: input.documentId,
+      startedBy: { type: 'user', id: input.userId },
+    },
+    (run) => readDeckInRun(input, run),
+    readDeckMessage,
+  )
+})
+
+const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
+  input: ReadDeckInput,
+  run: RunScope,
+): Effect.fn.Return<ReadDeckResult, ReadDeckFailure> {
   const doc = (yield* query(() =>
     db
       .select({
@@ -322,6 +348,8 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
     })
 
   const asOf = input.asOf ?? new Date().toISOString()
+  // Every refusal is behind us: the run opens here, at its first call.
+  const runId = yield* run.id
   const reads: Array<Read> = []
   // Sequential on purpose: each call is its own `ai_usage` row and its own
   // provider request, and nothing is written until every one has answered.
@@ -364,6 +392,7 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
         task: TASK(target, filename),
         ...(input.model === undefined ? {} : { model: input.model }),
         ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
+        runId,
       },
     )
     const raw =
@@ -391,6 +420,13 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
         answered.cachedAt === null
           ? null
           : { model: answered.target.model, at: answered.cachedAt },
+      step: callStep(
+        'extract',
+        items.map((i) => i.ref),
+        answered,
+        null,
+        input.jobRunId,
+      ),
     })
   }
 
@@ -401,8 +437,10 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
         entityId: read.target.id,
         reason: `Nothing in ${filename} held for ${read.target.name}`,
       })
+      yield* run.step(read.step)
       continue
     }
+    const first = suggestions.length
     if (Object.keys(read.proposal).length > 0) {
       // The values came off the wire as JSON and passed the validators, so
       // this decode is the type's claim made once, not a filter that bites.
@@ -418,6 +456,7 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
           payload: payload.data,
           rationale: rationaleFor(read, reads, filename, skipped),
           refs: proposalRefs(read.proposal),
+          runId,
           proposedBy: { type: 'user', id: input.userId },
         }),
       )
@@ -432,9 +471,17 @@ export const readDeckProgram = Effect.fn('readDeck')(function* (
           payload: identityPayloadOf(person.claim, person.slug),
           rationale: identityRationale(person, read, filename),
           refs: person.refs,
+          runId,
           proposedBy: { type: 'user', id: input.userId },
         }),
       )
+    // One step per call, in call order; its output is the first suggestion
+    // it wrote — the run's whole yield is every `suggestion.run_id` row.
+    const out = suggestions.at(first)
+    yield* run.step({
+      ...read.step,
+      outputRef: out === undefined ? null : suggestionOutputRef(out.id),
+    })
   }
   return { suggestions, skipped }
 })
@@ -518,10 +565,15 @@ export type ReadDeckEnqueued =
  * so pg-boss itself refuses a second send while one is queued or active and
  * answers `null`; the jobs read back tell that refusal from a queue that is
  * down.
+ *
+ * `summarizeOnto` is Read deck and summarize (SPA-100): the same job, keyed
+ * the same, with the record the summary lands on — one read of a deck at a
+ * time, whichever button pressed it.
  */
 export const enqueueReadDeckProgram = Effect.fn('enqueueReadDeck')(function* (
   documentId: string,
   userId: string,
+  summarizeOnto?: string,
 ): Effect.fn.Return<ReadDeckEnqueued, ReadDeckRefused | ReadDeckQueryFailed> {
   const doc = (yield* query(() =>
     db
@@ -538,7 +590,9 @@ export const enqueueReadDeckProgram = Effect.fn('enqueueReadDeck')(function* (
   const jobId = yield* query(() =>
     enqueue(
       QUEUES.readDeck,
-      { documentId, userId },
+      summarizeOnto === undefined
+        ? { documentId, userId }
+        : { documentId, userId, summarizeOnto },
       { singletonKey: documentId },
     ),
   )

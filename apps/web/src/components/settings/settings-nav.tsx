@@ -90,6 +90,14 @@ export const SETTINGS_SECTIONS = [
     admin: true,
   },
   {
+    // ai-25 (SPA-100): the run log. Provenance the inbox links every member
+    // to, and a page that writes nothing — not admin-only.
+    to: '/settings/usage',
+    label: 'AI usage',
+    group: 'workspace',
+    admin: false,
+  },
+  {
     // ai-23a (SPA-23): the MCP server's per-user tokens. A token is its
     // owner's, so every member manages their own — not admin-only.
     to: '/settings/tokens',

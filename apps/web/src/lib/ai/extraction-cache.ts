@@ -145,7 +145,16 @@ export type CachedExtractResult = {
   target: AiTarget
   /** When the stored answer was written — null when this run called. */
   cachedAt: string | null
+  /** What the call reported; both null on a hit, which made no call. */
+  usage: { tokensIn: number | null; tokensOut: number | null }
+  /** The key the call resolved; null on a hit or for an injected model. */
+  credentialId: string | null
 }
+
+const NO_CALL = {
+  usage: { tokensIn: null, tokensOut: null },
+  credentialId: null,
+} as const
 
 export const cachedExtractProgram = Effect.fn('cachedExtract')(function* (
   source: ExtractSource,
@@ -156,7 +165,13 @@ export const cachedExtractProgram = Effect.fn('cachedExtract')(function* (
   const { blobSha, documentId } = source
   if (blobSha === null) {
     const answered = yield* completeProgram('extract', items, schema, opts)
-    return { output: answered.output, target: answered.target, cachedAt: null }
+    return {
+      output: answered.output,
+      target: answered.target,
+      cachedAt: null,
+      usage: answered.usage,
+      credentialId: answered.credentialId,
+    }
   }
 
   const target = yield* laneTargetProgram('extract', opts)
@@ -195,6 +210,7 @@ export const cachedExtractProgram = Effect.fn('cachedExtract')(function* (
       },
       target,
       cachedAt: hit.at.toISOString(),
+      ...NO_CALL,
     }
   }
 
@@ -224,5 +240,11 @@ export const cachedExtractProgram = Effect.fn('cachedExtract')(function* (
         Effect.logWarning('extraction cache write failed', error),
       ),
     )
-  return { output: answered.output, target: answered.target, cachedAt: null }
+  return {
+    output: answered.output,
+    target: answered.target,
+    cachedAt: null,
+    usage: answered.usage,
+    credentialId: answered.credentialId,
+  }
 })

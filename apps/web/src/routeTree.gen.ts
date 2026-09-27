@@ -43,6 +43,7 @@ import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/m
 import { Route as AppSettingsObjectsRouteImport } from './routes/_app/settings/objects'
 import { Route as AppSettingsTemplatesRouteImport } from './routes/_app/settings/templates'
 import { Route as AppSettingsTokensRouteImport } from './routes/_app/settings/tokens'
+import { Route as AppSettingsUsageRouteImport } from './routes/_app/settings/usage'
 import { Route as AppSettingsWorkspaceRouteImport } from './routes/_app/settings/workspace'
 import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
 import { Route as AppTermsTermIdRouteImport } from './routes/_app/terms.$termId'
@@ -220,6 +221,11 @@ const AppSettingsTokensRoute = AppSettingsTokensRouteImport.update({
   path: '/tokens',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsUsageRoute = AppSettingsUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsWorkspaceRoute = AppSettingsWorkspaceRouteImport.update({
   id: '/workspace',
   path: '/workspace',
@@ -290,6 +296,7 @@ export interface FileRoutesByFullPath {
   '/settings/objects': typeof AppSettingsObjectsRoute
   '/settings/templates': typeof AppSettingsTemplatesRoute
   '/settings/tokens': typeof AppSettingsTokensRoute
+  '/settings/usage': typeof AppSettingsUsageRoute
   '/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/terms/$termId': typeof AppTermsTermIdRoute
@@ -331,6 +338,7 @@ export interface FileRoutesByTo {
   '/settings/objects': typeof AppSettingsObjectsRoute
   '/settings/templates': typeof AppSettingsTemplatesRoute
   '/settings/tokens': typeof AppSettingsTokensRoute
+  '/settings/usage': typeof AppSettingsUsageRoute
   '/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/terms/$termId': typeof AppTermsTermIdRoute
@@ -375,6 +383,7 @@ export interface FileRoutesById {
   '/_app/settings/objects': typeof AppSettingsObjectsRoute
   '/_app/settings/templates': typeof AppSettingsTemplatesRoute
   '/_app/settings/tokens': typeof AppSettingsTokensRoute
+  '/_app/settings/usage': typeof AppSettingsUsageRoute
   '/_app/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
   '/_app/terms/$termId': typeof AppTermsTermIdRoute
@@ -419,6 +428,7 @@ export interface FileRouteTypes {
     | '/settings/objects'
     | '/settings/templates'
     | '/settings/tokens'
+    | '/settings/usage'
     | '/settings/workspace'
     | '/spaces/$spaceId'
     | '/terms/$termId'
@@ -460,6 +470,7 @@ export interface FileRouteTypes {
     | '/settings/objects'
     | '/settings/templates'
     | '/settings/tokens'
+    | '/settings/usage'
     | '/settings/workspace'
     | '/spaces/$spaceId'
     | '/terms/$termId'
@@ -503,6 +514,7 @@ export interface FileRouteTypes {
     | '/_app/settings/objects'
     | '/_app/settings/templates'
     | '/_app/settings/tokens'
+    | '/_app/settings/usage'
     | '/_app/settings/workspace'
     | '/_app/spaces_/$spaceId'
     | '/_app/terms/$termId'
@@ -765,6 +777,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsTokensRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/usage': {
+      id: '/_app/settings/usage'
+      path: '/usage'
+      fullPath: '/settings/usage'
+      preLoaderRoute: typeof AppSettingsUsageRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/workspace': {
       id: '/_app/settings/workspace'
       path: '/workspace'
@@ -825,6 +844,7 @@ interface AppSettingsRouteChildren {
   AppSettingsObjectsRoute: typeof AppSettingsObjectsRoute
   AppSettingsTemplatesRoute: typeof AppSettingsTemplatesRoute
   AppSettingsTokensRoute: typeof AppSettingsTokensRoute
+  AppSettingsUsageRoute: typeof AppSettingsUsageRoute
   AppSettingsWorkspaceRoute: typeof AppSettingsWorkspaceRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
@@ -837,6 +857,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsObjectsRoute: AppSettingsObjectsRoute,
   AppSettingsTemplatesRoute: AppSettingsTemplatesRoute,
   AppSettingsTokensRoute: AppSettingsTokensRoute,
+  AppSettingsUsageRoute: AppSettingsUsageRoute,
   AppSettingsWorkspaceRoute: AppSettingsWorkspaceRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
 }

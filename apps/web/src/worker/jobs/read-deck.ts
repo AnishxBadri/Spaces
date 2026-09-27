@@ -2,7 +2,11 @@ import { Effect } from 'effect'
 import { z } from 'zod'
 import { QUEUES } from '@spaces/core/queue/names'
 import { readDeckMessage, readDeckProgram } from '#/lib/ai/read-deck'
-import type { ReadDeckInput } from '#/lib/ai/read-deck'
+import {
+  readDeckSummarizeMessage,
+  readDeckSummarizeProgram,
+} from '#/lib/ai/read-deck-summarize'
+import type { ReadDeckSummarizeInput } from '#/lib/ai/read-deck-summarize'
 import { JobPermanent } from '../run-job'
 import type { JobDef } from '../run-job'
 
@@ -16,21 +20,41 @@ import type { JobDef } from '../run-job'
  * cost. The failure's sentence is the job's output (`JobOutcome.reason`),
  * which `readDeckStatus` reads back for the Files tab's toast — no column on
  * `document` is borrowed for it; `extraction_error` is extraction's.
+ *
+ * **Read deck and summarize** (SPA-100) is the same job with
+ * `summarizeOnto` set: the record to summarize the deck onto, after the read,
+ * in one two-step run (`lib/ai/read-deck-summarize.ts`). One queue, so one
+ * deck is read once at a time whichever button was pressed, and the Files
+ * tab's status and toast read both the same way.
  */
 
 export const readDeckData = z.object({
   documentId: z.string().uuid(),
   userId: z.string().min(1),
+  /** Set by "Read deck and summarize": the record the summary lands on. */
+  summarizeOnto: z.string().uuid().optional(),
 })
 
 export type ReadDeckData = z.infer<typeof readDeckData>
 
+/** The test seam: one injected model per lane the job may call. */
+export type ReadDeckSeam = Pick<
+  ReadDeckSummarizeInput,
+  'extractModel' | 'synthesizeModel'
+>
+
 /** The job's body, with the model seam the test uses. */
-export const runReadDeck = (
-  data: ReadDeckData,
-  seam: Pick<ReadDeckInput, 'model'> = {},
-) =>
-  readDeckProgram({ ...data, ...seam }).pipe(
+export const runReadDeck = (data: ReadDeckData, seam: ReadDeckSeam = {}) =>
+  data.summarizeOnto === undefined
+    ? readOnly(data, seam)
+    : readAndSummarize(data, data.summarizeOnto, seam)
+
+const readOnly = (data: ReadDeckData, seam: ReadDeckSeam) =>
+  readDeckProgram({
+    documentId: data.documentId,
+    userId: data.userId,
+    ...(seam.extractModel === undefined ? {} : { model: seam.extractModel }),
+  }).pipe(
     Effect.tap((r) =>
       Effect.sync(() => {
         console.log(
@@ -41,6 +65,31 @@ export const runReadDeck = (
     Effect.asVoid,
     Effect.catch(
       (failure) => new JobPermanent({ reason: readDeckMessage(failure) }),
+    ),
+  )
+
+const readAndSummarize = (
+  data: ReadDeckData,
+  recordId: string,
+  seam: ReadDeckSeam,
+) =>
+  readDeckSummarizeProgram({
+    documentId: data.documentId,
+    recordId,
+    userId: data.userId,
+    ...seam,
+  }).pipe(
+    Effect.tap((r) =>
+      Effect.sync(() => {
+        console.log(
+          `[worker] read and summarized ${data.documentId} onto ${recordId}: run ${r.runId}, ${String(r.read.suggestions.length + 1)} suggestion(s)`,
+        )
+      }),
+    ),
+    Effect.asVoid,
+    Effect.catch(
+      (failure) =>
+        new JobPermanent({ reason: readDeckSummarizeMessage(failure) }),
     ),
   )
 

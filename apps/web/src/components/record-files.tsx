@@ -46,6 +46,7 @@ import {
   isLaneRouted,
   listSpaces,
   readDeck,
+  readDeckAndSummarize,
   readDeckStatus,
   reExtractDocument,
   searchEntities,
@@ -74,8 +75,16 @@ type Documents = Awaited<ReturnType<typeof listRecordDocuments>>
 
 type DeckStatus = Awaited<ReturnType<typeof readDeckStatus>>[string]
 
-/** What a row needs to draw Read deck; null when the row gets no button. */
-type DeckReader = { reading: boolean; onRead: () => void }
+/**
+ * What a row needs to draw Read deck; null when the row gets no button.
+ * `onReadAndSummarize` is the two-step run (SPA-100), null while the
+ * synthesize lane cannot run at this record's sensitivity.
+ */
+type DeckReader = {
+  reading: boolean
+  onRead: () => void
+  onReadAndSummarize: (() => void) | null
+}
 
 /** In-flight uploads, shown alongside the filed rows. */
 type Pending = {
@@ -387,6 +396,17 @@ function DocumentRow({
             className="mr-1"
           >
             {reader.reading ? 'reading…' : 'Read deck'}
+          </Button>
+        )}
+        {reader === null || reader.onReadAndSummarize === null ? null : (
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={reader.reading}
+            onClick={reader.onReadAndSummarize}
+            className="mr-1"
+          >
+            Read deck and summarize
           </Button>
         )}
         <FilingControl doc={doc} />
@@ -901,6 +921,10 @@ function useExtractionPolling(
  * `readDeckStatus`; a read that settles says so in a toast — the suggestions
  * are in the inbox, or the job's own failure sentence — and the button
  * comes back.
+ *
+ * Read deck and summarize (SPA-100) sits beside it when the synthesize lane
+ * can run too: the same job and key with this record as the summary's home,
+ * one two-step run — so the status, the polling and the toast are shared.
  */
 /** A document's read state; a deck the tab has not asked about is idle. */
 function stateOf(
@@ -915,6 +939,7 @@ function useDeckReader(
   documents: Documents,
 ): (doc: Documents[number]) => DeckReader | null {
   const [routed, setRouted] = useState(false)
+  const [synthesizes, setSynthesizes] = useState(false)
   const [statuses, setStatuses] = useState<Record<string, DeckStatus>>({})
   const [pressed, setPressed] = useState<Array<string>>([])
   const previous = useRef<Record<string, DeckStatus>>({})
@@ -928,14 +953,20 @@ function useDeckReader(
     const live = { current: true }
     void (async () => {
       try {
-        const [lane, sensitivity] = await Promise.all([
+        const [lane, synthesize, sensitivity] = await Promise.all([
           isLaneRouted({ data: { lane: 'extract' } }),
+          isLaneRouted({ data: { lane: 'synthesize' } }),
           getEntitySensitivity({ data: { entityId } }),
         ])
-        if (live.current) setRouted(lane[sensitivity.sensitivity])
+        if (!live.current) return
+        setRouted(lane[sensitivity.sensitivity])
+        setSynthesizes(synthesize[sensitivity.sensitivity])
       } catch {
         // A gate that cannot tell is closed: no button rather than a toast.
-        if (live.current) setRouted(false)
+        if (live.current) {
+          setRouted(false)
+          setSynthesizes(false)
+        }
       }
     })()
     return () => {
@@ -975,14 +1006,18 @@ function useDeckReader(
     return () => clearInterval(timer)
   }, [anyReading, refresh])
 
-  async function read(documentId: string) {
+  async function read(documentId: string, summarize: boolean) {
     setPressed((p) => [...p, documentId])
     previous.current = {
       ...previous.current,
       [documentId]: { state: 'reading' },
     }
     try {
-      const result = await readDeck({ data: { documentId } })
+      const result = summarize
+        ? await readDeckAndSummarize({
+            data: { documentId, recordId: entityId },
+          })
+        : await readDeck({ data: { documentId } })
       if (result.status === 'already-reading') toast.message('Already reading')
       if (result.status === 'queue-unavailable') {
         toast.error('The worker queue is unreachable; try again shortly')
@@ -999,7 +1034,8 @@ function useDeckReader(
     return {
       reading:
         pressed.includes(doc.id) || stateOf(statuses, doc.id) === 'reading',
-      onRead: () => void read(doc.id),
+      onRead: () => void read(doc.id, false),
+      onReadAndSummarize: synthesizes ? () => void read(doc.id, true) : null,
     }
   }
 }

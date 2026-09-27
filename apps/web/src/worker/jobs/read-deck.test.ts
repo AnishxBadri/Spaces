@@ -19,10 +19,32 @@ describe('document.read-deck', () => {
     expect(failure.reason).toBe('That document is gone')
   })
 
+  it('fails a chained read permanently with the step’s sentence (SPA-100)', async () => {
+    const failure = await Effect.runPromise(
+      Effect.flip(
+        runReadDeck({
+          documentId: randomUUID(),
+          userId: 'someone',
+          summarizeOnto: randomUUID(),
+        }),
+      ),
+    )
+    expect(failure).toBeInstanceOf(JobPermanent)
+    expect(failure.reason).toBe('That record is gone')
+  })
+
   it('never retries, and carries who pressed', () => {
     expect(readDeck.retry?.limit).toBe(0)
     expect(readDeckData.safeParse({ documentId: randomUUID() }).success).toBe(
       false,
     )
+    // Read deck and summarize: the same job, with the summary's record.
+    expect(
+      readDeckData.safeParse({
+        documentId: randomUUID(),
+        userId: 'someone',
+        summarizeOnto: randomUUID(),
+      }).success,
+    ).toBe(true)
   })
 })

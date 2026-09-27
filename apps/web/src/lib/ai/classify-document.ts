@@ -10,6 +10,8 @@ import { JSON_SCHEMA_DRAFT } from '@spaces/core/ai/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
 import { ref } from '#/lib/context/ref'
 import { completeMessage, completeProgram } from './complete'
+import { callStep, suggestionOutputRef, withRun } from './run'
+import type { RunScope } from './run'
 import type { CompleteFailure } from './complete'
 import { proposeProgram, suggestionMessage } from './propose'
 import type { Suggestion, SuggestionFailure } from './propose'
@@ -107,6 +109,8 @@ export type ClassifyInput = {
   /** The test seam: an injected model replaces the vault lookup. */
   model?: LanguageModel
   jobRunId?: string
+  /** A run this is a step of (SPA-100); absent, it opens its own. */
+  runId?: string
 }
 
 export type ClassifyResult =
@@ -165,6 +169,24 @@ const TASK = (filename: string) =>
 export const classifyDocumentProgram = Effect.fn('classifyDocument')(function* (
   input: ClassifyInput,
 ): Effect.fn.Return<ClassifyResult, ClassifyFailure> {
+  // Opened lazily, at the call: a skip before it — the usual answer, since
+  // this runs off every extraction — leaves no run behind.
+  return yield* withRun(
+    input.runId,
+    {
+      task: 'Classify document',
+      entityId: input.documentId,
+      startedBy: { type: 'system' },
+    },
+    (run) => classifyInRun(input, run),
+    classifyMessage,
+  )
+})
+
+const classifyInRun = Effect.fn('classifyDocument.inRun')(function* (
+  input: ClassifyInput,
+  run: RunScope,
+): Effect.fn.Return<ClassifyResult, ClassifyFailure> {
   const { documentId } = input
   const doc = (yield* query(() =>
     db
@@ -211,6 +233,7 @@ export const classifyDocumentProgram = Effect.fn('classifyDocument')(function* (
 
   const filename = doc.filename ?? doc.name
   const sensitivity = yield* sensitivityFor(documentId)
+  const runId = yield* run.id
   const answered = yield* completeProgram(
     'classify',
     [
@@ -235,8 +258,19 @@ export const classifyDocumentProgram = Effect.fn('classifyDocument')(function* (
       task: TASK(filename),
       ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
+      runId,
     },
   )
+  const step = (outputRef: string | null) =>
+    run.step(
+      callStep(
+        'classify',
+        [ref.doc(documentId, 0)],
+        answered,
+        outputRef,
+        input.jobRunId,
+      ),
+    )
 
   const parsed = answerSchema.safeParse(
     answered.output.kind === 'object' ? answered.output.object : undefined,
@@ -259,7 +293,8 @@ export const classifyDocumentProgram = Effect.fn('classifyDocument')(function* (
       ? null
       : `Dropped ${dropped.map((d) => JSON.stringify(d)).join(', ')}: not one of ${CLASSIFY_OPTIONS.join(', ')}.`
 
-  if (pick === null)
+  if (pick === null) {
+    yield* step(null)
     return {
       status: 'skipped',
       reason: [
@@ -271,6 +306,7 @@ export const classifyDocumentProgram = Effect.fn('classifyDocument')(function* (
         .filter((l) => l !== null)
         .join('. '),
     }
+  }
 
   const reason = parsed.success ? parsed.data.reason?.trim() : undefined
   const rationale = [
@@ -288,8 +324,10 @@ export const classifyDocumentProgram = Effect.fn('classifyDocument')(function* (
     payload: pick,
     rationale,
     refs: [ref.doc(documentId, 0)],
+    runId,
     proposedBy: { type: 'system' },
   })
+  yield* step(suggestionOutputRef(proposed.id))
   return { status: 'proposed', suggestion: proposed }
 })
 

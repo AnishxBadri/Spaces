@@ -7,7 +7,7 @@ import { requireUser } from './shared'
  * pull-based (docs/spec-ai-substrate.md §4): pressing it enqueues one
  * `document.read-deck` job keyed on the document, and pg-boss's
  * `singletonKey` — not a table — is what refuses a second press while the
- * first is queued or active. The run log is ai-25.
+ * first is queued or active. Each read is one `ai_run` (SPA-100).
  */
 
 export const readDeck = createServerFn({ method: 'POST' })
@@ -19,6 +19,35 @@ export const readDeck = createServerFn({ method: 'POST' })
     const { effectFn } = await import('./effect')
     try {
       return await effectFn(enqueueReadDeckProgram)(data.documentId, u.id)
+    } catch (failure) {
+      throw new Error(
+        failure instanceof ReadDeckRefused
+          ? failure.message
+          : 'Could not start reading the deck',
+      )
+    }
+  })
+
+/**
+ * Read deck and summarize (SPA-100): the same job with the record the
+ * summary lands on — one two-step run, extract then synthesize. The same
+ * key, so it is refused while the deck is already being read either way.
+ */
+export const readDeckAndSummarize = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({ documentId: z.string().uuid(), recordId: z.string().uuid() }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { enqueueReadDeckProgram, ReadDeckRefused } =
+      await import('../ai/read-deck')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(enqueueReadDeckProgram)(
+        data.documentId,
+        u.id,
+        data.recordId,
+      )
     } catch (failure) {
       throw new Error(
         failure instanceof ReadDeckRefused

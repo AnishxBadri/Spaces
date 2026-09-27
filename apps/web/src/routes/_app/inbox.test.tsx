@@ -116,6 +116,7 @@ describe('the suggestion card', () => {
               fields: null,
               origin: { via: 'app' },
               createdAt: '2026-09-23T00:00:00.000Z',
+              runId: null,
             }}
             pending={false}
             onAccept={() => {}}
@@ -131,7 +132,36 @@ describe('the suggestion card', () => {
       // payload is what the row shows, under the kind's word.
       expect(html).toContain(`payload-of-${kind}`)
       expect(html).toContain(SUGGESTION_KIND_WORD[kind])
+      expect(html).not.toContain('produced by this run')
     }
+  })
+
+  it('links a suggestion a run produced to that run (SPA-100)', async () => {
+    const { SuggestionEntry, usageRunHref } =
+      await import('#/components/inbox/suggestion-card')
+    const runId = '00000000-0000-4000-8000-000000000100'
+    const html = renderToStaticMarkup(
+      <ul>
+        <SuggestionEntry
+          item={{
+            id: 's-run',
+            kind: 'note',
+            payload: { title: 'Summary', markdown: 'Body', sourceId: runId },
+            rationale: 'from a run',
+            citations: [],
+            fields: null,
+            origin: { via: 'app' },
+            createdAt: '2026-09-27T00:00:00.000Z',
+            runId,
+          }}
+          pending={false}
+          onAccept={() => {}}
+          onReject={() => {}}
+        />
+      </ul>,
+    )
+    expect(html).toContain('produced by this run')
+    expect(html).toContain(`href="${usageRunHref(runId)}"`)
   })
 
   it('draws an attribute_patch through its fields, not its payload', async () => {
@@ -158,6 +188,7 @@ describe('the suggestion card', () => {
             ],
             origin: { via: 'app' },
             createdAt: '2026-09-23T00:00:00.000Z',
+            runId: null,
           }}
           pending={false}
           onAccept={() => {}}
@@ -186,6 +217,7 @@ describe('the suggestion card', () => {
               citations: [],
               fields: null,
               origin,
+              runId: null,
               createdAt: '2026-09-23T00:00:00.000Z',
             }}
             pending={false}
@@ -223,6 +255,7 @@ describe('the suggestion card', () => {
             fields: null,
             origin: { via: 'app' },
             createdAt: '2026-09-23T00:00:00.000Z',
+            runId: null,
           }}
           pending={false}
           onAccept={() => {}}
@@ -285,6 +318,7 @@ describe('bulk accept on the suggestion card', () => {
     ],
     origin: { via: 'app' },
     createdAt: '2026-09-23T00:00:00.000Z',
+    runId: null,
   }
 
   it('draws Accept all on the card header', async () => {

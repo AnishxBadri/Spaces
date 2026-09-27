@@ -14,6 +14,8 @@ import type { QueuedJob } from '#/lib/queue'
 import { recordContextProgram } from '#/lib/context/record'
 import type { ContextItem } from '#/lib/context/types'
 import { completeMessage, completeProgram, laneTargetProgram } from './complete'
+import { callStep, suggestionOutputRef, withRun } from './run'
+import type { RunScope } from './run'
 import type { CompleteFailure, SensitiveRouteRefused } from './complete'
 import { proposeProgram, suggestionMessage } from './propose'
 import type { Suggestion, SuggestionFailure } from './propose'
@@ -210,6 +212,8 @@ export type SuggestSpacesInput = {
   /** ISO 8601; defaults to now. */
   asOf?: string
   jobRunId?: string
+  /** A run this is a step of (SPA-100); absent, it opens its own. */
+  runId?: string
 }
 
 export type SuggestSpacesResult = {
@@ -301,6 +305,22 @@ const decidedFor = (entityId: string) =>
 export const suggestSpacesProgram = Effect.fn('suggestSpaces')(function* (
   input: SuggestSpacesInput,
 ): Effect.fn.Return<SuggestSpacesResult, SuggestSpacesFailure> {
+  return yield* withRun(
+    input.runId,
+    {
+      task: 'Suggest spaces',
+      entityId: input.entityId,
+      startedBy: { type: 'user', id: input.userId },
+    },
+    (run) => suggestSpacesInRun(input, run),
+    suggestSpacesMessage,
+  )
+})
+
+const suggestSpacesInRun = Effect.fn('suggestSpaces.inRun')(function* (
+  input: SuggestSpacesInput,
+  run: RunScope,
+): Effect.fn.Return<SuggestSpacesResult, SuggestSpacesFailure> {
   const record = yield* recordOrRefuse(input.entityId)
   const [tree, carried, decided] = yield* Effect.all([
     readTree(),
@@ -334,6 +354,7 @@ export const suggestSpacesProgram = Effect.fn('suggestSpaces')(function* (
 
   const task = TASK(record.name, options)
   const sensitivity = yield* sensitivityFor(record.id)
+  const runId = yield* run.id
   const answered = yield* completeProgram(
     'classify',
     items,
@@ -349,8 +370,19 @@ export const suggestSpacesProgram = Effect.fn('suggestSpaces')(function* (
       task,
       ...(input.model === undefined ? {} : { model: input.model }),
       ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
+      runId,
     },
   )
+  const step = (outputRef: string | null) =>
+    run.step(
+      callStep(
+        'classify',
+        items.map((i) => i.ref),
+        answered,
+        outputRef,
+        input.jobRunId,
+      ),
+    )
 
   const parsed = answerSchema.safeParse(
     answered.output.kind === 'object' ? answered.output.object : undefined,
@@ -364,7 +396,8 @@ export const suggestSpacesProgram = Effect.fn('suggestSpaces')(function* (
       ? null
       : `Dropped ${String(dropped.length)} answer${dropped.length === 1 ? '' : 's'}: ${dropped.map((d) => d.why).join('; ')}.`
 
-  if (picks.length === 0)
+  if (picks.length === 0) {
+    yield* step(null)
     return {
       suggestions: [],
       dropped,
@@ -377,6 +410,7 @@ export const suggestSpacesProgram = Effect.fn('suggestSpaces')(function* (
         .filter((l) => l !== null)
         .join('. '),
     }
+  }
 
   const reason = parsed.success ? parsed.data.reason?.trim() : undefined
   const refs = context.items.map((i) => i.ref)
@@ -397,10 +431,13 @@ export const suggestSpacesProgram = Effect.fn('suggestSpaces')(function* (
         payload: pick,
         rationale,
         refs,
+        runId,
         proposedBy: { type: 'user', id: input.userId },
       }),
     )
   }
+  const out = suggestions.at(0)
+  yield* step(out === undefined ? null : suggestionOutputRef(out.id))
   return { suggestions, dropped, skipped: null }
 })
 

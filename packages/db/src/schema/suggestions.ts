@@ -10,6 +10,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { actorType } from './actors'
+import { aiRun } from './ai'
 import { entity } from './entities'
 import { user } from './auth'
 import type { Json } from '../json'
@@ -72,10 +73,10 @@ export const suggestion = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     /**
-     * The provider run that produced this, once runs are rows. No FK: the
-     * run ledger does not exist yet.
+     * The run that produced this (`ai_run`, `schema/ai.ts`; SPA-100) — the
+     * inbox's "produced by this run". Null for a suggestion no run made.
      */
-    runId: uuid('run_id'),
+    runId: uuid('run_id').references(() => aiRun.id),
     proposedByType: actorType('proposed_by_type').notNull(),
     /**
      * A user id when `proposed_by_type = 'user'`, the `integration` row's
@@ -95,6 +96,7 @@ export const suggestion = pgTable(
   },
   (t) => [
     index('suggestion_entity_status_idx').on(t.entityId, t.status),
+    index('suggestion_run_idx').on(t.runId),
     // Decided ⇔ someone decided it, when. An open row carries neither.
     check(
       'suggestion_decision_invariant',

@@ -1,6 +1,7 @@
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core'
 import {
   activity,
+  aiRun,
   attributeEvent,
   chunk,
   duplicateCandidate,
@@ -443,5 +444,18 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     merge: { kind: 'repoint' }, // the runs were about the record, not the row
     context: null, // an attempt ledger is operator-facing, never AI-visible
     del: { kind: 'cascade' }, // a run about a deleted entity goes with it
+  },
+
+  // --- the AI run log -----------------------------------------------------
+  {
+    key: 'ai_run.entity',
+    table: aiRun,
+    column: aiRun.entityId,
+    merge: { kind: 'repoint' }, // the run was about the record: follow the survivor
+    del: {
+      kind: 'orphan',
+      why: 'a run is spend and provenance history: its ai_usage rows cite it and the tokens were paid whether or not the record survives',
+    },
+    context: null, // the run log is operator-facing, never AI-visible
   },
 ]

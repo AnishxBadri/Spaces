@@ -15,6 +15,7 @@ import type { CapExceeded, CapReadFailed } from './caps'
 import type { AiTarget, LaneNotRouted, RouteReadFailed } from './route'
 import type { AiLane, AiSensitivity } from './lanes'
 import type { SensitivityVia } from './sensitivity'
+import type { RunWriteFailed } from './run'
 
 /**
  * `complete(lane, items, schema?, opts)` — half of the provider contract
@@ -67,6 +68,12 @@ export type CompleteOptions = {
   model?: LanguageModel
   route?: AiTarget
   jobRunId?: string
+  /**
+   * The run this call is a step of (`./run.ts`, SPA-100) — written to
+   * `ai_usage.run_id`. Absent, the call is outside any run: the settings Test
+   * call.
+   */
+  runId?: string
   maxOutputTokens?: number
   maxRetries?: number
   /**
@@ -95,6 +102,8 @@ export type CompleteResult = {
   output: CompleteOutput
   target: AiTarget
   usage: { tokensIn: number | null; tokensOut: number | null }
+  /** The vault key the call resolved; null for an injected test model. */
+  credentialId: string | null
 }
 
 /** A `sensitive` call routed to a provider that is not local. */
@@ -157,6 +166,10 @@ export type CompleteFailure =
   | UsageWriteFailed
   | CapExceeded
   | CapReadFailed
+  // Not raised here: a feature's run-log write (`./run.ts`). Named in this
+  // union so every feature's message, which falls through to
+  // `completeMessage`, already has a sentence for it.
+  | RunWriteFailed
 
 const providerLabel = (provider: string): string =>
   Object.entries(PROVIDER_LABEL).find(([id]) => id === provider)?.[1] ??
@@ -186,6 +199,8 @@ export function completeMessage(failure: CompleteFailure): string {
       return capMessage(failure)
     case 'CapReadFailed':
       return 'Could not read the AI cap'
+    case 'RunWriteFailed':
+      return 'Could not record the AI run'
   }
 }
 
@@ -237,12 +252,14 @@ export const completeProgram = Effect.fn('complete')(function* (
   // if its tokens carry the day past the ceiling — the next call refuses.
   yield* checkCapProgram(opts.budgetChars)
 
-  const model =
-    opts.model ??
-    (yield* resolveLanguageModel(target.provider, {
-      modelId: target.model,
-      ...(opts.caller.type === 'user' ? { userId: opts.caller.id } : {}),
-    })).model
+  const resolved =
+    opts.model === undefined
+      ? yield* resolveLanguageModel(target.provider, {
+          modelId: target.model,
+          ...(opts.caller.type === 'user' ? { userId: opts.caller.id } : {}),
+        })
+      : { model: opts.model, credentialId: null }
+  const model = resolved.model
 
   const prompt = renderPrompt({
     items,
@@ -280,7 +297,7 @@ export const completeProgram = Effect.fn('complete')(function* (
   }
 
   const answered = yield* Effect.tryPromise({
-    try: async (): Promise<Omit<CompleteResult, 'target'>> => {
+    try: async (): Promise<Omit<CompleteResult, 'target' | 'credentialId'>> => {
       if (schema) {
         const r = await generateText({
           ...settings,
@@ -309,9 +326,10 @@ export const completeProgram = Effect.fn('complete')(function* (
         callerType: opts.caller.type,
         callerId: opts.caller.type === 'system' ? null : opts.caller.id,
         jobRunId: opts.jobRunId ?? null,
+        runId: opts.runId ?? null,
       }),
     catch: (cause) => new UsageWriteFailed({ cause }),
   })
 
-  return { ...answered, target }
+  return { ...answered, target, credentialId: resolved.credentialId }
 })

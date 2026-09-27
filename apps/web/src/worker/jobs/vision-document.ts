@@ -7,7 +7,10 @@ import { document } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
 import { completeProgram } from '#/lib/ai/complete'
 import type { CompleteFailure } from '#/lib/ai/complete'
+import { callStep, withRun } from '#/lib/ai/run'
+import type { RunScope } from '#/lib/ai/run'
 import { sensitivityFor } from '#/lib/ai/sensitivity-for'
+import { ref } from '#/lib/context/ref'
 import type { SensitivityRead } from '#/lib/ai/sensitivity-for'
 import {
   VISION_CHARS_PER_PAGE,
@@ -89,6 +92,7 @@ const readPages = Effect.fn('visionDocument.readPages')(function* (
     userId: string
     sensitivity: SensitivityRead
     seam: VisionSeam
+    run: RunScope
   },
 ): Effect.fn.Return<
   Array<{ page: number; text: string }>,
@@ -106,6 +110,7 @@ const readPages = Effect.fn('visionDocument.readPages')(function* (
     opts.seam.pagesPerChunk ?? VISION_PAGES_PER_CHUNK,
   )
   const sections: Array<{ page: number; text: string }> = []
+  const runId = yield* opts.run.id
   for (;;) {
     // The next chunk is cut only once the previous one's call has answered,
     // so one range's bytes are in flight at a time.
@@ -136,7 +141,14 @@ const readPages = Effect.fn('visionDocument.readPages')(function* (
       ],
       maxOutputTokens: VISION_MAX_OUTPUT_TOKENS_PER_PAGE * pages,
       ...(opts.seam.model === undefined ? {} : { model: opts.seam.model }),
+      runId,
     })
+    // One step per page range, in order. The input is the document's bytes
+    // (the grammar's whole-document ref); the text is written only once
+    // every range has answered, so no range has an output of its own.
+    yield* opts.run.step(
+      callStep('vision', [ref.doc(documentId, 0)], answered, null, undefined),
+    )
     const text = answered.output.kind === 'text' ? answered.output.text : ''
     const read = pageSections(text, range)
     sections.push(...read)
@@ -154,6 +166,7 @@ const readPages = Effect.fn('visionDocument.readPages')(function* (
 const program = Effect.fn('visionDocument')(function* (
   data: VisionDocumentData,
   seam: VisionSeam,
+  run: RunScope,
 ): Effect.fn.Return<
   void,
   VisionFailure | StoreUnavailable | BlobUnreadable | JobPermanent,
@@ -190,6 +203,7 @@ const program = Effect.fn('visionDocument')(function* (
     userId: data.userId,
     sensitivity,
     seam,
+    run,
   }).pipe(
     Effect.catch((failure) => {
       // The read failed: the row stays `unsupported`, its text untouched,
@@ -211,22 +225,44 @@ const program = Effect.fn('visionDocument')(function* (
   )
 })
 
-/** The job's body, with the seam the test uses. */
+type ProgramFailure =
+  VisionFailure | StoreUnavailable | BlobUnreadable | JobPermanent
+
+/** The sentence a failure leaves — on the job, and on the run (SPA-100). */
+const reasonOf = (failure: ProgramFailure): string =>
+  failure._tag === 'JobPermanent'
+    ? failure.reason
+    : failure._tag === 'StoreUnavailable'
+      ? `document store unavailable during ${failure.operation}: ${failure.message}`
+      : failure._tag === 'BlobUnreadable'
+        ? `Blob ${failure.blobSha.slice(0, 12)} unreadable: ${failure.message}`
+        : visionMessage(failure)
+
+/**
+ * The job's body, with the seam the test uses. One run per read ("Read with
+ * vision"), opened at the first page range's call, a step per range.
+ */
 export const runVisionDocument = (
   data: VisionDocumentData,
   seam: VisionSeam = {},
 ) =>
-  program(data, seam).pipe(
-    Effect.catch((failure) => {
-      if (failure._tag === 'JobPermanent') return Effect.fail(failure)
-      const reason =
-        failure._tag === 'StoreUnavailable'
-          ? `document store unavailable during ${failure.operation}: ${failure.message}`
-          : failure._tag === 'BlobUnreadable'
-            ? `Blob ${failure.blobSha.slice(0, 12)} unreadable: ${failure.message}`
-            : visionMessage(failure)
-      return Effect.fail(new JobPermanent({ reason }))
-    }),
+  withRun(
+    undefined,
+    {
+      task: 'Read with vision',
+      entityId: data.documentId,
+      startedBy: { type: 'user', id: data.userId },
+    },
+    (run) => program(data, seam, run),
+    reasonOf,
+  ).pipe(
+    Effect.catch((failure) =>
+      Effect.fail(
+        failure._tag === 'JobPermanent'
+          ? failure
+          : new JobPermanent({ reason: reasonOf(failure) }),
+      ),
+    ),
   )
 
 export const visionDocument: JobDef<VisionDocumentData, ExtractionStore> = {

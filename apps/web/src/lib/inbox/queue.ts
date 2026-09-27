@@ -114,6 +114,8 @@ export type SuggestionItem = {
   fields: Array<SuggestionField> | null
   origin: SuggestionOrigin
   createdAt: string
+  /** The run that produced it (SPA-100) — the card's "produced by this run". */
+  runId: string | null
 }
 
 /**
@@ -335,6 +337,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
         s.kind === 'attribute_patch' ? patchFields(s.payload, registry) : null,
       origin: originOf(s),
       createdAt: s.createdAt.toISOString(),
+      runId: s.runId,
     }
     const card = cards.get(s.entityId)
     if (card) card.suggestions.push(item)

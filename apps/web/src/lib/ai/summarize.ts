@@ -17,6 +17,8 @@ import { inlineCitations } from './inline-citations'
 import { proposeProgram, suggestionMessage } from './propose'
 import type { Suggestion, SuggestionFailure } from './propose'
 import { providerFailure } from './providers/test-call'
+import { callStep, suggestionOutputRef, withRun } from './run'
+import type { RunScope } from './run'
 import { sensitivityFor } from './sensitivity-for'
 import type {
   SensitivityEntityNotFound,
@@ -132,6 +134,12 @@ export type SummarizeInput = {
   /** ISO 8601; defaults to now. */
   asOf?: string
   jobRunId?: string
+  /**
+   * The run this summary is a step of (SPA-100) — "Read deck and summarize"
+   * hands its run here. Absent, Summarize opens and closes its own one-step
+   * run.
+   */
+  runId?: string
 }
 
 type Source = { id: string; name: string; what: string }
@@ -288,6 +296,22 @@ const TASK = (source: Source) =>
 export const summarizeProgram = Effect.fn('summarize')(function* (
   input: SummarizeInput,
 ): Effect.fn.Return<Suggestion, SummarizeFailure> {
+  return yield* withRun(
+    input.runId,
+    {
+      task: 'Summarize',
+      entityId: input.recordId,
+      startedBy: { type: 'user', id: input.userId },
+    },
+    (run) => summarizeInRun(input, run),
+    summarizeMessage,
+  )
+})
+
+const summarizeInRun = Effect.fn('summarize.inRun')(function* (
+  input: SummarizeInput,
+  run: RunScope,
+): Effect.fn.Return<Suggestion, SummarizeFailure> {
   const record = (yield* query(() =>
     db
       .select({
@@ -384,6 +408,7 @@ export const summarizeProgram = Effect.fn('summarize')(function* (
     docSensitivity?.sensitivity === 'sensitive'
       ? docSensitivity
       : recordSensitivity
+  const runId = yield* run.id
   const answered = yield* completeProgram('synthesize', items, undefined, {
     caller: { type: 'user', id: input.userId },
     sensitivity: sensitive.sensitivity,
@@ -392,13 +417,20 @@ export const summarizeProgram = Effect.fn('summarize')(function* (
     task: TASK(source),
     ...(input.model === undefined ? {} : { model: input.model }),
     ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
+    runId,
   })
   const text =
     answered.output.kind === 'text' ? answered.output.text.trim() : ''
-  if (text === '')
+  const inputRefs = items.map((i) => i.ref)
+  if (text === '') {
+    // The call was made and paid for: the step stands, with nothing out.
+    yield* run.step(
+      callStep('synthesize', inputRefs, answered, null, input.jobRunId),
+    )
     return yield* new SummarizeRefused({
       message: 'The model answered with an empty summary',
     })
+  }
 
   const labels = yield* citationLabels([...new Set(items.map((i) => i.ref))])
   const { markdown, cited } = inlineCitations(text, labels)
@@ -407,7 +439,7 @@ export const summarizeProgram = Effect.fn('summarize')(function* (
     markdown,
     sourceId: source.id,
   }
-  return yield* proposeProgram({
+  const proposed = yield* proposeProgram({
     entityId: record.id,
     kind: 'note',
     payload,
@@ -416,8 +448,19 @@ export const summarizeProgram = Effect.fn('summarize')(function* (
       `Accepting writes a shared note filed against ${record.name}, derived from ${source.name}.`,
     ].join('\n'),
     refs: cited,
+    runId,
     proposedBy: { type: 'user', id: input.userId },
   })
+  yield* run.step(
+    callStep(
+      'synthesize',
+      inputRefs,
+      answered,
+      suggestionOutputRef(proposed.id),
+      input.jobRunId,
+    ),
+  )
+  return proposed
 })
 
 // ---------- trigger + status (the Summarize buttons' two server fns) ----------

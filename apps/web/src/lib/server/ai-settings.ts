@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import { z } from 'zod'
 import { aiKeyInput, aiProviderInput } from '../ai/providers/ids'
 import { aiLaneInput, aiRouteInput } from '../ai/lanes'
 import { aiCapsInput } from '../ai/caps-input'
@@ -8,7 +9,8 @@ import {
 } from '../ai/providers/embed/ids'
 
 /**
- * Settings → AI (SPA-29). Admin-only, every one: the bodies live in
+ * Settings → AI (SPA-29). Admin-only, every one but `isLaneRouted` and the
+ * Usage reads (SPA-100), which say why where they stand: the bodies live in
  * `lib/ai/providers/settings.ts`, whose handlers open with `requireAdmin()`,
  * and are imported inside the handler so the AI SDK and the vault never
  * reach the client bundle — this module is re-exported by the client-imported
@@ -97,6 +99,25 @@ export const getAiUsageToday = createServerFn().handler(async () => {
   const { getAiUsageTodayHandler } = await import('../ai/caps')
   return getAiUsageTodayHandler()
 })
+
+/**
+ * Settings → Usage (SPA-100): the run log, newest first, and the calls no
+ * run owns. Any signed-in member may read it — it is provenance, and the
+ * inbox's "produced by this run" opens it; the body lives in
+ * `lib/ai/usage.ts`, whose handlers open with `requireUser()`.
+ */
+export const getAiUsage = createServerFn().handler(async () => {
+  const { getAiUsageHandler } = await import('../ai/usage')
+  return getAiUsageHandler()
+})
+
+/** One run opened: its steps, refs resolved, and what it proposed. */
+export const getAiRun = createServerFn()
+  .validator(z.object({ runId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const { getAiRunHandler } = await import('../ai/usage')
+    return getAiRunHandler(data.runId)
+  })
 
 /**
  * Settings → AI · Embeddings (SPA-51): the pin, the embedding keys, the Test

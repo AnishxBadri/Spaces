@@ -49,6 +49,10 @@ import { cn } from '#/lib/utils'
  * page; `identity` has one (SPA-105).
  */
 
+/** Where "produced by this run" goes: the run, opened on the Usage page. */
+export const usageRunHref = (runId: string): string =>
+  `/settings/usage?run=${encodeURIComponent(runId)}`
+
 /** The word a person reads for each kind. Exhaustive by type. */
 export const SUGGESTION_KIND_WORD: Record<SuggestionKind, string> = {
   attribute_patch: 'Field change',
@@ -453,6 +457,16 @@ export function SuggestionEntry({
             ))}
           </ul>
         ) : null}
+        {/* SPA-100: the run that proposed it, opened in Settings → Usage. A
+            plain anchor, so the entry stays pure over its props. */}
+        {item.runId === null ? null : (
+          <a
+            href={usageRunHref(item.runId)}
+            className="focus-ring self-start mono text-micro text-graphite hover:text-foreground hover:underline"
+          >
+            produced by this run ›
+          </a>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Button
