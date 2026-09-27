@@ -5,6 +5,8 @@ yarn.lock
 # generated — owned by their generators, don't fight them
 packages/db/drizzle/
 apps/web/src/routeTree.gen.ts
+# vitest writes it byte for byte; the test compares it byte for byte
+apps/web/src/lib/rpc/__snapshots__/
 .cta.json
 .impeccable/
 

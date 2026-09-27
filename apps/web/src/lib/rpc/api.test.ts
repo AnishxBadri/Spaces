@@ -72,7 +72,10 @@ describe('capture.hello over HTTP', () => {
 })
 
 describe('one definition, two audiences', () => {
-  it('the typed client gets a byte-identical object from the same handler', async () => {
+  // SPA-45: the same procedure over both handlers — the typed transport
+  // (`makeApiClient`) and plain REST (`handleApiRequest`, what curl and a
+  // client generated from the OpenAPI document call) — compared byte for byte.
+  it('typed client and REST answer the handshake byte-identically', async () => {
     const overHttp = await (await handleApiRequest(new Request(HELLO))).text()
     const viaClient = await withClient(inProcess, (client) =>
       client.capture.hello(),

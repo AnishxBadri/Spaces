@@ -20,6 +20,7 @@ import {
   HttpApiEndpoint,
   HttpApiError,
   HttpApiGroup,
+  HttpApiScalar,
   HttpApiSchema,
   OpenApi,
 } from 'effect/unstable/httpapi'
@@ -43,6 +44,35 @@ import { API_PREFIX, API_VERSION, CAPTURE_SCHEMA_VERSION } from './versions'
  * closed-Layer shape `runJob` provides in the worker.
  *
  * Server-fns are untouched (decision 4: the boundary finds itself).
+ *
+ * ## Versioning — two clocks (SPA-45; `docs/api-versioning.md`)
+ *
+ * The path is the only version: `/api/v1`, `API_VERSION` in `./versions.ts`.
+ * Within v1 every change is additive — a new procedure, a new optional input
+ * field, a new output field. What forces v2 is anything a v1 caller could
+ * trip on: a removed or renamed procedure, path or field; a narrowed type (a
+ * wider input refused, an output that loses a case); a required input that
+ * was optional; a changed status or error tag. v2 is a second `Api` under
+ * `/api/v2`, with v1 still served beside it.
+ *
+ * `captureSchemaVersion` (`CAPTURE_SCHEMA_VERSION`) is the second clock, and
+ * it lives inside v1 on purpose: the capture extension ships on its own
+ * release cycle (CONTEXT.md integration map #8), so the shape of the capture
+ * payload moves on its own. It moves when that payload's shape changes; the
+ * API version does not move with it. `capture.hello` answers both, which is
+ * how an installed extension tells "update me" from breakage.
+ *
+ * `openapi.test.ts` snapshots the whole document at `OPENAPI_PATH`: the
+ * snapshot diff is the review of every change to the external contract.
+ *
+ * Manual check that a generated client can call the handshake (not a
+ * dependency, not run in tests), against `pnpm dev`:
+ *
+ *     npx openapi-typescript http://localhost:3000/api/v1/openapi.json -o /tmp/spaces-api.d.ts
+ *     curl -s http://localhost:3000/api/v1/capture/hello
+ *
+ * The docs UI is `HttpApiScalar`, served at `DOCS_PATH` from the bundled
+ * script (no CDN). It is a page, not a procedure, and not part of the contract.
  *
  * ## Failures — one shape, one status per kind
  *
@@ -228,8 +258,11 @@ export class Api extends HttpApi.make('spaces')
     OpenApi.annotations({ title: 'Spaces', version: String(API_VERSION) }),
   ) {}
 
-/** Served beside the procedures; SPA-45 is what pins its contents. */
+/** Served beside the procedures; `openapi.test.ts` pins its contents. */
 export const OPENAPI_PATH = `${API_PREFIX}/openapi.json` as const
+
+/** The Scalar reference page over the same document. */
+export const DOCS_PATH = `${API_PREFIX}/docs` as const
 
 // ---------------------------------------------------------------------------
 // Handlers
@@ -248,9 +281,15 @@ const CaptureHandlers = HttpApiBuilder.group(Api, 'capture', (handlers) =>
 // The seam
 // ---------------------------------------------------------------------------
 
-const ApiRoutes = HttpApiBuilder.layer(Api, {
-  openapiPath: OPENAPI_PATH,
-}).pipe(Layer.provide(CaptureHandlers.pipe(Layer.provide(WebLayer))))
+const ApiRoutes = Layer.merge(
+  HttpApiBuilder.layer(Api, { openapiPath: OPENAPI_PATH }),
+  // No default fonts: they load from fonts.scalar.com, and a self-hosted
+  // instance's docs page should not call a third party.
+  HttpApiScalar.layer(Api, {
+    path: DOCS_PATH,
+    scalar: { withDefaultFonts: false },
+  }),
+).pipe(Layer.provide(CaptureHandlers.pipe(Layer.provide(WebLayer))))
 
 /**
  * Built once for the life of the process, on the first request: this is

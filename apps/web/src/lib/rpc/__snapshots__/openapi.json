@@ -1,0 +1,133 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Spaces",
+    "version": "1"
+  },
+  "paths": {
+    "/api/v1/capture/hello": {
+      "get": {
+        "tags": [
+          "capture"
+        ],
+        "operationId": "capture.hello",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "apiVersion": {
+                      "type": "integer"
+                    },
+                    "captureSchemaVersion": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "apiVersion",
+                    "captureSchemaVersion"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "The API version (the v in /api/v1) and the capture payload schema version, so a client can tell \"update me\" from breakage.",
+        "summary": "Version handshake"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BadRequestEncoded": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string",
+                "enum": [
+                  "BadRequest"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tag",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "InternalErrorEncoded": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string",
+                "enum": [
+                  "InternalError"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tag",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {}
+  },
+  "security": [],
+  "tags": [
+    {
+      "name": "capture"
+    }
+  ]
+}
