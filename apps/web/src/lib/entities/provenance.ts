@@ -36,5 +36,22 @@ export async function provenanceOf(entityId: string): Promise<{
       .where(eq(entity.id, entityId))
   ).at(0)
   if (!row) throw new Error('Entity not found')
-  return { ...row, label: row.sourceCapability ?? row.sourceClass }
+  return { ...row, label: channelLabel(row.sourceCapability, row.sourceClass) }
+}
+
+/**
+ * The word for the writer. A plugin's capability id is already the word on
+ * the Integrations page ("apollo"). A core capability is namespaced
+ * `core.<channel>` (`core.mailbox`, SPA-56), and the reader wants the
+ * channel — "mailbox" on the inbox card of a company a forwarded thread made
+ * (SPA-86), not "core.mailbox" and not the bare word "integration".
+ */
+export function channelLabel(
+  capability: string | null,
+  sourceClass: SourceClass,
+): string {
+  if (capability === null) return sourceClass
+  return capability.startsWith('core.')
+    ? capability.slice('core.'.length)
+    : capability
 }

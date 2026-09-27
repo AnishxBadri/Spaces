@@ -10,11 +10,12 @@ import {
   entityAlias,
   interaction,
   interactionEntity,
-  note,
 } from '@spaces/db/schema'
 import type { NoteBody } from '@spaces/db/schema/kinds'
+import { insertBodyNote } from '#/lib/notes/body-note'
 import type { Address } from './forwarded'
 import type { ArrivalMessage } from './message'
+import { participantRecordsProgram } from './participant-records'
 
 /**
  * One arrival → one interaction, its body note and its edges (SPA-56; D30,
@@ -31,12 +32,19 @@ import type { ArrivalMessage } from './message'
  * leaves no orphan body note behind, and a failed edge insert leaves no
  * bodyless interaction that the next poll would then skip as a duplicate.
  *
- * **Participants are matched, never created.** An address resolves through
- * `entity_alias` — the person whose `email` alias it is, the company whose
- * `domain` alias its domain is — and an address that matches nothing is
- * dropped. Creating people and companies from mail is arrival-2's (SPA-86),
- * with its own noise rules; a thread from an unknown domain writes an
- * interaction with no edges and not one entity or alias.
+ * **Participants become records first, then are matched** (SPA-86,
+ * arrival-2). Before the transaction, `participantRecordsProgram` decides
+ * create / attach / ignore per address (`participants.ts`, pure) and sends
+ * every survivor through `resolveEntity` — the one entry gate, which commits
+ * on its own and is why this step cannot sit inside the transaction. The
+ * match below then runs as before over aliases that now exist: an address
+ * resolves through `entity_alias` — the person whose `email` alias it is, the
+ * company whose `domain` alias its domain is — which is also how a member or
+ * an own-domain address, never created, is still named when its record
+ * exists. The records the gate returned are edged too, so a company that
+ * lost its domain claim to another kind of record (a `duplicate_candidate`)
+ * is still on the thread. Nothing here inserts into `entity` or
+ * `entity_alias` itself (`one-door.test.ts`).
  *
  * **Edges go to people and companies only** (D49). A deal's threads are
  * derived — every thread on its company or one of its contacts — so nothing
@@ -166,6 +174,11 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
   message: ArrivalMessage,
   ctx: FileContext,
 ): Effect.fn.Return<Filed, ArrivalWriteFailed> {
+  // Participants → records, through the gate (SPA-86). Before the
+  // transaction, and for a duplicate too: a re-read is all attaches.
+  const records = yield* participantRecordsProgram(message, ctx).pipe(
+    Effect.mapError((e) => new ArrivalWriteFailed({ cause: e.cause })),
+  )
   return yield* Effect.tryPromise({
     try: () =>
       db.transaction(async (tx): Promise<Filed> => {
@@ -188,36 +201,23 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
 
         const body = message.body.slice(0, MAX_BODY_CHARS)
         const title = message.subject ?? ''
-        const noteEntity = (
-          await tx
-            .insert(entity)
-            .values({
-              kind: 'note',
-              canonicalName: title || 'Untitled',
-              createdBy: ctx.authorId,
-              sourceClass: 'integration',
-              sourceRef: ctx.integrationId,
-            })
-            .returning({ id: entity.id })
-        ).at(0)
-        if (!noteEntity) throw new Error('note entity insert returned no row')
-        await tx.insert(note).values({
-          entityId: noteEntity.id,
-          authorId: ctx.authorId,
+        const noteId = await insertBodyNote(tx, {
           title,
-          kind: 'note',
           bodyJson: bodyBlocks(body),
           bodyMd: body,
-          visibility: 'shared',
+          authorId: ctx.authorId,
+          integrationId: ctx.integrationId,
         })
         await tx
           .update(interaction)
-          .set({ noteId: noteEntity.id })
+          .set({ noteId })
           .where(eq(interaction.id, row.id))
 
         const matched = await matchParticipants(tx, message.participants)
         const inherited = await threadEdges(tx, message.threadId)
-        const edges = [...new Set([...matched, ...inherited])]
+        const edges = [
+          ...new Set([...records.entityIds, ...matched, ...inherited]),
+        ]
         for (const entityId of edges) {
           await tx
             .insert(interactionEntity)
@@ -227,7 +227,7 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
         return {
           kind: 'written',
           interactionId: row.id,
-          noteId: noteEntity.id,
+          noteId,
           edges: edges.length,
         }
       }),

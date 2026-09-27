@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
 import {
   company,
+  duplicateCandidate,
   entity,
   entityAlias,
   integration,
@@ -16,13 +17,20 @@ import {
   person,
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
-import { truncatePublicTables } from '@spaces/db/test-db'
 import { FakeImapServer } from '#/test/fake-imap'
+import { truncateAndReseed } from '#/test/reseed'
 import { enqueued } from '#/test/queue-stub'
 import { canRead } from '#/lib/notes/visibility'
 import { recordTimelineProgram } from '#/lib/timeline/record'
-import { FIXTURE_ACTOR, seedTestDatabase } from '../../../vitest.seed'
-import { MAILBOX, bcc, gmailForward } from './fixtures'
+import {
+  createObjectProgram,
+  createRecordProgram,
+} from '#/lib/attributes/object-registry'
+import { entityContext } from '#/lib/inbox/context'
+import { FIXTURE_ACTOR } from '../../../vitest.seed'
+import { MAILBOX, OUTLOOK_FORWARD, bcc, gmailForward } from './fixtures'
+import { arrivalFromSource } from './message'
+import { participantRecordsProgram } from './participant-records'
 import { pollMailboxProgram } from './poll'
 import type { PollOutcome } from './poll'
 import { MailSchedule } from './schedule'
@@ -33,9 +41,10 @@ import { MAILBOX_CAPABILITY, saveMailboxProgram } from './settings'
  * SPA-56 end to end, minus the network: the poll against the in-repo fake
  * IMAP server (`#/test/fake-imap`), writing to this worker's test database.
  * Each claim of the slice that is about what lands in Postgres is one test
- * here — the dedupe, the UIDVALIDITY restart, match-never-create, the
- * provenance pair, the backoff, the shared body, the inherited edges and the
- * derived deal timeline. The `job_run` row is the worker's, so its test is
+ * here — the dedupe, the UIDVALIDITY restart, the provenance pair, the
+ * backoff, the shared body, the inherited edges and the derived deal
+ * timeline. SPA-86 turned match-never-create into participants-become-
+ * records; its claims are the second `describe` below. The `job_run` row is the worker's, so its test is
  * `worker/jobs/poll-mailbox.test.ts` (the web tree may not import the worker).
  */
 
@@ -57,14 +66,7 @@ beforeEach(async () => {
   // Isolation per test, not per file: every test here configures the one
   // mailbox row and asserts counts of what it wrote. The same structural
   // truncate-and-reseed the harness runs before each file, no delete list.
-  await truncatePublicTables((text) => db.$client.query(text))
-  const speak = console.log
-  console.log = () => undefined
-  try {
-    await seedTestDatabase()
-  } finally {
-    console.log = speak
-  }
+  await truncateAndReseed()
   server = new FakeImapServer({ user: MAILBOX, password: PASSWORD })
   port = await server.start()
   syncs.length = 0
@@ -169,6 +171,27 @@ async function edgesOf(messageId: string): Promise<Array<string>> {
   return rows.map((r) => r.id).sort()
 }
 
+/** The record holding an identity alias; throws when there is none. */
+async function holderOf(
+  kind: 'email' | 'domain',
+  valueNorm: string,
+): Promise<string> {
+  const row = (
+    await db
+      .select({ id: entityAlias.entityId })
+      .from(entityAlias)
+      .where(
+        and(
+          eq(entityAlias.kind, kind),
+          eq(entityAlias.valueNorm, valueNorm),
+          eq(entityAlias.isIdentity, true),
+        ),
+      )
+  ).at(0)
+  if (!row) throw new Error(`nobody holds ${kind} ${valueNorm}`)
+  return row.id
+}
+
 const janeMail = (id = 'seed-1@acme.io') =>
   bcc({
     messageId: id,
@@ -253,35 +276,6 @@ describe('the forwarding mailbox poll', () => {
 
     const box = (await db.select().from(mailbox)).at(0)
     expect(box).toMatchObject({ lastUid: 2, lastUidValidity: 99 })
-  })
-
-  it('matches only existing aliases: an unknown domain creates no entity and no alias', async () => {
-    await configure()
-    const entities = async () =>
-      (await db.select({ n: count() }).from(entity)).at(0)?.n
-    const aliases = async () =>
-      (await db.select({ n: count() }).from(entityAlias)).at(0)?.n
-    const before = { e: await entities(), a: await aliases() }
-
-    server.deliver(
-      bcc({
-        messageId: 'stranger@unknown.dev',
-        from: 'Stranger <bob@unknown.dev>',
-        to: 'Anish <anish@fund.example>',
-        subject: 'Hello from nowhere',
-      }),
-    )
-    expect((await poll()).written).toBe(1)
-
-    // One entity more — the body note — and not one company or person.
-    expect(await entities()).toBe((before.e ?? 0) + 1)
-    expect(await aliases()).toBe(before.a)
-    const kinds = await db
-      .select({ kind: entity.kind })
-      .from(entity)
-      .where(inArray(entity.kind, ['company', 'person']))
-    expect(kinds).toEqual([])
-    expect(await edgesOf('stranger@unknown.dev')).toEqual([])
   })
 
   it('refuses auto-replies, list mail, role senders and a missing Message-ID before any write', async () => {
@@ -372,7 +366,11 @@ describe('the forwarding mailbox poll', () => {
     const row = (await db.select().from(interaction)).at(0)
     expect(row?.subject).toBe('Seed round')
     expect(row?.occurredAt.toISOString()).toBe('2026-09-21T10:04:00.000Z')
-    expect(await edgesOf(row?.messageId ?? '')).toEqual([acme, jane].sort())
+    // Raj, on the Cc, had no record; arrival-2 made one (SPA-86).
+    const raj = await holderOf('email', 'raj@acme.io')
+    expect(await edgesOf(row?.messageId ?? '')).toEqual(
+      [acme, jane, raj].sort(),
+    )
     const body = (
       await db
         .select()
@@ -434,7 +432,13 @@ describe('the forwarding mailbox poll', () => {
       }),
     )
     await poll()
-    expect(await edgesOf('reply-9@elsewhere.org')).toEqual([acme, jane].sort())
+    // Kim and her company are records now (SPA-86); the thread's are
+    // inherited beside them.
+    const kim = await holderOf('email', 'kim@elsewhere.org')
+    const elsewhere = await holderOf('domain', 'elsewhere.org')
+    expect(await edgesOf('reply-9@elsewhere.org')).toEqual(
+      [acme, jane, kim, elsewhere].sort(),
+    )
   })
 
   it('never edges a deal; a company with two deals shows the thread on both', async () => {
@@ -470,5 +474,303 @@ describe('the forwarding mailbox poll', () => {
       .from(mailbox)
       .where(and(eq(mailbox.address, MAILBOX)))
     expect(any.at(0)?.n).toBe(0)
+  })
+})
+
+/** People and companies, and the identity aliases they hold. */
+async function graphCounts(): Promise<{
+  companies: number
+  people: number
+  identities: number
+}> {
+  const kinds = await db
+    .select({ kind: entity.kind, n: count() })
+    .from(entity)
+    .where(inArray(entity.kind, ['company', 'person']))
+    .groupBy(entity.kind)
+  const identities = await db
+    .select({ n: count() })
+    .from(entityAlias)
+    .where(eq(entityAlias.isIdentity, true))
+  return {
+    companies: kinds.find((k) => k.kind === 'company')?.n ?? 0,
+    people: kinds.find((k) => k.kind === 'person')?.n ?? 0,
+    identities: identities.at(0)?.n ?? 0,
+  }
+}
+
+async function mailboxIntegrationId(): Promise<string> {
+  const row = (
+    await db
+      .select({ id: integration.id })
+      .from(integration)
+      .where(eq(integration.capabilityId, MAILBOX_CAPABILITY))
+  ).at(0)
+  if (!row) throw new Error('no mailbox integration')
+  return row.id
+}
+
+/** A custom "Fund" object that keys its records on `domain`, and one record. */
+async function aFundRecord(name: string, domain: string): Promise<string> {
+  const object = await Effect.runPromise(
+    createObjectProgram({
+      singular: 'Fund',
+      plural: 'Funds',
+      identityKeys: ['domain'],
+      createdBy: FIXTURE_ACTOR.id,
+    }),
+  )
+  const row = await Effect.runPromise(
+    createRecordProgram({
+      objectId: object.id,
+      name,
+      values: { domain },
+      actor: { type: 'user', id: FIXTURE_ACTOR.id },
+    }),
+  )
+  return row.id
+}
+
+describe('participants become records (SPA-86)', () => {
+  it('a forwarded thread from a work domain creates one company and one person per non-member, each edged, as the mailbox', async () => {
+    await aMember('anish@fund.example')
+    await configure()
+    server.deliver(gmailForward())
+    expect((await poll()).written).toBe(1)
+
+    // Jane (From) and Raj (Cc) at acme.io; Anish (To) is a member.
+    expect(await graphCounts()).toEqual({
+      companies: 1,
+      people: 2,
+      identities: 3,
+    })
+    const acme = await holderOf('domain', 'acme.io')
+    const jane = await holderOf('email', 'jane@acme.io')
+    const raj = await holderOf('email', 'raj@acme.io')
+    const row = (await db.select().from(interaction)).at(0)
+    expect(await edgesOf(row?.messageId ?? '')).toEqual(
+      [acme, jane, raj].sort(),
+    )
+
+    const names = await db
+      .select({ id: entity.id, name: entity.canonicalName })
+      .from(entity)
+      .where(inArray(entity.id, [acme, jane, raj]))
+    expect(new Map(names.map((n) => [n.id, n.name]))).toEqual(
+      new Map([
+        [acme, 'Acme'],
+        [jane, 'Jane Founder'],
+        [raj, 'Raj Mehta'],
+      ]),
+    )
+
+    // The provenance pair on every record and every identity alias it holds.
+    const ref = await mailboxIntegrationId()
+    const records = await db
+      .select({ sourceClass: entity.sourceClass, sourceRef: entity.sourceRef })
+      .from(entity)
+      .where(inArray(entity.id, [acme, jane, raj]))
+    expect(records).toEqual(
+      Array(3).fill({ sourceClass: 'integration', sourceRef: ref }),
+    )
+    const aliases = await db
+      .select({
+        isIdentity: entityAlias.isIdentity,
+        sourceClass: entityAlias.sourceClass,
+        sourceRef: entityAlias.sourceRef,
+      })
+      .from(entityAlias)
+      .where(
+        and(
+          inArray(entityAlias.entityId, [acme, jane, raj]),
+          eq(entityAlias.isIdentity, true),
+        ),
+      )
+    expect(aliases).toEqual(
+      Array(3).fill({
+        isIdentity: true,
+        sourceClass: 'integration',
+        sourceRef: ref,
+      }),
+    )
+    // And the inbox card says which channel, not the bare class.
+    const side = await entityContext(acme)
+    expect(side.label).toBe('mailbox')
+  })
+
+  it('a participant on a free provider is a person with no company', async () => {
+    await configure()
+    server.deliver(
+      bcc({
+        messageId: 'intro-1@newco.dev',
+        from: 'Sam Founder <sam@newco.dev>',
+        to: 'Anish <anish@fund.example>',
+        cc: 'Lee Counsel <lee.counsel@gmail.com>',
+        subject: 'Intro',
+      }),
+    )
+    await poll()
+
+    const lee = await holderOf('email', 'leecounsel@gmail.com')
+    const companies = await db
+      .select({ id: entity.id })
+      .from(entity)
+      .where(eq(entity.kind, 'company'))
+    expect(companies.map((c) => c.id)).toEqual([
+      await holderOf('domain', 'newco.dev'),
+    ])
+    const gmail = await db
+      .select({ n: count() })
+      .from(entityAlias)
+      .where(
+        and(
+          eq(entityAlias.kind, 'domain'),
+          eq(entityAlias.valueNorm, 'gmail.com'),
+        ),
+      )
+    expect(gmail.at(0)?.n).toBe(0)
+    expect(await edgesOf('intro-1@newco.dev')).toContain(lee)
+  })
+
+  it('members and own-domain addresses create nothing, and are still named when their record exists', async () => {
+    await aMember('anish@fund.example')
+    await aMember('partner@fund.example')
+    // Anish is also a person record (someone made one by hand); nobody else
+    // at the fund is.
+    const anishRecord = await aPerson('Anish Badri', 'anish@fund.example')
+    const acme = await aCompany('Acme', 'acme.io')
+    await configure()
+    server.deliver(
+      bcc({
+        messageId: 'ic-1@acme.io',
+        from: 'Jane Founder <jane@acme.io>',
+        to: 'Anish <anish@fund.example>',
+        cc: 'Partner <partner@fund.example>, New Associate <associate@fund.example>',
+        subject: 'Diligence call',
+      }),
+    )
+    await poll()
+
+    // Jane was created; nobody at fund.example, and no fund.example company.
+    expect(await graphCounts()).toEqual({
+      companies: 1,
+      people: 2,
+      identities: 3,
+    })
+    const jane = await holderOf('email', 'jane@acme.io')
+    expect(await edgesOf('ic-1@acme.io')).toEqual(
+      [acme, jane, anishRecord].sort(),
+    )
+  })
+
+  it('a key another record already holds is a duplicate_candidate — not an error, not a second alias — and asked again, the same record', async () => {
+    // Sequoia is tracked as a Fund, which claimed sequoia.com.
+    const fund = await aFundRecord('Sequoia Capital', 'sequoia.com')
+    expect(await holderOf('domain', 'sequoia.com')).toBe(fund)
+    await configure()
+    server.deliver(
+      bcc({
+        messageId: 'coinvest-1@sequoia.com',
+        from: 'Pat Partner <pat@sequoia.com>',
+        to: 'Anish <anish@fund.example>',
+        subject: 'Co-invest on Acme?',
+      }),
+    )
+    const outcome = await poll()
+    expect(outcome.written).toBe(1)
+
+    // A company was made for the thread, without the claim.
+    const companies = await db
+      .select({ id: entity.id, name: entity.canonicalName })
+      .from(entity)
+      .where(eq(entity.kind, 'company'))
+    expect(companies.map((c) => c.name)).toEqual(['Sequoia'])
+    const sequoia = companies[0].id
+    const claims = await db
+      .select({ entityId: entityAlias.entityId })
+      .from(entityAlias)
+      .where(
+        and(
+          eq(entityAlias.kind, 'domain'),
+          eq(entityAlias.valueNorm, 'sequoia.com'),
+        ),
+      )
+    expect(claims).toEqual([{ entityId: fund }])
+
+    // The pair is in the inbox, keyed on what collided.
+    const [a, b] = sequoia < fund ? [sequoia, fund] : [fund, sequoia]
+    const pairs = await db
+      .select()
+      .from(duplicateCandidate)
+      .where(
+        and(
+          eq(duplicateCandidate.entityA, a),
+          eq(duplicateCandidate.entityB, b),
+        ),
+      )
+    expect(pairs).toHaveLength(1)
+    expect(pairs[0]).toMatchObject({
+      status: 'open',
+      score: 1,
+      reason: { shared: 'domain', value: 'sequoia.com' },
+    })
+    // The thread is on the company and on Pat all the same.
+    const pat = await holderOf('email', 'pat@sequoia.com')
+    expect(await edgesOf('coinvest-1@sequoia.com')).toEqual(
+      [sequoia, pat].sort(),
+    )
+
+    // Next week, a reply from Sequoia: the same company, no second pair.
+    const before = await graphCounts()
+    server.deliver(
+      bcc({
+        messageId: 'coinvest-2@sequoia.com',
+        from: 'Pat Partner <pat@sequoia.com>',
+        to: 'Anish <anish@fund.example>',
+        subject: 'Re: Co-invest on Acme?',
+        inReplyTo: 'coinvest-1@sequoia.com',
+        references: '<coinvest-1@sequoia.com>',
+      }),
+    )
+    await poll()
+    expect(await graphCounts()).toEqual(before)
+    expect(
+      (await db.select({ n: count() }).from(duplicateCandidate)).at(0)?.n,
+    ).toBe(1)
+    expect(await edgesOf('coinvest-2@sequoia.com')).toEqual(
+      [sequoia, pat].sort(),
+    )
+  })
+
+  it('re-polling the same thread creates no second entity: the second run is all attaches', async () => {
+    await aMember('anish@fund.example')
+    await configure()
+    server.deliver(gmailForward())
+    server.deliver(OUTLOOK_FORWARD)
+    await poll()
+    const first = await graphCounts()
+    // Acme, Beta, Gamma; Jane, Raj, Priya, Sam, Lee.
+    expect(first).toEqual({ companies: 3, people: 5, identities: 8 })
+
+    // The folder is recreated: both messages come round again.
+    server.renumber(7)
+    const again = await poll()
+    expect(again).toMatchObject({ fetched: 2, written: 0, duplicate: 2 })
+    expect(await graphCounts()).toEqual(first)
+
+    // The same judgement, run by hand, attaches every record it names.
+    const arrival = await arrivalFromSource(gmailForward(), {
+      mailboxAddress: MAILBOX,
+      receivedAt: new Date(),
+    })
+    if (arrival.kind !== 'message') throw new Error('refused')
+    const records = await Effect.runPromise(
+      participantRecordsProgram(arrival.message, {
+        integrationId: await mailboxIntegrationId(),
+        authorId: FIXTURE_ACTOR.id,
+      }),
+    )
+    expect(records).toMatchObject({ created: 0, attached: 4 })
+    expect(await graphCounts()).toEqual(first)
   })
 })

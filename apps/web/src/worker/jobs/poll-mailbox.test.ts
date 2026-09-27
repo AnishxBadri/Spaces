@@ -5,13 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { JobWithMetadata } from 'pg-boss'
 import { db } from '@spaces/db'
 import { jobRun, mailbox } from '@spaces/db/schema'
-import { truncatePublicTables } from '@spaces/db/test-db'
 import { FakeImapServer } from '#/test/fake-imap'
+import { truncateAndReseed } from '#/test/reseed'
 import { MAILBOX, bcc } from '#/lib/arrival/fixtures'
 import { MailSchedule, mailScheduleLayer } from '#/lib/arrival/schedule'
 import type { ScheduleClient } from '#/lib/arrival/schedule'
 import { saveMailboxProgram } from '#/lib/arrival/settings'
-import { FIXTURE_ACTOR, seedTestDatabase } from '../../../vitest.seed'
+import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { runJob } from '../run-job'
 import type { JobHost, JobOutcome } from '../run-job'
 import { pollMailbox, syncMailScheduleProgram } from './poll-mailbox'
@@ -34,14 +34,7 @@ const quietSchedule = Layer.succeed(
 )
 
 beforeEach(async () => {
-  await truncatePublicTables((text) => db.$client.query(text))
-  const speak = console.log
-  console.log = () => undefined
-  try {
-    await seedTestDatabase()
-  } finally {
-    console.log = speak
-  }
+  await truncateAndReseed()
   server = new FakeImapServer({ user: MAILBOX, password: PASSWORD })
   port = await server.start()
 })

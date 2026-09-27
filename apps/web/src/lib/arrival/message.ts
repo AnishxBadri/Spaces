@@ -44,6 +44,13 @@ export type ArrivalMessage = {
   forwarder: Address | null
   /** Sender, To and Cc, deduped, the mailbox itself left out. */
   participants: Array<Address>
+  /**
+   * To and Cc as the conversation addressed them, the mailbox left out —
+   * the fields `decideParticipants` reads (SPA-86). The original's on a true
+   * forward.
+   */
+  to: Array<Address>
+  cc: Array<Address>
   /** The plain-text body, stored as the interaction's note (D30). */
   body: string
   forwarded: boolean
@@ -122,6 +129,13 @@ export function toArrival(parsed: ParsedMail, opts: ArrivalOptions): Arrival {
     }
 
   const mailbox = opts.mailboxAddress.trim().toLowerCase()
+  const notMailbox = (a: Address) => a.email !== mailbox
+  const to = (original !== null ? original.to : addresses(parsed.to)).filter(
+    notMailbox,
+  )
+  const cc = (original !== null ? original.cc : addresses(parsed.cc)).filter(
+    notMailbox,
+  )
   const participants = dedupe(
     original !== null
       ? [original.from, ...original.to, ...original.cc]
@@ -139,6 +153,8 @@ export function toArrival(parsed: ParsedMail, opts: ArrivalOptions): Arrival {
         from: outerFrom,
         forwarder: null,
         participants,
+        to,
+        cc,
         body: text.trim(),
         forwarded: false,
       },
@@ -161,6 +177,8 @@ export function toArrival(parsed: ParsedMail, opts: ArrivalOptions): Arrival {
       from: original.from,
       forwarder: outerFrom,
       participants,
+      to,
+      cc,
       body: text.trim(),
       forwarded: true,
     },

@@ -73,17 +73,34 @@ const LEGAL_SUFFIXES =
  * URLs, and emails-shaped input. Returns null for invalid or free-mail.
  */
 export function normalizeDomain(input: string): string | null {
-  const raw = input.trim().toLowerCase()
-  if (!raw) return null
-  const domain = getDomain(raw, { allowPrivateDomains: false })
+  const domain = registrableDomain(input)
   if (!domain) return null
   if (FREE_MAIL.has(domain)) return null
   return domain
 }
 
+/**
+ * Host → registrable domain (eTLD+1), lowercase, free-mail or not; null when
+ * the host has none. `normalizeDomain` minus the free-mail refusal, for the
+ * caller that has to *ask* whether a host is a free provider rather than be
+ * told nothing (the arrival lane's participant judgement, SPA-86).
+ */
+export function registrableDomain(input: string): string | null {
+  const raw = input.trim().toLowerCase()
+  if (!raw) return null
+  return getDomain(raw, { allowPrivateDomains: false })
+}
+
 export function isFreeMailDomain(domain: string): boolean {
   return FREE_MAIL.has(domain.toLowerCase())
 }
+
+/**
+ * The free-mail set itself, read-only — for the arrival lane's own list
+ * (`apps/web/src/lib/arrival/free-email-domains.ts`, D34), whose test holds
+ * it to a superset of this one.
+ */
+export const FREE_MAIL_DOMAINS: ReadonlySet<string> = FREE_MAIL
 
 /**
  * Email → matching form. Lowercase always; gmail additionally strips dots

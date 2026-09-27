@@ -1,6 +1,12 @@
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { company, entity, entityAlias, person } from '@spaces/db/schema'
+import {
+  company,
+  duplicateCandidate,
+  entity,
+  entityAlias,
+  person,
+} from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
 import type { Actor } from '../attributes/values'
 import { canonicalId, suggestDuplicate, sweepNameSimilarity } from './sweep'
@@ -19,9 +25,24 @@ import {
  * it is how the database rots.
  *
  * Doctrine: deterministic auto, probabilistic suggest.
- * - Exact identity-key match (domain/email/linkedin/cin) → attach.
+ * - Exact identity-key match (domain/email/linkedin/cin) on a record of the
+ *   kind asked for → attach.
  * - No match → create, then fuzzy-sweep names into duplicate_candidate.
  * - Fuzzy NEVER merges or attaches.
+ *
+ * **One collision door** (SPA-86). A key already held by a record of
+ * *another* kind — a custom Fund record that claimed `sequoia.com`, asked
+ * for as a company — is not this record, so it is not an attach. The record
+ * is created without that key and the claim goes through
+ * `claimIdentityAlias`, which is what every identity write does on a
+ * collision: a `duplicate_candidate` for the inbox, never an error and never
+ * a second identity alias. The create path's race — a concurrent writer
+ * committing the same key between the lookup and the insert — lands on the
+ * same door, since the alias inserts run in `claimIdentityAlias`'s
+ * savepoint. And the collision is recorded once: asked again for the same
+ * key, the record that lost that claim before is the one returned
+ * (`priorClaimant`), so an arrival lane re-reading a thread does not mint a
+ * second loser each time.
  */
 
 export type EntityKindResolvable = 'company' | 'person'
@@ -161,7 +182,8 @@ export async function resolveEntity(
     throw new Error('resolveEntity needs a name or at least one identity key')
   }
 
-  // 1. Deterministic: exact identity-key match → attach.
+  // 1. Deterministic: exact identity-key match on this kind → attach.
+  const heldElsewhere: Array<{ key: NormalizedKey; holderId: string }> = []
   for (const key of keys) {
     const hit = (
       await db
@@ -176,11 +198,23 @@ export async function resolveEntity(
         )
         .limit(1)
     ).at(0)
-    if (hit) {
-      const id = await canonicalId(hit.entityId)
+    if (!hit) continue
+    const id = await canonicalId(hit.entityId)
+    if ((await kindOf(id)) === input.kind) {
       // New name for a known entity is still signal — record as alias.
       if (name) await recordNameAlias(id, name, input.source)
       return { entityId: id, action: 'attached', matchedOn: key.kind }
+    }
+    heldElsewhere.push({ key, holderId: id })
+  }
+
+  // 1b. A key another kind of record holds: the record that already lost
+  // that claim, if there is one, is this record again.
+  for (const { key, holderId } of heldElsewhere) {
+    const prior = await priorClaimant(input.kind, key, holderId)
+    if (prior !== null) {
+      if (name) await recordNameAlias(prior, name, input.source)
+      return { entityId: prior, action: 'attached', matchedOn: key.kind }
     }
   }
 
@@ -203,15 +237,13 @@ export async function resolveEntity(
       })
       .returning({ id: entity.id })
 
+    // Every identity key is a claim, and a claim someone else holds is a
+    // duplicate_candidate — the key held by another kind of record (1b
+    // found no prior loser) and the key a concurrent writer committed a
+    // moment ago alike. The savepoint inside keeps either from taking this
+    // transaction down.
     for (const key of keys) {
-      await tx.insert(entityAlias).values({
-        entityId: ent.id,
-        kind: key.kind,
-        value: key.value,
-        valueNorm: key.valueNorm,
-        isIdentity: true,
-        ...sourceColumns(input.source),
-      })
+      await claimIdentityAlias(tx, ent.id, key.kind, key.value, input.source)
     }
     if (name) {
       await tx.insert(entityAlias).values({
@@ -260,6 +292,62 @@ export async function resolveEntity(
   }
 
   return { entityId: created.id, action: 'created' }
+}
+
+/** The kind of a record, by id; null when there is no such row. */
+async function kindOf(id: string): Promise<string | null> {
+  const row = (
+    await db
+      .select({ kind: entity.kind })
+      .from(entity)
+      .where(eq(entity.id, id))
+      .limit(1)
+  ).at(0)
+  return row?.kind ?? null
+}
+
+/**
+ * The record of `kind` that already lost the claim to `key` against
+ * `holderId` — the other side of the `duplicate_candidate` that collision
+ * minted, whatever its status (a dismissed pair still says which record is
+ * which), unless it has since been merged away. Null when the collision is
+ * new.
+ */
+async function priorClaimant(
+  kind: EntityKindResolvable,
+  key: NormalizedKey,
+  holderId: string,
+): Promise<string | null> {
+  const pairs = await db
+    .select({ a: duplicateCandidate.entityA, b: duplicateCandidate.entityB })
+    .from(duplicateCandidate)
+    .where(
+      and(
+        or(
+          eq(duplicateCandidate.entityA, holderId),
+          eq(duplicateCandidate.entityB, holderId),
+        ),
+        sql`${duplicateCandidate.reason} ->> 'shared' = ${key.kind}`,
+        sql`${duplicateCandidate.reason} ->> 'value' = ${key.valueNorm}`,
+      ),
+    )
+  const others = pairs.map((p) => (p.a === holderId ? p.b : p.a))
+  if (others.length === 0) return null
+  const row = (
+    await db
+      .select({ id: entity.id })
+      .from(entity)
+      .where(
+        and(
+          inArray(entity.id, others),
+          eq(entity.kind, kind),
+          isNull(entity.mergedIntoId),
+        ),
+      )
+      .orderBy(asc(entity.createdAt))
+      .limit(1)
+  ).at(0)
+  return row?.id ?? null
 }
 
 /**

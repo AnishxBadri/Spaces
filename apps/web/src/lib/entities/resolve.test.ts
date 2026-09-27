@@ -251,4 +251,86 @@ describe('resolveEntity', () => {
     expect(li.cls).toBe('integration')
     expect(li.ref).toBe(inst.id)
   })
+
+  it('a key held by another kind of record is a duplicate_candidate, not an attach — and asked again, the same record', async () => {
+    const { Effect } = await import('effect')
+    const { resolveEntity } = await import('./resolve')
+    const { createObjectProgram, createRecordProgram } =
+      await import('../attributes/object-registry')
+    const { db } = await import('@spaces/db')
+    const { duplicateCandidate, entity, entityAlias } =
+      await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+    const { and, eq, or } = await import('drizzle-orm')
+
+    const tag = randomUUID().slice(0, 8)
+    const domain = `sequoia-${tag}.com`
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    const fundObject = await Effect.runPromise(
+      createObjectProgram({
+        singular: `Fund ${tag}`,
+        plural: `Funds ${tag}`,
+        identityKeys: ['domain'],
+        createdBy: actor.id,
+      }),
+    )
+    const fund = await Effect.runPromise(
+      createRecordProgram({
+        objectId: fundObject.id,
+        name: `Sequoia ${tag} Capital`,
+        values: { domain },
+        actor: { type: 'user', id: actor.id },
+      }),
+    )
+
+    // Asked for as a company, the Fund's key is not this record.
+    const first = await resolveEntity({
+      kind: 'company',
+      name: `Sequoia ${tag}`,
+      keys: { domain },
+      source: { class: 'manual' },
+    })
+    expect(first.action).toBe('created')
+    expect(first.entityId).not.toBe(fund.id)
+    const [kind] = await db
+      .select({ kind: entity.kind })
+      .from(entity)
+      .where(eq(entity.id, first.entityId))
+    expect(kind.kind).toBe('company')
+
+    // One claim on the key — the Fund's — and the pair in the inbox.
+    const claims = await db
+      .select({ entityId: entityAlias.entityId })
+      .from(entityAlias)
+      .where(
+        and(eq(entityAlias.kind, 'domain'), eq(entityAlias.valueNorm, domain)),
+      )
+    expect(claims).toEqual([{ entityId: fund.id }])
+    const pair = (id: string) =>
+      db
+        .select()
+        .from(duplicateCandidate)
+        .where(
+          or(
+            eq(duplicateCandidate.entityA, id),
+            eq(duplicateCandidate.entityB, id),
+          ),
+        )
+    const pairs = await pair(fund.id)
+    expect(pairs).toHaveLength(1)
+    expect(pairs[0].reason).toEqual({ shared: 'domain', value: domain })
+
+    // Asked again: the record that lost the claim, no second loser.
+    const second = await resolveEntity({
+      kind: 'company',
+      keys: { domain: `www.${domain}` },
+      source: { class: 'manual' },
+    })
+    expect(second).toMatchObject({
+      entityId: first.entityId,
+      action: 'attached',
+      matchedOn: 'domain',
+    })
+    expect(await pair(fund.id)).toHaveLength(1)
+  })
 })

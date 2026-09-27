@@ -1850,14 +1850,61 @@ archive.
   - What the lane writes: one `interaction(kind: email)` per Message-ID with
     `source_class = 'integration'` and `source_ref` → the one core
     `integration` row (`capability_id = 'core.mailbox'`, D1); edges to the
-    people and companies whose `email`/`domain` alias matches, never created
-    (arrival-2 owns creation), never to a deal; a reply inherits its thread's
-    edges; a true forward is matched and keyed on its Forwarded-message block
+    people and companies whose `email`/`domain` alias matches — made first
+    by arrival-2 when they do not exist yet (below) — never to a deal; a
+    reply inherits its thread's edges; a true forward is matched and keyed on its Forwarded-message block
     (an id derived from the original's sender, date and subject when the
     block prints no Message-ID). Refusals — no Message-ID, `Auto-Submitted`,
     list mail, a machine sender — are pure (`apps/web/src/lib/arrival/noise.ts`)
     so the calendar lane reuses them, and each poll's `job_run.summary` says
     how many were written and why the rest were not.
+- **Participants become records: create-all-visible, minus a free-provider
+  list (SPA-86, arrival-2; D34 option 1, 2026-09-28).** Two recorded
+  positions conflicted. This section's own line above — forward-only sync
+  turns the flood into a trickle and makes **"create all, visible"** the
+  obvious policy — against the Twenty survey's takeaway, **SENT-only
+  creation** (only people you have written to become records) plus a
+  free-email-provider list. **Create-all won**, keeping the survey's list:
+  a forwarding mailbox has no sent folder for the SENT rule to read, so it
+  is unimplementable on the first channel and can only ever be a later
+  Gmail-sync refinement (arrival-10); and a forward is itself the consent
+  signal SENT-only was standing in for — somebody at the fund chose to send
+  this thread in. What create-all without the list gets wrong — companies
+  named after mail providers, a dedupe inbox full of them — is what the list
+  prevents. The judgement is one pure module,
+  `apps/web/src/lib/arrival/participants.ts`: addresses in, a typed
+  `create | attach | ignore` per address out, shared by every arrival lane
+  (calendar arrival-5, recorder arrival-6, Gmail arrival-10).
+  - **create** — a work-domain address makes a person (email alias,
+    `is_identity`) and a company (registrable-domain alias, `is_identity`,
+    named after its first label); a free provider
+    (`apps/web/src/lib/arrival/free-email-domains.ts`, tested data owned by
+    this area, a superset of core's free-mail set) makes the person and never
+    a company; a shared inbox at a work domain (`founders@`, `hello@`) makes
+    the company and no person.
+  - **attach** — the workspace's own people, whichever policy won: a
+    member's address, or any address at an own domain, creates nothing, and
+    is still edged when a record for it already exists. Own domains are
+    derived — the work domains among the members' addresses plus the
+    forwarding mailbox's own — because the workspace row carries none; a
+    member on Gmail never makes Gmail internal.
+  - **ignore** — machine senders (`noreply@`, `notifications@`: the
+    `noise.ts` list), a role address at a free provider, and anything that
+    does not parse.
+  - **One door.** Every create goes through `resolveEntity` with
+    `{class: 'integration', ref: <the core.mailbox integration>}`, so the
+    record, its aliases and its birth events name the channel, and the inbox
+    card reads "mailbox" (`channelLabel`, `lib/entities/provenance.ts`)
+    rather than "integration". Nothing under `lib/arrival/` inserts into
+    `entity` or `entity_alias` itself (grep test). `resolveEntity` attaches
+    on an identity key only when its holder is the kind asked for; a key a
+    record of another kind holds (a custom Fund that claimed the domain) is
+    created without the key and the claim goes through `claimIdentityAlias`
+    — a `duplicate_candidate`, never an error and never a second identity
+    alias — and asked again, the record that lost that claim is returned, so
+    a re-read thread does not mint a second one. The step runs before the
+    filing transaction (the gate commits its own) and for a duplicate too: a
+    re-poll is all attaches.
 
 ### Privacy default (decide deliberately — get it wrong and partner #2 never connects their mailbox)
 
