@@ -1815,6 +1815,49 @@ archive.
   not the forwarder's. Attio's shape.
 - **Deck links stay links (owner, 2026-09-23).** No headless browser, no
   renderer port, no snapshot container; D32 superseded, SPA-138 cancelled.
+- **The forwarding lane is built (SPA-56, arrival-1; 2026-09-27).** Two
+  choices, ratified as D31 and D30 and amended by D49:
+  - **Transport: IMAP poll of an operator-owned mailbox (D31).** An address
+    the fund forwards or BCCs to, an app password in the vault
+    (`credential.kind = 'mailbox'`), a `mail.poll` job on the worker every
+    `mailbox.cadence_minutes`. It is core, not a plugin — a protocol with a
+    password, no OAuth consent screen, no loader — beside the URL clip, while
+    Gmail's History API stays a plugin (arrival-10). _Rejected:_ an **inbound
+    SMTP listener** (needs an MX record pointed at the box, port 25 open and a
+    TLS certificate for it — a public mail server on a two-container
+    self-host, and a new required-env surface where the frozen set is
+    `{DATABASE_URL, APP_URL}`); an **inbound-email provider webhook**
+    (Postmark/SendGrid/Mailgun: a third-party account and a public URL for
+    every install, the fund's mail routed through a vendor). All three share
+    the parser and the filing path, so the cheapest was taken; switching is a
+    transport, not a rewrite. The trap the poll owns is UIDVALIDITY: the
+    cursor carries the validity it was read under and a change restarts from
+    UID 1, leaning on `interaction_message_id_unique` — caught as a conflict,
+    never pre-checked — to write nothing twice.
+  - **Bodies are notes, one visibility model (D30), and a forwarded body is
+    born `shared` (D49).** `interaction.note_id` claims a `note` row, so mail
+    reuses the one editor, search index and private-note carve-out already
+    enforced in SQL. Forwarding is the consent; the private-until-attached
+    default belongs to the synced mailbox (arrival-10) only. _Rejected:_ a
+    **body column on `interaction`** (notes-5 moved prose off `interaction`
+    deliberately — a second body store means a second search index and a
+    second visibility rule); **bodies private until attached** for this lane
+    (every forwarded thread would need a manual share, and a reply next week
+    another — the manual-act-per-thread D49 removed). The body note is filed
+    against nothing — it reaches records through the interaction's edges on
+    the timeline, not `link(tagged_in)` — so mail does not fill every
+    participant's Notes section.
+  - What the lane writes: one `interaction(kind: email)` per Message-ID with
+    `source_class = 'integration'` and `source_ref` → the one core
+    `integration` row (`capability_id = 'core.mailbox'`, D1); edges to the
+    people and companies whose `email`/`domain` alias matches, never created
+    (arrival-2 owns creation), never to a deal; a reply inherits its thread's
+    edges; a true forward is matched and keyed on its Forwarded-message block
+    (an id derived from the original's sender, date and subject when the
+    block prints no Message-ID). Refusals — no Message-ID, `Auto-Submitted`,
+    list mail, a machine sender — are pure (`apps/web/src/lib/arrival/noise.ts`)
+    so the calendar lane reuses them, and each poll's `job_run.summary` says
+    how many were written and why the rest were not.
 
 ### Privacy default (decide deliberately — get it wrong and partner #2 never connects their mailbox)
 

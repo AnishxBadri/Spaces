@@ -74,6 +74,13 @@ export const jobRun = pgTable(
      * one is the current state of the document, which outlives every run.
      */
     error: text('error'),
+    /**
+     * What a successful attempt did, in the one line its handler returned —
+     * `fetched 3 · written 1 · duplicate 1 · refused 1 (auto-submitted 1)`
+     * (SPA-56). Null for a handler that returns nothing, and for every failed
+     * attempt, whose account is `error`. Still written only by `runJob`.
+     */
+    summary: text('summary'),
   },
   (t) => [
     index('job_run_entity_idx').on(t.entityId, t.startedAt),

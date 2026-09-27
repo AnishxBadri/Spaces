@@ -117,12 +117,19 @@ export interface JobRunRefs {
   readonly integrationId?: string | null
 }
 
+/**
+ * What a successful attempt may say about itself: one line the wrapper writes
+ * to `job_run.summary` (SPA-56's mail poll returns its message counts). A
+ * handler with nothing to say returns `void`, and the column stays null.
+ */
+export type JobSummary = string
+
 export interface JobDef<TData, TServices = never> {
   readonly name: string
   readonly schema: z.ZodType<TData>
   readonly run: (
     data: TData,
-  ) => Effect.Effect<void, JobFailure, TServices | JobContext>
+  ) => Effect.Effect<JobSummary | void, JobFailure, TServices | JobContext>
   readonly retry?: JobRetryPolicy
   readonly timeout?: Duration.Input
   readonly concurrency?: number
@@ -213,6 +220,8 @@ export interface JobRunEnd {
   readonly finishedAt: Date
   readonly durationMs: number
   readonly error: string | null
+  /** The handler's own line on success; null otherwise. */
+  readonly summary: string | null
 }
 
 /**
@@ -304,6 +313,7 @@ async function endRun(
   startedAt: Date,
   settled: JobOutcome | null,
   hostError: unknown,
+  summary: string | null,
 ): Promise<void> {
   if (runId === null) return
   const finishedAt = new Date()
@@ -316,6 +326,7 @@ async function endRun(
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       error: ledgerError(settled, hostError),
+      summary: settled?.kind === 'completed' ? summary : null,
     })
   } catch (err) {
     console.error(
@@ -436,6 +447,7 @@ async function settle<TData, TServices>(
     recorded.outcome = o
   })
   let hostError: unknown = null
+  let summary: string | null = null
 
   try {
     if (!parsed.success) {
@@ -464,7 +476,8 @@ async function settle<TData, TServices>(
     )
 
     if (Exit.isSuccess(exit)) {
-      await host.complete(queue, job.id, outcome('completed', 'ok'))
+      summary = typeof exit.value === 'string' ? exit.value : null
+      await host.complete(queue, job.id, outcome('completed', summary ?? 'ok'))
       return
     }
 
@@ -504,7 +517,7 @@ async function settle<TData, TServices>(
       err,
     )
   } finally {
-    await endRun(ledger, runId, startedAt, recorded.outcome, hostError)
+    await endRun(ledger, runId, startedAt, recorded.outcome, hostError, summary)
   }
 }
 
@@ -527,8 +540,8 @@ function refsOf<TData, TServices>(
 
 function withTimeout<TData, TServices>(
   def: JobDef<TData, TServices>,
-  effect: Effect.Effect<void, JobFailure, TServices>,
-): Effect.Effect<void, JobFailure, TServices> {
+  effect: Effect.Effect<JobSummary | void, JobFailure, TServices>,
+): Effect.Effect<JobSummary | void, JobFailure, TServices> {
   const duration = def.timeout
   if (duration === undefined) return effect
   return Effect.timeoutOrElse(effect, {

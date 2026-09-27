@@ -1,4 +1,4 @@
-import { Layer } from 'effect'
+import { Effect, Layer } from 'effect'
 import { PgBoss } from 'pg-boss'
 import type { Job } from 'pg-boss'
 import { requireEnv } from '#/lib/server/env'
@@ -23,6 +23,12 @@ import {
   COLUMN_RUN_EXPIRE_SECONDS,
   attributeColumnRun,
 } from './jobs/attribute-column-run'
+import {
+  pollMailbox,
+  pollMailboxRetry,
+  syncMailScheduleProgram,
+} from './jobs/poll-mailbox'
+import { mailScheduleLayer } from '#/lib/arrival/schedule'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -248,6 +254,33 @@ async function main() {
     QUEUES.attributeColumnRun,
     { batchSize: 1, includeMetadata: true },
     runJob(attributeColumnRun, { host, layer: Layer.empty }),
+  )
+  // The forwarding mailbox (SPA-56): `singleton`, so two polls never share
+  // one IMAP cursor, and never retried — the next scheduled tick is the
+  // retry, and a refused login backs off on the mailbox row instead. Created
+  // before the plain create loop below for the deck reader's reason. The
+  // schedule follows `mailbox.cadence_minutes`: synced here at boot and again
+  // at the top of every poll, so with no mailbox row the queue exists and
+  // nothing is scheduled into it.
+  await boss
+    .createQueue(QUEUES.pollMailbox, {
+      policy: 'singleton',
+      retryLimit: pollMailboxRetry.limit,
+    })
+    .catch(() => {})
+  await boss.updateQueue(QUEUES.pollMailbox, {
+    retryLimit: pollMailboxRetry.limit,
+    retryDelay: pollMailboxRetry.delaySeconds,
+    retryBackoff: pollMailboxRetry.backoff,
+  })
+  const mailSchedule = mailScheduleLayer(boss)
+  await boss.work(
+    QUEUES.pollMailbox,
+    { batchSize: 1, includeMetadata: true },
+    runJob(pollMailbox, { host, layer: mailSchedule }),
+  )
+  await Effect.runPromise(
+    Effect.provide(syncMailScheduleProgram(), mailSchedule),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots

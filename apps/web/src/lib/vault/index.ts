@@ -10,7 +10,7 @@ import { decryptSecret, encryptSecret, redact } from './crypto'
 export { redact }
 
 /**
- * The six kinds, read off the column rather than retyped, so widening the
+ * The seven kinds (`mailbox` since SPA-56), read off the column rather than retyped, so widening the
  * enum (SPA-112) widens this boundary in the same edit and cannot drift from
  * it. `llm` and (from SPA-29's AI settings on) the AI substrate write here;
  * `embedding`, `oauth_client` and `webhook` are claimed by the AI substrate,
@@ -213,6 +213,25 @@ export async function resolveSecret(
   userId?: string,
 ): Promise<string | null> {
   return (await resolveCredential(provider, userId))?.secret ?? null
+}
+
+/**
+ * One row's secret by id, for a caller that holds a foreign key to it rather
+ * than a provider name — the forwarding mailbox's `credential_id` (SPA-56).
+ * Null when the row is gone or marked invalid. Decrypted here, in the vault,
+ * with the same `scope:provider` AAD every other read uses.
+ */
+export async function resolveSecretById(id: string): Promise<string | null> {
+  const row = (
+    await db
+      .select()
+      .from(credential)
+      .where(and(eq(credential.id, id), eq(credential.status, 'active')))
+      .limit(1)
+  ).at(0)
+  if (!row) return null
+  touch(row.id)
+  return decryptSecret(row.secretEnc, aadFor(row.scope, row.provider))
 }
 
 /**

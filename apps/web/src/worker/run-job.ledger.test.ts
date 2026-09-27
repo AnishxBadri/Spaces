@@ -138,6 +138,8 @@ describe('runJob — the job_run ledger', () => {
       'queue',
       'started_at',
       'status',
+      // SPA-56: a successful handler's own one line (the mail poll's counts).
+      'summary',
     ])
   })
 

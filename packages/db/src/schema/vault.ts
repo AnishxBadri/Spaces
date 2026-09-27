@@ -26,7 +26,7 @@ const bytea = customType<{ data: Buffer }>({
 
 export const credentialScope = pgEnum('credential_scope', ['workspace', 'user'])
 /**
- * What class of secret a row holds. Six values, three of which nothing writes
+ * What class of secret a row holds. Seven values, three of which nothing writes
  * yet — they exist because the slices that need them were specified against a
  * three-value enum and would each have had to widen it (SPA-112):
  *
@@ -35,6 +35,9 @@ export const credentialScope = pgEnum('credential_scope', ['workspace', 'user'])
  * - `oauth_client` — an OAuth app's client id/secret per provider, registered
  *   once by the operator (`docs/spec-plugin-sdk.md` §12, slice `storage-1`).
  * - `webhook` — a webhook signing secret per integration (slice `sdk-23`).
+ * - `mailbox` — the forwarding mailbox's IMAP app password (SPA-56), the
+ *   seventh value. Added by that slice's own migration: SPA-112 stopped at
+ *   six, and a mailbox password is none of them.
  *
  * Widening is free for stored ciphertext: the AAD is `scope:provider`, so
  * `kind` is not an encryption input and no existing row is re-encrypted.
@@ -46,6 +49,7 @@ export const credentialKind = pgEnum('credential_kind', [
   'search',
   'oauth_client',
   'webhook',
+  'mailbox',
 ])
 /** Non-secret provider config: base URL for Ollama, model mapping, etc. */
 export type CredentialMeta = { [k: string]: Json }

@@ -105,6 +105,14 @@ export const SETTINGS_SECTIONS = [
     group: 'workspace',
     admin: false,
   },
+  {
+    // arrival-1 (SPA-56): the forwarding mailbox — an address and an app
+    // password the workspace polls. Admin-only, like every vault secret.
+    to: '/settings/arrival',
+    label: 'Arrival',
+    group: 'workspace',
+    admin: true,
+  },
   { to: '/settings/objects', label: 'Objects', group: 'objects', admin: false },
   {
     to: '/settings/currency',

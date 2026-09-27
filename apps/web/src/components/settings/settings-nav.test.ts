@@ -107,6 +107,8 @@ describe('the settings nav grammar', () => {
     expect(lockedForAMember.map((row) => row.label)).toEqual([
       'AI providers',
       'Embeddings',
+      // arrival-1 (SPA-56): the forwarding mailbox and its app password.
+      'Arrival',
     ])
   })
 })

@@ -123,6 +123,16 @@ export const QUEUES = {
    * queued or active is refused by pg-boss; never retried.
    */
   attributeColumnRun: 'attribute.column-run',
+  /**
+   * The forwarding mailbox (SPA-56): one IMAP poll of the operator's
+   * mailbox → one interaction per new RFC Message-ID. Scheduled by the
+   * worker from `mailbox.cadence_minutes` and only while a mailbox row
+   * exists; saving the mailbox in Settings → Arrival also sends one, which
+   * polls at once and re-syncs that schedule. `singleton`, so two polls never
+   * run at the same time over one cursor; never retried — the next tick is
+   * the retry, and a refused login backs off rather than hammering.
+   */
+  pollMailbox: 'mail.poll',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

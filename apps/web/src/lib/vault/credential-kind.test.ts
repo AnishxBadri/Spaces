@@ -63,7 +63,9 @@ describe('a row written before the enum widened', () => {
 })
 
 describe('the vault write path', () => {
-  it('accepts all six kinds', async () => {
+  it('accepts all seven kinds', async () => {
+    // `mailbox` is the seventh (SPA-56): the forwarding mailbox's app
+    // password, added by that slice's own migration.
     expect(CREDENTIAL_KINDS).toEqual([
       'llm',
       'embedding',
@@ -71,6 +73,7 @@ describe('the vault write path', () => {
       'search',
       'oauth_client',
       'webhook',
+      'mailbox',
     ])
 
     for (const kind of CREDENTIAL_KINDS) {

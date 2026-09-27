@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import { condenseBursts } from '@spaces/core/timeline/bursts'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
@@ -9,6 +9,7 @@ import {
   integration,
   interaction,
   interactionEntity,
+  link,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import type { Json } from '#/lib/json'
@@ -107,10 +108,38 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
       })),
     )
 
+    // Whose interactions this timeline reads. A record reads its own; a deal
+    // also reads its company's and its contacts' (D49, SPA-56): a thread
+    // reaches a deal by derivation, never by an edge written at arrival, so
+    // a company carrying two deals shows every thread on both. The deal's
+    // own edges still count — the one explicit pin D49 keeps.
+    const kind = (yield* query(() =>
+      db
+        .select({ kind: entity.kind })
+        .from(entity)
+        .where(eq(entity.id, entityId)),
+    )).at(0)?.kind
+    const derived =
+      kind === 'deal'
+        ? (yield* query(() =>
+            db
+              .select({ id: link.toEntityId })
+              .from(link)
+              .where(
+                and(
+                  eq(link.fromEntityId, entityId),
+                  eq(link.relation, 'references'),
+                  inArray(link.attrSlug, ['company', 'people']),
+                ),
+              ),
+          )).map((r) => r.id)
+        : []
+    const readFrom = [...new Set([entityId, ...derived])]
+
     // Interactions this entity participated in, with co-attendees.
     const myInteractions = yield* query(() =>
       db
-        .select({
+        .selectDistinct({
           id: interaction.id,
           kind: interaction.kind,
           subject: interaction.subject,
@@ -125,7 +154,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           interaction,
           eq(interaction.id, interactionEntity.interactionId),
         )
-        .where(eq(interactionEntity.entityId, entityId))
+        .where(inArray(interactionEntity.entityId, readFrom))
         .orderBy(desc(interaction.occurredAt))
         .limit(50),
     )
