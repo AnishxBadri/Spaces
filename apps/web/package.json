@@ -57,6 +57,7 @@
     "lucide-react": "^0.577.0",
     "nitro": "3.0.260610-beta",
     "ollama-ai-provider-v2": "^4.0.1",
+    "pdf-lib": "^1.17.1",
     "pg": "^8.16.3",
     "pg-boss": "^12.26.3",
     "radix-ui": "^1.6.7",

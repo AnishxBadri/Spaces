@@ -69,6 +69,21 @@ export type CompleteOptions = {
   jobRunId?: string
   maxOutputTokens?: number
   maxRetries?: number
+  /**
+   * Files sent beside the rendered prompt, as `file` parts of the one user
+   * message (SPA-94: the vision lane hands a PDF page range to the provider,
+   * which renders the pages itself). Absent or empty, the call is the plain
+   * `prompt` string it always was. The cap estimate is still `budgetChars`:
+   * a caller sending files sizes it for what the files will cost.
+   */
+  files?: ReadonlyArray<CompleteFile>
+}
+
+/** One file part of a `complete()` call. PDF only, until a lane needs more. */
+export type CompleteFile = {
+  mediaType: 'application/pdf'
+  data: Uint8Array
+  name?: string
 }
 
 export type CompleteOutput =
@@ -234,9 +249,30 @@ export const completeProgram = Effect.fn('complete')(function* (
     task: opts.task,
     budgetChars: opts.budgetChars,
   })
+  // With files, the prompt becomes the text part of one user message and each
+  // file a `file` part after it; without, the call is unchanged.
+  const input =
+    opts.files === undefined || opts.files.length === 0
+      ? { prompt }
+      : {
+          messages: [
+            {
+              role: 'user' as const,
+              content: [
+                { type: 'text' as const, text: prompt },
+                ...opts.files.map((f) => ({
+                  type: 'file' as const,
+                  data: f.data,
+                  mediaType: f.mediaType,
+                  ...(f.name === undefined ? {} : { filename: f.name }),
+                })),
+              ],
+            },
+          ],
+        }
   const settings = {
     model,
-    prompt,
+    ...input,
     ...(opts.maxOutputTokens === undefined
       ? {}
       : { maxOutputTokens: opts.maxOutputTokens }),

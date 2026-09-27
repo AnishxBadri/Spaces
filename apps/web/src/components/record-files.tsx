@@ -29,6 +29,8 @@ import { SummarizeRowButton, useSummarizer } from './summarize'
 import type { Summarizer } from './summarize'
 import { KeyTermsRowButton, useKeyTermsExtractor } from './key-terms'
 import type { KeyTermsExtractor } from './key-terms'
+import { VisionRowButton, useVisionReader } from './vision'
+import type { VisionReader } from './vision'
 import {
   DOCUMENT_KINDS,
   DOCUMENT_KIND_LABELS,
@@ -111,6 +113,8 @@ export function RecordFiles({
   )
   // Extract key terms (SPA-91): a legal or diligence document on a deal.
   const keyTermsFor = useKeyTermsExtractor(entityId, documents)
+  // Read with vision (SPA-94): a stored PDF with no text layer.
+  const visionFor = useVisionReader(entityId, documents)
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -246,6 +250,7 @@ export function RecordFiles({
               doc={doc}
               reader={deckReaderFor(doc)}
               keyTerms={keyTermsFor(doc)}
+              vision={visionFor(doc)}
               summarizer={
                 doc.extractionStatus === 'done' ? summarizerFor(doc.id) : null
               }
@@ -289,12 +294,14 @@ function DocumentRow({
   doc,
   reader,
   keyTerms,
+  vision,
   summarizer,
   onPreview,
 }: {
   doc: Documents[number]
   reader: DeckReader | null
   keyTerms: KeyTermsExtractor | null
+  vision: VisionReader | null
   summarizer: Summarizer | null
   onPreview: () => void
 }) {
@@ -370,6 +377,7 @@ function DocumentRow({
           <SummarizeRowButton summarizer={summarizer} />
         )}
         {keyTerms === null ? null : <KeyTermsRowButton extractor={keyTerms} />}
+        {vision === null ? null : <VisionRowButton reader={vision} />}
         {reader === null ? null : (
           <Button
             size="xs"

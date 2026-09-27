@@ -94,6 +94,15 @@ export const QUEUES = {
    * pg-boss.
    */
   extractKeyTerms: 'document.key-terms',
+  /**
+   * The vision lane (SPA-94): a stored PDF at `extraction_status:
+   * 'unsupported'` → its pages read by the routed vision model, written as
+   * `extracted_text` + `tsv` through extraction's own statement. Enqueued by
+   * the Files tab's "Read with vision" and nothing else. Created `exclusive`
+   * and sent with `singletonKey = documentId`, so a second press while one
+   * is queued or active is refused by pg-boss; never retried.
+   */
+  visionDocument: 'document.vision',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

@@ -17,6 +17,7 @@ import { embedBackfill, embedBackfillRetry } from './jobs/embed-backfill'
 import { classifyDocument } from './jobs/classify-document'
 import { suggestSpaces } from './jobs/suggest-spaces'
 import { extractKeyTerms } from './jobs/extract-key-terms'
+import { visionDocument } from './jobs/vision-document'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -175,6 +176,27 @@ async function main() {
     QUEUES.extractKeyTerms,
     { batchSize: 1, includeMetadata: true },
     runJob(extractKeyTerms, { host, layer: Layer.empty }),
+  )
+  // Read with vision (SPA-94): the deck reader's shape — `exclusive` with
+  // `singletonKey = documentId`, so a second press while one is queued or
+  // active is refused by pg-boss; no retries, since every failure is
+  // permanent and a retry re-pays for every page before the one that broke.
+  // Created before the plain create loop below for the deck reader's reason.
+  // A batch of one; its Layer is extraction's, because its write *is*
+  // extraction's (`ExtractionStore.markExtracted` / `onExtracted`).
+  await boss
+    .createQueue(QUEUES.visionDocument, { policy: 'exclusive' })
+    .catch(() => {})
+  if (visionDocument.retry)
+    await boss.updateQueue(QUEUES.visionDocument, {
+      retryLimit: visionDocument.retry.limit,
+      retryDelay: visionDocument.retry.delaySeconds,
+      retryBackoff: visionDocument.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.visionDocument,
+    { batchSize: 1, includeMetadata: true },
+    runJob(visionDocument, { host, layer: ExtractionStore.layer }),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots

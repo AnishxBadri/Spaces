@@ -25,6 +25,12 @@ vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
  * bottom holds both halves. Between them: `document.embed` always, and
  * `document.classify` only for a document still at `other` with the
  * classify lane routed.
+ *
+ * SPA-94 is the seam's second tenant, as SPA-62's body named it ("ai-21's
+ * vision write"): the vision job reaches `onDocumentExtracted` through the
+ * *store* — `ExtractionStore.onExtracted`, whose layer is the one call site
+ * below — so the single-call-site assertion is unchanged, and the store
+ * seam's callers are pinned by name beside it.
  */
 
 const USER = FIXTURE_ACTOR.id
@@ -179,6 +185,20 @@ describe('document.extracted has one author', () => {
     // The definition is `Effect.fn('onDocumentExtracted')(…)` and does not
     // match; what is left is the one call on extraction's success path.
     expect(calls).toEqual(['worker/jobs/extract-document.ts'])
+  })
+
+  it('the store seam is called by extraction and by the vision write, and nobody else', () => {
+    // `ExtractionStore.onExtracted` is `onDocumentExtracted` behind the
+    // job's Layer. Extraction calls it on its success path; the vision job
+    // (SPA-94) calls it after writing through the same `markExtracted`,
+    // because a scanned page read by a model is extraction too.
+    const calls = files.flatMap((f) =>
+      [...f.text.matchAll(/\bstore\.onExtracted\(/g)].map(() => f.path),
+    )
+    expect(calls.sort()).toEqual([
+      'worker/jobs/extract-document.ts',
+      'worker/jobs/vision-document.ts',
+    ])
   })
 
   it('no other file enqueues a follow-on lane of an extraction', () => {
