@@ -17,6 +17,7 @@ import { Select } from '#/components/ui/select'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
 import { RailField } from '#/components/attributes/rail-field'
+import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import { KeyHint } from '#/components/page-header'
 import {
   DitherMark,
@@ -343,36 +344,39 @@ function CompanyRecordPage() {
           </>
         }
       >
-        <PropertyGrid>
-          {registry.map((def) => (
-            <RailField
-              key={def.slug}
-              def={def}
-              attr={def}
-              objectLabel={'company'}
-              onAttributeSaved={() => router.invalidate()}
-              value={company.values[def.slug] ?? null}
-              onSave={async (v) => {
-                await updateRecord({
-                  data: { id: company.id, patch: { [def.slug]: v } },
-                })
-                void router.invalidate()
-              }}
-            />
-          ))}
-          <DomainsField companyId={company.id} domains={domains} />
-          <PropertyCell label="">
-            <AttributeCreateDialog
-              objectKind="company"
-              onCreated={() => router.invalidate()}
-              trigger={
-                <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
-                  + add attribute
-                </button>
-              }
-            />
-          </PropertyCell>
-        </PropertyGrid>
+        <AiCellsProvider entityIds={[company.id]} registry={registry}>
+          <PropertyGrid>
+            {registry.map((def) => (
+              <RailField
+                key={def.slug}
+                entityId={company.id}
+                def={def}
+                attr={def}
+                objectLabel={'company'}
+                onAttributeSaved={() => router.invalidate()}
+                value={company.values[def.slug] ?? null}
+                onSave={async (v) => {
+                  await updateRecord({
+                    data: { id: company.id, patch: { [def.slug]: v } },
+                  })
+                  void router.invalidate()
+                }}
+              />
+            ))}
+            <DomainsField companyId={company.id} domains={domains} />
+            <PropertyCell label="">
+              <AttributeCreateDialog
+                objectKind="company"
+                onCreated={() => router.invalidate()}
+                trigger={
+                  <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
+                    + add attribute
+                  </button>
+                }
+              />
+            </PropertyCell>
+          </PropertyGrid>
+        </AiCellsProvider>
 
         <RecordNotes
           recordName={company.name}

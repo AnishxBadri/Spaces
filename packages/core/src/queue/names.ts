@@ -103,6 +103,16 @@ export const QUEUES = {
    * is queued or active is refused by pg-boss; never retried.
    */
   visionDocument: 'document.vision',
+  /**
+   * AI attributes (SPA-72): one cell — a (record, attribute) pair whose
+   * attribute carries `options.ai` — → one `attribute_patch` suggestion,
+   * plus a registry proposal per option a classify answer wanted and the
+   * attribute lacks. Enqueued by the cell trigger on the record rail and in
+   * the table, nothing else. Created `exclusive` and sent with
+   * `singletonKey = <entityId>:<attributeId>`, so a second press on one
+   * cell while one is queued or active is refused by pg-boss.
+   */
+  attributeRun: 'attribute.run',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

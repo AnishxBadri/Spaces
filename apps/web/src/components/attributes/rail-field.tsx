@@ -1,5 +1,7 @@
 import { Pencil } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
+import { AiCell } from './ai-cell'
 import { AttributeDialog } from './attribute-dialog'
 import type { EditableAttribute } from './attribute-dialog'
 import { ValueEditor } from './value-editor'
@@ -32,6 +34,7 @@ export function RailField({
   attr,
   objectLabel,
   onAttributeSaved,
+  entityId,
 }: {
   def: RegistryEntry
   value: unknown
@@ -41,6 +44,11 @@ export function RailField({
   attr?: EditableAttribute | undefined
   objectLabel?: string | undefined
   onAttributeSaved?: (() => void) | undefined
+  /**
+   * The record the field belongs to: given, an AI attribute (SPA-72) grows
+   * its cell trigger beside the value, inside an `AiCellsProvider`.
+   */
+  entityId?: string | undefined
 }) {
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -103,27 +111,49 @@ export function RailField({
           onSaved={() => onAttributeSaved?.()}
         />
       ) : null}
-      <ValueEditor
-        key={attempt}
-        def={def}
-        value={value}
-        variant="field"
-        refNames={refNames}
-        onSave={(v) => {
-          onSave(v).then(
-            () => {
-              setError(null)
-              setReject('rest')
-            },
-            (err: unknown) => {
-              const raw = err instanceof Error ? err.message : 'Could not save'
-              setError(raw.replace(new RegExp(`^${def.slug}: `), ''))
-              setAttempt((n) => n + 1)
-              setReject('hold')
-            },
-          )
-        }}
-      />
+      <MaybeAiCell def={def} entityId={entityId}>
+        <ValueEditor
+          key={attempt}
+          def={def}
+          value={value}
+          variant="field"
+          refNames={refNames}
+          onSave={(v) => {
+            onSave(v).then(
+              () => {
+                setError(null)
+                setReject('rest')
+              },
+              (err: unknown) => {
+                const raw =
+                  err instanceof Error ? err.message : 'Could not save'
+                setError(raw.replace(new RegExp(`^${def.slug}: `), ''))
+                setAttempt((n) => n + 1)
+                setReject('hold')
+              },
+            )
+          }}
+        />
+      </MaybeAiCell>
     </PropertyCell>
+  )
+}
+
+/** The AI cell wrapper when the rail knows its record; the bare editor otherwise. */
+function MaybeAiCell({
+  def,
+  entityId,
+  children,
+}: {
+  def: RegistryEntry
+  entityId: string | undefined
+  children: ReactNode
+}) {
+  return entityId === undefined ? (
+    children
+  ) : (
+    <AiCell def={def} entityId={entityId}>
+      {children}
+    </AiCell>
   )
 }

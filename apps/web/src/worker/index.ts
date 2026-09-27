@@ -18,6 +18,7 @@ import { classifyDocument } from './jobs/classify-document'
 import { suggestSpaces } from './jobs/suggest-spaces'
 import { extractKeyTerms } from './jobs/extract-key-terms'
 import { visionDocument } from './jobs/vision-document'
+import { attributeRun } from './jobs/attribute-run'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -197,6 +198,26 @@ async function main() {
     QUEUES.visionDocument,
     { batchSize: 1, includeMetadata: true },
     runJob(visionDocument, { host, layer: ExtractionStore.layer }),
+  )
+  // AI attributes (SPA-72): one cell per job, pressed on the record rail or
+  // in the table, with `singletonKey = <entityId>:<attributeId>` —
+  // `exclusive`, so a second press on one cell while one is queued or active
+  // adds nothing. Created before the plain create loop below for the deck
+  // reader's reason. A model call per cell, a batch of one, never retried
+  // (`attributeRun.retry`). No Layer.
+  await boss
+    .createQueue(QUEUES.attributeRun, { policy: 'exclusive' })
+    .catch(() => {})
+  if (attributeRun.retry)
+    await boss.updateQueue(QUEUES.attributeRun, {
+      retryLimit: attributeRun.retry.limit,
+      retryDelay: attributeRun.retry.delaySeconds,
+      retryBackoff: attributeRun.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.attributeRun,
+    { batchSize: 1, includeMetadata: true },
+    runJob(attributeRun, { host, layer: Layer.empty }),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots

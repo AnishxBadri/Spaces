@@ -21,6 +21,7 @@ import {
   optionLabel,
   ValueEditor,
 } from '#/components/attributes/value-editor'
+import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { EmptyState } from '#/components/empty-state'
@@ -292,13 +293,15 @@ function DealsPage() {
             size: def.type === 'text' ? 200 : 140,
             sortUndefined: 'last',
             cell: (info) => (
-              <ValueEditor
-                def={def}
-                value={info.row.original.values[def.slug] ?? null}
-                variant="cell"
-                refNames={refNames}
-                onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
-              />
+              <AiCell def={def} entityId={info.row.original.id}>
+                <ValueEditor
+                  def={def}
+                  value={info.row.original.values[def.slug] ?? null}
+                  variant="cell"
+                  refNames={refNames}
+                  onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
+                />
+              </AiCell>
             ),
           },
         ),
@@ -474,18 +477,23 @@ function DealsPage() {
                 </div>
               ) : null}
             </TableToolbar>
-            <RecordTable
-              table={table}
-              label="Deals"
-              stickyColumnId="name"
-              addColumn={
-                <AttributeCreateDialog
-                  objectKind="deal"
-                  onCreated={() => router.invalidate()}
-                  trigger={<AddColumnButton />}
-                />
-              }
-            />
+            <AiCellsProvider
+              entityIds={table.getRowModel().rows.map((r) => r.original.id)}
+              registry={registry}
+            >
+              <RecordTable
+                table={table}
+                label="Deals"
+                stickyColumnId="name"
+                addColumn={
+                  <AttributeCreateDialog
+                    objectKind="deal"
+                    onCreated={() => router.invalidate()}
+                    trigger={<AddColumnButton />}
+                  />
+                }
+              />
+            </AiCellsProvider>
           </>
         )}
       </div>

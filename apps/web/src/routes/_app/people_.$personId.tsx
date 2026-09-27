@@ -13,6 +13,7 @@ import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
+import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import { KeyHint } from '#/components/page-header'
 import {
   DitherMark,
@@ -328,51 +329,54 @@ function PersonRecordPage() {
           </>
         }
       >
-        <PropertyGrid>
-          {registry.map((def) => (
-            <RailField
-              key={def.slug}
-              def={def}
-              attr={def}
-              objectLabel={'person'}
-              onAttributeSaved={() => router.invalidate()}
-              value={person.values[def.slug] ?? null}
-              onSave={async (v) => {
-                await updateRecord({
-                  data: { id: person.id, patch: { [def.slug]: v } },
-                })
-                void router.invalidate()
-              }}
+        <AiCellsProvider entityIds={[person.id]} registry={registry}>
+          <PropertyGrid>
+            {registry.map((def) => (
+              <RailField
+                key={def.slug}
+                entityId={person.id}
+                def={def}
+                attr={def}
+                objectLabel={'person'}
+                onAttributeSaved={() => router.invalidate()}
+                value={person.values[def.slug] ?? null}
+                onSave={async (v) => {
+                  await updateRecord({
+                    data: { id: person.id, patch: { [def.slug]: v } },
+                  })
+                  void router.invalidate()
+                }}
+              />
+            ))}
+            <ContactField
+              personId={person.id}
+              label="Emails"
+              kind="email"
+              icon={AtSign}
+              values={person.emails.map((e) => e.valueNorm)}
+              placeholder="name@company.com"
             />
-          ))}
-          <ContactField
-            personId={person.id}
-            label="Emails"
-            kind="email"
-            icon={AtSign}
-            values={person.emails.map((e) => e.valueNorm)}
-            placeholder="name@company.com"
-          />
-          <ContactField
-            personId={person.id}
-            label="LinkedIn"
-            kind="linkedin"
-            icon={Linkedin}
-            values={person.linkedins.map((l) => l.valueNorm)}
-            placeholder="linkedin.com/in/…"
-          />
-          <PropertyCell label="">
-            <AttributeCreateDialog
-              objectKind="person"
-              onCreated={() => router.invalidate()}
-              trigger={
-                <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
-                  + add attribute
-                </button>
-              }
+            <ContactField
+              personId={person.id}
+              label="LinkedIn"
+              kind="linkedin"
+              icon={Linkedin}
+              values={person.linkedins.map((l) => l.valueNorm)}
+              placeholder="linkedin.com/in/…"
             />
-          </PropertyCell>
-        </PropertyGrid>
+            <PropertyCell label="">
+              <AttributeCreateDialog
+                objectKind="person"
+                onCreated={() => router.invalidate()}
+                trigger={
+                  <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
+                    + add attribute
+                  </button>
+                }
+              />
+            </PropertyCell>
+          </PropertyGrid>
+        </AiCellsProvider>
 
         <RecordNotes
           recordName={person.name}

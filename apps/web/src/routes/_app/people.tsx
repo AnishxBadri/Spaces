@@ -24,6 +24,7 @@ import {
   fieldSpanClass,
   ValueEditor,
 } from '#/components/attributes/value-editor'
+import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
 import { TemplatePicker } from '#/components/templates'
@@ -262,12 +263,14 @@ function PeoplePage() {
           header: def.name,
           size: def.type === 'text' ? 180 : 140,
           cell: (info) => (
-            <ValueEditor
-              def={def}
-              value={info.getValue()}
-              variant="cell"
-              onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
-            />
+            <AiCell def={def} entityId={info.row.original.id}>
+              <ValueEditor
+                def={def}
+                value={info.getValue()}
+                variant="cell"
+                onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
+              />
+            </AiCell>
           ),
         }),
       ),
@@ -358,25 +361,30 @@ function PeoplePage() {
                 canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
               />
             </TableToolbar>
-            <RecordTable
-              table={table}
-              label="People"
-              stickyColumnId="name"
-              page={{
-                total,
-                hasMore: records.hasNextPage,
-                loading: records.isFetchingNextPage,
-                step: RECORD_PAGE_SIZE,
-                onLoadMore: () => void records.fetchNextPage(),
-              }}
-              addColumn={
-                <AttributeCreateDialog
-                  objectKind="person"
-                  onCreated={refresh}
-                  trigger={<AddColumnButton />}
-                />
-              }
-            />
+            <AiCellsProvider
+              entityIds={table.getRowModel().rows.map((r) => r.original.id)}
+              registry={registry}
+            >
+              <RecordTable
+                table={table}
+                label="People"
+                stickyColumnId="name"
+                page={{
+                  total,
+                  hasMore: records.hasNextPage,
+                  loading: records.isFetchingNextPage,
+                  step: RECORD_PAGE_SIZE,
+                  onLoadMore: () => void records.fetchNextPage(),
+                }}
+                addColumn={
+                  <AttributeCreateDialog
+                    objectKind="person"
+                    onCreated={refresh}
+                    trigger={<AddColumnButton />}
+                  />
+                }
+              />
+            </AiCellsProvider>
           </>
         )}
       </div>

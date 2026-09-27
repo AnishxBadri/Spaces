@@ -3,6 +3,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { BADGE_COLORS } from '@spaces/core/attributes/colors'
+import { aiConfigInput } from '@spaces/core/ai/attribute-ai'
 import { requireAdmin, requireUser } from './shared'
 import { jsonValue } from '#/lib/json'
 
@@ -141,6 +142,11 @@ export const updateAttributeInput = z.object({
       precision: z.number().int().min(0).max(6).optional(),
       /** spec §4 default — shape checked by the program, per type */
       default: jsonValue.optional(),
+      /**
+       * SPA-72: the spec's `attribute.config.ai`, stored as `options.ai`;
+       * null clears. The mode is checked against the type by the program.
+       */
+      ai: aiConfigInput.nullable().optional(),
     })
     .optional(),
 })

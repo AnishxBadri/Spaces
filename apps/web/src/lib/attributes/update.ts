@@ -3,6 +3,8 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute, entity, objectDef } from '@spaces/db/schema'
 import { nextBadgeColor } from '@spaces/core/attributes/colors'
+import { buildAiConfig } from '@spaces/core/ai/attribute-ai'
+import type { AiConfigInput } from '@spaces/core/ai/attribute-ai'
 import { validateDefault } from './defaults'
 import type { BadgeColor } from '@spaces/core/attributes/colors'
 import type { Json } from '#/lib/json'
@@ -84,6 +86,14 @@ export type AttributeConfigPatch = {
    * time, never at record creation.
    */
   default?: Json | undefined
+  /**
+   * AI attribute config (SPA-72) — the spec's `attribute.config.ai`, stored
+   * as `options.ai`; null clears. Any type that can hold the mode may carry
+   * it (`@spaces/core/ai/attribute-ai`); it rewrites no value and touches no
+   * other key, so it sits outside every §3 guard above rather than
+   * loosening one.
+   */
+  ai?: AiConfigInput | null | undefined
 }
 
 export type UpdateAttributePatch = {
@@ -257,6 +267,27 @@ const applyConfig = Effect.fn('applyConfig')(function* (
           message: `Default: ${problem}`,
         })
       next = { ...next, default: patch.default }
+    }
+  }
+  if (patch.ai !== undefined) {
+    if (patch.ai === null) {
+      next = { ...next }
+      delete next.ai
+    } else {
+      const slugs = yield* query(() =>
+        db
+          .select({ slug: attribute.slug })
+          .from(attribute)
+          .where(eq(attribute.objectId, attr.objectId)),
+      )
+      const built = buildAiConfig(
+        attr.type,
+        patch.ai,
+        slugs.map((s) => s.slug),
+      )
+      if (!built.ok)
+        return yield* new AttributeConfigRejected({ message: built.message })
+      next = { ...next, ai: built.config }
     }
   }
   return next

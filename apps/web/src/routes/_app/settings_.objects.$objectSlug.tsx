@@ -3,6 +3,7 @@ import { Archive, ArchiveRestore, Pencil, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
+import { AiConfigSection } from '#/components/attributes/ai-config-section'
 import { ObjectDialog } from '#/components/objects/object-dialog'
 import { RegistryList } from '#/components/attributes/registry-list'
 import { KeyHint, PageHeader } from '#/components/page-header'
@@ -187,6 +188,16 @@ function ObjectAttributesPage() {
             canReshape={isAdmin}
           />
         </div>
+
+        {/* AI attributes (SPA-72): config on the existing types — the
+            spec's `attribute.config.ai`, stored as `options.ai`. Offered
+            only on types that can hold a mode; core and custom objects
+            alike. */}
+        <AiConfigSection
+          objectPlural={object.plural}
+          registry={registry}
+          canReshape={isAdmin}
+        />
 
         {/* Identity keys (spec §9) — each backed by an attribute above, and
             revisable only while the object has no records (the slug rule).

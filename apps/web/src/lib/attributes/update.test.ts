@@ -347,3 +347,107 @@ describe('updateAttributeProgram', () => {
     expect(options.multi).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------------------
+// SPA-72: `options.ai` (the spec's `attribute.config.ai`) sits beside the §3
+// guards, not inside them — adding it trips none, and none drops it.
+// ---------------------------------------------------------------------------
+
+describe('updateAttributeProgram — the ai key', () => {
+  it('adds, keeps and clears ai without tripping the option or config guards', async () => {
+    const { updateAttributeProgram, AttributeConfigRejected } =
+      await import('./update')
+    const attr = await makeAttribute('ai_status', 'status', {
+      options: [
+        { id: 'open', label: 'Open', group: 'active', color: 'blue' },
+        { id: 'done', label: 'Done', group: 'closed', color: 'emerald' },
+      ],
+    })
+    await Effect.runPromise(
+      updateAttributeProgram({
+        id: attr.id,
+        config: { ai: { mode: 'classify', prompt: 'Where is it?' } },
+      }),
+    )
+    expect((await readOptions(attr.id)).ai).toEqual({
+      mode: 'classify',
+      prompt: 'Where is it?',
+      lane: 'classify',
+    })
+    // The option-list edit and `required` still run with ai present, and
+    // neither drops it.
+    await Effect.runPromise(
+      updateAttributeProgram({
+        id: attr.id,
+        required: true,
+        options: [
+          { id: 'open', label: 'Open', group: 'active', color: 'blue' },
+          { id: 'done', label: 'Done', group: 'closed', color: 'emerald' },
+          { label: 'Parked', group: 'parked' },
+        ],
+      }),
+    )
+    const kept = await readOptions(attr.id)
+    expect(kept.options?.map((o) => o.label)).toEqual([
+      'Open',
+      'Done',
+      'Parked',
+    ])
+    expect(kept.required).toBe(true)
+    expect(kept.ai?.mode).toBe('classify')
+    // Removing an option is still refused with ai present.
+    const removed = await Effect.runPromise(
+      Effect.flip(
+        updateAttributeProgram({
+          id: attr.id,
+          options: [{ id: 'open', label: 'Open' }],
+        }),
+      ),
+    )
+    expect(removed).toBeInstanceOf(AttributeConfigRejected)
+    await Effect.runPromise(
+      updateAttributeProgram({ id: attr.id, config: { ai: null } }),
+    )
+    expect((await readOptions(attr.id)).ai).toBeUndefined()
+  })
+
+  it('carries ai beside another config key, and refuses a type that holds no mode', async () => {
+    const { updateAttributeProgram, AttributeConfigRejected } =
+      await import('./update')
+    const num = await makeAttribute('ai_number', 'number', { precision: 2 })
+    await Effect.runPromise(
+      updateAttributeProgram({
+        id: num.id,
+        config: { precision: 1, ai: { mode: 'prompt', prompt: 'Fund size?' } },
+      }),
+    )
+    const opts = await readOptions(num.id)
+    expect(opts.precision).toBe(1)
+    expect(opts.ai?.lane).toBe('synthesize')
+    const rating = await makeAttribute('ai_rating', 'rating', {})
+    const err = await Effect.runPromise(
+      Effect.flip(
+        updateAttributeProgram({
+          id: rating.id,
+          config: { ai: { mode: 'prompt', prompt: 'x' } },
+        }),
+      ),
+    )
+    expect(err).toBeInstanceOf(AttributeConfigRejected)
+    expect((await readOptions(rating.id)).ai).toBeUndefined()
+  })
+
+  it('the zod boundary carries ai and its null', async () => {
+    const { updateAttributeInput } = await import('../server/attributes')
+    const id = randomUUID()
+    expect(
+      updateAttributeInput.parse({
+        id,
+        config: { ai: { mode: 'summarize', prompt: ' Why now? ' } },
+      }).config,
+    ).toEqual({ ai: { mode: 'summarize', prompt: 'Why now?' } })
+    expect(
+      updateAttributeInput.parse({ id, config: { ai: null } }).config,
+    ).toEqual({ ai: null })
+  })
+})

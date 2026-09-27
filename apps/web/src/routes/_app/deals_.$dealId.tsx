@@ -9,6 +9,7 @@ import { Compass } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { RailField } from '#/components/attributes/rail-field'
+import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import { OptionChip } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
@@ -356,36 +357,39 @@ function DealRecordPage() {
           </>
         }
       >
-        <PropertyGrid>
-          {registry.map((def) => (
-            <RailField
-              key={def.slug}
-              def={def}
-              attr={def}
-              objectLabel={'deal'}
-              onAttributeSaved={() => router.invalidate()}
-              value={deal.values[def.slug] ?? null}
-              refNames={refNames}
-              onSave={async (v) => {
-                await updateRecord({
-                  data: { id: deal.id, patch: { [def.slug]: v } },
-                })
-                void router.invalidate()
-              }}
-            />
-          ))}
-          <PropertyCell label="">
-            <AttributeCreateDialog
-              objectKind="deal"
-              onCreated={() => router.invalidate()}
-              trigger={
-                <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
-                  + add attribute
-                </button>
-              }
-            />
-          </PropertyCell>
-        </PropertyGrid>
+        <AiCellsProvider entityIds={[deal.id]} registry={registry}>
+          <PropertyGrid>
+            {registry.map((def) => (
+              <RailField
+                key={def.slug}
+                entityId={deal.id}
+                def={def}
+                attr={def}
+                objectLabel={'deal'}
+                onAttributeSaved={() => router.invalidate()}
+                value={deal.values[def.slug] ?? null}
+                refNames={refNames}
+                onSave={async (v) => {
+                  await updateRecord({
+                    data: { id: deal.id, patch: { [def.slug]: v } },
+                  })
+                  void router.invalidate()
+                }}
+              />
+            ))}
+            <PropertyCell label="">
+              <AttributeCreateDialog
+                objectKind="deal"
+                onCreated={() => router.invalidate()}
+                trigger={
+                  <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
+                    + add attribute
+                  </button>
+                }
+              />
+            </PropertyCell>
+          </PropertyGrid>
+        </AiCellsProvider>
 
         <RecordNotes
           recordName={deal.name}

@@ -58,6 +58,27 @@ export type SelectOption = {
   archived?: boolean
 }
 
+/**
+ * AI attribute config (SPA-72, docs/spec-ai-substrate.md §13). **The spec's
+ * `attribute.config.ai` and this `attribute.options.ai` are the same thing**:
+ * there is no `config` column — the per-type blob is `attribute.options`
+ * jsonb, so the spec's name for it is this key. Config on the existing
+ * types, never a new type: the fifteen-type menu stays frozen, and a custom
+ * object's attribute carries it exactly as a core one does. The mode × type
+ * matrix and the mode → lane map live in `@spaces/core/ai/attribute-ai`;
+ * `updateAttributeProgram` refuses a mode the type cannot hold and writes
+ * `lane` from the mode, so the stored lane is never a second opinion.
+ */
+export type AiAttributeMode = 'classify' | 'summarize' | 'prompt' | 'research'
+export type AiAttributeConfig = {
+  mode: AiAttributeMode
+  /** What to ask, in the operator's words; `{{slug}}` names a variable. */
+  prompt: string
+  /** The attribute slugs whose values the prompt reads (`{{slug}}`). */
+  variables?: Array<string>
+  lane: 'classify' | 'synthesize' | 'research'
+}
+
 export type AttributeOptions = {
   options?: Array<SelectOption>
   /** record_reference — a core kind, or any object row (custom objects) */
@@ -86,6 +107,8 @@ export type AttributeOptions = {
    * (`validateDefault`), resolved at record birth (`resolveDefault`).
    */
   default?: Json
+  /** AI attribute config (SPA-72) — the spec's `attribute.config.ai`; see `AiAttributeConfig`. */
+  ai?: AiAttributeConfig
 }
 
 /**

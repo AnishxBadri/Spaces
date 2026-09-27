@@ -7,6 +7,8 @@ import { KIND_ICONS } from '#/components/editor/mention'
 import { ChipLink } from '#/components/table/cells'
 import { Button } from '#/components/ui/button'
 import { checkboxClasses } from '#/components/ui/checkbox'
+import { readOptionProposals } from '@spaces/core/ai/attribute-ai'
+import { OptionProposalBody } from './option-proposal'
 import { readIdentityPayload } from '@spaces/core/ai/identity'
 import type { IdentityPayload } from '@spaces/core/ai/identity'
 import { readNotePayload } from '@spaces/core/ai/note'
@@ -84,6 +86,10 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
         fields={item.fields}
         actions={actions}
       />
+    ) : readOptionProposals(item.rationale).length > 0 ? (
+      // SPA-72: a registry proposal — an empty patch naming an option an AI
+      // attribute's classify run wanted. "Add option" is its explicit write.
+      <OptionProposalBody suggestionId={item.id} rationale={item.rationale} />
     ) : (
       <PayloadBody item={item} actions={actions} />
     ),
