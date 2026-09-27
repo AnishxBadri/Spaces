@@ -1,6 +1,6 @@
 # Roadmap — reconciled
 
-_2026-09-15. Supersedes the first-pass structure in this file's history. Two decomposition passes: eight areas sliced in parallel (153 slices), then a reconciliation that resolved seven collision clusters, split seven oversized slices, corrected labels and verticality, and added seven areas the first pass never covered. Full bodies: `research/roadmap-slices-2026-09.json` (first pass) and `research/roadmap-reconciled-2026-09-15.json` (this one). Both git-ignored; they become Linear issue bodies at publish time._
+_2026-09-15, trimmed 2026-09-27. The order of all 23 projects and why, the milestones of the unshipped ones, the decisions still ahead, and the open audit findings. The reconciliation narrative, the shipped projects' milestones and the decisions carried by shipped slices are in this file's git history._
 
 **230 slices · 23 projects · 2 initiatives · 80 added · 3 deleted · 227 with written bodies, 3 still key-and-title only**
 
@@ -16,399 +16,22 @@ _Historical note from before publication:_ The 35 unresolved placeholder blocker
 
 ## 1. Projects
 
-### 1. Ship polish first — the name, the box, and the vocabulary
-
-_Spaces v1 · 7 slices_
-
-The rename to Spaces, an entrypoint that owns /data, a downgrade guard, a copy-paste TLS overlay, a restore that works, and gate 5 turned from a lying grep into a lint rule. Nothing here needs the monorepo and everything here is cheaper now than after: CONTEXT.md requires the rename before images bake the old name in, and mono-1 is blockedBy ship-1 so the great git mv never renames the same file twice.
-
-**▸ It is called Spaces, and the box boots correctly** — A Linux operator with a mis-owned ./data stops getting a green healthcheck followed by a failure at their first upload — the entrypoint repairs ownership as root, drops to UID 1000, and refuses to boot with the fix printed if it still cannot write. An older image refuses a database from the future instead of running old code against a new schema. And the product's name is its own everywhere a human reads it. Demoable on a laptop with docker alone.
-
-| slice    |      |     | title                                                                                       | blocked by |
-| -------- | ---- | --- | ------------------------------------------------------------------------------------------- | ---------- |
-| `ship-1` | hitl | S   | Rename to Spaces — every place a human reads the name, and the three that must not move     | —          |
-| `ship-2` | afk  | M   | Entrypoint owns /data — root repairs, su-exec drops, boot fails instead of the first upload | —          |
-| `ship-4` | afk  | S   | Downgrade guard — an image refuses a database from the future                               | —          |
-
-**▸ HTTPS, and a restore from total loss** — Point a domain at a box and one overlay gets a real certificate, a Secure cookie and an https blob presign, with port 3000 no longer reachable from outside at all — which also closes the first-run /setup window. Then: upload a deck, save an API key, docker compose down -v && rm -rf ./data, and restore both from a backup directory.
-
-| slice    |     |     | title                                                                       | blocked by         |
-| -------- | --- | --- | --------------------------------------------------------------------------- | ------------------ |
-| `ship-3` | afk | M   | TLS overlay — a worked Caddyfile, and the only port that stays open         | `ship-1`           |
-| `ship-5` | afk | M   | Restore is a script — the both-or-neither round trip, proven on a clean box | `ship-1`, `ship-4` |
-
-**▸ The vocabulary is enforceable, and written down** — Gate 5 stops passing vacuously and stops failing on a comment: the banned v1 names become lint rules that name their Instrument replacement, and the missing 10px type step lands so 45 hand-written text-[…] sizes collapse into it with nothing moving on screen. This must precede mono-6, which is about to wire today's grep into CI.
-
-| slice      |     |     | title                                                                | blocked by |
-| ---------- | --- | --- | -------------------------------------------------------------------- | ---------- |
-| `design-1` | afk | M   | V1 vocabulary out — dead tokens deleted, gate 5 becomes lint         | —          |
-| `design-3` | afk | S   | The field-label step — one named size, forty arbitrary ones collapse | `design-1` |
-
-### 2. Worker spine, the workspace, and a test database of its own
-
-_Spaces v1 · 12 slices_
-
-runJob and the role-keyed heartbeat land against the flat tree, then pnpm 10 alone, then the move into apps/web, then the turbo graph, @spaces/db, a test database the suite owns, and CI enforcing all five gates. The first ten, one agent at a time, is now sdk-1 · sdk-2 · mono-1a · mono-1 · mono-1b · mono-2 · mono-3 · mono-4 · mono-5 · mono-6.
-
-**▸ A worker that cannot die silently** — Every background job goes through one wrapper whose own promise never rejects and which resolves each job in a pg-boss batch explicitly, with a stated retryable-versus-terminal mapping so a transient blob read retries and an unsupported mime does not. curl /api/health says whether the worker is alive with an age, keyed by role so three restarts leave one row, and a dead worker never fails a healthy web container's HEALTHCHECK.
-
-| slice   |     |     | title                                                                         | blocked by |
-| ------- | --- | --- | ----------------------------------------------------------------------------- | ---------- |
-| `sdk-1` | afk | M   | runJob wrapper — one wrapper, typed outcomes, extractDocument as first tenant | —          |
-| `sdk-2` | afk | M   | Worker heartbeat — a ROLE=worker container you can health-check               | —          |
-
-**▸ pnpm 10, apps/web, and the turbo graph** — Three failure modes, three PRs: a whole-lockfile regeneration whose failure is a missing native binary; a whole-tree rename whose failure is silence (a dotenv that no longer resolves, an eslint rule that stops matching, a data directory that moves, a grep that passes against a path that is gone); and a cached task graph whose failure is a gate serving a green result for inputs that changed. From a clean clone, pnpm install && pnpm dev is identical and the PR diff is renames plus config.
-
-| slice     |      |     | title                                                               | blocked by |
-| --------- | ---- | --- | ------------------------------------------------------------------- | ---------- |
-| `mono-1a` | afk  | S   | pnpm 10 — the lockfile bump alone, before the tree moves            | —          |
-| `mono-1`  | hitl | M   | Workspace scaffold — everything into apps/web, nothing else moves   | `mono-1a`  |
-| `mono-1b` | afk  | S   | Turbo task graph — the five gates cached, and what invalidates what | `mono-1`   |
-
-**▸ @spaces/db and tests that stop touching the dev database** — Schema, migrations and ENTITY_REFS become a package whose entity-refs test is green with Postgres stopped, verified as a dump-diff that comes back empty. Then dealos_test is created, migrated and seeded by a global setup and truncated between files — with /companies open, a full test run leaves the grid untouched — and CI runs all five gates against a real Postgres. This is the standing debt that makes 150 unattended agent runs safe.
-
-| slice    |     |     | title                                                                                     | blocked by |
-| -------- | --- | --- | ----------------------------------------------------------------------------------------- | ---------- |
-| `mono-2` | afk | S   | @spaces/db specifier sweep — one mechanical rewrite, behind a temporary alias             | `mono-1`   |
-| `mono-3` | afk | M   | packages/db extraction — schema, migrations, ENTITY_REFS, journal verified against a dump | `mono-2`   |
-| `mono-4` | afk | M   | Test database — its own, migrated and seeded by a global setup                            | `mono-3`   |
-| `mono-5` | afk | M   | Test isolation — truncate between files, delete the name-regex cleanup                    | `mono-4`   |
-| `mono-6` | afk | S   | CI on turbo — five gates, the test database, no dev-DB writes                             | `mono-5`   |
-
-**▸ Pure core and the queue seam** — Portfolio metrics, glossary auto-link, the due-date parser and the view filter model run green with Postgres stopped, and web stops importing the worker — one QUEUES definition, and an upload with the worker down opens and downloads instead of 500ing.
-
-| slice     |     |     | title                                                                        | blocked by |
-| --------- | --- | --- | ---------------------------------------------------------------------------- | ---------- |
-| `mono-7`  | afk | M   | packages/core, pure half — no db, no React, no process.env                   | `mono-3`   |
-| `mono-9c` | afk | S   | Queue seam into core — one QUEUES definition, web stops importing the worker | `mono-7`   |
-
-### 3. Provenance without vendors, deletes that don't lie
-
-_Spaces v1 · 9 slices_
-
-Delete the organization ghost, create integration and job_run, open credential.kind once for everyone who needs it, collapse every vendor-named enum into source_class + source_ref, make deletion walk ENTITY_REFS, and give a deal the person behind the channel. The widest blast radius in the plan: seven sdk slices, three storage slices, two ai slices and now the arrival mailbox all key on these tables.
-
-**▸ No vendor names in the schema** — Eight entity kinds, no ghost, every kind routing from the mention picker and the task rail. credential.kind opens to oauth_client, webhook, embedding and mailbox with the unique key rebuilt, so a Gemini key and a Google OAuth app stop overwriting each other and four downstream areas can be specified honestly. The timeline names the integration that wrote a value and stops folding two integrations into one lying burst, the extraction job leaves a run record the Files tab can read, and a deal records who referred it.
-
-| slice        |      |     | title                                                                   | blocked by          |
-| ------------ | ---- | --- | ----------------------------------------------------------------------- | ------------------- |
-| `clean-1`    | afk  | S   | Organization kind deleted — no ghost, no wrong route                    | —                   |
-| `clean-2a`   | afk  | M   | integration table + actor_ref — the typed actor finally has a target    | —                   |
-| `clean-2c`   |      |     | _body not yet written_                                                  |                     |
-| `clean-2b`   | afk  | S   | job_run — one writer in runJob, and extraction stops being unobservable | `clean-2a`, `sdk-1` |
-| `clean-3`    | hitl | M   | source_class + source_ref on entity and alias — one branch in resolve   | `clean-2a`          |
-| `clean-4`    | afk  | S   | source_class on interaction and document — the last two vendor enums    | `clean-3`           |
-| `backfill-2` | afk  | S   | referred_by — the who behind the channel, beside deal.source            | —                   |
-
-**▸ Delete walks the registry** — Deleting anything stops depending on a hand-maintained table list. A note goes with its filings, mentions and space edges while documents derived from it survive; the mandate's note and anything a merge snapshot depends on refuse by name instead of throwing an FK violation.
-
-| slice     |      |     | title                                                          | blocked by |
-| --------- | ---- | --- | -------------------------------------------------------------- | ---------- |
-| `clean-7` | hitl | M   | Entity deletion walks the registry — one list, three consumers | —          |
-| `clean-8` | hitl | M   | Note deletion — the note goes, what it fed survives            | `clean-7`  |
-
-### 4. The Instrument port — a new surface is born ported
-
-_Spaces v1 · 9 slices_
-
-The design contract, the three missing primitives, the nav and chord ledger, the settings shell, the native controls, the editor chrome, and dark deferred with the deferral paid. This project exists here and not later because the ten projects after it add roughly forty surfaces, and the audit's non-negotiable is that they are not built on chrome the port is mid-way through replacing.
-
-**▸ A new surface is born ported** — docs/design-contract.md answers 'what should this look like' without a human — hand it the contract and the docsurf-5 issue body and it says '/portfolio pattern, hand-declared columns, no ViewBar' and asks nothing. Badge, Checkbox and Switch become primitives with one API instead of eight hand-assembled copies; a page joins a nav group and claims a chord as data with a test that names both pages on a collision; dark is deferred by decision with the dead machinery removed, so every surface after this is token-only.
-
-| slice      |      |     | title                                                                    | blocked by |
-| ---------- | ---- | --- | ------------------------------------------------------------------------ | ---------- |
-| `design-2` | hitl | S   | The surface contract — what a new surface must satisfy before it is born | `design-1` |
-| `design-4` | hitl | M   | Badge, Checkbox and Switch — three primitives, one home                  | `design-2` |
-| `design-6` | afk  | S   | Nav grammar and the chord ledger — a page joins a group, never an index  | `design-2` |
-| `design-9` | hitl | S   | Dark, deferred and paid for — the dead machinery out, tokens in          | `design-1` |
-
-**▸ Settings can take ten more sections** — The 881-line settings route becomes a shell with a section nav, a mono crumb and an exported SettingsSection, so the eleven pending settings slices (AI providers, routing, embeddings, usage, caps, integrations, connections, providers, binding health, plugin install) have one answer to 'where does this live' instead of the three they are drafted with. Every native select becomes a paper sheet. Deep-link into the FX ledger and the nav is already on it.
-
-| slice      |      |     | title                                                                  | blocked by             |
-| ---------- | ---- | --- | ---------------------------------------------------------------------- | ---------------------- |
-| `design-5` | hitl | M   | Settings is a shell — one nav, one crumb, a section is a route         | `design-2`             |
-| `design-7` | hitl | M   | Native controls stop being OS chrome — the selects and the date fields | `design-2`, `design-4` |
-
-**▸ The last unported surface** — The note body and the editor's chrome stop being shadcn v1 — the mention chip is square ink-on-bone like every other reference, the slash menu and toolbars are paper sheets, and the v1 alias layer leaves styles.css entirely. The four micro-interactions the canvas sheet pins land in code, and all of them still work with Reduce Motion on.
-
-| slice       |      |     | title                                                                        | blocked by  |
-| ----------- | ---- | --- | ---------------------------------------------------------------------------- | ----------- |
-| `design-8a` | afk  | S   | Marks in the prose — the mention chip, the glossary underline, the note body | `design-1`  |
-| `design-8b` | hitl | M   | The editor chrome — BlockNote's shadcn theme replaced by the Instrument one  | `design-8a` |
-| `design-10` | afk  | S   | The four micro-interactions — the canvas sheet's proposals, in code          | `design-4`  |
-
-### 5. Custom objects, and one review inbox
-
-_Spaces v1 · 9 slices_
-
-Fuzzy dedupe, merge, a real nightly sweep and opt-in identity keys for user-created objects — and, because three slices here touch it before project 10 starts, the review inbox itself. /inbox is built once, by the area that gets there first, as a queue over typed rows whose only member on day one is duplicate_candidate.
-
-**▸ Customs dedupe like everything else** — Merge lands first, then the sweep that produces pairs, then renames that keep old names findable. Merging repoints every space tag, mention, reference and task onto the survivor while the loser's URL redirects — which makes the 'no fourth system object' rule honest.
-
-| slice        |     |     | title                                                                                | blocked by  |
-| ------------ | --- | --- | ------------------------------------------------------------------------------------ | ----------- |
-| `objects-2`  | afk | M   | Merge-as-target for customs — MERGEABLE joins, same-object guard                     | —           |
-| `objects-1b` | afk | S   | A rename keeps the old name — name alias on every record rename                      | —           |
-| `objects-1a` | afk | M   | Custom records join the fuzzy sweep — a name alias at birth, one object-scoped sweep | `objects-2` |
-
-**▸ One queue, typed rows, and duplicates found while you sleep** — /dedupe becomes /inbox with a redirect, rows render through a kind-keyed renderer map with a payload fallback, the card reads 'Same Fund?' with both sides clickable into /o/funds, and Today stops loading the whole list to read a number. Then the 03:30 sweep CONTEXT.md promised actually runs, for every object, with a 'Scan for duplicates' action in the queue's own header — and a bounded first pass so an established workspace is not flooded.
-
-| slice       |      |     | title                                                                       | blocked by                |
-| ----------- | ---- | --- | --------------------------------------------------------------------------- | ------------------------- |
-| `objects-3` | afk  | M   | Review inbox — /inbox, one queue over typed rows                            | `objects-1a`              |
-| `objects-4` | hitl | M   | The nightly sweep is real — worker job, on-demand scan, a bounded first run | `objects-1a`, `objects-3` |
-
-**▸ Opt-in identity keys** — Tick domain on Funds and the object gets a Domain attribute whose writes hit the same unique-index tripwire core records use: a second record claiming an owned domain becomes a toasted duplicate suggestion with the colliding value visible on both sides of the pair card, not a silent second row. Keys editable while empty, frozen once there are records, and clearing the attribute releases the claim instead of stranding it.
-
-| slice       |      |     | title                                                                                   | blocked by               |
-| ----------- | ---- | --- | --------------------------------------------------------------------------------------- | ------------------------ |
-| `objects-5` | hitl | M   | Identity keys declared at creation — object.identity_keys and its backing attribute     | —                        |
-| `objects-6` | afk  | S   | Keys are frozen after the first record — mutable while empty, read-only after           | `objects-5`              |
-| `objects-7` | afk  | M   | Identity-backed writes — a declared key routes through addIdentityAlias                 | `objects-5`, `objects-3` |
-| `objects-8` | afk  | S   | A claimed key is never silent — collision toast and the duplicate row's domain fallback | `objects-7`              |
-
-### 6. The note model — filed, not just mentioned
-
-_Spaces v1 · 8 slices_
-
-Record filing via tagged_in, filed-vs-mentions lanes on every record page, kind as a toggle, templates that stamp a genre, and interaction bodies that are real notes. Self-contained, high daily value, and it has to precede ai-15 (which lands a note) and docsurf-9 (which edits the same editor).
-
-**▸ Filed, not just mentioned** — A note started from a company, person, deal or custom record is genuinely filed against it and survives deletion of the starter mention. All four record pages separate 'Filed here' from 'Mentions this' through one component, four unfiltered mentionedIn queries that leaked private note titles are deleted, and any note can be filed against any record from its own header.
-
-| slice      |      |     | title                                                                                     | blocked by |
-| ---------- | ---- | --- | ----------------------------------------------------------------------------------------- | ---------- |
-| `notes-1a` | hitl | M   | Record filing — "Note about this" writes tagged_in, and the company Notes section splits  | —          |
-| `notes-1b` | afk  | S   | Same section everywhere — people, deals and custom records adopt the filed/mentions lanes | `notes-1a` |
-| `notes-3`  | hitl | M   | Filed against — record chips beside the space chips in the note editor                    | `notes-1a` |
-
-**▸ Kind is a choice** — Note · Memo · Scratch becomes a toggle instead of a decision frozen at creation. A memo pins to the top of a space's filed list, the space page stops calling every filed note a memo, and a template stamps the genre it was saved from.
-
-| slice     |      |     | title                                                             | blocked by |
-| --------- | ---- | --- | ----------------------------------------------------------------- | ---------- |
-| `notes-2` | hitl | M   | Kind is a toggle — Note · Memo · Scratch in the editor header     | —          |
-| `notes-4` | afk  | S   | Memo pins where it is filed — space ordering, and an honest count | `notes-1a` |
-| `notes-7` | afk  | S   | Genres are templates — a note template stamps its kind            | `notes-2`  |
-
-**▸ Meeting notes are notes** — interaction.note_id makes a meeting's body a real note row: one editor, mentions creating links, Cmd-K finding a meeting by a sentence in its write-up, and 'write it up later' for calls logged in twenty seconds.
-
-| slice     |      |     | title                                                                      | blocked by |
-| --------- | ---- | --- | -------------------------------------------------------------------------- | ---------- |
-| `notes-5` | hitl | M   | Meeting notes are notes — interaction.note_id and a body worth writing     | `notes-1a` |
-| `notes-6` | afk  | S   | Write it up later — lazy note creation for interactions logged without one | `notes-5`  |
-
-### 7. Documents file into spaces
-
-_Spaces v1 · 8 slices_
-
-The filing target becomes a union, a space grows Sources and Contacts, documents can be re-filed and re-extracted, and the browser upload path is hoisted once. The union has to open before /documents, before global upload and before any storage binding — storage-8a binds a folder to a space, which presumes a document can be filed into a space at all.
-
-**▸ A space is a place you file into** — Drop a PDF into a space's Sources and it is filed there through entity_space, extracted, searchable and routed back to the space from Cmd-K, with company documents underneath, collapsed and named. The Contacts half of the same answered question lands with it: people tagged into the space, and those reached through its companies, in the same collapsed pattern.
-
-| slice         |      |     | title                                                                         | blocked by                |
-| ------------- | ---- | --- | ----------------------------------------------------------------------------- | ------------------------- |
-| `docsurf-1a`  | afk  | M   | Filing target is a union — documents file into spaces, not only onto records  | —                         |
-| `docsurf-1b`  | hitl | M   | Space Sources section — a space becomes a place you file into                 | `docsurf-1a`              |
-| `docsurf-4`   | afk  | S   | Inherited sources — company documents under the space, collapsed              | `docsurf-1b`              |
-| `backfill-10` | afk  | M   | Space Contacts — tagged people and those reached through companies, collapsed | `docsurf-1b`, `docsurf-4` |
-
-**▸ A misdrop is fixable** — kind loses memo (six values; an exported memo is derived_from), a document's edges can be added and removed from its filing control with re-kind and re-extract, and the browser hasher is hoisted into one client module so the three later entry points inherit one hasher, one size guard and one secure-context check. grep for crypto.subtle returns one line.
-
-| slice        |      |     | title                                                          | blocked by                 |
-| ------------ | ---- | --- | -------------------------------------------------------------- | -------------------------- |
-| `docsurf-2`  | afk  | S   | Kind loses memo — six values, an exported memo is derived_from | —                          |
-| `docsurf-3`  | hitl | M   | Re-file a document — the edges it can gain and lose            | `docsurf-1a`               |
-| `docsurf-6a` | afk  | S   | Browser upload lane — one hasher, hoisted out of the Files tab | `docsurf-1a`, `docsurf-1b` |
-
-**▸ Documents are mentionable** — @ a deck by filename in a note: the chip inserts with a paperclip, the markdown export carries the entity link, and clicking it pops the PDF preview over the note.
-
-| slice       |     |     | title                                                  | blocked by |
-| ----------- | --- | --- | ------------------------------------------------------ | ---------- |
-| `docsurf-8` | afk | S   | Documents are mentionable — the chip opens the preview | —          |
-
-### 8. The documents shelf, one row birth, two byte lanes
-
-_Spaces v1 · 11 slices_
-
-/documents on the record-table engine with its provenance migration and its own door in the chassis, then the arrival cluster rebuilt so nothing claims to be the only writer of bytes: one browser lane, one server intake, one document birth, three greps, three files. Then global upload, the unfiled inbox, the orphan-blob sweep, the URL clip and drop-into-note.
-
-**▸ The whole shelf** — Every file the fund holds on one surface — filename, kind, filed against, space, origin, extraction, date, size — with show/hide/resize, sort, preview and chips that route through recordPath; then a nav row with a chord that is data, printed in the sheet and the palette with no per-surface code. The §11 provenance columns land as a declared foundation migration whose first writer is the server intake two milestones on.
-
-| slice        |      |     | title                                                                                       | blocked by   |
-| ------------ | ---- | --- | ------------------------------------------------------------------------------------------- | ------------ |
-| `docsurf-5`  | hitl | M   | /documents — every document with its filing, on the record-table engine                     | `docsurf-1a` |
-| `docsurf-5b` | hitl | S   | Documents in the chassis — a nav row, its chord lane and the sheet                          | `docsurf-5`  |
-| `docsurf-11` | afk  | S   | Provenance columns — source_path, external_id, external_url, external_status, connection_id | `docsurf-5`  |
-
-**▸ One row birth, two byte lanes, nothing lost** — Document birth becomes one Effect program — dedupe, entity + document + edges + activity in one transaction, enqueue outside it — widened once for every caller already queued (N targets, nullable sha, nullable actor, provenance as one bag), and server intake streams bytes to a temp file while hashing so a 200 MB arrival never buffers. Then bytes stop needing a record: global upload with a record/space/unfiled picker, unfiled counted on Today, and a scheduled sweep that reclaims bytes whose finalize never arrived.
-
-| slice         |      |     | title                                                               | blocked by                            |
-| ------------- | ---- | --- | ------------------------------------------------------------------- | ------------------------------------- |
-| `storage-6a1` | afk  | M   | Document birth — one transaction, the only writer of a document row | `docsurf-1a`, `docsurf-11`, `clean-4` |
-| `storage-6a2` | afk  | M   | Server intake — bytes from a stream, hashed as they land            | `storage-6a1`                         |
-| `docsurf-6b`  | hitl | M   | Global upload — one dialog, a file-against picker, unfiled is legal | `docsurf-5`, `docsurf-6a`             |
-| `docsurf-7`   | afk  | S   | Unfiled inbox — no edge, a filter on the shelf, a cell on Today     | `docsurf-5`, `docsurf-6b`             |
-| `backfill-3`  | afk  | M   | Orphan blob sweep — bytes with no row, reclaimed on a schedule      | `sdk-1`                               |
-
-**▸ A link is a document** — A pasted URL becomes a document whose article text joins the same search index as the decks — blobless, through birth, never through the byte lane — with the SSRF guard table in one module and unit-tested without the network; a URL that serves a PDF goes down the ordinary blob path, and blobless rows stop throwing on preview and download.
-
-| slice         |      |     | title                                                                         | blocked by                  |
-| ------------- | ---- | --- | ----------------------------------------------------------------------------- | --------------------------- |
-| `docsurf-10a` | hitl | M   | URL clip — a blobless document, and the fetch is guarded                      | `storage-6a1`, `docsurf-6b` |
-| `docsurf-10b` | afk  | S   | A clipped PDF is an upload — blobless rows stop breaking preview and download | `docsurf-10a`               |
-
-**▸ Files in the writing** — Drag a file into a note body and it files where the note is filed, with the mention left at the cursor — the reason document birth takes an array of targets rather than one.
-
-| slice       |      |     | title                                                                            | blocked by                                                          |
-| ----------- | ---- | --- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `docsurf-9` | hitl | M   | Drop a file into a note — filed where the note is, mentioned where the cursor is | `docsurf-1a`, `docsurf-6a`, `docsurf-7`, `docsurf-8`, `storage-6a1` |
-
-### 9. Views leave the browser — server-side filters and pagination
-
-_Spaces v1 · 7 slices_
-
-The area nobody owned. One surface discriminator so a view can address /documents, one Condition-to-SQL compiler proven equal to the client matcher by property test, keyset pagination with an honest count, and filterable/sortable flags that mint expression indexes on demand — closing CONTEXT's values-jsonb open question with shipped code rather than a comment.
-
-**▸ Views leave the browser** — A view can address a surface that has no object row, and object-list conditions run in SQL with one property test walking every operator in OP_LABELS to prove both evaluators agree. Filter a custom object and the network response carries the matching rows instead of all of them, while every existing saved view still applies on first paint — and /documents saves its columns as a real view instead of per-browser localStorage.
-
-| slice         |      |     | title                                                                             | blocked by  |
-| ------------- | ---- | --- | --------------------------------------------------------------------------------- | ----------- |
-| `views-1`     | hitl | M   | View surfaces — one discriminator, decided before three areas inherit it          | —           |
-| `views-2`     | afk  | M   | Conditions compile to SQL — one evaluator, proven equal to the client's           | —           |
-| `docsurf-12a` | hitl | M   | A view can address a surface that is not an object — /documents saves its columns | `docsurf-5` |
-
-**▸ Twenty thousand rows** — The custom-object table pages on a keyset cursor with a server-computed count — first page instant, the foot reading '50 of 20,000', the count dropping to the true number when the filter narrows — and ticking 'filter and sort on this' mints that attribute's expression index live, turning a seq scan into an index scan while you watch. Untick it and the index is gone.
-
-| slice     |      |     | title                                                                             | blocked by |
-| --------- | ---- | --- | --------------------------------------------------------------------------------- | ---------- |
-| `views-3` | hitl | M   | The record table pages — a keyset cursor and an honest count                      | `views-2`  |
-| `views-4` | hitl | M   | Filterable is an attribute flag — expression indexes minted and dropped on demand | `views-3`  |
-
-**▸ Every record table pages, and the shelf filters** — Companies and people run on the same loader, which is the day-to-day surface actually getting faster; the deals board is a documented exception with its stage-chip semantics on record rather than an oversight. The shelf gains document-field conditions compiled through the one evaluator, so 'scanned decks' and 'unfiled since Monday' are saved, shareable views.
-
-| slice         |      |     | title                                                                          | blocked by                 |
-| ------------- | ---- | --- | ------------------------------------------------------------------------------ | -------------------------- |
-| `views-5`     | afk  | M   | Companies and people page too — and the board says why it cannot               | `views-3`                  |
-| `docsurf-12b` | hitl | M   | Document fields as filter conditions — a registry the shelf can be filtered by | `docsurf-12a`, `docsurf-7` |
-
-### 10. AI substrate — it reads a deck
-
-_Spaces v1 · 15 slices_
-
-Context readout, the registry-to-JSON-schema compiler, the provider vault and lane routing, the sensitivity flag, a per-day ceiling, the suggestion table, the second row kind in the inbox, chips on the record rail, citation stability, and the deck reader. The inbox shell already exists from project 5, so this area contributes a row kind and never a page.
-
-**▸ Context with no model at all** — Expand Context on a record and read the ranked list with citations, with a second user correctly not seeing the private note; and the registry compiles to JSON schema — the deck reader's output type, legible with DATABASE_URL unset.
-
-| slice  |      |     | title                                                      | blocked by |
-| ------ | ---- | --- | ---------------------------------------------------------- | ---------- |
-| `ai-1` | hitl | M   | Context readout — the assembler gets its first consumer    | —          |
-| `ai-2` | afk  | M   | Registry to JSON schema — the output type system, compiled | —          |
-
-**▸ Keys, lanes, sensitivity and a ceiling** — Paste an Anthropic key or point at Ollama — or at your own Helicone/LiteLLM gateway through baseURL and headers — press Test, read the answer. Features name a lane, never a model; the lane × sensitivity grid is a settings ledger rather than a new matrix pattern; a space marked sensitive makes the triggers refuse by name; and a per-day ceiling the worker asks before it spends lands once, as the helper the backfill and the column run both inherit.
-
-| slice        |      |     | title                                                                          | blocked by |
-| ------------ | ---- | --- | ------------------------------------------------------------------------------ | ---------- |
-| `ai-3a`      | hitl | M   | Provider vault — one provider, a settings home, a test call                    | —          |
-| `ai-3b`      | afk  | S   | The other four adapters — openai, google, ollama, openrouter                   | `ai-3a`    |
-| `ai-4a`      | afk  | M   | Lanes and complete() — features name a lane, never a model                     | `ai-3a`    |
-| `ai-4b`      | hitl | S   | Routing grid — lane × sensitivity as a settings surface                        | `ai-4a`    |
-| `ai-26`      | hitl | M   | Sensitivity resolves — one function over entity, binding and workspace default | `ai-4a`    |
-| `backfill-4` | afk  | M   | AI caps — a per-day ceiling every lane asks before it spends                   | `ai-4a`    |
-
-**▸ Propose, never write** — The suggestion table plus the second member of the inbox's row union: suggestion cards beside duplicate pair cards, one card per record, each row individually accept/rejectable with its rationale and citations, and filter tabs copying the shipped HeaderTab treatment. Chips on the record rail show what is waiting where the deck reader's output is actually noticed, and citations survive a merge and a re-chunk — pinned by test, not by convention.
-
-| slice        |      |     | title                                                          | blocked by                  |
-| ------------ | ---- | --- | -------------------------------------------------------------- | --------------------------- |
-| `ai-5`       | afk  | M   | The suggestion table — propose, never write                    | `ai-2`                      |
-| `ai-8a`      | hitl | M   | Suggestions join the queue — the second row kind and its card  | `ai-1`, `ai-5`, `objects-3` |
-| `backfill-5` | hitl | M   | Suggestion chips — the record rail shows what is waiting       | `ai-5`, `ai-8a`             |
-| `backfill-7` | afk  | S   | Refs survive merge and re-chunk — one resolver, pinned by test | `ai-1`, `ai-5`, `ai-8a`     |
-
-**▸ It reads a deck** — Press Read deck on a real pitch deck and accept proposed funding stage, business model, location, description and founders from /inbox, each citing the page it came from, each landing with the accepter as actor. Founders route through the same resolveEntity door every creator walks. Bulk accept per record and per column, with per-row failure surfacing the validator's message — and never touching a duplicate row, because a merge has no unmerge.
-
-| slice   |      |     | title                                                                 | blocked by                       |
-| ------- | ---- | --- | --------------------------------------------------------------------- | -------------------------------- |
-| `ai-6`  | hitl | M   | Deck reader — one extract call on a document already extracted        | `ai-2`, `ai-4b`, `ai-5`, `ai-26` |
-| `ai-7`  | afk  | S   | Founders from a deck — identity claims route through the dedupe inbox | `ai-6`, `ai-8a`                  |
-| `ai-8b` | afk  | S   | Bulk accept — per record and per column, with per-row failure         | `ai-8a`                          |
-
-### 11. Everything Cmd-K can find
-
-_Spaces v1 · 13 slices_
-
-Tasks and terms as search lanes, then the chunk table generalized while it is still empty, embeddings at a pinned dimension with a local slot, and semantic search fused into the same query. Strictly serial, one agent: five slices from three areas restructure the same 234-line CTE union and two concurrent agents here guarantee a rewrite.
-
-**▸ Tasks and terms** — A phrase from a task returns it fused with companies, notes and deck text, and Enter lands on /tasks with that row focused and scrolled to — completed tasks included, with the result-row treatment settled rather than guessed. The glossary stops being a tooltip and becomes a real graph node with a page. Neither needs a provider configured.
-
-| slice     |      |     | title                                                       | blocked by                |
-| --------- | ---- | --- | ----------------------------------------------------------- | ------------------------- |
-| `clean-5` | afk  | M   | Task search lane — the fused query learns a second id space | `clean-5a`, `docsurf-1a2` |
-| `clean-6` | afk  | S   | Focused task row — the hit lands on the task, not the page  | `clean-5`                 |
-| `ai-19`   | afk  | M   | Concept links — the glossary stops being a tooltip          | —                         |
-| `ai-20`   | hitl | M   | Term page — concept as the third way into the graph         | `ai-19`, `clean-5a`       |
-
-**▸ Chunks, pages and vectors** — The chunk table is generalized while it is still empty, so the note/close_reason migration never moves real vectors and the HNSW index is recreated once by hand. The dimension pins at 768 and refuses a change, embed() takes a sensitivity argument from the first day even though one branch is unreachable, PDFs learn their page numbers, and document.embed stops being a stub.
-
-| slice    |      |     | title                                                        | blocked by                  |
-| -------- | ---- | --- | ------------------------------------------------------------ | --------------------------- |
-| `ai-12a` | afk  | M   | The chunk table — generalize before it holds a single vector | `ai-26`                     |
-| `ai-9a`  | hitl | M   | The dimension pin — 768, and a cloud embedding provider      | `ai-3a`                     |
-| `ai-10a` | afk  | S   | PDFs learn their page numbers                                | —                           |
-| `ai-10b` | afk  | M   | Chunk per format — and document.embed stops being a stub     | `ai-9a`, `ai-10a`, `ai-12a` |
-
-**▸ Search by meaning** — The fourth RRF CTE joins the fusion: 'cheaper cooling for racks' finds the immersion-cooling deck that uses none of those words. Notes and close reasons embed too, and the backfill runs with an estimate against the ceiling so a five-year-old deck becomes findable by meaning.
-
-| slice    |      |     | title                                                        | blocked by          |
-| -------- | ---- | --- | ------------------------------------------------------------ | ------------------- |
-| `ai-11`  | hitl | M   | The fourth RRF CTE — semantic search joins the fusion        | `clean-5`, `ai-10b` |
-| `ai-12b` | afk  | S   | Notes and close reasons get embedded                         | `ai-11`             |
-| `ai-13`  | afk  | M   | Corpus backfill and caps — the one embed job that asks first | `ai-11`             |
-
-**▸ No key required, and memory of judgment** — transformers.js downloaded at click time gives semantic search on a workspace with no API key at all — and is the slot sensitive records embed into at the same dimension. A pass reason written on one deal is cited on a similar company's Context section before you ask a model anything.
-
-| slice   |      |     | title                                                                | blocked by |
-| ------- | ---- | --- | -------------------------------------------------------------------- | ---------- |
-| `ai-9b` | hitl | M   | Local embeddings — transformers.js, downloaded at click time         | `ai-9a`    |
-| `ai-27` | hitl | M   | Judgment memory — similar records' pass reasons as an assembler mode | `ai-12b`   |
-
-### 12. AI on every object, and the graph from outside
-
-_Spaces v1 · 14 slices_
-
-Classify, summarize, extract, space tags, AI attributes, column runs over a paged view, vision with its page-image cache, the extraction cache, the run log, and MCP. Every lane here adds a renderer to the inbox rather than a page, and every spend goes through one ceiling and one usage ledger.
-
-**▸ Every lane** — Documents classify themselves — which is also what makes the deck reader's trigger appear on the right files — anything summarizes into a real editable note with page citations, a term sheet extracts preference, pro-rata and board terms as a note rather than as fields, and space membership finally gets its machine writer: entity_space(source 'ai', confidence) proposed into the queue, never silently written.
-
-| slice        |     |     | title                                                                     | blocked by                              |
-| ------------ | --- | --- | ------------------------------------------------------------------------- | --------------------------------------- |
-| `ai-14`      | afk | M   | Kind classify — one post-extraction fan-out, and the cheapest lane on it  | `sdk-1`, `ai-4b`, `ai-8a`, `docsurf-2`  |
-| `ai-15`      | afk | M   | Summarize — the synthesize lane, landing as a note suggestion             | `ai-4b`, `ai-8a`                        |
-| `ai-16`      | afk | S   | DD and legal extract — key terms as a note, not as fields                 | `ai-15`                                 |
-| `backfill-6` | afk | M   | Space-tag suggestions — the first entity_space writer that is not a human | `ai-4b`, `ai-8a`, `ai-26`, `backfill-5` |
-
-**▸ AI attributes and column runs** — Any attribute on any object — including a custom object created that morning — can carry an AI config and run per cell, or over every row a saved view names, with the estimate computed from the server-side evaluator so the number shown is the filtered count and not the object's total. Re-running skips rows that already carry an open suggestion.
-
-| slice   |      |     | title                                                                         | blocked by               |
-| ------- | ---- | --- | ----------------------------------------------------------------------------- | ------------------------ |
-| `ai-17` | hitl | M   | AI attributes — config on existing types, one cell at a time                  | `ai-2`, `ai-4b`, `ai-8a` |
-| `ai-18` | hitl | M   | Server-side view filter — one Condition compiler, and the count on every chip | `docsurf-12b`            |
-
-**▸ Vision, the two caches, and the run log** — A photographed deck stops being a dead end, and both sha-keyed derived layers the storage spec specified and nobody owned land beside it: rasterize once and serve both the vision lane and the preview; extract once per (sha, schema, model) so re-asking is free. Settings → AI · Usage shows one run, its steps, the tokens each cost and the suggestions it produced — which is where run vs job_run is reconciled.
-
-| slice        |      |     | title                                                                         | blocked by                     |
-| ------------ | ---- | --- | ----------------------------------------------------------------------------- | ------------------------------ |
-| `ai-21`      | hitl | M   | Vision lane — scanned decks stop being dead ends                              | `ai-4b`, `ai-10b`              |
-| `backfill-9` | afk  | M   | Page-image cache — rasterize once, keyed by sha, shared by vision and preview | `ai-21`, `backfill-3`          |
-| `backfill-8` | afk  | M   | Extraction cache — same sha, same schema, same model, no second call          | `ai-6`, `backfill-3`           |
-| `ai-25`      | hitl | M   | Run log and the Usage surface — multi-step provenance                         | `ai-15`, `clean:job-run-table` |
-
-**▸ MCP — any assistant, auditable** — Point Claude Desktop at the server with a per-user token and ask what we know about a company: it cites the deck and the space memo with no model key configured in Spaces at all, and refuses a sensitive record the way complete() does. Search and registry follow, propose sends values into /inbox attributed to that token, and four banked features are recorded as deferred with their trigger instead of quietly lost.
-
-| slice         |      |     | title                                                                          | blocked by |
-| ------------- | ---- | --- | ------------------------------------------------------------------------------ | ---------- |
-| `ai-23a`      | hitl | M   | MCP read — tokens, transport, and the assembler as a tool                      | `ai-1`     |
-| `ai-23b`      | afk  | S   | MCP search and registry — the other two read tools                             | `ai-23a`   |
-| `ai-24`       | afk  | S   | MCP propose — the same one door, from outside                                  | `ai-23a`   |
-| `backfill-14` | afk  | S   | Banked-features register — deferred with the reason and the trigger to revisit | —          |
+Projects 1–12 have shipped (their slice bodies are the Linear issues). Project 13 is in Linear; 14–23 are in `docs/roadmap-backlog.md` and are published to Linear when reached.
+
+**Shipped:**
+
+- **1.** Ship polish first — the name, the box, and the vocabulary
+- **2.** Worker spine, the workspace, and a test database of its own
+- **3.** Provenance without vendors, deletes that don't lie
+- **4.** The Instrument port — a new surface is born ported
+- **5.** Custom objects, and one review inbox
+- **6.** The note model — filed, not just mentioned
+- **7.** Documents file into spaces
+- **8.** The documents shelf, one row birth, two byte lanes
+- **9.** Views leave the browser — server-side filters and pagination
+- **10.** AI substrate — it reads a deck
+- **11.** Everything Cmd-K can find
+- **12.** AI on every object, and the graph from outside
 
 ### 13. Doors that are not an upload — a mailbox, a link, and an API with a spec
 
@@ -791,165 +414,9 @@ The last unimplemented port goes live and every kind interface the SDK froze fin
 
 ---
 
-## 2. What changed in the reconciliation
+## 3. Decisions still ahead (18 of 48)
 
-- **merge** `sdk-1` `mono-11b` — sdk-1 is the canonical runJob wrapper and absorbs mono-11b's one real contribution — the retryable-versus-terminal outcome mapping (transient blob read → JobRetryable; unsupported mime and sha mismatch → JobPermanent) plus a JobContext service {queue, jobId, attempt, isFinalAttempt} in the Layer so extraction_status is only written on a terminal failure or the final attempt. run(data) keeps its §11 signature. sdk-1 explicitly does NOT rename queue strings.
-- **merge** `sdk-2` `mono-12` — sdk-2 is the canonical heartbeat and absorbs mono-12. The row is keyed by role, not HOSTNAME, so restart-idempotence is structural; instance and pid are stored for the operator and never served; the unauthenticated /api/health payload stays {status, db, worker:{status, lastBeatSeconds}}; overall status and the HTTP code are driven by the database alone so a dead worker never restarts a healthy web container. Keeps sdk-2's ROLE=worker self-check, the $ROLE-branched HEALTHCHECK and docker-compose.split.yml. Size S → M.
-- **merge** `mono-11a` `mono-11b` — The core.<domain>.<verb> queue rename — homeless once mono-11b is deleted, and refused by mono-9c — is reassigned to mono-11a together with its drain-or-abandon note for in-flight jobs and the 03:30 'entity.dedupe-sweep' schedule row. mono-11a's 'behaviour untouched' framing relaxes to 'handlers untouched, queue names renamed once, with the upgrade consequence recorded'. This matters more after objects-4, where a stale schedule row is a silently dead nightly job.
-- **merge** `mono-1` `mono-10` — The eslint ownership line is written into both bodies. mono-1 adds, renames and relocates no rule — eslint.config.js stays at the repo root and only its four path globs move; its lint check is a regression guard, named as such. mono-10 owns moving the config into packages/config and adding the new sdk/core/web/db boundary zones, and its failing-case demo is a boundary zone only.
-- **merge** `objects-3` `ai-8a` — One review surface, built once and early. objects-3 becomes 'Review inbox — /inbox, one queue over typed rows' (afk, S → M): /dedupe → /inbox with a permanent redirect, dedupe.ts → inbox.ts by git mv, listInbox() returning a kind-discriminated InboxRow[], a RENDERERS map with a payload fallback, countOpenInbox() → {open, byKind} in one grouped query, and the pair card with objects-3's two hardcodings removed. ai-8a shrinks to the second row kind: the suggestion member, its card, the HeaderTab filter tabs and the UNION ALL count. Bulk accept never touches duplicate rows; 'inbox' joins 'dedupe' in RESERVED.
-- **merge** `docsurf-6a` `storage-6a1` `storage-6a2` `sdk-8` — Two byte lanes, one row birth — nobody claims to be the only writer of bytes. docsurf-6a owns the browser lane (grep: exactly one crypto.subtle), storage-6a2 owns server intake (grep: exactly one storage().put outside seeds), storage-6a1 owns document birth (grep: exactly one insert(document) outside tests and seeds). Birth's signature widens once now: fileAgainst is an array of targets, blobSha and actor nullable, provenance as one bag. Neither server module is re-exported from the client-imported barrel. sdk-8's hedge ('if the extraction has not landed when this one starts, this one performs the extraction') is deleted — that hedge is the mechanism that produced this cluster.
-- **merge** `ai-18` `views-2` `docsurf-12b` — The server-side filter evaluator gets one owner: views-2. This supersedes the ai-18 split (which would have made ai-18 the evaluator and ai-18b the column run) because a views area now exists and D5 assigns it there. ai-18 keeps its key, sheds the evaluator, and is the column run only — blockedBy views-2, views-3, ai-8b, ai-13, ai-17; size L → M, which answers the audit's oversized finding. docsurf-12b ships a document column registry and compiles through views-2's compileConditions rather than a second evaluator.
-- **fold** `docsurf-11` `storage-6a1` `storage-6b` — The hygiene pass wanted docsurf-11 deleted (migration into storage-6a, UI into storage-6b); cluster C3 keeps it and I follow C3, because the duplication it was flagged for disappears once storage-6a1 is blockedBy docsurf-11 and storage-6a2 becomes its first real writer. docsurf-11 is now the §11 provenance migration only, explicitly labelled a foundation migration; its /documents Source column, gone marker and Open-in-source action move to storage-6b, so the 'gone' treatment is decided once by the slice that first produces a gone row.
-- **split** `mono-1a` `mono-1` `mono-1b` — mono-1 splits three ways along what each part can break. mono-1a: the pnpm 10 bump and lockfile regeneration alone, in front of the rename (onlyBuiltDependencies confirmed, workspace: protocol and turbo prune --docker are why it leads). mono-1: the git mv into apps/web plus the three silent landmines (dotenv cwd, four eslint globs, dataDir()), with @spaces/* scope, per-package '#/*' imports and workspace-root dataDir pinned in the spec. mono-1b: turbo.json and the cached task graph, whose failure mode is a gate that passes from cache after its inputs changed.
-- **split** `mono-9a` `mono-9d` `mono-9e` — mono-9a splits into three subsystems with three silences. mono-9a keeps the vault (a regenerated secret.key makes every credential unrecoverable and invalidates every session); mono-9d moves storage (blocked on 9a, since local.ts imports dataDir and loadMasterKey); mono-9e moves both seeds and the boot composition. Plan correction forced by the split: seeds/demo.ts does NOT move — it imports resolveEntity, which does not reach core until mono-8b, so the original would have made packages/core import apps/web.
-- **split** `storage-2a` `storage-2a2` — The OAuth L splits at the redirect boundary. storage-2a (hitl M) is the outbound leg: PKCE S256, the signed state, the Connect control, the fake IdP's authorize endpoint, and the one open call it records — where the code_verifier lives between the legs. storage-2a2 (afk M) is the grant row: code exchange, userinfo, the migration adding scopes/expires_at/refresh_token_expires_at/external_account_id, and the encrypted bundle under AAD connection:<userId>:<provider>. The migration stays whole inside the second part, so no second _journal.json entry.
-- **split** `storage-11` `storage-11b` `storage-11c` — The change table splits one row of §8 per failure mode, chained (all three edit one dispatcher). storage-11 keeps its key for renames and moves (a crossing move is a suggestion — it keeps the ai-5 + ai-8a dependency). storage-11b is the gone pointer (provider delete or leaving the binding — same outcome, needs neither the suggestion table nor the inbox). storage-11c is resurrection: the app-side-delete tombstone and the expired-cursor re-list, which have to be tested against each other or neither is proven. NOTE: the bodies for 11b and 11c were truncated in my input; keys, seam and ordering are recorded, the prose is owed.
-- **split** `docsurf-5` `docsurf-5b` — The shelf splits from its door. docsurf-5 keeps /documents on the /portfolio pattern (hand-declared columns, useTablePrefs, no ViewBar), addressable by URL from that slice. docsurf-5b is the nav row, its chord lane and the keyboard sheet — a keyboard-map judgement that was riding inside a table slice, and one that NAV_ITEMS' positional lane bounds (slice(0,4)/slice(4,7)/slice(7)) make unsafe to do casually. All four existing dependents keep pointing at docsurf-5; nothing may block on docsurf-5b.
-- **split** `storage-6a` `storage-6a1` `storage-6a2` — storage-6a's key is retired: its singular claim was about a document row while its title claimed bytes. It becomes storage-6a1 (document birth, the only writer of a document row) and storage-6a2 (server intake, stream → sha → blob, the deliberately horizontal slice four slices across three areas key on). storage-6a1 is blockedBy clean-4, not clean-3 — source_class reaches the document table in clean-4.
-- **drop** `mono-11b` `mono-12` — Deleted as duplicates of sdk-1 and sdk-2, which land against the flat tree before the monorepo as the plan's own depFixes already directed.
-- **drop** `ai-18b` `backfill-1` — Two proposed keys are never created. ai-18b (the split's column-run half) is unnecessary once ai-18 sheds the evaluator to views-2 and keeps its own key. backfill-1 (credential.kind opens) is absorbed into a new clean-2c per D3, so the widening rides the project-2 migration lane with clean-2a instead of arriving from a backfill area much later.
-- **relabel** `objects-4` — afk → hitl. Confirmed: the slice cannot be written without pinning how much accumulated history the never-yet-run sweep may surface on its first pass. Built against the default (top 3 per entity, 50 inserts per run, no announcement beyond the count); the owner confirms the two caps and the announce question before merge (D25).
-- **relabel** `clean-5` — afk → hitl, on narrower grounds than the audit gave: strikethrough for a completed item is already shipped in tasks.tsx, so that is not new language. What is new is an inert checkbox glyph in a palette row where every row today is inert navigation, plus the unconfirmed 'tasks stay workspace-visible in Cmd-K' call. The backend half (task.tsv, the row_kind discriminator, lifting searchAllQuery) stays mechanical.
-- **relabel** `ai-15` — afk → hitl. ai-8a's contract anticipates later kinds, but a suggestion carrying a 400-word markdown body is a card shape nothing pins — truncated, expandable or previewed — and ai-16, ai-22 and ai-24 all inherit it. The markdown→BlockNote renderer itself stays mechanical.
-- **relabel** `mono-13a` — afk → hitl. It moves the Dockerfile, re-points both compose build contexts and adds an image-build CI job — the moment a name bakes into published paths. With ship-1 landing in project 1 the rename is already done, so the human call here narrows to the image name and tag scheme (D13, D15).
-- **relabel** `notes-3` — hitl → afk. The chip row is an explicit mirror of a shipped control in the same header, the design judgement for the area was spent in notes-1a, and mandate cannot be offered by the picker as a matter of schema. Whichever of notes-3/notes-5 lands second owns the unfileNoteFrom guard — say so in its body rather than leaving it to discovery.
-- **relabel** `objects-7` — Stays afk, against the audit — but only after the body grows a release path. Clearing or overwriting an identity-key-backed attribute now demotes the alias it created (is_identity → false) in the same transaction: the row survives so history and pg_trgm are intact, the exclusive claim is released, and a typo'd domain stops permanently blocking the correct record. objects-5's recorded decision changes from append-only to clearing-retires; if the human confirms append-only instead, objects-7 becomes hitl.
-- **relabel** `objects-8` `ai-7` — Both stay afk; the audit's escalations are rejected. objects-8 declines the undecided thing (no toast action button) and copies the shipped companies_.$companyId.tsx:474 precedent — declining an open question is not answering it. ai-7 applies a decision CONTEXT.md already made and names deck upload in verbatim ('create-then-suggest through resolveEntity'); the ai-area open question restating it is stale and is struck.
-- **relabel** `ai-18` `sdk-2` `objects-3` `storage-2a` `docsurf-12a` — Size and label consequences of the merges: ai-18 L → M and stays afk (the hitl judgement moved with the evaluator to views-2, which is hitl); sdk-2 S → M (migration + worker loop + route + second entry point + compose overlay); objects-3 S → M (it now owns the surface); storage-2a L → M with storage-2a2 (afk M) beside it; docsurf-12a M → S, still hitl (views-1 takes its discriminator half).
-- **relabel** `sdk-3` `clean-2b` `sdk-23` — Three spec pins from the hygiene sweep so afk labels stay honest: sdk-3's acceptance must pin the settings JSON Schema subset (string, number, boolean, enum; every other type refused at manifest-validation time) — narrowing later breaks published plugins; clean-2b writes 'context: null, revisit with ai-25' into its ENTITY_REFS entry rather than letting an agent choose what leaks into prompts; sdk-23's 'clean-credential-kind' blocker now resolves to a real slice (clean-2c) instead of a decision nobody owned.
-- **fold** `ai-2` `storage-4b` `sdk-4b` `mono-7` `mono-8a` `mono-8b` `mono-9b` `ai-12a` `clean-2a` — The audit's non-vertical flags are answered rather than acted on: each of these has a consumer inside its own project (ai-2 → ai-5/ai-6, storage-4b → storage-5, sdk-4b → sdk-15, ai-12a → ai-10b/ai-11, clean-2a → clean-3 plus twelve keyed slices), and a package extraction is horizontal by construction. The fix is wording: projects 15 and 17 must say in shipsWhat that those milestones ship no user-visible surface and are verified by regression. ai-2 gains an adjacency note so it lands beside its consumer rather than months ahead.
-- **new-area** `ship-1` `ship-2` `ship-3` `ship-4` `ship-5` `ship-6` `ship-7` `ship-8` `ship-9` `ship-10` `ship-11` `ship-12` — The ship/hostability area lands as 12 slices, split across project 1 (rename, /data ownership, downgrade guard, TLS overlay, restore) and project 16 (Playwright harness, image smoke, published multi-arch images, install/upgrade docs, upgrade CI, PaaS templates), with ship-9 (plugin release tags) placed in the plugin-install project where sdk-21a already owns the packing scheme. This satisfies the non-negotiable that ship is not last: the rename is project 1, before any image bakes DealOS in.
-- **new-area** `design-1` `design-2` `design-3` `design-4` `design-5` `design-6` `design-7` `design-8a` `design-8b` `design-9` `design-10` — The Instrument port area lands as 11 slices. design-1 (gate 5 becomes lint) and design-3 (the field-label step) ride in project 1 because mono-6 wires today's gate-5 grep into CI and that grep fails on a clean tree; the other nine become project 4, which sits ahead of every project that adds a surface — the audit's other non-negotiable. Roughly forty surfaces in projects 5–14 are now born ported instead of built on chrome the port is replacing.
-- **new-area** `views-1` `views-2` `views-3` `views-4` `views-5` — A views area finally owns what three areas were each carrying a piece of: the surface discriminator (views-1), the Condition-to-SQL compiler with its property test against the client evaluator (views-2), keyset pagination with an honest count (views-3), filterable/sortable flags minting expression indexes on demand (views-4, closing CONTEXT's values-jsonb open question with shipped code), and companies/people on the same loader (views-5). It becomes project 9, with docsurf-12a and docsurf-12b moved into it.
-- **new-area** `api-1` `api-2` `api-3` `api-4` `api-5` `api-6` — The external door lands as 6 slices in project 13. Per D8 api-1 is rewritten from 'oRPC spike' to 'HttpApi door — one definition, OpenAPI out' since effect/unstable/httpapi is already installed and the named fallback now ships inside the pinned package; the amendment to CONTEXT decision 3 is still owed — D8 is in §3 (awaiting your call), and CONTEXT.md:107 plus the `no-restricted-imports` message in eslint.config.js both still name oRPC. One /api/v1 namespace (D27), one personal-token store shared with MCP (ai-23a widened, not duplicated), no filter dialect and no second search.
-- **new-area** `arrival-1` `arrival-2` `arrival-3` `arrival-4` `arrival-5` `arrival-6` `arrival-7` `arrival-8` `arrival-9` `arrival-10` — The arrival area lands as 10 slices split by what they need: the forwarding mailbox, participants, attachments and deck links (arrival-1..4) join project 13, since they need only clean, objects-3, the birth/intake pair and docsurf-7; the calendar syncer, the recorder ingress, its summary, feeds and Gmail (arrival-5..10) become project 23, after OAuth and the SDK kinds exist. This is the channel CONTEXT sequences first and the plan had no slice for.
-- **new-area** `import-1` `import-2` `import-3` `import-4` `import-5` `import-6` `import-7` `import-8` `import-9` `import-10` — The import area lands as project 14, renamed 'import and export'. It reads CSV/XLSX into one grid, maps onto the object registry (so a custom object created that morning imports with no importer change), coerces per attribute type, previews attach-or-create before any write, commits idempotently through the existing writers, and bootstraps a portfolio as dated events rather than balances. import-10 (a dialect is a plugin) is the last milestone and is the only part gated on the SDK.
-- **new-area** `backfill-2` `backfill-3` `backfill-4` `backfill-5` `backfill-6` `backfill-7` `backfill-8` `backfill-9` `backfill-10` `backfill-11` `backfill-12` `backfill-13` `backfill-14` — The backfill area is dissolved into the projects it belongs to rather than becoming a project of its own, which is its own stated intent: referred_by → project 3; orphan blob sweep → project 8; AI caps, suggestion chips and ref stability → project 10; space tags, the two sha-keyed caches and the banked register → project 12; space Contacts → project 7; the Ai port live and plugins/exa → project 23; plugin upgrade → project 19, beside sdk-21b whose version directory it needs (D47).
-- **new-area** `clean-2c` `import-11` `import-12` — Three slices created by the framed decisions. clean-2c (D3) opens credential.kind to oauth_client, webhook, embedding and mailbox with the membership rule as a comment and the unique key rebuilt on (scope, provider, kind, user_id) so a Gemini key and a Google OAuth app coexist on provider 'google'. import-11 (D12) is the ledger correction policy — the append-only tables' one reversing door — landing before import-9 commits forty events at once. import-12 (D42) is export, so the data can leave.
-- **dep-fix** `sdk-3` `sdk-6a` `sdk-6b` `sdk-7a` `sdk-7b` `sdk-8` `sdk-9` `sdk-10` `sdk-11` `sdk-13` `sdk-20a` `sdk-23` `sdk-24a` `sdk-25` `storage-4a` `storage-5` `storage-6b` `storage-8a` `storage-9` `storage-11` `storage-16` `storage-18` `ai-22` `ai-25` — All sixteen placeholder blocker strings now resolve to real keys: mono-workspace-scaffold → mono-1; mono-packages → mono-7; sdk-sdk-package → sdk-5; mono-test-db-harness → mono-4 + mono-5; clean-integration-table → clean-2a; clean-source-class → clean-3 (clean-4 where the column is on document/interaction); clean-job-run-table → clean-2b; clean-credential-kind → clean-2c; sdk-integration-row → clean-2a; sdk-loader → sdk-11; sdk-runjob → sdk-1; docsurf-space-filing → docsurf-1a; docsurf-document-birth → storage-6a1 (storage-6a2 for sdk-8, which arrives with a stream); ai-suggestion-inbox → ai-5 + ai-8a; storage:document-revisions → storage-10b. A publish with an unresolved placeholder creates a dangling Linear relation, so this is a hard gate.
-- **dep-fix** `objects-2` `objects-1a` `objects-7` `notes-5` `docsurf-2` `docsurf-3` `ai-7` `ai-11` `mono-9b` `storage-18` `storage-16` `sdk-13` `ai-25` — Twenty of the 29 recorded dependency corrections applied unchanged: objects-2/objects-1a ← clean-1 (so the organization-ghost branch is never written); objects-7 ← clean-3; notes-5 ← clean-4 and docsurf-2 ← clean-4 (one enum rebuild each, the migration lane held once); docsurf-3 ← clean-7; ai-7 ← clean-3; ai-11 ← clean-5 + docsurf-1a (the fused CTE stays strictly serial); mono-9b ← ai-1; storage-18 ← ai-26 + ai-12a; storage-16 ← storage-12; sdk-13 and ai-25 ← clean-2b, which forces the run-vs-job_run reconciliation to be settled in clean-2b rather than discovered twice.
-- **dep-fix** `mono-1` `mono-1a` `mono-1b` `mono-2` `mono-3` `mono-6` `mono-10` `mono-11a` `mono-13a` `mono-13b` `sdk-11` `sdk-3` — C1 and the mono-1/mono-9a splits: mono-1 ← mono-1a and ← sdk-1 + sdk-2 (it now carries their files across the move); mono-1b ← mono-1; mono-3 and mono-6 ← mono-1b (their acceptance is written as turbo run --filter, which no longer arrives with mono-1); mono-2 deliberately does NOT gain mono-1b so it can run alongside it; mono-9d ← mono-9a; mono-10 replaces mono-9a with mono-9d + mono-9e; mono-11a ← sdk-1 + sdk-2; mono-13a drops mono-12 and gains mono-11a; mono-13b ← mono-13a + sdk-1; sdk-11 ← sdk-2 (it adds a third writer to the health payload sdk-2 now owns); sdk-3 ← mono-10 so @spaces/sdk is born inside the fence.
-- **dep-fix** `objects-4` `ai-8a` `ai-6` `ai-24` `storage-9` `storage-11` `sdk-10` `objects-7` — C2: objects-4 ← objects-3 (the sweep fills the queue and hangs its action on the queue's header); ai-8a ← objects-3, replacing the audit's weaker 'whichever lands second inherits the first's shape'; ai-6 ← ai-8a (its own demo is reading proposals in /inbox, which without a renderer exist only in SQL); ai-24 ← ai-8a; storage-9, storage-11 and sdk-10 ← ai-5 + ai-8a; objects-7 keeps its objects-3 edge, which now means the surface as a whole. Every body that says /dedupe now says /inbox.
-- **dep-fix** `storage-6a1` `storage-6a2` `docsurf-10a` `docsurf-6b` `docsurf-7` `sdk-8` `docsurf-6a` — C3: storage-6a1 ← docsurf-1a + docsurf-11 + clean-4; storage-6a2 ← storage-6a1; sdk-8 ← sdk-7a + clean-3 + clean-4 + storage-6a2; docsurf-10a ← storage-6a1 + docsurf-6b (a blobless clip needs birth, not the byte lane — so the audit's blanket 'docsurf-10a ← storage-6a' was half right); docsurf-6a ← docsurf-1a + docsurf-1b; docsurf-6b's 'finalizeDocumentUpload accepts fileAgainst: null' criterion moves into storage-6a1 as the empty-array rule, leaving docsurf-6b as the picker UI.
-- **dep-fix** `ai-18` `docsurf-12a` `docsurf-12b` `mono-8b` `mono-7` `views-2` — Views: ai-18 loses docsurf-12b and gains views-2 + views-3; docsurf-12a ← views-1 and loses its first two acceptance bullets (the shape decision and the discriminator backfill are views-1's); docsurf-12b ← views-2 and rewrites its 'filter evaluation stays client-side' bullet, which stops being true of object surfaces; mono-8b's recorded fix ('← docsurf-12a and ai-18') becomes '← views-1 and views-2' and its move list gains views/sql.ts; mono-7's move list gains the shared fixture file views-2 adds beside filter.ts, so core's suite and the SQL suite read one case table.
-- **dep-fix** `mono-1` `mono-13a` `mono-13b` `storage-2a` `mono-6` `mono-3` — Ship: mono-1 ← ship-1, or its 'zero content-changed lines under apps/web/src' criterion becomes untrue and a dozen files rename twice; mono-13a ← ship-2 and must carry the root-start, su-exec drop and boot write-probe forward rather than restoring USER node; mono-13b's 'no tsx binary' must not become 'no su-exec binary'; storage-2a ← ship-3, because Google and Box reject non-localhost http redirect URIs so the consent dance cannot be proven without a real https origin; mono-6's CI rewire leaves room for additive jobs (e2e, image-publish, upgrade); mono-3 carries ship-4's downgrade precheck across when it moves migrate.ts.
-- **dep-fix** `mono-6` `docsurf-5` `ai-8a` `ai-3a` `sdk-20a` `sdk-20b` `storage-3b` `ai-4b` `ai-25` `storage-1` `storage-17` `ai-9a` `ai-13` `sdk-21b` `notes-2` `notes-3` `docsurf-9` `ai-17` — Design: mono-6 ← design-1 or its gate-5 CI step ships permanently red (the grep hits a comment in attribute-dialog.tsx on a clean tree); docsurf-5 and ai-8a ← design-2 + design-6, so a nav row is data with a collision test instead of a hand audit; every settings surface (ai-3a, ai-4b, ai-25, sdk-20a, storage-1, storage-3b, storage-17, ai-9a, ai-13, sdk-21b) ← design-5, so 'where does this live' has one answer instead of three; sdk-20b ← design-4 for Switch and the picker; notes-2/notes-3 ← design-8a and docsurf-9 ← design-8b, so the editor is not re-skinned under freshly-landed work; ai-17 ← design-2.
-- **dep-fix** `sdk-24b` `clean-2c` `storage-1` `sdk-25` `docsurf-10a` `docsurf-7` `clean-3` — Arrival: sdk-24b ← arrival-8, with feeds and per-guid dedupe moving to core feed/feed_item and plugin_rss keeping only the conditional-GET cache — otherwise the repo gets two feed_item tables and feeds are configured in a plugin settings form instead of on the space and record pages; clean-2c gains 'mailbox' alongside oauth_client and webhook; storage-1's scope vocabulary carries calendar.readonly and gmail.readonly (storage-2b's own demo already assumes the first); sdk-25's fake list gains google-calendar; docsurf-10a dispatches the clip job on a link-kind table so arrival-4 registers a renderer rather than branching inside a guarded job; clean-3's core-owned-channel decision must cover the mailbox, the snapshotter and the feed poller, not just the clip.
-- **dep-fix** `ai-22` `mono-7` `sdk-4a` `objects-4` `clean-2b` `mono-9c` `storage-6a1` `storage-12` — Import: ai-22 ← import-9 and its accept() ledger branch calls the programs import-9 extracts, so the append-only tables keep exactly one writer each; mono-7's move list gains import/read.ts, coerce.ts and ledger.ts; sdk-4a's importer interface is specified against the pipeline that now exists (parse output lands in an import_batch and never writes, each unit carries a row ordinal); objects-4's flood bound must cover a 400-row import, the second way a quiet inbox floods; clean-2b's comment names import.commit as a job_run tenant; mono-9c's QUEUES gains import.commit; storage-6a1/6a2 must accept an in-memory payload with a caller-supplied name and mime (api-4 and import-2 both arrive with no stream and no content-length); storage-12's retain policy must cover derived layers and the import payload in the same sentence it covers bytes (D38).
-- **dep-fix** `storage-1` `ai-3a` `ai-13` `ai-17` `docsurf-6b` `ai-9a` `ai-23a` `sdk-23` `ai-6` `mono-10` — Backfill and api body edits: storage-1 and ai-3a ← clean-2c and each drops its own credential-enum migration criterion; ai-13 ← backfill-4 and reads the shared caps helper instead of writing a second ceiling; ai-17 ← backfill-5 so the cell's pending state inherits the chip vocabulary; docsurf-6b ← backfill-3, since its 'the bytes GC' criterion is unprovable before a sweep exists; ai-9a's embed signature ships as embed(input, {sensitivity}) with only one branch reachable (D11), so the local slot is additive; ai-23a creates api_token with scopes and last_used_at from the start and its wording widens so one token opens both MCP and /api/v1; sdk-23 records that webhook ingress stays a raw route outside the versioned namespace; ai-6 states that extract takes the target registry as a parameter so api-5 is a third caller, not a fork; mono-10's zones carry api-1's one-file bridge restriction.
-- **dep-fix** `views-4` `objects-5` `clean-5` `ai-11` `views-3` — Two scheduling constraints recorded that are not blockedBy edges: views-4 and objects-5 both migrate the attribute table and must not hold open migrations concurrently (_journal.json is the serialization point the migration label exists for); and views-3's paged global text box is a deliberately separate ILIKE beside the fused RRF CTE, never a fifth lane inside it, so the search track stays strictly serial and one-agent.
-- **drop** `docsurf-5` `objects-8` `ai-7` `mono-1` — Four audit findings struck as answered rather than acted on: docsurf-5's oversize flag (docsurf-5b answers it), objects-8's and ai-7's hitl escalations (rejected above), and mono-1 ∩ mono-10's rule duplication (the ownership line is now written into both bodies). One audit finding is NOT answered and stays open: sdk-15 is still an undeclared L (provider client, self-throttle, bulk endpoints, claim mapping, receipts, the wired job) and nobody handed me a split for it.
-
-**Deleted:** `mono-11b` `mono-12` `storage-6a`
-
-**Dependency corrections dropped as already handled by the collision resolvers:**
-
-- 'sdk-8 must be blockedBy storage-6a, not docsurf-1a' — already handled by cluster C3, which resolves it more precisely: sdk-8 blocks on storage-6a2 (it arrives with a stream and needs the intake half), not on the row-birth half.
-- 'docsurf-10a must be blockedBy storage-6a' — already handled by C3, and half wrong as stated: an HTML clip keeps no bytes, so docsurf-10a blocks on storage-6a1 (birth, with blobSha null) and docsurf-6b, and deliberately never touches the byte lane.
-- 'storage-9, storage-11 and sdk-10 must be blockedBy ai-5 and ai-8a' — already handled by C2's depEdits, with one refinement the fix could not know: after the storage-11 split the suggestion dependency attaches to storage-11 (a crossing move proposes) and NOT to storage-11b or storage-11c, which propose nothing.
-- 'ai-8a must be blockedBy objects-3' — already handled and superseded by C2. The fix only ordered two rewrites of one page; the resolution makes objects-3 the owner of the surface and ai-8a the owner of one row kind.
-- 'ai-18 must be blockedBy docsurf-12b' — superseded by the views area (D5). ai-18 now blocks on views-2 and views-3; docsurf-12b ships a column registry only and compiles through the same evaluator, which is what the original fix was reaching for.
-- 'mono-8b must be blockedBy docsurf-12a and ai-18' — superseded by the views area. It becomes 'blockedBy views-1 and views-2': the surface discriminator and the compiler are what settle the view store's shape, and ai-18 no longer touches it.
-- 'mono-11b and mono-12 are duplicates of sdk-1 and sdk-2 and must not both be created' — already handled by C1, which deletes both and moves the queue rename into mono-11a.
-- 'mono-13b must be blockedBy sdk-1 (replacing its dep on the deleted mono-11b)' — already handled by C1, which also adds sdk-2's ROLE=worker health command to mono-13b's bundle list so removing tsx does not break the HEALTHCHECK.
-- 'GAP, no slice owns credential.kind widening' — already handled by D3, which creates clean-2c in project 2's migration lane and absorbs backfill-1 into it; the widening now covers oauth_client, webhook, embedding and mailbox in one migration.
-
----
-
-## 3. Decisions awaiting your call (48)
-
-Forty-eight decisions, with nineteen merges recorded — most of the six the audit named turned out to be fewer questions than they looked. audit #3 (run vs job_run) is closed by the C4 resolver and I ratify it rather than reopen it; audit #5 is already half-decided in src/lib/context/ref.ts, so what remains is a resolver and a fence, not a grammar; audit #2 and #6 collapse into two decisions now that a views area exists to own them. On the two that were genuinely ownerless: source_ref points at integration.id always (spec-storage-sources §5.3 is the drafting error and is corrected in clean-3's PR), and credential.kind stays a closed enum widened to six values in a new clean-2c inside project 2's migration lane. Five decisions are ones nobody had surfaced: plugin schemas must not hold foreign keys to public.entity.id or merge and delete stop being implementable by core alone (D7); MCP is an egress path and currently bypasses the sensitivity flag entirely (D10); the client and server filter evaluators need a shared case table or they will drift (D6); the append-only ledger needs a reversal-by-compensating-event door before a bulk import can commit forty wrong rows (D12); and nothing in the plan lets a user get their data back out (D42). One recommendation changes a recorded decision: drop the @orpc bridge — effect/unstable/httpapi ships inside the pinned effect@4.0.0-rc.112 with HttpApi, HttpApiBuilder, OpenApi and HttpApiTest, and the internal half oRPC was bought for is already served by createServerFn. Two small riders worth carrying into the roadmap: RESERVED in src/lib/attributes/object-registry.ts is missing 'documents', 'inbox' and 'import', so a custom object can currently steal those routes; and ship-1 only looks blocking because an internal workspace specifier was being treated as a public npm identifier — nothing in projects 1 through 10 publishes anything.
-
-### D1-source-ref-referent
-
-**When a row says "an integration wrote this", does `source_ref` point at the installed integration row or at the OAuth account connection it borrows credentials from?**
-
-`spec-plugin-sdk.md` §8 declares `source_ref uuid → integration.id (null unless class = integration)`; `spec-storage-sources.md` §5.3 writes `source_ref: binding.connection_id` in the resolveItem pseudocode. Both are shipping specs and clean-3 adds the columns. The repo already has `account_connection` (per-user OAuth grant, src/db/schema/vault.ts) and storage-6b/docsurf-11 separately add `document.connection_id → account_connection`, so under the storage reading one column would carry two FK targets and could carry no FK at all.
-
-- **source_ref → integration.id, always, with a real FK; null unless source_class = 'integration'** — One enforceable FK; the record timeline's "which integration wrote this" agrees with `attribute_event.actor_ref` (clean-2a) because both point at the same row; two integrations sharing one Google grant (Drive + Calendar) stay distinguishable. "Which account's bytes" is answered one hop away by `document.connection_id` / `storage_binding.connection_id` / `integration.connection_id`. _Reversal cost:_ High once plugins write: a backfill over every provenance-stamped entity, alias, interaction and document row plus an edit to every port write path in sdk-7a/7b/8/9.
-- **source_ref → account_connection.id (the storage spec's reading)** — The column cannot FK anything for non-OAuth integrations (Apollo has a credential, no connection), so it becomes an un-FK'd uuid; provenance answers "whose Google account" instead of "what wrote this", which is the question the timeline actually asks; document.connection_id becomes a duplicate of source_ref. _Reversal cost:_ Same backfill in the other direction, plus re-deriving an integration id for rows that only recorded a connection — recoverable only where exactly one integration used that connection.
-- **A polymorphic pair (ref_type, ref_id)** — Both questions answerable, no FK ever, and `entity-refs.test.ts`'s FK-metadata diff can never see it. Attio's polymorphic actor is the thing spec-attribute-engine §4 explicitly declined. _Reversal cost:_ Permanent: two consumers will branch on ref_type within a release and collapsing it later means rewriting both.
-
-**Recommendation:** Option 1. `source_ref` always references `integration.id`, FK enforced, null unless class = 'integration'. Correct `spec-storage-sources.md` §5.3 in clean-3's PR, citing spec-plugin-sdk §8, and make the storage binding's connection reachable through `integration.connection_id` and the document's own `connection_id` column.  
-The enum collapse exists to answer "what wrote this value" with one branch in resolve.ts; the integration row is the only thing that is always present for class='integration' and is already the typed-actor target, so the two provenance systems stay in agreement by construction. This is the same failure that produced this whole pass — two specs describing one column — and the cheap fix is to make one of them wrong in writing.
-
-_Carried by_ `clean-3`. _Blocks_ `clean-4`, `docsurf-11`, `storage-6b`, `storage-8b`, `storage-9`, `sdk-7a`, `sdk-7b`, `sdk-8`, `sdk-9`, `sdk-10`, `ai-7`, `objects-7`.
-
-### D2-view-surface-discriminator
-
-**How does a saved view address a surface like /documents that has no object row and no `entity.values` — by minting a system object row, or by a discriminator on the view table?**
-
-`view.object_id` is `notNull` with an FK to `object` (src/db/schema/views.ts). `entity.object_id` is deliberately null for research kinds (space/note/document/term), and `attribute.object_id` is notNull — so an object row implies an attribute registry. docsurf-12a, docsurf-12b, ai-18 and mono-8b all inherit whatever is decided, and the new views area has already drafted views-1 with `object` and `document` surface values. Separately, `RESERVED` in src/lib/attributes/object-registry.ts does not contain 'documents' or 'inbox', so a user can mint a custom object that steals either route.
-
-- **A `surface` discriminator column on view (`object | document`), `object_id` made nullable, with a check constraint `(surface = 'object') = (object_id is not null)`** — Documents keep no attribute registry and no values jsonb; the view store gains one branch; the condition registry per surface is a code-side map, not a database row. Rule for a third value, written once: a surface may carry views when it is a list of rows with a stable id and a declared column registry — tasks qualify but ship no ViewBar until asked; `extra` stays legal on any surface. _Reversal cost:_ Low-moderate: converting to object rows later is a seed plus an update over view rows.
-- **Seed a system object row per non-entity surface** — `/o/documents` starts routing to a record page that does not exist; the attribute registry gains rows for something with no entity.values; dedupe, merge and identity-key machinery must each special-case it; "no fourth system object" stops being true. _Reversal cost:_ High: un-seeding an object row after `entity.object_id` invariants and attribute rows have referenced it is a data migration with no clean rollback.
-- **A second table (document_view)** — Two stores, two ViewBars, two save paths; mono-8b moves both into packages/core and every later surface adds a third. _Reversal cost:_ Moderate but paid twice — once to build, once to merge.
-
-**Recommendation:** Option 1, and with it: docsurf-5 ships the /portfolio prefs pattern only (no ViewBar), and docsurf-12a explicitly migrates that page's `useTablePrefs` state into a default view row and deletes the prefs path for that page — named in its acceptance criteria so the chrome reconciliation is a task, not an inheritance. Add 'documents' and 'inbox' to `RESERVED` in the same slice.  
-An object row is the carrier of the attribute registry, not a generic "thing with a list page"; minting one for documents buys a nullable FK's worth of convenience and breaks the two-tier model's central claim. The discriminator keeps the view store one table and one save path, which is what mono-8b needs to move it once rather than twice.
-
-_Carried by_ `views-1`. _Blocks_ `views-2`, `views-3`, `docsurf-12a`, `docsurf-12b`, `ai-18`, `mono-8b`, `docsurf-5`.
-
-### D3-credential-kind
-
-**Does `credential.kind` stay a closed enum and widen to cover OAuth apps, webhook secrets and embedding providers, or does it become open text like `provider`?**
-
-`credentialKind` is a pgEnum of llm|enrichment|search (src/db/schema/vault.ts). storage-1 needs `oauth_client` for the provider registry, sdk-23 needs `webhook` for ingress secrets, spec-ai-substrate §9 needs `embedding`. Manifest `requires.credential.kind` is typed against the enum, and the plugin doctrine forbids a plugin needing a shared core enum edited. The plan's own dep list marks this a GAP with no slice, and backfill-1 recommends keeping the enum without authority to decide.
-
-- **Keep the closed enum; widen to `llm | embedding | enrichment | search | oauth_client | webhook` and write the membership rule: a value is added when the HOST gains new machinery for a secret, never when a vendor arrives — vendors are `provider` text** — Settings can group credentials, `aiRoute` can trust `kind`, manifests stay typed. A plugin that genuinely needs a seventh kind is a core change — correct, because the host must know what it is being asked to hold and decrypt. _Reversal cost:_ Low: enum → text is a one-line migration; the rows survive.
-- **Open text like `provider`** — Any plugin invents a kind; nothing validates; the settings sections and the AI lane router both have to pattern-match strings. Satisfies "a plugin never edits a shared enum" at the cost of the enum meaning anything. _Reversal cost:_ High: text → enum later means reconciling whatever strings shipped, across installed plugin manifests in the field.
-- **Collapse enrichment|search into one `integration` value, giving five (llm, embedding, oauth_client, webhook, integration)** — Truest to what the host actually does with each secret, and a plugin never needs a new one. Contradicts CONTEXT's recorded three values and spec-plugin-sdk §12's names. _Reversal cost:_ Low today (there are no enrichment/search rows yet), rising the moment Apollo ships.
-
-**Recommendation:** Option 1, landed as a new `clean-2c` in project 2 so it rides the migration lane with clean-2a rather than arriving from the backfill area later. backfill-1 is absorbed into it. Write the membership rule as a comment above the enum.  
-Every value names host machinery — a lane that routes, a consent dance, an ingress verifier — not a vendor, so the enum is closed for a real reason and saying so out loud is what stops the next plugin author asking for `kind: 'apollo'`. Option 3 is more honest but re-opens two specs for a refactor nothing is currently paying for.
-
-_Carried by_ `clean-2c (new, project 2)`. _Blocks_ `storage-1`, `storage-2a`, `storage-3b`, `sdk-23`, `sdk-20b`, `sdk-4a`, `ai-9a`, `ai-3b`.
-
-### D4-citation-ref-grammar
-
-**Is the shipped ref grammar the one and only citation format, who resolves a ref into a destination through `merged_into_id`, and what is a chunk of something that is not a document called?**
-
-The grammar already exists and already decides the two things the audit flagged: `src/lib/context/ref.ts` pins `doc:<entityId>#<idx>` ("chunk index, not chunk uuid, so a re-chunk keeps citations") and records "entity ids inside refs may be merged losers; resolvers follow merged_into_id at read time (decided 2026-09-09)". What does not exist: any resolver, any enforcement that it is the only formatter, and any ref form for a note chunk — which ai-12a creates the moment `document_chunk` generalizes to a `chunk` table keyed by `entity_id`. `attribute_event.refs` is already a shipped jsonb column, so refs are persisted strings.
-
-- **Freeze ref.ts as the one grammar (grep gate in the shape of CLAUDE.md gate 5), add `src/lib/context/cite.ts` with `resolveRefs(refs) → {ref, label, href, missing}[]` following merged_into_id and returning a tombstone for a deleted target, and generalize the index suffix: any chunk ref is `<kind>:<entityId>#<idx>`, so a note chunk is `note:<id>#<idx>` while `note:<id>` stays the whole note** — One parser, one resolver, one place a merge or a re-chunk is handled. parseRef's '#' branch generalizes from doc-only to all entity-keyed kinds. _Reversal cost:_ Low now; high after ai-5 and ai-6 persist refs — a grammar change becomes a data migration over stored strings in attribute_event.refs and suggestion.refs.
-- **Add a `chunk:<uuid>` form for generalized chunks** — Citations break on every re-chunk, which is exactly what ai-13's corpus backfill does to the whole corpus. _Reversal cost:_ Very high: refs already written point at rows that no longer exist.
-- **Let each consumer resolve refs itself** — Three resolvers (inbox card, record timeline, MCP), three merge behaviours, and the one in the timeline is the one that gets it right. _Reversal cost:_ Moderate but the bug it produces — a citation that silently points at a merged loser — is invisible until someone checks.
-
-**Recommendation:** Option 1, carried by ai-5 because the suggestion table is the second persisted writer of refs and the first one a user reads. ai-12a applies the chunk-ref generalization in the same PR that generalizes the chunk table.  
-The expensive half was already decided in code a week ago; what is missing is a resolver and a fence, and both are cheap while there is exactly one writer. Persisted refs are the reason to do it before ai-5 rather than at ai-25.
-
-_Carried by_ `ai-5`. _Blocks_ `ai-6`, `ai-8a`, `ai-12a`, `ai-11`, `ai-13`, `ai-15`, `ai-16`, `ai-22`, `ai-23a`, `ai-23b`, `ai-25a`.
-
-### D5-filter-evaluator-owner
-
-**Who owns the one server-side view-filter evaluator, now that an area for views exists?**
-
-Every object list is fetched whole and filtered client-side today (`src/lib/views/filter.ts` — "tables are not paginated"). The audit flags ai-18 as carrying the evaluator as a rider inside an already-L slice, and docsurf-12b as building a second, document-shaped condition registry; the dep correction "ai-18 must be blockedBy docsurf-12b" only orders two independent inventions. The views area now exists and views-2 is drafted around exactly this.
-
-- **views-2 owns a single condition→SQL builder (e.g. `src/lib/views/where.ts`), pure and table-driven; docsurf-12b becomes a registry of document columns feeding it; ai-18 becomes a consumer** — One filter semantics for objects, documents, the column run and later MCP search. ai-18 loses its riders and drops from L toward M. The dep correction is superseded: ai-18 is blockedBy views-2, not docsurf-12b. _Reversal cost:_ Low while there is one caller.
-- **ai-18 keeps it as a rider** — An agent building a column-run UX invents the filter semantics the whole repo then lives with, inside a diff nobody is reading for that. _Reversal cost:_ High: two surfaces adopt it before anyone notices it is the contract.
-- **Two evaluators, one per surface** — Predictable parity bugs — `contains` on a document filename behaving unlike `contains` on a text attribute — and two SQL dialects to index for. _Reversal cost:_ Moderate and paid under pressure, once a user reports the inconsistency.
-
-**Recommendation:** Option 1. views-2 owns the evaluator and its expression-index minting; docsurf-12b ships a column registry only; ai-18 is re-blocked on views-2 and sheds the evaluator from its scope.  
-The evaluator is a foundation three consumers key on, which is the one case the slice contract allows a horizontal slice — and it is the only way ai-18 gets back inside a reviewable diff.
-
-_Carried by_ `views-2`. _Blocks_ `ai-18`, `docsurf-12b`, `views-3`, `mono-8b`.
-
-### D6-client-and-server-evaluators
-
-**When filtering moves into SQL, does the pure client-side matcher survive, and if it does, how are the two kept from disagreeing?**
-
-`src/lib/views/filter.ts` exports `matchesCondition` / `matchesConditions` with a shipped test, and mono-7 moves it into packages/core as part of the "pure half" the project-1 milestone advertises ("the due-date parser and view filters run green with Postgres stopped"). views-2 replaces its role in the list query. Nobody has said whether it is deleted, and the answer decides whether a cell edit can remove a row from a filtered view without a refetch. The audit did not surface this.
-
-- **Keep both, and pin one shared fixture table of (values, condition, type, expected) that both the pure matcher's test and the SQL builder's test import** — Optimistic in-page filtering survives (edit a cell, the row leaves the view immediately); parity is enforced by a file, not by discipline. Cost: one fixture, and every new op is added in two places with the test failing until both exist. _Reversal cost:_ Low.
-- **Delete the client matcher; refetch on every edit** — One implementation, no parity risk, and a visible refetch flicker on the two surfaces the owner uses most. mono-7's pure half loses one of its three advertised members. _Reversal cost:_ Low to restore, but the code and its test are gone and get rewritten from the SQL.
-- **Keep both with no shared fixture** — They drift on the first ambiguous op (`is` against a multi-select, `gt` on a date string), and the bug presents as a row that will not disappear. _Reversal cost:_ Moderate; the drift is found by a user, not by CI.
-
-**Recommendation:** Option 1. views-2 ships the shared case table and both tests read it.  
-The pure matcher is doing real work that SQL cannot do cheaply — reconciling a just-edited row against a view without a round trip — and the only thing that makes two implementations safe is making them share their definition of correct.
-
-_Carried by_ `views-2`. _Blocks_ `ai-18`, `views-3`, `mono-7`.
+Every decision is closed; answers are in `docs/decisions-2026-09.md`. The full question, options and reversal costs are kept here only for decisions whose carrying slice has not shipped, because the ledger's "Option 1" means nothing without them. The 30 carried by shipped slices were removed 2026-09-27 and are in this file's git history.
 
 ### D7-entity-refs-and-plugin-fks
 
@@ -981,96 +448,6 @@ The bridge's entire advantage was one vocabulary across both audiences, and the 
 
 _Carried by_ `api-1`. _Blocks_ `every other api slice`, `sdk-23`, `ai-23a`, `ai-23b`, `ai-24`, `the /api/capture slice`.
 
-### D9-provenance-cardinality
-
-**When the same bytes or the same email arrive twice through different channels, does the row keep one provenance, or does provenance become its own append-only table?**
-
-Two areas hit the identical shape independently. Documents dedupe on sha, so a deck hand-uploaded and later mirrored from Drive reuses the row and keeps saying a person uploaded it — "Open in Drive" never appears on a file that genuinely is in Drive (C3's escalation). Interactions dedupe on a globally unique `message_id` (uniqueIndex in src/db/schema/interactions.ts), so the second mailbox to see a thread is a silent no-op that loses which mailbox saw it (arrival's escalation). Arrival is history, and the house rule says append-only where history is information.
-
-- **First-writer-wins, plus fill-in-the-nulls: a dedupe fills any provenance field that is currently null (external_id, external_url, connection_id, source_path) and never overwrites a non-null one; class, ref and uploader are first-writer-wins** — Cheapest; one row tells one story; "Open in Drive" does appear on the human's row once Drive arrives. Cannot say a deck is mirrored in two places, or that a thread was seen in two mailboxes. _Reversal cost:_ High without a hedge: every arrival caller writes provenance inline, so introducing a table later edits four paths.
-- **Ship `document_source` and `interaction_channel` now — append-only rows, one per arrival, with the parent row keeping a `primary_source_id` for the one-line UI** — Correct and symmetrical; a Source column must then choose what to show; two migrations, two ENTITY_REFS entries, and neither table has a second writer until storage-8b and the second mailbox exist. _Reversal cost:_ Low to keep, but it is a horizontal layer with no consumer in projects 5–9, which the slice contract forbids.
-- **Option 1 now, with one hedge: every provenance write goes through a single `stampProvenance(rowId, provenance)` function, so the later table has exactly one call site** — Same behaviour and cost as option 1 today; the later table becomes a ~100-line slice plus a backfill that copies each row's current stamp into its first source row. _Reversal cost:_ Low by construction — that is the point of the hedge.
-
-**Recommendation:** Option 3, in both places: storage-6a1 owns `stampProvenance` for documents, arrival-1 owns the same shape for interactions. Record `document_source` / `interaction_channel` as the pre-agreed end state so the slice that needs it does not re-litigate.  
-The side table is almost certainly the end state — two mailboxes and a mirrored data room are both planned, not hypothetical — but it cannot be demonstrated by anything shipping before project 14, and a table nobody writes twice is exactly the horizontal layer this pass exists to delete. The hedge buys the reversal for one function.
-
-_Carried by_ `storage-6a1 (documents) · arrival-1 (interactions)`. _Blocks_ `storage-6b`, `storage-8b`, `storage-10b`, `storage-11`, `docsurf-10a`, `sdk-8`, `arrival-2`, `arrival-10`.
-
-### D10-mcp-and-sensitivity
-
-**Does the MCP read surface refuse a sensitive record the way `complete()` does, or does a flagged deal flow to a cloud assistant untouched?**
-
-The sensitivity cluster settled that the flag is an egress guard enforced at `complete()`, `embed()` and vision resolve, with `canRead` remaining the only access control. ai-23a's model is "a teammate's assistant sees what that teammate sees" — an access statement. But MCP is an egress path: a remote model reads raw memo and deck text through the assembler tool. As currently specified, the flag that stops a sensitive deal reaching a cloud model stops nothing the moment MCP ships. Neither the audit nor any resolver names this.
-
-- **`sensitivityFor()` is evaluated in every MCP read tool exactly as in complete(); a sensitive subject returns its existence (name, kind, link) plus a typed refusal, and content is withheld. A per-token `allow_sensitive` switch lets an operator pointing MCP at a local model (Ollama, LM Studio) opt in** — The flag means one thing at all three boundaries. An assistant can still say "there is a deal called X you have flagged" and link to it, which is the useful minimum. _Reversal cost:_ Loosening later is a setting. Tightening later breaks an assistant workflow someone already built against full access.
-- **MCP sees everything canRead sees** — Simplest and matches ai-23a as drafted; the sensitivity flag becomes decorative for the one channel most likely to be pointed at a third-party model. _Reversal cost:_ High and user-visible.
-- **Hide sensitive rows entirely from MCP** — The assistant answers "no such deal" about a deal that exists, which the box's own dedupe doctrine argues against everywhere else. _Reversal cost:_ Low, but it trains the user to distrust the tool.
-
-**Recommendation:** Option 1, carried by ai-23a. It makes the guard list three boundaries rather than two, which should be written into `src/lib/ai/sensitivity.ts`'s header comment alongside the two the cluster already named.  
-Sensitivity is defined as "bytes leaving the box", and MCP is the most literal case of that in the whole plan; leaving it out is not a scoping choice, it is the flag quietly not working.
-
-_Carried by_ `ai-23a`. _Blocks_ `ai-23b`, `ai-24`, `ai-26`.
-
-### D11-sensitive-embeddings
-
-**Do records flagged sensitive simply get no vectors in v1, so semantic search cannot reach them?**
-
-With one pinned embedding dimension (768) and one configured provider, `embed()` refuses on a sensitive subject when the lane routes to a cloud provider — so a flagged deal's chunks land with null embeddings. The roadmap audit already flags "the sensitive embedding slot" (a second, local provider at the same dimension) as having no slice. This is the one consequence of the whole sensitivity design a user actually feels.
-
-- **Accept the hole for v1: refuse rather than fall back, and have ai-9a's Embeddings section carry one line saying sensitive records are not embedded until a local slot is configured** — Flagged records stay reachable by lexical, trigram and graph lanes through the same RRF fusion — the honest statement is "semantic recall is worse on flagged records", not "flagged records are invisible". ai-13's backfill must skip them rather than fail on them. _Reversal cost:_ One slice: a second credential at the pinned dimension plus `aiRoute('embed', 'sensitive')`. No schema change, because the dimension was pinned for exactly this.
-- **Fund the local slot now (ai-9b's transformers.js model as the sensitive lane)** — No hole; costs a download-at-click-time flow and a second provider in the routing grid before anyone has flagged anything. _Reversal cost:_ Low, but it front-loads work on a feature with no demand signal.
-- **Fall back to the cloud provider with a warning** — The one thing the flag exists to prevent, performed on the user's behalf. _Reversal cost:_ Unrecoverable — the bytes have left.
-
-**Recommendation:** Option 1, and pin the signature now: `embed(input, { sensitivity })` and `aiRoute('embed', sensitivity)` ship in ai-9a even though only one branch is reachable, so the local slot is additive rather than a signature change across every caller.  
-Refusing loudly is the correct behaviour under the doctrine, and the pinned dimension already bought the cheap reversal; what would make this expensive is shipping `embed()` without sensitivity in its signature and discovering it at ai-9b.
-
-_Carried by_ `ai-9a`. _Blocks_ `ai-11`, `ai-12b`, `ai-13`, `ai-26`, `storage-18`.
-
-### D12-ledger-correction-policy
-
-**How does anyone fix a wrong investment, mark or distribution, given the portfolio event tables are append-only with no edit or delete path — and an import can commit forty at once?**
-
-CLAUDE.md names the correction policy an open decision and says not to add mutation paths casually. import-9 adds no mutation path, so a wrong imported position is permanent. ai-22 separately proposes ledger events from live-file revisions — an accepted proposal writes into the same doorless tables. This is the one place bulk writing meets append-only and it lands before an angel imports a real portfolio.
-
-- **Reversal by compensating event: add a nullable self-referencing `reverses_id` to each event table and a void flow that appends an exact-negative event citing the original; a batch reversal appends N events under one import_batch reference** — Portfolio math sums as before; the timeline shows both rows; the audit trail survives; a wrong import is a two-click fix. Roughly a 200-line slice. _Reversal cost:_ Low and additive — any future policy can be layered on top.
-- **No correction path in v1 (import-9's current state)** — A bad 40-row import is permanent for the life of the workspace; the realistic user fix is to start a new workspace, which is the worst possible answer for the onboarding-critical feature. _Reversal cost:_ Low to add later, but the damaged data is already there and the compensating events have to be hand-written.
-- **Allow edit/delete on the ledger tables** — Burns the append-only doctrine for a rare case, and silently invalidates every downstream mark and metric that read the old value. _Reversal cost:_ Very high: once the mutation paths exist, everything that could have used them did.
-
-**Recommendation:** Option 1, as its own slice in the portfolio/import area landing before import-9's commit step. ai-22's accepted proposals write through the same door.  
-Reversal-by-append is the only correction that keeps history information rather than overwriting it, and bulk import is what turns "a rare wrong row" into "forty rows and no way back". It is also the smallest of the three answers, which is unusual and worth taking.
-
-_Carried by_ `portfolio-correction (new slice, import area)`. _Blocks_ `import-9`, `ai-22`.
-
-### D13-published-identity
-
-**What name do the published packages, images and domain carry, given `@spaces` on npm is probably taken?**
-
-mono-1 and mono-2 bake `@spaces/*` into every package.json and mono-13a bakes the image name; ship-1 is hitl entirely because of this and it blocks the first slice of the monorepo area. CONTEXT says the rename must land before GHCR images bake the old name in. The repo's package name is still `dealos`.
-
-- **Keep `@spaces/*` as private workspace names and publish nothing to npm in v1 — the packages are `"private": true` and the scope question moves to sdk-3/sdk-21a, where `@spaces/sdk` is the only package that would ever be published** — mono-1 unblocks today with no name research. GHCR's namespace is not a separate choice — it is the GitHub owner, already decided by where the repo lives. A scope rename at publish time is one find-and-replace in a repo with no external consumers. _Reversal cost:_ Low: one sweep, paid once, at the moment there is a reason to pay it.
-- **Pick a fallback public scope now (@spacesapp or a vendor scope) and bake it everywhere** — Same sweep, paid now, for a publish event that is in project 11 at the earliest — and risks being paid twice if the name research changes the answer later. _Reversal cost:_ Low but wasteful.
-- **Unscoped package names** — Almost certainly unavailable, and gives up the namespace grouping that makes the import zones legible. _Reversal cost:_ Moderate.
-
-**Recommendation:** Option 1. ship-1 records that the workspace names are internal and unpublished, and the public-name decision is explicitly deferred to the slice that first runs `npm publish`.  
-The decision is blocking mono-1 only because it was framed as a publishing decision; nothing in projects 1–10 publishes anything, so the honest answer is to stop treating an internal specifier as a public identifier and let mono-1 go.
-
-_Carried by_ `ship-1`. _Blocks_ `mono-1`, `mono-2`, `mono-13a`.
-
-### D14-rename-depth
-
-**How deep into the running box does the DealOS → Spaces rename cut — the Postgres role and database, the compose project, the `dealos.*` localStorage keys?**
-
-docker-compose.yml hardcodes role, password default and database as `dealos` and the volume as `dealos_pgdata`; the compose project name is `dealos`; saved table-column layouts live under `dealos.*` localStorage keys; mono-4 will name a test database. ship-1 pins "rename now, document the two-line ALTER" on the grounds there is one deployment and it never gets cheaper.
-
-- **Rename the infrastructure (compose project, image, role, database, test database) and parameterise them in compose so an existing operator can keep old names; freeze the `dealos.*` localStorage keys with a comment explaining the name** — One documented ALTER for the one existing deployment; no user loses a saved column layout; the only cost is a prefs key nobody sees whose comment explains itself. _Reversal cost:_ Low: a later read-old/write-new shim can migrate the keys inside any slice that already touches useTablePrefs.
-- **Rename everything including the prefs keys, with a one-time migration shim** — Fully consistent; the shim is small but it is client-side state with no server truth, so a bug resets someone's layout silently and irreversibly. _Reversal cost:_ A reset layout cannot be recovered.
-- **Rename nothing internal; change the docs only** — Published images and the product name diverge from the database the operator sees, permanently, for one deployment's worth of convenience. _Reversal cost:_ Rises with every new deployment.
-
-**Recommendation:** Option 1.  
-The infrastructure names are seen by an operator reading a compose file and are worth getting right while there is exactly one of them; the prefs keys are seen by nobody and their only observable behaviour is losing someone's work if the shim misfires. Asymmetric risk, asymmetric answer.
-
-_Carried by_ `ship-1`. _Blocks_ `ship-2`, `ship-10`, `mono-4`, `mono-13a`.
-
 ### D15-tags-registries-and-the-upgrade-window
 
 **Does `latest` move, do we publish to Docker Hub as well as GHCR, and how far back does upgrade CI test?**
@@ -1100,141 +477,6 @@ ship's open questions ask for cosign + SLSA or nothing on images; sdk-21a is sep
 "One answer for both" is appealing until you notice the two verifiers have nothing in common — one is interactive and online, one is a Node process that may have no internet at all. Matching the scheme to the verifier is the whole decision.
 
 _Carried by_ `ship-8 (images) · sdk-21a (tarballs)`. _Blocks_ `sdk-21b`, `sdk-22`.
-
-### D17-supported-container-runtimes
-
-**Is a non-root container start an officially supported, tested deployment target, and does that include OpenShift's arbitrary-UID model?**
-
-Hostability contract 1 says the entrypoint starts as root, repairs /data ownership and drops to UID 1000 via su-exec. Today's docker/entrypoint.sh does none of it. ship-2 additionally handles `user: "1000:1000"`, rootless Podman and userns-remap by skipping the repair when /data is already writable. Whether OpenShift's arbitrary UID is a target is unstated, and it is the difference between a tested path and a best-effort branch.
-
-- **Support and test two starts — root-then-drop (the documented path) and `user: "1000:1000"` — in CI; declare arbitrary-UID unsupported but not broken: the entrypoint must skip the repair and run rather than fail** — Two CI legs covering every deployment an angel fund or a small team actually uses; OpenShift users get something that boots and a documented caveat rather than a promise. _Reversal cost:_ Low: promoting arbitrary UID to supported later is a CI leg plus group-writable /data and fsGroup docs.
-- **Fully support arbitrary UID** — A third CI leg and a permanent constraint on every future file the app writes under /data, for a deployment target nobody has asked for. _Reversal cost:_ High: demoting a documented target is a broken promise.
-- **Root-only** — Contradicts the published non-root UID 1000 claim and rules out rootless Podman. _Reversal cost:_ Moderate.
-
-**Recommendation:** Option 1, stated explicitly in ship-2's acceptance criteria and in the install docs.  
-The repair-then-drop path is the contract; the second start exists because operators already run compose with a `user:` line. Testing those two is proportionate; testing a model nobody in this audience uses is paying for a matrix leg with maintenance forever.
-
-_Carried by_ `ship-2`. _Blocks_ `ship-10`.
-
-### D18-documentation-canon
-
-**When two documents describe the same rule, which one is edited — and does apps/site fork the install docs or read them?**
-
-design-2 makes docs/design-contract.md the operational document and leaves DESIGN.md descriptive, with pointers both ways and no rule about where a new decision is written. ship-10 writes install and upgrade markdown in docs/ while spec-plugin-sdk §2 lists a later `apps/site` for marketing and docs. These are one question asked twice, and D1 in this list is what happens when it goes unanswered: spec-storage-sources §5.3 and spec-plugin-sdk §8 describe one column differently and both are shipping specs.
-
-- **One rule for both pairs: reasoning lives in the human document, the operational artifact is derived from it and never argues. DESIGN.md holds decisions and reasoning; docs/design-contract.md is regenerated from it, with a test asserting every rule in the contract appears in DESIGN.md. docs/\*.md holds install prose; apps/site reads those files at build time and never forks them** — One place to edit, one place that can be wrong, and a test that notices drift in the design pair. _Reversal cost:_ Low while both documents are young.
-- **The contract is canonical; DESIGN.md becomes narrative history** — The reasoning rots first and the next contributor cannot tell which rules are load-bearing. _Reversal cost:_ Moderate — the reasoning has to be reconstructed.
-- **No rule** — Both drift, exactly as the two specs did. _Reversal cost:_ Paid in decisions like D1, repeatedly.
-
-**Recommendation:** Option 1, recorded in design-2 for the design pair and in ship-10 for the docs pair.  
-This pass exists because two documents described one thing and nobody owned the reconciliation. The cheapest possible prevention is a written rule about which file a decision goes into, and a derived artifact that cannot contradict it.
-
-_Carried by_ `design-2 (design pair) · ship-10 (docs pair)`. _Blocks_ `ship-10`, `design-9`.
-
-### D19-icon-set
-
-**Is lucide the sanctioned icon set with a written rule, or a v1 holdover on the deprecation path?**
-
-43 .tsx files import from lucide-react. DESIGN.md never names an icon library — it states a texture doctrine of 1-bit dither, mono glyphs and ink initials squares, and mentions icons only incidentally ("icon-only buttons carry aria-label", "a 1-bit icon grid of 32px tiles"). Roughly forty new surfaces in this plan will each reach for an icon and each decide alone. This is not on CONTEXT's open-questions list.
-
-- **Sanctioned, with a rule written into DESIGN.md §5: one stroke weight (1.5), two sizes (14 and 16), and icons permitted only in the nav chassis, in icon-only buttons with aria-label, and as row-leading affordances in a mono lane — never in prose, never decorative, never as a status where a badge exists** — Forty surfaces inherit a decision instead of making one. Import count per file is lintable; the taste half stays human. _Reversal cost:_ A later move to mono glyphs is the same 43-file port it is today — waiting costs nothing.
-- **Deprecate for mono glyphs** — A 43-file port plus a glyph inventory nobody has drawn, blocking or churning every new surface in projects 5–9. _Reversal cost:_ High and immediate.
-- **Leave it unstated** — The current failure mode, multiplied by forty. _Reversal cost:_ Moderate but paid as inconsistency that is never quite worth fixing.
-
-**Recommendation:** Option 1, carried by design-2 as a section of the design contract.  
-Deprecation and sanction cost exactly the same 43-file port whenever they happen, so there is no option value in waiting — and in the meantime the absence of a rule is producing forty independent answers, which is the specific thing this pass is undoing.
-
-_Carried by_ `design-2`. _Blocks_ `docsurf-5`, `docsurf-6b`, `ai-4b`, `ai-8a`, `sdk-20a`, `sdk-20b`, `storage-3b`, `views-3`.
-
-### D20-routing-grid-pattern
-
-**Is ai-4b's lane × sensitivity routing table drawn as a new matrix pattern, or expressed as a ledger with a second lane?**
-
-ai-4b is the first surface in the product that is not a ledger, a record, a shelf or a queue, and its own body says so. DESIGN.md has eight patterns, P1–P8, and none is a matrix. design-2 can record the absence but cannot decide it, and ai-4b sits on the AI arc that projects 7–9 depend on.
-
-- **Express it as a ledger (P2) with a second lane: one row per lane, cells for default provider and sensitive provider** — No new visual language; the existing ledger-section pattern already handles it; a third column (cap, last used) can be added later, which a matrix cannot absorb gracefully. At four to six lanes and two columns it reads better than a grid anyway. _Reversal cost:_ Low: ledger → grid later is a re-port of one settings section.
-- **Draw the matrix on the Paper canvas before ai-4b is coded** — A genuine new pattern with a DESIGN.md sheet; adds a design cycle to the critical AI path for a table that is currently 5×2. _Reversal cost:_ Low, but the cycle is spent.
-- **Let ai-4b invent it in code** — Precisely the failure this pass exists to undo — a new visual language shipped inside a feature slice. _Reversal cost:_ High: it becomes the precedent the next matrix copies.
-
-**Recommendation:** Option 1. ai-4b stays hitl (the copy and the provider cells still want a human eye) but ships no new pattern.  
-A matrix earns a pattern at 8×8, not 5×2; here the second axis is two values and a ledger row holds them without inventing anything. If the grid is genuinely wanted later, it will be wanted when there are more providers, and then it is a deliberate design slice rather than a rider.
-
-_Carried by_ `ai-4b`. _Blocks_ `ai-4b`.
-
-### D21-dark-theme-shape
-
-**Is the deferred dark theme a token swap, or a real re-port — and should design-9 keep paying for enforcement that assumes the former?**
-
-The `dark` custom-variant exists, no dark token values do, next-themes is already a dependency, and CONTEXT schedules dark post-v1 without saying which kind of job it is. design-9 pays a token-only enforcement cost on every surface on the assumption it is a swap. DESIGN.md's own materials doctrine says bone is a chassis because it is lighter than paper — a relationship that does not survive inversion.
-
-- **Declare dark a re-port; keep token discipline for its own sake (consistency and the gate-5 lint) and delete "so dark is a token swap" from design-9's justification** — Honest scoping; the enforcement stays because it is worth it anyway, but nobody is told it buys something it does not. _Reversal cost:_ Nil — if dark turns out to be a swap, the tokens are already there.
-- **Assume token swap and enforce for it** — The same enforcement, justified by a benefit that will not arrive, and a post-v1 surprise when the second ramp produces grey mush. _Reversal cost:_ The surprise is the cost; the tokens survive either way.
-- **Build dark now** — Post-v1 by CONTEXT, and forty surfaces are still unported in light. _Reversal cost:_ High opportunity cost.
-
-**Recommendation:** Option 1, carried by design-9 as a one-paragraph scope correction.  
-The tokens are worth keeping regardless, so nothing material changes — but the justification does, and an enforcement rule justified by a false promise is the kind of thing that gets dropped the first time it is inconvenient.
-
-_Carried by_ `design-9`. _Blocks_ nothing.
-
-### D22-visual-regression-coverage
-
-**Does the design area get machine coverage — a snapshot suite over forty surfaces — or does visual review stay human at the milestone demos?**
-
-The audit's Playwright slice is a functional smoke (upload, preview, the login gate). Nothing in the plan looks at a pixel, and after this pass forty surfaces ship against a contract enforced by a lint rule that can only read class names. A snapshot suite is a real maintenance tax and the Instrument port is still mid-flight.
-
-- **No snapshot suite. Two machine gates instead: the Playwright functional smoke, and gate 5's class-name lint extended with D19's icon rule. Visual judgement stays human at the milestone demo, revisited at two reviewers** — CI stays fast and its failures stay meaningful. The visual gate depends on the milestone demos actually being run — which risk 9 already names as the plan's only feedback loop. _Reversal cost:_ Low: snapshots are easiest to add once surfaces stop moving, which is after the port.
-- **Snapshot suite over the forty surfaces** — Every port slice produces forty expected diffs; a suite whose failures are always expected is a suite nobody reads. _Reversal cost:_ Moderate to remove, and the intervening noise trains people to approve diffs blind.
-- **Nothing at all** — No functional browser coverage either, on a product adding four byte-arrival paths and a preview surface. _Reversal cost:_ Low.
-
-**Recommendation:** Option 1.  
-Snapshots are worth their tax against a stable design and worthless against one being replaced; this codebase is the second case for the length of this plan, and the honest substitute — a functional smoke plus a lint that reads the token vocabulary — is already half-built.
-
-_Carried by_ `design-2 (records the rule) · the Playwright slice (mono)`. _Blocks_ nothing.
-
-### D23-semantic-lane-trigger
-
-**How does the semantic lane fire in Cmd-K, given the palette has no submit — it debounces per keystroke and Enter opens the highlighted row?**
-
-ai-11 as drafted said the vector lane "runs only on a submitted query", which does not exist. CONTEXT, DESIGN.md's palette sheet and spec-ai-substrate §7 are all silent. This is the only decision in the search cluster a user feels.
-
-- **An idle second wave: lexical as today, then the same fused query re-run with the vector lane 600ms after the last keystroke, replacing the list — suppressed once the user has moved the selection or pressed Enter, so no row moves under the cursor** — No new visual language; one ranking; the palette stays fast because the first wave is unchanged. _Reversal cost:_ Moderate: if (b) or (c) later wins, ai-11 splits into a server slice (CTE, pin guard, cache — pure afk) and a surface slice.
-- **An explicit "Search everything" row at the foot of the results, running the semantic pass on Enter** — A new row type and a new DESIGN.md sheet, decided inside a search slice. _Reversal cost:_ Low to remove, but the sheet has been written.
-- **Semantic only on a dedicated /search page; Cmd-K stays lexical** — Two surfaces with two different orders for the same corpus, and the user has to know which one they are in. _Reversal cost:_ Moderate.
-
-**Recommendation:** Option 1 — and regardless of which wins, write ai-11's server half (the fourth CTE, the k=60 pin guard, the cache) so it stands alone, because that is the part the other two options reuse unchanged.  
-It invents nothing, keeps one ranking, and the suppression rule removes the only real objection (a row moving under a cursor). Writing the server half to stand alone makes the reversal cheap enough that this is a low-stakes call.
-
-_Carried by_ `ai-11`. _Blocks_ `ai-12b`.
-
-### D24-what-kind-other-means
-
-**Does `kind: 'other'` mean "unknown" — so the classify lane proposes on it — or can it mean "a human chose Other"?**
-
-The classify ladder writes a kind deterministically at filing time (folder name, then filename, then 'other') and the model proposes only afterwards on anything still at 'other'. Nothing today records whether a kind was guessed or chosen: document.kind is not an attribute, so kind changes do not appear in attribute_event. The alternative is a `kind_source` column (guessed | chosen | accepted).
-
-- **'other' means unknown. The classify lane proposes once per document; the suggestion row records a rejection, so it never re-proposes** — Someone who deliberately picks "Other" gets exactly one inbox row saying it looks like a cap table, and dismisses it. No new column, no migration, and the once-only property is free because the suggestion table already records rejected. _Reversal cost:_ Low: kind_source is a nullable column added later with no backfill hazard, since nothing reads it.
-- **Add `kind_source` now** — A column nothing reads on day one, plus a timeline line saying where a kind came from — which is genuinely nice and genuinely not needed yet. _Reversal cost:_ Low, but it rides in a migration that docsurf-2 is already making to the document enums, so it is nearly free if wanted.
-- **Never classify a document a human has touched** — Unimplementable today — there is no record of a human having touched it — so this is option 2 wearing a different name. _Reversal cost:_ n/a
-
-**Recommendation:** Option 1, carried by ai-14.  
-The state worth protecting is not recorded anywhere, the cost of not protecting it is a single dismissible row, and the inbox is the surface designed for a machine being wrong in public. If the owner wants the timeline line, option 2 is cheap and additive later.
-
-_Carried by_ `ai-14`. _Blocks_ `storage-9`.
-
-### D25-first-sweep-flood
-
-**How much accumulated history may the nightly duplicate sweep surface on its very first run, and does it announce itself?**
-
-The job has never executed for any kind, so on an established workspace its first 03:30 pass proposes every near-duplicate accumulated since the workspace was created, into a queue the owner reads daily. The objects area left the bound undecided, which is why objects-4 is relabelled hitl. It is a judgement about the owner's own workspace, not an architecture question.
-
-- **Bounded and announced: top 3 candidates per entity, 50 inserts per run, both applied in SQL, and the first-ever run writes a Today cell reading "first duplicate scan — N pairs found"** — The inbox fills at a readable rate and the owner knows why it filled. The cell is one row on a surface built for exactly this kind of unfinished business. _Reversal cost:_ Trivial — the cap is a constant and the cell is one component.
-- **Bounded and silent (the resolver's default)** — Same rate; a queue that grows overnight with no explanation reads as a bug the first time. _Reversal cost:_ Trivial.
-- **Unbounded first pass** — An inbox with several hundred pairs on day one, which is how a daily queue stops being read at all. _Reversal cost:_ Dismissing them is per-pair; the damage is to the habit, not the data.
-
-**Recommendation:** Option 1.  
-The cap and the announcement are the same two lines of work, and the announcement is what converts a surprise into a feature; the only reason this needs the owner is that only the owner knows how many pairs "N" will actually be in their workspace.
-
-_Carried by_ `objects-4`. _Blocks_ nothing.
 
 ### D26-worker-bundler
 
@@ -1280,21 +522,6 @@ Outbound delivery is a subsystem justified by demand nobody has expressed, while
 
 _Carried by_ `api read-API slice`. _Blocks_ `the digest channel work`, `arrival-8`.
 
-### D29-public-door-safety
-
-**What stops abuse of a token-authenticated endpoint on a box that may sit on the open internet — and is a capture token allowed to read everything its owner can?**
-
-There is no rate-limit code anywhere in src today; required env is frozen at {DATABASE_URL, APP_URL} so there is no Redis; and the endpoint being opened enqueues AI work the operator pays for. Separately, ai-23a's model is "a teammate's assistant sees what that teammate sees" — scopes narrow verbs, not rows — and a capture-only token lives in a browser extension on a laptop, the most exposed credential in the product.
-
-- **Per-token counters in Postgres (one upsert per token per minute window) enforced in the HttpApi middleware, plus a documented Caddy rate-limit directive as the second layer; and PATs gain a write-only shape, so a capture token may write captures and read nothing** — Works with or without a proxy, adds no env and no service, and the extension's credential stops being a full read key on a laptop. One extra write on the hot path, which at this scale is free. _Reversal cost:_ Adding counters later is one middleware. Narrowing a token type that already shipped is breaking for installed extensions — which is the reason the write-only shape ships with the first PAT.
-- **Delegate entirely to the reverse proxy** — The default compose has no proxy, so the default deployment has no limit at all; and the Caddy overlay then has to document something load-bearing. _Reversal cost:_ Low to add counters later, after the first surprise bill.
-- **Nothing until someone is abused** — An endpoint that spends the operator's money, reachable by anyone holding one leaked token. _Reversal cost:_ Low technically; the incident is the cost.
-
-**Recommendation:** Option 1, carried by the PAT slice (ai-23a today).  
-The two halves are properties of the same object — the token — and both are cheap now and breaking later. The write-only shape in particular is the difference between a leaked extension key being an annoyance and being a full export of the workspace.
-
-_Carried by_ `ai-23a`. _Blocks_ `the /api/capture slice`, `ai-24`, `sdk-23`.
-
 ### D30-mail-body-and-privacy
 
 **Where does a forwarded or synced email body live, and who can see it before the thread is attached to a deal?**
@@ -1325,21 +552,6 @@ It is the only option that satisfies the frozen-env rule for the channel CONTEXT
 
 _Carried by_ `arrival-1`. _Blocks_ `arrival-2`, `arrival-10`.
 
-### D32-headless-browser
-
-**Does a headless browser ship in the default image so DocSend and Pitch links can be snapshotted to PDF?**
-
-No playwright, puppeteer or chromium appears in package.json, CONTEXT.md or ARCHITECTURE.md. Bundled Chromium is roughly 400 MB on a product whose pitch is two containers and `docker compose up`. docsurf-10a's clip handles articles and PDF responses; a DocSend link is neither and will fail its guard. Deck-link ingestion is sequenced first alongside forwarding.
-
-- **Not in the default image. Three tiers: a PDF response is filed directly; an article is clipped by readability; a deck link becomes a document row with `external_url` and a "snapshot unavailable" state plus a one-line instruction to print-to-PDF and drop it in. An optional `spaces-snapshot` companion container, documented and not default, fills the gap behind one port with two implementations** — The image stays small, the row still exists so the deal has its link and its timeline entry, and nobody is told a snapshot happened when it did not. Anyone who wants automated snapshots adds one compose service. _Reversal cost:_ Low both ways: adding the companion is a compose overlay; removing Chromium from a published image later is a breaking size change people already sized their box for.
-- **Bundle Chromium** — Automatic snapshots, a ~400 MB image, and a dependency that still fails on DocSend's email gate a good share of the time. _Reversal cost:_ High — image size is a promise people plan around.
-- **Refuse politely with no row** — The link is lost and so is the fact that someone sent it. _Reversal cost:_ Low.
-
-**Recommendation:** Option 1, carried by the deck-links slice with arrival-4 written against the same port.  
-The single largest violation of the hostability contract available in this plan, traded for a capability that is unreliable even when it works — and the two-implementation port means the capable version is one optional container away for whoever wants it.
-
-_Carried by_ `the deck-links slice (docsurf) · arrival-4`. _Blocks_ `arrival-4`.
-
 ### D33-feeds-core-or-plugin
 
 **Is the RSS feed poller a plugin, or core?**
@@ -1369,51 +581,6 @@ Two halves of one policy. CONTEXT says forward-only sync makes "create all, visi
 Create-all is right for forward-only consent, the domain list is the one cheap guard that prevents the characteristic failure, and reframing the calendar rule from "are all attendees internal" to "does it touch the graph" keeps the case the naive rule loses.
 
 _Carried by_ `arrival-2`. _Blocks_ `arrival-5`, `arrival-10`.
-
-### D35-list-query-state
-
-**Do ad-hoc filter conditions belong in the URL, and does the global text box on a paged table survive as a server-side search?**
-
-Only `?view=` is linkable today. Typed search params are one of the recorded reasons for choosing TanStack Start, and a pasteable filtered list is nearly free once filtering is server-side — but it makes every keystroke in the condition editor a navigation. Separately, the text box cannot stay client-side once the table holds one page of rows; views-3 carries the call and it is named in two areas so it is not answered twice.
-
-- **Conditions stay out of the URL for v1 (refetch keyed on the condition array); the text box stays and becomes a server ILIKE over canonical_name plus name aliases** — No navigation per keystroke in the editor; "narrow this list" stays a distinct gesture from "go somewhere" (Cmd-K). When shareable filtered links are wanted, the same text can join a search param later without touching the evaluator. _Reversal cost:_ Adding search params later is additive and does not change the evaluator.
-- **Conditions in typed search params now** — Shareable filtered lists immediately; every keystroke in the condition editor is a history entry, and the back button starts undoing filter edits. _Reversal cost:_ Once people share links, the param shape is a contract.
-- **Delete the text box in favour of Cmd-K** — One fewer thing to build; filtering a table now costs a navigation away from the table. _Reversal cost:_ Low to restore.
-
-**Recommendation:** Option 1.  
-The two gestures are genuinely different — Cmd-K takes you somewhere, the box narrows what you are looking at — and collapsing them makes the most-used table worse to save one server function. The URL question has a cheap later answer and no cheap way back.
-
-_Carried by_ `views-2 (conditions) · views-3 (text box)`. _Blocks_ `views-3`, `docsurf-5`.
-
-### D36-filterable-sortable-flags
-
-**What happens when someone sorts or filters by an attribute that is not flagged, and which system attributes are flagged at seed?**
-
-Per-attribute expression indexes on `(values->>'slug')` are minted behind a filterable/sortable flag. Default-off means a fresh install mints no indexes and the first filter on `stage` is a seq scan; flagging at seed means the reconciler mints those indexes at first boot against an empty table, which is free then and is the only moment it is free.
-
-- **Offer only flagged attributes in the sort and filter menus (no silent slow path, no auto-flag); a saved view whose attribute loses its flag keeps the condition, marks it unavailable in the bar and falls back to unfiltered rather than erroring; seed `stage`, `status`, `owner` and `close_date` as filterable** — Indexes exist before there is data to index; a cleared flag degrades a saved view visibly instead of breaking it; conditions are treated as user intent and a flag as an index, which is what it is. _Reversal cost:_ Flags are booleans and indexes are mintable and droppable — cheap in every direction, which is why the seed choice is the only part that matters.
-- **Default-off everywhere** — The first filter on stage on a real workspace is a seq scan and a support question. _Reversal cost:_ Low, but the index is then minted against a populated table.
-- **Auto-flag on first use** — An index minted inside a user's click, possibly on a large table, with no warning. _Reversal cost:_ Low, but the pause is felt by the user.
-
-**Recommendation:** Option 1.  
-Flagging the four attributes the product ships opinions about costs nothing at seed and removes the only realistic first-filter-is-slow complaint; treating a cleared flag as "unavailable" rather than "invalid" is the behaviour that does not lose someone's saved view.
-
-_Carried by_ `views-1 (flags) · views-2 (evaluator honouring them)`. _Blocks_ `views-2`, `views-3`, `ai-18`.
-
-### D37-deals-board-pagination
-
-**Is the deals board permanently exempt from pagination, and what do the stage chip counts mean if it is not?**
-
-The board's stage chips count over every deal, so a page makes them lie. CONTEXT's kanban group-by entry assumed the values-jsonb index would serve the board. Whether a board ever pages per column is open, and it is the one list surface where the count is the point.
-
-- **Permanently exempt: load all deals in open stages, page nothing, and collapse closed/passed stages behind a separate `count(*)`** — Chips are always honest because nothing is hidden; the one genuinely unbounded stage is the one nobody scrolls, and it is counted rather than loaded. A fund has hundreds of open deals, not hundreds of thousands. _Reversal cost:_ Adding per-column paging later is additive.
-- **Page per column with counts from a separate count query** — Counts are right and the column reads "20 of 340", at which point it is a list with chips, not a board. _Reversal cost:_ Low.
-- **Page the board like every other list** — The chips lie, which is the one thing the board is for. _Reversal cost:_ Low technically; the trust is the cost.
-
-**Recommendation:** Option 1.  
-The board's value is the whole pipeline at a glance; the scale argument that justifies pagination elsewhere does not apply to open deals, and the stage that could grow without bound is exactly the one worth collapsing rather than paging.
-
-_Carried by_ `views-3`. _Blocks_ nothing.
 
 ### D38-retention-of-derived-layers-and-payloads
 
@@ -1505,51 +672,6 @@ Both halves are small and both address the same failure — an import that is ha
 
 _Carried by_ `the import wizard slice`. _Blocks_ nothing.
 
-### D44-suggestion-chips
-
-**May a suggestion chip on the record rail carry inline accept and reject, or is it a read-only pointer into /inbox?**
-
-The recorded decision is "chips on the record rail + a review inbox" — two surfaces. backfill-5 pins inbox-only for v1 so ai-8b's bulk accept keeps one path. DESIGN.md's Micro-interactions sheet has four proposals and none is a chip with an action, so inline accept is new visual language as well as a second write path.
-
-- **Read-only chip: "3 waiting" on the rail, opening /inbox filtered to that record** — One accept path, so refs rendering, per-row failure handling and bulk accept all live in one card. The chip still solves the real gap — the deck reader's output being invisible where someone is actually reading. _Reversal cost:_ Adding inline accept later is additive and can reuse the inbox's accept function.
-- **Inline accept on the chip** — Faster for the single-suggestion case; the Micro-interactions sheet gains a fifth proposal and ai-8b's shape changes to accommodate two entry points to one write. _Reversal cost:_ Moderate — two write paths are hard to re-merge once both have users.
-- **No chip** — The inbox is the only way to notice a suggestion, and nothing on the record says there is one. _Reversal cost:_ Low.
-
-**Recommendation:** Option 1, carried by backfill-5.  
-The chip's job is discovery, not action; giving it an action duplicates the one write path the doctrine cares most about protecting, for a saving of one click.
-
-_Carried by_ `backfill-5`. _Blocks_ `ai-8b`.
-
-### D45-space-tag-classify-vocabulary
-
-**When the model proposes space tags, what is the candidate vocabulary — the whole space tree, or a bounded slice of it?**
-
-backfill-6 pins the whole space tree as the enum, which is right at seed scale and wrong at a few hundred nodes. The cut becomes real the first time a fund models its taxonomy properly, and the obvious alternative (embedding similarity to the record) depends on vectors that a sensitive record will not have under D11.
-
-- **The record's existing space subtree(s) plus their siblings, capped at 40 nodes in ltree depth-first order** — At seed scale (≤40 spaces) this is the whole tree, so nothing changes visibly today; at a few hundred nodes the prompt stays bounded and deterministic, and it works for sensitive records with no embeddings. _Reversal cost:_ Swapping the selector is one function; tags already written are suggestions, so there is no data to migrate.
-- **The whole tree, always** — An unbounded prompt and a model picking a leaf it half-understands, exactly when the taxonomy gets interesting. _Reversal cost:_ Low.
-- **Embedding-similarity top-N now** — Better selection where vectors exist; silently degrades to nothing on a record with no embeddings — including every sensitive record under D11. _Reversal cost:_ Low.
-
-**Recommendation:** Option 1, carried by backfill-6.  
-A deterministic bound that is a no-op at today's scale is free insurance, and it does not inherit the embedding hole that the similarity approach would.
-
-_Carried by_ `backfill-6`. _Blocks_ nothing.
-
-### D46-caps-and-usage-accounting
-
-**What unit does the AI cap count, is there a second ceiling per integration, and does a cache hit appear in Usage?**
-
-Three questions about one surface. backfill-4 pins daily tokens workspace-wide because ai_usage stores tokens and prices are per-provider; sdk-16's credit cap is per integration, so a runaway researcher can spend the human's whole day of tokens before anything refuses; and backfill-8 pins a cache hit as writing no ai_usage row, which makes the Usage surface under-report activity while the run log may want the opposite.
-
-- **Daily tokens as the one unit, with two ceilings (workspace and per integration) in that unit; no bundled price table, but an optional operator-entered $/Mtok per provider in credential.meta that turns the number into a labelled estimate; a cache hit writes no ai_usage row but does open an `ai_run` with a `cached: true` step** — One unit everywhere, so sdk-16 and backfill-4 stop being two mechanisms; the box never states a price it cannot verify; Usage reports activity and provenance from the run log while spend stays exactly what was spent. No new table. _Reversal cost:_ Adding a price field is additive; changing the cap unit later is a settings migration plus every operator's mental model.
-- **Cap in currency with a bundled price table** — The operator reads the number they think in; the table rots the first time a provider changes prices, and the number becomes confidently wrong. _Reversal cost:_ High — you cannot un-tell someone a wrong dollar figure.
-- **Cap in requests** — Meaningless across a 400-token classify and a 100k-token deck read. _Reversal cost:_ Low.
-
-**Recommendation:** Option 1, carried by backfill-4 for the ceilings and ai-25a for the run-log half.  
-Tokens are the only unit the box can measure honestly, and the split between ai_usage (spend) and ai_run (activity) already exists — using it is what lets the Usage surface be complete without the spend number being inflated by cache hits.
-
-_Carried by_ `backfill-4 · ai-25a`. _Blocks_ `sdk-16`, `ai-13`, `ai-17`, `ai-18`.
-
 ### D47-plugin-rollback-entry-point
 
 **How does an operator roll back a bad plugin upgrade on a box that ships no CLI?**
@@ -1565,24 +687,9 @@ The condition that makes rollback safe — no migration ran — is already recor
 
 _Carried by_ `the plugin-upgrade slice (sdk area)`. _Blocks_ nothing.
 
-### D48-space-crumb-line
+## 4. Audit findings still open
 
-**How many terms does the space page's crumb count line carry?**
-
-backfill-10 pins contacts counted separately from sources, subspaces, companies and filed notes, which makes the line five terms long. Every one of those sections already carries its own count in its header.
-
-- **Two terms on the crumb line (sources, contacts); the rest stay on their section headers** — The line stays readable and says the two things that answer "is there anything here"; nothing is lost because the other counts are visible one scroll down. _Reversal cost:_ Copy.
-- **Five terms** — A sentence nobody reads, duplicating four numbers that appear again immediately below. _Reversal cost:_ Copy.
-- **No count line** — The space page's header stops answering whether the space has content at all. _Reversal cost:_ Copy.
-
-**Recommendation:** Option 1.  
-Duplicated counts earn their place only when the duplicate answers a question the original cannot; two of these do and three do not.
-
-_Carried by_ `backfill-10`. _Blocks_ nothing.
-
----
-
-## 4. Second audit
+From the second audit (2026-09-15), only the findings that touch a project not yet shipped. Check each against the slice body when its project is published; some may already have been folded in.
 
 ### New collisions introduced by this pass (11)
 
@@ -1594,12 +701,8 @@ _Carried by_ `backfill-10`. _Blocks_ nothing.
   **Fix:** api-6 ← views-3, and its acceptance states it returns views-3's keyset cursor verbatim rather than a page/offset or an opaque id of its own. Same edge for api-6 ← views-2 if any external filter ever lands (today api-6 correctly ships none).
 - `arrival-4` `ship-6` `mono-13a` `ship-8` — Two new areas each introduce a headless browser without seeing the other. arrival-4 (P13) snapshots DocSend/Pitch links and carries D32, 'does a headless browser ship in the default image'. ship-6 (P16) installs Playwright and a real Chromium for CI. mono-13a/ship-8 own the image contents and its size. Nobody reconciles one browser dependency across runtime and test, and the ship area's notes never mention arrival-4.  
   **Fix:** Answer D32 in ship-8 (image contents) rather than in arrival-4, and record the answer in arrival-4; if Chromium ships, ship-6 reuses the image's browser instead of installing a second one, and the 400 MB is charged once in the before/after size record mono-13a already owes.
-- `design-2` `docsurf-5` `views-1` `docsurf-12a` — The documents shelf's chrome is decided twice, one project apart. design-2's contract (P4) answers docsurf-5 with '/portfolio pattern, hand-declared columns, useTablePrefs, no ViewBar'; docsurf-12a (P9) then replaces useTablePrefs with a real saved view and a ViewBar on the same page. The design area raised exactly this as its open question #4 ('what happens when a ViewBar lands on a surface with no object row... worth deciding before docsurf-5 rather than after') and the merge did not answer it, so P8 builds a shelf P9 rebuilds.  
-  **Fix:** Answer it in views-1 (which now owns the surface discriminator) and write the answer into design-2's contract before docsurf-5 is written, so docsurf-5 either ships the ViewBar shape from the start or docsurf-12a's diff is explicitly declared as the replacement and sized for it.
 - `ship-1` `ship-3` `ship-8` `sdk-2` `mono-13a` `ship-10` — Five slices across two new areas and one old one author the compose overlay set and the README with no stated ownership. sdk-2 (P2) ships docker-compose.split.yml and 'references it from the README'. ship-1 (P1) rewrites the README, which the ship notes record is still the TanStack Start template verbatim including a section on removing Tailwind. ship-3 (P1) adds docker-compose.tls.yml against `build: .`. mono-13a (P16) re-points both compose build contexts. ship-8 (P16) pins published tags in compose. ship-10 (P16) writes install docs and its own open question asks where docs live.  
   **Fix:** Name ship-1 the owner of README structure (it already owns the wordmark), give it a named section sdk-2 appends to, and give ship-8 one criterion that re-points every overlay file by name (docker-compose.yml, .tls.yml, .split.yml) when the build context becomes an image tag.
-- `objects-3` `ai-8a` `design-2` `design-6` — The merge moved surface ownership from ai-8a to objects-3 but left the design blockers on ai-8a. objects-3 now owns /inbox, the route rename and redirect, the RENDERERS map, the row contract every later kind inherits, and Today's readout count — and has no design dependency and is afk. ai-8a, reduced to one row kind plus filter tabs, keeps ← design-2 + design-6 and stays hitl. The design rule the merge applied everywhere else (docsurf-5, ai-17, notes-2/3, docsurf-9, sdk-20b, every settings surface) is not applied to the one slice that now creates a surface.  
-  **Fix:** objects-3 ← design-2 + design-6 (the nav row and chord for /inbox are design-6's data), and relabel it hitl or explicitly declare the row-card treatment as 'same card, same rails' with no new language. ai-8a keeps design-2 only if its filter tabs are genuinely new; otherwise the HeaderTab precedent it cites makes it afk.
 - `arrival-9` `backfill-12` `sdk-7b` `arrival-8` — Two writers of `signal` on a record, and the decision that separates them (D33, is the feed poller core or a plugin) is unresolved. arrival-9 owns src/lib/arrival/match.ts as 'the only deterministic graph matcher' writing signals from feed items; backfill-12's Exa researcher produces 'five web signals on a record' through sdk-7b's signal lane. Both land in P23. If feeds are core, arrival-9 is a second signal writer beside sdk-7b's port; if they are a plugin, arrival-8's core feed/feed_item tables have no fetcher.  
   **Fix:** Answer D33 in arrival-8 before P19 (sdk-24b already depends on it), and state in arrival-9's body whether it writes signals directly or through sdk-7b's Content port, so the repo has one signal writer per actor class rather than two per row.
 - `design-5` `api-3` `backfill-4` — The settings-shell dependency list is incomplete. The dep-fix routes ai-3a, ai-4b, ai-25, sdk-20a, storage-1, storage-3b, storage-17, ai-9a, ai-13 and sdk-21b through design-5, but omits api-3 (mints a personal token from a settings surface) and backfill-4, which is literally the missing fifth section of Settings → AI (Providers · Routing · Embeddings · Usage · Caps). Two more settings surfaces get to invent their own home.  
@@ -1664,27 +767,22 @@ _Carried by_ `backfill-10`. _Blocks_ nothing.
 
 ---
 
-## 5. Scale and what to cut
+## 5. What to cut, and known defects
 
-230 slices across 23 projects, 144 of them inside the initiative that is supposed to be v1. Of the 150 surviving original slices the split is 54 hitl / 96 afk and 106 M / 42 S / 2 declared L; adding the relabels (objects-4, clean-5, ai-15, mono-13a to hitl; notes-3 to afk) and the new areas' own hitl slices puts the plan at roughly 80 human decision points and, at M ≈ 200-500 changed lines, somewhere around 70,000-90,000 changed lines across 230 gate-passing PRs. That is a backlog with an order, not a commitment. It is also demonstrably not schedulable as written: three of the projects the plan says to publish now have blockedBy edges into projects it says are not ready, 80 of the 230 slices have no body, and two of the six framed decisions that gate the first two projects (D13 published identity, D14 rename depth) are unanswered. The honest framing is that projects 1-9 — ship polish, the worker spine and workspace, provenance, the design port, custom objects and the inbox, notes, documents into spaces, the shelf and the byte lanes, and views — are about 81 slices and a real commitment; everything from project 17 onward (70 slices of plugin SDK, Apollo, install-from-the-app, storage sources, bound data rooms, the archive, and the researcher/syncer/recorder/feed lane) is an ordered backlog whose first slice should not be scheduled until a user has asked for something in it. Two structural notes on shape: project 10 (15 slices) and project 12 (14) are above the 7-15 band's top and both mix substrate with surfaces; and the plan's own risk — five slices from three areas rewriting one 234-line CTE — is now spread across projects 7, 11 and 12 rather than serialised into one, which the views-3 note half-acknowledges by keeping its text box out of the fusion.
-
-**Cut first, in order:**
+**The audit's cut list** (advice, not decided):
 
 - Project 22 in full (storage-13 through storage-19b, 9 slices) — the plan's own summary says 'Half of this is speculative until a real user asks — treat it as a backlog with an order.' Take it at its word and stop the storage arc at project 21. That also removes storage-19a/19b, whose deliverable is a git diff --stat proving the port abstraction held: valuable as architecture validation, worthless to a user, and unbuyable at two slices before a second provider is asked for.
 - Project 23 in full (8 slices: backfill-11, backfill-12, arrival-5 through arrival-10) — every slice needs OAuth, the loader and the fakes, which is three projects of prerequisite for a calendar sync. Keep arrival-1 through arrival-4 (project 13), which need none of that and are the channel CONTEXT sequences first. Cut the rest to the backlog with arrival-8's D33 recorded so the feed tables are not built twice later.
 - ship-12 (PaaS templates) — the ship area names this itself as the one slice that could be dropped without leaving a contract unimplemented: it is a CONTEXT Hosting bullet, not a locked decision. Cut it, not ship-11.
 - import-10 and import-12 — the only two slices in project 14 gated on the SDK (import-10) or unspecified in shape (import-12, D42). The pipeline's value is projects 14 milestones 1-3; the Airtable dialect proves an abstraction nobody has asked for yet, and export should be one slice re-scoped after a user asks to leave.
-- ai-27 (judgment memory) and ai-9b (local embeddings) — both are second-order: ai-27 is an assembler mode nobody has asked for, ai-9b is a keyless alternative to a lane that already works with a pasted key. Keep ai-9a's sensitivity argument, which is what makes ai-9b additive later.
+- ~~ai-27 (judgment memory) and ai-9b (local embeddings)~~ **overtaken: ai-27 shipped as SPA-139; ai-9b kept by the owner, resequenced Ollama-first (SPA-83) with transformers.js split to SPA-161.** — both are second-order: ai-27 is an assembler mode nobody has asked for, ai-9b is a keyless alternative to a lane that already works with a pasted key. Keep ai-9a's sensitivity argument, which is what makes ai-9b additive later.
 - sdk-18 and sdk-19 (LISTEN/NOTIFY to SSE, enrich-on-create) — polish on an enrichment arc whose first real tenant (sdk-15) is still an undeclared L. A cell that resolves on refresh is acceptable until someone complains.
 - If more must go: project 19's ship-9 and backfill-13 (plugin release tags and plugin upgrade). Nothing can be released or upgraded until a plugin exists that someone outside the repo wants, and both are cheap to add the week that happens.
-- Do NOT cut: ship-1 through ship-5 (project 1), design-1 through design-10 (projects 1 and 4), views-1 through views-5 (project 9), or mono-4/mono-5 (the test database). These are the four things the first audit was right about — the box has to install, the surfaces have to be born ported, the lists have to leave the browser, and 150 unattended agent runs are unsafe against the dev database.
 
-**Verdict**
+**Known defects to fix when the owning project is published:**
 
-The merge did what merges do: it fixed the nine named duplicates and introduced a new generation of them at the seams between the seven areas that could not see each other. Structurally the graph is in better shape than the prose claims and worse shape than the readiness note admits — exactly one backward cross-project blockedBy edge exists (sdk-24b ← arrival-8), all sixteen placeholders resolve, and no slice key is referenced that was never created; but three live edges still point at deleted storage-6a (storage-6b, storage-8b, storage-18), three acceptance bodies cite it by name, and the two OAuth-split consumers (storage-2b, storage-3a) point at the half of storage-2a that no longer contains what they need. The worse class of error is the one a graph check cannot see: four dep-fixes write content into slices that cannot hold it — mono-7 (project 2) is told to move files import-1/import-8 create in project 14 and a fixture views-2 creates in project 9, and mono-9c (project 2) is told to add a queue import-6 creates in project 14, in direct contradiction of its own acceptance criterion. Of the 34 originally-missing decisions, 33 now have a carrier; audit #32 (nightly conformance against real provider sandboxes) has none, #31 (changesets) is half-covered by two tag-triggered publish jobs, and #22's two hand-back acceptance edits were dropped in transit. Beyond the 34: MIS + runway lens is absent from both the plan and backfill-14's four-item deferral register, DESIGN.md §5 has no owner, and nobody rewrites CLAUDE.md gate 5 or mono-6's grep step after design-1 abolishes them. The two non-negotiables hold on the surface and leak underneath — design is project 4 ahead of the surface-adding projects, but the one slice the merge turned into a surface owner (objects-3) is the only new surface without a design blocker, while ai-8a keeps the blockers it no longer needs; ship is project 1 and 16 rather than last, but the installable image sits outside the v1 initiative and the 'first ten, one agent at a time' list still starts at sdk-1 when mono-1 is blockedBy ship-1. My three highest-priority fixes before anything is published: (1) do not publish projects 2, 5 and 6 — all three have edges into unpublished projects 1, 3 and 4, which is the dangling-Linear-relation failure the placeholder gate was raised to prevent; publish project 1 first, which means writing ship-1..5 and design-1/design-3's bodies and answering D13 and D14. (2) Resolve the three-way match-only-resolve collision (import-5, storage-9, arrival-2) and the three-way blob-ownership collision (backfill-3, import-2, backfill-9) now, in the bodies, because both are the first-pass failure repeating one layer down. (3) Fix objects-3: it is an L labelled M, afk while owning a new surface's row contract, and it inherited the design dependencies ai-8a is still holding.
-
----
-
-## 6. Readiness (the merge's own account)
-
-Structurally this is publishable: 230 slices across 23 projects in two initiatives, every project between 7 and 15 slices, every milestone demoable, all sixteen placeholder blocker strings resolved to real keys, twenty of the twenty-nine recorded dependency corrections applied and nine dropped as already handled by the collision resolvers. The two non-negotiables hold — design lands as project 4, ahead of the ten projects that add roughly forty surfaces, and ship is split so the rename is project 1 (mono-1 is blockedBy ship-1) and the published image is project 16 rather than last. The six previously ownerless decisions now have carriers in slices that are hitl for that reason: source_ref in clean-3, the view discriminator in views-1, the filter evaluator in views-2, credential.kind in the new clean-2c, the citation grammar in ai-5, and run-vs-job_run in clean-2b. What is left is mostly writing, not deciding: 80 of the 230 slices reached me as key, title, type, size, blockedBy and demo only — every ship, design, api, arrival, views, import and backfill slice, plus clean-2c, import-11 and import-12 — so their what-prose, acceptance criteria and specRefs must be written into research/roadmap-slices-2026-09.json before those projects become Linear issues. Three gaps I could not close and am handing back: storage-11b's and storage-11c's bodies were truncated in my input (keys, seam and chain order survived, the prose did not), the same truncation cut C3's docsurf-9 body mid-sentence, and sdk-15 remains an undeclared L that the audit flags and no resolver addressed — split it at the provider-client seam before project 18 is published.
+- `storage-6a` was split into `storage-6a1` (document birth) and the server intake lane; backlog bodies in projects 20–23 still cite `storage-6a` by name — repoint them.
+- Four 2026-09-15 dep-fixes wrote content into project-2 slices that could not hold it (mono-7 moving files import-1/import-8 create; mono-9c adding a queue import-6 creates). Project 2 shipped without them, so import-1, import-6 and import-8 own those files and that queue themselves.
+- MIS and the runway lens have no slice and no deferral entry.
+- `import-11` and `import-12` have no acceptance criteria.
+- Project 15 plans `packages/core`, which already exists with code; check each mono slice against the tree.

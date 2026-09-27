@@ -5,7 +5,7 @@ grilled). Builds on CONTEXT.md decisions: BYOK vault, Vercel AI SDK +
 task→model mapping, Ollama first-class, the embeddings dimension trap, the
 suggestion/provenance doctrine, canRead, and the two-tier object model
 (`docs/spec-attribute-engine.md`). Competitive grounding:
-`docs/survey-attio-attribute-model.md` (their AI sees attribute values only),
+the 2026-09 Attio survey (their AI sees attribute values only; removed 2026-09-25, in git history),
 folk's assistants (interaction-fed, push-triggered — we take the context
 idea, reject the push).
 

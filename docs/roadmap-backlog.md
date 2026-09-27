@@ -604,7 +604,7 @@ Three recorded decisions have no written home and all three are standing debt. R
 - [ ] The MASTER_KEY sentence appears in bold in install, upgrade and backup sections, identically worded: lose ./data/secret.key and every stored credential is unrecoverable
 - [ ] The ownership paragraph matches ship-2's behaviour — the entrypoint repairs ./data; the chown line is documented only for containers pinned to a non-root user
 - [ ] Every command in both documents was executed against a clean box by a human, and the PR says so; no untested command appears
-- [ ] docs/CODEBASE.md and docs/tour/* hosting lines are re-pointed at these documents instead of repeating them
+- [ ] docs/CODEBASE.md hosting lines are re-pointed at these documents instead of repeating them
 - [ ] Explicitly out of scope and named as such: the comparison page, the PaaS templates, and the marketing site
 - [ ] Full gate pass: tsc, vitest green, lint zero, prettier
 

@@ -17,7 +17,6 @@ docs/
   adr/                  formal ADRs (e.g. 0001 deals-are-an-object)
   survey-*.md           prior-art studies (Twenty sync; Attio attribute model)
   spec-*.md             buildable specs (attribute engine / custom objects; AI substrate)
-  tour/                 file-by-file walkthrough (deeper than this map)
   CODEBASE.md           this file
 pnpm-workspace.yaml     the workspace: apps/* + packages/* (SPA-101, 2026-09-19)
 eslint.config.js        one lint vocabulary for every package

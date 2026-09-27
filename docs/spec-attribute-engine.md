@@ -1,7 +1,7 @@
 # Spec: the attribute engine (custom-attribute layer)
 
 Consolidates the CONTEXT.md "Attribute engine" decisions with the Attio study
-(`survey-attio-attribute-model.md`, API + UI + lifecycle probes, 2026-09).
+(a survey of Attio's API, UI and lifecycle, 2026-09; removed 2026-09-25, in git history).
 This is the buildable spec: what exists, what the study changes, exact dialog
 and lifecycle contracts.
 

@@ -1,6 +1,6 @@
 # Decision ledger — the 2026-09 architecture week
 
-_Forty-eight decisions surfaced by the reconciliation pass of 2026-09-15 and closed on 2026-09-16/18. Every one is carried by a slice that is `hitl` precisely because of it; the answer belongs in that slice's body before it is picked up. Options, consequences and reversal costs for each are in `research/roadmap-reconciled-2026-09-15.json` under `.decisions`._
+_Forty-eight decisions surfaced by the reconciliation pass of 2026-09-15 and closed on 2026-09-16/18. Every one is carried by a slice that is `hitl` precisely because of it; the answer belongs in that slice's body before it is picked up. Options, consequences and reversal costs are in §3 of `docs/roadmap-2026-09.md` for the decisions whose carrying slice has not shipped; the rest are in that file's git history (trimmed 2026-09-27)._
 
 **All forty-eight are closed.** Ten were the owner's and were answered directly. Thirty-eight were engineering calls ratified as recommended, on the standing rule that the recommendation was in every case the reversible option and the carrying slice is `hitl`, so the judgement is met again in the code rather than lost.
 

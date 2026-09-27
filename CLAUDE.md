@@ -13,9 +13,9 @@ block before designing anything); synthesis in `docs/ARCHITECTURE.md`; ADRs in
   milestones and real blocking relations. An issue body is the spec; do not
   re-derive it. Two saved views are the whole workflow: **grabbable now**
   (`afk`, no open blockers) and **needs me** (`hitl`).
-- `docs/roadmap-2026-09.md` — all 23 projects, their order and why, the
-  milestones, and the audit findings. Structure only for 1–13, since Linear
-  holds those bodies.
+- `docs/roadmap-2026-09.md` — all 23 projects and their order (1–12 as a
+  shipped list), the milestones of 13–23, the decisions still ahead with
+  their options, open audit findings and the audit's cut list.
 - `docs/roadmap-backlog.md` — the 98 slices of projects 14–23, in full. Not in
   Linear on purpose: publish a project when you reach it, not before.
 - `docs/decisions-2026-09.md` — the 48 decisions, all closed. A slice labelled
@@ -245,6 +245,24 @@ anyway. Don't re-litigate it from the flag list.
 
 - One-line commit messages, no co-author trailer.
 - Never push unless explicitly asked.
+
+## Cloud sessions (Claude Code on the web)
+
+A cloud session sees this repo and nothing from `~/.claude` — no memory, no
+user-scoped MCP servers. `.claude/settings.json` runs
+`scripts/cloud-session-start.sh` on every start: Postgres with pgvector ≥ 0.8
+(the `pgvector/pgvector:pg17` image if Docker answers, else the preinstalled
+Postgres 16), then `pnpm install`. It exits at once outside the cloud. The
+environment sets `DATABASE_URL=postgresql://spaces:spaces@localhost:5432/spaces`
+and nothing else, exactly like CI.
+
+- One session implements one SPA issue: read its Linear body as the spec, run
+  all five gates, commit on a branch named for the issue, push it, open a PR.
+  Never commit to `main`; the owner merges.
+- **`migration`-labelled issues run one at a time across every session**, for
+  the journal reason above. Dispatch the next only after the last one merged.
+- A session that needs a `hitl` decision stops and says so in its PR or on the
+  issue; it does not guess.
 
 ## Traps (each of these has already cost a session)
 
