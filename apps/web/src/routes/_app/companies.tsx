@@ -61,6 +61,7 @@ import { jsonRecord } from '#/lib/json'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import {
   countOpenInbox,
+  countViews,
   createCompany,
   getSession,
   listCompaniesTable,
@@ -88,9 +89,20 @@ export const Route = createFileRoute('/_app/companies')({
     const view = viewData.views.find((v) => v.id === deps.view) ?? null
     const conditions = view?.filter ?? []
     const sort = view?.sort ?? null
-    const initial = await listCompaniesTable({
-      data: { conditions, sort, limit: RECORD_PAGE_SIZE, cursor: null },
-    })
+    // Every chip's count rides the same load (SPA-162), so the bar paints
+    // with its numbers — the inactive views' included — beside page one.
+    const [initial, counts] = await Promise.all([
+      listCompaniesTable({
+        data: { conditions, sort, limit: RECORD_PAGE_SIZE, cursor: null },
+      }),
+      countViews({
+        data: {
+          surface: 'object',
+          kind: 'company',
+          viewIds: viewData.views.map((v) => v.id),
+        },
+      }),
+    ])
     return {
       conditions,
       sort,
@@ -99,6 +111,7 @@ export const Route = createFileRoute('/_app/companies')({
       // The banner speaks for one lane of the queue, not the whole of it.
       openDuplicates: dupes.byKind.duplicate_candidate,
       views: viewData.views,
+      counts,
       objectId: viewData.objectId,
       me: session?.user ?? null,
     }
@@ -120,6 +133,7 @@ function CompaniesPage() {
     registry,
     openDuplicates,
     views,
+    counts,
     objectId,
     me,
   } = Route.useLoaderData()
@@ -380,6 +394,7 @@ function CompaniesPage() {
                 objectId={objectId}
                 registry={registry}
                 views={views}
+                counts={counts}
                 activeId={activeId ?? null}
                 snapshot={vs.snapshot}
                 onApply={(v) => {

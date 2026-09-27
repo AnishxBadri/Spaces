@@ -1,10 +1,11 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, ilike, inArray, isNull, sql } from 'drizzle-orm'
+import { and, eq, ilike, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute, entity, entitySpace, link } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { compileConditions } from './sql'
 import { entityValuesResolver } from './resolve'
+import { listScope } from './scope'
 import {
   afterCursor,
   clampLimit,
@@ -96,9 +97,7 @@ export const listRecordsProgram = Effect.fn('listRecordsProgram')(function* (
   // the count would make the foot read "12 of 20,000" while twelve is the
   // whole truth — the box narrows, so it narrows the count too.
   const matching = and(
-    eq(entity.objectId, objectId),
-    eq(entity.kind, 'custom'),
-    isNull(entity.mergedIntoId),
+    listScope({ kind: 'custom', objectId }),
     filter,
     q ? ilike(entity.canonicalName, likeArg(q)) : undefined,
   )

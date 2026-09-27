@@ -77,6 +77,8 @@ type DealTableRow = {
  */
 export const listDealsTable = createServerFn().handler(async () => {
   await requireUser()
+  // The same set the view chips count over (SPA-162, `views/scope.ts`).
+  const { listScope } = await import('../views/scope')
   const rows = await db
     .select({
       id: entity.id,
@@ -85,7 +87,7 @@ export const listDealsTable = createServerFn().handler(async () => {
       createdAt: entity.createdAt,
     })
     .from(entity)
-    .where(and(eq(entity.kind, 'deal'), isNull(entity.mergedIntoId)))
+    .where(listScope({ kind: 'deal' }))
     .orderBy(desc(entity.createdAt))
 
   if (rows.length === 0) {

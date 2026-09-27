@@ -3,18 +3,17 @@ import { and, eq, exists, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   attribute,
-  company,
   entity,
   entityAlias,
   entitySpace,
   interaction,
   interactionEntity,
   link,
-  person,
 } from '@spaces/db/schema'
 import { objectIdForKind } from '../attributes/objects'
 import { compileConditions } from './sql'
 import { entityValuesResolver } from './resolve'
+import { listScope } from './scope'
 import {
   afterCursor,
   clampLimit,
@@ -165,12 +164,12 @@ async function spacesFor(
  * compile the conditions and the sort against it, then cut one keyset page
  * and count the whole matching set beside it.
  *
- * `extra` is the surface's own `where` — the subtype join guard and the kind
- * — and `search` is how its text box narrows. Everything else is the pager.
+ * The surface's own `where` — the subtype guard, the kind, not merged — is
+ * `listScope(kind)`, shared with the view chips' counts (SPA-162); `search`
+ * is how its text box narrows. Everything else is the pager.
  */
 const pageOfKind = Effect.fn('pageOfKind')(function* (
   kind: 'company' | 'person',
-  extra: SQL | undefined,
   search: (q: string) => SQL | undefined,
   conditions: Array<Condition>,
   options: ListPageOptions,
@@ -196,8 +195,7 @@ const pageOfKind = Effect.fn('pageOfKind')(function* (
   // narrows the count too — "12 of 20,000" when twelve is the whole truth is
   // two lies in one line.
   const matching = and(
-    extra,
-    isNull(entity.mergedIntoId),
+    listScope({ kind }),
     compileConditions(conditions, resolve),
     q ? search(q) : undefined,
   )
@@ -239,17 +237,6 @@ export const listCompaniesPageProgram = Effect.fn('listCompaniesPageProgram')(
   function* (conditions: Array<Condition>, options: ListPageOptions = {}) {
     const page = yield* pageOfKind(
       'company',
-      // The subtype row is the guard the old `innerJoin company` was; as an
-      // `exists` it cannot multiply a row, and the pager owns the `from`.
-      and(
-        eq(entity.kind, 'company'),
-        exists(
-          db
-            .select({ one: sql`1` })
-            .from(company)
-            .where(eq(company.entityId, entity.id)),
-        ),
-      ),
       (q) => nameOrAlias('domain', q),
       conditions,
       options,
@@ -307,14 +294,6 @@ export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
   function* (conditions: Array<Condition>, options: ListPageOptions = {}) {
     const page = yield* pageOfKind(
       'person',
-      // `/people` filtered on the subtype row alone, never on `entity.kind`;
-      // that is preserved rather than tightened here.
-      exists(
-        db
-          .select({ one: sql`1` })
-          .from(person)
-          .where(eq(person.entityId, entity.id)),
-      ),
       (q) => nameOrAlias('email', q),
       conditions,
       options,

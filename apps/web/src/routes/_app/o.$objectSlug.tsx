@@ -58,6 +58,7 @@ import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import {
+  countViews,
   createObjectRecord,
   getObject,
   getSession,
@@ -95,15 +96,26 @@ export const Route = createFileRoute('/_app/o/$objectSlug')({
     const view = viewData.views.find((v) => v.id === deps.view) ?? null
     const conditions = view?.filter ?? []
     const sort = view?.sort ?? null
-    const initial = await listObjectRecords({
-      data: {
-        objectId: object.id,
-        conditions,
-        sort,
-        limit: RECORD_PAGE_SIZE,
-        cursor: null,
-      },
-    })
+    // Every chip's count rides the same load (SPA-162), so the bar paints
+    // with its numbers — the inactive views' included — beside page one.
+    const [initial, counts] = await Promise.all([
+      listObjectRecords({
+        data: {
+          objectId: object.id,
+          conditions,
+          sort,
+          limit: RECORD_PAGE_SIZE,
+          cursor: null,
+        },
+      }),
+      countViews({
+        data: {
+          surface: 'object',
+          objectId: object.id,
+          viewIds: viewData.views.map((v) => v.id),
+        },
+      }),
+    ])
     return {
       object,
       registry,
@@ -111,6 +123,7 @@ export const Route = createFileRoute('/_app/o/$objectSlug')({
       sort,
       initial,
       views: viewData.views,
+      counts,
       me: session?.user ?? null,
     }
   },
@@ -128,6 +141,7 @@ function ObjectListPage() {
     sort: loaderSort,
     initial,
     views,
+    counts,
     me,
   } = Route.useLoaderData()
   const router = useRouter()
@@ -393,6 +407,7 @@ function ObjectListPage() {
                 objectId={object.id}
                 registry={registry}
                 views={views}
+                counts={counts}
                 activeId={activeId ?? null}
                 snapshot={vs.snapshot}
                 onApply={(v) => {

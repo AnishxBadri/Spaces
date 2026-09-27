@@ -1,5 +1,6 @@
 import { Check, Filter, Plus, Save, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ValueEditor } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
@@ -21,7 +22,7 @@ import {
   PopoverTrigger,
 } from '#/components/ui/popover'
 import { Select } from '#/components/ui/select'
-import { deleteView, saveView } from '#/lib/server-fns'
+import { countViews, deleteView, saveView } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 import {
   OP_LABELS,
@@ -38,6 +39,7 @@ import type {
 } from '@spaces/core/views/filter'
 import { viewTarget } from '#/lib/views/target'
 import type { ViewRow, ViewSort } from '#/lib/views/store'
+import type { ViewCount } from '#/lib/views/counts'
 
 /**
  * Views on a list page (SPA-14): chips for the saved views, a Filter
@@ -59,6 +61,7 @@ export function ViewBar({
   registry,
   filterUnavailable,
   views,
+  counts,
   activeId,
   snapshot,
   onApply,
@@ -86,6 +89,15 @@ export function ViewBar({
    */
   filterUnavailable?: string
   views: Array<ViewRow>
+  /**
+   * Each saved view's record count, from `countViews` in the page's loader
+   * (SPA-162) — SQL through `compileConditions`, so every chip has its
+   * number on first paint, the inactive ones included. Omitted on
+   * /documents, which is the one surface that is not counted: its registry
+   * is synthetic (docsurf-12b) and its conditions do not compile to SQL — see
+   * `countViews` in `lib/server/views.ts`.
+   */
+  counts?: Record<string, ViewCount>
   /** the view the page is currently showing, from `?view=` */
   activeId: string | null
   /** the page's current filter/sort/columns/extra */
@@ -111,6 +123,40 @@ export function ViewBar({
       snapshot,
     )
   const [saving, setSaving] = useState<'new' | 'rename' | null>(null)
+
+  /**
+   * The active chip moves with the table: while its conditions differ from
+   * the saved ones, the page's current filter is counted through the same
+   * server fn, keyed on the conditions the way the table's own query is.
+   * Sort and column edits make the view dirty but cannot change its count,
+   * so they ask nothing. `keepPreviousData` holds the last number while the
+   * next is in flight rather than blanking the slot.
+   */
+  const live =
+    active !== null &&
+    objectId !== null &&
+    counts !== undefined &&
+    !sameJson(active.filter, snapshot.filter)
+      ? { objectId, viewId: active.id, filter: snapshot.filter }
+      : null
+  const liveCount = useQuery({
+    queryKey: ['view-count-live', live],
+    queryFn: (): Promise<Record<string, ViewCount>> =>
+      live
+        ? countViews({
+            data: {
+              surface: 'object',
+              objectId: live.objectId,
+              viewIds: [live.viewId],
+              live: { viewId: live.viewId, filter: live.filter },
+            },
+          })
+        : Promise.resolve({}),
+    enabled: live !== null,
+    placeholderData: keepPreviousData,
+  })
+  const countOf = (id: string): ViewCount | undefined =>
+    (live?.viewId === id ? liveCount.data?.[id] : undefined) ?? counts?.[id]
 
   async function persist(target: {
     id?: string
@@ -140,6 +186,7 @@ export function ViewBar({
           shared={v.visibility === 'shared'}
           onClick={() => onApply(v)}
           label={v.name}
+          count={countOf(v.id)}
         />
       ))}
 
@@ -248,14 +295,24 @@ function ViewChip({
   dirty,
   shared,
   label,
+  count,
   onClick,
 }: {
   active: boolean
   dirty?: boolean
   shared?: boolean
   label: string
+  /** undefined: this surface is not counted, so the chip prints no slot */
+  count?: ViewCount | undefined
   onClick: () => void
 }) {
+  // A view the compiler cannot express prints no number — never one from a
+  // partial `where` — and says why on hover, on the whole chip.
+  const notes = [
+    shared ? 'Shared view' : null,
+    count?.count === null ? count.reason : null,
+  ].filter((t) => t !== null)
+  const title = notes.length > 0 ? notes.join(' · ') : undefined
   return (
     <button
       type="button"
@@ -267,9 +324,16 @@ function ViewChip({
           ? 'border-primary text-foreground'
           : 'border-transparent text-graphite hover:text-foreground',
       )}
-      title={shared ? 'Shared view' : undefined}
+      title={title}
     >
       {label}
+      {count === undefined ? null : count.count === null ? (
+        <span aria-label={count.reason} className="text-graphite">
+          –
+        </span>
+      ) : (
+        <span className="tabular text-graphite">{count.count}</span>
+      )}
       {dirty ? (
         <span aria-label="unsaved changes" className="size-1.5 bg-primary" />
       ) : null}

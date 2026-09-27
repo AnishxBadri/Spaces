@@ -47,6 +47,7 @@ import {
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import {
+  countViews,
   createDeal,
   dealFunnelStats,
   getSession,
@@ -88,11 +89,23 @@ export const Route = createFileRoute('/_app/deals')({
       listViews({ data: { surface: 'object', kind: 'deal' } }),
       getSession(),
     ])
+    // Every chip's count (SPA-162): the view's conditions, in SQL, over the
+    // same set `listDealsTable` loads. The group/stage chips a view keeps in
+    // `extra` are this board's own narrowing and are not a view condition,
+    // so the chip counts what the view's filter holds, as on every list.
+    const counts = await countViews({
+      data: {
+        surface: 'object',
+        kind: 'deal',
+        viewIds: viewData.views.map((v) => v.id),
+      },
+    })
     return {
       deals,
       registry,
       funnel,
       views: viewData.views,
+      counts,
       objectId: viewData.objectId,
       me: session?.user ?? null,
     }
@@ -161,7 +174,15 @@ function sortValue(
 }
 
 function DealsPage() {
-  const { deals, registry, funnel, views, objectId, me } = Route.useLoaderData()
+  const {
+    deals,
+    registry,
+    funnel,
+    views,
+    counts: viewCounts,
+    objectId,
+    me,
+  } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
@@ -392,6 +413,7 @@ function DealsPage() {
                 objectId={objectId}
                 registry={registry}
                 views={views}
+                counts={viewCounts}
                 activeId={activeId ?? null}
                 snapshot={vs.snapshot}
                 onApply={(v) => {

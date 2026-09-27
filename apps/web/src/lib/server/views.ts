@@ -9,6 +9,7 @@ import {
   surfaceKey,
 } from '../views/target'
 import type { SurfaceKey, ViewTarget } from '../views/target'
+import type { ViewCount } from '../views/counts'
 import { requireUser } from './shared'
 
 const condition = z.object({
@@ -109,5 +110,50 @@ export const deleteView = createServerFn({ method: 'POST' })
     return effectFn(deleteViewProgram)(
       { id: data.id, surface: data.surface },
       { id: u.id, isAdmin: u.role === 'admin' },
+    )
+  })
+
+/**
+ * The view chips' counts (SPA-162): one call per page for every chip on the
+ * bar. `live` carries the conditions the page is showing for its active view
+ * when they differ from the saved ones, so that chip moves with the table.
+ *
+ * **Object surfaces only.** `/documents` is excluded by this validator, not
+ * by an oversight: its registry is synthetic (docsurf-12b,
+ * `lib/documents/registry.ts`) — its fields are columns and edges projected
+ * in the browser, there is no `entity.values` for `entityValuesResolver` to
+ * read, and its conditions do not compile through `compileConditions`
+ * today. Counting it would take a column-backed `FieldResolver` for the
+ * shelf, which is a surface resolver of its own, not a count.
+ */
+export const countViews = createServerFn()
+  .validator(
+    z.discriminatedUnion('surface', [
+      z
+        .object({
+          ...objectKeyFields,
+          viewIds: z.array(z.string().uuid()).max(100),
+          live: z
+            .object({
+              viewId: z.string().uuid(),
+              filter: z.array(condition).max(20),
+            })
+            .optional(),
+        })
+        .refine(exactlyOneObjectRef, exactlyOneObjectRefMessage),
+    ]),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { countViewsProgram } = await import('../views/counts')
+    const { effectFn } = await import('./effect')
+    const target = await resolveTarget(data)
+    const none: Record<string, ViewCount> = {}
+    if (target.surface !== 'object') return none
+    return effectFn(countViewsProgram)(
+      target.objectId,
+      data.viewIds,
+      u.id,
+      data.live,
     )
   })

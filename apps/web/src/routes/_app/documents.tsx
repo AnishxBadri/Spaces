@@ -587,6 +587,17 @@ function DocumentsPage() {
                 objectId={objectId}
                 registry={registry}
                 views={views}
+                /*
+                  No `counts` here, deliberately (SPA-162): this shelf is the
+                  one surface whose chips carry no number. Its registry is
+                  synthetic (docsurf-12b, `lib/documents/registry.ts`) — the
+                  fields are columns and edges projected in the browser, with
+                  no `entity.values` behind them — so its conditions do not
+                  compile through `compileConditions`, and a count from any
+                  other evaluator would be the second filter semantics the
+                  chip counts refuse. Counting it takes a column-backed
+                  `FieldResolver` for the shelf first.
+                */
                 activeId={activeId ?? null}
                 /*
                   `filed` is read off the URL rather than out of the hook's
