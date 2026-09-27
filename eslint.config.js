@@ -124,7 +124,23 @@ export default [
             {
               name: 'effect',
               message:
-                'Effect never crosses into React — the seam is effectFn() / oRPC handlers (CONTEXT.md "Backend paradigm").',
+                'Effect never crosses into React — the seam is effectFn() / HttpApi handlers (CONTEXT.md "Backend paradigm").',
+            },
+            {
+              name: 'effect/unstable/httpapi',
+              message:
+                'The HttpApi layer lives in apps/web/src/lib/rpc/api.ts and nowhere else — a route mounts it by dynamic import inside its server handler (see routes/api/v1/$.ts).',
+            },
+          ],
+          // Every other `effect/*` subpath too: a `paths` entry matches its
+          // specifier exactly, and `effect/unstable/http` is as much Effect as
+          // `effect` is. httpapi is left out of the regex only so it reports
+          // once, with its own message.
+          patterns: [
+            {
+              regex: '^effect/(?!unstable/httpapi$)',
+              message:
+                'Effect never crosses into React — the seam is effectFn() / HttpApi handlers (CONTEXT.md "Backend paradigm").',
             },
           ],
         },

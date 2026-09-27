@@ -49,6 +49,7 @@ import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spa
 import { Route as AppTermsTermIdRouteImport } from './routes/_app/terms.$termId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
+import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
 import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings_.objects.$objectSlug'
 
@@ -251,6 +252,11 @@ const ApiBlobKeyRoute = ApiBlobKeyRouteImport.update({
   path: '/api/blob/$key',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
+  id: '/api/v1/$',
+  path: '/api/v1/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppOObjectSlugRecordIdRoute = AppOObjectSlugRecordIdRouteImport.update({
   id: '/o_/$objectSlug/$recordId',
   path: '/o/$objectSlug/$recordId',
@@ -302,6 +308,7 @@ export interface FileRoutesByFullPath {
   '/terms/$termId': typeof AppTermsTermIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
@@ -344,6 +351,7 @@ export interface FileRoutesByTo {
   '/terms/$termId': typeof AppTermsTermIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/settings': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
@@ -389,6 +397,7 @@ export interface FileRoutesById {
   '/_app/terms/$termId': typeof AppTermsTermIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/api/v1/$': typeof ApiV1SplatRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/_app/settings_/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
@@ -434,6 +443,7 @@ export interface FileRouteTypes {
     | '/terms/$termId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/api/v1/$'
     | '/settings/'
     | '/o/$objectSlug/$recordId'
     | '/settings/objects/$objectSlug'
@@ -476,6 +486,7 @@ export interface FileRouteTypes {
     | '/terms/$termId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/api/v1/$'
     | '/settings'
     | '/o/$objectSlug/$recordId'
     | '/settings/objects/$objectSlug'
@@ -520,6 +531,7 @@ export interface FileRouteTypes {
     | '/_app/terms/$termId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/api/v1/$'
     | '/_app/settings/'
     | '/_app/o_/$objectSlug/$recordId'
     | '/_app/settings_/objects/$objectSlug'
@@ -535,6 +547,7 @@ export interface RootRouteChildren {
   ApiMcpRoute: typeof ApiMcpRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBlobKeyRoute: typeof ApiBlobKeyRoute
+  ApiV1SplatRoute: typeof ApiV1SplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -819,6 +832,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBlobKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/$': {
+      id: '/api/v1/$'
+      path: '/api/v1/$'
+      fullPath: '/api/v1/$'
+      preLoaderRoute: typeof ApiV1SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/o_/$objectSlug/$recordId': {
       id: '/_app/o_/$objectSlug/$recordId'
       path: '/o/$objectSlug/$recordId'
@@ -930,6 +950,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMcpRoute: ApiMcpRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBlobKeyRoute: ApiBlobKeyRoute,
+  ApiV1SplatRoute: ApiV1SplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
