@@ -72,9 +72,10 @@ export type ShelfDocument = {
   /**
    * The two columns that say whether this row has a file behind it or only
    * an address (docsurf-10b). `blobSha` is null on a clipped article — the
-   * page was read, never stored — and `url` is set on exactly the clips. The
-   * shelf reads the pair to offer "Open source" where there is nothing to
-   * download, rather than a control that throws.
+   * page was read, never stored — and `url` is set on the clips and on
+   * captures (SPA-111), which keep the page's text as a blob too. The shelf
+   * reads the pair to offer "Open source" wherever there is a page, and never
+   * a download where there are no bytes.
    */
   blobSha: string | null
   url: string | null

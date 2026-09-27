@@ -11,6 +11,16 @@
 export const MAX_UPLOAD_BYTES = 250 * 1024 * 1024
 
 /**
+ * 2MB of page text: the cap on one `POST /api/v1/capture` (SPA-111). A
+ * capture is the visible text of one page posted as JSON through Node, never
+ * a presigned PUT, so it is held to a limit a page could plausibly reach —
+ * a long profile is tens of KB — and nowhere near `MAX_UPLOAD_BYTES`, which
+ * guards bytes that never pass through a request body. Counted in UTF-8
+ * bytes of `text`, checked before anything is stored.
+ */
+export const MAX_CAPTURE_BYTES = 2 * 1024 * 1024
+
+/**
  * Mirrors the document_kind enum — six, not seven. `memo` was dropped
  * 2026-09-20 (SPA-25, spec-storage-sources §11 delta 3): it collided with
  * `note.kind = 'memo'` while meaning something else. An exported memo PDF is

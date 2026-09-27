@@ -71,6 +71,13 @@ export type DocumentIntakeInput = {
   /** The bytes, still unread. Consumed exactly once. */
   stream: Readable
   filename: string
+  /**
+   * The page these bytes are the text of, for the one server-lane arrival
+   * that has one: a capture (SPA-111) stores the page's text as a blob *and*
+   * keeps its address, which birth writes to `document.url`. Every other
+   * caller omits it.
+   */
+  url?: string | null
   mime: string | null
   /**
    * What the provider said the size was, or null when it said nothing — a
@@ -209,6 +216,7 @@ const storeAndBirth = Effect.fn('documentIntake.storeAndBirth')(function* (
   return yield* birthDocumentProgram({
     blobSha: sha,
     filename: input.filename,
+    url: input.url ?? null,
     mime: input.mime,
     // What we counted, never what the provider declared.
     sizeBytes,

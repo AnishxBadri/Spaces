@@ -421,13 +421,13 @@ function DocumentsPage() {
                   className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                 />
               )}
-              {/* A clipped article, which has an address and no bytes
-                  (docsurf-10b): "Open source" is the only place to go, since
-                  there is no blob to download and the preview shows the
-                  extracted text. Never rendered beside the button above — a
-                  clip's `external_url` is null by construction
-                  (`lib/documents/clip.ts`). */}
-              {r.blobSha === null && r.url !== null ? (
+              {/* The page a row came from (docsurf-10b, SPA-111): a clipped
+                  article, which has an address and no bytes, and a capture,
+                  which has both — its text is the blob, the page is its
+                  source. Never rendered beside the button above: a clip's and
+                  a capture's `external_url` are null by construction
+                  (`lib/documents/clip.ts`, `lib/rpc/capture.ts`). */}
+              {r.url !== null ? (
                 <OpenSourceButton
                   url={r.url}
                   filename={r.filename}

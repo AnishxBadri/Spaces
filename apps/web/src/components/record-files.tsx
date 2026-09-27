@@ -424,17 +424,18 @@ function DocumentRow({
         >
           <Eye />
         </Button>
-        {/* Bytes or an address, never both (docsurf-10b). A clipped article
-            has no blob, so Download would only reach
-            `getDocumentDownloadUrl`'s throw — the row offers the page it was
-            read from instead. A blobless row with no URL either is not a
-            state the product writes, and it gets no control rather than a
-            broken one. */}
-        {doc.blobSha === null ? (
-          doc.url === null ? null : (
-            <OpenSourceButton url={doc.url} filename={doc.filename} />
-          )
-        ) : (
+        {/* The page it came from, wherever the row has one (docsurf-10b,
+            SPA-111). A clipped article has no blob, so this is its only
+            control — Download would only reach `getDocumentDownloadUrl`'s
+            throw. A capture has both: its text is a real blob and the page
+            is still its source, so it offers the two side by side. */}
+        {doc.url === null ? null : (
+          <OpenSourceButton url={doc.url} filename={doc.filename} />
+        )}
+        {/* Download only where there are bytes. A blobless row with no URL
+            either is not a state the product writes, and it gets no control
+            rather than a broken one. */}
+        {doc.blobSha === null ? null : (
           <Button
             size="icon-xs"
             variant="ghost"
@@ -824,10 +825,13 @@ function ExtractionNote({ doc }: { doc: Documents[number] }) {
   if (doc.extractionStatus === 'pending') {
     // A clip has no bytes to extract — it has a page still to be fetched, and
     // saying "extracting text…" over a URL nobody has read yet would describe
-    // a step that has not started (SPA-117).
+    // a step that has not started (SPA-117). A capture has a URL *and* its
+    // bytes (SPA-111): nothing to fetch, so it reads as any other file.
     return (
       <p className="mono text-field text-graphite">
-        {doc.url === null ? 'extracting text…' : 'fetching…'}
+        {doc.url !== null && doc.blobSha === null
+          ? 'fetching…'
+          : 'extracting text…'}
       </p>
     )
   }

@@ -30,11 +30,14 @@ import {
   HttpApiSecurity,
   OpenApi,
 } from 'effect/unstable/httpapi'
+import { MAX_CAPTURE_BYTES } from '@spaces/core/documents'
 import { listRegistryProgram } from '#/lib/mcp/tools-read'
 import { API_SCOPES } from '#/lib/tokens/scopes'
 import type { ApiScope } from '#/lib/tokens/scopes'
 import { authenticateTokenProgram } from '#/lib/tokens/store'
 import { RECORD_PAGE_MAX, RECORD_PAGE_SIZE } from '#/lib/views/page-size'
+import { captureProgram } from './capture'
+import type { CaptureInput } from './capture'
 import { getApiRecordProgram, listApiRecordsProgram } from './records'
 import { WebLayer } from './runtime'
 import { API_PREFIX, API_VERSION, CAPTURE_SCHEMA_VERSION } from './versions'
@@ -91,18 +94,27 @@ import { API_PREFIX, API_VERSION, CAPTURE_SCHEMA_VERSION } from './versions'
  * Every non-2xx answer from `/api/v1/*` has the body
  * `{ "error": { "tag": string, "message": string } }`, and never a stack.
  *
- * | What happened                                        | Status | tag             |
- * | ---------------------------------------------------- | ------ | --------------- |
- * | A handler failed with a declared failure             | its own| the failure's   |
- * | No bearer, or one that is malformed, unknown,        | 401    | `Unauthorized`  |
- * | revoked, or whose user is banned — one message, so   |        |                 |
- * | the answer never says whether the token exists       |        |                 |
- * | A live token without the procedure's scope           | 403    | `Forbidden`     |
- * | Params, query, headers or payload failed the schema  | 400    | `BadRequest`    |
- * | The request could not be read at all                 | 400    | `BadRequest`    |
- * | No procedure at that method and path                 | 404    | `NotFound`      |
- * | Our own response failed its schema                   | 500    | `InternalError` |
- * | A defect, an interrupt, anything else                | 500    | `InternalError` |
+ * | What happened                                        | Status | tag                               |
+ * | ---------------------------------------------------- | ------ | --------------------------------- |
+ * | A handler failed with a declared failure             | its own| the failure's                     |
+ * | No bearer, or one that is malformed, unknown,        | 401    | `Unauthorized`                    |
+ * | revoked, or whose user is banned — one message, so   |        |                                   |
+ * | the answer never says whether the token exists       |        |                                   |
+ * | A live token without the procedure's scope           | 403    | `Forbidden`                       |
+ * | Params, query, headers or payload failed the schema  | 400    | `BadRequest`                      |
+ * | The request could not be read at all                 | 400    | `BadRequest`                      |
+ * | No procedure at that method and path                 | 404    | `NotFound`                        |
+ * | A capture's target names no record the token's user  | 404    | `NotFound`                        |
+ * | can see, or names several                            |        |                                   |
+ * | A capture's target will not take a document (a       | 400    | `BadRequest`                      |
+ * | space, a document, a merged record) — birth's reason |        |                                   |
+ * | A capture's `text` is over `MAX_CAPTURE_BYTES`; the  | 413    | `PayloadTooLarge`                 |
+ * | limit is in the message and nothing was stored       |        |                                   |
+ * | A capture's `captureSchemaVersion` is not in         | 422    | `UnsupportedCaptureSchemaVersion` |
+ * | `ACCEPTED_CAPTURE_SCHEMA_VERSIONS`; the message says |        |                                   |
+ * | "update the extension" and names the accepted ones   |        |                                   |
+ * | Our own response failed its schema                   | 500    | `InternalError`                   |
+ * | A defect, an interrupt, anything else                | 500    | `InternalError`                   |
  *
  * A declared failure is a `Schema.TaggedError` with a `message`, carried on
  * the wire through `onTheWire` below, which is what gives it its status and
@@ -199,7 +211,29 @@ export class NotFound extends Schema.TaggedError<NotFound>()('NotFound', {
   message: Schema.String,
 }) {}
 
+/** A capture's text is over `MAX_CAPTURE_BYTES` (SPA-111). */
+export class PayloadTooLarge extends Schema.TaggedError<PayloadTooLarge>()(
+  'PayloadTooLarge',
+  { message: Schema.String },
+) {}
+
+/**
+ * A capture payload version this instance does not read (SPA-111): the
+ * extension and the instance have drifted, and the answer is "update the
+ * extension", never a schema error.
+ */
+export class UnsupportedCaptureSchemaVersion extends Schema.TaggedError<UnsupportedCaptureSchemaVersion>()(
+  'UnsupportedCaptureSchemaVersion',
+  { message: Schema.String },
+) {}
+
 const BadRequestWire = onTheWire('BadRequest', 400, BadRequest)
+const PayloadTooLargeWire = onTheWire('PayloadTooLarge', 413, PayloadTooLarge)
+const UnsupportedCaptureSchemaVersionWire = onTheWire(
+  'UnsupportedCaptureSchemaVersion',
+  422,
+  UnsupportedCaptureSchemaVersion,
+)
 const NotFoundWire = onTheWire('NotFound', 404, NotFound)
 const InternalErrorWire = onTheWire('InternalError', 500, InternalError)
 const UnauthorizedWire = onTheWire('Unauthorized', 401, Unauthorized)
@@ -376,6 +410,68 @@ const Hello = Schema.Struct({
   captureSchemaVersion: Schema.Int,
 })
 
+/** A string that is not only whitespace. */
+const NonBlank = Schema.String.check(
+  Schema.makeFilter((s: string) => s.trim().length > 0 || 'must not be blank'),
+)
+
+/** An absolute http(s) address — the page the text was read from. */
+const PageUrl = Schema.String.check(
+  Schema.makeFilter((s: string) => {
+    try {
+      const { protocol } = new URL(s)
+      return (
+        protocol === 'http:' ||
+        protocol === 'https:' ||
+        'must be an http or https URL'
+      )
+    } catch {
+      return 'must be an absolute URL'
+    }
+  }),
+).annotate({ description: 'The address of the captured page' })
+
+/** An instant, as `Date.parse` reads an ISO 8601 string. */
+const Instant = Schema.String.check(
+  Schema.makeFilter(
+    (s: string) =>
+      !Number.isNaN(Date.parse(s)) || 'must be an ISO 8601 date-time',
+  ),
+).annotate({ description: 'When the page was captured, ISO 8601' })
+
+/**
+ * The capture payload, v1 (SPA-111; CONTEXT.md integration map #8). The
+ * shape an extension, a bookmarklet or curl posts.
+ */
+const CapturePayload = Schema.Struct({
+  captureSchemaVersion: Schema.Int.annotate({
+    description:
+      'The payload version the client was built for; capture.hello answers the one this instance speaks',
+  }),
+  url: PageUrl,
+  title: NonBlank.check(Schema.isMaxLength(400)).annotate({
+    description: 'The page title; the document’s name',
+  }),
+  capturedAt: Instant,
+  text: NonBlank.annotate({
+    description: `The page’s visible text, stored as a text/plain blob; at most ${MAX_CAPTURE_BYTES} bytes of UTF-8`,
+  }),
+  target: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        'A record id, or a record’s exact name, to file the capture on; omit to leave it unfiled',
+    }),
+  ),
+})
+
+const Captured = Schema.Struct({
+  documentId: Schema.String,
+  url: Schema.String.annotate({
+    description:
+      'Where the capture shows in the app: the record it was filed on, or the unfiled inbox',
+  }),
+})
+
 class CaptureGroup extends HttpApiGroup.make('capture')
   .add(
     HttpApiEndpoint.get('hello', '/hello', {
@@ -388,6 +484,27 @@ class CaptureGroup extends HttpApiGroup.make('capture')
           'The API version (the v in /api/v1) and the capture payload schema version, so a client can tell "update me" from breakage.',
       }),
     ),
+  )
+  .add(
+    HttpApiEndpoint.post('capture', '/', {
+      payload: CapturePayload,
+      success: Captured,
+      error: [
+        ...SEAM_FAILURES,
+        NotFoundWire,
+        PayloadTooLargeWire,
+        UnsupportedCaptureSchemaVersionWire,
+      ],
+    })
+      .middleware(TokenAuth)
+      .annotate(RequiredScope, 'capture:write')
+      .annotateMerge(
+        OpenApi.annotations({
+          summary: 'Capture a page',
+          description:
+            'Files a page’s text as a document: a text/plain blob named by the title, with the page’s URL on the row, filed on the target record or left unfiled, extraction queued behind it. Re-posting the same text to the same record answers the same document. Runs as the token’s user.',
+        }),
+      ),
   )
   .prefix('/capture') {}
 
@@ -604,9 +721,42 @@ const hello = Effect.succeed({
   captureSchemaVersion: CAPTURE_SCHEMA_VERSION,
 }).pipe(Effect.withSpan('capture.hello'))
 
+/** The capture program's refusals, as the wire has them; the rest die (500). */
+const captureFailure = (
+  failure: Effect.Error<ReturnType<typeof captureProgram>>,
+): Effect.Effect<
+  never,
+  UnsupportedCaptureSchemaVersion | PayloadTooLarge | NotFound | BadRequest
+> => {
+  switch (failure._tag) {
+    case 'CaptureSchemaUnsupported':
+      return Effect.fail(
+        new UnsupportedCaptureSchemaVersion({ message: failure.message }),
+      )
+    case 'CaptureTooLarge':
+      return Effect.fail(new PayloadTooLarge({ message: failure.message }))
+    case 'CaptureTargetNotFound':
+      return Effect.fail(new NotFound({ message: failure.message }))
+    case 'CaptureTargetRefused':
+      return Effect.fail(new BadRequest({ message: failure.message }))
+    case 'CaptureFailed':
+      return Effect.die(failure)
+  }
+}
+
+/** As the token's user: they are the actor, and canRead is theirs. */
+const capture = Effect.fn('capture.capture')(function* (payload: CaptureInput) {
+  const principal = yield* Principal
+  return yield* captureProgram(principal.user, payload).pipe(
+    Effect.catch(captureFailure),
+  )
+})
+
 const CaptureHandlers = HttpApiBuilder.group(Api, 'capture', (handlers) =>
-  handlers.handle('hello', () => hello),
-)
+  handlers
+    .handle('hello', () => hello)
+    .handle('capture', ({ payload }) => capture(payload)),
+).pipe(Layer.provide(TokenAuthLive))
 
 /** The principal, as the wire has it. Nothing about the token but its grant. */
 const me = Effect.gen(function* () {
@@ -740,44 +890,3 @@ export const makeApiClient = (baseUrl: string, token?: string) =>
   )
 
 export type ApiClient = HttpApiClient.ForApi<typeof Api>
-
-// ---------------------------------------------------------------------------
-// The scope probe
-// ---------------------------------------------------------------------------
-
-/**
- * One procedure that requires `capture:write`, behind the same `TokenAuth`
- * and the same seam, and answering the principal it was handed. It is never
- * mounted — not under `/api/v1/$`, not in the OpenAPI document, and not in
- * `Api` — so it is no part of the external contract. It exists because
- * SPA-48 pins a scope refusal before any mounted procedure requires a scope:
- * the first is api-4's `/api/capture`, and when it lands its own test takes
- * this proof over and the probe goes.
- */
-class ProbeApi extends HttpApi.make('scope-probe')
-  .add(
-    HttpApiGroup.make('probe').add(
-      HttpApiEndpoint.get('captureWrite', '/probe/capture-write', {
-        success: Me,
-        error: SEAM_FAILURES,
-      })
-        .middleware(TokenAuth)
-        .annotate(RequiredScope, 'capture:write'),
-    ),
-  )
-  .prefix(API_PREFIX) {}
-
-const ProbeHandlers = HttpApiBuilder.group(ProbeApi, 'probe', (handlers) =>
-  handlers.handle('captureWrite', () => me),
-).pipe(Layer.provide(TokenAuthLive))
-
-const probe = webHandlerOf(
-  HttpApiBuilder.layer(ProbeApi).pipe(Layer.provide(ProbeHandlers)),
-)
-
-/** Where the probe answers, for the test that calls it. */
-export const SCOPE_PROBE_PATH = `${API_PREFIX}/probe/capture-write` as const
-
-/** The probe's handler: a web `Request` in, a web `Response` out. */
-export const handleScopeProbeRequest = (request: Request): Promise<Response> =>
-  probe.handler(request)

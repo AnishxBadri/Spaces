@@ -52,6 +52,15 @@ extension calls the handshake first and compares both numbers. If
 `apiVersion` differs, the API it was built for is gone. If only
 `captureSchemaVersion` differs, it should update itself.
 
+`POST /api/v1/capture` (SPA-111) holds the instance's side of that promise.
+It accepts every version in `ACCEPTED_CAPTURE_SCHEMA_VERSIONS`
+(`apps/web/src/lib/rpc/versions.ts`), which is the current version plus each
+older one the handler can still read. Any other version gets a 422
+`UnsupportedCaptureSchemaVersion` whose message says to update the extension
+and lists the accepted versions. When `CAPTURE_SCHEMA_VERSION` is bumped, add
+the new number to that list and keep the old one for as long as its shape is
+still read.
+
 ## The snapshot is the review
 
 `apps/web/src/lib/rpc/openapi.test.ts` checks that the served document is

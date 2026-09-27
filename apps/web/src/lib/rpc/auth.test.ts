@@ -2,8 +2,9 @@ import { Effect } from 'effect'
 import { eq } from 'drizzle-orm'
 import { FetchHttpClient } from 'effect/unstable/http'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, note } from '@spaces/db/schema'
+import { document, entity, note } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { apiToken } from '@spaces/db/schema/tokens'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
@@ -17,14 +18,16 @@ import {
 import type { ApiClient } from './api'
 import {
   Forbidden,
-  SCOPE_PROBE_PATH,
   UNAUTHORIZED_MESSAGE,
   Unauthorized,
   failureBody,
   handleApiRequest,
-  handleScopeProbeRequest,
   makeApiClient,
 } from './api'
+import { CAPTURE_SCHEMA_VERSION } from './versions'
+
+// A capture:write request files a document, and birth enqueues extraction.
+vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
 /**
  * SPA-48 — the personal-token store opens the HttpApi door. The same
@@ -33,11 +36,24 @@ import {
  * token without the procedure's scope, and puts the token's user in the
  * procedure's context. Everything goes through `handleApiRequest`, the
  * function the `/api/v1/$` route hands a request to — what curl sends.
+ *
+ * The scope half is proven against `POST /api/v1/capture` (SPA-111), the
+ * first mounted procedure that requires `capture:write` — it took over from
+ * the unmounted probe SPA-48 stood in its place.
  */
 
 const ORIGIN = 'http://spaces.test'
 const ME = `${ORIGIN}/api/v1/me`
-const PROBE = `${ORIGIN}${SCOPE_PROBE_PATH}`
+const CAPTURE = `${ORIGIN}/api/v1/capture`
+
+/** A well-formed capture, so only the token decides the answer. */
+const CAPTURE_BODY = JSON.stringify({
+  captureSchemaVersion: CAPTURE_SCHEMA_VERSION,
+  url: 'https://example.com/spa48',
+  title: 'SPA-48 scope proof',
+  capturedAt: '2026-09-28T00:00:00Z',
+  text: 'A page captured to prove the capture:write scope.',
+})
 
 const TEAMMATE = {
   id: 'spa48-teammate',
@@ -58,10 +74,15 @@ const bearer = (token: string): RequestInit => ({
   headers: { authorization: `Bearer ${token}` },
 })
 
-const call = (url: string, init?: RequestInit) =>
-  (url.startsWith(PROBE) ? handleScopeProbeRequest : handleApiRequest)(
-    new Request(url, init),
+/** A GET to `url`, or — for the capture door — a POST of a valid capture. */
+const call = (url: string, init?: RequestInit) => {
+  if (url !== CAPTURE) return handleApiRequest(new Request(url, init))
+  const headers = new Headers(init?.headers)
+  headers.set('content-type', 'application/json')
+  return handleApiRequest(
+    new Request(url, { method: 'POST', headers, body: CAPTURE_BODY }),
   )
+}
 
 /** The typed client over the mounted handler, carrying `token`. */
 const withClient = <TValue, TError>(
@@ -169,7 +190,7 @@ describe('401 — one answer for every way a token can fail', () => {
       failureBody('Unauthorized', UNAUTHORIZED_MESSAGE),
     )
     for (const [label, init] of cases) {
-      for (const url of [ME, PROBE]) {
+      for (const url of [ME, CAPTURE]) {
         const response = await call(url, init)
         expect(response.status, `${label} at ${url}`).toBe(401)
         expect(await response.text(), `${label} at ${url}`).toBe(expected)
@@ -198,7 +219,7 @@ describe('401 — one answer for every way a token can fail', () => {
 describe('403 — a live token without the procedure’s scope', () => {
   it('records:read is refused by a capture:write procedure', async () => {
     const created = await mint(FIXTURE_ACTOR.id, ['records:read'])
-    const response = await call(PROBE, bearer(created.token))
+    const response = await call(CAPTURE, bearer(created.token))
     expect(response.status).toBe(403)
     const body: unknown = await response.json()
     expect(body).toEqual(
@@ -212,12 +233,18 @@ describe('403 — a live token without the procedure’s scope', () => {
 
   it('capture:write is let through, as the token’s user', async () => {
     const created = await mint(TEAMMATE.id, ['capture:write'])
-    const response = await call(PROBE, bearer(created.token))
+    const response = await call(CAPTURE, bearer(created.token))
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({
-      user: { id: TEAMMATE.id },
-      scopes: ['capture:write'],
-    })
+    const { documentId } = z
+      .object({ documentId: z.string() })
+      .parse(await response.json())
+    const row = (
+      await db
+        .select({ uploadedBy: document.uploadedBy })
+        .from(document)
+        .where(eq(document.entityId, documentId))
+    ).at(0)
+    expect(row?.uploadedBy).toBe(TEAMMATE.id)
   })
 
   it('the typed client decodes a 403 back into Forbidden', async () => {
@@ -251,7 +278,7 @@ describe('last_used_at', () => {
       .update(apiToken)
       .set({ lastUsedAt: new Date('2026-01-01T00:00:00Z') })
       .where(eq(apiToken.id, created.id))
-    await call(PROBE, bearer(created.token))
+    await call(CAPTURE, bearer(created.token))
     const second = (
       await Effect.runPromise(listApiTokensProgram(TEAMMATE.id))
     ).find((t) => t.id === created.id)
@@ -305,7 +332,7 @@ describe('the raw token', () => {
       revokeApiTokenProgram({ userId: TEAMMATE.id, id: revoked.id }),
     )
     await call(ME, bearer(live.token))
-    await call(PROBE, bearer(live.token))
+    await call(CAPTURE, bearer(live.token))
     await call(ME, bearer(revoked.token))
     for (const line of lines) {
       expect(line).not.toContain(live.token)

@@ -92,10 +92,12 @@ export type DocumentBirthInput = {
   /**
    * The page this row **is**, for the one entry point that keeps no bytes:
    * §3.1's URL clip writes the article's address here and `blobSha` null
-   * (SPA-117). It is not `provenance.externalUrl` — that column is the
+   * (SPA-117). A capture (§3.1 entry 8, SPA-111) writes it too, beside a
+   * real blob: the page's text is the bytes, the page is still where they
+   * came from. It is not `provenance.externalUrl` — that column is the
    * provider's copy of a file we also hold, rendered as "Open in source"
    * (docsurf-11), and a clip has no provider and no second copy. Optional
-   * because eight of the nine entry points have no URL at all.
+   * because most entry points have no URL at all.
    */
   url?: string | null
   mime: string | null
