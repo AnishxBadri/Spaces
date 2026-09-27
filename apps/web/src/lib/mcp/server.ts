@@ -12,6 +12,7 @@ import type { TokenUser } from '#/lib/tokens/store'
 import { getRecordProgram, resolveEntityRefProgram } from './tools'
 import { jsonValue } from '#/lib/json'
 import { proposeSuggestionProgram } from './tools-propose'
+import { listRegistryProgram, searchRecordsProgram } from './tools-read'
 
 /**
  * The MCP server (SPA-23, `docs/spec-ai-substrate.md` §5): the four
@@ -166,6 +167,49 @@ export function buildMcpServer(reader: TokenUser): McpServer {
           },
         ),
       ),
+  )
+
+  // ---- SPA-28: search_records and list_registry (`./tools-read.ts`) ----
+  server.registerTool(
+    'search_records',
+    {
+      title: 'Search records',
+      description:
+        'Search Spaces the way its Cmd-K box does — record names and aliases (typo-tolerant), note bodies, document text, tasks, and meaning when an embedding model is configured — fused into one ranked list of at most 20 hits. Each hit carries its id (pass it to get_record or get_context), kind, name, object, and a snippet marked «like this». Pass `object` to keep only one object’s records.',
+      inputSchema: {
+        query: z.string().min(1).max(200).describe('What to look for'),
+        object: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            'An object’s slug, singular or plural name (see list_registry); only its records are returned',
+          ),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ query, object }) =>
+      answer(searchRecordsProgram(me, { query, object })),
+  )
+
+  server.registerTool(
+    'list_registry',
+    {
+      title: 'Object registry',
+      description:
+        'The workspace’s object registry: every object (Companies, People, Deals and any custom object), each with its attributes in order — slug, name, description, type, the object a reference points at, and per-type options such as select and status choices. Always current: an object or attribute created a moment ago is listed.',
+      inputSchema: {
+        object: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            'Just this object — its slug, singular or plural name; omit for all',
+          ),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ object }) => answer(listRegistryProgram({ object })),
   )
 
   return server

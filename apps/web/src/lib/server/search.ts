@@ -50,12 +50,8 @@ export const searchAll = createServerFn()
     z.object({ q: z.string().max(200), semantic: z.boolean().optional() }),
   )
   .handler(async ({ data }) => {
-    const u = await requireUser()
-    const { searchAllProgram } = await import('#/lib/search/query')
-    const { effectFn } = await import('./effect')
-    return effectFn(searchAllProgram)({
-      userId: u.id,
-      q: data.q,
-      semantic: data.semantic === true,
-    })
+    // The body lives outside `lib/server/` so a test can call it (SPA-28:
+    // the MCP `search_records` tool is pinned to answer exactly this).
+    const { searchAllHandler } = await import('#/lib/search/search-all-handler')
+    return searchAllHandler(data)
   })

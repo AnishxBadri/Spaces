@@ -20,6 +20,11 @@ import {
   revokeApiTokenProgram,
 } from '#/lib/tokens/store'
 import { handleMcpRequest } from './server'
+import { searchAllHandler } from '#/lib/search/search-all-handler'
+import { setMemberBannedHandler } from '#/lib/members/suspend'
+import { createObjectProgram } from '#/lib/attributes/object-registry'
+import { createAttributeProgram } from '#/lib/attributes/create'
+import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
 
 /**
  * SPA-23 — the MCP read surface, end to end: a real MCP client speaks
@@ -299,7 +304,9 @@ describe('an MCP client with a per-user token', () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       'get_context',
       'get_record',
+      'list_registry', // SPA-28
       'propose_suggestion', // SPA-31
+      'search_records', // SPA-28
     ])
     const ctx = tools.find((t) => t.name === 'get_context')
     expect(Object.keys(ctx?.inputSchema.properties ?? {}).sort()).toEqual([
@@ -452,5 +459,300 @@ describe('an MCP client with a per-user token', () => {
         entity: expect.objectContaining({ id: fixture.sharedNoteId }),
       }),
     )
+  })
+})
+
+/**
+ * SPA-28 — the other two read tools. `search_records` is Cmd-K's search run
+ * as the token's user, compared against the palette's own request half
+ * (`searchAllHandler`, the `searchAll` server fn's body) under a stubbed
+ * session; `list_registry` reads the registry on every call, so an object
+ * made after the client connected is in the next answer.
+ */
+describe('SPA-28: search_records and list_registry', () => {
+  const SUSPENDED = {
+    id: 'spa28-suspended',
+    name: 'Leaving Member',
+    email: 'spa28-suspended@spaces.test',
+  }
+  const COOLING = 'Submersa Immersion Cooling'
+
+  const HitsShape = z.array(
+    z.object({
+      id: z.string(),
+      kind: z.string(),
+      name: z.string(),
+      objectSlug: z.string().nullable(),
+      matchedIn: z.string(),
+      rowKind: z.enum(['entity', 'task']),
+    }),
+  )
+  const RegistryShape = z.array(
+    z.object({
+      slug: z.string(),
+      singular: z.string(),
+      isSystem: z.boolean(),
+      attributes: z.array(
+        z.object({
+          slug: z.string(),
+          name: z.string(),
+          type: z.string(),
+          target: z.string().nullable(),
+          options: z.object({
+            options: z.array(z.object({ label: z.string() })).optional(),
+          }),
+        }),
+      ),
+    }),
+  )
+
+  const call = async (
+    client: Client,
+    name: string,
+    args: Record<string, string>,
+  ): Promise<unknown> =>
+    JSON.parse(textOf(await client.callTool({ name, arguments: args })))
+
+  beforeAll(async () => {
+    await db.insert(user).values(SUSPENDED)
+    await resolveEntity({
+      kind: 'company',
+      name: COOLING,
+      keys: { domain: 'submersa.example' },
+      source: { class: 'manual' },
+    })
+  })
+
+  it('lists both tools beside the SPA-23 two, with their input schemas', async () => {
+    const client = await connect((await mint(FIXTURE_ACTOR.id, 'l28')).token)
+    const { tools } = await client.listTools()
+    await client.close()
+    expect(tools.map((t) => t.name)).toEqual(
+      expect.arrayContaining([
+        'get_context',
+        'get_record',
+        'search_records',
+        'list_registry',
+      ]),
+    )
+    const search = tools.find((t) => t.name === 'search_records')
+    expect(Object.keys(search?.inputSchema.properties ?? {}).sort()).toEqual([
+      'object',
+      'query',
+    ])
+    expect(search?.inputSchema.required).toEqual(['query'])
+    const registry = tools.find((t) => t.name === 'list_registry')
+    expect(Object.keys(registry?.inputSchema.properties ?? {})).toEqual([
+      'object',
+    ])
+    expect(registry?.inputSchema.required ?? []).toEqual([])
+  })
+
+  it('search_records answers exactly what Cmd-K answers the same user, lexical lanes with no embedding pin', async () => {
+    // No pin: the semantic lane cannot join, and the tool is still there.
+    expect(await Effect.runPromise(readEmbeddingPinProgram())).toBeNull()
+
+    for (const who of [FIXTURE_ACTOR.id, TEAMMATE.id]) {
+      const client = await connect((await mint(who, `search ${who}`)).token)
+      session.current = { id: who, role: 'member' }
+      for (const q of ['immersion cooling', 'orbital', 'Private doubts']) {
+        const res = await client.callTool({
+          name: 'search_records',
+          arguments: { query: q },
+        })
+        expect(res.isError).not.toBe(true)
+        // The palette's settled answer is its second wave; with no pin both
+        // waves are the same lexical statement.
+        const palette = await searchAllHandler({ q, semantic: true })
+        expect(textOf(res)).toBe(JSON.stringify(palette))
+        expect(palette).toEqual(await searchAllHandler({ q }))
+      }
+      await client.close()
+    }
+
+    // …and the hits are real: the company by a word of its name.
+    const client = await connect((await mint(FIXTURE_ACTOR.id, 's')).token)
+    const hits = z.parse(
+      HitsShape,
+      await call(client, 'search_records', { query: 'immersion cooling' }),
+    )
+    await client.close()
+    expect(hits.at(0)).toMatchObject({
+      name: COOLING,
+      kind: 'company',
+      objectSlug: 'companies',
+      matchedIn: 'name',
+    })
+    expect(hits.every((h) => h.matchedIn !== 'semantic')).toBe(true)
+  })
+
+  it('search_records applies canRead as the token’s user: a teammate’s private note never comes back', async () => {
+    const search = async (userId: string) => {
+      const client = await connect((await mint(userId, 'canread')).token)
+      const text = textOf(
+        await client.callTool({
+          name: 'search_records',
+          arguments: { query: 'Private doubts about Orbital' },
+        }),
+      )
+      await client.close()
+      return text
+    }
+    expect(await search(FIXTURE_ACTOR.id)).toContain(fixture.privateNoteId)
+    const theirs = await search(TEAMMATE.id)
+    expect(theirs).not.toContain(fixture.privateNoteId)
+    expect(theirs).not.toContain('Private doubts')
+  })
+
+  it('search_records narrows to one object by slug or name, and refuses an unknown one', async () => {
+    const client = await connect((await mint(FIXTURE_ACTOR.id, 'o')).token)
+    const all = z.parse(
+      HitsShape,
+      await call(client, 'search_records', { query: 'orbital' }),
+    )
+    // Unnarrowed, the company and its notes both come back…
+    expect(all.some((h) => h.kind === 'note')).toBe(true)
+    for (const object of ['companies', 'Company', 'COMPANIES']) {
+      const narrowed = z.parse(
+        HitsShape,
+        await call(client, 'search_records', { query: 'orbital', object }),
+      )
+      // …narrowed, only the company's object remains.
+      expect(narrowed.map((h) => h.id)).toEqual([fixture.companyId])
+    }
+    const unknown = await client.callTool({
+      name: 'search_records',
+      arguments: { query: 'orbital', object: 'Spaceships' },
+    })
+    await client.close()
+    expect(unknown.isError).toBe(true)
+    expect(textOf(unknown)).toContain('No object "Spaceships"')
+    expect(textOf(unknown)).toContain('companies')
+  })
+
+  it('list_registry shows a custom object created after the client connected, with no restart', async () => {
+    const client = await connect((await mint(FIXTURE_ACTOR.id, 'reg')).token)
+    const before = z.parse(
+      RegistryShape,
+      await call(client, 'list_registry', {}),
+    )
+    expect(before.map((o) => o.slug).slice(0, 3)).toEqual([
+      'companies',
+      'people',
+      'deals',
+    ])
+    const companies = before.find((o) => o.slug === 'companies')
+    expect(companies?.attributes.length).toBeGreaterThan(0)
+    expect(before.some((o) => o.singular === 'Fund')).toBe(false)
+
+    // The same connected client; the object is made after it connected.
+    const fund = await Effect.runPromise(
+      createObjectProgram({
+        singular: 'Fund',
+        plural: 'Funds',
+        createdBy: FIXTURE_ACTOR.id,
+      }),
+    )
+    const actor = { createdBy: FIXTURE_ACTOR.id, objectId: fund.id }
+    await Effect.runPromise(
+      createAttributeProgram({ ...actor, name: 'Vintage', type: 'number' }),
+    )
+    await Effect.runPromise(
+      createAttributeProgram({
+        ...actor,
+        name: 'Strategy',
+        type: 'select',
+        options: [{ label: 'Venture' }, { label: 'Growth' }],
+      }),
+    )
+    await Effect.runPromise(
+      createAttributeProgram({
+        ...actor,
+        name: 'Anchor LP',
+        type: 'record_reference',
+        config: { targetKind: 'company' },
+      }),
+    )
+
+    for (const object of ['Fund', 'funds']) {
+      const after = z.parse(
+        RegistryShape,
+        await call(client, 'list_registry', { object }),
+      )
+      expect(after).toHaveLength(1)
+      expect(after.at(0)).toMatchObject({
+        slug: 'funds',
+        singular: 'Fund',
+        isSystem: false,
+      })
+      const attrs = after.at(0)?.attributes ?? []
+      expect(attrs.map((a) => [a.name, a.type])).toEqual([
+        ['Vintage', 'number'],
+        ['Strategy', 'select'],
+        ['Anchor LP', 'record_reference'],
+      ])
+      expect(
+        attrs
+          .find((a) => a.name === 'Strategy')
+          ?.options.options?.map((o) => o.label),
+      ).toEqual(['Venture', 'Growth'])
+      expect(attrs.find((a) => a.name === 'Anchor LP')?.target).toBe(
+        'companies',
+      )
+    }
+    const everything = z.parse(
+      RegistryShape,
+      await call(client, 'list_registry', {}),
+    )
+    expect(everything.map((o) => o.slug)).toContain('funds')
+    await client.close()
+  })
+
+  it('answers 401 on both tools once the token’s user is suspended from the workspace, and again once restored', async () => {
+    const created = await mint(SUSPENDED.id, 'leaving')
+    const client = await connect(created.token)
+    const calls = [
+      { name: 'search_records', arguments: { query: 'orbital' } },
+      { name: 'list_registry', arguments: {} },
+    ]
+    for (const c of calls)
+      expect((await client.callTool(c)).isError).not.toBe(true)
+
+    // Settings → Members → Suspend access, through its real body.
+    session.current = { id: FIXTURE_ACTOR.id, role: 'admin' }
+    await setMemberBannedHandler({ userId: SUSPENDED.id, banned: true })
+
+    // The connected client is refused on its very next call — every request
+    // is authenticated afresh — and a bare request sees no tool at all.
+    for (const c of calls) await expect(client.callTool(c)).rejects.toThrow()
+    await client.close()
+    for (const c of calls) {
+      const res = await handleMcpRequest(
+        new Request(ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            accept: 'application/json, text/event-stream',
+            authorization: `Bearer ${created.token}`,
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: c,
+          }),
+        }),
+      )
+      expect(res.status).toBe(401)
+      expect(await res.text()).toBe('{"error":"unauthorized"}')
+    }
+    await expect(connect(created.token)).rejects.toThrow()
+
+    // Restoring access restores the same token; nothing was revoked.
+    await setMemberBannedHandler({ userId: SUSPENDED.id, banned: false })
+    const back = await connect(created.token)
+    for (const c of calls)
+      expect((await back.callTool(c)).isError).not.toBe(true)
+    await back.close()
   })
 })

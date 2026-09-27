@@ -86,13 +86,25 @@ export const canReadNoteSql = (userId: string): SQL => sql`not exists (
  * plus the vector lane, asked for 600ms after the last keystroke. Omitted,
  * the statement is lexical and nothing is embedded.
  */
-export type SearchAllInput = { userId: string; q: string; semantic?: boolean }
+export type SearchAllInput = {
+  userId: string
+  q: string
+  semantic?: boolean
+  /**
+   * Narrow the answer to one object's records (SPA-28, the MCP
+   * `search_records(query, object?)`). Cmd-K never passes it, and without it
+   * the statement is exactly the palette's.
+   */
+  objectId?: string
+}
 
 /** What the builder takes: the query vector, when the second wave has one. */
 export type FusedRowsInput = {
   userId: string
   q: string
   vector?: QueryVector
+  /** One object's records only; tasks, which belong to no object, drop out. */
+  objectId?: string
 }
 
 /** `model` replaces the embedding wire in tests; see `query-embedding.ts`. */
@@ -217,7 +229,12 @@ function semanticLane(userId: string, { vector, model }: QueryVector): SQL {
 }
 
 /** The fused statement: four lanes (five with a query vector), one RRF, top 20. */
-export function fusedStatement({ userId, q, vector }: FusedRowsInput): SQL {
+export function fusedStatement({
+  userId,
+  q,
+  vector,
+  objectId,
+}: FusedRowsInput): SQL {
   const semantic = vector === undefined ? null : semanticLane(userId, vector)
   return sql`
       with q as (
@@ -342,6 +359,11 @@ ${semantic ?? sql``}
       left join entity e on f.row_kind = 'entity' and e.id = f.id
       left join task t on f.row_kind = 'task' and t.id = f.id
       left join object o on o.id = e.object_id
+      ${
+        // After the lanes rank, so a narrowed hit keeps the score it has in
+        // the palette; absent, nothing is emitted.
+        objectId === undefined ? sql`` : sql`where e.object_id = ${objectId}`
+      }
       group by f.row_kind, f.id,
                e.kind, e.canonical_name, o.slug,
                t.id, t.content, t.due_date, t.done_at
@@ -443,7 +465,7 @@ export const documentParentsProgram = Effect.fn('documentParentsProgram')(
  * is one log line, never an error per pause.
  */
 export const searchAllProgram = Effect.fn('searchAllProgram')(function* (
-  { userId, q: raw, semantic = false }: SearchAllInput,
+  { userId, q: raw, semantic = false, objectId }: SearchAllInput,
   seam: SearchSeam = {},
 ): Effect.fn.Return<Array<SearchHit>, SearchQueryFailed> {
   const q = raw.trim()
@@ -460,6 +482,7 @@ export const searchAllProgram = Effect.fn('searchAllProgram')(function* (
     userId,
     q,
     ...(vector === null ? {} : { vector }),
+    ...(objectId === undefined ? {} : { objectId }),
   })
   if (hits.length === 0) return []
 

@@ -88,43 +88,10 @@ export const setMemberRole = createServerFn({ method: 'POST' })
 export const setMemberBanned = createServerFn({ method: 'POST' })
   .validator(z.object({ userId: z.string(), banned: z.boolean() }))
   .handler(async ({ data }) => {
-    const admin = await requireAdmin()
-    if (data.userId === admin.id) {
-      throw new Error('You cannot ban yourself.')
-    }
-    if (data.banned) {
-      // Same lockout as demotion: banning the last active admin bricks
-      // the workspace just as surely.
-      const target = (
-        await db
-          .select({ role: user.role })
-          .from(user)
-          .where(eq(user.id, data.userId))
-      ).at(0)
-      if (target?.role === 'admin') {
-        const [{ value: otherAdmins }] = await db
-          .select({ value: count() })
-          .from(user)
-          .where(
-            and(
-              eq(user.role, 'admin'),
-              eq(user.banned, false),
-              ne(user.id, data.userId),
-            ),
-          )
-        if (otherAdmins === 0) {
-          throw new Error('Cannot ban the only active admin.')
-        }
-      }
-    }
-    await db
-      .update(user)
-      .set({ banned: data.banned, updatedAt: new Date() })
-      .where(eq(user.id, data.userId))
-    if (data.banned) {
-      await db.delete(session).where(eq(session.userId, data.userId))
-    }
-    return { ok: true }
+    // The body lives outside `lib/server/` so a test can drive the real
+    // suspension (SPA-28 — a suspended member's MCP token stops answering).
+    const { setMemberBannedHandler } = await import('#/lib/members/suspend')
+    return setMemberBannedHandler(data)
   })
 
 /** "Sign out everywhere" — sessions are DB rows, so revocation is a delete. */
