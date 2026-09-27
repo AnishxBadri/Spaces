@@ -1503,6 +1503,16 @@ credential(id, scope: workspace|user, provider, kind: llm|enrichment|search,
 - **Task -> model mapping**, not one global model. Tagging = cheap model, memo drafting = frontier.
 - **Ollama/LM Studio first-class**, not an afterthought. Self-host audience overlaps local-model audience.
 - Token counter for the operator's own cost visibility.
+- **AI proposes, a person accepts (D41, landed 2026-09-27).** Whatever a
+  model produces — an attribute value, a document kind, a space tag, a note,
+  a column mapping on import, an identity claim — lands as a `suggestion` row
+  that a human accepts or rejects in the queue. It is never a pre-selected
+  control that a click confirms, and never a value written with a flag to
+  undo. The difference is provenance and memory: a suggestion carries its
+  rationale, its refs and its run, and a rejection is remembered so the same
+  thing is not proposed twice; a pre-filled form field carries nothing. AI
+  attributes (`ai-17`), column runs (`ai-18`) and any later AI-assisted
+  mapping build against this sentence, not around it.
 
 ### Embeddings — the dimension trap
 
