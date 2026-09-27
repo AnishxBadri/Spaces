@@ -1,30 +1,38 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
-import { chunk, document, entity, link } from '@spaces/db/schema'
+import { chunk, document, entity, link, suggestion } from '@spaces/db/schema'
 import {
   proposalRefs,
   schemaFor,
   toPatch,
   validateProposal,
 } from '@spaces/core/ai/schema'
-import type { IdentityClaim, Proposal } from '@spaces/core/ai/schema'
+import type {
+  IdentityClaim,
+  Proposal,
+  SchemaAttribute,
+} from '@spaces/core/ai/schema'
 import { identityPayloadOf } from '@spaces/core/ai/identity'
-import type { AttributeDef } from '@spaces/core/attributes/registry'
 import { QUEUES } from '@spaces/core/queue/names'
+import { getRegistryByObjectId } from '#/lib/attributes/values'
 import { recordContextProgram } from '#/lib/context/record'
 import { ref } from '#/lib/context/ref'
 import type { ContextItem } from '#/lib/context/types'
 import { jsonValue } from '#/lib/json'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
+import { storage } from '#/lib/storage'
+import { captureObjectById, captureReadTask } from './capture-read'
+import type { CaptureObject } from './capture-read'
 import { completeMessage } from './complete'
 import type { CompleteFailure } from './complete'
 import { cachedExtractProgram } from './extraction-cache'
 import { proposeProgram, registryFor, suggestionMessage } from './propose'
 import type { Suggestion, SuggestionFailure } from './propose'
 import { providerFailure } from './providers/test-call'
+import { isLaneRoutedProgram } from './route'
 import { callStep, suggestionOutputRef, withRun } from './run'
 import type { RunScope, RunStepInput } from './run'
 import { sensitivityFor } from './sensitivity-for'
@@ -71,6 +79,20 @@ import type {
  * **Kind is kind.** The trigger and this program read `document.kind` and
  * nothing else — there is no column saying how the kind was set, and nothing
  * here would branch on one if there were.
+ *
+ * **A captured page is the third caller (SPA-134).** `against` swaps the
+ * filed records for one declared object and one anchor: the page is read
+ * against that object's registry — person for a profile, company for a
+ * company page — through the same `cachedExtractProgram` call, the same
+ * validator and the same `proposeProgram`, and what it proposes is anchored
+ * on the captured document itself (`./capture-read.ts`), since a capture
+ * usually names somebody we hold no record for. Read as a person, the schema
+ * gains one field, `_subject` — a person reference, so its answer is the
+ * same identity claim a deck's `founders` yields — and the page's subject
+ * becomes one `identity` suggestion ahead of one `attribute_patch`. Every
+ * other reference claim is held back: with no record, nothing could hold it.
+ * A document that already carries a capture read's suggestions is not read
+ * again, so a re-posted page opens nothing new.
  */
 
 export const READ_DECK_CONTEXT_CHARS = 12_000
@@ -80,6 +102,25 @@ export const READ_DECK_CONTEXT_CHARS = 12_000
  */
 export const READ_DECK_PURPOSE = 'read-deck/v1'
 export const READ_DECK_BUDGET_CHARS = 24_000
+/** The cache's purpose for a captured page: its task prompt is its own. */
+export const READ_CAPTURE_PURPOSE = 'read-capture/v1'
+
+/**
+ * The field a person page's subject is claimed through (SPA-134). Not an
+ * attribute: an attribute slug never starts with `_` (the slugifier trims
+ * it), so it cannot shadow one, and it never reaches a patch.
+ */
+export const PAGE_SUBJECT_SLUG = '_subject'
+
+const PAGE_SUBJECT: SchemaAttribute = {
+  slug: PAGE_SUBJECT_SLUG,
+  name: 'Who this page is about',
+  description:
+    'The person this page is about: their name as the page gives it, their role or title, and their email or LinkedIn URL when the page states them',
+  type: 'record_reference',
+  options: { targetKind: 'person', multi: false },
+  archived: false,
+}
 
 const KIND_LABEL: Record<string, string> = {
   company: 'company',
@@ -159,6 +200,13 @@ export type ReadDeckInput = {
    * one-step run ("Read deck").
    */
   runId?: string
+  /**
+   * A captured page (SPA-134): read against this object's registry rather
+   * than the records the document is filed on, and propose onto
+   * `anchorEntityId` — the captured document's own entity. Absent, the deck
+   * reader it always was.
+   */
+  against?: { objectId: string; anchorEntityId: string }
 }
 
 export type ReadDeckResult = {
@@ -172,12 +220,21 @@ type Target = { id: string; kind: string; name: string }
 /** A person the deck named, off one person-targeted reference field. */
 type PersonClaim = { slug: string; claim: IdentityClaim; refs: Array<string> }
 
+/** A captured page's read: the declared object and its live registry. */
+type Against = {
+  object: CaptureObject
+  registry: ReadonlyArray<SchemaAttribute>
+  anchorEntityId: string
+}
+
 type Read = {
   target: Target
-  registry: Array<AttributeDef>
+  registry: ReadonlyArray<SchemaAttribute>
   proposal: Proposal
   dropped: Array<string>
   people: Array<PersonClaim>
+  /** A captured person page: who it is about, off `_subject`. */
+  subject: PersonClaim | null
   /** Reference slugs held back: claims on a target that is not a person. */
   heldBack: Array<string>
   /** Set when the extraction cache answered: who read it, and when. */
@@ -231,7 +288,7 @@ const deckItems = Effect.fn('readDeck.deckItems')(function* (
  * is dropped and named rather than sinking the whole proposal.
  */
 function keepValid(
-  registry: ReadonlyArray<AttributeDef>,
+  registry: ReadonlyArray<SchemaAttribute>,
   raw: unknown,
 ): { proposal: Proposal; dropped: Array<string> } {
   const proposal: Proposal = {}
@@ -263,29 +320,90 @@ const TASK = (target: Target, filename: string) =>
     'For each field, list in `refs` the bracketed refs of the context items the value was read from, and give a confidence between 0 and 1.',
   ].join('\n')
 
+const CAPTURE_TASK = (against: Against, title: string) =>
+  [
+    `Read the captured page "${title}" above and fill in what it states about the ${against.object.singular.toLowerCase()} it describes.`,
+    'Use only facts the context states. Omit any field the context does not state; never guess.',
+    'For each field, list in `refs` the bracketed refs of the context items the value was read from, and give a confidence between 0 and 1.',
+  ].join('\n')
+
+/** The declared object, read once before the run opens: it names the run. */
+const againstOf = Effect.fn('readDeck.against')(function* (
+  against: NonNullable<ReadDeckInput['against']>,
+): Effect.fn.Return<Against, ReadDeckRefused | ReadDeckQueryFailed> {
+  const object = yield* query(() => captureObjectById(db, against.objectId))
+  if (object === null)
+    return yield* new ReadDeckRefused({
+      message: 'The object the page was captured as no longer exists',
+    })
+  const registry = yield* query(() => getRegistryByObjectId(object.id))
+  return { object, registry, anchorEntityId: against.anchorEntityId }
+})
+
 export const readDeckProgram = Effect.fn('readDeck')(function* (
   input: ReadDeckInput,
 ): Effect.fn.Return<ReadDeckResult, ReadDeckFailure> {
+  const against =
+    input.against === undefined ? null : yield* againstOf(input.against)
   return yield* withRun(
     input.runId,
     {
-      task: 'Read deck',
+      task:
+        against === null ? 'Read deck' : captureReadTask(against.object.slug),
       entityId: input.documentId,
       startedBy: { type: 'user', id: input.userId },
     },
-    (run) => readDeckInRun(input, run),
+    (run) => readDeckInRun(input, against, run),
     readDeckMessage,
   )
 })
 
+/**
+ * A captured page's text before its extraction lands: the blob is the text,
+ * byte for byte what was posted (`lib/rpc/capture.ts`), so the read need not
+ * wait on the extract job to run.
+ */
+const pageText = (
+  doc: { text: string | null; status: string; mime: string | null },
+  blobSha: string | null,
+) =>
+  doc.status === 'done' ||
+  blobSha === null ||
+  !(doc.mime ?? '').startsWith('text/plain')
+    ? Effect.succeed(doc.text)
+    : query(async () =>
+        Buffer.from(await storage().getBytes(blobSha)).toString('utf8'),
+      )
+
+/** Has a capture read of this page already proposed? Then it is not re-read. */
+const alreadyRead = (anchorEntityId: string) =>
+  query(
+    async () =>
+      (
+        await db
+          .select({ id: suggestion.id })
+          .from(suggestion)
+          .where(
+            and(
+              eq(suggestion.entityId, anchorEntityId),
+              inArray(suggestion.kind, ['identity', 'attribute_patch']),
+            ),
+          )
+          .limit(1)
+      ).length > 0,
+  )
+
 const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
   input: ReadDeckInput,
+  against: Against | null,
   run: RunScope,
 ): Effect.fn.Return<ReadDeckResult, ReadDeckFailure> {
   const doc = (yield* query(() =>
     db
       .select({
         filename: document.filename,
+        url: document.url,
+        mime: document.mime,
         kind: document.kind,
         status: document.extractionStatus,
         text: document.extractedText,
@@ -299,22 +417,37 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
   )).at(0)
   if (!doc)
     return yield* new ReadDeckRefused({ message: 'That document is gone' })
-  if (doc.kind !== 'deck')
+  if (against === null && doc.kind !== 'deck')
     return yield* new ReadDeckRefused({ message: 'Only a deck is read' })
-  if (doc.status !== 'done')
+  if (against === null && doc.status !== 'done')
     return yield* new ReadDeckRefused({
       message: 'The deck’s text is not extracted yet',
     })
+  if (against !== null && (yield* alreadyRead(against.anchorEntityId)))
+    return {
+      suggestions: [],
+      skipped: [
+        {
+          entityId: against.anchorEntityId,
+          reason: 'Already read: this page’s suggestions are in the inbox',
+        },
+      ],
+    }
 
   const filename = doc.filename ?? doc.name
   const deck = yield* deckItems(
     input.documentId,
-    filename,
-    doc.text,
+    against === null
+      ? filename
+      : `Captured page "${filename}"${doc.url === null ? '' : ` at ${doc.url}`}`,
+    against === null ? doc.text : yield* pageText(doc, doc.blobSha),
     doc.createdAt.toISOString(),
   )
   if (deck.length === 0)
-    return yield* new ReadDeckRefused({ message: 'The deck has no text' })
+    return yield* new ReadDeckRefused({
+      message:
+        against === null ? 'The deck has no text' : 'The page has no text',
+    })
 
   const filed = yield* query(() =>
     db
@@ -332,8 +465,21 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
   )
 
   const skipped: ReadDeckResult['skipped'] = []
-  const targets: Array<Target> = []
-  for (const t of filed) {
+  // A captured page has one target: its own document, read as the object
+  // the capture declared.
+  const targets: Array<Target> =
+    against === null
+      ? []
+      : [
+          {
+            id: against.anchorEntityId,
+            kind: against.object.kind ?? 'custom',
+            name: filename,
+          },
+        ]
+  // Not the records it is filed on: a capture filed on a company is still
+  // read as the object it declared, once.
+  for (const t of against === null ? filed : []) {
     if (t.kind === 'company' || t.kind === 'deal' || t.kind === 'custom')
       targets.push(t)
     else if (t.kind === 'person')
@@ -356,13 +502,24 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
   // Sequential also lets a second record over the same schema hit the cache
   // row the first one's call just stored.
   for (const target of targets) {
-    const registry = yield* query(() => registryFor(db, target.id))
-    const context = yield* recordContextProgram({
-      entityId: target.id,
-      user: { id: input.userId },
-      asOf,
-      budgetChars: READ_DECK_CONTEXT_CHARS,
-    }).pipe(Effect.mapError((cause) => new ReadDeckQueryFailed({ cause })))
+    const registry: ReadonlyArray<SchemaAttribute> =
+      against === null
+        ? yield* query(() => registryFor(db, target.id))
+        : against.object.kind === 'person'
+          ? [PAGE_SUBJECT, ...against.registry]
+          : against.registry
+    // A captured page has no record to bring context from: the page is all.
+    const context =
+      against !== null
+        ? { items: [] }
+        : yield* recordContextProgram({
+            entityId: target.id,
+            user: { id: input.userId },
+            asOf,
+            budgetChars: READ_DECK_CONTEXT_CHARS,
+          }).pipe(
+            Effect.mapError((cause) => new ReadDeckQueryFailed({ cause })),
+          )
     const items: Array<ContextItem> = [
       ...deck,
       ...context.items.map((i) => ({
@@ -378,10 +535,15 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
       {
         blobSha: doc.blobSha,
         documentId: input.documentId,
-        purpose: READ_DECK_PURPOSE,
+        purpose: against === null ? READ_DECK_PURPOSE : READ_CAPTURE_PURPOSE,
       },
       items,
-      schemaFor(registry, `${KIND_LABEL[target.kind] ?? 'record'} fields`),
+      schemaFor(
+        registry,
+        against === null
+          ? `${KIND_LABEL[target.kind] ?? 'record'} fields`
+          : `${against.object.singular.toLowerCase()} fields`,
+      ),
       {
         caller: { type: 'user', id: input.userId },
         sensitivity: sensitivity.sensitivity,
@@ -389,7 +551,10 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
           ? { via: sensitivity.via }
           : {}),
         budgetChars: READ_DECK_BUDGET_CHARS,
-        task: TASK(target, filename),
+        task:
+          against === null
+            ? TASK(target, filename)
+            : CAPTURE_TASK(against, filename),
         ...(input.model === undefined ? {} : { model: input.model }),
         ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
         runId,
@@ -401,12 +566,16 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
     const { claims } = toPatch(registry, proposal)
     const people: Array<PersonClaim> = []
     const heldBack: Array<string> = []
+    let subject: PersonClaim | null = null
     for (const [slug, list] of Object.entries(claims)) {
       const { refs } = proposal[slug]
       Reflect.deleteProperty(proposal, slug)
       const def = registry.find((d) => d.slug === slug)
-      if (def?.options.targetKind === 'person')
-        for (const claim of list) people.push({ slug, claim, refs })
+      const claim = list.at(0)
+      if (slug === PAGE_SUBJECT_SLUG) {
+        if (claim !== undefined) subject = { slug, claim, refs }
+      } else if (against === null && def?.options.targetKind === 'person')
+        for (const c of list) people.push({ slug, claim: c, refs })
       else heldBack.push(slug)
     }
     reads.push({
@@ -415,6 +584,7 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
       proposal,
       dropped,
       people,
+      subject,
       heldBack,
       cached:
         answered.cachedAt === null
@@ -432,7 +602,11 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
 
   const suggestions: Array<Suggestion> = []
   for (const read of reads) {
-    if (Object.keys(read.proposal).length === 0 && read.people.length === 0) {
+    if (
+      Object.keys(read.proposal).length === 0 &&
+      read.people.length === 0 &&
+      read.subject === null
+    ) {
       skipped.push({
         entityId: read.target.id,
         reason: `Nothing in ${filename} held for ${read.target.name}`,
@@ -441,6 +615,20 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
       continue
     }
     const first = suggestions.length
+    // A captured page's subject first: accepting it is what gives the patch
+    // below its record, and "Accept all" takes a card oldest first.
+    if (read.subject !== null)
+      suggestions.push(
+        yield* proposeProgram({
+          entityId: read.target.id,
+          kind: 'identity',
+          payload: identityPayloadOf(read.subject.claim),
+          rationale: subjectRationale(read.subject, filename),
+          refs: read.subject.refs,
+          runId,
+          proposedBy: { type: 'user', id: input.userId },
+        }),
+      )
     if (Object.keys(read.proposal).length > 0) {
       // The values came off the wire as JSON and passed the validators, so
       // this decode is the type's claim made once, not a filter that bites.
@@ -454,7 +642,10 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
           entityId: read.target.id,
           kind: 'attribute_patch',
           payload: payload.data,
-          rationale: rationaleFor(read, reads, filename, skipped),
+          rationale:
+            against === null
+              ? rationaleFor(read, reads, filename, skipped)
+              : captureRationale(read, against, filename),
           refs: proposalRefs(read.proposal),
           runId,
           proposedBy: { type: 'user', id: input.userId },
@@ -526,6 +717,48 @@ function rationaleFor(
     )
   for (const s of skipped) lines.push(`${s.reason}.`)
   return lines.join('\n')
+}
+
+/** Why a captured page's patch is on the page, and where it will land. */
+function captureRationale(read: Read, against: Against, title: string): string {
+  const fields = Object.keys(read.proposal).length
+  const what = against.object.singular.toLowerCase()
+  const lines = [
+    `Read from the captured page ${title} against the ${what} fields: ${String(fields)} field${fields === 1 ? '' : 's'} proposed.`,
+  ]
+  if (read.cached !== null)
+    lines.push(
+      `Answered from the extraction cache (cached): ${read.cached.model} read these bytes against these fields at ${read.cached.at}, so no provider call was made and no usage was recorded.`,
+    )
+  if (read.dropped.length > 0)
+    lines.push(
+      `${String(read.dropped.length)} proposed field${read.dropped.length === 1 ? ' was' : 's were'} dropped at validation: ${read.dropped.join('; ')}.`,
+    )
+  lines.push(
+    read.subject !== null
+      ? `These apply to the ${what} the identity above matches or creates, once it is accepted.`
+      : `These apply to the ${what} the page is filed on.`,
+  )
+  if (read.heldBack.length > 0)
+    lines.push(
+      `Held back ${read.heldBack.join(', ')}: a captured page has no record to hold a reference on.`,
+    )
+  return lines.join('\n')
+}
+
+/** Why a captured page's identity is on the page: who it is about. */
+function subjectRationale(subject: PersonClaim, title: string): string {
+  const as = subject.claim.role === undefined ? '' : `, ${subject.claim.role}`
+  const keys = [
+    subject.claim.email === undefined ? null : 'email',
+    subject.claim.linkedin === undefined ? null : 'LinkedIn',
+  ].filter((k) => k !== null)
+  return [
+    `${subject.claim.name}${as} — from a captured page, ${title}.`,
+    keys.length > 0
+      ? `Accepting matches an existing person by ${keys.join(' or ')}, else creates one, and files the page on them; the page’s fields then apply to that person.`
+      : 'No email or LinkedIn given: accepting creates a person and files the page on them — a near-identical name already held is filed as a duplicate candidate; the page’s fields then apply to that person.',
+  ].join('\n')
 }
 
 /**
@@ -602,6 +835,45 @@ export const enqueueReadDeckProgram = Effect.fn('enqueueReadDeck')(function* (
     ? { status: 'already-reading' }
     : { status: 'queue-unavailable' }
 })
+
+/** What `POST /api/v1/capture` answers about the read behind it. */
+export type CaptureReadQueued = 'queued' | 'skipped'
+
+/**
+ * Queue a captured page's read (SPA-134) — the Read deck job with `capture`
+ * set, keyed on the document as Read deck is, so pg-boss refuses a second
+ * send while one is queued or active. Routed first, at the page's own
+ * sensitivity: with no model for the extract lane there is no job and no
+ * suggestion, and the capture still answers — `skipped`, never a failure,
+ * so the endpoint never fails for want of a model key. A queue that is down
+ * is `skipped` too: nothing will read the page.
+ */
+export const enqueueCaptureReadProgram = Effect.fn('enqueueCaptureRead')(
+  function* (input: {
+    documentId: string
+    userId: string
+    objectId: string
+  }): Effect.fn.Return<CaptureReadQueued> {
+    const routed = yield* isLaneRoutedProgram('extract', input.userId)
+    if (!routed.normal && !routed.sensitive) return 'skipped'
+    const read = yield* Effect.result(sensitivityFor(input.documentId))
+    if (read._tag === 'Failure' || !routed[read.success.sensitivity])
+      return 'skipped'
+    const { documentId, userId, objectId } = input
+    const jobId = yield* Effect.promise(() =>
+      enqueue(
+        QUEUES.readDeck,
+        { documentId, userId, capture: { objectId } },
+        { singletonKey: documentId },
+      ),
+    )
+    if (jobId !== null) return 'queued'
+    const jobs = yield* Effect.promise(() =>
+      jobsByKey(QUEUES.readDeck, documentId),
+    )
+    return jobs !== null && jobs.some(inFlight) ? 'queued' : 'skipped'
+  },
+)
 
 const inFlight = (j: QueuedJob): boolean =>
   j.state === 'created' || j.state === 'retry' || j.state === 'active'

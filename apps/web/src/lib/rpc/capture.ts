@@ -10,7 +10,10 @@ import {
 } from '#/lib/documents/intake'
 import type { DocumentIntakeFailure } from '#/lib/documents/intake'
 import { DocumentBirthRejected } from '#/lib/documents/birth'
+import { enqueueCaptureReadProgram } from '#/lib/ai/read-deck'
+import type { CaptureReadQueued } from '#/lib/ai/read-deck'
 import { resolveEntityRefProgram } from '#/lib/mcp/tools'
+import { listRegistryProgram } from '#/lib/mcp/tools-read'
 import { canRead } from '#/lib/notes/visibility'
 import { recordPath } from '#/lib/record-path'
 import { describeExternalOrigin } from '#/lib/server/external-origin'
@@ -56,6 +59,16 @@ import { ACCEPTED_CAPTURE_SCHEMA_VERSIONS } from './versions'
  *   `manual` row anyway. The token's user lands in `uploaded_by` and the
  *   activity line, which is where "who filed it" is read.
  * - **`kind` is `article`**, as the URL clip files a page (`clip.ts`).
+ *
+ * **Extraction (SPA-134).** `object` declares what the page is — `person`
+ * for a profile, `company` for a company page, or any object's slug,
+ * singular or plural — and is checked against the registry before anything
+ * is stored: an object the registry does not hold is refused naming the
+ * slug. Declared, the page is queued for the deck reader's program against
+ * that object's registry, anchored on the document
+ * (`enqueueCaptureReadProgram`); the answer says `queued`. With the extract
+ * lane unrouted, or no object declared, the page still lands and nothing is
+ * queued: the answer says `skipped`, never an error.
  */
 
 /** The payload as the handler receives it, already schema-decoded. */
@@ -67,12 +80,16 @@ export type CaptureInput = {
   readonly text: string
   /** A record id, or a record's exact name; omitted for an unfiled capture. */
   readonly target?: string
+  /** The registry object the page is read as (SPA-134); omitted, unread. */
+  readonly object?: string
 }
 
 export type CaptureResult = {
   documentId: string
   /** Where the capture can be seen in the app, on `APP_URL`. */
   url: string
+  /** Whether the page was queued to be read against its object (SPA-134). */
+  extraction: CaptureReadQueued
 }
 
 /** The payload's version is not one this instance reads. */
@@ -99,6 +116,12 @@ export class CaptureTargetRefused extends Schema.TaggedError<CaptureTargetRefuse
   { message: Schema.String },
 ) {}
 
+/** The declared object is not in the registry; nothing was stored. */
+export class CaptureObjectUnknown extends Schema.TaggedError<CaptureObjectUnknown>()(
+  'CaptureObjectUnknown',
+  { message: Schema.String },
+) {}
+
 /** A query, the store or the queue broke. A defect at the door (500). */
 export class CaptureFailed extends Schema.TaggedError<CaptureFailed>()(
   'CaptureFailed',
@@ -110,6 +133,7 @@ export type CaptureFailure =
   | CaptureTooLarge
   | CaptureTargetNotFound
   | CaptureTargetRefused
+  | CaptureObjectUnknown
   | CaptureFailed
 
 /**
@@ -200,6 +224,23 @@ function deepLink(target: Target | null): string {
 }
 
 /**
+ * The declared object, as the registry holds it — the read `registry.list`
+ * answers, by slug, singular or plural. Unknown, it refuses with the slug
+ * named and the slugs there are.
+ */
+const resolveObject = (ref: string) =>
+  // `object` set, the read answers exactly the one object or refuses.
+  listRegistryProgram({ object: ref }).pipe(
+    Effect.map(([object]) => object),
+    Effect.catchTag('McpToolRefused', (refused) =>
+      Effect.fail(new CaptureObjectUnknown({ message: refused.message })),
+    ),
+    Effect.catchTag('McpToolQueryFailed', (failure) =>
+      Effect.fail(new CaptureFailed({ cause: failure })),
+    ),
+  )
+
+/**
  * Birth's refusal is the caller's to read (a space, a document, a merged
  * record); anything else — the store, a query, the meter — is ours.
  */
@@ -227,6 +268,8 @@ export const captureProgram = Effect.fn('captureProgram')(function* (
       message: captureTooLargeMessage(bytes.length),
     })
 
+  const object =
+    input.object === undefined ? null : yield* resolveObject(input.object)
   const target =
     input.target === undefined
       ? null
@@ -248,5 +291,14 @@ export const captureProgram = Effect.fn('captureProgram')(function* (
     actor: { userId: actor.id },
   }).pipe(Effect.mapError(intakeFailure))
 
-  return { documentId: filed.id, url: deepLink(target) }
+  const extraction =
+    object === null
+      ? 'skipped'
+      : yield* enqueueCaptureReadProgram({
+          documentId: filed.id,
+          userId: actor.id,
+          objectId: object.id,
+        })
+
+  return { documentId: filed.id, url: deepLink(target), extraction }
 })

@@ -26,6 +26,15 @@ import type { JobDef } from '../run-job'
  * in one two-step run (`lib/ai/read-deck-summarize.ts`). One queue, so one
  * deck is read once at a time whichever button was pressed, and the Files
  * tab's status and toast read both the same way.
+ *
+ * **A captured page** (SPA-134) is the same job again, with `capture` set:
+ * the object the page was captured as. The program is the same one —
+ * `readDeckProgram` with `against`, anchored on the document — so one
+ * extract program serves decks and pages alike, and the queue's singleton
+ * key on the document id is what refuses a re-posted page a second read
+ * while the first is queued or running. A second queue would have bought
+ * nothing but a second worker registration and a second key space for the
+ * same one-read-per-document rule.
  */
 
 export const readDeckData = z.object({
@@ -33,6 +42,8 @@ export const readDeckData = z.object({
   userId: z.string().min(1),
   /** Set by "Read deck and summarize": the record the summary lands on. */
   summarizeOnto: z.string().uuid().optional(),
+  /** Set by `POST /api/v1/capture`: the object the page is read as. */
+  capture: z.object({ objectId: z.string().uuid() }).optional(),
 })
 
 export type ReadDeckData = z.infer<typeof readDeckData>
@@ -54,6 +65,15 @@ const readOnly = (data: ReadDeckData, seam: ReadDeckSeam) =>
     documentId: data.documentId,
     userId: data.userId,
     ...(seam.extractModel === undefined ? {} : { model: seam.extractModel }),
+    // A captured page anchors on its own document (SPA-134).
+    ...(data.capture === undefined
+      ? {}
+      : {
+          against: {
+            objectId: data.capture.objectId,
+            anchorEntityId: data.documentId,
+          },
+        }),
   }).pipe(
     Effect.tap((r) =>
       Effect.sync(() => {

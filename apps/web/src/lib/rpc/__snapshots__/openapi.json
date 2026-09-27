@@ -88,11 +88,20 @@
                     "url": {
                       "type": "string",
                       "description": "Where the capture shows in the app: the record it was filed on, or the unfiled inbox"
+                    },
+                    "extraction": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "skipped"
+                      ],
+                      "description": "queued: the page will be read against the declared object and its suggestions land in the inbox. skipped: no object was declared, or no model is routed for the extract lane — the page is filed all the same."
                     }
                   },
                   "required": [
                     "documentId",
-                    "url"
+                    "url",
+                    "extraction"
                   ],
                   "additionalProperties": false
                 }
@@ -170,7 +179,7 @@
             }
           }
         },
-        "description": "Files a page’s text as a document: a text/plain blob named by the title, with the page’s URL on the row, filed on the target record or left unfiled, extraction queued behind it. Re-posting the same text to the same record answers the same document. Runs as the token’s user.",
+        "description": "Files a page’s text as a document: a text/plain blob named by the title, with the page’s URL on the row, filed on the target record or left unfiled, extraction queued behind it. With `object` declared and the extract lane routed, the page is also read against that object’s fields and its suggestions land in the inbox, anchored on the page; `extraction` says whether that read was queued. Re-posting the same text to the same record answers the same document. Runs as the token’s user.",
         "summary": "Capture a page",
         "requestBody": {
           "content": {
@@ -199,6 +208,10 @@
                   "target": {
                     "type": "string",
                     "description": "A record id, or a record’s exact name, to file the capture on; omit to leave it unfiled"
+                  },
+                  "object": {
+                    "type": "string",
+                    "description": "The registry object the page describes — person for a profile, company for a company page, or any object’s slug — to read it against that object’s fields; omit to file the page unread. An object the registry does not hold is refused."
                   }
                 },
                 "required": [

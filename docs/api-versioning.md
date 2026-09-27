@@ -61,6 +61,12 @@ and lists the accepted versions. When `CAPTURE_SCHEMA_VERSION` is bumped, add
 the new number to that list and keep the old one for as long as its shape is
 still read.
 
+SPA-134 added an optional `object` input and an `extraction` output
+(`queued` | `skipped`) to the capture. Both are additive within v1 by the
+rules above, so neither `API_VERSION` nor `CAPTURE_SCHEMA_VERSION` moved: a
+client that sends no `object` gets the capture it always did, plus a field it
+may ignore.
+
 ## The snapshot is the review
 
 `apps/web/src/lib/rpc/openapi.test.ts` checks that the served document is

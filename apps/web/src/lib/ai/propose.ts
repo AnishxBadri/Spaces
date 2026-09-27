@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { activity, document, entity, link, suggestion } from '@spaces/db/schema'
 import type { suggestionKind } from '@spaces/db/schema'
@@ -26,6 +26,8 @@ import { canonicalId } from '#/lib/entities/sweep'
 import { notePayloadSchema } from '@spaces/core/ai/note'
 import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
 import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'
+import { captureObjectOfRun } from './capture-read'
+import type { CaptureObject } from './capture-read'
 
 /**
  * The AI layer's one mutating verb (docs/spec-ai-substrate.md §3, §10).
@@ -52,6 +54,15 @@ import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'
  * `contact_at` link to the record and — SPA-160 — the person written into
  * the reference field the claim came from). Every other kind is refused by
  * name.
+ *
+ * **A captured page is an anchor too (SPA-134).** A capture names somebody
+ * we usually hold no record for, so its read is anchored on the captured
+ * document's own entity (`lib/ai/capture-read.ts`). Two things differ
+ * there, and nothing else: a patch on a document is held to the registry of
+ * the object its run read the page against (`patchAnchor`), and lands on the
+ * one record of that object the page is filed on; an identity on a document
+ * files the page on the person it resolves (`tagged_in`) rather than linking
+ * them `contact_at` it — which is what then gives the patch its record.
  */
 
 export type SuggestionKind = (typeof suggestionKind.enumValues)[number]
@@ -172,6 +183,90 @@ export async function registryFor(
   return getRegistryByObjectId(await objectIdForKindAsync(core))
 }
 
+/**
+ * What a patch on this entity is held to, and — for a captured page — the
+ * object it was read against (SPA-134). A record is its own anchor and its
+ * own registry. A document holds a patch only when a capture read wrote it:
+ * its run names the object, and that object's live registry is the one the
+ * model was handed, so propose and accept validate against what was read.
+ */
+async function patchAnchor(
+  reader: Reader,
+  entityId: string,
+  runId: string | null,
+): Promise<{
+  registry: Array<AttributeDef>
+  page: CaptureObject | null
+}> {
+  const ent = (
+    await reader
+      .select({ kind: entity.kind })
+      .from(entity)
+      .where(eq(entity.id, entityId))
+  ).at(0)
+  if (ent?.kind !== 'document')
+    return { registry: await registryFor(reader, entityId), page: null }
+  const page = await captureObjectOfRun(reader, runId)
+  if (page === null)
+    throw new EntityNotFound({
+      entityId,
+      message: 'A document takes a field change only from a captured page read',
+    })
+  return { registry: await getRegistryByObjectId(page.id), page }
+}
+
+/**
+ * The record a captured page's patch applies to: the one live record of the
+ * object it was read against that the page is filed on. Accepting the
+ * page's identity is what files it on the person (`acceptIdentityInTx`);
+ * a company page applies once it is filed on a company.
+ */
+async function pageTarget(
+  tx: Tx,
+  documentId: string,
+  page: CaptureObject,
+): Promise<string> {
+  const ofObject =
+    page.kind === null
+      ? eq(entity.objectId, page.id)
+      : or(
+          eq(entity.objectId, page.id),
+          and(isNull(entity.objectId), eq(entity.kind, page.kind)),
+        )
+  const filed = await tx
+    .select({ id: entity.id })
+    .from(link)
+    .innerJoin(entity, eq(entity.id, link.toEntityId))
+    .where(
+      and(
+        eq(link.fromEntityId, documentId),
+        eq(link.relation, 'tagged_in'),
+        isNull(entity.mergedIntoId),
+        ofObject,
+      ),
+    )
+  const only = filed.at(0)
+  const what = page.singular.toLowerCase()
+  if (only === undefined)
+    throw invalid([
+      {
+        slug: 'record',
+        message:
+          page.kind === 'person'
+            ? 'Accept the identity first: these fields apply to the person it matches or creates'
+            : `File the page on a ${what} first: these fields apply to the ${what} it is filed on`,
+      },
+    ])
+  if (filed.length > 1)
+    throw invalid([
+      {
+        slug: 'record',
+        message: `The page is filed on more than one ${what}: these fields apply to one`,
+      },
+    ])
+  return only.id
+}
+
 /** Known refusals pass through; anything else is a write failure. */
 const asFailure = (cause: unknown): SuggestionFailure =>
   cause instanceof SuggestionNotFound ||
@@ -209,7 +304,11 @@ export const proposeProgram = Effect.fn('proposeProgram')(function* (
       // A patch is held to the registry now, so the queue never shows a
       // proposal that could not have been accepted when it was made.
       if (input.kind === 'attribute_patch') {
-        const registry = await registryFor(db, input.entityId)
+        const { registry } = await patchAnchor(
+          db,
+          input.entityId,
+          input.runId ?? null,
+        )
         const checked = validateProposal(registry, input.payload)
         if (!checked.ok) throw invalid(checked.issues)
         refs = input.refs ?? proposalRefs(checked.proposal)
@@ -284,7 +383,10 @@ export type Accepted =
       suggestion: Suggestion
       /** What `resolveEntity` did: attached to a known person, or created one. */
       resolved: ResolveResult
-      /** False when the person was already `contact_at` the record. */
+      /**
+       * False when the person was already `contact_at` the record — or, for
+       * a captured page (SPA-134), when the page was already filed on them.
+       */
       linked: boolean
       /**
        * The person-reference attribute that holds the person after this
@@ -399,6 +501,16 @@ async function acceptIdentityInTx(
       { slug: 'identity', message: 'A person cannot be a contact at itself' },
     ])
 
+  // SPA-134: a captured page's identity. The page is not somewhere a person
+  // is a contact at; it is the source they were read from, so it is filed
+  // on them — which is also what its patch then applies through.
+  if (record.kind === 'document')
+    return {
+      resolved,
+      linked: await filePageOn(tx, row, resolved.entityId, actor),
+      filed: null,
+    }
+
   const inserted = await tx
     .insert(link)
     .values({
@@ -423,6 +535,40 @@ async function acceptIdentityInTx(
           actor,
         })
   return { resolved, linked: inserted.length > 0, filed }
+}
+
+/**
+ * File a captured page on the person its identity resolved to: the
+ * `tagged_in` edge a document is filed through, and the `document.refiled`
+ * line `fileDocumentProgram` writes, with the suggestion as its receipt.
+ * False when the page was already filed there.
+ */
+async function filePageOn(
+  tx: Tx,
+  row: Suggestion,
+  personId: string,
+  actor: Decider,
+): Promise<boolean> {
+  const added = await tx
+    .insert(link)
+    .values({
+      fromEntityId: row.entityId,
+      toEntityId: personId,
+      relation: 'tagged_in',
+      source: 'extracted',
+      createdBy: actor.id,
+    })
+    .onConflictDoNothing()
+    .returning({ id: link.id })
+  if (added.length === 0) return false
+  await tx.insert(activity).values({
+    actorId: actor.id,
+    verb: 'document.refiled',
+    subjectEntityId: personId,
+    objectEntityId: row.entityId,
+    meta: { action: 'filed', target: 'record', suggestionId: row.id },
+  })
+  return true
 }
 
 /**
@@ -832,7 +978,11 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
 
         // Validated again: the registry the proposal was checked against
         // may have moved (an option archived, an attribute retired).
-        const registry = await registryFor(tx, row.entityId)
+        const { registry, page } = await patchAnchor(
+          tx,
+          row.entityId,
+          row.runId,
+        )
         const checked = validateProposal(registry, picked)
         if (!checked.ok) throw invalid(checked.issues)
         const { patch, claims } = toPatch(registry, checked.proposal)
@@ -849,7 +999,12 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
           )
 
         const write = await setValuesInTx(tx, {
-          entityId: row.entityId,
+          // A captured page's patch lands on the record the page is filed
+          // on, never on the document (SPA-134).
+          entityId:
+            page === null
+              ? row.entityId
+              : await pageTarget(tx, row.entityId, page),
           patch,
           actor,
           source: 'suggestion',

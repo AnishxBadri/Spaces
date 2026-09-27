@@ -4,6 +4,7 @@ import { db } from '@spaces/db'
 import {
   aiRun,
   apiToken,
+  document,
   duplicateCandidate,
   entity,
   objectDef,
@@ -17,6 +18,7 @@ import { objectIdForKindAsync } from '#/lib/attributes/objects'
 import { getRegistryByObjectId } from '#/lib/attributes/values'
 import type { SuggestionKind } from '#/lib/ai/propose'
 import { isColumnRunTask } from '#/lib/ai/column-run'
+import { captureReadSlug } from '#/lib/ai/capture-read'
 import { resolveRefsProgram } from '#/lib/context/names'
 import type { ResolvedRef } from '#/lib/context/names'
 import { jsonRecord } from '#/lib/json'
@@ -121,6 +123,17 @@ export type SuggestionItem = {
 }
 
 /**
+ * The captured page a card is anchored on (SPA-134): a capture names
+ * somebody we hold no record for, so its read's suggestions sit on the
+ * document itself, and the card's heading names the page — its title and
+ * the address it was captured from — where a record card has its chip.
+ */
+export type CapturedPage = {
+  title: string
+  url: string | null
+}
+
+/**
  * Every open suggestion on one record: the unit of decision is the record,
  * each member accepted or rejected on its own. `id` is the record's id —
  * one card per record, so it is unique within the lane.
@@ -129,6 +142,11 @@ export type SuggestionRow = {
   kind: 'suggestion'
   id: string
   record: SuggestionRecord
+  /**
+   * Set when the card is a captured page's rather than a record's — the
+   * ownerless group, headed by the page. Null for every record card.
+   */
+  page: CapturedPage | null
   /** Newest first. */
   suggestions: Array<SuggestionItem>
   /** The newest member's `created_at` — where the card sorts in the queue. */
@@ -306,6 +324,19 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       .where(inArray(entity.id, entityIds)),
   )
   const headOf = new Map(heads.map((h) => [h.id, h]))
+  // SPA-134: a document is the anchor of a captured page's read; its
+  // address is what the card's heading links.
+  const docIds = heads.filter((h) => h.kind === 'document').map((h) => h.id)
+  const pageUrl = new Map(
+    docIds.length === 0
+      ? []
+      : (yield* query(() =>
+          db
+            .select({ id: document.entityId, url: document.url })
+            .from(document)
+            .where(inArray(document.entityId, docIds)),
+        )).map((d) => [d.id, d.url]),
+  )
 
   // One registry per object, not per record: a card draws its patch's
   // values through the attribute definitions the record's object carries.
@@ -313,10 +344,15 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
     string,
     Awaited<ReturnType<typeof getRegistryByObjectId>>
   >()
-  const registryOf = (head: (typeof heads)[number]) =>
+  const registryOf = (
+    head: (typeof heads)[number],
+    pageObjectId: string | null,
+  ) =>
     query(async () => {
       const core = toObjectKind(head.kind)
+      // A captured page's patch reads through the object it was read as.
       const objectId =
+        pageObjectId ??
         head.objectId ??
         (core === null ? null : await objectIdForKindAsync(core))
       if (objectId === null) return []
@@ -373,10 +409,10 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   const runIds = [
     ...new Set(open.flatMap((s) => (s.runId === null ? [] : [s.runId]))),
   ]
-  const columnRuns = new Map<string, ColumnRunSummary>(
+  const runs =
     runIds.length === 0
       ? []
-      : (yield* query(() =>
+      : yield* query(() =>
           db
             .select({
               id: aiRun.id,
@@ -388,10 +424,34 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
             })
             .from(aiRun)
             .where(inArray(aiRun.id, runIds)),
-        ))
-          .filter((r) => isColumnRunTask(r.task))
-          .map((r) => [r.id, { ...r, startedAt: r.startedAt.toISOString() }]),
+        )
+  const columnRuns = new Map<string, ColumnRunSummary>(
+    runs
+      .filter((r) => isColumnRunTask(r.task))
+      .map((r) => [r.id, { ...r, startedAt: r.startedAt.toISOString() }]),
   )
+  // SPA-134: a capture read's run names the object its page was read as.
+  const pageSlugOf = new Map(
+    runs.flatMap((r) => {
+      const slug = captureReadSlug(r.task)
+      return slug === null ? [] : [[r.id, slug] as const]
+    }),
+  )
+  const pageSlugs = [...new Set(pageSlugOf.values())]
+  const objectIdOfSlug = new Map(
+    pageSlugs.length === 0
+      ? []
+      : (yield* query(() =>
+          db
+            .select({ id: objectDef.id, slug: objectDef.slug })
+            .from(objectDef)
+            .where(inArray(objectDef.slug, pageSlugs)),
+        )).map((o) => [o.slug, o.id]),
+  )
+  const pageObjectOf = (s: (typeof open)[number]): string | null => {
+    const slug = s.runId === null ? undefined : pageSlugOf.get(s.runId)
+    return slug === undefined ? null : (objectIdOfSlug.get(slug) ?? null)
+  }
   const groups = new Map<string, Map<string, SuggestionRow>>()
 
   // `open` is newest first, so the first member seen for a record is its
@@ -400,7 +460,8 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   for (const s of open) {
     const head = headOf.get(s.entityId)
     if (!head) continue
-    const registry = yield* registryOf(head)
+    const pageObjectId = head.kind === 'document' ? pageObjectOf(s) : null
+    const registry = yield* registryOf(head, pageObjectId)
     const item: SuggestionItem = {
       id: s.id,
       kind: s.kind,
@@ -420,9 +481,15 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       groups.set(inRun, group)
       into = group
     }
+    const page: CapturedPage | null =
+      pageObjectId === null
+        ? null
+        : { title: head.name, url: pageUrl.get(head.id) ?? null }
     const card = into.get(s.entityId)
-    if (card) card.suggestions.push(item)
-    else
+    if (card) {
+      card.suggestions.push(item)
+      card.page ??= page
+    } else
       into.set(s.entityId, {
         kind: 'suggestion',
         id: s.entityId,
@@ -433,6 +500,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
           objectSlug: head.objectSlug,
           objectSingular: head.objectSingular,
         },
+        page,
         suggestions: [item],
         latestAt: item.createdAt,
       })

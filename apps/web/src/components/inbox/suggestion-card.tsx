@@ -9,6 +9,7 @@ import { Button } from '#/components/ui/button'
 import { checkboxClasses } from '#/components/ui/checkbox'
 import { readOptionProposals } from '@spaces/core/ai/attribute-ai'
 import { OptionProposalBody } from './option-proposal'
+import { CapturedPageHeading } from './captured-page-heading'
 import { readIdentityPayload } from '@spaces/core/ai/identity'
 import type { IdentityPayload } from '@spaces/core/ai/identity'
 import { readNotePayload } from '@spaces/core/ai/note'
@@ -607,7 +608,12 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
   return (
     <li className="flex flex-col border border-hairline bg-paper shadow-[3px_3px_0_0_var(--hairline)]">
       <div className="flex min-h-11 items-center gap-3 border-b border-hairline px-5 py-2.5">
-        <RecordChip record={card.record} />
+        {/* SPA-134: a captured page's card is headed by the page. */}
+        {card.page === null ? (
+          <RecordChip record={card.record} />
+        ) : (
+          <CapturedPageHeading page={card.page} />
+        )}
         <span className="label-caps text-graphite">Suggestions</span>
         <span className="mono text-micro text-graphite">{n}</span>
         <AcceptAllButton

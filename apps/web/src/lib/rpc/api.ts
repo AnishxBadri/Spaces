@@ -106,6 +106,8 @@ import { API_PREFIX, API_VERSION, CAPTURE_SCHEMA_VERSION } from './versions'
  * | No procedure at that method and path                 | 404    | `NotFound`                        |
  * | A capture's target names no record the token's user  | 404    | `NotFound`                        |
  * | can see, or names several                            |        |                                   |
+ * | A capture's `object` is not in the registry; the     | 400    | `BadRequest`                      |
+ * | message names the slug and nothing was stored        |        |                                   |
  * | A capture's target will not take a document (a       | 400    | `BadRequest`                      |
  * | space, a document, a merged record) — birth's reason |        |                                   |
  * | A capture's `text` is over `MAX_CAPTURE_BYTES`; the  | 413    | `PayloadTooLarge`                 |
@@ -462,6 +464,12 @@ const CapturePayload = Schema.Struct({
         'A record id, or a record’s exact name, to file the capture on; omit to leave it unfiled',
     }),
   ),
+  object: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        'The registry object the page describes — person for a profile, company for a company page, or any object’s slug — to read it against that object’s fields; omit to file the page unread. An object the registry does not hold is refused.',
+    }),
+  ),
 })
 
 const Captured = Schema.Struct({
@@ -469,6 +477,10 @@ const Captured = Schema.Struct({
   url: Schema.String.annotate({
     description:
       'Where the capture shows in the app: the record it was filed on, or the unfiled inbox',
+  }),
+  extraction: Schema.Literals(['queued', 'skipped']).annotate({
+    description:
+      'queued: the page will be read against the declared object and its suggestions land in the inbox. skipped: no object was declared, or no model is routed for the extract lane — the page is filed all the same.',
   }),
 })
 
@@ -502,7 +514,7 @@ class CaptureGroup extends HttpApiGroup.make('capture')
         OpenApi.annotations({
           summary: 'Capture a page',
           description:
-            'Files a page’s text as a document: a text/plain blob named by the title, with the page’s URL on the row, filed on the target record or left unfiled, extraction queued behind it. Re-posting the same text to the same record answers the same document. Runs as the token’s user.',
+            'Files a page’s text as a document: a text/plain blob named by the title, with the page’s URL on the row, filed on the target record or left unfiled, extraction queued behind it. With `object` declared and the extract lane routed, the page is also read against that object’s fields and its suggestions land in the inbox, anchored on the page; `extraction` says whether that read was queued. Re-posting the same text to the same record answers the same document. Runs as the token’s user.',
         }),
       ),
   )
@@ -738,6 +750,7 @@ const captureFailure = (
     case 'CaptureTargetNotFound':
       return Effect.fail(new NotFound({ message: failure.message }))
     case 'CaptureTargetRefused':
+    case 'CaptureObjectUnknown':
       return Effect.fail(new BadRequest({ message: failure.message }))
     case 'CaptureFailed':
       return Effect.die(failure)

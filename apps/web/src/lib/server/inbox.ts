@@ -21,6 +21,7 @@ import { requireUser } from './shared'
  */
 
 export type {
+  CapturedPage,
   ColumnRunRow,
   ColumnRunSummary,
   DuplicateCandidateRow,
