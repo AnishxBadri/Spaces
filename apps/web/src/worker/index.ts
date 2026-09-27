@@ -19,6 +19,10 @@ import { suggestSpaces } from './jobs/suggest-spaces'
 import { extractKeyTerms } from './jobs/extract-key-terms'
 import { visionDocument } from './jobs/vision-document'
 import { attributeRun } from './jobs/attribute-run'
+import {
+  COLUMN_RUN_EXPIRE_SECONDS,
+  attributeColumnRun,
+} from './jobs/attribute-column-run'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -218,6 +222,32 @@ async function main() {
     QUEUES.attributeRun,
     { batchSize: 1, includeMetadata: true },
     runJob(attributeRun, { host, layer: Layer.empty }),
+  )
+  // Column run (SPA-122): the per-cell program over every row of one saved
+  // view, with `singletonKey = <viewId>:<attributeId>` — `exclusive`, so a
+  // second press while one is queued or active adds nothing. Created before
+  // the plain create loop for the deck reader's reason. One long job, a
+  // batch of one, never retried (`attributeColumnRun.retry`): a retry would
+  // re-spend on every row the first attempt had not proposed. Hours, not
+  // pg-boss's default 15 minutes, before an active run expires: it is one
+  // lane call per row of a view. No Layer.
+  await boss
+    .createQueue(QUEUES.attributeColumnRun, {
+      policy: 'exclusive',
+      expireInSeconds: COLUMN_RUN_EXPIRE_SECONDS,
+    })
+    .catch(() => {})
+  if (attributeColumnRun.retry)
+    await boss.updateQueue(QUEUES.attributeColumnRun, {
+      retryLimit: attributeColumnRun.retry.limit,
+      retryDelay: attributeColumnRun.retry.delaySeconds,
+      retryBackoff: attributeColumnRun.retry.backoff,
+      expireInSeconds: COLUMN_RUN_EXPIRE_SECONDS,
+    })
+  await boss.work(
+    QUEUES.attributeColumnRun,
+    { batchSize: 1, includeMetadata: true },
+    runJob(attributeColumnRun, { host, layer: Layer.empty }),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots

@@ -58,6 +58,42 @@ export const openCellProposals = createServerFn()
     return effectFn(openCellProposalsProgram)(data.entityIds)
   })
 
+export type { ColumnRunEnqueued, ColumnRunEstimate } from '../ai/column-run'
+
+const byColumn = z.object({
+  viewId: z.string().uuid(),
+  attributeId: z.string().uuid(),
+})
+
+/**
+ * Column run (SPA-122): what "Run on this view" would do — the view's
+ * records counted in SQL over its conditions, the ones already proposed,
+ * the rough token cost — or why it is refused. Read when the confirm
+ * dialog opens; nothing is queued.
+ */
+export const estimateColumnRun = createServerFn()
+  .validator(byColumn)
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { estimateColumnRunProgram } = await import('../ai/column-run')
+    const { effectFn } = await import('./effect')
+    return effectFn(estimateColumnRunProgram)(
+      data.viewId,
+      data.attributeId,
+      u.id,
+    )
+  })
+
+/** The dialog's confirm: one `attribute.column-run` job, or the refusal. */
+export const runColumn = createServerFn({ method: 'POST' })
+  .validator(byColumn)
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { pressColumnRunProgram } = await import('../ai/column-run')
+    const { effectFn } = await import('./effect')
+    return effectFn(pressColumnRunProgram)(data.viewId, data.attributeId, u.id)
+  })
+
 /**
  * "Add option" on a registry proposal: the attribute's option-list edit,
  * which is admin-owned (`updateAttribute`), then the proposal accepted.

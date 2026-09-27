@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { EmptyState } from '#/components/empty-state'
 import { SuggestionCard } from '#/components/inbox/suggestion-card'
+import { ColumnRunGroup } from '#/components/inbox/column-run-group'
 import { PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import {
@@ -14,8 +15,10 @@ import {
   runDedupeSweep,
 } from '#/lib/server-fns'
 import type {
+  ColumnRunRow,
   DuplicateCandidateRow,
   InboxKind,
+  InboxLane,
   InboxSide,
   SuggestionRow,
 } from '#/lib/server-fns'
@@ -64,6 +67,15 @@ function isDuplicateCandidate(row: QueueRow): row is DuplicateCandidateRow {
   return row.kind === 'duplicate_candidate' && 'a' in row && 'b' in row
 }
 
+function isColumnRunRow(row: QueueRow): row is ColumnRunRow {
+  return (
+    row.kind === 'column_run' &&
+    'run' in row &&
+    'cards' in row &&
+    Array.isArray(row.cards)
+  )
+}
+
 function isSuggestionRow(row: QueueRow): row is SuggestionRow {
   return (
     row.kind === 'suggestion' &&
@@ -91,6 +103,12 @@ const RENDERERS: Record<InboxKind, InboxRenderer> = {
   suggestion: ({ row }) =>
     isSuggestionRow(row) ? (
       <SuggestionCard card={row} />
+    ) : (
+      <PayloadFallback row={row} />
+    ),
+  column_run: ({ row }) =>
+    isColumnRunRow(row) ? (
+      <ColumnRunGroup group={row} />
     ) : (
       <PayloadFallback row={row} />
     ),
@@ -134,7 +152,11 @@ function reasonLabel(pair: DuplicateCandidateRow): string {
  * The filter over the one queue: All, or one lane. React state only — it
  * does not survive navigation, and it never changes what the server sends.
  */
-type Lane = 'all' | InboxKind
+type Lane = 'all' | InboxLane
+
+/** A column run's group is suggestions, gathered — it sits in that tab. */
+const laneOf = (kind: string): InboxLane =>
+  kind === 'duplicate_candidate' ? 'duplicate_candidate' : 'suggestion'
 
 const LANES: Array<{ key: Lane; label: string }> = [
   { key: 'all', label: 'All' },
@@ -156,11 +178,18 @@ function InboxPage() {
     search.lane ? LANE_PARAM[search.lane] : 'all',
   )
   const visible =
-    lane === 'all' ? rows : rows.filter((row) => row.kind === lane)
+    lane === 'all' ? rows : rows.filter((row) => laneOf(row.kind) === lane)
   const countOf = (key: Lane) =>
-    key === 'all' ? rows.length : rows.filter((r) => r.kind === key).length
+    key === 'all'
+      ? rows.length
+      : rows.filter((r) => laneOf(r.kind) === key).length
   const suggestionCount = rows.reduce(
-    (n, r) => (r.kind === 'suggestion' ? n + r.suggestions.length : n),
+    (n, r) =>
+      r.kind === 'suggestion'
+        ? n + r.suggestions.length
+        : r.kind === 'column_run'
+          ? n + r.cards.reduce((m, c) => m + c.suggestions.length, 0)
+          : n,
     0,
   )
 

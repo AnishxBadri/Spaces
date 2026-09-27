@@ -39,6 +39,8 @@ import {
 import type { Suggestion, SuggestionFailure } from './propose'
 import { providerFailure } from './providers/test-call'
 import type { LaneNotRouted, RouteReadFailed } from './route'
+import { callStep, suggestionOutputRef, withRun } from './run'
+import type { RunScope } from './run'
 import { sensitivityFor } from './sensitivity-for'
 import type {
   SensitivityEntityNotFound,
@@ -416,6 +418,13 @@ export type AttributeRunInput = {
   /** ISO 8601; defaults to now. */
   asOf?: string
   jobRunId?: string
+  /**
+   * The run this cell is one step of (`./run.ts`, SPA-100) — a column run
+   * (SPA-122) threads its one run through every row. Absent, the press is
+   * its own one-step run, opened at the model call and closed when the
+   * cell settles.
+   */
+  runId?: string
 }
 
 export type AttributeRunResult = {
@@ -429,10 +438,35 @@ export type AttributeRunResult = {
   skipped: string | null
 }
 
+/** What the Usage page lists a per-cell run as, before the attribute's name. */
+export const ATTRIBUTE_RUN_TASK = 'AI attribute'
+
 export const attributeRunProgram = Effect.fn('attributeRun')(function* (
   input: AttributeRunInput,
 ): Effect.fn.Return<AttributeRunResult, AttributeRunFailure> {
   const cell = yield* readCell(input.entityId, input.attributeId)
+  return yield* withRun(
+    input.runId,
+    {
+      task: `${ATTRIBUTE_RUN_TASK} · ${cell.def.name}`,
+      entityId: cell.record.id,
+      startedBy: { type: 'user', id: input.userId },
+    },
+    (run) => attributeRunInRun(input, cell, run),
+    attributeRunMessage,
+  )
+})
+
+/**
+ * The cell inside its run: one lane call, so one step — written once the
+ * answer is read, citing the value suggestion it produced (or nothing, when
+ * the model found no answer; the call was made and paid for either way).
+ */
+const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
+  input: AttributeRunInput,
+  cell: Cell,
+  run: RunScope,
+): Effect.fn.Return<AttributeRunResult, AttributeRunFailure> {
   const { def, ai, record } = cell
   // Checked again here: two presses can race past the button's check.
   if (yield* openFor(record.id, def.slug))
@@ -457,6 +491,7 @@ export const attributeRunProgram = Effect.fn('attributeRun')(function* (
 
   const task = taskFor(cell)
   const sensitivity = yield* sensitivityFor(record.id)
+  const runId = yield* run.id
   const answered = yield* completeProgram(ai.lane, items, outputSchema(cell), {
     caller: { type: 'user', id: input.userId },
     sensitivity: sensitivity.sensitivity,
@@ -467,7 +502,22 @@ export const attributeRunProgram = Effect.fn('attributeRun')(function* (
     task,
     ...(input.model === undefined ? {} : { model: input.model }),
     ...(input.jobRunId === undefined ? {} : { jobRunId: input.jobRunId }),
+    runId,
   })
+  const settle = (result: AttributeRunResult) => {
+    const first = result.suggestions.at(0)
+    return run
+      .step(
+        callStep(
+          ai.lane,
+          contextRefs,
+          answered,
+          first === undefined ? null : suggestionOutputRef(first.id),
+          input.jobRunId,
+        ),
+      )
+      .pipe(Effect.as(result))
+  }
 
   const raw = z
     .record(z.string(), z.unknown())
@@ -475,12 +525,12 @@ export const attributeRunProgram = Effect.fn('attributeRun')(function* (
       answered.output.kind === 'object' ? answered.output.object : undefined,
     )
   if (!raw.success)
-    return {
+    return yield* settle({
       suggestions: [],
       proposedOptions: [],
       dropped: [],
       skipped: `The model answered in no shape ${def.name} can be read from`,
-    }
+    })
   const answer = answerSchema.safeParse(raw.data)
   const reason = answer.success ? (answer.data.reason?.trim() ?? '') : ''
   const dropped: Array<string> = []
@@ -558,6 +608,7 @@ export const attributeRunProgram = Effect.fn('attributeRun')(function* (
             .filter((l) => l !== null)
             .join('\n'),
           refs,
+          runId,
           proposedBy,
         }),
       )
@@ -578,12 +629,13 @@ export const attributeRunProgram = Effect.fn('attributeRun')(function* (
           .filter((l) => l !== null)
           .join('\n'),
         refs,
+        runId,
         proposedBy,
       }),
     )
 
   if (suggestions.length === 0)
-    return {
+    return yield* settle({
       suggestions,
       proposedOptions,
       dropped,
@@ -593,8 +645,8 @@ export const attributeRunProgram = Effect.fn('attributeRun')(function* (
       ]
         .filter((l) => l !== null)
         .join('. '),
-    }
-  return { suggestions, proposedOptions, dropped, skipped: null }
+    })
+  return yield* settle({ suggestions, proposedOptions, dropped, skipped: null })
 })
 
 /**

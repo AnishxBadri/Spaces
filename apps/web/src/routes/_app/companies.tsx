@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
+import { useColumnRun } from '#/components/views/column-run'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import {
   fieldSpanClass,
@@ -141,6 +142,11 @@ function CompaniesPage() {
   const navigate = useNavigate()
   const prefs = useTablePrefs(PREFS_KEY)
   const { view: activeId } = Route.useSearch()
+  // SPA-122: "Run on this view" in an AI attribute's column header.
+  const columnRun = useColumnRun({
+    viewId: views.find((v) => v.id === activeId)?.id ?? null,
+    registry,
+  })
   const vs = useViewState({
     views,
     activeId: activeId ?? null,
@@ -412,6 +418,7 @@ function CompaniesPage() {
               registry={registry}
             >
               <RecordTable
+                columnActions={columnRun.columnActions}
                 table={table}
                 label="Companies"
                 stickyColumnId="name"
@@ -431,6 +438,7 @@ function CompaniesPage() {
                 }
               />
             </AiCellsProvider>
+            {columnRun.dialog}
           </>
         )}
       </div>

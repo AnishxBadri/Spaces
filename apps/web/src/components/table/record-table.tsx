@@ -56,6 +56,17 @@ export type TablePage = {
   onLoadMore: () => void
 }
 
+/**
+ * A surface's own verb in a column's header menu, after sort and hide —
+ * "Run on this view" on an AI attribute's column (SPA-122). The menu closes
+ * on select, so a verb that opens a dialog keeps the dialog outside it and
+ * only flips its state here.
+ */
+export type ColumnAction = {
+  label: string
+  onSelect: () => void
+}
+
 export function RecordTable<T>({
   table,
   stickyColumnId,
@@ -63,6 +74,7 @@ export function RecordTable<T>({
   label,
   onRowClick,
   page,
+  columnActions,
 }: {
   table: Table<T>
   /** Column pinned to the left edge while the rest scrolls under it. */
@@ -89,6 +101,8 @@ export function RecordTable<T>({
    * the same 32px lane, the same two slots, no second table chrome.
    */
   page?: TablePage
+  /** The surface's verbs for one column, by its id; none when omitted. */
+  columnActions?: (columnId: string) => ReadonlyArray<ColumnAction>
 }) {
   const rows = table.getRowModel().rows
 
@@ -111,6 +125,7 @@ export function RecordTable<T>({
                   header={header}
                   table={table}
                   sticky={header.column.id === stickyColumnId}
+                  actions={columnActions?.(header.column.id) ?? []}
                 />
               ))}
               {addColumn ? (
@@ -206,10 +221,12 @@ function HeaderCell<T>({
   header,
   table,
   sticky,
+  actions,
 }: {
   header: Header<T, unknown>
   table: Table<T>
   sticky: boolean
+  actions: ReadonlyArray<ColumnAction>
 }) {
   const { column } = header
   const sorted = column.getIsSorted()
@@ -241,7 +258,7 @@ function HeaderCell<T>({
         sticky && 'sticky left-0 z-20 bg-paper',
       )}
     >
-      {column.getCanSort() || column.getCanHide() ? (
+      {column.getCanSort() || column.getCanHide() || actions.length > 0 ? (
         // Header cells are buttons: the menu carries sort both ways and hide.
         // The sort direction reads as a mono arrow after the label; the
         // chevron only appears on hover, so a resting header stays quiet.
@@ -301,6 +318,15 @@ function HeaderCell<T>({
                 Hide column
               </DropdownMenuItem>
             ) : null}
+            {actions.length > 0 &&
+            (column.getCanSort() || column.getCanHide()) ? (
+              <DropdownMenuSeparator />
+            ) : null}
+            {actions.map((a) => (
+              <DropdownMenuItem key={a.label} onSelect={a.onSelect}>
+                {a.label}
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (

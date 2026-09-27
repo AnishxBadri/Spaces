@@ -72,7 +72,13 @@ export const acceptSuggestionsForRecord = createServerFn({ method: 'POST' })
   })
 
 export const acceptSuggestionColumn = createServerFn({ method: 'POST' })
-  .validator(z.object({ attributeSlug: z.string().min(1) }))
+  .validator(
+    z.object({
+      attributeSlug: z.string().min(1),
+      // A column run's "Accept all" (SPA-122): only that run's suggestions.
+      runId: z.string().uuid().optional(),
+    }),
+  )
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { acceptColumnProgram, suggestionMessage } =
@@ -82,6 +88,7 @@ export const acceptSuggestionColumn = createServerFn({ method: 'POST' })
       return await effectFn(acceptColumnProgram)({
         attributeSlug: data.attributeSlug,
         actorId: u.id,
+        ...(data.runId === undefined ? {} : { runId: data.runId }),
       })
     } catch (err) {
       throw new Error(suggestionMessage(err))

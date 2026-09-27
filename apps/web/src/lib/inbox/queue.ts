@@ -2,6 +2,7 @@ import { Effect, Schema } from 'effect'
 import { and, count, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
+  aiRun,
   apiToken,
   duplicateCandidate,
   entity,
@@ -15,6 +16,7 @@ import { toObjectKind } from '@spaces/core/attributes/registry'
 import { objectIdForKindAsync } from '#/lib/attributes/objects'
 import { getRegistryByObjectId } from '#/lib/attributes/values'
 import type { SuggestionKind } from '#/lib/ai/propose'
+import { isColumnRunTask } from '#/lib/ai/column-run'
 import { resolveRefsProgram } from '#/lib/context/names'
 import type { ResolvedRef } from '#/lib/context/names'
 import { jsonRecord } from '#/lib/json'
@@ -134,18 +136,63 @@ export type SuggestionRow = {
 }
 
 /**
+ * A column run as its inbox header reads it (SPA-122): the `ai_run` row's
+ * task, where it stands, and — for a run the daily cap stopped — its
+ * summary line (rows done, rows left), which the run writes to
+ * `ai_run.error` when it closes.
+ */
+export type ColumnRunSummary = {
+  id: string
+  task: string
+  status: 'running' | 'done' | 'failed'
+  /** The stop line: why the run ended early, with rows done and left. */
+  error: string | null
+  /** Rows the model was asked about so far — the run's steps. */
+  rowsRun: number
+  startedAt: string
+}
+
+/**
+ * Every open suggestion one column run wrote, under one header (SPA-122):
+ * the run's summary and "Accept all", which accepts the run's attribute
+ * across its suggestions through `acceptColumnProgram`. The members are the
+ * ordinary per-record cards, so each is still decided on its own.
+ */
+export type ColumnRunRow = {
+  kind: 'column_run'
+  /** The run's id — one row per run, so unique within the lane. */
+  id: string
+  run: ColumnRunSummary
+  /**
+   * The attribute the run proposed — what "Accept all" accepts. Null when
+   * no member proposes a value (only registry proposals are left), and the
+   * header then offers no bulk accept.
+   */
+  attributeSlug: string | null
+  /** Newest first, by each record's newest member. */
+  cards: Array<SuggestionRow>
+  latestAt: string
+}
+
+/**
  * Every row the inbox can hold. Add a lane by adding a member here and a
  * renderer in `routes/_app/inbox.tsx` — the queue, the count and the page
  * follow. Nothing else in the app switches on this union.
  */
-export type InboxRow = DuplicateCandidateRow | SuggestionRow
+export type InboxRow = DuplicateCandidateRow | SuggestionRow | ColumnRunRow
 
 export type InboxKind = InboxRow['kind']
+
+/**
+ * The tables a row comes from — what the header tabs and the counts split
+ * by. A column run's group is suggestions, gathered; it is not a lane.
+ */
+export type InboxLane = 'suggestion' | 'duplicate_candidate'
 
 /** `open` is the whole queue; `byKind` is what each lane contributes. */
 export type InboxCounts = {
   open: number
-  byKind: Record<InboxKind, number>
+  byKind: Record<InboxLane, number>
 }
 
 /**
@@ -228,7 +275,7 @@ function patchFields(
 
 const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   scope: InboxScope,
-): Effect.fn.Return<Array<SuggestionRow>, InboxQueryFailed> {
+): Effect.fn.Return<Array<SuggestionRow | ColumnRunRow>, InboxQueryFailed> {
   const isOpen = eq(suggestion.status, 'open')
   const open = yield* query(() =>
     db
@@ -320,6 +367,33 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
     return token === undefined ? { via: 'integration' } : { via: 'mcp', token }
   }
 
+  // SPA-122: a column run's suggestions gather under the run. The runs are
+  // read once for the lane; a run that is not a column run (a per-cell
+  // press, a deck read) leaves its suggestions on their record's card.
+  const runIds = [
+    ...new Set(open.flatMap((s) => (s.runId === null ? [] : [s.runId]))),
+  ]
+  const columnRuns = new Map<string, ColumnRunSummary>(
+    runIds.length === 0
+      ? []
+      : (yield* query(() =>
+          db
+            .select({
+              id: aiRun.id,
+              task: aiRun.task,
+              status: aiRun.status,
+              error: aiRun.error,
+              rowsRun: sql<number>`jsonb_array_length(${aiRun.steps})::int`,
+              startedAt: aiRun.startedAt,
+            })
+            .from(aiRun)
+            .where(inArray(aiRun.id, runIds)),
+        ))
+          .filter((r) => isColumnRunTask(r.task))
+          .map((r) => [r.id, { ...r, startedAt: r.startedAt.toISOString() }]),
+  )
+  const groups = new Map<string, Map<string, SuggestionRow>>()
+
   // `open` is newest first, so the first member seen for a record is its
   // newest and Map insertion order is already the queue's order.
   const cards = new Map<string, SuggestionRow>()
@@ -339,10 +413,17 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       createdAt: s.createdAt.toISOString(),
       runId: s.runId,
     }
-    const card = cards.get(s.entityId)
+    const inRun = s.runId !== null && columnRuns.has(s.runId) ? s.runId : null
+    let into = cards
+    if (inRun !== null) {
+      const group = groups.get(inRun) ?? new Map<string, SuggestionRow>()
+      groups.set(inRun, group)
+      into = group
+    }
+    const card = into.get(s.entityId)
     if (card) card.suggestions.push(item)
     else
-      cards.set(s.entityId, {
+      into.set(s.entityId, {
         kind: 'suggestion',
         id: s.entityId,
         record: {
@@ -356,7 +437,29 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
         latestAt: item.createdAt,
       })
   }
-  return [...cards.values()]
+  const runRows = [...groups].flatMap(([runId, group]): Array<ColumnRunRow> => {
+    const run = columnRuns.get(runId)
+    const members = [...group.values()]
+    const newest = members.at(0)
+    if (run === undefined || newest === undefined) return []
+    // The run proposed one attribute; any member with a value names it.
+    const attributeSlug =
+      members
+        .flatMap((c) => c.suggestions)
+        .flatMap((i) => (i.kind === 'attribute_patch' ? (i.fields ?? []) : []))
+        .at(0)?.slug ?? null
+    return [
+      {
+        kind: 'column_run',
+        id: runId,
+        run,
+        attributeSlug,
+        cards: members,
+        latestAt: newest.latestAt,
+      },
+    ]
+  })
+  return [...cards.values(), ...runRows]
 })
 
 /**
@@ -389,7 +492,7 @@ export const countOpenInboxProgram = Effect.fn('countOpenInboxProgram')(
     const rows = yield* query(() =>
       db
         .select({
-          kind: sql<InboxKind>`'suggestion'`.as('kind'),
+          kind: sql<InboxLane>`'suggestion'`.as('kind'),
           value: count(),
         })
         .from(suggestion)
@@ -397,14 +500,14 @@ export const countOpenInboxProgram = Effect.fn('countOpenInboxProgram')(
         .unionAll(
           db
             .select({
-              kind: sql<InboxKind>`'duplicate_candidate'`.as('kind'),
+              kind: sql<InboxLane>`'duplicate_candidate'`.as('kind'),
               value: count(),
             })
             .from(duplicateCandidate)
             .where(eq(duplicateCandidate.status, 'open')),
         ),
     )
-    const byKind: Record<InboxKind, number> = {
+    const byKind: Record<InboxLane, number> = {
       duplicate_candidate: 0,
       suggestion: 0,
     }

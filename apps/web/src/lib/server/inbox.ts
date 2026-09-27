@@ -21,9 +21,12 @@ import { requireUser } from './shared'
  */
 
 export type {
+  ColumnRunRow,
+  ColumnRunSummary,
   DuplicateCandidateRow,
   InboxCounts,
   InboxKind,
+  InboxLane,
   InboxRow,
   InboxScopeRecord,
   SuggestionCitation,

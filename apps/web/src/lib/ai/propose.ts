@@ -965,11 +965,18 @@ export const acceptRecordProgram = Effect.fn('acceptRecordProgram')(
  * "Accept this column": one attribute across every open patch that
  * proposes it, whatever record it is on. Only that field of each row is
  * accepted; the row's other fields stay open for their own decision.
+ *
+ * `runId` narrows it to one run's suggestions — a column run's "Accept all"
+ * in /inbox (SPA-122), which must not also accept the same attribute
+ * proposed elsewhere by another run. A registry proposal (an empty patch
+ * naming a wanted option) never matches: it proposes no value for the slug,
+ * and accepting it would add nothing.
  */
 export const acceptColumnProgram = Effect.fn('acceptColumnProgram')(
   function* (input: {
     attributeSlug: string
     actorId: string
+    runId?: string
   }): Effect.fn.Return<Array<BatchOutcome>, SuggestionFailure> {
     const rows = yield* read(() =>
       db
@@ -980,6 +987,9 @@ export const acceptColumnProgram = Effect.fn('acceptColumnProgram')(
             eq(suggestion.status, 'open'),
             eq(suggestion.kind, 'attribute_patch'),
             sql`(${suggestion.payload} -> ${input.attributeSlug}) is not null`,
+            input.runId === undefined
+              ? undefined
+              : eq(suggestion.runId, input.runId),
           ),
         )
         .orderBy(asc(suggestion.createdAt), asc(suggestion.id)),

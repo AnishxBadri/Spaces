@@ -7,6 +7,7 @@ import { compileConditions } from './sql'
 import { entityValuesResolver } from './resolve'
 import { listScope } from './scope'
 import type { SQL } from 'drizzle-orm'
+import type { FieldResolver } from './sql'
 import type { Condition } from '@spaces/core/views/filter'
 import type { ListScope } from './scope'
 
@@ -63,11 +64,68 @@ export type ViewCount = { count: number } | { count: null; reason: string }
 export type LiveConditions = { viewId: string; filter: Array<Condition> }
 
 /** Which list an object row's records are shown on — the page the chip opens. */
-const scopeOf = (object: { id: string; slug: string }): ListScope => {
+export const scopeOf = (object: { id: string; slug: string }): ListScope => {
   if (object.slug === CORE_OBJECTS.company.slug) return { kind: 'company' }
   if (object.slug === CORE_OBJECTS.person.slug) return { kind: 'person' }
   if (object.slug === CORE_OBJECTS.deal.slug) return { kind: 'deal' }
   return { kind: 'custom', objectId: object.id }
+}
+
+/**
+ * The object's live registry as the list page reads it — the resolver its
+ * `where` is compiled with — plus the archived attributes' names, which only
+ * name a reason. Shared with the column run (SPA-122), which walks exactly
+ * the rows a chip counts.
+ */
+export type ViewLens = {
+  resolve: FieldResolver
+  archivedName: ReadonlyMap<string, string>
+}
+
+export const viewLensProgram = Effect.fn('viewLensProgram')(function* (
+  objectId: string,
+): Effect.fn.Return<ViewLens, ViewCountFailed> {
+  // Every attribute, archived included: the live ones build the resolver
+  // (exactly as the list page does), the archived ones only name a reason.
+  const attributes = yield* query(() =>
+    db
+      .select({
+        slug: attribute.slug,
+        name: attribute.name,
+        type: attribute.type,
+        archived: attribute.archived,
+      })
+      .from(attribute)
+      .where(eq(attribute.objectId, objectId)),
+  )
+  return {
+    resolve: entityValuesResolver(attributes.filter((a) => !a.archived)),
+    archivedName: new Map(
+      attributes.filter((a) => a.archived).map((a) => [a.slug, a.name]),
+    ),
+  }
+})
+
+/**
+ * A view's conditions compiled to the list page's `where` — or, when any
+ * slug does not resolve, the condition that would have been dropped, named
+ * by its archived attribute when there is one, and never compiled. A caller
+ * that counts or walks rows refuses on `lost`; it never widens.
+ */
+export function compileViewWhere(
+  conditions: ReadonlyArray<Condition>,
+  lens: ViewLens,
+): { where: SQL } | { lost: string; archived: boolean } {
+  const lost = conditions.find((c) => lens.resolve(c.slug) === null)
+  if (lost) {
+    const name = lens.archivedName.get(lost.slug)
+    return name === undefined
+      ? { lost: lost.slug, archived: false }
+      : { lost: name, archived: true }
+  }
+  return {
+    where: compileConditions([...conditions], lens.resolve) ?? sql`true`,
+  }
 }
 
 export const countViewsProgram = Effect.fn('countViewsProgram')(function* (
@@ -104,29 +162,7 @@ export const countViewsProgram = Effect.fn('countViewsProgram')(function* (
         ),
       ),
   )
-  // Every attribute, archived included: the live ones build the resolver
-  // (exactly as the list page does), the archived ones only name a reason.
-  const attributes = yield* query(() =>
-    db
-      .select({
-        slug: attribute.slug,
-        name: attribute.name,
-        type: attribute.type,
-        archived: attribute.archived,
-      })
-      .from(attribute)
-      .where(eq(attribute.objectId, objectId)),
-  )
-  const resolve = entityValuesResolver(attributes.filter((a) => !a.archived))
-  const archivedName = new Map(
-    attributes.filter((a) => a.archived).map((a) => [a.slug, a.name]),
-  )
-  const why = (slug: string) => {
-    const name = archivedName.get(slug)
-    return name === undefined
-      ? `Not counted: it filters on “${slug}”, which this list no longer has`
-      : `Not counted: it filters on “${name}”, which is archived`
-  }
+  const lens = yield* viewLensProgram(objectId)
 
   const out: Record<string, ViewCount> = {}
   const countable: Array<{ id: string; where: SQL }> = []
@@ -140,15 +176,15 @@ export const countViewsProgram = Effect.fn('countViewsProgram')(function* (
     const conditions = live?.viewId === id ? live.filter : stored
     // Resolve before compiling — `compileConditions` would silently drop
     // the condition and count a wider set than the view names (see above).
-    const lost = conditions.find((c) => resolve(c.slug) === null)
-    if (lost) {
-      out[id] = { count: null, reason: why(lost.slug) }
+    const compiled = compileViewWhere(conditions, lens)
+    if ('lost' in compiled) {
+      out[id] = {
+        count: null,
+        reason: `Not counted: it filters on “${compiled.lost}”, which ${compiled.archived ? 'is archived' : 'this list no longer has'}`,
+      }
       continue
     }
-    countable.push({
-      id,
-      where: compileConditions(conditions, resolve) ?? sql`true`,
-    })
+    countable.push({ id, where: compiled.where })
   }
   if (countable.length === 0) return out
 

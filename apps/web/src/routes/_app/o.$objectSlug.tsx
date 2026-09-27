@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
+import { useColumnRun } from '#/components/views/column-run'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import {
   fieldSpanClass,
@@ -149,6 +150,11 @@ function ObjectListPage() {
   // FROZEN: renaming resets saved column layouts with no recovery path.
   const prefs = useTablePrefs(`dealos.o-${object.slug}-table.v1`)
   const { view: activeId } = Route.useSearch()
+  // SPA-122: "Run on this view" in an AI attribute's column header.
+  const columnRun = useColumnRun({
+    viewId: views.find((v) => v.id === activeId)?.id ?? null,
+    registry,
+  })
   const vs = useViewState({
     views,
     activeId: activeId ?? null,
@@ -425,6 +431,7 @@ function ObjectListPage() {
               registry={registry}
             >
               <RecordTable
+                columnActions={columnRun.columnActions}
                 table={table}
                 label={object.plural}
                 stickyColumnId="name"
@@ -446,6 +453,7 @@ function ObjectListPage() {
                 }
               />
             </AiCellsProvider>
+            {columnRun.dialog}
           </>
         )}
       </div>

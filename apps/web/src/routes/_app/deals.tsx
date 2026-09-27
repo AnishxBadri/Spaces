@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
+import { useColumnRun } from '#/components/views/column-run'
 import { matchesConditions } from '@spaces/core/views/filter'
 import { DealBoard } from '#/components/deal-board'
 import {
@@ -188,6 +189,11 @@ function DealsPage() {
   const [globalFilter, setGlobalFilter] = useState('')
   const prefs = useTablePrefs(PREFS_KEY)
   const { view: activeId } = Route.useSearch()
+  // SPA-122: "Run on this view" in an AI attribute's column header.
+  const columnRun = useColumnRun({
+    viewId: views.find((v) => v.id === activeId)?.id ?? null,
+    registry,
+  })
   const vs = useViewState<{ group: string | null; stage: string | null }>({
     views,
     activeId: activeId ?? null,
@@ -504,6 +510,7 @@ function DealsPage() {
               registry={registry}
             >
               <RecordTable
+                columnActions={columnRun.columnActions}
                 table={table}
                 label="Deals"
                 stickyColumnId="name"
@@ -516,6 +523,7 @@ function DealsPage() {
                 }
               />
             </AiCellsProvider>
+            {columnRun.dialog}
           </>
         )}
       </div>

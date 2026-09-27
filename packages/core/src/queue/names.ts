@@ -113,6 +113,16 @@ export const QUEUES = {
    * cell while one is queued or active is refused by pg-boss.
    */
   attributeRun: 'attribute.run',
+  /**
+   * Column run (SPA-122, spec-ai-substrate §13 "bulk = job with estimate +
+   * per-day cap"): one AI attribute over every record a saved view names —
+   * the per-cell program once per row, walked a page at a time, all rows one
+   * `ai_run`, stopped by the daily cap. Enqueued by "Run on this view" in a
+   * list's column header, nothing else. Created `exclusive` and sent with
+   * `singletonKey = <viewId>:<attributeId>`, so a second press while one is
+   * queued or active is refused by pg-boss; never retried.
+   */
+  attributeColumnRun: 'attribute.column-run',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
