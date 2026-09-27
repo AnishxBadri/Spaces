@@ -20,9 +20,16 @@ export async function listApiTokensHandler() {
 }
 
 /** The only response that ever carries a token's plaintext. */
-export async function createApiTokenHandler(data: { name: string }) {
+export async function createApiTokenHandler(data: {
+  name: string
+  scopes: Array<string>
+}) {
   const u = await requireUser()
-  return effectFn(createApiTokenProgram)({ userId: u.id, name: data.name })
+  return effectFn(createApiTokenProgram)({
+    userId: u.id,
+    name: data.name,
+    scopes: data.scopes,
+  })
 }
 
 export async function revokeApiTokenHandler(data: { id: string }) {

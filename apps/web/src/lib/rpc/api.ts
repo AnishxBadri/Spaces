@@ -3,10 +3,14 @@ import {
   Context,
   Effect,
   Layer,
+  Option,
+  Redacted,
   Schema,
   SchemaTransformation,
 } from 'effect'
 import {
+  HttpClient,
+  HttpClientRequest,
   HttpEffect,
   HttpRouter,
   HttpServer,
@@ -20,10 +24,15 @@ import {
   HttpApiEndpoint,
   HttpApiError,
   HttpApiGroup,
+  HttpApiMiddleware,
   HttpApiScalar,
   HttpApiSchema,
+  HttpApiSecurity,
   OpenApi,
 } from 'effect/unstable/httpapi'
+import { API_SCOPES } from '#/lib/tokens/scopes'
+import type { ApiScope } from '#/lib/tokens/scopes'
+import { authenticateTokenProgram } from '#/lib/tokens/store'
 import { WebLayer } from './runtime'
 import { API_PREFIX, API_VERSION, CAPTURE_SCHEMA_VERSION } from './versions'
 
@@ -82,6 +91,10 @@ import { API_PREFIX, API_VERSION, CAPTURE_SCHEMA_VERSION } from './versions'
  * | What happened                                        | Status | tag             |
  * | ---------------------------------------------------- | ------ | --------------- |
  * | A handler failed with a declared failure             | its own| the failure's   |
+ * | No bearer, or one that is malformed, unknown,        | 401    | `Unauthorized`  |
+ * | revoked, or whose user is banned — one message, so   |        |                 |
+ * | the answer never says whether the token exists       |        |                 |
+ * | A live token without the procedure's scope           | 403    | `Forbidden`     |
  * | Params, query, headers or payload failed the schema  | 400    | `BadRequest`    |
  * | The request could not be read at all                 | 400    | `BadRequest`    |
  * | No procedure at that method and path                 | 404    | `NotFound`      |
@@ -95,6 +108,20 @@ import { API_PREFIX, API_VERSION, CAPTURE_SCHEMA_VERSION } from './versions'
  * seam (`web` below) catches it at the router and renders it with
  * `failureOf`. The 500 message is fixed ("Internal error"): the cause is
  * logged on the server, and nothing about it is sent.
+ *
+ * ## Authentication — one personal-token store, scoped (SPA-48)
+ *
+ * A procedure that needs a caller carries the `TokenAuth` middleware and
+ * declares the scope it requires as the `RequiredScope` annotation (`null`
+ * for "any live token"). The credential is `Authorization: Bearer <token>`,
+ * the same `api_token` rows the MCP server reads — one store, minted once in
+ * Settings → API tokens, not a second credential. `authorize` below hashes
+ * the token, finds the row, compares the digests in constant time
+ * (`lib/tokens/store.ts`), refuses 401 or 403 per the table, and otherwise
+ * puts the token's user and grant in the procedure's context as `Principal`.
+ * A procedure then runs as that user — canRead and all. A token is an
+ * identity, never an escalation: a scope can only narrow what the user could
+ * already do. The token itself is never logged and never answered.
  */
 
 // ---------------------------------------------------------------------------
@@ -150,8 +177,19 @@ const onTheWire = <TTag extends string, TSelf>(
     HttpApiSchema.status(status),
   )
 
+export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
+  'Unauthorized',
+  { message: Schema.String },
+) {}
+
+export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
+  message: Schema.String,
+}) {}
+
 const BadRequestWire = onTheWire('BadRequest', 400, BadRequest)
 const InternalErrorWire = onTheWire('InternalError', 500, InternalError)
+const UnauthorizedWire = onTheWire('Unauthorized', 401, Unauthorized)
+const ForbiddenWire = onTheWire('Forbidden', 403, Forbidden)
 
 /**
  * What the seam can answer for any procedure, whatever its handler declares:
@@ -223,6 +261,94 @@ const renderFailure = (cause: Cause.Cause<unknown>) => {
 }
 
 // ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+
+/**
+ * The one 401 message. Absent, malformed, unknown, revoked and banned all
+ * read the same, so a caller cannot tell a token that never existed from
+ * one that stopped working.
+ */
+export const UNAUTHORIZED_MESSAGE = 'Unauthorized'
+
+/** Who is calling: the token's user, and what the token was granted. */
+export interface PrincipalShape {
+  readonly user: {
+    readonly id: string
+    readonly name: string
+    readonly email: string
+  }
+  readonly tokenId: string
+  readonly scopes: ReadonlyArray<ApiScope>
+}
+
+export class Principal extends Context.Service<Principal, PrincipalShape>()(
+  'spaces/api/Principal',
+) {}
+
+/**
+ * The scope an authenticated procedure requires, as an endpoint annotation:
+ * an `ApiScope`, or `null` for any live token. An endpoint that carries
+ * `TokenAuth` and forgets this does not fall open — `authorize` treats it as
+ * a defect and the seam answers 500.
+ */
+class RequiredScope extends Context.Service<RequiredScope, ApiScope | null>()(
+  'spaces/api/RequiredScope',
+) {}
+
+export class TokenAuth extends HttpApiMiddleware.Service<
+  TokenAuth,
+  { provides: Principal }
+>()('spaces/api/TokenAuth', {
+  security: { bearer: HttpApiSecurity.bearer },
+  error: [UnauthorizedWire, ForbiddenWire],
+}) {}
+
+/**
+ * The bearer credential and the procedure's declared scope in, the
+ * principal out — or 401, or 403. A store that cannot answer is a defect
+ * (500), never a pass.
+ */
+const authorize = Effect.fn('api.authorize')(function* (
+  credential: Redacted.Redacted<string>,
+  endpoint: HttpApiEndpoint.Top,
+): Effect.fn.Return<PrincipalShape, Unauthorized | Forbidden> {
+  const required = Context.getOption(endpoint.annotations, RequiredScope)
+  if (Option.isNone(required))
+    return yield* Effect.die(
+      `api: ${endpoint.name} carries TokenAuth but declares no RequiredScope`,
+    )
+  const token = yield* authenticateTokenProgram(
+    Redacted.value(credential),
+  ).pipe(
+    Effect.catchTag('ApiTokenUnauthorized', () =>
+      Effect.fail(new Unauthorized({ message: UNAUTHORIZED_MESSAGE })),
+    ),
+    Effect.catchTag('ApiTokenQueryFailed', (failure) => Effect.die(failure)),
+  )
+  const scope = required.value
+  if (scope !== null && !token.scopes.includes(scope))
+    return yield* new Forbidden({
+      message: `This token does not hold the ${scope} scope`,
+    })
+  return {
+    user: { id: token.id, name: token.name, email: token.email },
+    tokenId: token.tokenId,
+    scopes: token.scopes,
+  }
+})
+
+const TokenAuthLive = Layer.succeed(
+  TokenAuth,
+  TokenAuth.of({
+    bearer: (httpEffect, { credential, endpoint }) =>
+      Effect.flatMap(authorize(credential, endpoint), (principal) =>
+        Effect.provideService(httpEffect, Principal, principal),
+      ),
+  }),
+)
+
+// ---------------------------------------------------------------------------
 // The definition
 // ---------------------------------------------------------------------------
 
@@ -251,8 +377,39 @@ class CaptureGroup extends HttpApiGroup.make('capture')
   )
   .prefix('/capture') {}
 
+/**
+ * Who the token is. Any live token, no scope: it is how the capture
+ * extension's settings screen says "connected to <instance> as <user>", and
+ * how anyone checks a token still works.
+ */
+const Me = Schema.Struct({
+  user: Schema.Struct({
+    id: Schema.String,
+    name: Schema.String,
+    email: Schema.String,
+  }),
+  scopes: Schema.Array(Schema.Literals(API_SCOPES)),
+})
+
+class SessionGroup extends HttpApiGroup.make('session').add(
+  HttpApiEndpoint.get('me', '/me', {
+    success: Me,
+    error: SEAM_FAILURES,
+  })
+    .middleware(TokenAuth)
+    .annotate(RequiredScope, null)
+    .annotateMerge(
+      OpenApi.annotations({
+        summary: 'The token’s user and scopes',
+        description:
+          'Answers for any live token, whatever its scopes. 401 for anything else, with no hint why.',
+      }),
+    ),
+) {}
+
 export class Api extends HttpApi.make('spaces')
   .add(CaptureGroup)
+  .add(SessionGroup)
   .prefix(API_PREFIX)
   .annotateMerge(
     OpenApi.annotations({ title: 'Spaces', version: String(API_VERSION) }),
@@ -277,6 +434,16 @@ const CaptureHandlers = HttpApiBuilder.group(Api, 'capture', (handlers) =>
   handlers.handle('hello', () => hello),
 )
 
+/** The principal, as the wire has it. Nothing about the token but its grant. */
+const me = Effect.gen(function* () {
+  const principal = yield* Principal
+  return { user: principal.user, scopes: principal.scopes }
+}).pipe(Effect.withSpan('session.me'))
+
+const SessionHandlers = HttpApiBuilder.group(Api, 'session', (handlers) =>
+  handlers.handle('me', () => me),
+).pipe(Layer.provide(TokenAuthLive))
+
 // ---------------------------------------------------------------------------
 // The seam
 // ---------------------------------------------------------------------------
@@ -289,30 +456,42 @@ const ApiRoutes = Layer.merge(
     path: DOCS_PATH,
     scalar: { withDefaultFonts: false },
   }),
-).pipe(Layer.provide(CaptureHandlers.pipe(Layer.provide(WebLayer))))
+).pipe(
+  Layer.provide(
+    Layer.mergeAll(CaptureHandlers, SessionHandlers).pipe(
+      Layer.provide(WebLayer),
+    ),
+  ),
+)
+
+/**
+ * Routes in, a web handler out, with the envelope as the only way out.
+ * `HttpRouter.toWebHandler` is this plus a request logger, minus the catch —
+ * its router middleware may not swallow errors it was not configured for,
+ * and this seam's whole job is that nothing leaves it except the envelope.
+ */
+const webHandlerOf = (routes: typeof ApiRoutes) =>
+  HttpEffect.toWebHandlerLayerWith(
+    Layer.provideMerge(
+      routes.pipe(Layer.provide(HttpServer.layerServices)),
+      HttpRouter.layer,
+    ),
+    {
+      toHandler: (context) =>
+        Effect.succeed(
+          Effect.catchCause(
+            Context.get(context, HttpRouter.HttpRouter).asHttpEffect(),
+            renderFailure,
+          ),
+        ),
+    },
+  )
 
 /**
  * Built once for the life of the process, on the first request: this is
- * where `WebLayer` is provided, and nowhere else. `HttpRouter.toWebHandler`
- * is this plus a request logger, minus the catch — its router middleware may
- * not swallow errors it was not configured for, and this seam's whole job is
- * that nothing leaves it except the envelope.
+ * where `WebLayer` is provided, and nowhere else.
  */
-const web = HttpEffect.toWebHandlerLayerWith(
-  Layer.provideMerge(
-    ApiRoutes.pipe(Layer.provide(HttpServer.layerServices)),
-    HttpRouter.layer,
-  ),
-  {
-    toHandler: (context) =>
-      Effect.succeed(
-        Effect.catchCause(
-          Context.get(context, HttpRouter.HttpRouter).asHttpEffect(),
-          renderFailure,
-        ),
-      ),
-  },
-)
+const web = webHandlerOf(ApiRoutes)
 
 /** The whole of `/api/v1/*`: a web `Request` in, a web `Response` out. */
 export const handleApiRequest = (request: Request): Promise<Response> =>
@@ -321,9 +500,61 @@ export const handleApiRequest = (request: Request): Promise<Response> =>
 /**
  * The typed client over the same definition. It needs an `HttpClient`; the
  * caller picks the transport — `FetchHttpClient.layer` for a remote instance,
- * or a `Fetch` that calls `handleApiRequest` for the in-process test.
+ * or a `Fetch` that calls `handleApiRequest` for the in-process test. With a
+ * token, every request carries it as the bearer; without one, only the
+ * unauthenticated procedures answer.
  */
-export const makeApiClient = (baseUrl: string) =>
-  HttpApiClient.make(Api, { baseUrl })
+export const makeApiClient = (baseUrl: string, token?: string) =>
+  HttpApiClient.make(
+    Api,
+    token === undefined
+      ? { baseUrl }
+      : {
+          baseUrl,
+          transformClient: (client: HttpClient.HttpClient) =>
+            HttpClient.mapRequest(client, HttpClientRequest.bearerToken(token)),
+        },
+  )
 
 export type ApiClient = HttpApiClient.ForApi<typeof Api>
+
+// ---------------------------------------------------------------------------
+// The scope probe
+// ---------------------------------------------------------------------------
+
+/**
+ * One procedure that requires `capture:write`, behind the same `TokenAuth`
+ * and the same seam, and answering the principal it was handed. It is never
+ * mounted — not under `/api/v1/$`, not in the OpenAPI document, and not in
+ * `Api` — so it is no part of the external contract. It exists because
+ * SPA-48 pins a scope refusal before any mounted procedure requires a scope:
+ * the first is api-4's `/api/capture`, and when it lands its own test takes
+ * this proof over and the probe goes.
+ */
+class ProbeApi extends HttpApi.make('scope-probe')
+  .add(
+    HttpApiGroup.make('probe').add(
+      HttpApiEndpoint.get('captureWrite', '/probe/capture-write', {
+        success: Me,
+        error: SEAM_FAILURES,
+      })
+        .middleware(TokenAuth)
+        .annotate(RequiredScope, 'capture:write'),
+    ),
+  )
+  .prefix(API_PREFIX) {}
+
+const ProbeHandlers = HttpApiBuilder.group(ProbeApi, 'probe', (handlers) =>
+  handlers.handle('captureWrite', () => me),
+).pipe(Layer.provide(TokenAuthLive))
+
+const probe = webHandlerOf(
+  HttpApiBuilder.layer(ProbeApi).pipe(Layer.provide(ProbeHandlers)),
+)
+
+/** Where the probe answers, for the test that calls it. */
+export const SCOPE_PROBE_PATH = `${API_PREFIX}/probe/capture-write` as const
+
+/** The probe's handler: a web `Request` in, a web `Response` out. */
+export const handleScopeProbeRequest = (request: Request): Promise<Response> =>
+  probe.handler(request)

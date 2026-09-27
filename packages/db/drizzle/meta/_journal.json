@@ -365,6 +365,13 @@
       "when": 1790531386672,
       "tag": "0051_mailbox",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1790534735519,
+      "tag": "0052_api_token_scopes",
+      "breakpoints": true
     }
   ]
 }

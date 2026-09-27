@@ -229,6 +229,12 @@ const unauthorized = () =>
  * one reaches the transport.
  */
 export async function handleMcpRequest(request: Request): Promise<Response> {
+  // The same store the /api/v1 door authenticates against (SPA-48), but
+  // scopes are not consulted here: they gate the HttpApi procedures, and the
+  // MCP tools (SPA-28/31) are not on that door. A token minted before scopes
+  // existed ('{}') keeps working over MCP exactly as it did; every tool still
+  // runs as the token's user, so the missing check widens nothing canRead
+  // does not already allow.
   const auth = await Effect.runPromiseExit(
     authenticateBearerProgram(request.headers.get('authorization')),
   )

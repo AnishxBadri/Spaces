@@ -1,5 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
+import { API_SCOPES } from '../tokens/scopes'
 
 /**
  * Settings → API tokens (SPA-23): the MCP server's per-user credentials.
@@ -15,7 +16,13 @@ export const listApiTokens = createServerFn().handler(async () => {
 
 /** Mints a token; the response is the one place its plaintext appears. */
 export const createApiToken = createServerFn({ method: 'POST' })
-  .validator(z.object({ name: z.string().max(200) }))
+  .validator(
+    z.object({
+      name: z.string().max(200),
+      // What the token may do at /api/v1 (SPA-48). MCP ignores it.
+      scopes: z.array(z.enum(API_SCOPES)).max(API_SCOPES.length),
+    }),
+  )
   .handler(async ({ data }) => {
     const { createApiTokenHandler } = await import('../tokens/handlers')
     return createApiTokenHandler(data)

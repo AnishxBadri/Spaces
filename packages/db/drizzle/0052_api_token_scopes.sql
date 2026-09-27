@@ -1,0 +1,1 @@
+ALTER TABLE "api_token" ADD COLUMN "scopes" text[] DEFAULT '{}'::text[] NOT NULL;

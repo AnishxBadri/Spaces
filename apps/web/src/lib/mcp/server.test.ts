@@ -207,6 +207,7 @@ describe('the token store', () => {
       'name',
       'prefix',
       'revokedAt',
+      'scopes',
     ])
     expect(JSON.stringify(listed)).not.toContain(created.token)
   })
