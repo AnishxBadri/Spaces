@@ -114,6 +114,7 @@ describe('the suggestion card', () => {
                 },
               ],
               fields: null,
+              origin: { via: 'app' },
               createdAt: '2026-09-23T00:00:00.000Z',
             }}
             pending={false}
@@ -155,6 +156,7 @@ describe('the suggestion card', () => {
                 value: 2019,
               },
             ],
+            origin: { via: 'app' },
             createdAt: '2026-09-23T00:00:00.000Z',
           }}
           pending={false}
@@ -166,6 +168,38 @@ describe('the suggestion card', () => {
     expect(html).toContain('Founded')
     expect(html).toContain('2019')
     expect(html).not.toContain('confidence')
+  })
+
+  it('labels an MCP proposal with its token, and an in-app one not at all', async () => {
+    // SPA-31: a proposal from an outside assistant is distinguishable.
+    const { SuggestionEntry } =
+      await import('#/components/inbox/suggestion-card')
+    const draw = (origin: SuggestionItem['origin']) =>
+      renderToStaticMarkup(
+        <ul>
+          <SuggestionEntry
+            item={{
+              id: 's-origin',
+              kind: 'attribute_patch',
+              payload: {},
+              rationale: 'Read on their site',
+              citations: [],
+              fields: null,
+              origin,
+              createdAt: '2026-09-23T00:00:00.000Z',
+            }}
+            pending={false}
+            onAccept={() => {}}
+            onReject={() => {}}
+          />
+        </ul>,
+      )
+    const outside = draw({ via: 'mcp', token: 'Claude Desktop' })
+    expect(outside).toContain('Proposed over MCP by token')
+    expect(outside).toContain('Claude Desktop')
+    const inApp = draw({ via: 'app' })
+    expect(inApp).not.toContain('Proposed over MCP')
+    expect(inApp).not.toContain('Proposed by an integration')
   })
 
   it('draws an identity as the person the deck named, not its payload', async () => {
@@ -187,6 +221,7 @@ describe('the suggestion card', () => {
             rationale: 'Named in deck.pdf as CEO',
             citations: [],
             fields: null,
+            origin: { via: 'app' },
             createdAt: '2026-09-23T00:00:00.000Z',
           }}
           pending={false}
@@ -248,6 +283,7 @@ describe('bulk accept on the suggestion card', () => {
         value: 2021,
       },
     ],
+    origin: { via: 'app' },
     createdAt: '2026-09-23T00:00:00.000Z',
   }
 

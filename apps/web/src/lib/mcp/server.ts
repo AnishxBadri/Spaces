@@ -10,6 +10,8 @@ import {
 import { authenticateBearerProgram } from '#/lib/tokens/store'
 import type { TokenUser } from '#/lib/tokens/store'
 import { getRecordProgram, resolveEntityRefProgram } from './tools'
+import { jsonValue } from '#/lib/json'
+import { proposeSuggestionProgram } from './tools-propose'
 
 /**
  * The MCP server (SPA-23, `docs/spec-ai-substrate.md` §5): the four
@@ -113,6 +115,57 @@ export function buildMcpServer(reader: TokenUser): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ id }) => answer(getRecordProgram(me, id)),
+  )
+
+  // SPA-31: the one write verb — a proposal into the review queue, through
+  // the same `proposeProgram` every in-app feature calls. No accept, write,
+  // delete or merge tool is registered, ever (spec §6).
+  server.registerTool(
+    'propose_suggestion',
+    {
+      title: 'Propose a suggestion',
+      description:
+        'Propose attribute values for one record. Nothing is written: the proposal lands in the Spaces review inbox, labelled with this token, and a person accepts or rejects it. The patch is keyed by attribute slug (see get_record), each field wrapped as {value, refs, confidence}; it is validated against the record’s live attribute registry and refused field by field.',
+      inputSchema: {
+        entity: z
+          .string()
+          .min(1)
+          .describe('Record id (uuid), or the record’s exact name'),
+        patch: z
+          .record(z.string(), jsonValue)
+          .describe(
+            '{[attribute slug]: {value, refs: string[], confidence: 0..1}}',
+          ),
+        rationale: z
+          .string()
+          .min(1)
+          .describe('Why these values — what the reviewer reads first'),
+        refs: z
+          .array(z.string())
+          .optional()
+          .describe(
+            'Citation refs for the whole proposal; default: the union of each field’s refs',
+          ),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ entity, patch, rationale, refs }) =>
+      answer(
+        proposeSuggestionProgram(
+          { id: reader.id, tokenId: reader.tokenId },
+          {
+            entity,
+            patch,
+            rationale,
+            ...(refs === undefined ? {} : { refs }),
+          },
+        ),
+      ),
   )
 
   return server

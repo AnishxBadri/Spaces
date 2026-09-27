@@ -59,6 +59,9 @@ export type SuggestionKind = (typeof suggestionKind.enumValues)[number]
 /** Only a person accepts or rejects: the decision is what `decided_by` names. */
 export type Decider = { type: 'user'; id: string }
 
+/** Read wider than `Decider` on purpose: the runtime half of that claim. */
+const isPerson = (actor: { type: string }): boolean => actor.type === 'user'
+
 export class SuggestionNotFound extends Schema.TaggedError<SuggestionNotFound>()(
   'SuggestionNotFound',
   { id: Schema.String },
@@ -718,6 +721,17 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
   actor: Decider,
   fields?: ReadonlyArray<string>,
 ): Effect.fn.Return<Accepted, SuggestionFailure> {
+  // SPA-31, spec §6: an agent is a client of the four contracts and gets no
+  // fifth. `Decider` already admits only a person; this says it again at
+  // runtime for a caller that reached here past the type — an integration
+  // (an MCP token) proposes, it never accepts.
+  if (!isPerson(actor))
+    return yield* invalid([
+      {
+        slug: 'decided_by',
+        message: 'decided_by: only a person accepts a suggestion',
+      },
+    ])
   return yield* Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {

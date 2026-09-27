@@ -427,6 +427,16 @@ export function SuggestionEntry({
         <p className="text-ui text-graphite">
           {item.rationale ?? 'No rationale given.'}
         </p>
+        {/* SPA-31: a proposal from outside the app says which door it came
+            through, so it never reads as one of the app's own. */}
+        {item.origin.via === 'mcp' ? (
+          <p className="text-label text-graphite">
+            Proposed over MCP by token{' '}
+            <span className="mono">{item.origin.token}</span>
+          </p>
+        ) : item.origin.via === 'integration' ? (
+          <p className="text-label text-graphite">Proposed by an integration</p>
+        ) : null}
         {item.citations.length > 0 ? (
           <ul className="flex flex-wrap gap-1" aria-label="Citations">
             {item.citations.map((c) => (

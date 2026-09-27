@@ -290,7 +290,7 @@ describe('the endpoint refuses without a live token', () => {
 })
 
 describe('an MCP client with a per-user token', () => {
-  it('lists exactly two tools, with their input schemas', async () => {
+  it('lists exactly its tools, with their input schemas', async () => {
     const created = await mint(FIXTURE_ACTOR.id, 'lister')
     const client = await connect(created.token)
     const { tools } = await client.listTools()
@@ -299,6 +299,7 @@ describe('an MCP client with a per-user token', () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       'get_context',
       'get_record',
+      'propose_suggestion', // SPA-31
     ])
     const ctx = tools.find((t) => t.name === 'get_context')
     expect(Object.keys(ctx?.inputSchema.properties ?? {}).sort()).toEqual([

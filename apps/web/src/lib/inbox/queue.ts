@@ -2,6 +2,7 @@ import { Effect, Schema } from 'effect'
 import { and, count, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
+  apiToken,
   duplicateCandidate,
   entity,
   objectDef,
@@ -89,6 +90,16 @@ export type SuggestionField = {
  */
 export type SuggestionCitation = ResolvedRef
 
+/**
+ * Where a suggestion came from (SPA-31). `app`: an in-app feature — a
+ * person's click or a worker job. `mcp`: an outside assistant over the MCP
+ * server, named by the API token that made it (revoked tokens keep their
+ * name: the proposal outlives the credential). `integration`: an integration
+ * actor that is not a token.
+ */
+export type SuggestionOrigin =
+  { via: 'app' } | { via: 'mcp'; token: string } | { via: 'integration' }
+
 export type SuggestionItem = {
   id: string
   kind: SuggestionKind
@@ -101,6 +112,7 @@ export type SuggestionItem = {
    * card prints the payload instead.
    */
   fields: Array<SuggestionField> | null
+  origin: SuggestionOrigin
   createdAt: string
 }
 
@@ -142,6 +154,8 @@ export type InboxCounts = {
 export type InboxScope = { record: string | null }
 
 const ALL: InboxScope = { record: null }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const listDuplicateLane = Effect.fn('listDuplicateLane')(function* (
   scope: InboxScope,
@@ -274,6 +288,36 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   for (const s of open)
     citationsOf.set(s.id, resolved.slice(at, (at += s.refs.length)))
 
+  // SPA-31: an MCP proposal carries its API token's id as the integration
+  // actor's id — the token's name is what the card labels it with.
+  const tokenIds = [
+    ...new Set(
+      open.flatMap((s) =>
+        s.proposedByType === 'integration' &&
+        s.proposedById !== null &&
+        UUID.test(s.proposedById)
+          ? [s.proposedById]
+          : [],
+      ),
+    ),
+  ]
+  const tokenName = new Map(
+    tokenIds.length === 0
+      ? []
+      : (yield* query(() =>
+          db
+            .select({ id: apiToken.id, name: apiToken.name })
+            .from(apiToken)
+            .where(inArray(apiToken.id, tokenIds)),
+        )).map((t) => [t.id, t.name]),
+  )
+  const originOf = (s: (typeof open)[number]): SuggestionOrigin => {
+    if (s.proposedByType !== 'integration') return { via: 'app' }
+    const token =
+      s.proposedById === null ? undefined : tokenName.get(s.proposedById)
+    return token === undefined ? { via: 'integration' } : { via: 'mcp', token }
+  }
+
   // `open` is newest first, so the first member seen for a record is its
   // newest and Map insertion order is already the queue's order.
   const cards = new Map<string, SuggestionRow>()
@@ -289,6 +333,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       citations: citationsOf.get(s.id) ?? [],
       fields:
         s.kind === 'attribute_patch' ? patchFields(s.payload, registry) : null,
+      origin: originOf(s),
       createdAt: s.createdAt.toISOString(),
     }
     const card = cards.get(s.entityId)
