@@ -111,3 +111,99 @@ References: <root-777@delta.ai> <mid-778@delta.ai>
 
 Following up on our call.
 `
+
+/** One MIME part of `withParts`, before it is base64'd. */
+export type FixturePart = {
+  filename: string
+  mime: string
+  content: Buffer
+  disposition: 'attachment' | 'inline'
+  /** Sent as `Content-ID: <cid>`; referenced only if the HTML says so. */
+  cid?: string
+}
+
+function base64Lines(content: Buffer): string {
+  return (content.toString('base64').match(/.{1,76}/g) ?? []).join('\n')
+}
+
+function partLines(part: FixturePart): Array<string> {
+  return [
+    `Content-Type: ${part.mime}; name="${part.filename}"`,
+    `Content-Disposition: ${part.disposition}; filename="${part.filename}"`,
+    'Content-Transfer-Encoding: base64',
+    ...(part.cid === undefined ? [] : [`Content-ID: <${part.cid}>`]),
+    '',
+    base64Lines(part.content),
+  ]
+}
+
+/**
+ * A message with a real MIME tree (SPA-115): `multipart/mixed` holding a
+ * `multipart/related` — the text and HTML alternatives plus every part that
+ * carries a Content-ID, the way Gmail and Outlook lay out an inline image —
+ * followed by the parts that carry none. `headers` are the top-level lines
+ * (From, To, Subject, Message-ID …) without any Content-Type.
+ */
+export function withParts(opts: {
+  headers: Array<string>
+  text: string
+  html?: string
+  parts: Array<FixturePart>
+}): string {
+  const related = opts.parts.filter((p) => p.cid !== undefined)
+  const mixed = opts.parts.filter((p) => p.cid === undefined)
+  const alternative = [
+    'Content-Type: multipart/alternative; boundary="alt-b"',
+    '',
+    '--alt-b',
+    'Content-Type: text/plain; charset="UTF-8"',
+    '',
+    opts.text,
+    ...(opts.html === undefined
+      ? []
+      : ['--alt-b', 'Content-Type: text/html; charset="UTF-8"', '', opts.html]),
+    '--alt-b--',
+  ]
+  return [
+    ...opts.headers,
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/mixed; boundary="mixed-b"',
+    '',
+    '--mixed-b',
+    'Content-Type: multipart/related; boundary="rel-b"',
+    '',
+    '--rel-b',
+    ...alternative,
+    ...related.flatMap((p) => ['--rel-b', ...partLines(p)]),
+    '--rel-b--',
+    ...mixed.flatMap((p) => ['--mixed-b', ...partLines(p)]),
+    '--mixed-b--',
+    '',
+  ].join('\n')
+}
+
+/** `bcc`'s headers, for a `withParts` message. */
+export function bccHeaders(opts: {
+  messageId: string
+  from: string
+  to: string
+  cc?: string
+  subject: string
+  date?: string
+}): Array<string> {
+  return [
+    `From: ${opts.from}`,
+    `To: ${opts.to}`,
+    ...(opts.cc === undefined ? [] : [`Cc: ${opts.cc}`]),
+    `Subject: ${opts.subject}`,
+    `Date: ${opts.date ?? 'Mon, 21 Sep 2026 10:04:00 +0000'}`,
+    `Message-ID: <${opts.messageId}>`,
+  ]
+}
+
+/** Bytes of a given size that are no format at all — a stand-in image. */
+export function fillerBytes(size: number, seed = 0): Buffer {
+  const out = Buffer.alloc(size)
+  for (let i = 0; i < size; i++) out[i] = (i * 31 + seed) % 251
+  return out
+}

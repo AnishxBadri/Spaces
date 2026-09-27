@@ -5,10 +5,12 @@ import { mailbox } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { resolveSecretById } from '#/lib/vault'
 import { fileArrivalProgram } from './file'
+import { NO_ATTACHMENTS } from './attachment-filing'
 import { fetchSince } from './imap'
 import type { MailFailure, MailboxConnection } from './imap'
 import { arrivalFromSource } from './message'
 import type { NoiseReason } from './noise'
+import type { AttachmentOutcome } from './attachment-filing'
 import { MailSchedule } from './schedule'
 
 /**
@@ -49,6 +51,8 @@ export type PollOutcome = {
   written: number
   duplicate: number
   refused: Partial<Record<NoiseReason | 'unparseable', number>>
+  /** Every written message's attachments, summed (SPA-115). */
+  attachments: AttachmentOutcome
 }
 
 const BACKOFF_CAP_MINUTES = 360
@@ -102,6 +106,25 @@ async function authorFor(
   return admin?.id ?? null
 }
 
+/**
+ * The attachments' clause, or nothing when no written message carried one —
+ * so a poll of plain mail reads exactly as it did before SPA-115. A refused
+ * part is named with its reason: this line is where "why is the deck not on
+ * the company" is answered.
+ */
+function describeAttachments(a: AttachmentOutcome): Array<string> {
+  if (a.filed + a.unfiled + a.skipped + a.refused.length === 0) return []
+  const refused = a.refused.map((r) => `${r.filename}: ${r.reason}`).join('; ')
+  return [
+    [
+      `attachments filed ${String(a.filed)}`,
+      `unfiled ${String(a.unfiled)}`,
+      `skipped ${String(a.skipped)}`,
+      `refused ${String(a.refused.length)}${refused ? ` (${refused})` : ''}`,
+    ].join(', '),
+  ]
+}
+
 function describe(o: Omit<PollOutcome, 'summary'>, extra: Array<string>) {
   const refusedTotal = Object.values(o.refused).reduce((a, b) => a + b, 0)
   const reasons = Object.entries(o.refused)
@@ -112,6 +135,7 @@ function describe(o: Omit<PollOutcome, 'summary'>, extra: Array<string>) {
     `written ${String(o.written)}`,
     `duplicate ${String(o.duplicate)}`,
     `refused ${String(refusedTotal)}${reasons ? ` (${reasons})` : ''}`,
+    ...describeAttachments(o.attachments),
     ...extra,
   ].join(' · ')
 }
@@ -137,7 +161,13 @@ export const pollMailboxProgram = Effect.fn('pollMailbox')(function* (
         }
       : null,
   )
-  const empty = { fetched: 0, written: 0, duplicate: 0, refused: {} }
+  const empty = {
+    fetched: 0,
+    written: 0,
+    duplicate: 0,
+    refused: {},
+    attachments: NO_ATTACHMENTS,
+  }
   if (!box) return { ...empty, summary: 'no mailbox configured' }
 
   if (box.status === 'error' && box.failureCount > 0 && box.lastPolledAt) {
@@ -200,6 +230,7 @@ export const pollMailboxProgram = Effect.fn('pollMailbox')(function* (
     written: 0,
     duplicate: 0,
     refused: {},
+    attachments: { ...NO_ATTACHMENTS, refused: [] },
   }
   const refuse = (reason: NoiseReason | 'unparseable') => {
     counts.refused[reason] = (counts.refused[reason] ?? 0) + 1
@@ -266,8 +297,14 @@ export const pollMailboxProgram = Effect.fn('pollMailbox')(function* (
             }),
         ),
       )
-      if (filed.kind === 'written') counts.written++
-      else counts.duplicate++
+      if (filed.kind === 'written') {
+        counts.written++
+        const a = counts.attachments
+        a.filed += filed.attachments.filed
+        a.unfiled += filed.attachments.unfiled
+        a.skipped += filed.attachments.skipped
+        a.refused.push(...filed.attachments.refused)
+      } else counts.duplicate++
     }
     cursor = mail.uid
   }

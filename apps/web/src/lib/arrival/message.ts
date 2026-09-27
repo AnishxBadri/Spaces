@@ -10,6 +10,8 @@ import {
 import type { Address, ForwardedBlock } from './forwarded'
 import { refusal } from './noise'
 import type { Refusal } from './noise'
+import { sortAttachments } from './attachments'
+import type { SortedAttachments } from './attachments'
 
 /**
  * One fetched message → what the poll writes, or why it writes nothing
@@ -54,6 +56,13 @@ export type ArrivalMessage = {
   /** The plain-text body, stored as the interaction's note (D30). */
   body: string
   forwarded: boolean
+  /**
+   * The parts that are documents, and the ones skipped as inline or
+   * signature images (SPA-115, `attachments.ts`). On a true forward these are
+   * the wrapper's parts, which is where every client puts the original's
+   * attachments.
+   */
+  attachments: SortedAttachments
 }
 
 export type Arrival =
@@ -128,6 +137,7 @@ export function toArrival(parsed: ParsedMail, opts: ArrivalOptions): Arrival {
       messageId: null,
     }
 
+  const attachments = sortAttachments(parsed.attachments, parsed.html)
   const mailbox = opts.mailboxAddress.trim().toLowerCase()
   const notMailbox = (a: Address) => a.email !== mailbox
   const to = (original !== null ? original.to : addresses(parsed.to)).filter(
@@ -157,6 +167,7 @@ export function toArrival(parsed: ParsedMail, opts: ArrivalOptions): Arrival {
         cc,
         body: text.trim(),
         forwarded: false,
+        attachments,
       },
     }
   }
@@ -181,6 +192,7 @@ export function toArrival(parsed: ParsedMail, opts: ArrivalOptions): Arrival {
       cc,
       body: text.trim(),
       forwarded: true,
+      attachments,
     },
   }
 }

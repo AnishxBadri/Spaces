@@ -16,6 +16,8 @@ import { insertBodyNote } from '#/lib/notes/body-note'
 import type { Address } from './forwarded'
 import type { ArrivalMessage } from './message'
 import { participantRecordsProgram } from './participant-records'
+import { NO_ATTACHMENTS, fileAttachmentsProgram } from './attachment-filing'
+import type { AttachmentOutcome } from './attachment-filing'
 
 /**
  * One arrival → one interaction, its body note and its edges (SPA-56; D30,
@@ -62,6 +64,15 @@ import { participantRecordsProgram } from './participant-records'
  * against nothing: it reaches a record through the interaction's edges on
  * the timeline, not through `link(tagged_in)`, which would put every mail in
  * every participant's Notes section.
+ *
+ * **Attachments follow the interaction, and only a written one** (SPA-115,
+ * `attachment-filing.ts`). The filing company is chosen inside the
+ * transaction from the edges it just wrote (`chooseFilingCompany`); the
+ * parts go through the documents intake after it commits, because intake
+ * commits on its own. A duplicate files nothing: the Message-ID already
+ * brought its attachments in, and re-reading a renumbered folder must not
+ * mint a second unfiled copy of every deck in it — §3.4's dedupe is a rule
+ * about a target, and an unfiled document has none.
  */
 
 export class ArrivalWriteFailed extends Schema.TaggedError<ArrivalWriteFailed>()(
@@ -77,7 +88,15 @@ export type FileContext = {
 }
 
 export type Filed =
-  | { kind: 'written'; interactionId: string; noteId: string; edges: number }
+  | {
+      kind: 'written'
+      interactionId: string
+      noteId: string
+      edges: number
+      /** Where the attachments went; null is unfiled. */
+      companyId: string | null
+      attachments: AttachmentOutcome
+    }
   | { kind: 'duplicate' }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -139,6 +158,46 @@ export async function matchParticipants(
   return rows.map((r) => r.id)
 }
 
+/**
+ * The one company a thread's attachments file onto, or null for unfiled —
+ * §3.1 entry point 6's "matched company, else unfiled", made singular.
+ *
+ * One company on the thread is the company. Several — a founder copying a
+ * co-investor, a partner introducing two portfolio companies — is settled by
+ * the sender: the company the From address resolves to, when it is one of
+ * them. Otherwise the deck is ambiguous, and an unfiled document that files
+ * with one click is the honest answer; a deck filed on every company on the
+ * Cc line is three misfilings to undo.
+ */
+export function chooseFilingCompany(
+  threadCompanies: ReadonlyArray<string>,
+  senderEntities: ReadonlyArray<string>,
+): string | null {
+  const companies = [...new Set(threadCompanies)]
+  if (companies.length === 1) return companies[0]
+  const sender = companies.filter((c) => senderEntities.includes(c))
+  return sender.length === 1 ? sender[0] : null
+}
+
+/** The live companies among an edge list. */
+async function companiesOf(
+  tx: Tx,
+  entityIds: ReadonlyArray<string>,
+): Promise<Array<string>> {
+  if (entityIds.length === 0) return []
+  const rows = await tx
+    .select({ id: entity.id })
+    .from(entity)
+    .where(
+      and(
+        inArray(entity.id, [...entityIds]),
+        eq(entity.kind, 'company'),
+        isNull(entity.mergedIntoId),
+      ),
+    )
+  return rows.map((r) => r.id)
+}
+
 /** People and companies already on this thread — what a reply inherits. */
 async function threadEdges(tx: Tx, threadId: string): Promise<Array<string>> {
   const rows = await tx
@@ -179,7 +238,7 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
   const records = yield* participantRecordsProgram(message, ctx).pipe(
     Effect.mapError((e) => new ArrivalWriteFailed({ cause: e.cause })),
   )
-  return yield* Effect.tryPromise({
+  const written = yield* Effect.tryPromise({
     try: () =>
       db.transaction(async (tx): Promise<Filed> => {
         const row = (
@@ -224,13 +283,29 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
             .values({ interactionId: row.id, entityId })
             .onConflictDoNothing()
         }
+        const companyId = chooseFilingCompany(
+          await companiesOf(tx, edges),
+          message.from === null
+            ? []
+            : await matchParticipants(tx, [message.from]),
+        )
         return {
           kind: 'written',
           interactionId: row.id,
           noteId,
           edges: edges.length,
+          companyId,
+          attachments: NO_ATTACHMENTS,
         }
       }),
     catch: (cause) => new ArrivalWriteFailed({ cause }),
   })
+  if (written.kind === 'duplicate') return written
+
+  const attachments = yield* fileAttachmentsProgram(message.attachments, {
+    integrationId: ctx.integrationId,
+    subject: message.subject,
+    companyId: written.companyId,
+  })
+  return { ...written, attachments }
 })
