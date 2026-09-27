@@ -28,6 +28,7 @@ import { Route as AppSpacesRouteImport } from './routes/_app/spaces'
 import { Route as AppTasksRouteImport } from './routes/_app/tasks'
 import { Route as AppTodayRouteImport } from './routes/_app/today'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/companies_.$companyId'
 import { Route as AppDealsDealIdRouteImport } from './routes/_app/deals_.$dealId'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId'
@@ -41,6 +42,7 @@ import { Route as AppSettingsEmbeddingsRouteImport } from './routes/_app/setting
 import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
 import { Route as AppSettingsObjectsRouteImport } from './routes/_app/settings/objects'
 import { Route as AppSettingsTemplatesRouteImport } from './routes/_app/settings/templates'
+import { Route as AppSettingsTokensRouteImport } from './routes/_app/settings/tokens'
 import { Route as AppSettingsWorkspaceRouteImport } from './routes/_app/settings/workspace'
 import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spaceId'
 import { Route as AppTermsTermIdRouteImport } from './routes/_app/terms.$termId'
@@ -143,6 +145,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppCompaniesCompanyIdRoute = AppCompaniesCompanyIdRouteImport.update({
   id: '/companies_/$companyId',
   path: '/companies/$companyId',
@@ -208,6 +215,11 @@ const AppSettingsTemplatesRoute = AppSettingsTemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsTokensRoute = AppSettingsTokensRouteImport.update({
+  id: '/tokens',
+  path: '/tokens',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsWorkspaceRoute = AppSettingsWorkspaceRouteImport.update({
   id: '/workspace',
   path: '/workspace',
@@ -264,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/tasks': typeof AppTasksRoute
   '/today': typeof AppTodayRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
@@ -276,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/settings/members': typeof AppSettingsMembersRoute
   '/settings/objects': typeof AppSettingsObjectsRoute
   '/settings/templates': typeof AppSettingsTemplatesRoute
+  '/settings/tokens': typeof AppSettingsTokensRoute
   '/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/terms/$termId': typeof AppTermsTermIdRoute
@@ -303,6 +317,7 @@ export interface FileRoutesByTo {
   '/tasks': typeof AppTasksRoute
   '/today': typeof AppTodayRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
@@ -315,6 +330,7 @@ export interface FileRoutesByTo {
   '/settings/members': typeof AppSettingsMembersRoute
   '/settings/objects': typeof AppSettingsObjectsRoute
   '/settings/templates': typeof AppSettingsTemplatesRoute
+  '/settings/tokens': typeof AppSettingsTokensRoute
   '/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/spaces/$spaceId': typeof AppSpacesSpaceIdRoute
   '/terms/$termId': typeof AppTermsTermIdRoute
@@ -345,6 +361,7 @@ export interface FileRoutesById {
   '/_app/tasks': typeof AppTasksRoute
   '/_app/today': typeof AppTodayRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/_app/companies_/$companyId': typeof AppCompaniesCompanyIdRoute
   '/_app/deals_/$dealId': typeof AppDealsDealIdRoute
   '/_app/notes_/$noteId': typeof AppNotesNoteIdRoute
@@ -357,6 +374,7 @@ export interface FileRoutesById {
   '/_app/settings/members': typeof AppSettingsMembersRoute
   '/_app/settings/objects': typeof AppSettingsObjectsRoute
   '/_app/settings/templates': typeof AppSettingsTemplatesRoute
+  '/_app/settings/tokens': typeof AppSettingsTokensRoute
   '/_app/settings/workspace': typeof AppSettingsWorkspaceRoute
   '/_app/spaces_/$spaceId': typeof AppSpacesSpaceIdRoute
   '/_app/terms/$termId': typeof AppTermsTermIdRoute
@@ -387,6 +405,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/today'
     | '/api/health'
+    | '/api/mcp'
     | '/companies/$companyId'
     | '/deals/$dealId'
     | '/notes/$noteId'
@@ -399,6 +418,7 @@ export interface FileRouteTypes {
     | '/settings/members'
     | '/settings/objects'
     | '/settings/templates'
+    | '/settings/tokens'
     | '/settings/workspace'
     | '/spaces/$spaceId'
     | '/terms/$termId'
@@ -426,6 +446,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/today'
     | '/api/health'
+    | '/api/mcp'
     | '/companies/$companyId'
     | '/deals/$dealId'
     | '/notes/$noteId'
@@ -438,6 +459,7 @@ export interface FileRouteTypes {
     | '/settings/members'
     | '/settings/objects'
     | '/settings/templates'
+    | '/settings/tokens'
     | '/settings/workspace'
     | '/spaces/$spaceId'
     | '/terms/$termId'
@@ -467,6 +489,7 @@ export interface FileRouteTypes {
     | '/_app/tasks'
     | '/_app/today'
     | '/api/health'
+    | '/api/mcp'
     | '/_app/companies_/$companyId'
     | '/_app/deals_/$dealId'
     | '/_app/notes_/$noteId'
@@ -479,6 +502,7 @@ export interface FileRouteTypes {
     | '/_app/settings/members'
     | '/_app/settings/objects'
     | '/_app/settings/templates'
+    | '/_app/settings/tokens'
     | '/_app/settings/workspace'
     | '/_app/spaces_/$spaceId'
     | '/_app/terms/$termId'
@@ -496,6 +520,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiMcpRoute: typeof ApiMcpRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBlobKeyRoute: typeof ApiBlobKeyRoute
 }
@@ -635,6 +660,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/companies_/$companyId': {
       id: '/_app/companies_/$companyId'
       path: '/companies/$companyId'
@@ -726,6 +758,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsTemplatesRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/tokens': {
+      id: '/_app/settings/tokens'
+      path: '/tokens'
+      fullPath: '/settings/tokens'
+      preLoaderRoute: typeof AppSettingsTokensRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/workspace': {
       id: '/_app/settings/workspace'
       path: '/workspace'
@@ -785,6 +824,7 @@ interface AppSettingsRouteChildren {
   AppSettingsMembersRoute: typeof AppSettingsMembersRoute
   AppSettingsObjectsRoute: typeof AppSettingsObjectsRoute
   AppSettingsTemplatesRoute: typeof AppSettingsTemplatesRoute
+  AppSettingsTokensRoute: typeof AppSettingsTokensRoute
   AppSettingsWorkspaceRoute: typeof AppSettingsWorkspaceRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
@@ -796,6 +836,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsMembersRoute: AppSettingsMembersRoute,
   AppSettingsObjectsRoute: AppSettingsObjectsRoute,
   AppSettingsTemplatesRoute: AppSettingsTemplatesRoute,
+  AppSettingsTokensRoute: AppSettingsTokensRoute,
   AppSettingsWorkspaceRoute: AppSettingsWorkspaceRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
 }
@@ -865,6 +906,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiMcpRoute: ApiMcpRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBlobKeyRoute: ApiBlobKeyRoute,
 }

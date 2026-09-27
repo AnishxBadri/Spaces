@@ -1,6 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireUser } from './shared'
 
 /**
  * The context read protocol's first product surface (SPA-18): what the
@@ -10,8 +9,6 @@ import { requireUser } from './shared'
  * tagged failures — ContextQueryFailed, ContextEntityNotFound, ContextLeak —
  * reject through `effectFn()` and the normal server-fn error path.
  */
-
-const DEFAULT_BUDGET_CHARS = 8000
 
 export const getRecordContext = createServerFn()
   .validator(
@@ -23,14 +20,9 @@ export const getRecordContext = createServerFn()
     }),
   )
   .handler(async ({ data }) => {
-    const u = await requireUser()
-    const { recordContextProgram } = await import('../context/record')
-    const { effectFn } = await import('./effect')
-    return effectFn(recordContextProgram)({
-      entityId: data.entityId,
-      user: { id: u.id },
-      asOf: new Date().toISOString(),
-      budgetChars: data.budgetChars ?? DEFAULT_BUDGET_CHARS,
-      similar: data.similar === true,
-    })
+    // The body is `getRecordContextHandler` (lib/context/record-handler.ts),
+    // shared word for word with the MCP `get_context` tool's test (SPA-23).
+    const { getRecordContextHandler } =
+      await import('../context/record-handler')
+    return getRecordContextHandler(data)
   })

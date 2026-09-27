@@ -89,6 +89,14 @@ export const SETTINGS_SECTIONS = [
     group: 'workspace',
     admin: true,
   },
+  {
+    // ai-23a (SPA-23): the MCP server's per-user tokens. A token is its
+    // owner's, so every member manages their own — not admin-only.
+    to: '/settings/tokens',
+    label: 'API tokens',
+    group: 'workspace',
+    admin: false,
+  },
   { to: '/settings/objects', label: 'Objects', group: 'objects', admin: false },
   {
     to: '/settings/currency',

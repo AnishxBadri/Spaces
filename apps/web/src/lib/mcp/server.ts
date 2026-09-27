@@ -1,0 +1,162 @@
+import { Cause, Effect, Exit, Option } from 'effect'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
+import { z } from 'zod'
+import {
+  DEFAULT_BUDGET_CHARS,
+  recordContextProgram,
+} from '#/lib/context/record'
+import { authenticateBearerProgram } from '#/lib/tokens/store'
+import type { TokenUser } from '#/lib/tokens/store'
+import { getRecordProgram, resolveEntityRefProgram } from './tools'
+
+/**
+ * The MCP server (SPA-23, `docs/spec-ai-substrate.md` §5): the four
+ * contracts as a tool surface a person's own assistant connects to. This
+ * half ships two read tools — `get_context`, the assembler verbatim, and
+ * `get_record`, registry-shaped; ai-23b adds `search_records`,
+ * `list_registry` and `propose_suggestion`.
+ *
+ * Transport: the SDK's web-standard Streamable HTTP transport, stateless —
+ * a fresh server and transport per request, JSON responses rather than an
+ * SSE stream, because the tools answer in one shot and nothing here holds a
+ * session. Authentication is a per-user bearer token from the token store
+ * (`lib/tokens/store.ts`, the owner's decision recorded there); no token, a
+ * bad one or a revoked one is a 401 before the MCP layer sees the request,
+ * so an unauthenticated client never learns the tool list.
+ *
+ * Every tool runs as the token's user. canRead is theirs: a teammate's
+ * assistant sees exactly what that teammate sees, and no more.
+ */
+
+const SERVER_INFO = { name: 'spaces', version: '0.1.0' }
+
+const text = (body: string, isError = false): CallToolResult =>
+  isError
+    ? { content: [{ type: 'text', text: body }], isError: true }
+    : { content: [{ type: 'text', text: body }] }
+
+/**
+ * Run a tool's program to a result. A typed refusal is the assistant's to
+ * read (`isError` with the message); a defect is logged and answered
+ * generically, so a stack never leaves the box.
+ */
+async function answer<TValue, TError extends { message: string }>(
+  program: Effect.Effect<TValue, TError>,
+): Promise<CallToolResult> {
+  const exit = await Effect.runPromiseExit(program)
+  if (Exit.isSuccess(exit)) return text(JSON.stringify(exit.value))
+  const failure = Cause.findErrorOption(exit.cause)
+  if (Option.isSome(failure) && failure.value.message)
+    return text(failure.value.message, true)
+  console.error('[mcp] tool failed', Cause.pretty(exit.cause))
+  return text('The tool failed on the server', true)
+}
+
+export function buildMcpServer(reader: TokenUser): McpServer {
+  const server = new McpServer(SERVER_INFO)
+  const me = { id: reader.id }
+
+  server.registerTool(
+    'get_context',
+    {
+      title: 'Record context',
+      description:
+        'What Spaces knows about one record — its attributes, history, notes, memos, documents, spaces and tasks — ranked and trimmed to a character budget, each item with a citation. Exactly what the record page’s Context section shows the same person. Pass a record id, or a record’s exact name.',
+      inputSchema: {
+        entity: z
+          .string()
+          .min(1)
+          .describe('Record id (uuid), or the record’s exact name'),
+        task: z
+          .string()
+          .optional()
+          .describe(
+            'What you are trying to do; ranks matching document passages first',
+          ),
+        budget: z
+          .number()
+          .int()
+          .min(500)
+          .max(100_000)
+          .optional()
+          .describe(`Character budget; default ${DEFAULT_BUDGET_CHARS}`),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ entity, task, budget }) =>
+      answer(
+        Effect.gen(function* () {
+          const entityId = yield* resolveEntityRefProgram(me, entity)
+          return yield* recordContextProgram({
+            entityId,
+            user: me,
+            asOf: new Date().toISOString(),
+            budgetChars: budget ?? DEFAULT_BUDGET_CHARS,
+            similar: false,
+            taskText: task?.trim() ? task.trim() : undefined,
+          })
+        }),
+      ),
+  )
+
+  server.registerTool(
+    'get_record',
+    {
+      title: 'Record',
+      description:
+        'One record, shaped by its object’s attribute registry: every attribute with its stored value and a readable rendering, then its links in both directions and the spaces it is tagged into.',
+      inputSchema: {
+        id: z.string().uuid().describe('Record id (uuid)'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ id }) => answer(getRecordProgram(me, id)),
+  )
+
+  return server
+}
+
+const unauthorized = () =>
+  Response.json(
+    { error: 'unauthorized' },
+    {
+      status: 401,
+      headers: { 'www-authenticate': 'Bearer realm="spaces"' },
+    },
+  )
+
+/**
+ * One HTTP request to `/api/mcp`. The token is checked first; only a live
+ * one reaches the transport.
+ */
+export async function handleMcpRequest(request: Request): Promise<Response> {
+  const auth = await Effect.runPromiseExit(
+    authenticateBearerProgram(request.headers.get('authorization')),
+  )
+  if (Exit.isFailure(auth)) {
+    const failure = Cause.findErrorOption(auth.cause)
+    if (Option.isSome(failure) && failure.value._tag === 'ApiTokenUnauthorized')
+      return unauthorized()
+    // The store could not answer: not the caller's fault, and not a pass.
+    console.error('[mcp] token check failed', Cause.pretty(auth.cause))
+    return Response.json({ error: 'unavailable' }, { status: 503 })
+  }
+  // Stateless: no session to DELETE and no standalone stream to GET — the
+  // spec's answer for a server that offers neither is 405.
+  if (request.method !== 'POST')
+    return new Response(null, { status: 405, headers: { allow: 'POST' } })
+  const server = buildMcpServer(auth.value)
+  // No `sessionIdGenerator`: its absence is what makes the transport
+  // stateless, one per request.
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    enableJsonResponse: true,
+  })
+  try {
+    await server.connect(transport)
+    return await transport.handleRequest(request)
+  } finally {
+    await server.close()
+  }
+}

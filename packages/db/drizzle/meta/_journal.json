@@ -344,6 +344,13 @@
       "when": 1790331532462,
       "tag": "0048_suggestion_space_tag",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1790515358609,
+      "tag": "0049_api_token",
+      "breakpoints": true
     }
   ]
 }

@@ -1,11 +1,12 @@
 import { Effect } from 'effect'
+import { eq } from 'drizzle-orm'
+import { db } from '@spaces/db'
+import { note } from '@spaces/db/schema'
 import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
+import { canRead } from '#/lib/notes/visibility'
+import { ContextEntityNotFound, ContextQueryFailed } from './errors'
 import { assembleProgram } from './assemble'
-import type {
-  ContextEntityNotFound,
-  ContextLeak,
-  ContextQueryFailed,
-} from './assemble'
+import type { ContextLeak } from './assemble'
 import { resolveRefsProgram } from './names'
 import type { ContextKind } from './types'
 
@@ -51,7 +52,15 @@ export type RecordContextInput = {
   budgetChars: number
   /** The judgment-memory mode — `AssembleOptions.similar`. */
   similar?: boolean | undefined
+  /**
+   * Task text — `AssembleOptions.taskText`, the lexical lane. The record page
+   * never sends one; the MCP `get_context` tool passes its `task` (SPA-23).
+   */
+  taskText?: string | undefined
 }
+
+/** The Context section's default budget; the MCP tool's too (SPA-23). */
+export const DEFAULT_BUDGET_CHARS = 8000
 
 export const recordContextProgram = Effect.fn('recordContextProgram')(
   function* (
@@ -60,6 +69,23 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
     RecordContext,
     ContextQueryFailed | ContextEntityNotFound | ContextLeak
   > {
+    // A private note is its author's: asked for as the seed by anyone else,
+    // it does not exist — not even its title leaves as the seed's name. The
+    // assembler filters notes it reaches over a link; this is the one door
+    // it does not walk through (SPA-23: a token asks by id).
+    const seedNote = (yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ visibility: note.visibility, authorId: note.authorId })
+          .from(note)
+          .where(eq(note.entityId, input.entityId)),
+      catch: (cause) => new ContextQueryFailed({ cause }),
+    })).at(0)
+    if (seedNote && !canRead(input.user, seedNote))
+      return yield* new ContextEntityNotFound({
+        id: input.entityId,
+        message: 'Record not found',
+      })
     const result = yield* assembleProgram(
       { entityId: input.entityId },
       {
@@ -67,6 +93,7 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
         asOf: input.asOf,
         budgetChars: input.budgetChars,
         similar: input.similar,
+        taskText: input.taskText,
       },
     )
     // A pin that cannot be read only hides the toggle; the mode itself,
