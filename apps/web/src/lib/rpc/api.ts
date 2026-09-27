@@ -30,9 +30,12 @@ import {
   HttpApiSecurity,
   OpenApi,
 } from 'effect/unstable/httpapi'
+import { listRegistryProgram } from '#/lib/mcp/tools-read'
 import { API_SCOPES } from '#/lib/tokens/scopes'
 import type { ApiScope } from '#/lib/tokens/scopes'
 import { authenticateTokenProgram } from '#/lib/tokens/store'
+import { RECORD_PAGE_MAX, RECORD_PAGE_SIZE } from '#/lib/views/page-size'
+import { getApiRecordProgram, listApiRecordsProgram } from './records'
 import { WebLayer } from './runtime'
 import { API_PREFIX, API_VERSION, CAPTURE_SCHEMA_VERSION } from './versions'
 
@@ -186,7 +189,18 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
   message: Schema.String,
 }) {}
 
+/**
+ * No such thing for this caller: an unknown object, or a record that does
+ * not exist or that the token's user may not read — the two read the same,
+ * so a private note's existence is never disclosed. The same tag the seam
+ * answers for an unknown path.
+ */
+export class NotFound extends Schema.TaggedError<NotFound>()('NotFound', {
+  message: Schema.String,
+}) {}
+
 const BadRequestWire = onTheWire('BadRequest', 400, BadRequest)
+const NotFoundWire = onTheWire('NotFound', 404, NotFound)
 const InternalErrorWire = onTheWire('InternalError', 500, InternalError)
 const UnauthorizedWire = onTheWire('Unauthorized', 401, Unauthorized)
 const ForbiddenWire = onTheWire('Forbidden', 403, Forbidden)
@@ -407,9 +421,169 @@ class SessionGroup extends HttpApiGroup.make('session').add(
     ),
 ) {}
 
+/**
+ * The read half of integration map #11 (SPA-80): the registry, then records
+ * a page at a time, then one record — every one `records:read`, every one a
+ * thin wrapper over a program the app already runs (`./records.ts` says
+ * which). Three things are absent on purpose, each owned elsewhere, and
+ * `records-api.test.ts` fails if one appears here: a filter parameter
+ * (docsurf-12b's condition registry and ai-18), search (the fused query,
+ * clean-5 and ai-11; MCP has it via ai-23b) and any write (ai-24's one
+ * proposal door).
+ */
+const RegistryAttributeWire = Schema.Struct({
+  id: Schema.String,
+  slug: Schema.String,
+  name: Schema.String,
+  description: Schema.NullOr(Schema.String),
+  type: Schema.String,
+  isSystem: Schema.Boolean,
+  target: Schema.NullOr(Schema.String),
+  options: Schema.JsonObject,
+})
+
+const RegistryObjectWire = Schema.Struct({
+  id: Schema.String,
+  slug: Schema.String,
+  singular: Schema.String,
+  plural: Schema.String,
+  isSystem: Schema.Boolean,
+  identityKeys: Schema.Array(Schema.String),
+  attributes: Schema.Array(RegistryAttributeWire),
+})
+
+const Registry = Schema.Struct({ objects: Schema.Array(RegistryObjectWire) })
+
+class RegistryGroup extends HttpApiGroup.make('registry').add(
+  HttpApiEndpoint.get('list', '/registry', {
+    success: Registry,
+    error: SEAM_FAILURES,
+  })
+    .middleware(TokenAuth)
+    .annotate(RequiredScope, 'records:read')
+    .annotateMerge(
+      OpenApi.annotations({
+        summary: 'Every object and its attributes',
+        description:
+          'Every live object — companies, people, deals and each custom object — with its live attributes in registry order and their per-type config (select options, reference target, currency code). Read on every call: an object created a minute ago is listed. This is how a record’s `values`, keyed by attribute slug, are interpreted.',
+      }),
+    ),
+) {}
+
+/** A record's attribute values, keyed by the registry's attribute slug. */
+const Values = Schema.Record(Schema.String, Schema.Json)
+
+const RecordRow = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  createdAt: Schema.String,
+  values: Values,
+  domains: Schema.optionalKey(Schema.Array(Schema.String)),
+  emails: Schema.optionalKey(Schema.Array(Schema.String)),
+})
+
+const RecordPage = Schema.Struct({
+  object: Schema.String,
+  rows: Schema.Array(RecordRow),
+  nextCursor: Schema.NullOr(Schema.String),
+  total: Schema.Int,
+})
+
+const RecordWire = Schema.Struct({
+  id: Schema.String,
+  kind: Schema.String,
+  name: Schema.String,
+  mergedFrom: Schema.NullOr(Schema.String),
+  object: Schema.NullOr(
+    Schema.Struct({
+      id: Schema.String,
+      slug: Schema.String,
+      singular: Schema.String,
+      plural: Schema.String,
+    }),
+  ),
+  values: Values,
+  links: Schema.Array(
+    Schema.Struct({
+      direction: Schema.Literals(['out', 'in']),
+      relation: Schema.String,
+      attrSlug: Schema.String,
+      source: Schema.String,
+      entity: Schema.Struct({
+        id: Schema.String,
+        kind: Schema.String,
+        name: Schema.String,
+      }),
+    }),
+  ),
+  spaces: Schema.Array(
+    Schema.Struct({ id: Schema.String, name: Schema.String }),
+  ),
+})
+
+/**
+ * A query value is a string on the wire; the description rides on that side
+ * so the OpenAPI document states the bounds a caller is held to.
+ */
+const PageLimit = Schema.String.annotate({
+  description: `Rows per page, an integer from 1 to ${RECORD_PAGE_MAX}; ${RECORD_PAGE_SIZE} when omitted`,
+}).pipe(
+  Schema.decodeTo(
+    Schema.Int.check(
+      Schema.isBetween({ minimum: 1, maximum: RECORD_PAGE_MAX }),
+    ),
+    SchemaTransformation.numberFromString,
+  ),
+)
+
+class RecordsGroup extends HttpApiGroup.make('records')
+  .add(
+    HttpApiEndpoint.get('list', '/objects/:object/records', {
+      params: { object: Schema.String },
+      query: {
+        cursor: Schema.optionalKey(
+          Schema.String.annotate({
+            description:
+              'The previous page’s nextCursor, as it was handed out; omit for the first page',
+          }),
+        ),
+        limit: Schema.optionalKey(PageLimit),
+      },
+      success: RecordPage,
+      error: [...SEAM_FAILURES, NotFoundWire],
+    })
+      .middleware(TokenAuth)
+      .annotate(RequiredScope, 'records:read')
+      .annotateMerge(
+        OpenApi.annotations({
+          summary: 'One page of an object’s records',
+          description:
+            'The object by slug (or its singular or plural name). The same rows, in the same order, as the object’s list in the app with no view applied: newest first, keyset-paged on (created_at, id), so rows created or deleted while you page never repeat or skip another. Pass the previous page’s nextCursor to continue; null means the last page. No filter, search or sort parameter, by design.',
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.get('get', '/records/:id', {
+      params: { id: Schema.String },
+      success: RecordWire,
+      error: [...SEAM_FAILURES, NotFoundWire],
+    })
+      .middleware(TokenAuth)
+      .annotate(RequiredScope, 'records:read')
+      .annotateMerge(
+        OpenApi.annotations({
+          summary: 'One record',
+          description:
+            'Its object, its values keyed by attribute slug, its links both ways and the spaces it is tagged into — as the token’s user may see it. A record that user may not read is not found.',
+        }),
+      ),
+  ) {}
+
 export class Api extends HttpApi.make('spaces')
   .add(CaptureGroup)
   .add(SessionGroup)
+  .add(RegistryGroup)
+  .add(RecordsGroup)
   .prefix(API_PREFIX)
   .annotateMerge(
     OpenApi.annotations({ title: 'Spaces', version: String(API_VERSION) }),
@@ -444,6 +618,52 @@ const SessionHandlers = HttpApiBuilder.group(Api, 'session', (handlers) =>
   handlers.handle('me', () => me),
 ).pipe(Layer.provide(TokenAuthLive))
 
+const registry = listRegistryProgram({}).pipe(
+  Effect.map((objects) => ({ objects })),
+  Effect.orDie,
+  Effect.withSpan('registry.list'),
+)
+
+const RegistryHandlers = HttpApiBuilder.group(Api, 'registry', (handlers) =>
+  handlers.handle('list', () => registry),
+).pipe(Layer.provide(TokenAuthLive))
+
+/** An unknown object is 404, a foreign cursor 400; a query failure dies (500). */
+const listFailure = (
+  failure: Effect.Error<ReturnType<typeof listApiRecordsProgram>>,
+): Effect.Effect<never, NotFound | BadRequest> =>
+  failure._tag === 'McpToolRefused'
+    ? Effect.fail(new NotFound({ message: failure.message }))
+    : failure._tag === 'UnreadableCursor'
+      ? Effect.fail(new BadRequest({ message: failure.message }))
+      : Effect.die(failure)
+
+const listRecords = Effect.fn('records.list')(function* (
+  object: string,
+  page: { readonly cursor?: string; readonly limit?: number },
+) {
+  return yield* listApiRecordsProgram(object, { ...page }).pipe(
+    Effect.catch(listFailure),
+  )
+})
+
+/** As the token's user: canRead is `getRecordProgram`'s own. */
+const getRecord = Effect.fn('records.get')(function* (id: string) {
+  const principal = yield* Principal
+  return yield* getApiRecordProgram(principal.user, id).pipe(
+    Effect.catchTag('McpToolRefused', (refused) =>
+      Effect.fail(new NotFound({ message: refused.message })),
+    ),
+    Effect.catchTag('McpToolQueryFailed', (failure) => Effect.die(failure)),
+  )
+})
+
+const RecordsHandlers = HttpApiBuilder.group(Api, 'records', (handlers) =>
+  handlers
+    .handle('list', ({ params, query }) => listRecords(params.object, query))
+    .handle('get', ({ params }) => getRecord(params.id)),
+).pipe(Layer.provide(TokenAuthLive))
+
 // ---------------------------------------------------------------------------
 // The seam
 // ---------------------------------------------------------------------------
@@ -458,9 +678,12 @@ const ApiRoutes = Layer.merge(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(CaptureHandlers, SessionHandlers).pipe(
-      Layer.provide(WebLayer),
-    ),
+    Layer.mergeAll(
+      CaptureHandlers,
+      SessionHandlers,
+      RegistryHandlers,
+      RecordsHandlers,
+    ).pipe(Layer.provide(WebLayer)),
   ),
 )
 

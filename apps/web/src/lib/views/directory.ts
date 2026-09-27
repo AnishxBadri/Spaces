@@ -169,7 +169,7 @@ async function spacesFor(
  * is how its text box narrows. Everything else is the pager.
  */
 const pageOfKind = Effect.fn('pageOfKind')(function* (
-  kind: 'company' | 'person',
+  kind: 'company' | 'person' | 'deal',
   search: (q: string) => SQL | undefined,
   conditions: Array<Condition>,
   options: ListPageOptions,
@@ -313,6 +313,35 @@ export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
         emails: emails.get(r.id) ?? [],
         company: employers.get(r.id) ?? null,
         lastTouched: touched.get(r.id) ?? null,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      nextCursor: page.nextCursor,
+      total: page.total,
+    }
+  },
+)
+
+/**
+ * Deals, one keyset page at a time (SPA-80). `/deals` itself still loads
+ * the whole set (`listDealsTable`, and see the module header for why), so
+ * this is not what the board reads: it is the same set — `listScope('deal')`
+ * — in the same newest-first order, cut by the same pager, for the one
+ * caller that must page it, the external API's `records.list`. No side
+ * queries: a deal row is its core and its values.
+ */
+export const listDealsPageProgram = Effect.fn('listDealsPageProgram')(
+  function* (conditions: Array<Condition>, options: ListPageOptions = {}) {
+    const page = yield* pageOfKind(
+      'deal',
+      (q) => ilike(entity.canonicalName, likeArg(q)),
+      conditions,
+      options,
+    )
+    return {
+      rows: page.rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        values: r.values,
         createdAt: r.createdAt.toISOString(),
       })),
       nextCursor: page.nextCursor,
