@@ -159,6 +159,18 @@ export const aliasKind = pgEnum('alias_kind', [
 ])
 
 /**
+ * The keys that identify a person or a company — the alias kinds that carry
+ * `is_identity`, which is every kind but `name`. Derived from the enum rather
+ * than spelled again, so the repo has one notion of what identifies a record
+ * (SPA-165): `CORE_IDENTITY_KEYS` in `@spaces/core/attributes/registry` is
+ * the runtime list, typed against this.
+ */
+export type CoreIdentityKey = Exclude<
+  (typeof aliasKind.enumValues)[number],
+  'name'
+>
+
+/**
  * Identity lives here, not on side tables — single source of truth.
  * Deterministic keys (domain/email/linkedin/cin) carry is_identity and are
  * globally unique; writing a colliding identity alias must be converted by

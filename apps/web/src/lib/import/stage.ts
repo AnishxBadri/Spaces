@@ -15,6 +15,7 @@ import { putBlobProgram } from '#/lib/documents/intake'
 import { storage } from '#/lib/storage'
 import type { Grid, Sheet } from '@spaces/core/import/read'
 import type { ImportBatchStatus, ImportMode } from '@spaces/db/schema'
+import type { Mapping } from '@spaces/core/import/mapping'
 
 /**
  * **Staged import** (SPA-164, import-2) — the wizard's first step, folded
@@ -321,7 +322,7 @@ export const stageImportProgram = Effect.fn('stageImportProgram')(function* (
 // A staged batch: read, define, switch sheet, discard
 // ---------------------------------------------------------------------------
 
-const stagedBatch = Effect.fn('stagedBatch')(function* (
+export const stagedBatch = Effect.fn('stagedBatch')(function* (
   batchId: string,
 ): Effect.fn.Return<
   typeof importBatch.$inferSelect,
@@ -352,6 +353,8 @@ export type ImportBatchView = {
   header: Array<string> | null
   mode: ImportMode
   targetObjectId: string | null
+  /** Column → target; null until the mapping step is entered (SPA-165). */
+  mapping: Mapping | null
   status: ImportBatchStatus
   rowCount: number
   /** The sheet's width — every row is padded to it. */
@@ -394,6 +397,7 @@ export const loadImportBatchProgram = Effect.fn('loadImportBatchProgram')(
       header: batch.header,
       mode: batch.mode,
       targetObjectId: batch.targetObjectId,
+      mapping: batch.mapping,
       status: batch.status,
       rowCount: batch.rowCount,
       columnCount: batch.header?.length ?? preview.at(0)?.cells.length ?? 0,
@@ -411,13 +415,20 @@ export const defineImportBatchProgram = Effect.fn('defineImportBatchProgram')(
     mode: ImportMode
     targetObjectId: string | null
   }): Effect.fn.Return<void, ImportFailure> {
-    yield* stagedBatch(input.batchId)
+    const batch = yield* stagedBatch(input.batchId)
     const targetObjectId = input.mode === 'ledger' ? null : input.targetObjectId
     yield* checkTarget(input.mode, targetObjectId)
+    // A mapping is onto one object's registry; another target starts over.
+    const same =
+      batch.mode === input.mode && batch.targetObjectId === targetObjectId
     yield* query(() =>
       db
         .update(importBatch)
-        .set({ mode: input.mode, targetObjectId })
+        .set({
+          mode: input.mode,
+          targetObjectId,
+          ...(same ? {} : { mapping: null }),
+        })
         .where(eq(importBatch.id, input.batchId)),
     )
   },
@@ -445,9 +456,10 @@ export const selectImportSheetProgram = Effect.fn('selectImportSheetProgram')(
       db.transaction(async (tx) => {
         await tx.delete(importRow).where(eq(importRow.batchId, batch.id))
         await insertRows(tx, batch.id, dataRowsOf(sheet))
+        // Another sheet is other columns: its mapping starts over.
         await tx
           .update(importBatch)
-          .set(sheetColumns(sheet))
+          .set({ ...sheetColumns(sheet), mapping: null })
           .where(eq(importBatch.id, batch.id))
       }),
     )

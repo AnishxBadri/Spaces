@@ -6,7 +6,10 @@ import { nextBadgeColor } from '@spaces/core/attributes/colors'
 import { validateDefault } from './defaults'
 import { objectIdForKind } from './objects'
 import { deriveOptionIds } from '@spaces/core/attributes/options'
-import { IDENTITY_KEY_ATTRIBUTES } from '@spaces/core/attributes/registry'
+import {
+  IDENTITY_KEY_ATTRIBUTES,
+  slugifyAttributeName,
+} from '@spaces/core/attributes/registry'
 import { AttributeQueryFailed } from './update'
 import type { ObjectQueryFailed, SystemObjectNotSeeded } from './objects'
 import type { BadgeColor } from '@spaces/core/attributes/colors'
@@ -103,14 +106,6 @@ const query = <T>(run: () => Promise<T>) =>
     try: run,
     catch: (cause) => new AttributeQueryFailed({ cause }),
   })
-
-const slugify = (name: string) =>
-  name
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 48) || 'attribute'
 
 /** Per-type options blob from the dialog's config; rejects config the type can't carry. */
 const buildOptions = Effect.fn('buildOptions')(function* (
@@ -226,7 +221,7 @@ export const createAttributeProgram = Effect.fn('createAttributeProgram')(
 
     // Slug: derived once, suffixed on collision within the object, then
     // immutable forever (spec §3 — Attio's mutable slug is the footgun).
-    const base = slugify(name)
+    const base = slugifyAttributeName(name)
     let slug = base
     for (let i = 2; ; i++) {
       const taken = yield* query(() =>

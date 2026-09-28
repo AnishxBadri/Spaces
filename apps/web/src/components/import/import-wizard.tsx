@@ -6,13 +6,15 @@ import { DitherBlock } from '#/components/dither'
 import { KeyHint, PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
+import { columnLetter } from '@spaces/core/import/mapping'
 import { cn } from '#/lib/utils'
 
 /**
  * The import wizard's chrome (SPA-164, import-2): the page header, the
  * four-step strip, the drop zone, the define row (object + mode), the sheet
- * tabs and the preview grid. Only step 1 is live this slice; the strip draws
- * the other three inert so the shape of the wizard is visible from the start.
+ * tabs and the preview grid. Steps 1 and 2 are live (the mapping grid is
+ * `mapping-grid.tsx`, SPA-165); the strip draws the other two inert so the
+ * shape of the wizard is visible from the start.
  *
  * Copied, not designed: the header is `PageHeader`, the drop zone is the P5
  * `EmptyState` anatomy with a dashed rule, the grid keeps `RecordTable`'s
@@ -42,6 +44,8 @@ export function ImportHeader({
   readout,
   onDiscard,
   discarding = false,
+  onContinue,
+  continuing = false,
 }: {
   mode: ImportMode
   title: string
@@ -49,6 +53,9 @@ export function ImportHeader({
   /** Absent before a file is staged — there is nothing to discard. */
   onDiscard?: () => void
   discarding?: boolean
+  /** Absent until the step can be left — no object chosen, no file staged. */
+  onContinue?: () => void
+  continuing?: boolean
 }) {
   return (
     <PageHeader
@@ -65,8 +72,11 @@ export function ImportHeader({
           >
             {discarding ? 'Discarding…' : 'Discard'}
           </Button>
-          {/* Mapping is the next slice; Continue is drawn, not armed. */}
-          <Button disabled>
+          <Button
+            disabled={!onContinue}
+            pending={continuing}
+            onClick={onContinue}
+          >
             Continue <KeyHint>⌘↵</KeyHint>
           </Button>
         </>
@@ -81,16 +91,30 @@ export function ImportHeader({
 
 const STEPS = ['Upload', 'Map columns', 'Preview', 'Commit'] as const
 
-/** Four cells on rules; the current one carries the 2px ink foot. */
-export function StepStrip({ uploadHint }: { uploadHint: string | null }) {
+/**
+ * Four cells on rules; the current one carries the 2px ink foot. `step` is
+ * read off the batch by the caller (a mapping on the row is step 2), never
+ * kept in component state, so a reload lands where the operator left.
+ */
+export function StepStrip({
+  uploadHint,
+  step = 0,
+  mapHint = null,
+}: {
+  uploadHint: string | null
+  step?: 0 | 1
+  /** Step 2's readout once its mapping would advance — `7 of 11 mapped`. */
+  mapHint?: string | null
+}) {
   return (
     <nav
       aria-label="Import steps"
       className="flex h-10 shrink-0 border-b border-hairline"
     >
       {STEPS.map((label, i) => {
-        const current = i === 0
-        const done = i === 0 && uploadHint !== null
+        const current = i === step
+        const hint = i === 0 ? uploadHint : i === 1 ? mapHint : null
+        const done = hint !== null
         return (
           <div
             key={label}
@@ -114,7 +138,7 @@ export function StepStrip({ uploadHint }: { uploadHint: string | null }) {
             <span className="truncate">{label}</span>
             {done ? (
               <span className="truncate mono text-micro font-normal text-graphite">
-                {uploadHint}
+                {hint}
               </span>
             ) : null}
           </div>
@@ -340,16 +364,7 @@ export function SheetTabs({
 // ---------------------------------------------------------------------------
 
 /** A, B, … Z, AA — the head when the sheet has no header row. */
-export function columnLetter(index: number): string {
-  let n = index + 1
-  let out = ''
-  while (n > 0) {
-    const r = (n - 1) % 26
-    out = String.fromCharCode(65 + r) + out
-    n = Math.floor((n - 1) / 26)
-  }
-  return out
-}
+export { columnLetter }
 
 export function PreviewGrid({
   header,

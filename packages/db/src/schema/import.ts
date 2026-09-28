@@ -15,6 +15,8 @@ import {
 import { user } from './auth'
 import { entity } from './entities'
 import { objectDef } from './objects'
+import type { CoreIdentityKey } from './entities'
+import type { attributeType } from './attributes'
 import type { Json } from '../json'
 
 /**
@@ -50,6 +52,42 @@ export const importBatchStatus = pgEnum('import_batch_status', [
 
 export type ImportBatchStatus = (typeof importBatchStatus.enumValues)[number]
 
+/**
+ * The payload of `import_batch.mapping` (SPA-165, import-3), declared at the
+ * column that stores it and re-exported by `@spaces/core/import/mapping`,
+ * which owns the behaviour — packages/db imports nothing internal, and the
+ * column owns the shape of what it stores (SPA-142).
+ *
+ * One target per source column, by column index:
+ *
+ * - `name` — the record's name (exactly one column).
+ * - `attribute` — a live attribute of the target object. `dateOrder` is the
+ *   column's declared reading of a slashed date, never sniffed.
+ * - `identity` — one of the object's identity keys.
+ * - `ignore` — the column is not imported.
+ * - `new` — an attribute the operator is defining from this column and has
+ *   not yet confirmed; confirming creates it and the column becomes an
+ *   `attribute` target. `options` are the labels a select will be born with.
+ */
+export type ImportDateOrder = 'dmy' | 'mdy'
+
+export type ImportAttributeType = (typeof attributeType.enumValues)[number]
+
+export type ColumnTarget =
+  | { target: 'name' }
+  | { target: 'attribute'; attributeId: string; dateOrder?: ImportDateOrder }
+  | { target: 'identity'; key: CoreIdentityKey }
+  | { target: 'ignore' }
+  | {
+      target: 'new'
+      name: string
+      type: ImportAttributeType
+      options?: Array<string>
+      dateOrder?: ImportDateOrder
+    }
+
+export type Mapping = Array<ColumnTarget>
+
 export const importBatch = pgTable(
   'import_batch',
   {
@@ -72,8 +110,11 @@ export const importBatch = pgTable(
     header: jsonb('header').$type<Array<string>>(),
     mode: importMode('mode').notNull(),
     targetObjectId: uuid('target_object_id').references(() => objectDef.id),
-    /** Column → field, written by the mapping step; null until then. */
-    mapping: jsonb('mapping').$type<Json>(),
+    /**
+     * Column → target, written by the mapping step on every change; null
+     * until the step is entered. A batch with a mapping is on step 2.
+     */
+    mapping: jsonb('mapping').$type<Mapping>(),
     status: importBatchStatus('status').notNull().default('staged'),
     /** Data rows staged — one `import_row` each. */
     rowCount: integer('row_count').notNull(),

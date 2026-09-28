@@ -5,6 +5,7 @@ import type {
   SelectOption,
 } from '@spaces/db/schema/attributes'
 import type { IdentityKey } from '@spaces/db/schema/objects'
+import type { CoreIdentityKey } from '@spaces/db/schema/entities'
 import { normalizeDomain, normalizeLinkedin } from '../entities/normalize'
 import type { BadgeColor } from './colors'
 
@@ -19,7 +20,13 @@ import type { BadgeColor } from './colors'
  * unchanged — packages/db imports nothing internal, and the column owns the
  * shape of what it stores (SPA-142).
  */
-export type { AttributeOptions, IdentityKey, ObjectKind, SelectOption }
+export type {
+  AttributeOptions,
+  CoreIdentityKey,
+  IdentityKey,
+  ObjectKind,
+  SelectOption,
+}
 
 /** The three core kinds, as a list — iteration order for the seeder. */
 export const OBJECT_KINDS: Array<ObjectKind> = ['company', 'person', 'deal']
@@ -43,6 +50,22 @@ export function toObjectKind(kind: string): ObjectKind | null {
   return kind === 'company' || kind === 'person' || kind === 'deal'
     ? kind
     : null
+}
+
+/**
+ * An attribute's slug, from its name — derived once at creation and frozen
+ * (spec §3). The create program suffixes it on collision; the import mapping
+ * slugifies a sheet's header with it so `Close date` finds `close_date`.
+ */
+export function slugifyAttributeName(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 48) || 'attribute'
+  )
 }
 
 /**
@@ -72,11 +95,52 @@ export const IDENTITY_KEY_ATTRIBUTES: Record<
 }
 
 /**
- * Keys that identify people and companies and nothing else. Refused rather
- * than offered: the free-mail and role-prefix rules behind them are core
- * doctrine and mean nothing on an attribute bag.
+ * The core four: the keys that identify a person or a company, and the alias
+ * kinds that carry `is_identity` (`CoreIdentityKey` is derived from the
+ * `alias_kind` enum). `resolveEntity`'s normalizer table is keyed by this
+ * type, so the two cannot disagree about what identifies a record.
  */
-export const CORE_ONLY_IDENTITY_KEYS: Array<string> = ['email', 'cin']
+export const CORE_IDENTITY_KEYS: Array<CoreIdentityKey> = [
+  'domain',
+  'email',
+  'linkedin',
+  'cin',
+]
+
+/**
+ * Keys that identify people and companies and nothing else — the core four
+ * less the two a custom object may declare. Refused rather than offered: the
+ * free-mail and role-prefix rules behind them are core doctrine and mean
+ * nothing on an attribute bag.
+ */
+export const CORE_ONLY_IDENTITY_KEYS: Array<string> = CORE_IDENTITY_KEYS.filter(
+  (k) => !IDENTITY_KEYS.some((declarable) => declarable === k),
+)
+
+/** An object row's core kind — a seeded system row's slug — or null for a custom object. */
+export function coreKindOf(object: {
+  slug: string
+  isSystem: boolean
+}): ObjectKind | null {
+  if (!object.isSystem) return null
+  return OBJECT_KINDS.find((k) => CORE_OBJECTS[k].slug === object.slug) ?? null
+}
+
+/**
+ * The one answer to "what identifies a record of this object?" (SPA-165).
+ * Company and person carry the core four; a deal carries none; a custom
+ * object carries exactly what it declared in `object.identity_keys`.
+ */
+export function identityKeysOf(object: {
+  slug: string
+  isSystem: boolean
+  identityKeys: ReadonlyArray<IdentityKey>
+}): Array<CoreIdentityKey> {
+  const kind = coreKindOf(object)
+  if (kind === 'company' || kind === 'person') return [...CORE_IDENTITY_KEYS]
+  if (kind === 'deal') return []
+  return [...object.identityKeys]
+}
 
 export const CORE_ONLY_IDENTITY_MESSAGE =
   'email and cin identify people and companies, not custom records'

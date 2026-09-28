@@ -8,6 +8,7 @@ import {
   person,
 } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
+import type { CoreIdentityKey } from '@spaces/core/attributes/registry'
 import type { Actor } from '../attributes/values'
 import { canonicalId, suggestDuplicate, sweepNameSimilarity } from './sweep'
 import {
@@ -97,7 +98,7 @@ export type ResolveResult = {
   entityId: string
   action: 'attached' | 'created'
   /** Which key matched, when attached. */
-  matchedOn?: 'domain' | 'email' | 'linkedin' | 'cin'
+  matchedOn?: CoreIdentityKey
 }
 
 /**
@@ -140,7 +141,7 @@ function birthActor(
 }
 
 type NormalizedKey = {
-  kind: 'domain' | 'email' | 'linkedin' | 'cin'
+  kind: CoreIdentityKey
   value: string
   valueNorm: string
 }
@@ -396,7 +397,10 @@ export async function recordNameAlias(
 }
 
 /** The alias kinds that carry `is_identity`, and their one normalizer each. */
-const IDENTITY_NORMALIZERS = {
+const IDENTITY_NORMALIZERS: Record<
+  CoreIdentityKey,
+  (raw: string) => string | null
+> = {
   domain: normalizeDomain,
   email: normalizeEmail,
   linkedin: normalizeLinkedin,
