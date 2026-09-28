@@ -59,7 +59,8 @@ const resolveTarget = async (key: SurfaceKey): Promise<ViewTarget> => {
     return { surface: 'object', objectId: key.objectId }
   if (key.kind === undefined)
     throw new Error(exactlyOneObjectRefMessage.message)
-  const { objectIdForKindAsync } = await import('../attributes/objects')
+  const { objectIdForKindAsync } =
+    await import('@spaces/core/writes/attributes/objects')
   return { surface: 'object', objectId: await objectIdForKindAsync(key.kind) }
 }
 

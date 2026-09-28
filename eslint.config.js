@@ -165,7 +165,7 @@ export default [
       ],
     },
   },
-  // Both syntax bans, over the app and over core. Intl compact notation
+  // Both syntax bans, over every package's source. Intl compact notation
   // differs Node vs Chrome → hydration failures, so fmtMoney
   // (packages/core/src/portfolio/format.ts) hand-rolls compact — and since
   // SPA-144 moved both format modules to @spaces/core, the ban has to cover
@@ -173,9 +173,12 @@ export default [
   // place nothing watches. And attribute values have one write path
   // (CONTEXT.md "Backend paradigm" #9): setValues validates, diffs, logs
   // attribute_event and materializes reference links in one transaction, all
-  // four of which a direct `.update(entity).set({ values })` skips.
+  // four of which a direct `.update(entity).set({ values })` skips. The glob
+  // is the workspace, not one app (SPA-174): the attribute engine is moving
+  // into packages/core, and a package that appears later is covered the day
+  // it appears rather than the day someone remembers.
   {
-    files: ['apps/web/src/**', 'packages/core/src/**'],
+    files: ['apps/*/src/**', 'packages/*/src/**'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -232,9 +235,10 @@ export default [
   },
   // Guard against accidental full-table update/delete (portfolio event
   // tables are append-only by design). packages/db is in scope too: the
-  // schema moved there in SPA-142 and so did `heartbeat.ts`, which writes.
+  // schema moved there in SPA-142 and so did `heartbeat.ts`, which writes;
+  // packages/core since SPA-174, when its `src/writes/` half began to.
   {
-    files: ['apps/web/src/**', 'packages/db/src/**'],
+    files: ['apps/web/src/**', 'packages/db/src/**', 'packages/core/src/**'],
     plugins: { drizzle },
     rules: {
       'drizzle/enforce-delete-with-where': [

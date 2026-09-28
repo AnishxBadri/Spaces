@@ -244,7 +244,8 @@ describe('dedupe sweep job', () => {
     const { entity } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
     const { MERGEABLE } = await import('#/lib/entities/merge')
-    const { objectIdForKindAsync } = await import('#/lib/attributes/objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
 
     const me = await actorId()
     const tag = randomUUID().slice(0, 8)

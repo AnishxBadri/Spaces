@@ -30,7 +30,8 @@ describe('custom objects', () => {
     } = await import('./object-registry')
     const { createAttributeProgram } = await import('./create')
     const { setValues, getRegistryByObjectId } = await import('./values')
-    const { objectIdForKindAsync } = await import('./objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { db } = await import('@spaces/db')
     const { entity, link, objectDef } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')

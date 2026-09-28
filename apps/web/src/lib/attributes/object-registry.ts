@@ -20,7 +20,7 @@ import type { AttributeQueryFailed } from './update'
 import type {
   ObjectQueryFailed as CoreObjectQueryFailed,
   SystemObjectNotSeeded,
-} from './objects'
+} from '@spaces/core/writes/attributes/objects'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
 import {
   AttributeValidationError,

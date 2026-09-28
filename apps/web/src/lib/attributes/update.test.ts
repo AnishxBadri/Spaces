@@ -80,7 +80,8 @@ async function makeAttribute(
 ) {
   const { db } = await import('@spaces/db')
   const { attribute } = await import('@spaces/db/schema')
-  const { objectIdForKindAsync } = await import('./objects')
+  const { objectIdForKindAsync } =
+    await import('@spaces/core/writes/attributes/objects')
   const objectId = await objectIdForKindAsync('company')
   const row = (
     await db

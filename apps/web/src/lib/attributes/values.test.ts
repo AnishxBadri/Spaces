@@ -154,7 +154,8 @@ describe('required means can’t-clear (all types)', () => {
   it('rejects an explicit clear per type family, allows born-empty', async () => {
     const { resolveEntity } = await import('../entities/resolve')
     const { setValues, AttributeValidationError } = await import('./values')
-    const { objectIdForKindAsync } = await import('./objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { db } = await import('@spaces/db')
     const { attribute } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')

@@ -12,7 +12,7 @@ import { documentKindPayloadSchema } from '@spaces/core/ai/document-kind'
 import { spaceTagPayloadSchema } from '@spaces/core/ai/space-tag'
 import { toObjectKind } from '@spaces/core/attributes/registry'
 import type { AttributeDef } from '@spaces/core/attributes/registry'
-import { objectIdForKindAsync } from '#/lib/attributes/objects'
+import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import {
   AttributeValidationError,
   EntityNotFound,

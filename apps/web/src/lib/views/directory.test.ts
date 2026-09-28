@@ -29,7 +29,8 @@ async function actorId() {
 async function stageAttribute(kind: 'company' | 'person') {
   const { Effect } = await import('effect')
   const { createAttributeProgram } = await import('../attributes/create')
-  const { objectIdForKind } = await import('../attributes/objects')
+  const { objectIdForKind } =
+    await import('@spaces/core/writes/attributes/objects')
   const { db } = await import('@spaces/db')
   const { attribute } = await import('@spaces/db/schema')
   const { eq } = await import('drizzle-orm')

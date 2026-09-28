@@ -6,7 +6,7 @@ import type { attributeEventSource } from '@spaces/db/schema'
 import type { EntityValues } from '@spaces/db/schema/entities'
 import type { Json } from '#/lib/json'
 import { resolveDefault } from '@spaces/core/attributes/default-values'
-import { objectIdForKindAsync } from './objects'
+import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import {
   claimIdentityAlias,
   normalizeIdentityValue,

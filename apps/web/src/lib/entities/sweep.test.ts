@@ -210,7 +210,8 @@ describe('sweepNameSimilarity', () => {
     const { entity } = await import('@spaces/db/schema')
     const { renameRecordProgram } = await import('./rename')
     const { sweepNameSimilarity } = await import('./sweep')
-    const { objectIdForKindAsync } = await import('#/lib/attributes/objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { normalizeName } = await import('@spaces/core/entities/normalize')
     const { MERGEABLE } = await import('./merge')
 

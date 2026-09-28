@@ -130,7 +130,8 @@ describe('propose → accept', () => {
     const { db } = await import('@spaces/db')
     const { attribute, attributeEvent, suggestion } =
       await import('@spaces/db/schema')
-    const { objectIdForKindAsync } = await import('#/lib/attributes/objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { and, eq } = await import('drizzle-orm')
     const { accepter, entityId } = await setup()
 
@@ -292,7 +293,8 @@ describe('bulk accept', () => {
   async function archiveSeed() {
     const { db } = await import('@spaces/db')
     const { attribute } = await import('@spaces/db/schema')
-    const { objectIdForKindAsync } = await import('#/lib/attributes/objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { and, eq } = await import('drizzle-orm')
     const where = and(
       eq(attribute.objectId, await objectIdForKindAsync('company')),

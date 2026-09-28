@@ -17,7 +17,7 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { enqueued } from '#/test/queue-stub'
 import { jsonRecord } from '#/lib/json'
-import { objectIdForKindAsync } from '#/lib/attributes/objects'
+import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { resolveEntity } from '#/lib/entities/resolve'
 import {
   enqueueReadDeckProgram,

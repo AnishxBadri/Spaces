@@ -162,7 +162,8 @@ describe('reorderAttributesProgram', () => {
     const { createAttributeProgram } = await import('./create')
     const { reorderAttributesProgram } = await import('./update')
     const { getRegistryByObjectId } = await import('./values')
-    const { objectIdForKindAsync } = await import('./objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { db } = await import('@spaces/db')
     const { user } = await import('@spaces/db/schema/auth')
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)

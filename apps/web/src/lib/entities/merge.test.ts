@@ -769,7 +769,8 @@ describe('mergeEntities', () => {
     const { createObjectProgram, createRecordProgram } =
       await import('#/lib/attributes/object-registry')
     const { createAttributeProgram } = await import('#/lib/attributes/create')
-    const { objectIdForKindAsync } = await import('#/lib/attributes/objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { setValues } = await import('#/lib/attributes/values')
     const { mergeEntities } = await import('./merge')
     const { db } = await import('@spaces/db')

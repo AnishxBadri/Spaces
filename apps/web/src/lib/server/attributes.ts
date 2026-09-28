@@ -26,7 +26,8 @@ export const listRegistry = createServerFn()
     // auth stays promise-land outside the program.
     await requireUser()
     const { attribute } = await import('@spaces/db/schema')
-    const { objectIdForKind } = await import('../attributes/objects')
+    const { objectIdForKind } =
+      await import('@spaces/core/writes/attributes/objects')
     const { effectFn } = await import('./effect')
     const { Effect } = await import('effect')
 

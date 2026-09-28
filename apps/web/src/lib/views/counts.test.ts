@@ -260,7 +260,8 @@ describe('visibility and scope', () => {
     const { Effect } = await import('effect')
     const { db } = await import('@spaces/db')
     const { company, entity, view } = await import('@spaces/db/schema')
-    const { objectIdForKind } = await import('../attributes/objects')
+    const { objectIdForKind } =
+      await import('@spaces/core/writes/attributes/objects')
     const { listCompaniesPageProgram } = await import('./directory')
     const { countViewsProgram } = await import('./counts')
     const companyObject = await Effect.runPromise(objectIdForKind('company'))

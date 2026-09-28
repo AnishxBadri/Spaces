@@ -27,7 +27,8 @@ const actorId = async () => {
 async function referredDeals(tag: string, names: Array<string>) {
   const { resolveEntity } = await import('../entities/resolve')
   const { setValues } = await import('../attributes/values')
-  const { objectIdForKindAsync } = await import('../attributes/objects')
+  const { objectIdForKindAsync } =
+    await import('@spaces/core/writes/attributes/objects')
   const { db } = await import('@spaces/db')
   const { entity } = await import('@spaces/db/schema')
 
@@ -128,7 +129,8 @@ describe('the person page — referred deals', () => {
 
   it('gives a second record-reference attribute its own heading, no page edit', async () => {
     const { setValues } = await import('../attributes/values')
-    const { objectIdForKindAsync } = await import('../attributes/objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { groupReferencedBy, referencedByRows } = await import('./shared')
     const { db } = await import('@spaces/db')
     const { attribute } = await import('@spaces/db/schema')

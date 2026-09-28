@@ -313,7 +313,7 @@ export async function resolveEntity(
   // Every resolvable kind is an object record now, so every one carries an
   // object row — the ghost kind that had none was deleted (clean-1).
   const objectId = await (
-    await import('../attributes/objects')
+    await import('@spaces/core/writes/attributes/objects')
   ).objectIdForKindAsync(input.kind)
   const created = await db.transaction((tx) =>
     insertResolved(tx, input, keys, name, canonicalName, objectId),
@@ -455,7 +455,8 @@ export async function resolveEntityInTx(
     }
   }
   const canonicalName = name ?? keys[0].valueNorm
-  const { objectIdForKindAsync } = await import('../attributes/objects')
+  const { objectIdForKindAsync } =
+    await import('@spaces/core/writes/attributes/objects')
   const objectId = await objectIdForKindAsync(input.kind)
   const created = await insertResolved(
     tx,

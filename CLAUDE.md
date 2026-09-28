@@ -39,7 +39,14 @@ pnpm worker                                       # background worker
   journal, `drizzle.config.ts`, `ENTITY_REFS`, the worker heartbeat, the
   downgrade guard and `runMigrations()`** (SPA-142) — it depends on
   drizzle-orm, pg and zod and on nothing internal, so don't reach into
-  `apps/web` from it. `packages/*` is where `core` and `sdk` land later.
+  `apps/web` from it. **`packages/core` (`@spaces/core`) is the domain in
+  two halves that `src/purity.test.ts` keeps apart by directory** (mono-7,
+  narrowed by SPA-174): everything outside `src/writes/` computes and may
+  reach `@spaces/db` for types only; `src/writes/` is the db-coupled half
+  (the attribute engine lands there as `@spaces/core/writes/attributes/*`)
+  and is the only place in core a `drizzle-orm` import or a `db` value import
+  passes. Neither half imports React or reads `process.env`. `packages/*` is
+  where `sdk` lands later.
   What stayed at the root: `eslint.config.js` + `eslint-rules/`,
   `prettier.config.js`, `lefthook.yml`, `scripts/`, `docker/`, `docs/`,
   `.env.local` and `data/`.
@@ -84,7 +91,10 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
   reach by construction. The grain is a database per vitest worker —
   `apps/web` runs `maxWorkers: 4` on `pool: 'forks'` against
   `spaces_test_web1…4`; `packages/db` runs `fileParallelism: false` against
-  `spaces_test_db1` — because a truncate must not be able to reach a file
+  `spaces_test_db1`, and `packages/core` the same against `spaces_test_core1`
+  (SPA-174; no seeds there — the two seeds are still apps/web's, so a core
+  file that needs a system object row inserts it) — because a truncate must
+  not be able to reach a file
   running at the same moment in another worker. Drop any `spaces_test*`
   database any time; the next run rebuilds it. With Postgres down the setup
   fails once, naming the connection string, instead of ten files each

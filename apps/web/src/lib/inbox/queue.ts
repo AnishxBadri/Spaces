@@ -14,7 +14,7 @@ import {
 import type { AttributeOptions } from '@spaces/db/schema/attributes'
 import type { DuplicateReason } from '@spaces/db/schema/entities'
 import { toObjectKind } from '@spaces/core/attributes/registry'
-import { objectIdForKindAsync } from '#/lib/attributes/objects'
+import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { getRegistryByObjectId } from '#/lib/attributes/values'
 import type { SuggestionKind } from '#/lib/ai/propose'
 import { isColumnRunTask } from '#/lib/ai/column-run'

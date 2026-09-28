@@ -2,7 +2,7 @@ import { Effect, Schema } from 'effect'
 import { db } from '@spaces/db'
 import { entity } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
-import { objectIdForKindAsync } from '#/lib/attributes/objects'
+import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import {
   AttributeValidationError,
   EntityNotFound,

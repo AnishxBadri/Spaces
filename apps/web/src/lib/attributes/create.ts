@@ -4,14 +4,17 @@ import { db } from '@spaces/db'
 import { attribute } from '@spaces/db/schema'
 import { nextBadgeColor } from '@spaces/core/attributes/colors'
 import { validateDefault } from './defaults'
-import { objectIdForKind } from './objects'
+import { objectIdForKind } from '@spaces/core/writes/attributes/objects'
 import { deriveOptionIds } from '@spaces/core/attributes/options'
 import {
   IDENTITY_KEY_ATTRIBUTES,
   slugifyAttributeName,
 } from '@spaces/core/attributes/registry'
 import { AttributeQueryFailed } from './update'
-import type { ObjectQueryFailed, SystemObjectNotSeeded } from './objects'
+import type {
+  ObjectQueryFailed,
+  SystemObjectNotSeeded,
+} from '@spaces/core/writes/attributes/objects'
 import type { BadgeColor } from '@spaces/core/attributes/colors'
 import type { Json } from '#/lib/json'
 import type {

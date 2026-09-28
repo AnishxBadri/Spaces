@@ -275,6 +275,15 @@ importers:
 
   packages/core:
     dependencies:
+      '@spaces/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: ^0.45.1
+        version: 0.45.2(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0)
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
@@ -297,15 +306,21 @@ importers:
       '@spaces/config':
         specifier: workspace:*
         version: link:../config
-      '@spaces/db':
-        specifier: workspace:*
-        version: link:../db
       '@types/node':
         specifier: ^22.10.2
         version: 22.20.1
+      '@types/pg':
+        specifier: ^8.15.6
+        version: 8.20.0
+      dotenv:
+        specifier: ^17.3.1
+        version: 17.4.2
       eslint:
         specifier: ^9.20.0
         version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.16.3
+        version: 8.22.0
       typescript:
         specifier: ^6.0.2
         version: 6.0.3

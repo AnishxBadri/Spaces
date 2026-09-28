@@ -40,7 +40,7 @@ import {
   createObjectProgram,
   createRecordProgram,
 } from '#/lib/attributes/object-registry'
-import { objectIdForKindAsync } from '#/lib/attributes/objects'
+import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { getRegistry, setValues } from '#/lib/attributes/values'
 import { resolveEntity } from '#/lib/entities/resolve'
 import { storage } from '#/lib/storage'
