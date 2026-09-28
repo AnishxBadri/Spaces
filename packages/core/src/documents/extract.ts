@@ -1,4 +1,6 @@
-import { strFromU8, unzipSync } from 'fflate'
+import { strFromU8 } from 'fflate'
+import { readXlsx } from '../import/read'
+import { numbered, ooxmlRuns, unzip } from './ooxml'
 
 /**
  * Text extraction, in-process, no extra containers (CONTEXT.md → Storage).
@@ -196,7 +198,7 @@ async function fromDocx(bytes: Uint8Array): Promise<string> {
  * order, plus speaker notes — often where the actual numbers get said.
  */
 function fromPptx(bytes: Uint8Array): string {
-  const zip = unzipSync(bytes)
+  const zip = unzip(bytes)
   const slides = numbered(zip, /^ppt\/slides\/slide(\d+)\.xml$/)
   const notes = new Map(
     numbered(zip, /^ppt\/notesSlides\/notesSlide(\d+)\.xml$/).map((s) => [
@@ -223,129 +225,23 @@ function fromPptx(bytes: Uint8Array): string {
  * Cap tables and MIS sheets: values row-wise, tab-separated, under their real
  * sheet names. Sheet names carry meaning ("Cap Table (post)") — dropping them
  * for sheet1/sheet2 throws away the most searchable string in the file.
+ *
+ * The grid is the import reader's (`import/read.ts`, SPA-163), so search and
+ * import read through one xlsx parser — including its date resolution, which
+ * makes a date column searchable as 2023-03-15 rather than as 45000. The
+ * blank cells the rectangular grid pads a short row with are layout, not
+ * text, so they are dropped here.
  */
 function fromXlsx(bytes: Uint8Array): string {
-  const zip = unzipSync(bytes)
-  const sharedXml = entry(zip, 'xl/sharedStrings.xml')
-  const shared = sharedXml ? sharedStrings(sharedXml) : []
-  const names = sheetNames(zip)
-
   const out: Array<string> = []
-  for (const sheet of numbered(zip, /^xl\/worksheets\/sheet(\d+)\.xml$/)) {
-    const rows = worksheetRows(sheet.xml, shared)
-    if (rows.length === 0) continue
-    const title = names.get(sheet.path) ?? `Sheet ${sheet.n}`
-    out.push(`[${title}]\n${rows.map((r) => r.join('\t')).join('\n')}`)
+  for (const sheet of readXlsx(bytes)) {
+    if (sheet.rows.length === 0) continue
+    const rows = sheet.rows.map((row) => {
+      let n = row.length
+      while (n > 0 && row[n - 1] === '') n--
+      return row.slice(0, n).join('\t')
+    })
+    out.push(`[${sheet.name}]\n${rows.join('\n')}`)
   }
   return out.join('\n\n')
-}
-
-function sharedStrings(xml: string): Array<string> {
-  // One <si> may hold many <t> runs (rich text) — concatenate, don't take
-  // the first, or "Series A" arrives as "Series".
-  return [...xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map((m) =>
-    ooxmlRuns(m[1], 't').join(''),
-  )
-}
-
-/** rId → sheet name, resolved through the workbook relationships. */
-function sheetNames(zip: Zip): Map<string, string> {
-  const result = new Map<string, string>()
-  const workbook = entry(zip, 'xl/workbook.xml')
-  const rels = entry(zip, 'xl/_rels/workbook.xml.rels')
-  if (!workbook || !rels) return result
-
-  const target = new Map<string, string>()
-  for (const m of rels.matchAll(/<Relationship\b([^>]*)\/>/g)) {
-    const id = m[1].match(/\bId="([^"]+)"/)?.[1]
-    const path = m[1].match(/\bTarget="([^"]+)"/)?.[1]
-    if (id && path) {
-      target.set(id, `xl/${path.replace(/^\/?(xl\/)?/, '')}`)
-    }
-  }
-  for (const m of workbook.matchAll(/<sheet\b([^>]*)\/>/g)) {
-    const name = m[1].match(/\bname="([^"]*)"/)?.[1]
-    const rid = m[1].match(/r:id="([^"]+)"/)?.[1]
-    const path = rid ? target.get(rid) : undefined
-    if (name && path) result.set(path, decodeXml(name))
-  }
-  return result
-}
-
-function worksheetRows(
-  xml: string,
-  shared: Array<string>,
-): Array<Array<string>> {
-  const rows: Array<Array<string>> = []
-  for (const row of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
-    const cells: Array<string> = []
-    for (const cell of row[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
-      const type = cell[1].match(/\bt="([^"]+)"/)?.[1]
-      if (type === 's') {
-        const idx = Number(cell[2].match(/<v>([\s\S]*?)<\/v>/)?.[1])
-        cells.push((Number.isInteger(idx) ? shared.at(idx) : undefined) ?? '')
-      } else if (type === 'inlineStr') {
-        cells.push(ooxmlRuns(cell[2], 't').join(''))
-      } else {
-        // Numbers, dates (serials), booleans: the raw value. Formatting is
-        // presentation; search wants the number.
-        cells.push(decodeXml(cell[2].match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? ''))
-      }
-    }
-    if (cells.some((c) => c !== '')) rows.push(cells)
-  }
-  return rows
-}
-
-// ---------- shared OOXML helpers ----------
-
-type Zip = Record<string, Uint8Array>
-type ZipEntry = { path: string; n: number; xml: string }
-
-/** Decoded zip member, or undefined when the archive doesn't carry it. */
-function entry(zip: Zip, path: string): string | undefined {
-  const bytes = Object.hasOwn(zip, path) ? zip[path] : undefined
-  return bytes ? strFromU8(bytes) : undefined
-}
-
-/**
- * Zip entries matching a numbered-file pattern, in numeric order — slide10
- * sorts after slide9, which a lexical sort gets wrong.
- */
-function numbered(zip: Zip, pattern: RegExp): Array<ZipEntry> {
-  return Object.entries(zip)
-    .map(([path, bytes]) => {
-      const m = path.match(pattern)
-      return m ? { path, n: Number(m[1]), xml: strFromU8(bytes) } : null
-    })
-    .filter((x): x is ZipEntry => x !== null)
-    .sort((a, b) => a.n - b.n)
-}
-
-/** Text of every <tag>…</tag> run, entity-decoded. */
-function ooxmlRuns(xml: string, tag: string): Array<string> {
-  const pattern = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, 'g')
-  return [...xml.matchAll(pattern)]
-    .map((m) => decodeXml(m[1]))
-    .filter((t) => t.trim() !== '')
-}
-
-const ENTITIES = new Map([
-  ['amp', '&'],
-  ['lt', '<'],
-  ['gt', '>'],
-  ['quot', '"'],
-  ['apos', "'"],
-])
-
-function decodeXml(value: string): string {
-  return value.replace(/&(#x?[0-9a-fA-F]+|[a-z]+);/g, (whole, code: string) => {
-    if (code.startsWith('#x') || code.startsWith('#X')) {
-      return String.fromCodePoint(parseInt(code.slice(2), 16))
-    }
-    if (code.startsWith('#')) {
-      return String.fromCodePoint(Number(code.slice(1)))
-    }
-    return ENTITIES.get(code) ?? whole
-  })
 }
