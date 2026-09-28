@@ -267,8 +267,10 @@ and nothing else, exactly like CI.
 ## Traps (each of these has already cost a session)
 
 - `apps/web/src/lib/server-fns.ts` is a **client-imported barrel**: serverFns + types
-  only. Server-side helpers go in `server/shared.ts` (that's why
-  `birthHolding` lives there). A plain export from a `lib/server/*.ts` module
+  only. Server-side helpers go in `server/shared.ts`, or further out — the
+  pipeline→portfolio seam `birthHolding` lives in `lib/portfolio/holding.ts`
+  since SPA-169 because the deal birth and the import worker both need it,
+  and `shared.ts` only re-exports it. A plain export from a `lib/server/*.ts` module
   the barrel re-exports ships to the browser — only `createServerFn().handler()`
   bodies are stripped — so a helper a test needs to call without a request
   lives outside `lib/server/` (SPA-155).
