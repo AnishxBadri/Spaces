@@ -8,6 +8,7 @@ import {
   verdictSentence,
   whyOf,
 } from '@spaces/core/import/plan'
+import { NoLandTail } from '#/components/import/import-wizard'
 import { KeyHint, PageHeader, ReadoutStrip } from '#/components/page-header'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -194,8 +195,10 @@ function DecisionLane({
       return <RecordLane view={view} plan={plan} />
     case 'create':
       return null
+    // A records row stops on its name cell or a required reference — both
+    // the sheet's to fix; no mapping decision stops one (SPA-173).
     case 'no-land':
-      return 'fix in the sheet, re-upload'
+      return <NoLandTail stop="sheet" />
     case 'collide':
       return 'needs a decision'
     case 'merged':

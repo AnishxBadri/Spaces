@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { toast } from 'sonner'
 import type { ReactNode } from 'react'
 import { DitherBlock } from '#/components/dither'
 import { KeyHint, PageHeader } from '#/components/page-header'
@@ -25,6 +26,27 @@ import { cn } from '#/lib/utils'
 export type ImportMode = 'records' | 'ledger'
 
 export type ImportObject = { id: string; plural: string }
+
+/**
+ * The object `/import?object=` names (SPA-173). The list pages' Import
+ * action carries the registry slug (`deals`), and a hand-typed link says
+ * `deal` or `Deals` as often: slug, singular or plural, in any case, is the
+ * same object. Nothing matched is no object — the picker starts empty.
+ */
+export function objectForSearch<
+  T extends { slug: string; singular: string; plural: string },
+>(objects: ReadonlyArray<T>, param: string | undefined): T | null {
+  const want = param?.trim().toLowerCase() ?? ''
+  if (want === '') return null
+  return (
+    objects.find((o) => o.slug === want) ??
+    objects.find(
+      (o) =>
+        o.singular.toLowerCase() === want || o.plural.toLowerCase() === want,
+    ) ??
+    null
+  )
+}
 
 export type PreviousImport = {
   id: string
@@ -84,6 +106,80 @@ export function ImportHeader({
       }
     />
   )
+}
+
+// ---------------------------------------------------------------------------
+// A refused Continue
+// ---------------------------------------------------------------------------
+
+/**
+ * One id for the toast a refused Continue raises (SPA-173): a second refusal
+ * replaces the first, and the Continue that goes through dismisses it, so
+ * no refusal lingers into the next step.
+ */
+export const CONTINUE_REFUSED_TOAST = 'import-continue-refused'
+
+/**
+ * Continue's gate on a step's problems: the first names the toast, the rest
+ * its description, and `true` means the step stays. With nothing in the way
+ * the last refusal is dismissed and Continue may go on.
+ */
+export function refuseContinue(
+  problems: ReadonlyArray<{ reason: string }>,
+): boolean {
+  const first = problems.at(0)
+  if (!first) {
+    toast.dismiss(CONTINUE_REFUSED_TOAST)
+    return false
+  }
+  const rest = problems.slice(1)
+  toast.error(first.reason, {
+    id: CONTINUE_REFUSED_TOAST,
+    ...(rest.length > 0
+      ? { description: rest.map((p) => p.reason).join(' · ') }
+      : {}),
+  })
+  return true
+}
+
+// ---------------------------------------------------------------------------
+// A row that will not land
+// ---------------------------------------------------------------------------
+
+/** What stops a row: a choice step 2 has not made, or the sheet itself. */
+export type NoLandStop = 'decision' | 'sheet'
+
+export const NO_LAND_TAIL: Record<NoLandStop, string> = {
+  decision: 'decide in mapping ›',
+  sheet: 'fix in the sheet',
+}
+
+/**
+ * The no-land row's tail (SPA-173): one mono token saying where the fix is,
+ * never a sentence — the why lane already carries the cause. A decision
+ * stop links back to step 2 when the step hands it the way there.
+ */
+export function NoLandTail({
+  stop,
+  onMapping,
+  disabled = false,
+}: {
+  stop: NoLandStop
+  onMapping?: () => void
+  disabled?: boolean
+}) {
+  if (stop === 'decision' && onMapping)
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onMapping}
+        className="focus-ring text-primary hover:underline disabled:opacity-50"
+      >
+        {NO_LAND_TAIL.decision}
+      </button>
+    )
+  return <span className="text-destructive">{NO_LAND_TAIL[stop]}</span>
 }
 
 // ---------------------------------------------------------------------------

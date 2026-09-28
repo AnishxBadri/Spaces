@@ -101,6 +101,7 @@ describe('a ledger receipt (SPA-171)', () => {
     ],
     voidLine: 'void reaches 12 investments · 8 marks · 9 rounds stay',
     voidable: true,
+    voided: false,
   }
 
   it('titles what landed and reads as the ledger', () => {
@@ -133,7 +134,12 @@ describe('a ledger receipt (SPA-171)', () => {
       ),
     ).toBe('')
     const voids = renderToStaticMarkup(
-      <VoidLine ledger={ledger} onVoid={() => {}} voiding={false} />,
+      <VoidLine
+        ledger={ledger}
+        onVoid={() => {}}
+        voiding={false}
+        onReimport={() => {}}
+      />,
     )
     expect(voids).toContain(
       'void reaches 12 investments · 8 marks · 9 rounds stay',
@@ -145,8 +151,48 @@ describe('a ledger receipt (SPA-171)', () => {
           ledger={{ ...ledger, voidable: false }}
           onVoid={() => {}}
           voiding={false}
+          onReimport={() => {}}
         />,
       ),
     ).not.toContain('void batch')
+  })
+
+  it('after a void, the re-run is a quiet Re-import › under the voided line, not Commit again (SPA-173)', () => {
+    const header = (l: LedgerReceipt) =>
+      renderToStaticMarkup(
+        <ReceiptHeader
+          view={view({ ledger: l })}
+          filename="portfolio-tracker.csv"
+          onCommit={() => {}}
+          onRetry={() => {}}
+          pending={null}
+        />,
+      )
+    const before = header(ledger)
+    expect(button(before, 'Commit again')).not.toContain('disabled=""')
+    expect(before).not.toContain('Re-import')
+
+    const voided: LedgerReceipt = {
+      ...ledger,
+      voidLine: 'voided · 12 investments · 8 marks reversed · 9 rounds stay',
+      voidable: false,
+      voided: true,
+    }
+    const after = header(voided)
+    expect(after).not.toContain('Commit again')
+    expect(after).not.toContain('Re-import')
+    const line = renderToStaticMarkup(
+      <VoidLine
+        ledger={voided}
+        onVoid={() => {}}
+        voiding={false}
+        onReimport={() => {}}
+      />,
+    )
+    expect(line.indexOf('voided · 12 investments')).toBeLessThan(
+      line.indexOf('Re-import ›'),
+    )
+    expect(button(line, 'Re-import ›')).not.toContain('disabled=""')
+    expect(line).not.toContain('void batch')
   })
 })

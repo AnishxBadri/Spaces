@@ -1480,6 +1480,15 @@ export function ledgerReport(
   return out
 }
 
+/**
+ * Where a stopped row's fix is (SPA-173): a decision the mapping step has
+ * not made — an instrument, a marks-as-of date, a date order, a currency —
+ * or the sheet itself (a blank company, an amount that does not read).
+ */
+export function ledgerStop(plan: LedgerRowPlan): 'decision' | 'sheet' {
+  return plan.ledger.needs.length > 0 ? 'decision' : 'sheet'
+}
+
 /** A stopped row's why: `Instrument "SAFE" · could be safe_post_money or safe_pre_money`. */
 export function ledgerWhy(
   plan: LedgerRowPlan,

@@ -104,6 +104,9 @@ export function ReceiptHeader({
 }) {
   const last = view.lastRun
   const idle = !view.running
+  // Once voided, a re-run is not the primary action: it moves under the
+  // voided line as a quiet `Re-import ›` (`VoidLine`, SPA-173).
+  const voided = view.ledger?.voided ?? false
   return (
     <PageHeader
       eyebrow={view.ledger ? 'Import · Ledger' : 'Import · Records'}
@@ -134,13 +137,15 @@ export function ReceiptHeader({
               Retry failed rows
             </Button>
           ) : null}
-          <Button
-            disabled={!idle || pending !== null}
-            pending={pending === 'commit'}
-            onClick={onCommit}
-          >
-            Commit again <KeyHint>⌘↵</KeyHint>
-          </Button>
+          {voided ? null : (
+            <Button
+              disabled={!idle || pending !== null}
+              pending={pending === 'commit'}
+              onClick={onCommit}
+            >
+              Commit again <KeyHint>⌘↵</KeyHint>
+            </Button>
+          )}
         </>
       }
     />
@@ -212,30 +217,53 @@ export function MissingRateLine({ ledger }: { ledger: LedgerReceipt }) {
   )
 }
 
+/**
+ * The void line, with `void batch ›` while something is left to void. Once
+ * the batch is voided the header's `Commit again` moves here as a quiet
+ * `Re-import ›` (SPA-173) — the same commit, confirmed first.
+ */
 export function VoidLine({
   ledger,
   onVoid,
   voiding,
+  onReimport,
+  reimporting = false,
 }: {
   ledger: LedgerReceipt
   onVoid: () => void
   voiding: boolean
+  onReimport: () => void
+  reimporting?: boolean
 }) {
   if (ledger.voidLine === null) return null
   return (
-    <p className="flex flex-wrap items-center gap-x-2 pb-2 mono text-micro text-graphite">
-      <span className="tabular">{ledger.voidLine}</span>
-      {ledger.voidable ? (
-        <button
-          type="button"
-          disabled={voiding}
-          onClick={onVoid}
-          className="focus-ring text-destructive hover:underline disabled:opacity-50"
-        >
-          void batch ›
-        </button>
+    <div className="flex flex-col gap-1 pb-2 mono text-micro text-graphite">
+      <p className="flex flex-wrap items-center gap-x-2">
+        <span className="tabular">{ledger.voidLine}</span>
+        {ledger.voidable ? (
+          <button
+            type="button"
+            disabled={voiding}
+            onClick={onVoid}
+            className="focus-ring text-destructive hover:underline disabled:opacity-50"
+          >
+            void batch ›
+          </button>
+        ) : null}
+      </p>
+      {ledger.voided ? (
+        <p>
+          <button
+            type="button"
+            disabled={reimporting}
+            onClick={onReimport}
+            className="focus-ring hover:text-foreground hover:underline disabled:opacity-50"
+          >
+            Re-import ›
+          </button>
+        </p>
       ) : null}
-    </p>
+    </div>
   )
 }
 

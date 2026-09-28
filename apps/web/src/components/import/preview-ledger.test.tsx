@@ -53,6 +53,13 @@ const view = (
   header: ['Name', 'Domain'],
 })
 
+/** The opening tag of the `Commit 43 rows` button, from its own `<button`. */
+function commitButton(html: string): string {
+  const at = html.indexOf('>Commit 43 rows')
+  if (at === -1) throw new Error('no Commit button')
+  return html.slice(html.lastIndexOf('<button', at), at)
+}
+
 describe('the preview header', () => {
   it('is the verdict sentence, names the file, and draws the commit disarmed', () => {
     const html = renderToStaticMarkup(
@@ -66,7 +73,8 @@ describe('the preview header', () => {
     expect(html).toContain('31 create · 12 attach · 3 will not land.')
     expect(html).toContain('nothing written yet')
     expect(html).toContain('Back to mapping')
-    expect(html).toMatch(/<button[^>]*disabled[^>]*>Commit 43 rows/)
+    // The class list spells `disabled:` variants, so read the attribute.
+    expect(commitButton(html)).toContain('disabled=""')
   })
 
   it('arms the commit when the route hands it one (SPA-169)', () => {
@@ -79,10 +87,7 @@ describe('the preview header', () => {
         onCommit={() => {}}
       />,
     )
-    // The class list spells `disabled:` variants, so read the attribute.
-    const commit = /<button(?:(?!<button).)*?>Commit 43 rows/.exec(html)?.[0]
-    expect(commit).toBeDefined()
-    expect(commit).not.toContain('disabled=""')
+    expect(commitButton(html)).not.toContain('disabled=""')
   })
 })
 

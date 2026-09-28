@@ -176,7 +176,29 @@ describe('autoMap', () => {
     expect(autoMap(['Company', 'Owner', 'Deal name'], deals)).toEqual([
       { target: 'attribute', attributeId: 'a-company' },
       { target: 'attribute', attributeId: 'a-owner' },
-      { target: 'ignore' },
+      { target: 'name' },
+    ])
+  })
+
+  it('maps Deal name, Company name, Person name and Full name to the name column', () => {
+    const people: MappingRegistry = {
+      identityKeys: CORE_IDENTITY_KEYS,
+      attributes: [],
+    }
+    for (const header of [
+      'Deal name',
+      'Company name',
+      'Person name',
+      'Full name',
+    ]) {
+      expect(autoMap([header, 'Notes'], people)).toEqual([
+        { target: 'name' },
+        { target: 'ignore' },
+      ])
+    }
+    expect(autoMap(['Deal name', 'Stage'], deals)).toEqual([
+      { target: 'name' },
+      { target: 'attribute', attributeId: 'a-stage' },
     ])
   })
 

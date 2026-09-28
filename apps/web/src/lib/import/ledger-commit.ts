@@ -65,6 +65,11 @@ import type { ImportFailure } from './stage'
  *    row never leaves its own events behind (they share its transaction). A
  *    mark is a statement of value, so an equal one is the same statement
  *    wherever it came from. A round is reused by company, kind and date.
+ *    So cheques and proceeds never dedupe against rows of their own batch —
+ *    two equal cheques in one sheet stay two, because each is money that
+ *    moved and the cost basis sums them — while marks dedupe everywhere,
+ *    because a mark states a value rather than moving money, and the same
+ *    statement made twice is still one.
  *
  * Every investment, mark and distribution appended carries
  * `batch_id = import_batch.id`, the handle `voidLedgerBatchProgram` grabs; a
@@ -573,6 +578,8 @@ export type LedgerReceipt = {
   voidLine: string | null
   /** A batch void would still reverse something. */
   voidable: boolean
+  /** Every event the batch appended has been reversed (SPA-173). */
+  voided: boolean
 }
 
 const committedPath = (field: string) =>
@@ -658,14 +665,13 @@ export const loadLedgerReceiptProgram = Effect.fn('loadLedgerReceiptProgram')(
         ),
     )
     const total = stamped.investments + stamped.marks + stamped.distributions
+    const allVoided = total > 0 && stamped.voided >= total
     return {
       counts: tally,
-      missingRates:
-        stamped.voided >= total && total > 0
-          ? []
-          : missingRates(priced.rows, rates, base),
+      missingRates: allVoided ? [] : missingRates(priced.rows, rates, base),
       voidLine: ledgerVoidLine({ ...stamped, rounds: tally.rounds }),
       voidable: total > stamped.voided,
+      voided: allVoided,
     }
   },
 )

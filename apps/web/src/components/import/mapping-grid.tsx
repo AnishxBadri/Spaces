@@ -836,6 +836,13 @@ function visibleRange(
   return { first, last: Math.max(first - 1, last) }
 }
 
+/** `F` for one column, `F–G` for more — never `F–F`. */
+function columnSpan(first: number, last: number): string {
+  return first === last
+    ? columnLetter(first)
+    : `${columnLetter(first)}–${columnLetter(last)}`
+}
+
 export function footLine(
   shown: number,
   rowCount: number,
@@ -847,13 +854,9 @@ export function footLine(
   const visible = Math.max(0, range.last - range.first + 1)
   const parts = [rows, `${visible} of ${columnCount} columns`]
   if (range.first > 0)
-    parts.push(
-      `scroll ← for ${columnLetter(0)}–${columnLetter(range.first - 1)}`,
-    )
+    parts.push(`scroll ← for ${columnSpan(0, range.first - 1)}`)
   if (range.last < columnCount - 1)
-    parts.push(
-      `scroll → for ${columnLetter(range.last + 1)}–${columnLetter(columnCount - 1)}`,
-    )
+    parts.push(`scroll → for ${columnSpan(range.last + 1, columnCount - 1)}`)
   return parts.join(' · ')
 }
 

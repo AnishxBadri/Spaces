@@ -19,6 +19,7 @@ import {
   ledgerColumnsOf,
   ledgerDecisionsOf,
   ledgerReport,
+  ledgerStop,
   ledgerWhy,
   planLedgerBatch,
   resolveInstrument,
@@ -429,6 +430,8 @@ export type LedgerFailedRow = {
   rowNum: number
   name: string | null
   why: string
+  /** Where the fix is: a decision on step 2, or the sheet. */
+  stop: 'decision' | 'sheet'
   /** A `per_row` instrument still to choose: the cell and its candidates. */
   perRow: { raw: string; candidates: Array<LedgerInstrument> } | null
 }
@@ -470,6 +473,7 @@ function failedRow(
     rowNum: row.rowNum,
     name: row.plan.name,
     why: ledgerWhy(row.plan, header),
+    stop: ledgerStop(row.plan),
     perRow,
   }
 }

@@ -6,6 +6,7 @@ import {
   ImportHeader,
   PreviousImportNotice,
   StepStrip,
+  objectForSearch,
 } from '#/components/import/import-wizard'
 import { Button } from '#/components/ui/button'
 import { uploadImport } from '#/lib/import/upload'
@@ -31,7 +32,7 @@ function ImportPage() {
   const objects = Route.useLoaderData()
   const { object: slug } = Route.useSearch()
   const navigate = useNavigate()
-  const target = objects.find((o) => o.slug === slug) ?? null
+  const target = objectForSearch(objects, slug)
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)

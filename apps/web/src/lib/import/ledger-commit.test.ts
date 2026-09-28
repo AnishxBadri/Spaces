@@ -585,6 +585,7 @@ describe('voiding the batch', () => {
     expect((await receipt(batchId)).ledger.voidLine).toBe(
       'void reaches 12 investments · 8 marks · 9 rounds stay',
     )
+    expect((await receipt(batchId)).ledger.voided).toBe(false)
 
     const out = await Effect.runPromise(voidLedgerBatchProgram(ME, batchId))
     expect(out.reversed).toBe(20)
@@ -628,6 +629,7 @@ describe('voiding the batch', () => {
       'voided · 12 investments · 8 marks reversed · 9 rounds stay',
     )
     expect(ledger.voidable).toBe(false)
+    expect(ledger.voided).toBe(true)
     expect(ledger.missingRates).toEqual([])
     // Rounds carry no batch id; the receipt still names them.
     expect(ledger.counts.rounds).toBe(9)

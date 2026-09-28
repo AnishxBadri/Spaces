@@ -189,6 +189,21 @@ export function normalizeUrl(input: string): string | null {
 }
 
 /**
+ * A domain as a record shows it: the host `normalizeUrl` reads, lowercase,
+ * without a leading `www.` — `https://www.Example.com/` is `example.com`,
+ * `app.deel.com/login` stays `app.deel.com`. The display half of a domain
+ * identity alias (SPA-173); what it matches on is `normalizeDomain`'s eTLD+1
+ * in `value_norm`, and this never feeds a comparison. Null when the input
+ * reads as no web host.
+ */
+export function domainHost(input: string): string | null {
+  const href = normalizeUrl(input)
+  if (href === null) return null
+  const host = new URL(href).hostname
+  return host.startsWith('www.') ? host.slice(4) : host
+}
+
+/**
  * Phone → matching form: a leading `+` when one was written, then the digits.
  * Accepts the punctuation people type (spaces, dashes, dots, parentheses,
  * slashes) and nothing else, and 7–15 digits, E.164's ceiling. A stored phone

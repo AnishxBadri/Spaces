@@ -2,7 +2,7 @@ import { useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { INSTRUMENT_LABELS, ledgerSentence } from '@spaces/core/import/ledger'
-import { StepStrip } from '#/components/import/import-wizard'
+import { NoLandTail, StepStrip } from '#/components/import/import-wizard'
 import { KeyHint, PageHeader, ReadoutStrip } from '#/components/page-header'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -22,7 +22,9 @@ import type { LedgerFailedRow, LedgerPreviewView } from '#/lib/import/ledger'
  * company**, and its what-lands lane is the events it would write, in date
  * order: `round Seed 2023-03-15 · investment $50,000 priced · mark $120,000
  * 2025-12-31`. Rows that will not land follow, each with its reason, and a
- * SAFE decided per row carries its choice in the decision lane. Commit
+ * SAFE decided per row carries its choice in the decision lane; any other
+ * stop ends on one token — `decide in mapping ›` back to step 2, or `fix in
+ * the sheet` (SPA-173). Commit
  * (SPA-171) enqueues the same `import.commit` job a records batch does, and
  * the page turns into its receipt.
  */
@@ -83,10 +85,13 @@ export function FailedRow({
   row,
   disabled,
   onDecide,
+  onMapping,
 }: {
   row: LedgerFailedRow
   disabled: boolean
   onDecide: (rowNum: number, instrument: LedgerInstrument) => void
+  /** Back to step 2, where a decision stop is fixed. */
+  onMapping: () => void
 }) {
   return (
     <li className="flex h-10 items-center gap-3 border-b border-rule bg-[var(--badge-rose)] px-2">
@@ -123,8 +128,12 @@ export function FailedRow({
           onChange={(i) => onDecide(row.rowNum, i)}
         />
       ) : (
-        <span className="w-44 shrink-0 truncate text-right mono text-micro text-destructive">
-          fix in the sheet, re-upload
+        <span className="w-44 shrink-0 truncate text-right mono text-micro">
+          <NoLandTail
+            stop={row.stop}
+            onMapping={onMapping}
+            disabled={disabled}
+          />
         </span>
       )}
     </li>
@@ -230,8 +239,9 @@ export function LedgerPreviewStep({
               <FailedRow
                 key={row.rowNum}
                 row={row}
-                disabled={busy}
+                disabled={busy || backing}
                 onDecide={decide}
+                onMapping={back}
               />
             ))}
           </ol>

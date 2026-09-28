@@ -6,6 +6,7 @@ import {
   eventsText,
   ledgerStripCells,
 } from './ledger-preview'
+import { NO_LAND_TAIL } from './import-wizard'
 import type { LedgerCompanyReport } from '@spaces/core/import/ledger'
 
 /**
@@ -64,6 +65,7 @@ describe('the ledger preview', () => {
           rowNum: 4,
           name: 'Kalpa',
           why: 'Instrument · "SAFE" could be safe_post_money or safe_pre_money',
+          stop: 'decision',
           perRow: {
             raw: 'SAFE',
             candidates: ['safe_post_money', 'safe_pre_money'],
@@ -71,6 +73,7 @@ describe('the ledger preview', () => {
         }}
         disabled={false}
         onDecide={noop}
+        onMapping={noop}
       />,
     )
     expect(perRow).toContain('Instrument for row 4')
@@ -79,14 +82,44 @@ describe('the ledger preview', () => {
         row={{
           rowNum: 2,
           name: 'Ohmium',
-          why: 'Amount · no amount',
+          why: 'Company · no company',
+          stop: 'sheet',
           perRow: null,
         }}
         disabled={false}
         onDecide={noop}
+        onMapping={noop}
       />,
     )
-    expect(stopped).toContain('fix in the sheet, re-upload')
+    expect(stopped).toContain('>fix in the sheet<')
+    expect(stopped).not.toContain('re-upload')
+    expect(stopped).not.toContain('<button')
+  })
+
+  it('a decision stop reads decide in mapping › and is the way back to step 2 (SPA-173)', () => {
+    const noop = () => undefined
+    const html = renderToStaticMarkup(
+      <FailedRow
+        row={{
+          rowNum: 5,
+          name: 'Tessol',
+          why: 'Instrument "SAFE" · could be safe_post_money or safe_pre_money',
+          stop: 'decision',
+          perRow: null,
+        }}
+        disabled={false}
+        onDecide={noop}
+        onMapping={noop}
+      />,
+    )
+    const at = html.indexOf('>decide in mapping ›<')
+    expect(at).toBeGreaterThan(-1)
+    expect(html.slice(html.lastIndexOf('<', at), at)).toMatch(/^<button /)
+  })
+
+  it('keeps every tail to four words or fewer', () => {
+    for (const tail of Object.values(NO_LAND_TAIL))
+      expect(tail.split(/\s+/).length).toBeLessThanOrEqual(4)
   })
 
   it('reads the five counts the strip shows', () => {

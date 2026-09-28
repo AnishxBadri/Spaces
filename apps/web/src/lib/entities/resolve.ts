@@ -13,6 +13,7 @@ import type { Actor, EventSource } from '../attributes/values'
 import type { EmbedSource } from '../ai/chunk-sources'
 import { canonicalId, suggestDuplicate, sweepNameSimilarity } from './sweep'
 import {
+  domainHost,
   isRoleEmail,
   normalizeCin,
   normalizeDomain,
@@ -163,8 +164,15 @@ export function normalizeKeys(
   const k = input.keys ?? {}
   if (k.domain) {
     const norm = normalizeDomain(k.domain)
+    // The alias a resolve writes shows the host it matches on — a sheet's
+    // `https://www.Example.com/` is stored as `example.com` beside the
+    // eTLD+1 in `value_norm` (SPA-173). Nothing compares on `value`.
     if (norm)
-      out.push({ kind: 'domain', value: k.domain.trim(), valueNorm: norm })
+      out.push({
+        kind: 'domain',
+        value: domainHost(k.domain) ?? k.domain.trim(),
+        valueNorm: norm,
+      })
   }
   if (k.email) {
     const norm = normalizeEmail(k.email)

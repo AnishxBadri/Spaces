@@ -19,6 +19,7 @@ import {
   ledgerDecisionsOf,
   ledgerReport,
   ledgerSentence,
+  ledgerStop,
   lineBecomes,
   lineColumns,
   planLedgerBatch,
@@ -229,6 +230,20 @@ describe('the instrument', () => {
     expect(reason).toContain('"SAFE"')
     expect(reason).toContain('safe_post_money')
     expect(reason).toContain('safe_pre_money')
+    expect(ledgerStop(row.plan)).toBe('decision')
+  })
+
+  it('a row with no company is the sheet’s to fix, not a decision (SPA-173)', () => {
+    const cells = [...MESSY_ROWS[0]]
+    cells[0] = ''
+    const chosen = decide(m, {
+      kind: 'instrument',
+      value: instrumentKey('SAFE'),
+      resolution: 'safe_post_money',
+    })
+    const [row] = plan(MESSY_HEADER, [cells], chosen)
+    expect(row.plan.verdict).toBe('no-land')
+    expect(ledgerStop(row.plan)).toBe('sheet')
   })
 
   it('lands once the choice is stored on the mapping', () => {

@@ -24,6 +24,7 @@ import {
   ImportHeader,
   SheetTabs,
   StepStrip,
+  refuseContinue,
 } from '#/components/import/import-wizard'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -652,16 +653,7 @@ export function LedgerMappingStep({
   const canContinue = staged && !busy
 
   function onContinue() {
-    const first = view.problems.at(0)
-    if (first) {
-      const rest = view.problems.slice(1)
-      toast.error(first.reason, {
-        ...(rest.length > 0
-          ? { description: rest.map((p) => p.reason).join(' · ') }
-          : {}),
-      })
-      return
-    }
+    if (refuseContinue(view.problems)) return
     setContinuing(true)
     void write(async () => {
       await flushAsOf()

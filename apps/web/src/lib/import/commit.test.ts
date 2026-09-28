@@ -8,6 +8,7 @@ import {
   attributeEvent,
   duplicateCandidate,
   entity,
+  entityAlias,
   importBatch,
   importRow,
   objectDef,
@@ -374,6 +375,33 @@ describe('re-resolve on commit', () => {
     expect(row.entityId).toBe(meanwhile.entityId)
     expect(row.plan?.verdict).toBe('create')
     expect(row.plan?.committedAs).toBe('attach')
+  })
+})
+
+describe('a domain identity alias', () => {
+  it('stores the host the record matches on, not the cell as the sheet spelled it', async () => {
+    const companies = await objectId('companies')
+    const batchId = await plannedBatch(
+      ['Name', 'Website'],
+      [['Example', 'https://www.Example.com/']],
+      companies,
+    )
+    const run = await commit(batchId)
+    expect(run.written).toBe(1)
+    const row = (await rowsOf(batchId))[0]
+    if (row.entityId === null) throw new Error('row 1 wrote no record')
+    const aliases = await db
+      .select({ value: entityAlias.value, valueNorm: entityAlias.valueNorm })
+      .from(entityAlias)
+      .where(
+        and(
+          eq(entityAlias.entityId, row.entityId),
+          eq(entityAlias.kind, 'domain'),
+        ),
+      )
+    expect(aliases).toEqual([
+      { value: 'example.com', valueNorm: 'example.com' },
+    ])
   })
 })
 

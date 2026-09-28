@@ -11,6 +11,7 @@ import {
   PreviousImportNotice,
   SheetTabs,
   StepStrip,
+  refuseContinue,
 } from '#/components/import/import-wizard'
 import {
   IdentityStrip,
@@ -90,18 +91,21 @@ export const Route = createFileRoute('/_app/import_/$batchId')({
     outcome: search.outcome,
   }),
   loader: async ({ params, deps }) => {
+    const batchId = params.batchId
+    const batchRead = getImportBatch({ data: { batchId } })
+    // The ledger steps' data answers null for a records batch, so only a
+    // ledger batch asks for it — chained on the batch, beside the rest.
+    const ledgerRead = batchRead.then((b) =>
+      b.mode === 'ledger' ? getLedgerImport({ data: { batchId } }) : null,
+    )
     const [batch, objects, mapping, preview, ledger, receipt] =
       await Promise.all([
-        getImportBatch({ data: { batchId: params.batchId } }),
+        batchRead,
         listObjects(),
-        getImportMapping({ data: { batchId: params.batchId } }),
-        getImportPreview({
-          data: { batchId: params.batchId, filter: deps.show },
-        }),
-        getLedgerImport({ data: { batchId: params.batchId } }),
-        getImportReceipt({
-          data: { batchId: params.batchId, filter: deps.outcome },
-        }),
+        getImportMapping({ data: { batchId } }),
+        getImportPreview({ data: { batchId, filter: deps.show } }),
+        ledgerRead,
+        getImportReceipt({ data: { batchId, filter: deps.outcome } }),
       ])
     return { batch, objects, mapping, preview, ledger, receipt }
   },
@@ -224,6 +228,7 @@ function ImportBatchPage() {
 
   function onContinue() {
     if (step === 0) {
+      refuseContinue([])
       setContinuing(true)
       const begin =
         batch.mode === 'ledger' ? beginLedgerMapping : beginImportMapping
@@ -233,16 +238,7 @@ function ImportBatchPage() {
       return
     }
     if (!mapping) return
-    const first = mapping.problems.at(0)
-    const rest = mapping.problems.slice(1)
-    if (first) {
-      toast.error(first.reason, {
-        ...(rest.length > 0
-          ? { description: rest.map((p) => p.reason).join(' · ') }
-          : {}),
-      })
-      return
-    }
+    if (refuseContinue(mapping.problems)) return
     setContinuing(true)
     void write(() => planImport({ data: { batchId: batch.id } })).finally(() =>
       setContinuing(false),
@@ -308,6 +304,20 @@ function ImportBatchPage() {
   }
 
   /**
+   * After a void the re-run is `Re-import ›` under the voided line, and it
+   * asks first. It is the same commit as `Commit again`: a row the batch
+   * already committed is passed over, voided or not.
+   */
+  async function reimport() {
+    const ok = await confirm({
+      title: `Re-import ${batch.filename}?`,
+      body: 'The commit runs again over this batch. Rows it already committed are passed over, voided or not; to append these events again, upload the sheet as a new import.',
+      action: 'Re-import',
+    })
+    if (ok) commit(false)
+  }
+
+  /**
    * Progress by polling, deliberately: while a run is live the receipt is
    * re-read every 1.5 s, and every read comes from `import_row`, `job_run`
    * and the queue, so a reopened page recovers exactly where the commit is.
@@ -323,8 +333,11 @@ function ImportBatchPage() {
 
   // ⌘↵ is printed inside Continue and Commit, so it works wherever they do.
   useEffect(() => {
+    // A voided batch's re-run asks first, so ⌘↵ does not reach it.
     const armed = receipt
-      ? !receipt.running && committing === null
+      ? !receipt.running &&
+        committing === null &&
+        !(receipt.ledger?.voided ?? false)
       : canCommit && !busy
     if (!canContinue && !armed) return
     const onKey = (e: KeyboardEvent) => {
@@ -397,6 +410,8 @@ function ImportBatchPage() {
                 ledger={receipt.ledger}
                 voiding={voiding}
                 onVoid={() => void voidBatch()}
+                onReimport={() => void reimport()}
+                reimporting={committing === 'commit'}
               />
             ) : null}
             <ReceiptLedger view={receipt} batchId={batch.id} />

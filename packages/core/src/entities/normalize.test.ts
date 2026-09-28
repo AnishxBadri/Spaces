@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  domainHost,
   isRoleEmail,
   normalizeCin,
   normalizeDomain,
@@ -117,5 +118,18 @@ describe('normalizePhone', () => {
     expect(normalizePhone('12345')).toBeNull()
     expect(normalizePhone('1234567890123456')).toBeNull()
     expect(normalizePhone('555-0134 ext 2')).toBeNull()
+  })
+})
+
+describe('domainHost', () => {
+  it('is the host normalizeUrl reads, lowercase, without www', () => {
+    expect(domainHost('https://www.Example.com/')).toBe('example.com')
+    expect(domainHost('www.northgate.io/')).toBe('northgate.io')
+    expect(domainHost('app.deel.com/login')).toBe('app.deel.com')
+    expect(domainHost('acme.com')).toBe('acme.com')
+  })
+  it('is null where there is no web host', () => {
+    expect(domainHost('a@acme.com')).toBeNull()
+    expect(domainHost('not a domain')).toBeNull()
   })
 })
