@@ -1,6 +1,6 @@
 import { useRouter } from '@tanstack/react-router'
 import { ChevronDown } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import {
@@ -426,11 +426,16 @@ function DecisionsPanel({
   open,
   disabled,
   decide,
+  onAsOfChange,
+  onAsOfBlur,
 }: {
   view: LedgerMappingView
   open: Open
   disabled: boolean
   decide: (decision: PanelDecision) => void
+  /** The date as typed — a native date input reports partial years too. */
+  onAsOfChange: (value: string) => void
+  onAsOfBlur: () => void
 }) {
   const columns = ledgerColumnsOf(view.mapping)
   const decisions = ledgerDecisionsOf(columns)
@@ -500,12 +505,11 @@ function DecisionsPanel({
             value={asOf}
             disabled={disabled}
             className={cn('w-44', open.marksAsOf && 'border-warning')}
-            onChange={(e) => setAsOf(e.target.value)}
-            onBlur={() => {
-              const next = asOf === '' ? null : asOf
-              if (next !== decisions.marksAsOf)
-                decide({ kind: 'marksAsOf', date: next })
+            onChange={(e) => {
+              setAsOf(e.target.value)
+              onAsOfChange(e.target.value)
             }}
+            onBlur={onAsOfBlur}
           />
         </PanelSection>
       ) : null}
@@ -618,6 +622,33 @@ export function LedgerMappingStep({
     )
   }
 
+  // "Marks as of" is written on blur, not on change: Chrome reports every
+  // partial year (`0002`, `0020`, …) as a change. Blur alone lost the date
+  // when Continue's plan call raced the write (found live, SPA-170), so the
+  // typed value waits in a ref and Continue flushes it before it plans; the
+  // in-flight write is chained so the plan never overtakes it.
+  const pendingAsOf = useRef<string | null>(null)
+  const asOfFlight = useRef<Promise<void>>(Promise.resolve())
+  const storedAsOf = ledgerDecisionsOf(ledgerColumnsOf(view.mapping)).marksAsOf
+
+  function flushAsOf(): Promise<void> {
+    const typed = pendingAsOf.current
+    if (typed !== null) {
+      pendingAsOf.current = null
+      const date = typed === '' ? null : typed
+      if (date !== storedAsOf) {
+        const next = asOfFlight.current.then(() =>
+          setLedgerDecision({
+            data: { batchId: batch.id, decision: { kind: 'marksAsOf', date } },
+          }).then(() => undefined),
+        )
+        asOfFlight.current = next.catch(() => undefined)
+        return next
+      }
+    }
+    return asOfFlight.current
+  }
+
   const canContinue = staged && !busy
 
   function onContinue() {
@@ -632,9 +663,10 @@ export function LedgerMappingStep({
       return
     }
     setContinuing(true)
-    void write(() => planLedgerImport({ data: { batchId: batch.id } })).finally(
-      () => setContinuing(false),
-    )
+    void write(async () => {
+      await flushAsOf()
+      await planLedgerImport({ data: { batchId: batch.id } })
+    }).finally(() => setContinuing(false))
   }
 
   useEffect(() => {
@@ -725,6 +757,21 @@ export function LedgerMappingStep({
             open={open}
             disabled={busy || !staged}
             decide={decide}
+            onAsOfChange={(value) => {
+              pendingAsOf.current = value
+            }}
+            // Not through `write`: its `busy` would disable Continue under
+            // the click that blurred the field, and Continue awaits the
+            // in-flight write itself.
+            onAsOfBlur={() => {
+              void flushAsOf()
+                .then(() => router.invalidate())
+                .catch((err: unknown) =>
+                  toast.error(
+                    err instanceof Error ? err.message : 'Could not save',
+                  ),
+                )
+            }}
           />
         </div>
       </div>
