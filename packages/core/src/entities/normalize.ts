@@ -161,3 +161,43 @@ export function normalizeCin(input: string): string | null {
   const raw = input.trim().toUpperCase().replace(/\s/g, '')
   return /^[LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}$/.test(raw) ? raw : null
 }
+
+/**
+ * URL → absolute http(s) href. A bare host (`acme.com/about`) gains
+ * `https://`, which is what a spreadsheet column of websites almost always
+ * holds; any other scheme, whitespace, or a host without a dot is null. Not
+ * an identity key — LinkedIn identity is `normalizeLinkedin` — but the one
+ * place a URL somebody else typed becomes one the registry's `url` validator
+ * accepts (SPA-166: the importer calls this rather than a copy of it).
+ */
+export function normalizeUrl(input: string): string | null {
+  const raw = input.trim()
+  if (!raw || /\s/.test(raw)) return null
+  const absolute = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`
+  let url: URL
+  try {
+    url = new URL(absolute)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+  // Credentials are never a web address somebody meant — and a scheme-less
+  // `mailto:a@acme.com` would otherwise parse as user `mailto` at acme.com.
+  if (url.username || url.password) return null
+  if (!url.hostname.includes('.')) return null
+  return url.href
+}
+
+/**
+ * Phone → matching form: a leading `+` when one was written, then the digits.
+ * Accepts the punctuation people type (spaces, dashes, dots, parentheses,
+ * slashes) and nothing else, and 7–15 digits, E.164's ceiling. A stored phone
+ * stays as written; this answers "is it a phone number" and "which one".
+ */
+export function normalizePhone(input: string): string | null {
+  const raw = input.trim()
+  if (!/^\+?[\d\s().\-/]+$/.test(raw)) return null
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length < 7 || digits.length > 15) return null
+  return `${raw.startsWith('+') ? '+' : ''}${digits}`
+}
