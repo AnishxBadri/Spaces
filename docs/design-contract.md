@@ -98,6 +98,30 @@ The tier is decided by who is speaking, never by how small the text is.
 - **lowercase mono** — only what the instrument prints about _itself_: key hints
   (`↵ add · ⇧↵ add & keep open`), units, `end`, `dateless is legal`, `board ›`.
 
+### The Commentary Rule — data is dense, commentary is scarce
+
+Instrument density is measured density: readouts, ledger rows, five numbers in a
+strip. It is never explanatory density. The drift to guard against is doctrine
+written as interface copy — a footer under every card, a clause after every count,
+a sentence in every cell explaining what will happen next. That layer argues the
+architecture to a reviewer; the person at 8am needs the value.
+
+- **One mono commentary line per section**, at the section head, and none in rows
+  or cells. A row carries values. A cell carries its value and one provenance mark.
+- **Provenance is a mark, not a sentence.** Who wrote a value and when is the
+  hover or the receipt link, the way the shipped record pages already do it. The
+  exception is a machine write: anything a plugin or a model wrote says so on the
+  surface, in the cell, every time.
+- **Consequence text lives on the confirming control only.** "cursor resets ·
+  nothing is deleted" belongs in the dialog foot beside the button, never repeated
+  in the list the dialog came from.
+- **Counts stay, clauses go.** `38 of 40 parse` is data; the reasons open on click.
+- **Doctrine lives once.** A product truth — "every machine write is a suggestion" —
+  is said on Welcome or in the `?` sheet, not on six pages. If a sentence starts
+  with _because_ or _never_, it is doctrine and comes out of the surface.
+- **Card feet** carry one status token and one action. Settings rows carry help
+  only when the label does not explain itself.
+
 ---
 
 ## 2. The primitives that exist
@@ -276,7 +300,7 @@ all five and still be the wrong surface — that is what the checklist is for.
 
 ### The review checklist
 
-Nineteen questions. A merge needs a yes to each.
+Twenty questions. A merge needs a yes to each.
 
 **Vocabulary**
 
@@ -325,6 +349,10 @@ Nineteen questions. A merge needs a yes to each.
 18. Does it copy one of the five patterns in §3, named in the PR description?
 19. Is the empty state the P5 anatomy, and was any modal argued for rather than reached
     for?
+20. **Commentary** — one mono commentary line per section and none in a row or a
+    cell; provenance a mark or a hover except for a machine write; consequence text
+    only beside the control that commits it; no sentence on the surface that starts
+    with _because_ or _never_? (§1, "The Commentary Rule")
 
 ### afk or hitl
 
