@@ -6,6 +6,8 @@ import {
   normalizeEmail,
   normalizeLinkedin,
   normalizeName,
+  normalizePhone,
+  normalizeUrl,
 } from './normalize'
 
 describe('normalizeDomain', () => {
@@ -85,5 +87,35 @@ describe('normalizeCin', () => {
   })
   it('rejects malformed input', () => {
     expect(normalizeCin('12345')).toBeNull()
+  })
+})
+
+describe('normalizeUrl', () => {
+  it('keeps an absolute http(s) URL and gives a bare host https', () => {
+    expect(normalizeUrl('https://acme.com/about?x=1')).toBe(
+      'https://acme.com/about?x=1',
+    )
+    expect(normalizeUrl('  acme.com/pricing ')).toBe('https://acme.com/pricing')
+    expect(normalizeUrl('HTTP://Acme.com')).toBe('http://acme.com/')
+  })
+  it('rejects other schemes, whitespace and dotless hosts', () => {
+    expect(normalizeUrl('ftp://acme.com')).toBeNull()
+    expect(normalizeUrl('mailto:a@acme.com')).toBeNull()
+    expect(normalizeUrl('acme dot com')).toBeNull()
+    expect(normalizeUrl('localhost')).toBeNull()
+    expect(normalizeUrl('')).toBeNull()
+  })
+})
+
+describe('normalizePhone', () => {
+  it('reduces typed punctuation to + and digits', () => {
+    expect(normalizePhone('+91 98450 11223')).toBe('+919845011223')
+    expect(normalizePhone('(415) 555-0134')).toBe('4155550134')
+  })
+  it('rejects letters and implausible lengths', () => {
+    expect(normalizePhone('call me')).toBeNull()
+    expect(normalizePhone('12345')).toBeNull()
+    expect(normalizePhone('1234567890123456')).toBeNull()
+    expect(normalizePhone('555-0134 ext 2')).toBeNull()
   })
 })

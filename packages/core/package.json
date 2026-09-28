@@ -18,7 +18,8 @@
     "./attributes/*": "./src/attributes/*.ts",
     "./queue/*": "./src/queue/*.ts",
     "./timeline/*": "./src/timeline/*.ts",
-    "./ai/*": "./src/ai/*.ts"
+    "./ai/*": "./src/ai/*.ts",
+    "./import/*": "./src/import/*.ts"
   },
   "scripts": {
     "test": "vitest run",
