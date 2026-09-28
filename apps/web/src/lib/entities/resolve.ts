@@ -21,9 +21,13 @@ import {
 } from '@spaces/core/entities/normalize'
 
 /**
- * THE choke point. Every entity creator — manual, deck, mention, clip,
- * Apollo, Gmail — goes through resolveEntity(). No exceptions; bypassing
- * it is how the database rots.
+ * THE choke point. Every creator of a person or a company — manual, deck,
+ * mention, clip, Apollo, Gmail, import — goes through resolveEntity(). No
+ * exceptions; bypassing it is how the database rots. (Scoped honestly since
+ * SPA-167: `EntityKindResolvable` is those two kinds. A deal is born by
+ * `createDeal`'s direct insert and a custom record by `createRecordProgram`,
+ * neither through here — which is why the import plan names its creator per
+ * row.)
  *
  * Doctrine: deterministic auto, probabilistic suggest.
  * - Exact identity-key match (domain/email/linkedin/cin) on a record of the
@@ -140,13 +144,20 @@ function birthActor(
   return createdBy ? { type: 'user', id: createdBy } : { type: 'system' }
 }
 
-type NormalizedKey = {
+export type NormalizedKey = {
   kind: CoreIdentityKey
   value: string
   valueNorm: string
 }
 
-function normalizeKeys(input: ResolveInput): Array<NormalizedKey> {
+/**
+ * The keys a resolve compares on, in the order it tries them — shared by
+ * `resolveEntity` and `previewResolve`, so the preview matches on exactly
+ * what the write will (a person's role email dropped, a blank key skipped).
+ */
+export function normalizeKeys(
+  input: Pick<ResolveInput, 'kind' | 'keys'>,
+): Array<NormalizedKey> {
   const out: Array<NormalizedKey> = []
   const k = input.keys ?? {}
   if (k.domain) {
@@ -174,15 +185,26 @@ function normalizeKeys(input: ResolveInput): Array<NormalizedKey> {
   return out
 }
 
-export async function resolveEntity(
-  input: ResolveInput,
-): Promise<ResolveResult> {
-  const keys = normalizeKeys(input)
-  const name = input.name?.trim()
-  if (!name && keys.length === 0) {
-    throw new Error('resolveEntity needs a name or at least one identity key')
-  }
+/**
+ * `resolveEntity`'s refusal, said once: a record with neither a name nor an
+ * identity key is nothing a resolve can match or name. The preview reports
+ * the same words for the row the write would refuse.
+ */
+export const RESOLVE_NEEDS_NAME_OR_KEY =
+  'resolveEntity needs a name or at least one identity key'
 
+/**
+ * Step 1 and 1b, read-only: the live record of `kind` an identity key
+ * already names, or null. Every key is tried in `normalizeKeys` order; a
+ * key held by another kind of record falls through to the record that lost
+ * that claim before (`priorClaimant`). Both `resolveEntity` and
+ * `previewResolve` call this — one lookup, so the preview cannot say
+ * *attach* where the write would create.
+ */
+async function matchIdentity(
+  kind: EntityKindResolvable,
+  keys: Array<NormalizedKey>,
+): Promise<{ entityId: string; key: NormalizedKey } | null> {
   // 1. Deterministic: exact identity-key match on this kind → attach.
   const heldElsewhere: Array<{ key: NormalizedKey; holderId: string }> = []
   for (const key of keys) {
@@ -201,21 +223,75 @@ export async function resolveEntity(
     ).at(0)
     if (!hit) continue
     const id = await canonicalId(hit.entityId)
-    if ((await kindOf(id)) === input.kind) {
-      // New name for a known entity is still signal — record as alias.
-      if (name) await recordNameAlias(id, name, input.source)
-      return { entityId: id, action: 'attached', matchedOn: key.kind }
-    }
+    if ((await kindOf(id)) === kind) return { entityId: id, key }
     heldElsewhere.push({ key, holderId: id })
   }
 
   // 1b. A key another kind of record holds: the record that already lost
   // that claim, if there is one, is this record again.
   for (const { key, holderId } of heldElsewhere) {
-    const prior = await priorClaimant(input.kind, key, holderId)
-    if (prior !== null) {
-      if (name) await recordNameAlias(prior, name, input.source)
-      return { entityId: prior, action: 'attached', matchedOn: key.kind }
+    const prior = await priorClaimant(kind, key, holderId)
+    if (prior !== null) return { entityId: prior, key }
+  }
+  return null
+}
+
+export type PreviewResolveInput = Pick<ResolveInput, 'kind' | 'name' | 'keys'>
+
+export type PreviewResolveResult =
+  | {
+      verdict: 'attach'
+      entityId: string
+      matchedOn: { kind: CoreIdentityKey; value: string }
+    }
+  | { verdict: 'create' }
+  | { verdict: 'refused'; reason: typeof RESOLVE_NEEDS_NAME_OR_KEY }
+
+/**
+ * **The read-only twin of step 1** (SPA-167). What `resolveEntity` would do
+ * with this input, decided by the same `normalizeKeys`, the same identity
+ * alias lookup and the same `canonicalId` redirect — and nothing written:
+ * no name alias on an attach, no create (step 2), no fuzzy sweep (step 3).
+ * `refused` is `resolveEntity`'s own throw, answered instead of thrown so a
+ * batch of rows can report it and carry on.
+ *
+ * Two rows of one file claiming one key is not this function's business:
+ * the second does not exist when the first resolves, so the importer
+ * catches it (`@spaces/core/import/plan`).
+ */
+export async function previewResolve(
+  input: PreviewResolveInput,
+): Promise<PreviewResolveResult> {
+  const keys = normalizeKeys(input)
+  if (!input.name?.trim() && keys.length === 0)
+    return { verdict: 'refused', reason: RESOLVE_NEEDS_NAME_OR_KEY }
+  const match = await matchIdentity(input.kind, keys)
+  if (!match) return { verdict: 'create' }
+  return {
+    verdict: 'attach',
+    entityId: match.entityId,
+    matchedOn: { kind: match.key.kind, value: match.key.valueNorm },
+  }
+}
+
+export async function resolveEntity(
+  input: ResolveInput,
+): Promise<ResolveResult> {
+  const keys = normalizeKeys(input)
+  const name = input.name?.trim()
+  if (!name && keys.length === 0) {
+    throw new Error(RESOLVE_NEEDS_NAME_OR_KEY)
+  }
+
+  // 1. Deterministic: an identity key a record of this kind holds → attach.
+  const match = await matchIdentity(input.kind, keys)
+  if (match) {
+    // New name for a known entity is still signal — record as alias.
+    if (name) await recordNameAlias(match.entityId, name, input.source)
+    return {
+      entityId: match.entityId,
+      action: 'attached',
+      matchedOn: match.key.kind,
     }
   }
 

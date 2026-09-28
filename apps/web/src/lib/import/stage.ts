@@ -343,6 +343,49 @@ export const stagedBatch = Effect.fn('stagedBatch')(function* (
   return batch
 })
 
+/**
+ * A batch the wizard may still change: staged, or planned (SPA-167) — a
+ * planned batch's mapping can still move, and the change throws its plan
+ * away (`mapping.ts`'s `writeMapping`). Committed and failed batches are
+ * the record of what an import did.
+ */
+export const editableBatch = Effect.fn('editableBatch')(function* (
+  batchId: string,
+): Effect.fn.Return<
+  typeof importBatch.$inferSelect,
+  ImportRefused | ImportNotFound | ImportFailed
+> {
+  const batch = yield* query(() =>
+    db
+      .select()
+      .from(importBatch)
+      .where(eq(importBatch.id, batchId))
+      .then((rows) => rows.at(0)),
+  )
+  if (!batch) return yield* new ImportNotFound()
+  if (batch.status !== 'staged' && batch.status !== 'planned')
+    return yield* new ImportRefused({
+      reason: `This import is ${batch.status} and can no longer change`,
+    })
+  return batch
+})
+
+/**
+ * Throw a batch's plan away and return it to `staged` — every row's `plan`
+ * and `verdict` cleared in the transaction that changed what they were
+ * computed from, so a stale verdict has nowhere to be read from.
+ */
+export async function clearPlan(tx: Tx, batchId: string): Promise<void> {
+  await tx
+    .update(importRow)
+    .set({ plan: null, verdict: null })
+    .where(eq(importRow.batchId, batchId))
+  await tx
+    .update(importBatch)
+    .set({ status: 'staged' })
+    .where(eq(importBatch.id, batchId))
+}
+
 export type ImportBatchView = {
   id: string
   filename: string
@@ -467,13 +510,13 @@ export const selectImportSheetProgram = Effect.fn('selectImportSheetProgram')(
 )
 
 /**
- * Throw a staged batch away. Only a staged one: a committed batch is the
- * record of what an import wrote. The bytes go too when nothing else names
+ * Throw a staged or planned batch away. Never a committed one: that batch
+ * is the record of what an import wrote. The bytes go too when nothing else names
  * them — `reclaimBlobIfOrphaned` asks documents and batches alike.
  */
 export const discardImportBatchProgram = Effect.fn('discardImportBatchProgram')(
   function* (batchId: string): Effect.fn.Return<void, ImportFailure> {
-    const batch = yield* stagedBatch(batchId)
+    const batch = yield* editableBatch(batchId)
     yield* query(() =>
       db.delete(importBatch).where(eq(importBatch.id, batchId)),
     )

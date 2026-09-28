@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { asc, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute, importBatch, importRow, objectDef } from '@spaces/db/schema'
-import { identityKeysOf } from '@spaces/core/attributes/registry'
+import { coreKindOf, identityKeysOf } from '@spaces/core/attributes/registry'
 import {
   assignColumn,
   autoMap,
@@ -21,13 +21,16 @@ import {
   ImportFailed,
   ImportNotFound,
   ImportRefused,
-  stagedBatch,
+  clearPlan,
+  editableBatch,
 } from './stage'
 import type {
   AttributeType,
   CoreIdentityKey,
+  ObjectKind,
 } from '@spaces/core/attributes/registry'
 import type {
+  ColumnSpec,
   ColumnStatus,
   ColumnTarget,
   ImportDateOrder,
@@ -37,6 +40,7 @@ import type {
   MappingRegistry,
   Replaced,
 } from '@spaces/core/import/mapping'
+import type { ColumnSummary } from '@spaces/core/import/coerce'
 import type { ImportFailure } from './stage'
 
 /**
@@ -68,6 +72,9 @@ export function mappingMessage(failure: unknown): string {
 
 export type MappingObject = {
   id: string
+  slug: string
+  /** The core kind behind a system object; null for a custom one. */
+  kind: ObjectKind | null
   singular: string
   plural: string
   registry: MappingRegistry
@@ -112,15 +119,21 @@ export const mappingObjectOf = Effect.fn('mappingObjectOf')(function* (
   )
   return {
     id: object.id,
+    slug: object.slug,
+    kind: coreKindOf(object),
     singular: object.singular,
     plural: object.plural,
     registry: { attributes, identityKeys: identityKeysOf(object) },
   }
 })
 
-/** A staged records batch with its object chosen — the mapping step's precondition. */
+/**
+ * A records batch with its object chosen — the mapping step's precondition.
+ * Staged or planned: a planned batch's mapping may still change, and the
+ * change discards its plan.
+ */
 const mappableBatch = Effect.fn('mappableBatch')(function* (batchId: string) {
-  const batch = yield* stagedBatch(batchId)
+  const batch = yield* editableBatch(batchId)
   if (batch.mode !== 'records' || batch.targetObjectId === null)
     return yield* new ImportRefused({
       reason: 'Choose the object these rows go into first',
@@ -144,9 +157,21 @@ const firstRowWidth = (batchId: string) =>
       .then((rows) => rows.at(0)?.cells.length ?? 0),
   )
 
+/**
+ * Every mapping write. The plan is computed from the mapping, so the write
+ * that changes the mapping clears every row's plan and verdict and returns
+ * the batch to `staged`, in one transaction (SPA-167) — the preview is
+ * recomputed on Continue and a stale verdict is never shown.
+ */
 const writeMapping = (batchId: string, mapping: Mapping) =>
   query(() =>
-    db.update(importBatch).set({ mapping }).where(eq(importBatch.id, batchId)),
+    db.transaction(async (tx) => {
+      await tx
+        .update(importBatch)
+        .set({ mapping })
+        .where(eq(importBatch.id, batchId))
+      await clearPlan(tx, batchId)
+    }),
   )
 
 // ---------------------------------------------------------------------------
@@ -307,6 +332,46 @@ export const createImportAttributeProgram = Effect.fn(
 // The view
 // ---------------------------------------------------------------------------
 
+export type ColumnRead = {
+  values: Array<string>
+  spec: ColumnSpec | null
+  summary: ColumnSummary | null
+}
+
+/** Each mapped column read over every staged row. */
+export function readColumns(
+  mapping: Mapping,
+  registry: MappingRegistry,
+  rows: ReadonlyArray<{ cells: Array<string> }>,
+): Array<ColumnRead> {
+  return mapping.map((target, i) => {
+    const values = rows.map((r) => r.cells.at(i) ?? '')
+    const spec = specFor(target, registry)
+    return { values, spec, summary: spec ? summarizeSpec(spec, values) : null }
+  })
+}
+
+/**
+ * What stops the mapping step advancing: the mapping's own rules, then the
+ * columns where nothing parses. The step's view and the preview's refusal
+ * (SPA-167) read the one list.
+ */
+export function mappingProblemsOf(
+  mapping: Mapping,
+  registry: MappingRegistry,
+  header: ReadonlyArray<string> | null,
+  columns: ReadonlyArray<ColumnRead>,
+): Array<MappingProblem> {
+  return [
+    ...validateMapping(mapping, registry, header),
+    ...unparsedColumns(
+      mapping,
+      columns.map((c) => c.summary),
+      header,
+    ),
+  ]
+}
+
 /** Failures a head's click shows per column; the count is always whole. */
 export const FAILURES_SHOWN = 100
 
@@ -373,15 +438,7 @@ export const loadImportMappingProgram = Effect.fn('loadImportMappingProgram')(
     const width = columnCountOf(batch, rows.at(0)?.cells.length ?? 0)
     const mapping = fitMapping(batch.mapping, width)
     const registry = object.registry
-    const summaries = mapping.map((target, i) => {
-      const values = rows.map((r) => r.cells.at(i) ?? '')
-      const spec = specFor(target, registry)
-      return {
-        values,
-        spec,
-        summary: spec ? summarizeSpec(spec, values) : null,
-      }
-    })
+    const summaries = readColumns(mapping, registry, rows)
     const columns = summaries.map(
       ({ values, spec, summary }, i): ColumnView => {
         const blanks = values.filter((v) => v.trim() === '').length
@@ -424,14 +481,7 @@ export const loadImportMappingProgram = Effect.fn('loadImportMappingProgram')(
       attributes: mappableAttributes(registry),
       mapping,
       columns,
-      problems: [
-        ...validateMapping(mapping, registry, batch.header),
-        ...unparsedColumns(
-          mapping,
-          summaries.map((s) => s.summary),
-          batch.header,
-        ),
-      ],
+      problems: mappingProblemsOf(mapping, registry, batch.header, summaries),
     }
   },
 )

@@ -7,6 +7,7 @@ import {
   columnLetter,
   columnName,
   readCell,
+  shortRefusal,
   specFor,
 } from '@spaces/core/import/mapping'
 import { TYPE_LABELS } from '#/components/attributes/registry-list'
@@ -711,19 +712,6 @@ function ParseCount({
 // The cells
 // ---------------------------------------------------------------------------
 
-const NOT: Partial<Record<AttributeType, string>> = {
-  number: 'not a number',
-  currency: 'not money',
-  date: 'not a date',
-  checkbox: 'not yes/no',
-  rating: 'not a rating',
-  domain: 'not a domain',
-  email: 'not an email',
-  url: 'not a url',
-  phone: 'not a phone',
-  text: 'too long',
-}
-
 function SampleCell({ spec, raw }: { spec: ColumnSpec | null; raw: string }) {
   if (spec === null || raw.trim() === '') return <>{raw}</>
   const out = readCell(spec, raw)
@@ -758,7 +746,7 @@ function SampleCell({ spec, raw }: { spec: ColumnSpec | null; raw: string }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="shrink-0 mono text-micro text-destructive">
-        {spec.kind === 'cin' ? 'not a cin' : (NOT[spec.type] ?? 'not read')}
+        {shortRefusal(spec)}
       </span>
       <span className="truncate text-graphite line-through">{raw}</span>
     </span>

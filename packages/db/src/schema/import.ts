@@ -17,7 +17,6 @@ import { entity } from './entities'
 import { objectDef } from './objects'
 import type { CoreIdentityKey } from './entities'
 import type { attributeType } from './attributes'
-import type { Json } from '../json'
 
 /**
  * **Staged import** (SPA-164, import-2; CONTEXT.md phase 15 item 9 — one
@@ -42,7 +41,10 @@ export const importMode = pgEnum('import_mode', ['records', 'ledger'])
 
 export type ImportMode = (typeof importMode.enumValues)[number]
 
-/** Where the batch is in the wizard. Only `staged` is written this slice. */
+/**
+ * Where the batch is in the wizard. `planned` once every row carries its
+ * plan (SPA-167); a mapping change returns it to `staged`.
+ */
 export const importBatchStatus = pgEnum('import_batch_status', [
   'staged',
   'planned',
@@ -87,6 +89,64 @@ export type ColumnTarget =
     }
 
 export type Mapping = Array<ColumnTarget>
+
+/**
+ * The payload of `import_row.plan` (SPA-167, import-5): what the preview step
+ * decided to do with one row, stored so the commit replays it rather than
+ * recomputing an answer that could disagree with the report. Declared at the
+ * column and re-exported by `@spaces/core/import/plan`, which owns the rules.
+ *
+ * - `attach` — an identity key matched a live record (`entityId`,
+ *   `matchedOn`); the row's values land on it.
+ * - `create` — no match; `creator` births the record.
+ * - `collide` — the row shares an identity key with another row of this file
+ *   under a different name, and waits on a `decision` (`collidesWith` names
+ *   the other rows). Its `entityId` / `matchedOn` are kept, so a decision
+ *   restores the row to what the resolver said.
+ * - `merged` — the row folds into row `mergedInto`: same key and same name,
+ *   or the losing side of a decided collision. Counted once, on that row.
+ * - `skip` — a decided collision's `skip-both`.
+ * - `no-land` — the row cannot be written as it stands; `errors` say why.
+ */
+export type ImportVerdict =
+  'attach' | 'create' | 'collide' | 'merged' | 'skip' | 'no-land'
+
+/**
+ * The three doors a new record goes through, by target object: people and
+ * companies through `resolveEntity`, a deal through its birth path
+ * (`createDeal`), a custom record through `createRecordProgram`.
+ */
+export type ImportCreator =
+  'resolveEntity' | 'dealBirth' | 'createRecordProgram'
+
+export type CollisionDecision = 'keep-first' | 'keep-second' | 'skip-both'
+
+/** One cell that did not read: its column index, the cell, and why. */
+export type ImportCellIssue = { column: number; raw: string; reason: string }
+
+/** A coerced cell — the write shape `setValues` takes (core's `CoercedValue`). */
+export type ImportCellValue = string | number | boolean | Array<string>
+
+export type RowPlan = {
+  verdict: ImportVerdict
+  creator: ImportCreator
+  /** The name cell, trimmed; null when blank. */
+  name: string | null
+  /** Attach: the record matched, and on which key. */
+  entityId?: string
+  matchedOn?: { kind: CoreIdentityKey; value: string }
+  /** Attribute id → coerced value, blanks omitted. */
+  patch: Record<string, ImportCellValue>
+  /** Identity key → normalised value, as the resolver compares it. */
+  identity: Partial<Record<CoreIdentityKey, string>>
+  /** What stops the row landing; empty unless `no-land`. */
+  errors: Array<ImportCellIssue>
+  /** Cells left out of a row that still lands. */
+  skippedCells: Array<ImportCellIssue>
+  mergedInto?: number
+  collidesWith?: Array<number>
+  decision?: CollisionDecision
+}
 
 export const importBatch = pgTable(
   'import_batch',
@@ -154,8 +214,9 @@ export const importRow = pgTable(
     /** The row's cells, verbatim strings, padded to the sheet's width. */
     cells: jsonb('cells').$type<Array<string>>().notNull(),
     /** What the preview step decided to do with the row; null until then. */
-    plan: jsonb('plan').$type<Json>(),
-    verdict: text('verdict'),
+    plan: jsonb('plan').$type<RowPlan>(),
+    /** `plan.verdict`, copied out so the report counts without reading jsonb. */
+    verdict: text('verdict').$type<ImportVerdict>(),
     /** The record the commit wrote or matched; null until commit. */
     entityId: uuid('entity_id').references(() => entity.id),
     error: text('error'),

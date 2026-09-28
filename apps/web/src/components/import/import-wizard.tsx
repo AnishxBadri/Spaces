@@ -12,9 +12,10 @@ import { cn } from '#/lib/utils'
 /**
  * The import wizard's chrome (SPA-164, import-2): the page header, the
  * four-step strip, the drop zone, the define row (object + mode), the sheet
- * tabs and the preview grid. Steps 1 and 2 are live (the mapping grid is
- * `mapping-grid.tsx`, SPA-165); the strip draws the other two inert so the
- * shape of the wizard is visible from the start.
+ * tabs and the preview grid. Steps 1 to 3 are live (the mapping grid is
+ * `mapping-grid.tsx`, SPA-165; the preview ledger `preview-ledger.tsx`,
+ * SPA-167); the strip draws the commit inert so the shape of the wizard is
+ * visible from the start.
  *
  * Copied, not designed: the header is `PageHeader`, the drop zone is the P5
  * `EmptyState` anatomy with a dashed rule, the grid keeps `RecordTable`'s
@@ -102,7 +103,7 @@ export function StepStrip({
   mapHint = null,
 }: {
   uploadHint: string | null
-  step?: 0 | 1
+  step?: 0 | 1 | 2
   /** Step 2's readout once its mapping would advance — `7 of 11 mapped`. */
   mapHint?: string | null
 }) {

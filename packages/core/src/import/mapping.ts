@@ -350,6 +350,43 @@ export function specFor(
   }
 }
 
+/**
+ * The short word for a cell a column will not read, by type — what a sample
+ * cell prints in the mapping grid and what a skipped cell says in the
+ * preview's why lane (`Raise "TBD" skipped · not money`).
+ */
+const SHORT_REFUSAL: Partial<Record<AttributeType, string>> = {
+  number: 'not a number',
+  currency: 'not money',
+  date: 'not a date',
+  checkbox: 'not yes/no',
+  rating: 'not a rating',
+  domain: 'not a domain',
+  email: 'not an email',
+  url: 'not a url',
+  phone: 'not a phone',
+  text: 'too long',
+}
+
+export function shortRefusal(spec: ColumnSpec): string {
+  if (spec.kind === 'cin') return 'not a cin'
+  return SHORT_REFUSAL[spec.type] ?? 'not read'
+}
+
+/**
+ * A refusal with the cell taken off the front — the cell travels beside it
+ * as `raw`, so `"TBD" is not a number` on a currency column reads `not
+ * money`, while a refusal that says more than "is not" (`has a two-digit
+ * year — write it in full`, `an archived option — pick a current one`)
+ * keeps its words.
+ */
+export function cellReason(spec: ColumnSpec, reason: string): string {
+  const rest = reason.replace(/^"[^"]*"\s*:?\s*/, '')
+  if (rest.startsWith('is not ')) return shortRefusal(spec)
+  const said = rest.replace(/^is /, '')
+  return said === '' ? shortRefusal(spec) : said
+}
+
 /** One cell through a column's spec. */
 export function readCell(spec: ColumnSpec, raw: string | null): Coercion {
   if (spec.kind === 'typed') return coerce(spec.type, spec.options, raw)

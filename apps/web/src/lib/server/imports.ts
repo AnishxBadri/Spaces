@@ -298,3 +298,77 @@ export const createImportAttribute = createServerFn({ method: 'POST' })
       throw new Error(mappingMessage(failure))
     }
   })
+
+// ---------------------------------------------------------------------------
+// The preview step (SPA-167, import-5)
+// ---------------------------------------------------------------------------
+
+/** Spelled here rather than imported: `#/lib/import/plan` is server-only. */
+const PREVIEW_FILTERS = ['all', 'create', 'attach', 'decide', 'noland'] as const
+
+/** Continue from step 2: every row planned and stored; answers the counts. */
+export const planImport = createServerFn({ method: 'POST' })
+  .validator(batchInput)
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { planImportProgram, planMessage } = await import('../import/plan')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(planImportProgram)(data.batchId)
+    } catch (failure) {
+      throw new Error(planMessage(failure))
+    }
+  })
+
+/** Step 3's data, read off the stored plans; null unless the batch is planned. */
+export const getImportPreview = createServerFn()
+  .validator(
+    z.object({ batchId: uuid, filter: z.enum(PREVIEW_FILTERS).catch('all') }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { loadImportPreviewProgram, planMessage } =
+      await import('../import/plan')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(loadImportPreviewProgram)(data)
+    } catch (failure) {
+      throw new Error(planMessage(failure))
+    }
+  })
+
+/** One in-file collision's decision, stored on every row of it. */
+export const decideImportCollision = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      batchId: uuid,
+      rowNum: z.number().int().min(1),
+      decision: z.enum(['keep-first', 'keep-second', 'skip-both']),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { decideImportCollisionProgram, planMessage } =
+      await import('../import/plan')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(decideImportCollisionProgram)(data)
+    } catch (failure) {
+      throw new Error(planMessage(failure))
+    }
+  })
+
+/** Back to mapping: the plan is discarded and the batch staged again. */
+export const reopenImportMapping = createServerFn({ method: 'POST' })
+  .validator(batchInput)
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { reopenImportMappingProgram, planMessage } =
+      await import('../import/plan')
+    const { effectFn } = await import('./effect')
+    try {
+      await effectFn(reopenImportMappingProgram)(data.batchId)
+    } catch (failure) {
+      throw new Error(planMessage(failure))
+    }
+  })
