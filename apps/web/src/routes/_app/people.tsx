@@ -42,6 +42,7 @@ import {
   TableToolbar,
 } from '#/components/table/record-table'
 import { PageHeader } from '#/components/page-header'
+import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
@@ -339,7 +340,10 @@ function PeoplePage() {
         title="People"
         description="Founders, operators, co-investors — deduped by email, linked to their companies."
         action={
-          <CreatePersonDialog companies={companies} registry={registry} />
+          <>
+            <ImportAction objectSlug="people" />
+            <CreatePersonDialog companies={companies} registry={registry} />
+          </>
         }
       />
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">

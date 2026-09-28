@@ -10,6 +10,7 @@ import {
   entityAlias,
   entitySpace,
   holding,
+  importRow,
   interaction,
   interactionEntity,
   investment,
@@ -457,5 +458,18 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
       why: 'a run is spend and provenance history: its ai_usage rows cite it and the tokens were paid whether or not the record survives',
     },
     context: null, // the run log is operator-facing, never AI-visible
+  },
+
+  // --- staged import -------------------------------------------------------
+  {
+    key: 'import_row.entity',
+    table: importRow,
+    column: importRow.entityId,
+    merge: { kind: 'repoint' }, // the row wrote or matched the record: follow the survivor
+    del: {
+      kind: 'orphan',
+      why: 'a staging row is the record of what an import did; it outlives the record it wrote, as the batch it belongs to does',
+    },
+    context: null, // a staging row is bookkeeping and never enters a prompt
   },
 ]

@@ -44,6 +44,7 @@ import {
   TableToolbar,
 } from '#/components/table/record-table'
 import { PageHeader } from '#/components/page-header'
+import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
@@ -362,7 +363,12 @@ function CompaniesPage() {
       <PageHeader
         title="Companies"
         description="Every company you track — deduped by domain, tagged into spaces."
-        action={<CreateCompanyDialog registry={registry} />}
+        action={
+          <>
+            <ImportAction objectSlug="companies" />
+            <CreateCompanyDialog registry={registry} />
+          </>
+        }
       />
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
         {openDuplicates > 0 ? (

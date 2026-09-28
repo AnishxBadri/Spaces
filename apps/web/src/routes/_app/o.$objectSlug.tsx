@@ -42,6 +42,7 @@ import {
   TableToolbar,
 } from '#/components/table/record-table'
 import { PageHeader } from '#/components/page-header'
+import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import {
@@ -383,7 +384,12 @@ function ObjectListPage() {
       <PageHeader
         title={object.plural}
         description={`Every ${noun.one} you keep — your own object, your own attributes.`}
-        action={createDialog}
+        action={
+          <>
+            <ImportAction objectSlug={object.slug} />
+            {createDialog}
+          </>
+        }
       />
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
         {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (

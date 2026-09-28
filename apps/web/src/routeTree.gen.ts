@@ -18,6 +18,7 @@ import { Route as AppCompaniesRouteImport } from './routes/_app/companies'
 import { Route as AppDealsRouteImport } from './routes/_app/deals'
 import { Route as AppDedupeRouteImport } from './routes/_app/dedupe'
 import { Route as AppDocumentsRouteImport } from './routes/_app/documents'
+import { Route as AppImportRouteImport } from './routes/_app/import'
 import { Route as AppInboxRouteImport } from './routes/_app/inbox'
 import { Route as AppMandateRouteImport } from './routes/_app/mandate'
 import { Route as AppNotesRouteImport } from './routes/_app/notes'
@@ -31,6 +32,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/companies_.$companyId'
 import { Route as AppDealsDealIdRouteImport } from './routes/_app/deals_.$dealId'
+import { Route as AppImportBatchIdRouteImport } from './routes/_app/import_.$batchId'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId'
 import { Route as AppOObjectSlugRouteImport } from './routes/_app/o.$objectSlug'
 import { Route as AppPeoplePersonIdRouteImport } from './routes/_app/people_.$personId'
@@ -98,6 +100,11 @@ const AppDocumentsRoute = AppDocumentsRouteImport.update({
   path: '/documents',
   getParentRoute: () => AppRoute,
 } as any)
+const AppImportRoute = AppImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppInboxRoute = AppInboxRouteImport.update({
   id: '/inbox',
   path: '/inbox',
@@ -161,6 +168,11 @@ const AppCompaniesCompanyIdRoute = AppCompaniesCompanyIdRouteImport.update({
 const AppDealsDealIdRoute = AppDealsDealIdRouteImport.update({
   id: '/deals_/$dealId',
   path: '/deals/$dealId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppImportBatchIdRoute = AppImportBatchIdRouteImport.update({
+  id: '/import_/$batchId',
+  path: '/import/$batchId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppNotesNoteIdRoute = AppNotesNoteIdRouteImport.update({
@@ -284,6 +296,7 @@ export interface FileRoutesByFullPath {
   '/deals': typeof AppDealsRoute
   '/dedupe': typeof AppDedupeRoute
   '/documents': typeof AppDocumentsRoute
+  '/import': typeof AppImportRoute
   '/inbox': typeof AppInboxRoute
   '/mandate': typeof AppMandateRoute
   '/notes': typeof AppNotesRoute
@@ -297,6 +310,7 @@ export interface FileRoutesByFullPath {
   '/api/mcp': typeof ApiMcpRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
+  '/import/$batchId': typeof AppImportBatchIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/o/$objectSlug': typeof AppOObjectSlugRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
@@ -329,6 +343,7 @@ export interface FileRoutesByTo {
   '/deals': typeof AppDealsRoute
   '/dedupe': typeof AppDedupeRoute
   '/documents': typeof AppDocumentsRoute
+  '/import': typeof AppImportRoute
   '/inbox': typeof AppInboxRoute
   '/mandate': typeof AppMandateRoute
   '/notes': typeof AppNotesRoute
@@ -341,6 +356,7 @@ export interface FileRoutesByTo {
   '/api/mcp': typeof ApiMcpRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
+  '/import/$batchId': typeof AppImportBatchIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/o/$objectSlug': typeof AppOObjectSlugRoute
   '/people/$personId': typeof AppPeoplePersonIdRoute
@@ -375,6 +391,7 @@ export interface FileRoutesById {
   '/_app/deals': typeof AppDealsRoute
   '/_app/dedupe': typeof AppDedupeRoute
   '/_app/documents': typeof AppDocumentsRoute
+  '/_app/import': typeof AppImportRoute
   '/_app/inbox': typeof AppInboxRoute
   '/_app/mandate': typeof AppMandateRoute
   '/_app/notes': typeof AppNotesRoute
@@ -388,6 +405,7 @@ export interface FileRoutesById {
   '/api/mcp': typeof ApiMcpRoute
   '/_app/companies_/$companyId': typeof AppCompaniesCompanyIdRoute
   '/_app/deals_/$dealId': typeof AppDealsDealIdRoute
+  '/_app/import_/$batchId': typeof AppImportBatchIdRoute
   '/_app/notes_/$noteId': typeof AppNotesNoteIdRoute
   '/_app/o/$objectSlug': typeof AppOObjectSlugRoute
   '/_app/people_/$personId': typeof AppPeoplePersonIdRoute
@@ -422,6 +440,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/dedupe'
     | '/documents'
+    | '/import'
     | '/inbox'
     | '/mandate'
     | '/notes'
@@ -435,6 +454,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/companies/$companyId'
     | '/deals/$dealId'
+    | '/import/$batchId'
     | '/notes/$noteId'
     | '/o/$objectSlug'
     | '/people/$personId'
@@ -467,6 +487,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/dedupe'
     | '/documents'
+    | '/import'
     | '/inbox'
     | '/mandate'
     | '/notes'
@@ -479,6 +500,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/companies/$companyId'
     | '/deals/$dealId'
+    | '/import/$batchId'
     | '/notes/$noteId'
     | '/o/$objectSlug'
     | '/people/$personId'
@@ -512,6 +534,7 @@ export interface FileRouteTypes {
     | '/_app/deals'
     | '/_app/dedupe'
     | '/_app/documents'
+    | '/_app/import'
     | '/_app/inbox'
     | '/_app/mandate'
     | '/_app/notes'
@@ -525,6 +548,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/_app/companies_/$companyId'
     | '/_app/deals_/$dealId'
+    | '/_app/import_/$batchId'
     | '/_app/notes_/$noteId'
     | '/_app/o/$objectSlug'
     | '/_app/people_/$personId'
@@ -627,6 +651,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDocumentsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/import': {
+      id: '/_app/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/inbox': {
       id: '/_app/inbox'
       path: '/inbox'
@@ -716,6 +747,13 @@ declare module '@tanstack/react-router' {
       path: '/deals/$dealId'
       fullPath: '/deals/$dealId'
       preLoaderRoute: typeof AppDealsDealIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/import_/$batchId': {
+      id: '/_app/import_/$batchId'
+      path: '/import/$batchId'
+      fullPath: '/import/$batchId'
+      preLoaderRoute: typeof AppImportBatchIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/notes_/$noteId': {
@@ -912,6 +950,7 @@ interface AppRouteChildren {
   AppDealsRoute: typeof AppDealsRoute
   AppDedupeRoute: typeof AppDedupeRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
+  AppImportRoute: typeof AppImportRoute
   AppInboxRoute: typeof AppInboxRoute
   AppMandateRoute: typeof AppMandateRoute
   AppNotesRoute: typeof AppNotesRoute
@@ -923,6 +962,7 @@ interface AppRouteChildren {
   AppTodayRoute: typeof AppTodayRoute
   AppCompaniesCompanyIdRoute: typeof AppCompaniesCompanyIdRoute
   AppDealsDealIdRoute: typeof AppDealsDealIdRoute
+  AppImportBatchIdRoute: typeof AppImportBatchIdRoute
   AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
   AppOObjectSlugRoute: typeof AppOObjectSlugRoute
   AppPeoplePersonIdRoute: typeof AppPeoplePersonIdRoute
@@ -938,6 +978,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDealsRoute: AppDealsRoute,
   AppDedupeRoute: AppDedupeRoute,
   AppDocumentsRoute: AppDocumentsRoute,
+  AppImportRoute: AppImportRoute,
   AppInboxRoute: AppInboxRoute,
   AppMandateRoute: AppMandateRoute,
   AppNotesRoute: AppNotesRoute,
@@ -949,6 +990,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTodayRoute: AppTodayRoute,
   AppCompaniesCompanyIdRoute: AppCompaniesCompanyIdRoute,
   AppDealsDealIdRoute: AppDealsDealIdRoute,
+  AppImportBatchIdRoute: AppImportBatchIdRoute,
   AppNotesNoteIdRoute: AppNotesNoteIdRoute,
   AppOObjectSlugRoute: AppOObjectSlugRoute,
   AppPeoplePersonIdRoute: AppPeoplePersonIdRoute,

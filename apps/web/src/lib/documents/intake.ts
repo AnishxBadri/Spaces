@@ -7,6 +7,8 @@ import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { Effect, Schema } from 'effect'
 import { MAX_UPLOAD_BYTES, formatBytes } from '@spaces/core/documents'
+import { db } from '@spaces/db'
+import { pendingBlob } from '@spaces/db/schema'
 import { storage } from '#/lib/storage'
 import { birthDocumentProgram, documentBirthMessage } from './birth'
 import type { Readable } from 'node:stream'
@@ -193,26 +195,70 @@ const drainToTempFile = Effect.fn('documentIntake.drainToTempFile')(function* (
   return { sha: hash.digest('hex'), sizeBytes: seen }
 })
 
+/**
+ * The blob half of the lane: drain, hash, and `put` under the measured digest
+ * unless the store already holds it. Shared by `storeAndBirth` below and by
+ * `putBlobProgram`, so this module stays the one `storage().put(` site of the
+ * server lane.
+ *
+ * `intent` is the `pending_blob` row (SPA-54), written **before** the bytes
+ * and only when they are new — the order `prepareBlobUploadProgram` keeps, so
+ * no crash can leave stored bytes the orphan sweep has not heard of. Intake
+ * passes none: birth follows in the same program and clears nothing it did
+ * not write.
+ */
+const storeBlob = Effect.fn('documentIntake.storeBlob')(function* (
+  dir: string,
+  stream: Readable,
+  mime: string | null,
+  intent: { preparedBy: string | null } | null,
+): Effect.fn.Return<
+  { sha: string; sizeBytes: number; stored: boolean },
+  DocumentTooLarge | DocumentIntakeFailed
+> {
+  const path = join(dir, 'arriving')
+  const { sha, sizeBytes } = yield* drainToTempFile(stream, path)
+
+  // The same deck arriving from two providers costs one blob: content
+  // addressing means the stored bytes are already these bytes.
+  const stored = yield* io(() => storage().exists(sha))
+  if (!stored) {
+    if (intent !== null) {
+      yield* io(() =>
+        db
+          .insert(pendingBlob)
+          .values({ sha, sizeBytes, preparedBy: intent.preparedBy })
+          .onConflictDoUpdate({
+            target: pendingBlob.sha,
+            set: {
+              sizeBytes,
+              preparedBy: intent.preparedBy,
+              preparedAt: new Date(),
+            },
+          }),
+      )
+    }
+    // `put`, not `putContentAddressed`: the key is the digest this module
+    // measured, not a claim anybody made.
+    const meta = mime === null ? {} : { mime }
+    yield* io(() => storage().put(sha, createReadStream(path), meta))
+  }
+  return { sha, sizeBytes, stored: !stored }
+})
+
 const storeAndBirth = Effect.fn('documentIntake.storeAndBirth')(function* (
   dir: string,
   input: DocumentIntakeInput,
 ): Effect.fn.Return<{ id: string; deduped: boolean }, DocumentIntakeFailure> {
-  const path = join(dir, 'arriving')
-  const { sha, sizeBytes } = yield* drainToTempFile(input.stream, path)
+  const { sha, sizeBytes } = yield* storeBlob(
+    dir,
+    input.stream,
+    input.mime,
+    null,
+  )
 
-  // The same deck arriving from two providers costs one blob: content
-  // addressing means the stored bytes are already these bytes, and the
-  // document row is still born — §3.4's dedupe is about a *target*, and it is
-  // birth's rule to apply, not ours.
-  const stored = yield* io(() => storage().exists(sha))
-  if (!stored) {
-    // `put`, not `putContentAddressed`: the key is the digest this module
-    // measured, not a claim anybody made. If intake ever registers a
-    // `pending_blob` row (SPA-54), its delete belongs on the line below.
-    const meta = input.mime === null ? {} : { mime: input.mime }
-    yield* io(() => storage().put(sha, createReadStream(path), meta))
-  }
-
+  // The document row is still born on a stored blob — §3.4's dedupe is about
+  // a *target*, and it is birth's rule to apply, not ours.
   return yield* birthDocumentProgram({
     blobSha: sha,
     filename: input.filename,
@@ -227,6 +273,42 @@ const storeAndBirth = Effect.fn('documentIntake.storeAndBirth')(function* (
     fileAgainst: input.fileAgainst,
     actor: input.actor,
   })
+})
+
+export type PutBlobInput = {
+  /** The bytes, still unread. Consumed exactly once. */
+  stream: Readable
+  mime: string | null
+  /** Who is storing them; null for a lane that acts as an integration. */
+  preparedBy: string | null
+}
+
+/**
+ * **Bytes to a blob and nothing else** (SPA-164) — the lane for a payload
+ * that must never become a document: a spreadsheet staged for import is a
+ * portfolio ledger, and a `document` row would queue extraction, chunks and
+ * embeddings, which is exactly what must not happen to it. Same drain, same
+ * meter, same digest as intake; it stops at the store.
+ *
+ * A new blob gets its `pending_blob` intent row, so the caller clears it when
+ * the row that names these bytes is written (`import_batch` names them;
+ * `blobIsReferenced` counts it). Returns the digest, the metered size, and
+ * whether this call stored the bytes or found them already held.
+ */
+export const putBlobProgram = Effect.fn('putBlobProgram')(function* (
+  input: PutBlobInput,
+): Effect.fn.Return<
+  { sha: string; sizeBytes: number; stored: boolean },
+  DocumentTooLarge | DocumentIntakeFailed
+> {
+  return yield* Effect.acquireUseRelease(
+    makeTempDir,
+    (dir) =>
+      storeBlob(dir, input.stream, input.mime, {
+        preparedBy: input.preparedBy,
+      }),
+    (dir) => removeTempDir(dir),
+  )
 })
 
 /**

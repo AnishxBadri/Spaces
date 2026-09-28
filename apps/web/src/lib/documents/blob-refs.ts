@@ -1,10 +1,11 @@
 import { count, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { document, extractionCache } from '@spaces/db/schema'
+import { document, extractionCache, importBatch } from '@spaces/db/schema'
 import { storage } from '#/lib/storage'
 
 /**
- * **Is any document row still on this digest?** — the one question both
+ * **Is any row still on this digest?** A document, or since SPA-164 a
+ * staged import batch — the one question both
  * directions of blob GC ask, asked in one place (SPA-54).
  *
  * Content addressing means one file backs several rows: the deck emailed to
@@ -33,7 +34,17 @@ export async function blobIsReferenced(sha: string): Promise<boolean> {
       .from(document)
       .where(eq(document.blobSha, sha))
   ).at(0)
-  return (row?.value ?? 0) > 0
+  if ((row?.value ?? 0) > 0) return true
+  // A staged import names its spreadsheet by digest and has no document row
+  // (SPA-164): the same file filed as a document and then deleted must not
+  // take the batch's bytes with it.
+  const staged = (
+    await db
+      .select({ value: count() })
+      .from(importBatch)
+      .where(eq(importBatch.blobSha, sha))
+  ).at(0)
+  return (staged?.value ?? 0) > 0
 }
 
 /**
