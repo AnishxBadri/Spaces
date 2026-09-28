@@ -151,6 +151,8 @@ function claimOf(t: ColumnTarget): string | null {
       return `attribute:${t.attributeId}`
     case 'identity':
       return `identity:${t.key}`
+    case 'ledger':
+      return `ledger:${t.field}`
     case 'ignore':
     case 'new':
       return null
@@ -322,7 +324,9 @@ export function specFor(
   registry: MappingRegistry,
 ): ColumnSpec | null {
   switch (target.target) {
+    // A ledger column is read by `./ledger`, field by field — not as an attribute.
     case 'ignore':
+    case 'ledger':
       return null
     case 'name':
       return { kind: 'typed', type: 'text', options: {} }

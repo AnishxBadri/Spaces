@@ -22,9 +22,12 @@ import {
   PreviewLedger,
   PreviewStrip,
 } from '#/components/import/preview-ledger'
+import { LedgerMappingStep } from '#/components/import/ledger-mapping'
+import { LedgerPreviewStep } from '#/components/import/ledger-preview'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   beginImportMapping,
+  beginLedgerMapping,
   createImportAttribute,
   decideImportCollision,
   defineImportBatch,
@@ -32,6 +35,7 @@ import {
   getImportBatch,
   getImportMapping,
   getImportPreview,
+  getLedgerImport,
   listObjects,
   mapImportColumn,
   planImport,
@@ -69,15 +73,16 @@ export const Route = createFileRoute('/_app/import_/$batchId')({
   validateSearch: importSearch,
   loaderDeps: ({ search }) => ({ show: search.show }),
   loader: async ({ params, deps }) => {
-    const [batch, objects, mapping, preview] = await Promise.all([
+    const [batch, objects, mapping, preview, ledger] = await Promise.all([
       getImportBatch({ data: { batchId: params.batchId } }),
       listObjects(),
       getImportMapping({ data: { batchId: params.batchId } }),
       getImportPreview({
         data: { batchId: params.batchId, filter: deps.show },
       }),
+      getLedgerImport({ data: { batchId: params.batchId } }),
     ])
-    return { batch, objects, mapping, preview }
+    return { batch, objects, mapping, preview, ledger }
   },
   component: ImportBatchPage,
 })
@@ -88,7 +93,7 @@ function extensionOf(filename: string): string {
 }
 
 function ImportBatchPage() {
-  const { batch, objects, mapping, preview } = Route.useLoaderData()
+  const { batch, objects, mapping, preview, ledger } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const { confirm, confirmDialog } = useConfirm()
@@ -191,14 +196,16 @@ function ImportBatchPage() {
   const canContinue =
     staged &&
     !busy &&
-    (step === 1 || (batch.mode === 'records' && batch.targetObjectId !== null))
+    (step === 1 || batch.mode === 'ledger' || batch.targetObjectId !== null)
 
   function onContinue() {
     if (step === 0) {
       setContinuing(true)
-      void write(() =>
-        beginImportMapping({ data: { batchId: batch.id } }),
-      ).finally(() => setContinuing(false))
+      const begin =
+        batch.mode === 'ledger' ? beginLedgerMapping : beginImportMapping
+      void write(() => begin({ data: { batchId: batch.id } })).finally(() =>
+        setContinuing(false),
+      )
       return
     }
     if (!mapping) return
@@ -268,6 +275,30 @@ function ImportBatchPage() {
       ? `${mappedCount} of ${mapping.mapping.length} mapped`
       : null
 
+  // Ledger mode (SPA-170): steps 2 and 3 are the ledger's own components.
+  if (batch.mode === 'ledger' && ledger?.preview)
+    return (
+      <LedgerPreviewStep
+        batch={batch}
+        view={ledger.preview}
+        uploadHint={uploadHint}
+      />
+    )
+  if (batch.mode === 'ledger' && ledger?.mapping)
+    return (
+      <>
+        <LedgerMappingStep
+          batch={batch}
+          view={ledger.mapping}
+          objects={objects}
+          uploadHint={uploadHint}
+          discarding={discarding}
+          onDiscard={() => void discard()}
+        />
+        {confirmDialog}
+      </>
+    )
+
   if (preview) {
     return (
       <div className="flex h-full flex-col">
@@ -311,7 +342,12 @@ function ImportBatchPage() {
         {...(staged ? { onDiscard: () => void discard() } : {})}
         {...(canContinue ? { onContinue } : {})}
       />
-      <StepStrip step={step} uploadHint={uploadHint} mapHint={mapHint} />
+      <StepStrip
+        step={step}
+        uploadHint={uploadHint}
+        mapHint={mapHint}
+        mode={batch.mode}
+      />
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-8 py-6">
         {batch.previous ? (
           <PreviousImportNotice previous={batch.previous} />

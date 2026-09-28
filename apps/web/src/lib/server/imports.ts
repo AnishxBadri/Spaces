@@ -5,6 +5,7 @@ import {
   isCoreIdentityKey,
   isNewAttributeType,
 } from '@spaces/core/import/mapping'
+import { isLedgerField } from '@spaces/core/import/ledger'
 import { requireUser } from './shared'
 import type { ColumnTarget } from '@spaces/core/import/mapping'
 
@@ -171,6 +172,11 @@ const columnTargetInput = z.discriminatedUnion('target', [
     options: z.array(z.string().trim().min(1).max(60)).max(50).optional(),
     dateOrder: dateOrder.optional(),
   }),
+  /** SPA-170: accepted so the type is whole; a records batch refuses it. */
+  z.object({
+    target: z.literal('ledger'),
+    field: z.string().refine(isLedgerField, 'Not an event field'),
+  }),
 ])
 
 /** The parsed input as the stored shape — optional keys omitted, never `undefined`. */
@@ -189,6 +195,9 @@ function toColumnTarget(t: z.infer<typeof columnTargetInput>): ColumnTarget {
     case 'identity':
       if (!isCoreIdentityKey(t.key)) throw new Error('Not an identity key')
       return { target: 'identity', key: t.key }
+    case 'ledger':
+      if (!isLedgerField(t.field)) throw new Error('Not an event field')
+      return { target: 'ledger', field: t.field }
     case 'new': {
       if (!isNewAttributeType(t.type))
         throw new Error('Not a type a cell can hold')
@@ -371,5 +380,148 @@ export const reopenImportMapping = createServerFn({ method: 'POST' })
       await effectFn(reopenImportMappingProgram)(data.batchId)
     } catch (failure) {
       throw new Error(planMessage(failure))
+    }
+  })
+
+// ---------------------------------------------------------------------------
+// Ledger mode (SPA-170, import-8) — the mapping onto event fields and its
+// preview. Every program is `#/lib/import/ledger`'s, reached dynamically.
+// ---------------------------------------------------------------------------
+
+const INSTRUMENT_VALUES = [
+  'priced',
+  'safe_post_money',
+  'safe_pre_money',
+  'ccd',
+] as const
+
+const ledgerDecisionInput = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('instrument'),
+    value: z.string().max(200),
+    resolution: z.enum([...INSTRUMENT_VALUES, 'per_row']).nullable(),
+  }),
+  z.object({
+    kind: z.literal('marksAsOf'),
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable(),
+  }),
+  z.object({
+    kind: z.literal('currency'),
+    code: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .nullable(),
+  }),
+  z.object({ kind: z.literal('dateOrder'), order: dateOrder }),
+  z.object({ kind: z.literal('createMissing'), on: z.boolean() }),
+])
+
+/** Steps 2 and 3 of a ledger batch; null for a records batch. */
+export const getLedgerImport = createServerFn()
+  .validator(batchInput)
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { loadLedgerImportProgram, ledgerMessage } =
+      await import('../import/ledger')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(loadLedgerImportProgram)(data.batchId)
+    } catch (failure) {
+      throw new Error(ledgerMessage(failure))
+    }
+  })
+
+/** Continue from step 1 of a ledger batch: the first guess, written. */
+export const beginLedgerMapping = createServerFn({ method: 'POST' })
+  .validator(batchInput)
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { beginLedgerMappingProgram, ledgerMessage } =
+      await import('../import/ledger')
+    const { effectFn } = await import('./effect')
+    try {
+      await effectFn(beginLedgerMappingProgram)(data.batchId)
+    } catch (failure) {
+      throw new Error(ledgerMessage(failure))
+    }
+  })
+
+/** One event field onto a sheet column (or off it); answers what it replaced. */
+export const mapLedgerField = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      batchId: uuid,
+      field: z.string().refine(isLedgerField, 'Not an event field'),
+      column: z.number().int().min(0).max(1000).nullable(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    if (!isLedgerField(data.field)) throw new Error('Not an event field')
+    const { mapLedgerFieldProgram, ledgerMessage } =
+      await import('../import/ledger')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(mapLedgerFieldProgram)({
+        batchId: data.batchId,
+        field: data.field,
+        column: data.column,
+      })
+    } catch (failure) {
+      throw new Error(ledgerMessage(failure))
+    }
+  })
+
+/** One decision from the decisions panel, stored on the mapping. */
+export const setLedgerDecision = createServerFn({ method: 'POST' })
+  .validator(z.object({ batchId: uuid, decision: ledgerDecisionInput }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { setLedgerDecisionProgram, ledgerMessage } =
+      await import('../import/ledger')
+    const { effectFn } = await import('./effect')
+    try {
+      await effectFn(setLedgerDecisionProgram)(data)
+    } catch (failure) {
+      throw new Error(ledgerMessage(failure))
+    }
+  })
+
+/** Continue from step 2 of a ledger batch: every row planned and stored. */
+export const planLedgerImport = createServerFn({ method: 'POST' })
+  .validator(batchInput)
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { planLedgerImportProgram, ledgerMessage } =
+      await import('../import/ledger')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(planLedgerImportProgram)(data.batchId)
+    } catch (failure) {
+      throw new Error(ledgerMessage(failure))
+    }
+  })
+
+/** A `per_row` instrument, chosen for one row from the preview. */
+export const decideLedgerRow = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      batchId: uuid,
+      rowNum: z.number().int().min(1),
+      instrument: z.enum(INSTRUMENT_VALUES),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { decideLedgerRowProgram, ledgerMessage } =
+      await import('../import/ledger')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(decideLedgerRowProgram)(data)
+    } catch (failure) {
+      throw new Error(ledgerMessage(failure))
     }
   })

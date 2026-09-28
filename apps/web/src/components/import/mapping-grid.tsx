@@ -105,6 +105,9 @@ export function targetLabel(
       return { name: IDENTITY_KEY_LABELS[target.key], type: 'identity' }
     case 'new':
       return { name: '+ New', type: typeWord(target.type) }
+    // Never on a records batch; the ledger step draws its own targets.
+    case 'ledger':
+      return { name: 'Event field', type: target.field }
     case 'attribute': {
       const attr = view.attributes.find((a) => a.id === target.attributeId)
       return attr

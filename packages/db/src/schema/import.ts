@@ -17,6 +17,7 @@ import { entity } from './entities'
 import { objectDef } from './objects'
 import type { CoreIdentityKey } from './entities'
 import type { attributeType } from './attributes'
+import type { distributionKind, instrument, markBasis } from './portfolio'
 
 /**
  * **Staged import** (SPA-164, import-2; CONTEXT.md phase 15 item 9 — one
@@ -94,8 +95,79 @@ export type ColumnTarget =
       options?: Array<string>
       dateOrder?: ImportDateOrder
     }
+  | LedgerTarget
 
 export type Mapping = Array<ColumnTarget>
+
+// ---------------------------------------------------------------------------
+// Ledger mode (SPA-170, import-8)
+// ---------------------------------------------------------------------------
+
+export type LedgerInstrument = (typeof instrument.enumValues)[number]
+export type LedgerMarkBasis = (typeof markBasis.enumValues)[number]
+export type LedgerDistributionKind =
+  (typeof distributionKind.enumValues)[number]
+
+/**
+ * The event fields a ledger column maps onto — not attributes: the company
+ * (matched through the reference matcher), our cheque, the round it was
+ * part of, a current mark, and proceeds.
+ */
+export type LedgerField =
+  | 'company'
+  | 'date'
+  | 'amount'
+  | 'currency'
+  | 'instrument'
+  | 'cap'
+  | 'discount'
+  | 'shares'
+  | 'vehicle'
+  | 'roundKind'
+  | 'roundDate'
+  | 'raised'
+  | 'preMoney'
+  | 'postMoney'
+  | 'pricePerShare'
+  | 'sharesOutstanding'
+  | 'markValue'
+  | 'markDate'
+  | 'markBasis'
+  | 'distributionAmount'
+  | 'distributionDate'
+  | 'distributionKind'
+
+/**
+ * An instrument cell's resolution: one of the enum, or `per_row` — each row
+ * carrying the value is decided on its own (`instrumentByRow`).
+ */
+export type LedgerInstrumentResolution = LedgerInstrument | 'per_row'
+
+/**
+ * A ledger column's target. The decisions the plan needs ride on the column
+ * they are about, as `dateOrder` does in records mode, so planning the batch
+ * twice reads the same stored answer and a column moved elsewhere starts its
+ * decisions over (its values are other values):
+ *
+ * - `dateOrder` — on every date field.
+ * - `createMissing` — on `company`: a company the matcher does not find is
+ *   planned as a create.
+ * - `instrumentMap` — on `instrument`: source value (its `instrumentKey`) →
+ *   resolution. `instrumentByRow` — row number → instrument, for the values
+ *   resolved `per_row`.
+ * - `currency` — on `amount`: the currency of a row that names none.
+ * - `marksAsOf` — on `markValue`: the date of a mark whose row has none.
+ */
+export type LedgerTarget = {
+  target: 'ledger'
+  field: LedgerField
+  dateOrder?: ImportDateOrder
+  createMissing?: true
+  instrumentMap?: Record<string, LedgerInstrumentResolution>
+  instrumentByRow?: Record<string, LedgerInstrument>
+  currency?: string
+  marksAsOf?: string
+}
 
 /**
  * The payload of `import_row.plan` (SPA-167, import-5): what the preview step
@@ -181,7 +253,7 @@ export type ImportAlsoCreate = {
   plan: RowPlan
 }
 
-export type RowPlan = {
+export type RecordRowPlan = {
   verdict: ImportVerdict
   creator: ImportCreator
   /** The name cell, trimmed; null when blank. */
@@ -205,6 +277,80 @@ export type RowPlan = {
   /** Records of referenced objects this row creates first (SPA-168). */
   alsoCreates?: Array<ImportAlsoCreate>
 }
+
+/** A planned financing round (`round` columns); money as numbers until the write. */
+export type LedgerRoundEvent = {
+  date: string
+  kind: string
+  raised: number | null
+  currency: string | null
+  preMoney: number | null
+  postMoney: number | null
+  pricePerShare: number | null
+  sharesOutstanding: number | null
+}
+
+/** Our cheque (`investment` columns). `roundRow` names the row whose round it joins. */
+export type LedgerInvestmentEvent = {
+  date: string
+  amount: number
+  currency: string
+  instrument: LedgerInstrument
+  shares: number | null
+  cap: number | null
+  discount: number | null
+  vehicle: string | null
+  roundRow: number | null
+}
+
+export type LedgerMarkEvent = {
+  date: string
+  fairValue: number
+  currency: string
+  basis: LedgerMarkBasis
+}
+
+export type LedgerDistributionEvent = {
+  date: string
+  amount: number
+  currency: string
+  kind: LedgerDistributionKind
+}
+
+/** One row's dated events — never a balance. */
+export type LedgerEvents = {
+  round?: LedgerRoundEvent
+  investment: LedgerInvestmentEvent
+  mark?: LedgerMarkEvent
+  distribution?: LedgerDistributionEvent
+}
+
+/** A decision the operator has not made that stops a row. */
+export type LedgerNeed = 'instrument' | 'marksAsOf' | 'currency' | 'dateOrder'
+
+export type LedgerPlan = {
+  /** The company across the batch: `entity:<id>` or a create's key. */
+  company: string | null
+  /** This row births the company's holding — one row per company, at most. */
+  birthsHolding: boolean
+  /** Null when the row does not land. */
+  events: LedgerEvents | null
+  /** Decisions whose absence stops the row. */
+  needs: Array<LedgerNeed>
+}
+
+/**
+ * A ledger row's plan (SPA-170): the records plan's frame — the verdict says
+ * what happened to the company (`attach` found, `create` planned, `no-land`
+ * errors), `references` names it, `alsoCreates` carries its create — plus
+ * the row's dated events.
+ */
+export type LedgerRowPlan = RecordRowPlan & {
+  kind: 'ledger'
+  ledger: LedgerPlan
+}
+
+export type RowPlan = RecordRowPlan | LedgerRowPlan
 
 export const importBatch = pgTable(
   'import_batch',

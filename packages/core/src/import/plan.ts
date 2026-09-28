@@ -128,7 +128,8 @@ export function readRow(
   }
   mapping.forEach((target, column) => {
     const spec = specFor(target, registry)
-    if (spec === null || target.target === 'new') return
+    if (spec === null || target.target === 'new' || target.target === 'ledger')
+      return
     const raw = cells.at(column) ?? ''
     if (
       spec.kind === 'typed' &&

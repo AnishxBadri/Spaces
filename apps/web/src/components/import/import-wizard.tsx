@@ -101,11 +101,14 @@ export function StepStrip({
   uploadHint,
   step = 0,
   mapHint = null,
+  mode = 'records',
 }: {
   uploadHint: string | null
   step?: 0 | 1 | 2
   /** Step 2's readout once its mapping would advance — `7 of 11 mapped`. */
   mapHint?: string | null
+  /** A ledger batch maps to event fields (SPA-170). */
+  mode?: ImportMode
 }) {
   return (
     <nav
@@ -136,7 +139,9 @@ export function StepStrip({
               />
             ) : null}
             <span className="tabular mono text-label">{i + 1}</span>
-            <span className="truncate">{label}</span>
+            <span className="truncate">
+              {i === 1 && mode === 'ledger' ? 'Map to events' : label}
+            </span>
             {done ? (
               <span className="truncate mono text-micro font-normal text-graphite">
                 {hint}

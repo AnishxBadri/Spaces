@@ -237,6 +237,8 @@ function offered(
       return isNewAttributeType(target.type)
         ? null
         : 'A column cannot hold that type'
+    case 'ledger':
+      return 'An event field belongs to a ledger import'
   }
 }
 
