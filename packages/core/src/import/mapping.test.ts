@@ -126,10 +126,12 @@ describe('identity keys come from one helper', () => {
 })
 
 describe('what a column may map onto', () => {
-  it('offers live attributes a cell can carry, never a reference or an archived one', () => {
+  it('offers live attributes, references included since SPA-168, never an archived one', () => {
     expect(mappableAttributes(deals).map((a) => a.slug)).toEqual([
       'stage',
       'value',
+      'company',
+      'owner',
       'close_date',
     ])
   })
@@ -159,13 +161,21 @@ describe('autoMap', () => {
 
   it('matches a slug, then a name, then an alias, and ignores the rest', () => {
     expect(
-      autoMap(['Company', 'Round', 'close_date', 'Value', 'Notes', ''], deals),
+      autoMap(['Deal', 'Round', 'close_date', 'Value', 'Notes', ''], deals),
     ).toEqual([
-      { target: 'name' },
+      { target: 'ignore' },
       { target: 'attribute', attributeId: 'a-stage' },
       { target: 'attribute', attributeId: 'a-close' },
       { target: 'attribute', attributeId: 'a-value' },
       { target: 'ignore' },
+      { target: 'ignore' },
+    ])
+  })
+
+  it("on a deal, Company and Owner find the references before Company's name alias", () => {
+    expect(autoMap(['Company', 'Owner', 'Deal name'], deals)).toEqual([
+      { target: 'attribute', attributeId: 'a-company' },
+      { target: 'attribute', attributeId: 'a-owner' },
       { target: 'ignore' },
     ])
   })
@@ -271,7 +281,7 @@ describe('validateMapping', () => {
     ])
   })
 
-  it('refuses an archived attribute, a reference, a key the object lacks and an unconfirmed new attribute', () => {
+  it('refuses an archived attribute, a key the object lacks and an unconfirmed new attribute — a reference passes', () => {
     const problems = validateMapping(
       [
         { target: 'name' },
@@ -283,8 +293,8 @@ describe('validateMapping', () => {
       deals,
       null,
     )
-    expect(problems.map((p) => p.column)).toEqual([1, 2, 3, 4])
-    expect(problems[3].reason).toBe(
+    expect(problems.map((p) => p.column)).toEqual([1, 3, 4])
+    expect(problems[2].reason).toBe(
       'E: create the new attribute or skip the column',
     )
   })

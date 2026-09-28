@@ -9,6 +9,7 @@ import {
   columnStatus,
   fitMapping,
   isNewAttributeType,
+  isReferenceType,
   mappableAttributes,
   optionLabelsFrom,
   specFor,
@@ -16,7 +17,13 @@ import {
   unparsedColumns,
   validateMapping,
 } from '@spaces/core/import/mapping'
+import { summarizeReferences } from '@spaces/core/import/references'
 import { createAttributeProgram } from '#/lib/attributes/create'
+import {
+  lookupReferences,
+  referenceColumnsOf,
+  referenceLabelsOf,
+} from './references'
 import {
   ImportFailed,
   ImportNotFound,
@@ -42,6 +49,7 @@ import type {
 } from '@spaces/core/import/mapping'
 import type { ColumnSummary } from '@spaces/core/import/coerce'
 import type { ImportFailure } from './stage'
+import type { ReferenceLabel } from './references'
 
 /**
  * **Column mapping** (SPA-165, import-3) — the wizard's second step. Each
@@ -214,6 +222,11 @@ function offered(
       if (!attr) return 'That attribute is archived or cannot hold a cell'
       if (target.dateOrder !== undefined && attr.type !== 'date')
         return 'A date order belongs to a date column'
+      if (
+        target.createMissing !== undefined &&
+        attr.type !== 'record_reference'
+      )
+        return 'Create missing belongs to a record reference column'
       return null
     }
     case 'identity':
@@ -335,7 +348,10 @@ export const createImportAttributeProgram = Effect.fn(
 export type ColumnRead = {
   values: Array<string>
   spec: ColumnSpec | null
+  /** Null for an ignored column — and for a reference, which is looked up, not read. */
   summary: ColumnSummary | null
+  /** A reference column: its count is `n of m found` (SPA-168). */
+  reference: boolean
 }
 
 /** Each mapped column read over every staged row. */
@@ -347,7 +363,13 @@ export function readColumns(
   return mapping.map((target, i) => {
     const values = rows.map((r) => r.cells.at(i) ?? '')
     const spec = specFor(target, registry)
-    return { values, spec, summary: spec ? summarizeSpec(spec, values) : null }
+    const reference = spec?.kind === 'typed' && isReferenceType(spec.type)
+    return {
+      values,
+      spec,
+      summary: spec && !reference ? summarizeSpec(spec, values) : null,
+      reference,
+    }
   })
 }
 
@@ -376,8 +398,13 @@ export function mappingProblemsOf(
 export const FAILURES_SHOWN = 100
 
 export type ColumnView = {
-  /** Non-blank cells that read, of `total`. Null when the column is ignored. */
+  /**
+   * Non-blank cells that read — or, on a reference column, that found their
+   * record — of `total`. Null when the column is ignored.
+   */
   parsed: number | null
+  /** `found` on a reference column, whose head reads `n of m found`. */
+  unit: 'parse' | 'found'
   total: number
   blanks: number
   status: ColumnStatus | null
@@ -397,6 +424,8 @@ export type ImportMappingView = {
   }
   /** The attributes the picker offers, in registry order. */
   attributes: Array<MappingAttribute>
+  /** Reference attribute id → what it points at (`record → Companies`, `member`). */
+  references: Partial<Record<string, ReferenceLabel>>
   mapping: Mapping
   columns: Array<ColumnView>
   /** What stops the step advancing — empty when it may. */
@@ -439,6 +468,10 @@ export const loadImportMappingProgram = Effect.fn('loadImportMappingProgram')(
     const mapping = fitMapping(batch.mapping, width)
     const registry = object.registry
     const summaries = readColumns(mapping, registry, rows)
+    // The same lookup the preview makes, read-only, so a miss shows here.
+    const refColumns = yield* referenceColumnsOf(mapping, registry)
+    const lookup = yield* lookupReferences(refColumns, rows)
+    const toRow = (row: number) => rows[row].rowNum
     const columns = summaries.map(
       ({ values, spec, summary }, i): ColumnView => {
         const blanks = values.filter((v) => v.trim() === '').length
@@ -446,9 +479,32 @@ export const loadImportMappingProgram = Effect.fn('loadImportMappingProgram')(
           select: optionLabelsFrom('select', values),
           multi: optionLabelsFrom('multi_select', values),
         }
+        const refColumn = refColumns.get(i)
+        if (refColumn) {
+          const found = summarizeReferences(
+            refColumn,
+            values,
+            lookup.get(i) ?? new Map(),
+          )
+          return {
+            parsed: found.found,
+            unit: 'found',
+            total: found.total,
+            blanks,
+            status: found.failures.length > 0 ? 'warn' : 'ok',
+            failureCount: found.failures.length,
+            failures: found.failures.slice(0, FAILURES_SHOWN).map((f) => ({
+              rowNum: toRow(f.row),
+              raw: f.raw,
+              reason: f.reason,
+            })),
+            labels,
+          }
+        }
         if (!spec || !summary)
           return {
             parsed: null,
+            unit: 'parse',
             total: values.length - blanks,
             blanks,
             status: null,
@@ -458,12 +514,13 @@ export const loadImportMappingProgram = Effect.fn('loadImportMappingProgram')(
           }
         return {
           parsed: summary.parsed,
+          unit: 'parse',
           total: summary.total,
           blanks,
           status: columnStatus(mapping[i], spec, summary, blanks),
           failureCount: summary.failures.length,
           failures: summary.failures.slice(0, FAILURES_SHOWN).map((f) => ({
-            rowNum: rows[f.row].rowNum,
+            rowNum: toRow(f.row),
             raw: f.raw,
             reason: f.reason,
           })),
@@ -479,6 +536,7 @@ export const loadImportMappingProgram = Effect.fn('loadImportMappingProgram')(
         identityKeys: [...registry.identityKeys],
       },
       attributes: mappableAttributes(registry),
+      references: yield* referenceLabelsOf(registry),
       mapping,
       columns,
       problems: mappingProblemsOf(mapping, registry, batch.header, summaries),

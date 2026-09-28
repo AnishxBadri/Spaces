@@ -156,6 +156,8 @@ const columnTargetInput = z.discriminatedUnion('target', [
     target: z.literal('attribute'),
     attributeId: uuid,
     dateOrder: dateOrder.optional(),
+    /** SPA-168: a record reference column plans what it does not find. */
+    createMissing: z.literal(true).optional(),
   }),
   z.object({
     target: z.literal('identity'),
@@ -178,13 +180,12 @@ function toColumnTarget(t: z.infer<typeof columnTargetInput>): ColumnTarget {
     case 'ignore':
       return { target: t.target }
     case 'attribute':
-      return t.dateOrder
-        ? {
-            target: 'attribute',
-            attributeId: t.attributeId,
-            dateOrder: t.dateOrder,
-          }
-        : { target: 'attribute', attributeId: t.attributeId }
+      return {
+        target: 'attribute',
+        attributeId: t.attributeId,
+        ...(t.dateOrder ? { dateOrder: t.dateOrder } : {}),
+        ...(t.createMissing ? { createMissing: true } : {}),
+      }
     case 'identity':
       if (!isCoreIdentityKey(t.key)) throw new Error('Not an identity key')
       return { target: 'identity', key: t.key }

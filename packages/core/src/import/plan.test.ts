@@ -2,19 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { CORE_IDENTITY_KEYS } from '../attributes/registry'
 import {
   NEEDS_NAME,
-  REFERENCE_SKIP,
+  alsoCreateWhy,
   applyDecision,
+  assignCreates,
   awaitingDecision,
   countPlans,
   creatorFor,
   landingRows,
   planRows,
   readRow,
+  referenceLands,
   verdictSentence,
   whyOf,
+  withReferences,
 } from './plan'
 import type { Mapping, MappingAttribute, MappingRegistry } from './mapping'
 import type { PlannedRow, Resolved, RowInput } from './plan'
+import type { ReferenceColumn, ReferenceOutcome } from './references'
 
 /**
  * SPA-167. The preview's pure half: reading a row under the mapping, the
@@ -66,7 +70,15 @@ function input(
 ): RowInput {
   return {
     rowNum,
-    read: { name, keys: {}, patch: {}, errors: [], skippedCells: [] },
+    read: {
+      name,
+      keys: {},
+      patch: {},
+      errors: [],
+      skippedCells: [],
+      refs: [],
+      references: [],
+    },
     identity: domain === null ? {} : { domain },
     resolved,
   }
@@ -145,15 +157,16 @@ describe('reading a row', () => {
     expect(out.errors[0].column).toBe(0)
   })
 
-  it('a reference cell is skipped for SPA-168, not an error', () => {
+  it('a reference cell is set aside for its lookup, neither read nor skipped', () => {
     const out = readRow(
       ['Acme', 'acme.com', '', 'anish@fund.example', ''],
       mapping,
       companies,
     )
     expect(out.errors).toEqual([])
-    expect(out.skippedCells).toEqual([
-      { column: 3, raw: 'anish@fund.example', reason: REFERENCE_SKIP },
+    expect(out.skippedCells).toEqual([])
+    expect(out.refs).toEqual([
+      { column: 3, attributeId: 'a-owner', raw: 'anish@fund.example' },
     ])
   })
 })
@@ -281,6 +294,7 @@ describe('refusals and the report', () => {
   it('the title leaves out the zero terms after create and attach', () => {
     const counts = {
       create: 31,
+      referenceCreates: 0,
       attach: 12,
       noLand: 3,
       collide: 0,
@@ -295,5 +309,224 @@ describe('refusals and the report', () => {
     expect(verdictSentence({ ...counts, collide: 2 })).toBe(
       '31 create · 12 attach · 3 will not land · 2 collide.',
     )
+  })
+})
+
+describe('reference cells (SPA-168)', () => {
+  const deals: MappingRegistry = {
+    identityKeys: [],
+    attributes: [
+      attr('a-company', 'company', 'record_reference', {
+        options: { targetKind: 'company', required: true },
+      }),
+      attr('a-lead', 'lead', 'record_reference', {
+        options: { targetKind: 'company' },
+      }),
+      attr('a-owner', 'owner', 'actor_reference'),
+    ],
+  }
+  const target = {
+    objectId: 'o-companies',
+    kind: 'company' as const,
+    singular: 'Company',
+    plural: 'Companies',
+    identityKeys: [...CORE_IDENTITY_KEYS],
+    creator: 'resolveEntity' as const,
+  }
+  const columns = (createMissing: boolean) =>
+    new Map<number, ReferenceColumn>([
+      [
+        1,
+        {
+          type: 'record',
+          column: 1,
+          attributeId: 'a-company',
+          multi: false,
+          required: true,
+          createMissing,
+          target,
+        },
+      ],
+      [
+        2,
+        {
+          type: 'record',
+          column: 2,
+          attributeId: 'a-lead',
+          multi: false,
+          required: false,
+          createMissing,
+          target,
+        },
+      ],
+      [
+        3,
+        { type: 'member', column: 3, attributeId: 'a-owner', required: false },
+      ],
+    ])
+  const dealMapping: Mapping = [
+    { target: 'name' },
+    { target: 'attribute', attributeId: 'a-company' },
+    { target: 'attribute', attributeId: 'a-lead' },
+    { target: 'attribute', attributeId: 'a-owner' },
+  ]
+  const lookup = new Map<number, Map<string, ReferenceOutcome>>([
+    [
+      1,
+      new Map<string, ReferenceOutcome>([
+        ['ohmium', { status: 'found', entityId: 'e-ohm', name: 'Ohmium' }],
+        ['acme', { status: 'ambiguous', names: ['Acme Inc', 'Acme Labs'] }],
+        ['newco', { status: 'missing', identity: null }],
+      ]),
+    ],
+    [
+      2,
+      new Map<string, ReferenceOutcome>([
+        ['acme', { status: 'ambiguous', names: ['Acme Inc', 'Acme Labs'] }],
+        ['ohmium ltd', { status: 'missing', identity: null }],
+        [
+          'newco.io',
+          {
+            status: 'missing',
+            identity: { kind: 'domain', value: 'newco.io' },
+          },
+        ],
+      ]),
+    ],
+    [
+      3,
+      new Map<string, ReferenceOutcome>([
+        [
+          'anish@fund.example',
+          { status: 'member', userId: 'u-1', name: 'Anish' },
+        ],
+        ['anish', { status: 'not-email' }],
+        ['ghost@fund.example', { status: 'missing', identity: null }],
+      ]),
+    ],
+  ])
+  const read = (cells: Array<string>, createMissing = false) =>
+    withReferences(
+      readRow(cells, dealMapping, deals),
+      columns(createMissing),
+      lookup,
+    )
+  const one = (rowNum: number, r: ReturnType<typeof read>): RowInput => ({
+    rowNum,
+    read: r,
+    identity: {},
+    resolved: r.errors.length > 0 ? null : create,
+  })
+
+  it('a hit lands the record id and names it in what lands', () => {
+    const out = read(['Seed', '  Ohmium ', '', 'Anish@Fund.example'])
+    expect(out.patch).toEqual({ 'a-company': 'e-ohm', 'a-owner': 'u-1' })
+    expect(out.errors).toEqual([])
+    const [row] = planRows([one(1, out)], 'dealBirth', 0)
+    expect(referenceLands(row.plan)).toBe('→ Ohmium +1')
+  })
+
+  it('an ambiguous or missing name on an optional reference is a skipped cell naming why', () => {
+    const out = read(['Seed', '', 'Acme', ''])
+    expect(out.errors).toEqual([])
+    expect(out.skippedCells).toEqual([
+      { column: 2, raw: 'Acme', reason: '2 matches: Acme Inc, Acme Labs' },
+    ])
+    const [row] = planRows(
+      [one(1, read(['Seed', '', 'Ohmium Ltd', '']))],
+      'dealBirth',
+      0,
+    )
+    expect(row.plan.verdict).toBe('create')
+    expect(whyOf(row.plan, ['Deal', 'Company', 'Lead', 'Owner'])).toBe(
+      'Lead "Ohmium Ltd" skipped · no such company · deal birth',
+    )
+  })
+
+  it('a required reference that finds nothing stops the row, naming the cell', () => {
+    const out = read(['Seed', 'Acme', '', ''])
+    expect(out.errors).toEqual([
+      {
+        column: 1,
+        raw: 'Acme',
+        reason: '"Acme" · 2 matches: Acme Inc, Acme Labs',
+      },
+    ])
+    const [row] = planRows([one(1, out)], 'dealBirth', 0)
+    expect(row.plan.verdict).toBe('no-land')
+    expect(whyOf(row.plan, ['Deal', 'Company'])).toBe(
+      'B · Company: "Acme" · 2 matches: Acme Inc, Acme Labs',
+    )
+  })
+
+  it('a member is an email: a bare name and an unknown address are skipped', () => {
+    expect(read(['Seed', '', '', 'Anish']).skippedCells).toEqual([
+      { column: 3, raw: 'Anish', reason: "use the member's email" },
+    ])
+    const ghost = read(['Seed', '', '', 'ghost@fund.example'])
+    expect(ghost.patch).toEqual({})
+    expect(ghost.skippedCells[0].reason).toBe('no such member')
+  })
+
+  it('create missing plans one create per missing name, carried by the first landing row', () => {
+    const planned = planRows(
+      [
+        one(1, read(['A', 'NewCo', '', ''], true)),
+        one(2, read(['B', 'newco ', '', ''], true)),
+        one(3, read(['C', 'Ohmium', 'newco.io', ''], true)),
+      ],
+      'dealBirth',
+      0,
+    )
+    expect(planned.map((r) => r.plan.errors)).toEqual([[], [], []])
+    expect(planned[0].plan.alsoCreates).toEqual([
+      {
+        key: 'o-companies|name:newco',
+        column: 1,
+        attributeId: 'a-company',
+        objectId: 'o-companies',
+        plan: {
+          verdict: 'create',
+          creator: 'resolveEntity',
+          name: 'NewCo',
+          patch: {},
+          identity: {},
+          errors: [],
+          skippedCells: [],
+        },
+      },
+    ])
+    expect(planned[1].plan.alsoCreates).toBeUndefined()
+    // A domain-shaped miss is born on its key, with no name.
+    expect(planned[2].plan.alsoCreates?.[0].plan).toMatchObject({
+      name: null,
+      identity: { domain: 'newco.io' },
+    })
+    const byKey = planned[2].plan.alsoCreates?.at(0)
+    if (!byKey) throw new Error('row 3 carries no create')
+    expect(alsoCreateWhy(3, byKey, null)).toBe(
+      "new domain newco.io · from row 3's C column",
+    )
+    const counts = countPlans(planned.map((r) => r.plan))
+    expect(counts).toMatchObject({ create: 5, referenceCreates: 2 })
+    expect(verdictSentence(counts)).toBe('5 create · 0 attach.')
+  })
+
+  it('a skipped carrier hands its create to the next row that names it', () => {
+    const planned = planRows(
+      [
+        one(1, read(['A', 'NewCo', '', ''], true)),
+        one(2, read(['B', 'NewCo', '', ''], true)),
+      ],
+      'dealBirth',
+      0,
+    )
+    expect(planned[0].plan.alsoCreates).toHaveLength(1)
+    const skipped = assignCreates([
+      { rowNum: 1, plan: { ...planned[0].plan, verdict: 'skip' } },
+      planned[1],
+    ])
+    expect(skipped[0].plan.alsoCreates).toBeUndefined()
+    expect(skipped[1].plan.alsoCreates?.[0].key).toBe('o-companies|name:newco')
   })
 })

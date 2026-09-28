@@ -307,16 +307,20 @@ describe('one column, one target', () => {
     const deals = await objectId('deals')
     const batchId = await batchOf(['Company'], [['Acme']], deals)
     await Effect.runPromise(beginImportMappingProgram(batchId))
-    const company = await attributeId(deals, 'company')
+    const value = await attributeId(deals, 'value')
     expect(
       await refusalOf(
         mapImportColumnProgram({
           batchId,
           column: 0,
-          target: { target: 'attribute', attributeId: company },
+          target: {
+            target: 'attribute',
+            attributeId: value,
+            createMissing: true,
+          },
         }),
       ),
-    ).toBe('That attribute is archived or cannot hold a cell')
+    ).toBe('Create missing belongs to a record reference column')
     expect(
       await refusalOf(
         mapImportColumnProgram({

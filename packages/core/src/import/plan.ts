@@ -6,13 +6,21 @@ import {
   readCell,
   specFor,
 } from './mapping'
+import { resolveReferenceCells } from './references'
 import type { CoreIdentityKey, ObjectKind } from '../attributes/registry'
 import type { MappingRegistry } from './mapping'
 import type {
+  ReferenceCell,
+  ReferenceColumn,
+  ReferenceLookup,
+} from './references'
+import type {
   CollisionDecision,
+  ImportAlsoCreate,
   ImportCellIssue,
   ImportCellValue,
   ImportCreator,
+  ImportReference,
   ImportVerdict,
   Mapping,
   RowPlan,
@@ -32,9 +40,11 @@ import type {
  */
 export type {
   CollisionDecision,
+  ImportAlsoCreate,
   ImportCellIssue,
   ImportCellValue,
   ImportCreator,
+  ImportReference,
   ImportVerdict,
   RowPlan,
 }
@@ -68,9 +78,6 @@ export const CREATOR_LABELS: Record<ImportCreator, string> = {
  */
 export const NEEDS_NAME = 'Every record needs a name'
 
-/** The reason a reference cell is left out until SPA-168 matches it. */
-export const REFERENCE_SKIP = 'reference · SPA-168'
-
 // ---------------------------------------------------------------------------
 // One row
 // ---------------------------------------------------------------------------
@@ -81,10 +88,17 @@ export type ReadRow = {
   /** Identity key → the cell as read (not yet normalised). */
   keys: Partial<Record<CoreIdentityKey, string>>
   patch: Record<string, ImportCellValue>
-  /** A name cell that did not read — the only cell error that stops a row. */
+  /**
+   * The cells that stop a row: a name cell that did not read, and a required
+   * reference that found nothing (SPA-168).
+   */
   errors: Array<ImportCellIssue>
   /** Every other cell that did not read, with its reason; the row lands without it. */
   skippedCells: Array<ImportCellIssue>
+  /** Non-blank reference cells, waiting on their lookup (`withReferences`). */
+  refs: Array<ReferenceCell>
+  /** Reference cells the lookup settled. */
+  references: Array<ImportReference>
 }
 
 /**
@@ -93,9 +107,10 @@ export type ReadRow = {
  * never a row** (SPA-166's contract): a cell that does not read is a
  * skipped cell with its reason, and the row still lands with that value
  * left blank — an identity cell included, in which case the row matches on
- * the keys that remain, or creates. A reference cell is skipped the same
- * way until SPA-168 resolves it. The one cell the row cannot exist without
- * is its name: a name cell that does not read is the row's error.
+ * the keys that remain, or creates. A reference cell is not read here but
+ * set aside in `refs`: it names a record, and finding it is a lookup
+ * (`withReferences`). The one cell the row cannot exist without is its name:
+ * a name cell that does not read is the row's error.
  */
 export function readRow(
   cells: ReadonlyArray<string>,
@@ -108,6 +123,8 @@ export function readRow(
     patch: {},
     errors: [],
     skippedCells: [],
+    refs: [],
+    references: [],
   }
   mapping.forEach((target, column) => {
     const spec = specFor(target, registry)
@@ -117,8 +134,8 @@ export function readRow(
       spec.kind === 'typed' &&
       (spec.type === 'record_reference' || spec.type === 'actor_reference')
     ) {
-      if (raw.trim() !== '')
-        out.skippedCells.push({ column, raw, reason: REFERENCE_SKIP })
+      if (target.target === 'attribute' && raw.trim() !== '')
+        out.refs.push({ column, attributeId: target.attributeId, raw })
       return
     }
     const cell = readCell(spec, raw)
@@ -150,6 +167,30 @@ export function readRow(
     }
   })
   return out
+}
+
+/**
+ * A read row with its reference cells looked up (SPA-168): hits join the
+ * patch, misses become skipped cells — or the row's errors, for a required
+ * reference — and a create-missing miss plans a create.
+ */
+export function withReferences(
+  read: ReadRow,
+  columns: ReadonlyMap<number, ReferenceColumn>,
+  lookup: ReferenceLookup,
+): ReadRow {
+  if (read.refs.length === 0) return read
+  const out = resolveReferenceCells(read.refs, columns, lookup)
+  return {
+    ...read,
+    patch: { ...read.patch, ...out.patch },
+    errors: [...read.errors, ...out.errors],
+    skippedCells: [...read.skippedCells, ...out.skippedCells].sort(
+      (a, b) => a.column - b.column,
+    ),
+    refs: [],
+    references: [...read.references, ...out.references],
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -202,6 +243,9 @@ export function planRows(
       identity: row.identity,
       errors: [],
       skippedCells: row.read.skippedCells,
+      ...(row.read.references.length > 0
+        ? { references: row.read.references }
+        : {}),
     }
     if (row.read.errors.length > 0 || row.resolved === null)
       return {
@@ -234,7 +278,92 @@ export function planRows(
     }
   })
   for (const group of identityGroups(planned)) markGroup(group)
-  return planned
+  return assignCreates(planned)
+}
+
+// ---------------------------------------------------------------------------
+// Secondary creates
+// ---------------------------------------------------------------------------
+
+/** 0: lands now; 1: waits on a decision; null: never carries a create. */
+function carryRank(verdict: ImportVerdict): number | null {
+  if (LANDS.has(verdict)) return 0
+  if (verdict === 'collide') return 1
+  return null
+}
+
+/** The plan of the record a create-missing reference makes. */
+function secondaryPlan(
+  ref: Extract<ImportReference, { to: 'create' }>,
+): RowPlan {
+  return {
+    verdict: 'create',
+    creator: ref.creator,
+    name: ref.createName,
+    patch: {},
+    identity: ref.identity,
+    errors: [],
+    skippedCells: [],
+  }
+}
+
+/**
+ * Which row carries each secondary create (SPA-168). Every create-missing
+ * reference names its create by `key`; the first row naming it that lands
+ * (else the first still waiting on a decision) carries it on `alsoCreates`,
+ * so two rows naming one missing company plan one create, and the commit
+ * makes it before either reference. Recomputed whole from the references
+ * every time — after a decision too, so a carrier that is skipped hands its
+ * creates to the next row that needs them rather than stranding them.
+ */
+export function assignCreates(
+  rows: ReadonlyArray<PlannedRow>,
+): Array<PlannedRow> {
+  const carrier = new Map<
+    string,
+    { rank: number; rowNum: number; entry: ImportAlsoCreate }
+  >()
+  for (const row of rows) {
+    const rank = carryRank(row.plan.verdict)
+    if (rank === null) continue
+    for (const ref of row.plan.references ?? []) {
+      if (ref.to !== 'create') continue
+      const held = carrier.get(ref.key)
+      if (
+        held &&
+        (held.rank < rank || (held.rank === rank && held.rowNum < row.rowNum))
+      )
+        continue
+      carrier.set(ref.key, {
+        rank,
+        rowNum: row.rowNum,
+        entry: {
+          key: ref.key,
+          column: ref.column,
+          attributeId: ref.attributeId,
+          objectId: ref.objectId,
+          plan: secondaryPlan(ref),
+        },
+      })
+    }
+  }
+  const byRow = new Map<number, Array<ImportAlsoCreate>>()
+  for (const c of carrier.values())
+    byRow.set(c.rowNum, [...(byRow.get(c.rowNum) ?? []), c.entry])
+  return rows.map((row) => {
+    const rest = withoutCreates(row.plan)
+    const carried = byRow.get(row.rowNum)
+    if (!carried) return { rowNum: row.rowNum, plan: rest }
+    carried.sort((a, b) => a.column - b.column || a.key.localeCompare(b.key))
+    return { rowNum: row.rowNum, plan: { ...rest, alsoCreates: carried } }
+  })
+}
+
+/** The plan with `alsoCreates` taken off — absent, never `undefined`. */
+function withoutCreates(plan: RowPlan): RowPlan {
+  const out: RowPlan = { ...plan }
+  delete out.alsoCreates
+  return out
 }
 
 /**
@@ -333,6 +462,8 @@ function unmerged(plan: RowPlan): RowPlan {
   if (plan.matchedOn !== undefined) out.matchedOn = plan.matchedOn
   if (plan.collidesWith !== undefined) out.collidesWith = plan.collidesWith
   if (plan.decision !== undefined) out.decision = plan.decision
+  if (plan.references !== undefined) out.references = plan.references
+  if (plan.alsoCreates !== undefined) out.alsoCreates = plan.alsoCreates
   return out
 }
 
@@ -387,7 +518,10 @@ export function applyDecision(
 // ---------------------------------------------------------------------------
 
 export type PlanCounts = {
+  /** Records created: landing rows that create, plus their secondary creates. */
   create: number
+  /** Of `create`, the records a create-missing reference makes (SPA-168). */
+  referenceCreates: number
   attach: number
   noLand: number
   collide: number
@@ -403,6 +537,8 @@ export type VerdictTally = {
   verdict: ImportVerdict
   rows: number
   skippedCells: number
+  /** Secondary creates the rows carry. */
+  alsoCreates: number
 }
 
 const LANDS: ReadonlySet<ImportVerdict> = new Set([
@@ -414,6 +550,7 @@ const LANDS: ReadonlySet<ImportVerdict> = new Set([
 export function countsFrom(tallies: ReadonlyArray<VerdictTally>): PlanCounts {
   const counts: PlanCounts = {
     create: 0,
+    referenceCreates: 0,
     attach: 0,
     noLand: 0,
     collide: 0,
@@ -424,7 +561,11 @@ export function countsFrom(tallies: ReadonlyArray<VerdictTally>): PlanCounts {
   }
   for (const t of tallies) {
     counts.total += t.rows
-    if (LANDS.has(t.verdict)) counts.cellsSkipped += t.skippedCells
+    if (LANDS.has(t.verdict)) {
+      counts.cellsSkipped += t.skippedCells
+      counts.create += t.alsoCreates
+      counts.referenceCreates += t.alsoCreates
+    }
     switch (t.verdict) {
       case 'create':
         counts.create += t.rows
@@ -455,6 +596,7 @@ export function countPlans(plans: ReadonlyArray<RowPlan>): PlanCounts {
       verdict: p.verdict,
       rows: 1,
       skippedCells: p.skippedCells.length,
+      alsoCreates: p.alsoCreates?.length ?? 0,
     })),
   )
 }
@@ -554,4 +696,28 @@ export function whyOf(
     case 'skip':
       return `${firstKey(plan.identity) ?? 'same key'} · skipped`
   }
+}
+
+/**
+ * A secondary create's why lane: `new · from row 12's Company column`, with
+ * the key it is born on when the cell read as one.
+ */
+export function alsoCreateWhy(
+  carrierRow: number,
+  entry: ImportAlsoCreate,
+  headers: ReadonlyArray<string> | null,
+): string {
+  const key = firstKey(entry.plan.identity)
+  return `${key ? `new ${key}` : 'new'} · from row ${carrierRow}'s ${headerOf(entry.column, headers)} column`
+}
+
+/**
+ * What a row's references land on, for the what-lands lane: `→ Ohmium`,
+ * with a count when there are more. Empty when the row has none.
+ */
+export function referenceLands(plan: RowPlan): string {
+  const refs = plan.references ?? []
+  const first = refs.at(0)
+  if (!first) return ''
+  return `→ ${first.name}${refs.length > 1 ? ` +${refs.length - 1}` : ''}`
 }

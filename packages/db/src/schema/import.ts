@@ -65,6 +65,8 @@ export type ImportBatchStatus = (typeof importBatchStatus.enumValues)[number]
  * - `name` — the record's name (exactly one column).
  * - `attribute` — a live attribute of the target object. `dateOrder` is the
  *   column's declared reading of a slashed date, never sniffed.
+ *   `createMissing` (SPA-168, `record_reference` columns only, default off)
+ *   plans a record of the referenced object for a cell that names none.
  * - `identity` — one of the object's identity keys.
  * - `ignore` — the column is not imported.
  * - `new` — an attribute the operator is defining from this column and has
@@ -77,7 +79,12 @@ export type ImportAttributeType = (typeof attributeType.enumValues)[number]
 
 export type ColumnTarget =
   | { target: 'name' }
-  | { target: 'attribute'; attributeId: string; dateOrder?: ImportDateOrder }
+  | {
+      target: 'attribute'
+      attributeId: string
+      dateOrder?: ImportDateOrder
+      createMissing?: true
+    }
   | { target: 'identity'; key: CoreIdentityKey }
   | { target: 'ignore' }
   | {
@@ -127,6 +134,53 @@ export type ImportCellIssue = { column: number; raw: string; reason: string }
 /** A coerced cell — the write shape `setValues` takes (core's `CoercedValue`). */
 export type ImportCellValue = string | number | boolean | Array<string>
 
+/**
+ * A reference cell the plan settled (SPA-168): the record it found, the
+ * member it found, or the record a secondary create will make — `key` names
+ * that create across the batch (one per referenced object and name), and the
+ * create itself rides on one row's `alsoCreates`.
+ */
+export type ImportReference =
+  | {
+      to: 'record'
+      column: number
+      attributeId: string
+      entityId: string
+      name: string
+    }
+  | {
+      to: 'member'
+      column: number
+      attributeId: string
+      userId: string
+      name: string
+    }
+  | {
+      to: 'create'
+      column: number
+      attributeId: string
+      key: string
+      name: string
+      objectId: string
+      /** The secondary create, as it will be planned. */
+      creator: ImportCreator
+      createName: string | null
+      identity: Partial<Record<CoreIdentityKey, string>>
+    }
+
+/**
+ * A record of the referenced object this row's reference creates before the
+ * row lands — carried by exactly one row per `key`, so two rows naming one
+ * missing company plan one create.
+ */
+export type ImportAlsoCreate = {
+  key: string
+  column: number
+  attributeId: string
+  objectId: string
+  plan: RowPlan
+}
+
 export type RowPlan = {
   verdict: ImportVerdict
   creator: ImportCreator
@@ -146,6 +200,10 @@ export type RowPlan = {
   mergedInto?: number
   collidesWith?: Array<number>
   decision?: CollisionDecision
+  /** Reference cells that resolved, or plan a create (SPA-168). */
+  references?: Array<ImportReference>
+  /** Records of referenced objects this row creates first (SPA-168). */
+  alsoCreates?: Array<ImportAlsoCreate>
 }
 
 export const importBatch = pgTable(

@@ -12,6 +12,7 @@ import type { ImportPreviewView, PreviewRow } from '#/lib/import/plan'
 
 const counts = {
   create: 31,
+  referenceCreates: 0,
   attach: 12,
   noLand: 3,
   collide: 0,
@@ -104,5 +105,42 @@ describe('the ledger items', () => {
       ),
     ).toBe('3 values')
     expect(whatLands(plan({ verdict: 'no-land' }))).toBe('')
+  })
+
+  it('what lands names the record a reference found', () => {
+    expect(
+      whatLands(
+        plan({
+          patch: { c: 'e-1' },
+          references: [
+            {
+              to: 'record',
+              column: 1,
+              attributeId: 'c',
+              entityId: 'e-1',
+              name: 'Ohmium',
+            },
+          ],
+        }),
+      ),
+    ).toBe('→ Ohmium')
+  })
+
+  it("draws a row's secondary creates after it, and under create only what creates", () => {
+    const entry = {
+      key: 'o|name:newco',
+      column: 1,
+      attributeId: 'c',
+      objectId: 'o',
+      plan: plan({ name: 'NewCo' }),
+    }
+    const carrier = row(4, { verdict: 'attach', alsoCreates: [entry] })
+    const all = ledgerItems(view([row(3), carrier, row(5)]))
+    expect(all.map((i) => i.kind)).toEqual(['row', 'row', 'also', 'row'])
+    const creates = ledgerItems({
+      ...view([carrier]),
+      filter: 'create',
+    })
+    expect(creates).toEqual([{ kind: 'also', carrier: 4, entry }])
   })
 })

@@ -199,9 +199,13 @@ export const RESOLVE_NEEDS_NAME_OR_KEY =
  * key held by another kind of record falls through to the record that lost
  * that claim before (`priorClaimant`). Both `resolveEntity` and
  * `previewResolve` call this — one lookup, so the preview cannot say
- * *attach* where the write would create.
+ * *attach* where the write would create. The import's reference cells
+ * (SPA-168, `lib/import/references.ts`) call it too, for a company or
+ * person column holding a domain or an address; their name match is exact
+ * and lives there, not here — this module gets no fuzzy attach path, since
+ * a near-match that attaches is how a deal lands on the wrong company.
  */
-async function matchIdentity(
+export async function matchIdentity(
   kind: EntityKindResolvable,
   keys: Array<NormalizedKey>,
 ): Promise<{ entityId: string; key: NormalizedKey } | null> {

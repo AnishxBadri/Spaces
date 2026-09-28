@@ -6,6 +6,7 @@ import {
   NEW_ATTRIBUTE_TYPES,
   columnLetter,
   columnName,
+  isReferenceType,
   readCell,
   shortRefusal,
   specFor,
@@ -34,6 +35,7 @@ import type {
   ColumnTarget,
   ImportDateOrder,
   Mapping,
+  MappingAttribute,
   MappingRegistry,
 } from '@spaces/core/import/mapping'
 import type { ColumnView, ImportMappingView } from '#/lib/import/mapping'
@@ -77,6 +79,11 @@ const OPTION_TYPES: ReadonlySet<AttributeType> = new Set([
 const typeWord = (type: AttributeType) =>
   (TYPE_LABELS[type] ?? type).toLowerCase()
 
+/** An attribute's type in mono: its type word, or what a reference points at. */
+function attributeType(a: MappingAttribute, view: ImportMappingView): string {
+  return view.references[a.id]?.type ?? typeWord(a.type)
+}
+
 function registryOf(view: ImportMappingView): MappingRegistry {
   return {
     attributes: view.attributes,
@@ -101,7 +108,7 @@ export function targetLabel(
     case 'attribute': {
       const attr = view.attributes.find((a) => a.id === target.attributeId)
       return attr
-        ? { name: attr.name, type: typeWord(attr.type) }
+        ? { name: attr.name, type: attributeType(attr, view) }
         : { name: 'Unavailable', type: '' }
     }
   }
@@ -270,6 +277,31 @@ function DateOrderChoice({
         }}
       />
     </div>
+  )
+}
+
+/** A record reference column's toggle: a cell that names nothing plans one. */
+function CreateMissingChoice({
+  plural,
+  checked,
+  onChange,
+  disabled,
+}: {
+  plural: string
+  checked: boolean
+  onChange: (next: boolean) => void
+  disabled: boolean
+}) {
+  return (
+    <label className="flex h-9 shrink-0 cursor-pointer items-center gap-2 border-t border-rule px-2.5">
+      <Checkbox
+        checked={checked}
+        disabled={disabled}
+        aria-label={`Create missing ${plural.toLowerCase()}`}
+        onCheckedChange={(next) => onChange(next === true)}
+      />
+      <span className="text-ui">Create missing {plural.toLowerCase()}</span>
+    </label>
   )
 }
 
@@ -451,6 +483,14 @@ function TargetPicker({
   const sheet = useRef<HTMLDivElement>(null)
   const label = targetLabel(target, view)
   const headerText = header?.at(index)?.trim() ?? ''
+  // A record reference column names the object a missing record is made in.
+  const createsIn =
+    target.target === 'attribute' &&
+    view.attributes.some(
+      (a) => a.id === target.attributeId && a.type === 'record_reference',
+    )
+      ? (view.references[target.attributeId]?.plural ?? null)
+      : null
   const current =
     target.target === 'attribute'
       ? `attribute:${target.attributeId}`
@@ -582,7 +622,7 @@ function TargetPicker({
                       key={a.id}
                       value={`attribute:${a.id}`}
                       name={a.name}
-                      type={typeWord(a.type)}
+                      type={attributeType(a, view)}
                       current={
                         target.target === 'attribute' &&
                         target.attributeId === a.id
@@ -620,6 +660,24 @@ function TargetPicker({
                 }
               />
             ) : null}
+            {target.target === 'attribute' && createsIn !== null ? (
+              <CreateMissingChoice
+                plural={createsIn}
+                checked={target.createMissing === true}
+                disabled={disabled}
+                onChange={(on) =>
+                  void onMap(
+                    index,
+                    on
+                      ? { ...target, createMissing: true }
+                      : {
+                          target: 'attribute',
+                          attributeId: target.attributeId,
+                        },
+                  )
+                }
+              />
+            ) : null}
           </CommandPrimitive>
         )}
       </PopoverContent>
@@ -654,6 +712,7 @@ function ParseCount({
       <span className="tabular">
         {column.parsed.toLocaleString('en-US')} of{' '}
         {column.total.toLocaleString('en-US')}
+        {column.unit === 'found' ? ' found' : ''}
       </span>
     </>
   )
@@ -679,7 +738,9 @@ function ParseCount({
       </PopoverTrigger>
       <PopoverContent align="start" className="flex w-96 flex-col gap-2 p-0">
         <div className="flex h-8 shrink-0 items-center gap-2 border-b border-rule px-3">
-          <span className="label-caps text-foreground">Refused</span>
+          <span className="label-caps text-foreground">
+            {column.unit === 'found' ? 'Not found' : 'Refused'}
+          </span>
           <span className="tabular mono text-micro text-graphite">
             {column.failureCount.toLocaleString('en-US')} ·{' '}
             {columnName(index, header)}
@@ -714,6 +775,8 @@ function ParseCount({
 
 function SampleCell({ spec, raw }: { spec: ColumnSpec | null; raw: string }) {
   if (spec === null || raw.trim() === '') return <>{raw}</>
+  // A reference is looked up, not read — its head carries the count.
+  if (spec.kind === 'typed' && isReferenceType(spec.type)) return <>{raw}</>
   const out = readCell(spec, raw)
   if (spec.kind === 'typed' && OPTION_TYPES.has(spec.type)) {
     const options = spec.options.options ?? []

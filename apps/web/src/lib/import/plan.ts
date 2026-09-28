@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, importBatch, importRow } from '@spaces/db/schema'
 import { CORE_IDENTITY_KEYS } from '@spaces/core/attributes/registry'
@@ -7,10 +7,12 @@ import { fitMapping } from '@spaces/core/import/mapping'
 import {
   NEEDS_NAME,
   applyDecision,
+  assignCreates,
   countsFrom,
   creatorFor,
   planRows,
   readRow,
+  withReferences,
 } from '@spaces/core/import/plan'
 import {
   normalizeIdentityValue,
@@ -18,6 +20,7 @@ import {
   previewResolve,
 } from '#/lib/entities/resolve'
 import { mappingObjectOf, mappingProblemsOf, readColumns } from './mapping'
+import { lookupReferences, referenceColumnsOf } from './references'
 import { ImportFailed, ImportNotFound, ImportRefused, clearPlan } from './stage'
 import type {
   CoreIdentityKey,
@@ -192,9 +195,17 @@ export const planImportProgram = Effect.fn('planImportProgram')(function* (
   const first = problems.at(0)
   if (first) return yield* new ImportRefused({ reason: first.reason })
 
+  // Reference cells (SPA-168): every distinct cell looked up once, exactly.
+  const refColumns = yield* referenceColumnsOf(mapping, object.registry)
+  const lookup = yield* lookupReferences(refColumns, rows)
+
   const inputs: Array<RowInput> = []
   for (const row of rows) {
-    const read = readRow(row.cells, mapping, object.registry)
+    const read = withReferences(
+      readRow(row.cells, mapping, object.registry),
+      refColumns,
+      lookup,
+    )
     inputs.push({
       rowNum: row.rowNum,
       read,
@@ -254,6 +265,7 @@ const countsOf = (batchId: string) =>
         verdict: importRow.verdict,
         rows: sql<number>`count(*)::int`,
         skippedCells: sql<number>`coalesce(sum(jsonb_array_length(${importRow.plan} -> 'skippedCells')), 0)::int`,
+        alsoCreates: sql<number>`coalesce(sum(jsonb_array_length(coalesce(${importRow.plan} -> 'alsoCreates', '[]'::jsonb))), 0)::int`,
       })
       .from(importRow)
       .where(eq(importRow.batchId, batchId))
@@ -268,6 +280,7 @@ const countsOf = (batchId: string) =>
                     verdict: t.verdict,
                     rows: t.rows,
                     skippedCells: t.skippedCells,
+                    alsoCreates: t.alsoCreates,
                   },
                 ],
           ),
@@ -313,7 +326,9 @@ const plannedBatch = Effect.fn('plannedBatch')(function* (batchId: string) {
 /**
  * Store what the operator decided for one in-file collision, on every row
  * of it (and the rows that merged silently into them). The rows are locked
- * with the batch, so two decisions cannot interleave.
+ * with the batch, so two decisions cannot interleave. Every row that names a
+ * secondary create is read too, and the creates re-carried after the
+ * decision (SPA-168): a carrier the decision skips hands its creates on.
  */
 export const decideImportCollisionProgram = Effect.fn(
   'decideImportCollisionProgram',
@@ -340,12 +355,28 @@ export const decideImportCollisionProgram = Effect.fn(
           .where(
             and(
               eq(importRow.batchId, input.batchId),
-              sql`(jsonb_exists(${importRow.plan}, 'collidesWith') or jsonb_exists(${importRow.plan}, 'mergedInto'))`,
+              sql`(jsonb_exists(${importRow.plan}, 'collidesWith') or jsonb_exists(${importRow.plan}, 'mergedInto') or ${importRow.plan} -> 'references' @> '[{"to":"create"}]'::jsonb)`,
             ),
           )
       ).flatMap((r) => (r.plan ? [{ rowNum: r.rowNum, plan: r.plan }] : []))
       const next = applyDecision(rows, input.rowNum, input.decision)
-      await writePlans(tx, input.batchId, next)
+      if (next.length === 0) return 0
+      const decided = new Map(next.map((r) => [r.rowNum, r.plan]))
+      const carried = assignCreates(
+        rows.map((r) => ({
+          rowNum: r.rowNum,
+          plan: decided.get(r.rowNum) ?? r.plan,
+        })),
+      )
+      const before = new Map(rows.map((r) => [r.rowNum, r.plan]))
+      await writePlans(
+        tx,
+        input.batchId,
+        carried.filter(
+          (r) =>
+            JSON.stringify(r.plan) !== JSON.stringify(before.get(r.rowNum)),
+        ),
+      )
       return next.length
     }),
   )
@@ -400,7 +431,11 @@ function filterWhere(filter: PreviewFilter) {
     case 'all':
       return undefined
     case 'create':
-      return verdict('create')
+      // A row carrying a secondary create shows it under create too.
+      return or(
+        verdict('create'),
+        sql`jsonb_exists(${importRow.plan}, 'alsoCreates')`,
+      )
     case 'attach':
       return verdict('attach')
     case 'noland':

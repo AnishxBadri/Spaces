@@ -1,13 +1,20 @@
 import { Link } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { landingRows, verdictSentence, whyOf } from '@spaces/core/import/plan'
+import {
+  alsoCreateWhy,
+  landingRows,
+  referenceLands,
+  verdictSentence,
+  whyOf,
+} from '@spaces/core/import/plan'
 import { KeyHint, PageHeader, ReadoutStrip } from '#/components/page-header'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { cn } from '#/lib/utils'
 import type {
   CollisionDecision,
+  ImportAlsoCreate,
   ImportVerdict,
   PlanCounts,
   RowPlan,
@@ -125,9 +132,14 @@ export function PreviewStrip({
 // The ledger
 // ---------------------------------------------------------------------------
 
-/** Values the row writes: attributes plus identity keys. */
+/**
+ * What the row writes: the record its reference found (`→ Ohmium`), else
+ * the count of attributes plus identity keys.
+ */
 export function whatLands(plan: RowPlan): string {
   if (plan.verdict !== 'attach' && plan.verdict !== 'create') return ''
+  const reference = referenceLands(plan)
+  if (reference !== '') return reference
   const n = Object.keys(plan.patch).length + Object.keys(plan.identity).length
   return `${n} value${n === 1 ? '' : 's'}`
 }
@@ -215,7 +227,10 @@ function LedgerLanes({
       >
         {whyOf(plan, view.header)}
       </span>
-      <span className="w-20 shrink-0 numeric text-micro text-graphite">
+      <span
+        className="w-32 shrink-0 truncate text-right mono text-micro text-graphite"
+        title={whatLands(plan)}
+      >
         {whatLands(plan)}
       </span>
       <span
@@ -227,6 +242,53 @@ function LedgerLanes({
         <DecisionLane view={view} plan={plan} />
       </span>
     </>
+  )
+}
+
+/**
+ * A secondary create (SPA-168): the record a create-missing reference makes,
+ * drawn under the row that carries it, on the same lanes.
+ */
+function AlsoRow({
+  view,
+  carrier,
+  entry,
+}: {
+  view: ImportPreviewView
+  carrier: number
+  entry: ImportAlsoCreate
+}) {
+  const badge = BADGE.create
+  const why = alsoCreateWhy(carrier, entry, view.header)
+  const name = entry.plan.name ?? Object.values(entry.plan.identity).at(0)
+  const n = Object.keys(entry.plan.identity).length
+  return (
+    <li className="flex h-10 items-center gap-3 border-b border-rule px-2">
+      <span
+        aria-hidden
+        className="w-9 shrink-0 text-right mono text-micro text-graphite"
+      >
+        +
+      </span>
+      <span className="w-50 shrink-0 truncate text-ui" title={name ?? ''}>
+        {name ?? <span className="text-graphite">—</span>}
+      </span>
+      <span className="flex w-22 shrink-0">
+        <Badge option={{ color: badge.color }} index={0}>
+          {badge.label}
+        </Badge>
+      </span>
+      <span
+        className="min-w-0 flex-1 truncate text-ui text-graphite"
+        title={why}
+      >
+        {why}
+      </span>
+      <span className="w-32 shrink-0 truncate text-right mono text-micro text-graphite">
+        {n > 0 ? `${n} value${n === 1 ? '' : 's'}` : ''}
+      </span>
+      <span className="w-56 shrink-0" />
+    </li>
   )
 }
 
@@ -331,28 +393,34 @@ const FILTERS: Array<{ filter: PreviewFilter; label: string }> = [
   { filter: 'noland', label: 'will not land' },
 ]
 
-/**
- * Ledger items in sheet order, a collision drawn once — as a block, where
- * its lowest drawn row falls — with every row of it, drawn or not.
- */
-export function ledgerItems(
-  view: ImportPreviewView,
-): Array<
+export type LedgerItem =
   | { kind: 'row'; row: PreviewRow }
   | { kind: 'collision'; rows: Array<PreviewRow> }
-> {
+  | { kind: 'also'; carrier: number; entry: ImportAlsoCreate }
+
+/**
+ * Ledger items in sheet order, a collision drawn once — as a block, where
+ * its lowest drawn row falls — with every row of it, drawn or not. A row's
+ * secondary creates follow it (SPA-168); under the create filter a carrier
+ * that does not itself create is left out and its creates still drawn.
+ */
+export function ledgerItems(view: ImportPreviewView): Array<LedgerItem> {
   const byNum = new Map<number, PreviewRow>()
   for (const r of [...view.rows, ...view.collisionRows]) byNum.set(r.rowNum, r)
   const seen = new Set<number>()
-  const out: Array<
-    | { kind: 'row'; row: PreviewRow }
-    | { kind: 'collision'; rows: Array<PreviewRow> }
-  > = []
+  const out: Array<LedgerItem> = []
+  const alsos = (rows: ReadonlyArray<PreviewRow>) => {
+    for (const r of rows)
+      for (const entry of r.plan.alsoCreates ?? [])
+        out.push({ kind: 'also', carrier: r.rowNum, entry })
+  }
   for (const row of view.rows) {
     if (seen.has(row.rowNum)) continue
     const others = row.plan.collidesWith
     if (!others) {
-      out.push({ kind: 'row', row })
+      if (view.filter !== 'create' || row.plan.verdict === 'create')
+        out.push({ kind: 'row', row })
+      alsos([row])
       continue
     }
     const members = [row.rowNum, ...others]
@@ -363,8 +431,20 @@ export function ledgerItems(
       })
     for (const m of members) seen.add(m.rowNum)
     out.push({ kind: 'collision', rows: members })
+    alsos(members)
   }
   return out
+}
+
+function itemKey(item: LedgerItem): string {
+  switch (item.kind) {
+    case 'row':
+      return `r${item.row.rowNum}`
+    case 'collision':
+      return `c${item.rows[0].rowNum}`
+    case 'also':
+      return `a${item.carrier}:${item.entry.key}`
+  }
 }
 
 export function PreviewLedger({
@@ -386,16 +466,23 @@ export function PreviewLedger({
         <span className="w-50 shrink-0">{HEAD[1]}</span>
         <span className="w-22 shrink-0">{HEAD[2]}</span>
         <span className="min-w-0 flex-1">{HEAD[3]}</span>
-        <span className="w-20 shrink-0 text-right">{HEAD[4]}</span>
+        <span className="w-32 shrink-0 text-right">{HEAD[4]}</span>
         <span className="w-56 shrink-0 text-right">{HEAD[5]}</span>
       </div>
       <ol aria-label="Preview rows">
         {ledgerItems(view).map((item) =>
           item.kind === 'row' ? (
-            <Row key={item.row.rowNum} view={view} row={item.row} />
+            <Row key={itemKey(item)} view={view} row={item.row} />
+          ) : item.kind === 'also' ? (
+            <AlsoRow
+              key={itemKey(item)}
+              view={view}
+              carrier={item.carrier}
+              entry={item.entry}
+            />
           ) : (
             <CollisionBlock
-              key={`c${item.rows[0].rowNum}`}
+              key={itemKey(item)}
               view={view}
               rows={item.rows}
               disabled={disabled}

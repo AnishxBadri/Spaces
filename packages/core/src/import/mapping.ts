@@ -60,23 +60,23 @@ export const IDENTITY_KEY_LABELS: Record<CoreIdentityKey, string> = {
 
 /**
  * A reference is matched to a record, not read from its cell — `coerce`
- * refuses every cell of these two types — so no column maps onto one here.
+ * refuses every cell of these two types for value shape, and the plan finds
+ * what the cell names instead (SPA-168, `./references`).
  */
-export function cellCarries(type: AttributeType): boolean {
-  return type !== 'record_reference' && type !== 'actor_reference'
+export function isReferenceType(type: AttributeType): boolean {
+  return type === 'record_reference' || type === 'actor_reference'
 }
 
 /**
- * The attributes a column may map onto: live, of a type a cell can carry,
- * and not the backing attribute of an identity key — a custom object's
- * declared `domain` is offered once, as the identity target it is.
+ * The attributes a column may map onto: live, and not the backing attribute
+ * of an identity key — a custom object's declared `domain` is offered once,
+ * as the identity target it is. References included since SPA-168.
  */
 export function mappableAttributes(
   registry: MappingRegistry,
 ): Array<MappingAttribute> {
   return registry.attributes.filter(
-    (a) =>
-      !a.archived && cellCarries(a.type) && a.options.identityKey === undefined,
+    (a) => !a.archived && a.options.identityKey === undefined,
   )
 }
 
