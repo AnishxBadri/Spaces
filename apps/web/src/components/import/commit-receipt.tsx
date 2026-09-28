@@ -4,6 +4,7 @@ import { KeyHint, PageHeader, ReadoutStrip } from '#/components/page-header'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { cn } from '#/lib/utils'
+import { missingRateLine } from '@spaces/core/import/ledger-commit'
 import type { CommitCounts } from '@spaces/core/import/commit'
 import type { ImportVerdict } from '@spaces/core/import/plan'
 import type {
@@ -11,6 +12,10 @@ import type {
   ReceiptFilter,
   ReceiptRow,
 } from '#/lib/import/commit'
+import type {
+  LedgerReceipt,
+  LedgerReceiptCounts,
+} from '#/lib/import/ledger-commit'
 
 /**
  * The commit step (SPA-169, import-7): the batch page is the receipt. A
@@ -19,6 +24,10 @@ import type {
  * that each row gains as the job passes it: the outcome, in mono, linking to
  * the record it wrote. Never a spinner: the strip's REMAINING counts down
  * and the rows fill.
+ *
+ * A ledger batch (SPA-171) draws the same page: its strip reads what landed
+ * — HOLDINGS · INVESTMENTS · ROUNDS · MARKS · FAILED · REMAINING — and a
+ * row's outcome is the events it appended, linking to the holding.
  */
 
 const BADGE: Record<ImportVerdict, { color: string; label: string }> = {
@@ -39,6 +48,33 @@ export function receiptSentence(
     `${counts.written.toLocaleString('en-US')} written`,
     `${counts.attached.toLocaleString('en-US')} attached`,
   ]
+  if (counts.failed > 0)
+    parts.push(`${counts.failed.toLocaleString('en-US')} failed`)
+  if (running && counts.remaining > 0)
+    parts.push(`${counts.remaining.toLocaleString('en-US')} to go`)
+  return `${parts.join(' · ')}.`
+}
+
+const plural = (n: number, one: string) =>
+  `${n.toLocaleString('en-US')} ${n === 1 ? one : `${one}s`}`
+
+/**
+ * A ledger receipt's title (SPA-171): `10 holdings · 11 investments · 8
+ * rounds · 7 marks · 1 failed.` — what landed, then where a run is.
+ */
+export function ledgerReceiptSentence(
+  ledger: LedgerReceiptCounts,
+  counts: CommitCounts,
+  running: boolean,
+): string {
+  const parts = [
+    plural(ledger.holdings, 'holding'),
+    plural(ledger.investments, 'investment'),
+    plural(ledger.rounds, 'round'),
+    plural(ledger.marks, 'mark'),
+  ]
+  if (ledger.distributions > 0)
+    parts.push(plural(ledger.distributions, 'distribution'))
   if (counts.failed > 0)
     parts.push(`${counts.failed.toLocaleString('en-US')} failed`)
   if (running && counts.remaining > 0)
@@ -70,8 +106,12 @@ export function ReceiptHeader({
   const idle = !view.running
   return (
     <PageHeader
-      eyebrow="Import · Records"
-      title={receiptSentence(view.counts, view.running)}
+      eyebrow={view.ledger ? 'Import · Ledger' : 'Import · Records'}
+      title={
+        view.ledger
+          ? ledgerReceiptSentence(view.ledger.counts, view.counts, view.running)
+          : receiptSentence(view.counts, view.running)
+      }
       description={
         <span className="tabular">
           {filename}
@@ -110,26 +150,92 @@ export function ReceiptHeader({
 export function ReceiptStrip({
   counts,
   batchId,
+  ledger = null,
 }: {
   counts: CommitCounts
   batchId: string
+  /** A ledger batch's strip reads what landed (SPA-171). */
+  ledger?: LedgerReceiptCounts | null
 }) {
+  const failed = {
+    label: 'Failed',
+    value: counts.failed,
+    tone: 'bad' as const,
+    to: `/import/${batchId}`,
+    search: { outcome: 'failed' },
+  }
+  const remaining = { label: 'Remaining', value: counts.remaining }
   return (
     <ReadoutStrip
       className="border-t border-t-hairline border-b-rule"
-      cells={[
-        { label: 'Written', value: counts.written },
-        { label: 'Attached', value: counts.attached },
-        {
-          label: 'Failed',
-          value: counts.failed,
-          tone: 'bad',
-          to: `/import/${batchId}`,
-          search: { outcome: 'failed' },
-        },
-        { label: 'Remaining', value: counts.remaining },
-      ]}
+      cells={
+        ledger
+          ? [
+              { label: 'Holdings', value: ledger.holdings },
+              { label: 'Investments', value: ledger.investments },
+              { label: 'Rounds', value: ledger.rounds },
+              { label: 'Marks', value: ledger.marks },
+              ...(ledger.distributions > 0
+                ? [{ label: 'Distributions', value: ledger.distributions }]
+                : []),
+              failed,
+              remaining,
+            ]
+          : [
+              { label: 'Written', value: counts.written },
+              { label: 'Attached', value: counts.attached },
+              failed,
+              remaining,
+            ]
+      }
     />
+  )
+}
+
+/**
+ * The ledger receipt's commentary (SPA-171), one mono line per section: the
+ * FX rates the committed events still need, linked where `/today` links, and
+ * what a batch void reaches — never a round.
+ */
+export function MissingRateLine({ ledger }: { ledger: LedgerReceipt }) {
+  if (ledger.missingRates.length === 0) return null
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 px-8 mono text-micro text-warning">
+      <span className="tabular">{missingRateLine(ledger.missingRates)}</span>
+      <Link
+        to="/settings/currency"
+        className="focus-ring text-primary hover:underline"
+      >
+        add FX rate ›
+      </Link>
+    </p>
+  )
+}
+
+export function VoidLine({
+  ledger,
+  onVoid,
+  voiding,
+}: {
+  ledger: LedgerReceipt
+  onVoid: () => void
+  voiding: boolean
+}) {
+  if (ledger.voidLine === null) return null
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 pb-2 mono text-micro text-graphite">
+      <span className="tabular">{ledger.voidLine}</span>
+      {ledger.voidable ? (
+        <button
+          type="button"
+          disabled={voiding}
+          onClick={onVoid}
+          className="focus-ring text-destructive hover:underline disabled:opacity-50"
+        >
+          void batch ›
+        </button>
+      ) : null}
+    </p>
   )
 }
 
@@ -154,6 +260,8 @@ export function OutcomeLane({ row }: { row: ReceiptRow }): ReactNode {
       return link('created ›')
     case 'attached':
       return link('attached ›')
+    case 'appended':
+      return link(`${o.parts.join(' · ')} ›`)
     case 'folded':
       return o.entityId === null
         ? `into row ${o.into}`
@@ -197,7 +305,13 @@ function Row({ row }: { row: ReceiptRow }) {
       </span>
       <span
         className="w-72 shrink-0 truncate text-right mono text-micro text-graphite"
-        title={row.outcome.kind === 'failed' ? row.outcome.reason : undefined}
+        title={
+          row.outcome.kind === 'failed'
+            ? row.outcome.reason
+            : row.outcome.kind === 'appended'
+              ? row.outcome.parts.join(' · ')
+              : undefined
+        }
       >
         <OutcomeLane row={row} />
       </span>

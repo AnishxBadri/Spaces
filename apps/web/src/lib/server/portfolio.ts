@@ -3,16 +3,7 @@ import { asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { entity, workspace } from '@spaces/db/schema'
-import {
-  distribution,
-  fxRate,
-  holding,
-  investment,
-  mark,
-  round,
-  roundCoInvestor,
-} from '@spaces/db/schema/portfolio'
-import { activity } from '@spaces/db/schema/activity'
+import { fxRate, holding, round } from '@spaces/db/schema/portfolio'
 import { holdingMetrics } from '@spaces/core/portfolio/metrics'
 import type { MetricsResult } from '@spaces/core/portfolio/metrics'
 import { ownership } from '@spaces/core/portfolio/ownership'
@@ -191,6 +182,11 @@ export const createHolding = createServerFn({ method: 'POST' })
     })
   })
 
+/**
+ * The four event writers are thin callers (SPA-171): the bodies are the
+ * programs in `../portfolio/write`, which the ledger import commit calls
+ * too, so history has one writer.
+ */
 export const addRound = createServerFn({ method: 'POST' })
   .validator(
     z.object({
@@ -208,37 +204,14 @@ export const addRound = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    return db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(round)
-        .values({
-          companyId: data.companyId,
-          date: data.date,
-          kind: data.kind,
-          raised: data.raised?.toString(),
-          currency: data.currency,
-          preMoney: data.preMoney?.toString(),
-          postMoney: data.postMoney?.toString(),
-          pricePerShare: data.pricePerShare?.toString(),
-          sharesOutstanding: data.sharesOutstanding?.toString(),
-          createdBy: u.id,
-        })
-        .returning({ id: round.id })
-      if (data.coInvestorIds && data.coInvestorIds.length > 0) {
-        await tx.insert(roundCoInvestor).values(
-          data.coInvestorIds.map((investorEntityId) => ({
-            roundId: row.id,
-            investorEntityId,
-          })),
-        )
-      }
-      await tx.insert(activity).values({
-        actorId: u.id,
-        verb: 'round.added',
-        subjectEntityId: data.companyId,
-      })
-      return { id: row.id }
-    })
+    const { addRoundProgram, portfolioWriteMessage } =
+      await import('../portfolio/write')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(addRoundProgram)({ ...data, actorId: u.id })
+    } catch (failure) {
+      throw new Error(portfolioWriteMessage(failure))
+    }
   })
 
 export const addInvestment = createServerFn({ method: 'POST' })
@@ -264,34 +237,18 @@ export const addInvestment = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const h = await birthHolding({
-      companyId: data.companyId,
-      actorId: u.id,
-      openedAt: data.date,
-    })
-    const [row] = await db
-      .insert(investment)
-      .values({
-        holdingId: h.id,
-        dealId: data.dealId,
-        roundId: data.roundId,
-        date: data.date,
-        amount: data.amount.toString(),
-        currency: data.currency,
-        instrument: data.instrument,
-        shares: data.shares?.toString(),
-        cap: data.cap?.toString(),
-        discount: data.discount?.toString(),
-        vehicle: data.vehicle,
-        createdBy: u.id,
+    const { addInvestmentProgram, portfolioWriteMessage } =
+      await import('../portfolio/write')
+    const { effectFn } = await import('./effect')
+    try {
+      const out = await effectFn(addInvestmentProgram)({
+        ...data,
+        actorId: u.id,
       })
-      .returning({ id: investment.id })
-    await db.insert(activity).values({
-      actorId: u.id,
-      verb: 'investment.added',
-      subjectEntityId: data.companyId,
-    })
-    return { id: row.id, holdingId: h.id }
+      return { id: out.id, holdingId: out.holdingId }
+    } catch (failure) {
+      throw new Error(portfolioWriteMessage(failure))
+    }
   })
 
 export const addMark = createServerFn({ method: 'POST' })
@@ -306,30 +263,14 @@ export const addMark = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const h = (
-      await db
-        .select({ companyId: holding.companyId })
-        .from(holding)
-        .where(eq(holding.id, data.holdingId))
-    ).at(0)
-    if (!h) throw new Error('Holding not found')
-    const [row] = await db
-      .insert(mark)
-      .values({
-        holdingId: data.holdingId,
-        date: data.date,
-        fairValue: data.fairValue.toString(),
-        currency: data.currency,
-        basis: data.basis,
-        createdBy: u.id,
-      })
-      .returning({ id: mark.id })
-    await db.insert(activity).values({
-      actorId: u.id,
-      verb: 'mark.added',
-      subjectEntityId: h.companyId,
-    })
-    return { id: row.id }
+    const { addMarkProgram, portfolioWriteMessage } =
+      await import('../portfolio/write')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(addMarkProgram)({ ...data, actorId: u.id })
+    } catch (failure) {
+      throw new Error(portfolioWriteMessage(failure))
+    }
   })
 
 export const addDistribution = createServerFn({ method: 'POST' })
@@ -346,33 +287,14 @@ export const addDistribution = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const h = (
-      await db
-        .select({ companyId: holding.companyId })
-        .from(holding)
-        .where(eq(holding.id, data.holdingId))
-    ).at(0)
-    if (!h) throw new Error('Holding not found')
-    const [row] = await db
-      .insert(distribution)
-      .values({
-        holdingId: data.holdingId,
-        date: data.date,
-        amount: data.amount.toString(),
-        currency: data.currency,
-        kind: data.kind,
-        sharesSold: data.sharesSold?.toString(),
-        pricePerShare: data.pricePerShare?.toString(),
-        createdBy: u.id,
-      })
-      .returning({ id: distribution.id })
-    await db.insert(activity).values({
-      actorId: u.id,
-      verb:
-        data.kind === 'writeoff' ? 'holding.writtenoff' : 'distribution.added',
-      subjectEntityId: h.companyId,
-    })
-    return { id: row.id }
+    const { addDistributionProgram, portfolioWriteMessage } =
+      await import('../portfolio/write')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(addDistributionProgram)({ ...data, actorId: u.id })
+    } catch (failure) {
+      throw new Error(portfolioWriteMessage(failure))
+    }
   })
 
 /** Upsert on (currency, date): correcting a rate just recomputes. */

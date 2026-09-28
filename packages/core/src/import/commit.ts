@@ -1,3 +1,5 @@
+import { isLedgerPlan } from './ledger'
+import { ledgerOutcomeParts } from './ledger-commit'
 import type {
   ImportAlsoCreate,
   ImportReference,
@@ -97,6 +99,16 @@ export function createKeysOf(plan: RowPlan): Array<string> {
 export type CommitOutcome =
   | { kind: 'created'; entityId: string }
   | { kind: 'attached'; entityId: string }
+  /**
+   * A ledger row (SPA-171): the events it appended onto the company's
+   * holding, as the lane prints them.
+   */
+  | {
+      kind: 'appended'
+      entityId: string
+      holdingId: string
+      parts: Array<string>
+    }
   /** A merged row: its values landed on row `into`'s record. */
   | { kind: 'folded'; into: number; entityId: string | null }
   | { kind: 'failed'; reason: string }
@@ -129,6 +141,16 @@ export function commitOutcomeOf(row: {
     case 'attach':
     case 'create':
       if (entityId === null) return { kind: 'pending' }
+      if (isLedgerPlan(plan)) {
+        const committed = plan.ledger.committed
+        if (!committed) return { kind: 'pending' }
+        return {
+          kind: 'appended',
+          entityId,
+          holdingId: committed.holdingId,
+          parts: ledgerOutcomeParts(plan),
+        }
+      }
       return (plan.committedAs ?? plan.verdict) === 'attach'
         ? { kind: 'attached', entityId }
         : { kind: 'created', entityId }

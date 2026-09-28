@@ -8,7 +8,9 @@ import type { JobDef } from '../run-job'
 
 /**
  * `import.commit` (SPA-169, import-7) — a planned batch's rows through their
- * creators, each row in its own transaction (`#/lib/import/commit`). The
+ * creators, each row in its own transaction (`#/lib/import/commit`); a
+ * ledger batch's rows through the portfolio write path (SPA-171,
+ * `#/lib/import/ledger-commit`). The
  * program never fails on a row — a row's failure is its own `error` — so
  * the job fails only when the batch itself cannot commit (not planned, a
  * collision undecided, a query that broke), and then permanently: the

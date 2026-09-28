@@ -1,7 +1,14 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { ReceiptHeader, receiptSentence } from './commit-receipt'
+import {
+  MissingRateLine,
+  ReceiptHeader,
+  VoidLine,
+  ledgerReceiptSentence,
+  receiptSentence,
+} from './commit-receipt'
 import type { ImportReceiptView } from '#/lib/import/commit'
+import type { LedgerReceipt } from '#/lib/import/ledger-commit'
 
 const view = (over: Partial<ImportReceiptView> = {}): ImportReceiptView => ({
   status: 'committed',
@@ -18,6 +25,7 @@ const view = (over: Partial<ImportReceiptView> = {}): ImportReceiptView => ({
   matching: 0,
   filter: 'all',
   object: { kind: 'company', plural: 'Companies' },
+  ledger: null,
   ...over,
 })
 
@@ -75,5 +83,70 @@ describe('the receipt header', () => {
     expect(html).toContain('committing')
     expect(button(html, 'Retry failed rows')).toContain('disabled=""')
     expect(button(html, 'Commit again')).toContain('disabled=""')
+  })
+})
+
+describe('a ledger receipt (SPA-171)', () => {
+  const ledger: LedgerReceipt = {
+    counts: {
+      holdings: 11,
+      investments: 12,
+      rounds: 9,
+      marks: 8,
+      distributions: 0,
+    },
+    missingRates: [
+      { currency: 'AED', events: 2, earliest: '2022-04-10' },
+      { currency: 'JPY', events: 2, earliest: '2024-02-01' },
+    ],
+    voidLine: 'void reaches 12 investments · 8 marks · 9 rounds stay',
+    voidable: true,
+  }
+
+  it('titles what landed and reads as the ledger', () => {
+    expect(
+      ledgerReceiptSentence(
+        ledger.counts,
+        { written: 12, attached: 0, failed: 1, remaining: 0 },
+        false,
+      ),
+    ).toBe('11 holdings · 12 investments · 9 rounds · 8 marks · 1 failed.')
+    const html = renderToStaticMarkup(
+      <ReceiptHeader
+        view={view({ ledger })}
+        filename="portfolio-tracker.csv"
+        onCommit={() => {}}
+        onRetry={() => {}}
+        pending={null}
+      />,
+    )
+    expect(html).toContain('Import · Ledger')
+  })
+
+  it('prints the void line with its action only while something is left to void', () => {
+    // The missing-rate line carries a router `Link`, so its words are
+    // asserted in core (`missingRateLine`) and it is drawn nothing here
+    // when there is nothing missing.
+    expect(
+      renderToStaticMarkup(
+        <MissingRateLine ledger={{ ...ledger, missingRates: [] }} />,
+      ),
+    ).toBe('')
+    const voids = renderToStaticMarkup(
+      <VoidLine ledger={ledger} onVoid={() => {}} voiding={false} />,
+    )
+    expect(voids).toContain(
+      'void reaches 12 investments · 8 marks · 9 rounds stay',
+    )
+    expect(voids).toContain('void batch ›')
+    expect(
+      renderToStaticMarkup(
+        <VoidLine
+          ledger={{ ...ledger, voidable: false }}
+          onVoid={() => {}}
+          voiding={false}
+        />,
+      ),
+    ).not.toContain('void batch')
   })
 })

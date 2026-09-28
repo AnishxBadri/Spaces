@@ -49,7 +49,9 @@ import { enqueueSourceEmbed } from '#/lib/ai/chunk-sources'
 import { birthDealProgram } from '#/lib/deals/birth'
 import { recordPath } from '#/lib/record-path'
 import { mappingObjectOf } from './mapping'
+import { commitLedgerProgram, loadLedgerReceiptProgram } from './ledger-commit'
 import { ImportFailed, ImportNotFound, ImportRefused } from './stage'
+import type { LedgerReceipt } from './ledger-commit'
 import type { Tx } from '#/lib/attributes/values'
 import type { EmbedSource } from '#/lib/ai/chunk-sources'
 import type {
@@ -93,6 +95,10 @@ import type { MappingObject } from './mapping'
  * sweeps (`resolveEntity`'s for people and companies, the object-scoped one
  * for a custom record), run once the row has committed. An import is a human
  * write: it writes values directly and never proposes.
+ *
+ * A ledger batch (SPA-171) goes through the same request, job, refusals and
+ * receipt, and its rows through `./ledger-commit` — portfolio events
+ * appended through the portfolio write path, not records.
  *
  * Outside `lib/server/` for the barrel's reason (CLAUDE.md → Traps).
  */
@@ -153,9 +159,9 @@ const committableBatch = Effect.fn('committableBatch')(function* (
       .then((rows) => rows.at(0)),
   )
   if (!batch) return yield* new ImportNotFound()
-  if (batch.mode !== 'records' || batch.targetObjectId === null)
+  if (batch.mode === 'records' && batch.targetObjectId === null)
     return yield* new ImportRefused({
-      reason: 'Only a records import commits through this step',
+      reason: 'Pick the object this import fills before committing it',
     })
   if (batch.status === 'staged')
     return yield* new ImportRefused({
@@ -168,7 +174,7 @@ const committableBatch = Effect.fn('committableBatch')(function* (
     })
   if (onlyFailed && (yield* failedOf(batchId)) === 0)
     return yield* new ImportRefused({ reason: 'No failed rows to retry' })
-  return { ...batch, targetObjectId: batch.targetObjectId }
+  return batch
 })
 
 /**
@@ -520,8 +526,9 @@ const loadRows = (batchId: string) =>
       .where(eq(importRow.batchId, batchId))
       .orderBy(asc(importRow.rowNum))
       .then((rows) =>
-        // A ledger plan (SPA-170) is not this job's: its events commit
-        // through their own step (SPA-171), and a records batch holds none.
+        // A ledger plan (SPA-170) is not this path's: its events commit
+        // through `commitLedgerProgram` (SPA-171), and a records batch
+        // holds none.
         rows.flatMap((r): Array<LoadedRow> =>
           r.plan && !('kind' in r.plan) ? [{ ...r, plan: r.plan }] : [],
         ),
@@ -554,6 +561,12 @@ export const commitImportProgram = Effect.fn('commitImportProgram')(function* (
   input: CommitRequest,
 ): Effect.fn.Return<CommitRun, ImportFailure> {
   const batch = yield* committableBatch(input.batchId, input.onlyFailed)
+  // A ledger batch's rows are portfolio events (SPA-171).
+  if (batch.mode === 'ledger') return yield* commitLedgerProgram(batch, input)
+  if (batch.targetObjectId === null)
+    return yield* new ImportRefused({
+      reason: 'Pick the object this import fills before committing it',
+    })
   const rows = yield* loadRows(batch.id)
   const run = emptyRun()
 
@@ -756,6 +769,8 @@ export type ImportReceiptView = {
   matching: number
   filter: ReceiptFilter
   object: { kind: ObjectKind | null; plural: string }
+  /** A ledger batch's half (SPA-171): its strip, missing rates and void note. */
+  ledger: LedgerReceipt | null
 }
 
 /**
@@ -778,7 +793,7 @@ export const loadImportReceiptProgram = Effect.fn('loadImportReceiptProgram')(
         .then((rows) => rows.at(0)),
     )
     if (!batch) return yield* new ImportNotFound()
-    if (batch.mode !== 'records' || batch.targetObjectId === null) return null
+    if (batch.mode === 'records' && batch.targetObjectId === null) return null
     const inBatch = eq(importRow.batchId, batch.id)
     const tally = yield* query(() =>
       db
@@ -856,17 +871,23 @@ export const loadImportReceiptProgram = Effect.fn('loadImportReceiptProgram')(
         .where(where)
         .then((r) => r.at(0)?.n ?? 0),
     )
-    const object = yield* query(() =>
-      db
-        .select({
-          slug: objectDef.slug,
-          plural: objectDef.plural,
-          isSystem: objectDef.isSystem,
-        })
-        .from(objectDef)
-        .where(eq(objectDef.id, batch.targetObjectId ?? ''))
-        .then((r) => r.at(0)),
-    )
+    const targetObjectId = batch.targetObjectId
+    const object =
+      targetObjectId === null
+        ? undefined
+        : yield* query(() =>
+            db
+              .select({
+                slug: objectDef.slug,
+                plural: objectDef.plural,
+                isSystem: objectDef.isSystem,
+              })
+              .from(objectDef)
+              .where(eq(objectDef.id, targetObjectId))
+              .then((r) => r.at(0)),
+          )
+    const ledger =
+      batch.mode === 'ledger' ? yield* loadLedgerReceiptProgram(batch.id) : null
     return {
       status: batch.status,
       committedAt: batch.committedAt?.toISOString() ?? null,
@@ -882,27 +903,32 @@ export const loadImportReceiptProgram = Effect.fn('loadImportReceiptProgram')(
         : null,
       rows: found.flatMap((r): Array<ReceiptRow> => {
         if (!r.plan) return []
+        const outcome = commitOutcomeOf({
+          plan: r.plan,
+          entityId: r.entityId,
+          error: r.error,
+        })
         return [
           {
             rowNum: r.rowNum,
             name: r.plan.name,
             verdict: r.plan.verdict,
-            outcome: commitOutcomeOf({
-              plan: r.plan,
-              entityId: r.entityId,
-              error: r.error,
-            }),
+            outcome,
             record:
               r.entityId !== null &&
               r.recordName !== null &&
               r.recordKind !== null
                 ? {
                     name: r.recordName,
-                    href: recordPath({
-                      kind: r.recordKind,
-                      id: r.entityId,
-                      objectSlug: r.objectSlug,
-                    }),
+                    // A ledger row's events live on the company's holding.
+                    href:
+                      outcome.kind === 'appended'
+                        ? `/portfolio/${outcome.holdingId}`
+                        : recordPath({
+                            kind: r.recordKind,
+                            id: r.entityId,
+                            objectSlug: r.objectSlug,
+                          }),
                   }
                 : null,
           },
@@ -914,6 +940,7 @@ export const loadImportReceiptProgram = Effect.fn('loadImportReceiptProgram')(
         kind: object ? coreKindOf(object) : null,
         plural: object?.plural ?? 'records',
       },
+      ledger,
     }
   },
 )

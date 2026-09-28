@@ -23,9 +23,11 @@ import {
   PreviewStrip,
 } from '#/components/import/preview-ledger'
 import {
+  MissingRateLine,
   ReceiptHeader,
   ReceiptLedger,
   ReceiptStrip,
+  VoidLine,
 } from '#/components/import/commit-receipt'
 import { LedgerMappingStep } from '#/components/import/ledger-mapping'
 import { LedgerPreviewStep } from '#/components/import/ledger-preview'
@@ -48,6 +50,7 @@ import {
   planImport,
   reopenImportMapping,
   selectImportSheet,
+  voidLedgerBatch,
 } from '#/lib/server-fns'
 import type { ImportMode } from '#/components/import/import-wizard'
 import type { NewAttributeDraft } from '#/components/import/mapping-grid'
@@ -121,6 +124,7 @@ function ImportBatchPage() {
   const [continuing, setContinuing] = useState(false)
   const [backing, setBacking] = useState(false)
   const [committing, setCommitting] = useState<'commit' | 'retry' | null>(null)
+  const [voiding, setVoiding] = useState(false)
 
   const staged = batch.status === 'staged'
   const step = mapping ? 1 : 0
@@ -273,11 +277,35 @@ function ImportBatchPage() {
     }).finally(() => setCommitting(null))
   }
 
+  const ledgerLanding = ledger?.preview
+    ? ledger.preview.counts.total - ledger.preview.counts.noLand
+    : 0
   const canCommit =
-    preview !== null &&
     receipt === null &&
-    preview.counts.collide === 0 &&
-    landingRows(preview.counts) > 0
+    ((preview !== null &&
+      preview.counts.collide === 0 &&
+      landingRows(preview.counts) > 0) ||
+      ledgerLanding > 0)
+
+  /**
+   * Void a committed ledger batch through the shipped reversal path (D12):
+   * every investment, mark and distribution it appended gets its
+   * compensating event; its rounds stay.
+   */
+  async function voidBatch() {
+    if (!receipt?.ledger) return
+    const ok = await confirm({
+      title: `Void ${batch.filename}?`,
+      body: 'Every investment, mark and distribution this import appended gets a compensating entry, dated as the original. Rounds stay. Nothing is deleted.',
+      action: 'Void batch',
+    })
+    if (!ok) return
+    setVoiding(true)
+    void write(async () => {
+      const out = await voidLedgerBatch({ data: { batchId: batch.id } })
+      toast.success(`${out.reversed.toLocaleString('en-US')} entries voided`)
+    }).finally(() => setVoiding(false))
+  }
 
   /**
    * Progress by polling, deliberately: while a run is live the receipt is
@@ -333,6 +361,52 @@ function ImportBatchPage() {
       ? `${mappedCount} of ${mapping.mapping.length} mapped`
       : null
 
+  // Step 4 comes first: a ledger batch is still `planned` while its commit
+  // runs, and its receipt (SPA-171) is the page from the first row on.
+  if (receipt) {
+    return (
+      <div className="flex h-full flex-col">
+        <ReceiptHeader
+          view={receipt}
+          filename={batch.filename}
+          onCommit={() => commit(false)}
+          onRetry={() => commit(true)}
+          pending={committing}
+        />
+        <StepStrip
+          step={3}
+          mode={batch.mode}
+          uploadHint={uploadHint}
+          mapHint={mapHint ?? 'mapped'}
+          previewHint={`${batch.rowCount.toLocaleString('en-US')} rows`}
+        />
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto pb-6">
+          <div className="flex flex-col gap-3">
+            <ReceiptStrip
+              counts={receipt.counts}
+              batchId={batch.id}
+              ledger={receipt.ledger?.counts ?? null}
+            />
+            {receipt.ledger ? (
+              <MissingRateLine ledger={receipt.ledger} />
+            ) : null}
+          </div>
+          <div className="px-8">
+            {receipt.ledger ? (
+              <VoidLine
+                ledger={receipt.ledger}
+                voiding={voiding}
+                onVoid={() => void voidBatch()}
+              />
+            ) : null}
+            <ReceiptLedger view={receipt} batchId={batch.id} />
+          </div>
+        </div>
+        {confirmDialog}
+      </div>
+    )
+  }
+
   // Ledger mode (SPA-170): steps 2 and 3 are the ledger's own components.
   if (batch.mode === 'ledger' && ledger?.preview)
     return (
@@ -340,6 +414,8 @@ function ImportBatchPage() {
         batch={batch}
         view={ledger.preview}
         uploadHint={uploadHint}
+        committing={committing === 'commit'}
+        {...(canCommit ? { onCommit: () => commit(false) } : {})}
       />
     )
   if (batch.mode === 'ledger' && ledger?.mapping)
@@ -356,33 +432,6 @@ function ImportBatchPage() {
         {confirmDialog}
       </>
     )
-
-  if (receipt) {
-    return (
-      <div className="flex h-full flex-col">
-        <ReceiptHeader
-          view={receipt}
-          filename={batch.filename}
-          onCommit={() => commit(false)}
-          onRetry={() => commit(true)}
-          pending={committing}
-        />
-        <StepStrip
-          step={3}
-          uploadHint={uploadHint}
-          mapHint={mapHint ?? 'mapped'}
-          previewHint={`${batch.rowCount.toLocaleString('en-US')} rows`}
-        />
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto pb-6">
-          <ReceiptStrip counts={receipt.counts} batchId={batch.id} />
-          <div className="px-8">
-            <ReceiptLedger view={receipt} batchId={batch.id} />
-          </div>
-        </div>
-        {confirmDialog}
-      </div>
-    )
-  }
 
   if (preview) {
     return (

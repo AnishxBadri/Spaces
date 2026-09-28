@@ -29,7 +29,14 @@ import { fitMapping } from '@spaces/core/import/mapping'
 import { creatorFor } from '@spaces/core/import/plan'
 import { referenceKey } from '@spaces/core/import/references'
 import { lookupReferences } from './references'
-import { ImportFailed, ImportNotFound, ImportRefused, clearPlan } from './stage'
+import {
+  COMMITTING,
+  ImportFailed,
+  ImportNotFound,
+  ImportRefused,
+  clearPlan,
+  commitStarted,
+} from './stage'
 import type {
   CompanyTarget,
   LedgerCompanyReport,
@@ -59,7 +66,7 @@ import type { ImportFailure } from './stage'
  * row's plan on `import_row.plan`.
  *
  * **Nothing here writes to `round`, `investment`, `mark` or
- * `distribution`** — the commit is SPA-171's. Outside `lib/server/` for the
+ * `distribution`** — the commit is `./ledger-commit`'s (SPA-171). Outside `lib/server/` for the
  * barrel's reason (CLAUDE.md → Traps).
  */
 
@@ -112,6 +119,9 @@ const editableLedger = Effect.fn('editableLedger')(function* (
     return yield* new ImportRefused({
       reason: `This import is ${batch.status} and can no longer change`,
     })
+  // A plan the commit is replaying must not move under it (SPA-171).
+  if (batch.status === 'planned' && (yield* commitStarted(batch.id)))
+    return yield* new ImportRefused({ reason: COMMITTING })
   return batch
 })
 
@@ -475,7 +485,13 @@ export const loadLedgerImportProgram = Effect.fn('loadLedgerImportProgram')(
     const batch = yield* batchOf(batchId)
     if (!batch) return yield* new ImportNotFound()
     if (batch.mode !== 'ledger') return null
-    if (batch.mapping === null) return { mapping: null, preview: null }
+    // A committed batch is its receipt (SPA-171), not a step to edit.
+    if (
+      batch.mapping === null ||
+      batch.status === 'committed' ||
+      batch.status === 'failed'
+    )
+      return { mapping: null, preview: null }
 
     if (batch.status === 'planned') {
       const rows = yield* storedPlans(batchId)

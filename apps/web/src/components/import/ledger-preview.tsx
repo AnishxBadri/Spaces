@@ -22,8 +22,9 @@ import type { LedgerFailedRow, LedgerPreviewView } from '#/lib/import/ledger'
  * company**, and its what-lands lane is the events it would write, in date
  * order: `round Seed 2023-03-15 · investment $50,000 priced · mark $120,000
  * 2025-12-31`. Rows that will not land follow, each with its reason, and a
- * SAFE decided per row carries its choice in the decision lane. Commit is
- * drawn, not armed (SPA-171).
+ * SAFE decided per row carries its choice in the decision lane. Commit
+ * (SPA-171) enqueues the same `import.commit` job a records batch does, and
+ * the page turns into its receipt.
  */
 
 export function ledgerStripCells(counts: LedgerCounts) {
@@ -134,10 +135,15 @@ export function LedgerPreviewStep({
   batch,
   view,
   uploadHint,
+  onCommit,
+  committing = false,
 }: {
   batch: { id: string; filename: string }
   view: LedgerPreviewView
   uploadHint: string
+  /** Armed once a row lands (SPA-171); the page becomes the receipt. */
+  onCommit?: () => void
+  committing?: boolean
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -186,8 +192,11 @@ export function LedgerPreviewStep({
             <Button variant="outline" pending={backing} onClick={back}>
               Back to mapping
             </Button>
-            {/* The ledger commit is SPA-171's; the button is drawn, not armed. */}
-            <Button disabled>
+            <Button
+              disabled={!onCommit || landing === 0 || busy}
+              pending={committing}
+              onClick={onCommit}
+            >
               Commit {landing.toLocaleString('en-US')} rows{' '}
               <KeyHint>⌘↵</KeyHint>
             </Button>

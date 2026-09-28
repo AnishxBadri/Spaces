@@ -339,6 +339,30 @@ export type LedgerEvents = {
 /** A decision the operator has not made that stops a row. */
 export type LedgerNeed = 'instrument' | 'marksAsOf' | 'currency' | 'dateOrder'
 
+/** A ledger event kind, as the commit records what it reused. */
+export type LedgerEventKind = 'round' | 'investment' | 'mark' | 'distribution'
+
+/**
+ * What the commit did with a ledger row (SPA-171), written onto its plan in
+ * the row's own transaction. A row holding it is passed over by every later
+ * run, so a committed batch re-run appends nothing. The ids are the rows the
+ * events are — appended by this commit, or an existing live row with the
+ * same natural key, named in `reused`. `roundId` is set on the row that
+ * carries the round: a round has no `batch_id` (D12), so this is how the
+ * receipt names it.
+ */
+export type LedgerCommitted = {
+  holdingId: string
+  /** This row's cheque opened the company's holding. */
+  holdingBorn: boolean
+  roundId?: string
+  investmentId: string
+  markId?: string
+  distributionId?: string
+  /** Events matched to an existing live row by natural key, not appended. */
+  reused?: Array<LedgerEventKind>
+}
+
 export type LedgerPlan = {
   /** The company across the batch: `entity:<id>` or a create's key. */
   company: string | null
@@ -348,6 +372,8 @@ export type LedgerPlan = {
   events: LedgerEvents | null
   /** Decisions whose absence stops the row. */
   needs: Array<LedgerNeed>
+  /** Set by the commit once the row's events landed (SPA-171). */
+  committed?: LedgerCommitted
 }
 
 /**
