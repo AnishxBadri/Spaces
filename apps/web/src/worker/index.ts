@@ -29,6 +29,10 @@ import {
   syncMailScheduleProgram,
 } from './jobs/poll-mailbox'
 import { mailScheduleLayer } from '#/lib/arrival/schedule'
+import {
+  IMPORT_COMMIT_EXPIRE_SECONDS,
+  importCommit,
+} from './jobs/import-commit'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -281,6 +285,20 @@ async function main() {
   )
   await Effect.runPromise(
     Effect.provide(syncMailScheduleProgram(), mailSchedule),
+  )
+  // The import commit (SPA-169): keyed by the batch, so a double click is
+  // refused by pg-boss; never retried — a failed row is re-run on its own.
+  await boss
+    .createQueue(QUEUES.importCommit, {
+      policy: 'exclusive',
+      retryLimit: 0,
+      expireInSeconds: IMPORT_COMMIT_EXPIRE_SECONDS,
+    })
+    .catch(() => {})
+  await boss.work(
+    QUEUES.importCommit,
+    { batchSize: 1, includeMetadata: true },
+    runJob(importCommit, { host, layer: Layer.empty }),
   )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots

@@ -5,7 +5,6 @@ import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
 import { attributeEvent, entity, link } from '@spaces/db/schema'
 import { mandate } from '@spaces/db/schema/workspace'
-import { activity } from '@spaces/db/schema/activity'
 import { jsonString } from '#/lib/json'
 import type { EntityValues } from '@spaces/db/schema/entities'
 import { requireUser } from './shared'
@@ -18,49 +17,19 @@ const createDealInput = z.object({
   source: z.string().max(60).optional(),
 })
 
+/**
+ * A deal from the create dialog. The birth — entity, values, activity, and
+ * the Invested → holding seam — is `birthDealProgram` (SPA-169), the same
+ * program an imported Deals row goes through; this is its thin caller.
+ */
 export const createDeal = createServerFn({ method: 'POST' })
   .validator(createDealInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { objectIdForKindAsync } = await import('../attributes/objects')
-    const [ent] = await db
-      .insert(entity)
-      .values({
-        kind: 'deal',
-        objectId: await objectIdForKindAsync('deal'),
-        canonicalName: data.name,
-        createdBy: u.id,
-      })
-      .returning({ id: entity.id })
-
-    // Birth = supplied values, then defaults (spec §4). Owner is no longer
-    // stamped here: `deal.owner` defaults to current-user, so the dialog and
-    // any future path that has a human present agree on who owns it.
-    const { birthValues } = await import('../attributes/defaults')
-    await birthValues({
-      entityId: ent.id,
-      actor: { type: 'user', id: u.id },
-      supplied: {
-        company: data.companyId,
-        stage: data.stage ?? 'pre_lead',
-        ...(data.value !== undefined ? { value: data.value } : {}),
-        ...(data.source ? { source: data.source } : {}),
-      },
-    })
-    await db.insert(activity).values({
-      actorId: u.id,
-      verb: 'deal.created',
-      subjectEntityId: data.companyId,
-      objectEntityId: ent.id,
-    })
-    // The pipeline→portfolio seam applies at birth too: a deal *created*
-    // at Invested (import flows, direct entry) births its holding just
-    // like one moved there (companies.ts updateRecord has the twin hook).
-    if (data.stage === 'invested') {
-      const { birthHolding } = await import('./shared')
-      await birthHolding({ companyId: data.companyId, actorId: u.id })
-    }
-    return { id: ent.id }
+    const { birthDealProgram, dealFromDialog } = await import('../deals/birth')
+    const { effectFn } = await import('./effect')
+    const born = await effectFn(birthDealProgram)(dealFromDialog(data, u.id))
+    return { id: born.id }
   })
 
 /** One row of the deals table, values already the column's type. */

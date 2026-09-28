@@ -102,13 +102,16 @@ export function StepStrip({
   step = 0,
   mapHint = null,
   mode = 'records',
+  previewHint = null,
 }: {
   uploadHint: string | null
-  step?: 0 | 1 | 2
+  step?: 0 | 1 | 2 | 3
   /** Step 2's readout once its mapping would advance — `7 of 11 mapped`. */
   mapHint?: string | null
   /** A ledger batch maps to event fields (SPA-170). */
   mode?: ImportMode
+  /** Step 3's readout once the batch commits — `46 rows` (SPA-169). */
+  previewHint?: string | null
 }) {
   return (
     <nav
@@ -117,7 +120,14 @@ export function StepStrip({
     >
       {STEPS.map((label, i) => {
         const current = i === step
-        const hint = i === 0 ? uploadHint : i === 1 ? mapHint : null
+        const hint =
+          i === 0
+            ? uploadHint
+            : i === 1
+              ? mapHint
+              : i === 2
+                ? previewHint
+                : null
         const done = hint !== null
         return (
           <div

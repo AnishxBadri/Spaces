@@ -206,6 +206,7 @@ beforeEach(async () => {
         objectId: fundObject,
         name: `Northwind Fund I ${tag}`,
         actor: ME,
+        source: 'manual',
       }),
     )
   ).id

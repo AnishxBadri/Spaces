@@ -68,6 +68,22 @@ describe('the preview header', () => {
     expect(html).toContain('Back to mapping')
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Commit 43 rows/)
   })
+
+  it('arms the commit when the route hands it one (SPA-169)', () => {
+    const html = renderToStaticMarkup(
+      <PreviewHeader
+        counts={counts}
+        filename="portfolio.csv"
+        onBack={() => {}}
+        backing={false}
+        onCommit={() => {}}
+      />,
+    )
+    // The class list spells `disabled:` variants, so read the attribute.
+    const commit = /<button(?:(?!<button).)*?>Commit 43 rows/.exec(html)?.[0]
+    expect(commit).toBeDefined()
+    expect(commit).not.toContain('disabled=""')
+  })
 })
 
 describe('the ledger items', () => {

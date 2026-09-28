@@ -280,6 +280,7 @@ describe('resolveEntity', () => {
         name: `Sequoia ${tag} Capital`,
         values: { domain },
         actor: { type: 'user', id: actor.id },
+        source: 'manual',
       }),
     )
 

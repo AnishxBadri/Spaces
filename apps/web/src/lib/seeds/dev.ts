@@ -3390,6 +3390,7 @@ async function seedVehicles(companies: Ids, userId: string): Promise<number> {
           manager: userId,
         },
         actor: { type: 'user', id: userId },
+        source: 'seed',
       }),
     )
     created++

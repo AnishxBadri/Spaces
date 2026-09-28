@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream'
 import { Effect, Schema } from 'effect'
-import { and, asc, count, desc, eq, isNotNull, ne } from 'drizzle-orm'
+import { and, asc, count, desc, eq, isNotNull, ne, or } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   importBatch,
@@ -367,8 +367,34 @@ export const editableBatch = Effect.fn('editableBatch')(function* (
     return yield* new ImportRefused({
       reason: `This import is ${batch.status} and can no longer change`,
     })
+  if (batch.status === 'planned' && (yield* commitStarted(batch.id)))
+    return yield* new ImportRefused({ reason: COMMITTING })
   return batch
 })
+
+/** A planned batch's refusal once its commit has written a row (SPA-169). */
+export const COMMITTING =
+  'This import is being committed and can no longer change'
+
+/**
+ * Whether a commit has reached any row of the batch — written it or failed
+ * it (SPA-169). A plan the commit is replaying must not move under it, so a
+ * mapping change or a decision is refused from then on.
+ */
+export const commitStarted = (batchId: string) =>
+  query(() =>
+    db
+      .select({ rowNum: importRow.rowNum })
+      .from(importRow)
+      .where(
+        and(
+          eq(importRow.batchId, batchId),
+          or(isNotNull(importRow.entityId), isNotNull(importRow.error)),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows.length > 0),
+  )
 
 /**
  * Throw a batch's plan away and return it to `staged` — every row's `plan`

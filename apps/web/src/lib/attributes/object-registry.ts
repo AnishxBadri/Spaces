@@ -3,7 +3,6 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { activity } from '@spaces/db/schema/activity'
 import { attribute, attributeEvent, entity, objectDef } from '@spaces/db/schema'
-import { birthValuesEffect } from './defaults'
 import type { BirthValuesResult } from './defaults'
 import { createAttributeProgram } from './create'
 import {
@@ -23,12 +22,14 @@ import type {
   SystemObjectNotSeeded,
 } from './objects'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
-import type {
-  Actor,
+import {
   AttributeValidationError,
   EntityNotFound,
-  ValuesWriteFailed,
+  setValuesInTx,
 } from './values'
+import type { Actor, EventSource, ValuesWriteFailed } from './values'
+import { enqueueSourceEmbed } from '#/lib/ai/chunk-sources'
+import type { EmbedSource } from '#/lib/ai/chunk-sources'
 
 /**
  * Custom objects (spec §9, two-tier model). An object is an attribute bag
@@ -445,12 +446,30 @@ export const updateObjectProgram = Effect.fn('updateObjectProgram')(function* (
   return { ok: true }
 })
 
+/**
+ * Which door a custom record came through (SPA-169). It decides the pair the
+ * columns carry: `entity.source_class` and its birth alias say `manual`,
+ * `seed` or `import`, and the birth values log through `direct`, `seed` or
+ * `import` — so an imported record is honestly an import rather than a
+ * record somebody typed.
+ */
+export type RecordSource = 'manual' | 'seed' | 'import'
+
+const RECORD_EVENT_SOURCE: Record<RecordSource, EventSource> = {
+  manual: 'direct',
+  seed: 'seed',
+  import: 'import',
+}
+
 export type CreateRecordInput = {
   objectId: string
   /** the display name — core-owned, required at birth (§9 birth contract) */
   name: string
   values?: Record<string, unknown> | undefined
   actor: Actor
+  source: RecordSource
+  /** The import batch the birth belongs to; stamped on every event it writes. */
+  batchId?: string | undefined
 }
 
 /**
@@ -463,30 +482,10 @@ export type CreateRecordResult = { id: string } & Pick<
   'identity' | 'identityValues'
 >
 
-/**
- * Birth of a custom record: an entity row and its `name` alias, in one
- * transaction, then the same birth-values pass every record gets (supplied
- * first, defaults for the blanks), then the fuzzy sweep every other record
- * gets. The birth alias is the `name` one — non-identity, because a name is
- * history rather than a claim — and it is what puts the record in front of
- * pg_trgm and in `searchEntities`' alias lane. Identity aliases arrive by
- * the other door: a supplied value for an attribute carrying
- * `options.identityKey` is mirrored into `entity_alias` by the birth-values
- * pass itself (objects-7), in the transaction that wrote it.
- */
-export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
-  input: CreateRecordInput,
-): Effect.fn.Return<
-  CreateRecordResult,
-  | ObjectRejected
-  | ObjectQueryFailed
-  | AttributeValidationError
-  | EntityNotFound
-  | ValuesWriteFailed
-> {
-  const name = input.name.trim()
-  if (!name)
-    return yield* new ObjectRejected({ message: 'Every record needs a name' })
+/** The object a record is born into: live, custom, not archived. */
+const recordObject = Effect.fn('recordObject')(function* (
+  objectId: string,
+): Effect.fn.Return<{ id: string }, ObjectRejected | ObjectQueryFailed> {
   const object = yield* query(() =>
     db
       .select({
@@ -495,7 +494,7 @@ export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
         archived: objectDef.archived,
       })
       .from(objectDef)
-      .where(eq(objectDef.id, input.objectId))
+      .where(eq(objectDef.id, objectId))
       .then((rows) => rows.at(0)),
   )
   if (!object) return yield* new ObjectRejected({ message: 'Object not found' })
@@ -505,46 +504,143 @@ export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
     })
   if (object.archived)
     return yield* new ObjectRejected({ message: 'This object is archived' })
+  return { id: object.id }
+})
+
+/**
+ * The birth's writes, in one transaction the caller owns: the entity, its
+ * `name` alias, the birth values (supplied first, defaults for the blanks)
+ * and the `record.created` activity. An entity whose name alias failed to
+ * land would be a record the sweep cannot see and search cannot reach by its
+ * birth name; one whose values failed would be half-born.
+ */
+async function birthRecordInTx(
+  tx: Tx,
+  input: CreateRecordInput,
+  objectId: string,
+  name: string,
+): Promise<CreateRecordResult & { reembed: Array<EmbedSource> }> {
   const userId = input.actor.type === 'user' ? input.actor.id : null
-  // One transaction: an entity whose name alias failed to land would be a
-  // record the sweep cannot see and search cannot reach by its birth name.
-  const row = yield* query(() =>
-    db.transaction(async (tx) => {
-      const [ent] = await tx
-        .insert(entity)
-        .values({
-          kind: 'custom',
-          objectId: object.id,
-          canonicalName: name,
-          sourceClass: 'manual',
-          createdBy: userId,
-        })
-        .returning({ id: entity.id })
-      // Stamped exactly as `resolveEntity` stamps a manual birth alias —
-      // `manual`, no integration ref, `is_identity` false.
-      await recordNameAlias(ent.id, name, { class: 'manual' }, tx)
-      return ent
-    }),
+  const ent = (
+    await tx
+      .insert(entity)
+      .values({
+        kind: 'custom',
+        objectId,
+        canonicalName: name,
+        sourceClass: input.source,
+        createdBy: userId,
+      })
+      .returning({ id: entity.id })
+  ).at(0)
+  if (!ent) throw new Error('Record insert returned no row')
+  // Stamped exactly as `resolveEntity` stamps a birth alias of the same
+  // class — no integration ref, `is_identity` false.
+  await recordNameAlias(ent.id, name, { class: input.source }, tx)
+  const supplied = Object.fromEntries(
+    Object.entries(input.values ?? {}).filter(
+      ([, v]) => v !== undefined && v !== null && v !== '',
+    ),
   )
-  const { identity, identityValues } = yield* birthValuesEffect({
-    entityId: row.id,
+  const { identity, identityValues, reembed } = await setValuesInTx(tx, {
+    entityId: ent.id,
+    patch: supplied,
     actor: input.actor,
-    supplied: input.values,
+    source: RECORD_EVENT_SOURCE[input.source],
+    ...(input.batchId !== undefined ? { batchId: input.batchId } : {}),
+    fillDefaults: { now: new Date() },
   })
-  yield* query(() =>
-    db.insert(activity).values({
-      actorId: userId,
-      verb: 'record.created',
-      subjectEntityId: row.id,
-    }),
-  )
-  // Probabilistic, suggestion-only, and never fatal: the record exists by
-  // now, so a failing sweep must not report the creation as failed. Same
-  // stance `resolveEntity` takes, said in Effect.
-  yield* sweepNameSimilarityEffect(row.id, normalizeName(name)).pipe(
+  await tx.insert(activity).values({
+    actorId: userId,
+    verb: 'record.created',
+    subjectEntityId: ent.id,
+  })
+  return { id: ent.id, identity, identityValues, reembed }
+}
+
+const birthFailure = (cause: unknown) =>
+  cause instanceof AttributeValidationError || cause instanceof EntityNotFound
+    ? cause
+    : new ObjectQueryFailed({ cause })
+
+type CreateRecordFailure =
+  | ObjectRejected
+  | ObjectQueryFailed
+  | AttributeValidationError
+  | EntityNotFound
+  | ValuesWriteFailed
+
+/**
+ * Birth of a custom record: `birthRecordInTx` in its own transaction, then —
+ * once it has committed — the embeddable values queued and the fuzzy sweep
+ * every other record gets. The birth alias is the `name` one — non-identity,
+ * because a name is history rather than a claim — and it is what puts the
+ * record in front of pg_trgm and in `searchEntities`' alias lane. Identity
+ * aliases arrive by the other door: a supplied value for an attribute
+ * carrying `options.identityKey` is mirrored into `entity_alias` by the
+ * birth-values pass itself (objects-7), in the transaction that wrote it.
+ */
+export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
+  input: CreateRecordInput,
+): Effect.fn.Return<CreateRecordResult, CreateRecordFailure> {
+  const name = input.name.trim()
+  if (!name)
+    return yield* new ObjectRejected({ message: 'Every record needs a name' })
+  const object = yield* recordObject(input.objectId)
+  const born = yield* Effect.tryPromise({
+    try: () =>
+      db.transaction((tx) => birthRecordInTx(tx, input, object.id, name)),
+    catch: birthFailure,
+  })
+  for (const source of born.reembed)
+    yield* Effect.promise(() => enqueueSourceEmbed(source))
+  yield* sweepRecordName(born.id, name)
+  return {
+    id: born.id,
+    identity: born.identity,
+    identityValues: born.identityValues,
+  }
+})
+
+/**
+ * The object-scoped fuzzy sweep a custom record's birth runs once it has
+ * committed. Probabilistic, suggestion-only, and never fatal: the record
+ * exists by now, so a failing sweep must not report the creation as failed.
+ * Same stance `resolveEntity` takes, said in Effect.
+ */
+export const sweepRecordName = (id: string, name: string) =>
+  sweepNameSimilarityEffect(id, normalizeName(name)).pipe(
     Effect.catch((cause) =>
       Effect.logError('[objects] fuzzy sweep failed', cause),
     ),
+    Effect.asVoid,
   )
-  return { id: row.id, identity, identityValues }
-})
+
+/**
+ * `createRecordProgram` inside a caller's transaction (SPA-169): the import
+ * commit writes a row's secondary creates, its record and its values in one
+ * transaction, so a failure anywhere rolls the row back whole. The two steps
+ * that must follow a commit are handed back rather than run — the embeddable
+ * values to queue, and the name `sweepRecordName` sweeps — because the sweep
+ * inserts rows naming this record, which another connection cannot do before
+ * the record is committed.
+ */
+export const createRecordInTxProgram = Effect.fn('createRecordInTxProgram')(
+  function* (
+    tx: Tx,
+    input: CreateRecordInput,
+  ): Effect.fn.Return<
+    CreateRecordResult & { name: string; reembed: Array<EmbedSource> },
+    CreateRecordFailure
+  > {
+    const name = input.name.trim()
+    if (!name)
+      return yield* new ObjectRejected({ message: 'Every record needs a name' })
+    const object = yield* recordObject(input.objectId)
+    const born = yield* Effect.tryPromise({
+      try: () => birthRecordInTx(tx, input, object.id, name),
+      catch: birthFailure,
+    })
+    return { ...born, name }
+  },
+)

@@ -22,12 +22,18 @@ import {
   PreviewLedger,
   PreviewStrip,
 } from '#/components/import/preview-ledger'
+import {
+  ReceiptHeader,
+  ReceiptLedger,
+  ReceiptStrip,
+} from '#/components/import/commit-receipt'
 import { LedgerMappingStep } from '#/components/import/ledger-mapping'
 import { LedgerPreviewStep } from '#/components/import/ledger-preview'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   beginImportMapping,
   beginLedgerMapping,
+  commitImport,
   createImportAttribute,
   decideImportCollision,
   defineImportBatch,
@@ -35,6 +41,7 @@ import {
   getImportBatch,
   getImportMapping,
   getImportPreview,
+  getImportReceipt,
   getLedgerImport,
   listObjects,
   mapImportColumn,
@@ -46,6 +53,7 @@ import type { ImportMode } from '#/components/import/import-wizard'
 import type { NewAttributeDraft } from '#/components/import/mapping-grid'
 import type { ColumnTarget, Replaced } from '@spaces/core/import/mapping'
 import type { CollisionDecision } from '@spaces/core/import/plan'
+import { landingRows } from '@spaces/core/import/plan'
 
 /**
  * `/import/$batchId` — a staged batch. Step 1 (SPA-164): the define row
@@ -53,7 +61,8 @@ import type { CollisionDecision } from '@spaces/core/import/plan'
  * workbook's tabs, and the detected header over the first 20 rows. Step 2
  * (SPA-165): the same grid with the mapping in its heads. Step 3 (SPA-167):
  * the resolve preview — the verdict sentence, the readout strip and the
- * ledger of stored plans.
+ * ledger of stored plans. Step 4 (SPA-169): the commit's receipt — the
+ * strip, the rows filling with their outcomes as the job passes them.
  *
  * The step is read off the batch — a mapping on the row is step 2, a
  * planned batch step 3 — so a reload resumes exactly where the operator
@@ -67,22 +76,31 @@ const importSearch = z.object({
     .enum(['all', 'create', 'attach', 'decide', 'noland'])
     .catch('all')
     .default('all'),
+  /** Step 4's filter (SPA-169): every row, or the ones that failed. */
+  outcome: z.enum(['all', 'failed']).catch('all').default('all'),
 })
 
 export const Route = createFileRoute('/_app/import_/$batchId')({
   validateSearch: importSearch,
-  loaderDeps: ({ search }) => ({ show: search.show }),
+  loaderDeps: ({ search }) => ({
+    show: search.show,
+    outcome: search.outcome,
+  }),
   loader: async ({ params, deps }) => {
-    const [batch, objects, mapping, preview, ledger] = await Promise.all([
-      getImportBatch({ data: { batchId: params.batchId } }),
-      listObjects(),
-      getImportMapping({ data: { batchId: params.batchId } }),
-      getImportPreview({
-        data: { batchId: params.batchId, filter: deps.show },
-      }),
-      getLedgerImport({ data: { batchId: params.batchId } }),
-    ])
-    return { batch, objects, mapping, preview, ledger }
+    const [batch, objects, mapping, preview, ledger, receipt] =
+      await Promise.all([
+        getImportBatch({ data: { batchId: params.batchId } }),
+        listObjects(),
+        getImportMapping({ data: { batchId: params.batchId } }),
+        getImportPreview({
+          data: { batchId: params.batchId, filter: deps.show },
+        }),
+        getLedgerImport({ data: { batchId: params.batchId } }),
+        getImportReceipt({
+          data: { batchId: params.batchId, filter: deps.outcome },
+        }),
+      ])
+    return { batch, objects, mapping, preview, ledger, receipt }
   },
   component: ImportBatchPage,
 })
@@ -93,7 +111,8 @@ function extensionOf(filename: string): string {
 }
 
 function ImportBatchPage() {
-  const { batch, objects, mapping, preview, ledger } = Route.useLoaderData()
+  const { batch, objects, mapping, preview, ledger, receipt } =
+    Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const { confirm, confirmDialog } = useConfirm()
@@ -101,6 +120,7 @@ function ImportBatchPage() {
   const [discarding, setDiscarding] = useState(false)
   const [continuing, setContinuing] = useState(false)
   const [backing, setBacking] = useState(false)
+  const [committing, setCommitting] = useState<'commit' | 'retry' | null>(null)
 
   const staged = batch.status === 'staged'
   const step = mapping ? 1 : 0
@@ -239,13 +259,51 @@ function ImportBatchPage() {
     )
   }
 
-  // ⌘↵ is printed inside Continue, so it works wherever Continue does.
+  /**
+   * Commit, or Retry failed rows: the job is enqueued keyed by the batch,
+   * and the page turns into its receipt on the next load.
+   */
+  function commit(onlyFailed: boolean) {
+    setCommitting(onlyFailed ? 'retry' : 'commit')
+    void write(async () => {
+      const out = await commitImport({
+        data: { batchId: batch.id, onlyFailed },
+      })
+      if (!out.queued) toast('A commit of this import is already running')
+    }).finally(() => setCommitting(null))
+  }
+
+  const canCommit =
+    preview !== null &&
+    receipt === null &&
+    preview.counts.collide === 0 &&
+    landingRows(preview.counts) > 0
+
+  /**
+   * Progress by polling, deliberately: while a run is live the receipt is
+   * re-read every 1.5 s, and every read comes from `import_row`, `job_run`
+   * and the queue, so a reopened page recovers exactly where the commit is.
+   * sdk-18's SSE stream is the upgrade this does not build — when it lands,
+   * the interval becomes a subscription and nothing else changes.
+   */
+  const live = receipt?.running ?? false
   useEffect(() => {
-    if (!canContinue) return
+    if (!live) return
+    const timer = window.setInterval(() => void router.invalidate(), 1500)
+    return () => window.clearInterval(timer)
+  }, [live, router])
+
+  // ⌘↵ is printed inside Continue and Commit, so it works wherever they do.
+  useEffect(() => {
+    const armed = receipt
+      ? !receipt.running && committing === null
+      : canCommit && !busy
+    if (!canContinue && !armed) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        onContinue()
+        if (armed) commit(false)
+        else onContinue()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -299,6 +357,33 @@ function ImportBatchPage() {
       </>
     )
 
+  if (receipt) {
+    return (
+      <div className="flex h-full flex-col">
+        <ReceiptHeader
+          view={receipt}
+          filename={batch.filename}
+          onCommit={() => commit(false)}
+          onRetry={() => commit(true)}
+          pending={committing}
+        />
+        <StepStrip
+          step={3}
+          uploadHint={uploadHint}
+          mapHint={mapHint ?? 'mapped'}
+          previewHint={`${batch.rowCount.toLocaleString('en-US')} rows`}
+        />
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto pb-6">
+          <ReceiptStrip counts={receipt.counts} batchId={batch.id} />
+          <div className="px-8">
+            <ReceiptLedger view={receipt} batchId={batch.id} />
+          </div>
+        </div>
+        {confirmDialog}
+      </div>
+    )
+  }
+
   if (preview) {
     return (
       <div className="flex h-full flex-col">
@@ -307,6 +392,8 @@ function ImportBatchPage() {
           filename={batch.filename}
           onBack={backToMapping}
           backing={backing}
+          committing={committing === 'commit'}
+          {...(canCommit ? { onCommit: () => commit(false) } : {})}
         />
         <StepStrip step={2} uploadHint={uploadHint} mapHint={mapHint} />
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto pb-6">

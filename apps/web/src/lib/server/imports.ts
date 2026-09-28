@@ -525,3 +525,55 @@ export const decideLedgerRow = createServerFn({ method: 'POST' })
       throw new Error(ledgerMessage(failure))
     }
   })
+
+// ---------------------------------------------------------------------------
+// The commit step (SPA-169, import-7)
+// ---------------------------------------------------------------------------
+
+/** Spelled here rather than imported: `#/lib/import/commit` is server-only. */
+const RECEIPT_FILTERS = ['all', 'failed'] as const
+
+/**
+ * Commit, or Retry failed rows (`onlyFailed`): refused with a reason while a
+ * collision is undecided, otherwise `import.commit` is enqueued keyed by the
+ * batch. `queued: false` means one is already queued or running.
+ */
+export const commitImport = createServerFn({ method: 'POST' })
+  .validator(z.object({ batchId: uuid, onlyFailed: z.boolean() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { requestCommitProgram, commitMessage } =
+      await import('../import/commit')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(requestCommitProgram)({
+        batchId: data.batchId,
+        userId: u.id,
+        onlyFailed: data.onlyFailed,
+      })
+    } catch (failure) {
+      throw new Error(commitMessage(failure))
+    }
+  })
+
+/**
+ * Step 4's data — counts, liveness, the last run and the first rows with
+ * their outcomes — read from the database on every call, so the page polls
+ * it while a commit runs and a reopened page recovers where it is. Null
+ * until a commit has started.
+ */
+export const getImportReceipt = createServerFn()
+  .validator(
+    z.object({ batchId: uuid, filter: z.enum(RECEIPT_FILTERS).catch('all') }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { loadImportReceiptProgram, commitMessage } =
+      await import('../import/commit')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(loadImportReceiptProgram)(data)
+    } catch (failure) {
+      throw new Error(commitMessage(failure))
+    }
+  })

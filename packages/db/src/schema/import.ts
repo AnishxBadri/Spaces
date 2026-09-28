@@ -276,6 +276,17 @@ export type RecordRowPlan = {
   references?: Array<ImportReference>
   /** Records of referenced objects this row creates first (SPA-168). */
   alsoCreates?: Array<ImportAlsoCreate>
+  /**
+   * What the commit's creator actually did (SPA-169), stored only when it
+   * differs from `verdict` — a record born between the preview and the
+   * commit turns a planned create into an attach. The plan is intent; this
+   * is what happened.
+   */
+  committedAs?: 'attach' | 'create'
+  /** The records this row's `alsoCreates` became, by create key (SPA-169). */
+  alsoCreated?: Record<string, string>
+  /** Why the commit wrote nothing for a row that was never going to (SPA-169). */
+  skipReason?: string
 }
 
 /** A planned financing round (`round` columns); money as numbers until the write. */

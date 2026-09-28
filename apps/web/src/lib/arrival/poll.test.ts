@@ -526,6 +526,7 @@ async function aFundRecord(name: string, domain: string): Promise<string> {
       name,
       values: { domain },
       actor: { type: 'user', id: FIXTURE_ACTOR.id },
+      source: 'manual',
     }),
   )
   return row.id

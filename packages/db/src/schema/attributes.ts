@@ -17,6 +17,7 @@ import { integration } from './integrations'
 import { suggestion } from './suggestions'
 import { actorType } from './actors'
 import { objectDef } from './objects'
+import { importBatch } from './import'
 import type { IdentityKey } from './objects'
 import { user } from './auth'
 import type { Json } from '../json'
@@ -257,11 +258,24 @@ export const attributeEvent = pgTable(
     // queue filters on (`= ANY(refs)`), which is what a native array is for.
     // Accept copies one into the other unchanged.
     refs: jsonb('refs').$type<Array<string>>(),
+    // The import batch whose commit wrote this value (SPA-169), so every
+    // imported cell — and every default its birth fired — is findable by the
+    // batch that brought it. Not `refs`: those are citations a reader follows
+    // to a source, a flat list of mixed kinds with no index; this is one
+    // typed foreign key a "what did this import write?" query filters on.
+    // `set null` on delete: the receipt outlives the staging rows.
+    batchId: uuid('batch_id').references(() => importBatch.id, {
+      onDelete: 'set null',
+    }),
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index('attribute_event_entity_idx').on(t.entityId, t.at),
     index('attribute_event_slug_idx').on(t.entityId, t.attrSlug),
+    // Partial: all but imported rows carry no batch.
+    index('attribute_event_batch_idx')
+      .on(t.batchId)
+      .where(sql`${t.batchId} is not null`),
     // actor_type = 'user' ⇔ actor_id set, and actor_type = 'integration' ⇔
     // actor_ref set (spec §4 invariant, both halves). Biconditionals, not
     // implications: a `system` row carrying an integration id would be a

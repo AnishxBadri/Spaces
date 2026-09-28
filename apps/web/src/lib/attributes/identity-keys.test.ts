@@ -314,6 +314,7 @@ describe('revising an object’s identity keys', () => {
         objectId: fund.id,
         name: 'First fund',
         actor: { type: 'user', id: actor.id },
+        source: 'manual',
       }),
     )
     await expect(
@@ -412,7 +413,12 @@ describe('revising an object’s identity keys', () => {
       createObjectProgram({ ...nouns(), createdBy: actor.id }),
     )
     const winner = await Effect.runPromise(
-      createRecordProgram({ objectId: other.id, name: 'Winner', actor: me }),
+      createRecordProgram({
+        objectId: other.id,
+        name: 'Winner',
+        actor: me,
+        source: 'manual',
+      }),
     )
     const { singular, plural } = nouns()
     const fund = await Effect.runPromise(
@@ -424,7 +430,12 @@ describe('revising an object’s identity keys', () => {
       }),
     )
     const loser = await Effect.runPromise(
-      createRecordProgram({ objectId: fund.id, name: 'Loser', actor: me }),
+      createRecordProgram({
+        objectId: fund.id,
+        name: 'Loser',
+        actor: me,
+        source: 'manual',
+      }),
     )
     await db
       .update(entity)

@@ -106,6 +106,7 @@ describe('renaming a record', () => {
         objectId: fund.id,
         name: `Fund I ${tag}`,
         actor: { type: 'user', id: actor },
+        source: 'manual',
       }),
     )
 

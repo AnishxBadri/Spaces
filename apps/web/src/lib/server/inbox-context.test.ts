@@ -60,6 +60,7 @@ describe('entityContext — the noun and the link', () => {
         objectId: object.id,
         name: 'Sequoia Growth III',
         actor: { type: 'user', id: actor },
+        source: 'manual',
       }),
     )
     const side = await entityContext(record.id)
@@ -120,6 +121,7 @@ describe('entityContext — the colliding side still shows its domain', () => {
         name: 'Northwind Supply',
         values: { domain: 'northwind.example' },
         actor: { type: 'user', id: actor },
+        source: 'manual',
       }),
     )
     // The second record types the same domain: the value lands, the claim
@@ -130,6 +132,7 @@ describe('entityContext — the colliding side still shows its domain', () => {
         name: 'Northwind Supply Co',
         values: { domain: 'https://Northwind.example/' },
         actor: { type: 'user', id: actor },
+        source: 'manual',
       }),
     )
     expect(loser.identity).toEqual({ domain: 'suggested_duplicate' })

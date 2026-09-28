@@ -330,5 +330,6 @@ export const createObjectRecord = createServerFn({ method: 'POST' })
       name: data.name,
       values: data.values,
       actor: { type: 'user', id: u.id },
+      source: 'manual',
     })
   })

@@ -59,6 +59,7 @@ async function makeRecord(
       name,
       ...(values ? { values } : {}),
       actor: { type: 'user', id: actorId },
+      source: 'manual',
     }),
   )
   return row.id

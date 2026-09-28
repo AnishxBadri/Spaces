@@ -729,6 +729,7 @@ describe('mergeEntities', () => {
         objectId: funds.id,
         name: `Fund I ${tag}`,
         actor: me,
+        source: 'manual',
       }),
     )
     const vendor = await Effect.runPromise(
@@ -736,6 +737,7 @@ describe('mergeEntities', () => {
         objectId: vendors.id,
         name: `Vendor A ${tag}`,
         actor: me,
+        source: 'manual',
       }),
     )
 
@@ -866,6 +868,7 @@ describe('mergeEntities', () => {
         name: `Fund I ${tag}`,
         values: { [thesis.slug]: 'winner thesis' },
         actor: me,
+        source: 'manual',
       }),
     )
     const loser = await Effect.runPromise(
@@ -878,6 +881,7 @@ describe('mergeEntities', () => {
           [anchor.slug]: anchorCo.id,
         },
         actor: me,
+        source: 'manual',
       }),
     )
     const third = await Effect.runPromise(
@@ -885,6 +889,7 @@ describe('mergeEntities', () => {
         objectId: funds.id,
         name: `Fund II ${tag}`,
         actor: me,
+        source: 'manual',
       }),
     )
 

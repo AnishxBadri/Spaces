@@ -183,6 +183,7 @@ beforeEach(async () => {
         name: `${name} ${tag}`,
         values: { city: where },
         actor: ME,
+        source: 'manual',
       }),
     ).then((r) => r.id)
   bay = []

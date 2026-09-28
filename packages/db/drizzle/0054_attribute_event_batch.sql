@@ -1,0 +1,3 @@
+ALTER TABLE "attribute_event" ADD COLUMN "batch_id" uuid;--> statement-breakpoint
+ALTER TABLE "attribute_event" ADD CONSTRAINT "attribute_event_batch_id_import_batch_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."import_batch"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "attribute_event_batch_idx" ON "attribute_event" USING btree ("batch_id") WHERE "attribute_event"."batch_id" is not null;

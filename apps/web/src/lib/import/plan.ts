@@ -21,7 +21,14 @@ import {
 } from '#/lib/entities/resolve'
 import { mappingObjectOf, mappingProblemsOf, readColumns } from './mapping'
 import { lookupReferences, referenceColumnsOf } from './references'
-import { ImportFailed, ImportNotFound, ImportRefused, clearPlan } from './stage'
+import {
+  COMMITTING,
+  ImportFailed,
+  ImportNotFound,
+  ImportRefused,
+  clearPlan,
+  commitStarted,
+} from './stage'
 import type {
   CoreIdentityKey,
   ObjectKind,
@@ -316,6 +323,8 @@ const plannedBatch = Effect.fn('plannedBatch')(function* (batchId: string) {
           ? 'The preview is out of date — continue from the mapping'
           : `This import is ${batch.status} and can no longer change`,
     })
+  if (yield* commitStarted(batch.id))
+    return yield* new ImportRefused({ reason: COMMITTING })
   return batch
 })
 

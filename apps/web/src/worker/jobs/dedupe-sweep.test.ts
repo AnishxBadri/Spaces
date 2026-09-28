@@ -58,6 +58,7 @@ async function newRecord(objectId: string, name: string, userId: string) {
       objectId,
       name,
       actor: { type: 'user', id: userId },
+      source: 'manual',
     }),
   )
 }

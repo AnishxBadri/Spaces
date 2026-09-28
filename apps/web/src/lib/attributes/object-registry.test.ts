@@ -103,7 +103,12 @@ describe('custom objects', () => {
     // Record birth: name required, defaults fire, kind = custom.
     await expect(
       Effect.runPromise(
-        createRecordProgram({ objectId: fund.id, name: '  ', actor: me }),
+        createRecordProgram({
+          objectId: fund.id,
+          name: '  ',
+          actor: me,
+          source: 'manual',
+        }),
       ),
     ).rejects.toThrow(/needs a name/)
     const rec = await Effect.runPromise(
@@ -111,6 +116,7 @@ describe('custom objects', () => {
         objectId: fund.id,
         name: `Fund I ${tag}`,
         actor: me,
+        source: 'manual',
       }),
     )
     const [row] = await db
@@ -191,7 +197,12 @@ describe('custom objects', () => {
     ).rejects.toThrow(/System objects/)
     await expect(
       Effect.runPromise(
-        createRecordProgram({ objectId: fund.id, name: 'late', actor: me }),
+        createRecordProgram({
+          objectId: fund.id,
+          name: 'late',
+          actor: me,
+          source: 'manual',
+        }),
       ),
     ).rejects.toThrow(/archived/)
   })

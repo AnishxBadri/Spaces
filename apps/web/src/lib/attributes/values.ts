@@ -256,6 +256,12 @@ export type SetValuesInput = {
   suggestionId?: string
   refs?: Array<string>
   /**
+   * The import batch this write belongs to (SPA-169), stamped on every
+   * event it writes — the supplied values and the defaults alike — so a
+   * commit's receipts are findable by batch.
+   */
+  batchId?: string
+  /**
    * Birth mode (spec §4): after the patch, fill every still-blank attribute
    * that carries a default, logged through the `default` door — inside the
    * same transaction and registry read as the supplied values.
@@ -310,6 +316,7 @@ export async function setValuesInTx(
     source = 'direct',
     suggestionId,
     refs,
+    batchId,
     fillDefaults,
   } = opts
   const actorId = actor.type === 'user' ? actor.id : null
@@ -399,6 +406,7 @@ export async function setValuesInTx(
       source: viaDefault ? 'default' : source,
       suggestionId: viaDefault ? null : (suggestionId ?? null),
       refs: viaDefault ? null : (refs ?? null),
+      batchId: batchId ?? null,
     })
 
     // Materialize record-references into the graph (values

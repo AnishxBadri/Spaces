@@ -52,11 +52,16 @@ export function PreviewHeader({
   filename,
   onBack,
   backing,
+  onCommit,
+  committing = false,
 }: {
   counts: PlanCounts
   filename: string
   onBack: () => void
   backing: boolean
+  /** Armed only when nothing waits on a decision and a row would land. */
+  onCommit?: () => void
+  committing?: boolean
 }) {
   const landing = landingRows(counts)
   return (
@@ -74,8 +79,11 @@ export function PreviewHeader({
           <Button variant="outline" pending={backing} onClick={onBack}>
             Back to mapping
           </Button>
-          {/* The commit is SPA-169's; the button is drawn, not armed. */}
-          <Button disabled>
+          <Button
+            disabled={!onCommit || backing}
+            pending={committing}
+            {...(onCommit ? { onClick: onCommit } : {})}
+          >
             Commit {landing.toLocaleString('en-US')} rows <KeyHint>⌘↵</KeyHint>
           </Button>
         </>

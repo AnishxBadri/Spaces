@@ -9,7 +9,8 @@ import {
 } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
 import type { CoreIdentityKey } from '@spaces/core/attributes/registry'
-import type { Actor } from '../attributes/values'
+import type { Actor, EventSource } from '../attributes/values'
+import type { EmbedSource } from '../ai/chunk-sources'
 import { canonicalId, suggestDuplicate, sweepNameSimilarity } from './sweep'
 import {
   isRoleEmail,
@@ -306,47 +307,9 @@ export async function resolveEntity(
   const objectId = await (
     await import('../attributes/objects')
   ).objectIdForKindAsync(input.kind)
-  const created = await db.transaction(async (tx) => {
-    const [ent] = await tx
-      .insert(entity)
-      .values({
-        kind: input.kind,
-        objectId,
-        canonicalName,
-        ...sourceColumns(input.source),
-        createdBy: input.createdBy,
-      })
-      .returning({ id: entity.id })
-
-    // Every identity key is a claim, and a claim someone else holds is a
-    // duplicate_candidate — the key held by another kind of record (1b
-    // found no prior loser) and the key a concurrent writer committed a
-    // moment ago alike. The savepoint inside keeps either from taking this
-    // transaction down.
-    for (const key of keys) {
-      await claimIdentityAlias(tx, ent.id, key.kind, key.value, input.source)
-    }
-    if (name) {
-      await tx.insert(entityAlias).values({
-        entityId: ent.id,
-        kind: 'name',
-        value: name,
-        valueNorm: normalizeName(name),
-        isIdentity: false,
-        ...sourceColumns(input.source),
-      })
-    }
-
-    // Side-table row travels with the entity — attributes live there.
-    // The union is exactly company|person, so the else is the person case
-    // and not a silent no-op for some third kind.
-    if (input.kind === 'company') {
-      await tx.insert(company).values({ entityId: ent.id })
-    } else {
-      await tx.insert(person).values({ entityId: ent.id })
-    }
-    return ent
-  })
+  const created = await db.transaction((tx) =>
+    insertResolved(tx, input, keys, name, canonicalName, objectId),
+  )
 
   // Birth values (spec §4): supplied first, then defaults for the blanks.
   // After the transaction, since setValues takes its own row lock.
@@ -373,6 +336,150 @@ export async function resolveEntity(
   }
 
   return { entityId: created.id, action: 'created' }
+}
+
+/**
+ * Step 2's writes, inside whichever transaction the caller opened: the
+ * entity, every identity key as a claim, the birth name alias and the side
+ * table row. Shared by `resolveEntity` and `resolveEntityInTx`, so the two
+ * cannot birth a record differently.
+ */
+async function insertResolved(
+  tx: Tx,
+  input: ResolveInput,
+  keys: Array<NormalizedKey>,
+  name: string | undefined,
+  canonicalName: string,
+  objectId: string,
+): Promise<{ id: string }> {
+  const ent = (
+    await tx
+      .insert(entity)
+      .values({
+        kind: input.kind,
+        objectId,
+        canonicalName,
+        ...sourceColumns(input.source),
+        createdBy: input.createdBy,
+      })
+      .returning({ id: entity.id })
+  ).at(0)
+  if (!ent) throw new Error('Entity insert returned no row')
+
+  // Every identity key is a claim, and a claim someone else holds is a
+  // duplicate_candidate — the key held by another kind of record (1b
+  // found no prior loser) and the key a concurrent writer committed a
+  // moment ago alike. The savepoint inside keeps either from taking this
+  // transaction down.
+  for (const key of keys) {
+    await claimIdentityAlias(tx, ent.id, key.kind, key.value, input.source)
+  }
+  if (name) {
+    await tx.insert(entityAlias).values({
+      entityId: ent.id,
+      kind: 'name',
+      value: name,
+      valueNorm: normalizeName(name),
+      isIdentity: false,
+      ...sourceColumns(input.source),
+    })
+  }
+
+  // Side-table row travels with the entity — attributes live there.
+  // The union is exactly company|person, so the else is the person case
+  // and not a silent no-op for some third kind.
+  if (input.kind === 'company') {
+    await tx.insert(company).values({ entityId: ent.id })
+  } else {
+    await tx.insert(person).values({ entityId: ent.id })
+  }
+  return ent
+}
+
+export type ResolveInTxInput = ResolveInput & {
+  /** The door the birth values log through; `direct` when omitted. */
+  valuesSource?: EventSource
+  /** The import batch the write belongs to, stamped on every event. */
+  batchId?: string
+}
+
+/**
+ * `resolveEntity`'s result, plus the two steps that must wait for the
+ * caller's commit: the name the fuzzy sweep runs on (null on an attach, or
+ * on a record born from a key alone) and the embeddable values the birth set.
+ */
+export type ResolveInTxResult = ResolveResult & {
+  sweepName: string | null
+  reembed: Array<EmbedSource>
+}
+
+/**
+ * **`resolveEntity` inside a caller's transaction** (SPA-169). The import
+ * commit writes each row in one transaction — its secondary creates, its own
+ * record, its values — so a failure anywhere rolls back that row alone; a
+ * resolve that opened its own would commit a record the row then failed to
+ * finish. Same doctrine, same steps, same helpers: step 1 is the shared
+ * `matchIdentity` (a read, which sees every committed row — earlier rows of
+ * the batch included), step 2 is `insertResolved` plus the birth values in
+ * this transaction, and step 3 — the fuzzy sweep, which inserts rows naming
+ * the new record and so cannot run on another connection before it commits
+ * — is handed back as `sweepName` for the caller to run after its commit
+ * (`sweepNameSimilarity`).
+ */
+export async function resolveEntityInTx(
+  tx: Tx,
+  input: ResolveInTxInput,
+): Promise<ResolveInTxResult> {
+  const keys = normalizeKeys(input)
+  const name = input.name?.trim()
+  if (!name && keys.length === 0) {
+    throw new Error(RESOLVE_NEEDS_NAME_OR_KEY)
+  }
+  const match = await matchIdentity(input.kind, keys)
+  if (match) {
+    if (name) await recordNameAlias(match.entityId, name, input.source, tx)
+    return {
+      entityId: match.entityId,
+      action: 'attached',
+      matchedOn: match.key.kind,
+      sweepName: null,
+      reembed: [],
+    }
+  }
+  const canonicalName = name ?? keys[0].valueNorm
+  const { objectIdForKindAsync } = await import('../attributes/objects')
+  const objectId = await objectIdForKindAsync(input.kind)
+  const created = await insertResolved(
+    tx,
+    input,
+    keys,
+    name,
+    canonicalName,
+    objectId,
+  )
+  // Birth values in this transaction: supplied first, defaults for the
+  // blanks, through the one write path — imported dynamically for the cycle
+  // `resolveEntity` avoids the same way (values.ts imports this module).
+  const { setValuesInTx } = await import('../attributes/values')
+  const values = Object.fromEntries(
+    Object.entries(input.values ?? {}).filter(
+      ([, v]) => v !== undefined && v !== null && v !== '',
+    ),
+  )
+  const { reembed } = await setValuesInTx(tx, {
+    entityId: created.id,
+    patch: values,
+    actor: birthActor(input.source, input.createdBy),
+    ...(input.valuesSource ? { source: input.valuesSource } : {}),
+    ...(input.batchId !== undefined ? { batchId: input.batchId } : {}),
+    fillDefaults: { now: new Date() },
+  })
+  return {
+    entityId: created.id,
+    action: 'created',
+    sweepName: name ? normalizeName(name) : null,
+    reembed,
+  }
 }
 
 /** The kind of a record, by id; null when there is no such row. */

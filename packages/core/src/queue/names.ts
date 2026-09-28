@@ -133,6 +133,16 @@ export const QUEUES = {
    * the retry, and a refused login backs off rather than hammering.
    */
   pollMailbox: 'mail.poll',
+  /**
+   * The import commit (SPA-169): one planned batch's rows replayed through
+   * their creators, each row in its own transaction, so a failure rolls back
+   * that row alone and a re-run writes nothing for a row that already holds
+   * its record. Enqueued by the batch page's Commit and Retry failed rows,
+   * nothing else. Created `exclusive` and sent with `singletonKey = batchId`,
+   * so a double click cannot run two commits of one batch; never retried —
+   * a failed row is re-run on its own, by the operator.
+   */
+  importCommit: 'import.commit',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
