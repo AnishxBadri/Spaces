@@ -1,0 +1,151 @@
+# Upgrade CI (SPA-189, ship-11): the last release's image, this commit's
+# schema — and the way back.
+#
+# For every published tag in the window, boot that tag against a fresh
+# Postgres, plant a document + blob + credential through it, back it up with
+# scripts/backup.sh, boot THIS commit's image against the same volume, and
+# assert: the migration count equals the new image's journal, /api/health
+# says db ok and worker ok, the document downloads with the same bytes.
+# Then the reverse: the old image against the upgraded database is refused
+# by the downgrade guard, and scripts/restore.sh brings the old state back.
+# The recipe is scripts/upgrade-check.sh — CI's `roundtrip` job with two
+# images — so it runs by hand against any pair.
+#
+# The window (scripts/upgrade-tags.sh, recorded in CONTEXT.md, Hosting): the
+# newest prior tag, always, plus every other published tag with the same
+# major as package.json's version. Never "every prior release".
+#
+# Runs on `core@` tags and nightly. Never on a pull request: it pulls a
+# published image and takes minutes per matrix entry, and CI's own
+# `roundtrip` already proves backup → restore on one image for every PR.
+# While only one tag is published there is nothing to upgrade from — the
+# `tags` job prints
+#   upgrade-ci: one published tag (0.1.0), nothing to upgrade from — skipping
+# and the run is green with the matrix job skipped, never red.
+name: Upgrade
+
+on:
+  push:
+    tags: ['core@*']
+  schedule:
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: upgrade-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  GHCR_OWNER: anishxbadri
+  GHCR_PACKAGE: spaces
+
+jobs:
+  # The matrix, from the published tag list. scripts/published-tags.sh asks
+  # GHCR's package-versions API first (what the release workflow writes) and
+  # falls back to the registry's own tag list (the package is public);
+  # scripts/upgrade-tags.sh turns the list into the window.
+  tags:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.window.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: window
+        name: The published tags, and the window this commit upgrades from
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(jq -r .version package.json)"
+          OWN=''
+          if [ "$GITHUB_REF_TYPE" = tag ]; then OWN="--own-tag $GITHUB_REF_NAME"; fi
+          scripts/published-tags.sh "$GHCR_OWNER" "$GHCR_PACKAGE" | tee published.txt
+          # shellcheck disable=SC2086
+          MATRIX="$(scripts/upgrade-tags.sh --version "$VERSION" $OWN < published.txt | tee window.txt | tail -1)"
+          # A skip prints its sentence on stdout above the empty array; say
+          # it again where the run summary shows it.
+          if [ "$MATRIX" = '[]' ]; then
+            head -1 window.txt | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "upgrading from $MATRIX to $VERSION ($(git rev-parse --short HEAD))" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  upgrade:
+    needs: tags
+    if: needs.tags.outputs.matrix != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        from: ${{ fromJSON(needs.tags.outputs.matrix) }}
+    env:
+      OLD_IMAGE: ghcr.io/anishxbadri/spaces:${{ matrix.from }}
+      NEW_IMAGE: spaces:upgrade-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build this commit's image (docker/Dockerfile, context = repo root)
+        run: docker build -f docker/Dockerfile -t "$NEW_IMAGE" .
+
+      - name: Pull the published tag this run upgrades from
+        run: |
+          set -euo pipefail
+          docker pull "$OLD_IMAGE"
+          docker image inspect -f '{{.Id}} {{index .RepoDigests 0}}' "$OLD_IMAGE"
+
+      # The fixture that plants under the old image is bundled from the old
+      # tag's own checkout: it inlines that tag's schema, and the one from
+      # this commit may name a column the old database does not have yet.
+      # The verify after the upgrade uses this commit's bundle.
+      - uses: actions/checkout@v4
+        with:
+          ref: core@${{ matrix.from }}
+          path: old
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            old/pnpm-lock.yaml
+      - name: Bundle the roundtrip fixture from this commit
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @spaces/web exec vite build --config vite.boot.config.ts \
+            --ssr scripts/roundtrip-fixture.ts --outDir ../../fixture-new --emptyOutDir
+      - name: Bundle the roundtrip fixture from the old tag
+        working-directory: old
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @spaces/web exec vite build --config vite.boot.config.ts \
+            --ssr scripts/roundtrip-fixture.ts --outDir ../../fixture-old --emptyOutDir
+
+      - name: Old tag boots → plant → backup → this commit upgrades → old tag refused → restore
+        run: |
+          scripts/upgrade-check.sh --from "$OLD_IMAGE" --to "$NEW_IMAGE" \
+            --old-fixture old/fixture-old/roundtrip-fixture.mjs \
+            --new-fixture fixture-new/roundtrip-fixture.mjs \
+            --out "upgrade-${{ matrix.from }}" --label "${{ matrix.from }}"
+      - name: Summary
+        if: always()
+        run: cat "upgrade-${{ matrix.from }}/summary.md" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+      # Both containers' logs, every time: old-image.log (the tag, fresh),
+      # new-image.log (this commit against the upgraded volume),
+      # old-image-refused.log (the guard's refusal), old-image-restored.log,
+      # db.log and the check's own log. A failure has already named the
+      # migration that broke in its ::error:: line.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upgrade-logs-${{ matrix.from }}
+          path: |
+            upgrade-${{ matrix.from }}/*.log
+            upgrade-${{ matrix.from }}/summary.md
+          retention-days: 14

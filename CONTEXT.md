@@ -2043,7 +2043,18 @@ STORAGE_DRIVER=local # or s3, then S3_* vars
 ```
 
 Upgrade: `docker compose pull && docker compose up -d`. Never ship a breaking migration;
-CI must test the upgrade path from every prior release.
+~~CI must test the upgrade path from every prior release.~~ **Corrected 2026-09-29 (SPA-189,
+ship-11) to what actually runs:** `.github/workflows/upgrade.yml`, on every `core@` tag and
+nightly, never on a PR, upgrades from a **pinned window** of published tags to the commit's
+image — the newest prior tag (N-1), always, plus every other published tag with the same
+major as the version being built. So one prior tag means one run; a major accumulates its
+patch and minor tags; a new major starts again from N-1 alone. "Every prior release" would
+grow without bound and was never going to be afforded; the window is `scripts/upgrade-tags.sh`
+and the run is `scripts/upgrade-check.sh` (old tag boots → plant → `backup.sh` → the commit's
+image against the same volume → migration count equals the new journal → the document
+downloads → the old image is refused by the downgrade guard → `restore.sh` brings the old
+state back). While only one tag is published the workflow prints
+`upgrade-ci: one published tag (0.1.0), nothing to upgrade from — skipping` and exits 0.
 
 ## Hostability decisions (locked 2026-08, implementation slots later)
 
