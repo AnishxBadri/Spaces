@@ -1978,6 +1978,35 @@ Rules that decide adoption:
   as Next's `NEXT_PUBLIC_*`; a prebuilt image cannot be reconfigured at `docker run` otherwise.
 - Prebuilt multi-arch image (arm64 matters) on GHCR + Docker Hub.
   Non-root UID 1000. Docs tell people to pin tags, not `latest`.
+  **Built by SPA-187 (ship-8), `.github/workflows/release.yml`:** a `core@X.Y.Z` tag
+  (refused unless X.Y.Z is the root `package.json` version) runs the tagged commit's whole
+  CI, `image-smoke` included, then builds linux/amd64 + linux/arm64 once into an OCI
+  archive, smokes the amd64 variant, boots the arm64 variant under QEMU, and pushes that
+  archive unchanged — one digest — to `ghcr.io/anishxbadri/spaces` and
+  `docker.io/<owner>/spaces`.
+  - **Tag policy (decided 2026-09-29, owner): the exact version and major.minor —
+    `0.1.0` and `0.1` — and never `latest`.** Reason: the docs tell operators to pin, and a
+    moving `latest` would contradict them in the one place they look; it would also make
+    ship-11's upgrade matrix ("last release → this commit") ambiguous, because "last
+    release" has to be a tag that names one thing. `X.Y` moves with patch releases and
+    is the most an operator should float on; migrations make anything wider a schema jump.
+  - **Signing (D16, image half; decided 2026-09-29, owner): cosign keyless via GitHub
+    Actions OIDC, plus a SLSA build-provenance attestation.** The digest is signed, never a
+    tag, in both registries; provenance (`actions/attest-build-provenance`) is pushed to
+    GHCR. GHCR therefore carries image + signature + provenance, Docker Hub image +
+    signature. The release job runs both checks before it ends; an operator runs the same:
+
+    ```
+    cosign verify <image>@<digest> \
+      --certificate-identity-regexp '^https://github.com/AnishxBadri/Spaces/\.github/workflows/release\.yml@refs/tags/core@' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com
+    gh attestation verify oci://ghcr.io/anishxbadri/spaces@<digest> --repo AnishxBadri/Spaces
+    ```
+
+    **Plugins use a different scheme on purpose** — an offline ed25519/minisign signature over the tarball,
+    verified by the loader (`sdk-21a`): the image's verifier is a person with cosign and a
+    network, the plugin's is our own Node process on a box that may have neither. Two
+    schemes matched to two verifiers (roadmap D16).
 - **Onboarding direction lives on the surface, not in the wizard (decided
   2026-08-07).** Goal: the user thinks in spaces from minute one. Considered a
   wizard "name your markets" step; rejected — same question asked one screen
@@ -2454,9 +2483,10 @@ Standing debt:
 - **Rollback is unsafe and undocumented.** Migrations are forward-only and auto-apply, so
   pulling an older tag runs old code against a new schema. The upgrade doc must say _back
   up first_.
-- **No published images yet.** Compose still builds (from `docker/Dockerfile` with the
-  repo root as context, since SPA-183), so installing means building on the target box
-  (tight on 2GB RAM, fails on 1GB). SPA-183 (mono-13a) cut what gets built: the image
+- ~~**No published images yet.**~~ **Closed by SPA-187** once the owner pushes
+  `core@0.1.0`: every compose file pins `ghcr.io/anishxbadri/spaces:0.1.0` (the build
+  stanza stays, commented, as the developer override), so installing is a pull. Before
+  that, compose built on the target box (tight on 2GB RAM, fails on 1GB). SPA-183 (mono-13a) cut what gets built: the image
   installs its runtime node_modules from `turbo prune @spaces/worker` (the web process
   runs from its self-contained `.output`), `@spaces/config`'s eslint plugins stopped
   being prod dependencies, and `COPY --chown` replaced a recursive chown that stored

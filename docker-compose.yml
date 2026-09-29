@@ -3,13 +3,18 @@ name: spaces
 # Two containers, two volumes. Full env surface documented in CONTEXT.md.
 services:
   app:
-    # Context is the repo root: the Dockerfile's prune stage cuts the whole
-    # workspace. It lives in docker/ (docs/spec-plugin-sdk.md §2), so it is
-    # named rather than found.
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    # image: ghcr.io/OWNER/spaces:TAG   # once images are published, pin a tag
+    # The published image, pinned (SPA-187). Upgrading is changing this tag
+    # on purpose, after a backup — there is no `latest` to drift onto. The
+    # same digest is on Docker Hub as docker.io/<owner>/spaces:0.1.0, and
+    # both carry a cosign signature; GHCR also carries SLSA provenance.
+    image: ghcr.io/anishxbadri/spaces:0.1.0
+    # Developer override — build from a checkout instead of pulling. The
+    # context is the repo root (the Dockerfile's prune stage cuts the whole
+    # workspace), and the Dockerfile is named because it lives in docker/.
+    # Uncomment both lines and `docker compose up --build`:
+    # build:
+    #   context: .
+    #   dockerfile: docker/Dockerfile
     ports:
       - '3000:3000'
     environment:

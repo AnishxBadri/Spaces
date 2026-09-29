@@ -1,0 +1,311 @@
+# Published images (SPA-187, ship-8). A `core@X.Y.Z` tag builds
+# docker/Dockerfile once for linux/amd64 and linux/arm64 and pushes the one
+# manifest — one digest — to GHCR and Docker Hub, tagged `X.Y.Z` and `X.Y`.
+# Never `latest` (CONTEXT.md, Hosting: docs tell people to pin, and a moving
+# tag would contradict them).
+#
+# Order is the contract, and nothing reaches a registry until the end:
+#
+#   version   the tag must be core@X.Y.Z and X.Y.Z must be package.json's
+#   ci        the whole CI workflow (gates, hostability, roundtrip,
+#             image-smoke) for the tagged commit — publishing waits on it
+#   publish   build both platforms into one OCI archive → take the amd64
+#             variant out of it and re-run the image smoke against it → take
+#             the arm64 variant out and boot it under QEMU → push the archive
+#             unchanged (--preserve-digests) to both registries → cosign-sign
+#             the digest in both → SLSA provenance attested to GHCR → verify
+#
+# The archive is what makes "the bytes that were smoked are the bytes that
+# were pushed" true rather than likely: a second buildx invocation for the
+# push would be a second build.
+#
+# Dry run: a pull request that touches the release path runs everything up to
+# the registry login — version check (against a pretend `core@<package.json
+# version>` tag), CI, the multi-arch build, the amd64 smoke, the arm64 boot —
+# and pushes, signs and attests nothing.
+#
+# ship-11 (upgrade CI) keys on the list of published tags. It reads them from
+# GHCR's package versions API — GET /users/anishxbadri/packages/container/spaces/versions
+# (each version's metadata.container.tags) — which this workflow is the only
+# writer of.
+name: Release
+
+on:
+  push:
+    tags: ['core@*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .github/actions/image-smoke/**
+      - docker/**
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  GHCR_IMAGE: ghcr.io/anishxbadri/spaces
+  DRY_RUN: ${{ github.event_name != 'push' }}
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      minor: ${{ steps.v.outputs.minor }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        name: The tag names exactly the version package.json carries
+        run: |
+          set -euo pipefail
+          PKG="$(jq -r .version package.json)"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            TAG="$GITHUB_REF_NAME"
+          else
+            TAG="core@$PKG"
+            echo "dry run — checking a pretend tag, $TAG"
+          fi
+          if [[ ! "$TAG" =~ ^core@([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::$TAG is not core@X.Y.Z — refusing to publish"
+            exit 1
+          fi
+          VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+          MINOR="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+          if [ "$VERSION" != "$PKG" ]; then
+            echo "::error::the tag says $VERSION and package.json says $PKG — the tag and the code must agree"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "minor=$MINOR" >> "$GITHUB_OUTPUT"
+          echo "publishing $VERSION as tags $VERSION and $MINOR (no latest)"
+
+  # The tagged commit's own CI — the gates and `image-smoke` included. A red
+  # job here and `publish` never starts.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: [version, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+      id-token: write # cosign keyless + provenance: the workflow's OIDC identity
+      attestations: write # actions/attest-build-provenance
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      MINOR: ${{ needs.version.outputs.minor }}
+      ARCHIVE: /tmp/spaces.oci.tar
+    steps:
+      - uses: actions/checkout@v4
+
+      # Docker Hub's namespace is the owner's, and so a secret: the image is
+      # docker.io/<DOCKERHUB_USERNAME>/spaces. A real release without it
+      # refuses here, before anything is built.
+      - name: Resolve the Docker Hub image name
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DOCKERHUB_USERNAME" ]; then
+            if [ "$DRY_RUN" = true ]; then
+              echo "DOCKERHUB_IMAGE=docker.io/dockerhub-namespace/spaces" >> "$GITHUB_ENV"
+              echo "dry run — DOCKERHUB_USERNAME is not set; using a placeholder name"
+              exit 0
+            fi
+            echo "::error::DOCKERHUB_USERNAME is not set — create the Docker Hub repository and add DOCKERHUB_USERNAME and DOCKERHUB_TOKEN as repository secrets"
+            exit 1
+          fi
+          echo "DOCKERHUB_IMAGE=docker.io/${DOCKERHUB_USERNAME}/spaces" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.DOCKERHUB_IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=${{ env.VERSION }}
+            type=raw,value=${{ env.MINOR }}
+
+      # One build, both platforms, into an archive rather than a registry.
+      # buildx's own provenance/SBOM attestations are off so the index holds
+      # exactly the two platform manifests; provenance is attested below by
+      # actions/attest-build-provenance against the pushed digest.
+      - name: Build linux/amd64 + linux/arm64 into one OCI archive
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          provenance: false
+          sbom: false
+          outputs: type=oci,dest=${{ env.ARCHIVE }}
+          # One name inside the archive, so skopeo can address it
+          # (`oci-archive:<file>:<version>`); the registry names and tags are
+          # applied at push time. Four names here would be four index entries
+          # and an ambiguous reference.
+          tags: spaces:${{ env.VERSION }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=release
+          cache-to: type=gha,scope=release,mode=max
+
+      - name: Take both variants out of the archive
+        run: |
+          set -euo pipefail
+          SRC="oci-archive:$ARCHIVE:$VERSION"
+          skopeo inspect --raw "$SRC" | jq '.manifests[] | {platform, digest}'
+          echo "ARCHIVE_DIGEST=sha256:$(skopeo inspect --raw "$SRC" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          skopeo copy --override-os linux --override-arch amd64 \
+            "$SRC" docker-daemon:spaces:release-amd64
+          skopeo copy --override-os linux --override-arch arm64 \
+            "$SRC" docker-daemon:spaces:release-arm64
+          docker images spaces
+
+      # arm64 is the audience's hardware (CONTEXT.md, Hosting), so it is
+      # booted, not just built: under QEMU, against a real Postgres, through
+      # the real entrypoint — migrations, seeds, the privilege drop.
+      - name: arm64 is genuinely arm64 — uid 1000, boots and migrates
+        run: |
+          set -euo pipefail
+          OUT="$(docker run --rm --platform linux/arm64 --entrypoint sh spaces:release-arm64 \
+            -c 'uname -m; su-exec node id')"
+          echo "$OUT"
+          grep -qx aarch64 <<<"$OUT"
+          grep -q '^uid=1000(node)' <<<"$OUT"
+          docker network create arm64net
+          docker run -d --name arm64db --network arm64net \
+            -e POSTGRES_USER=spaces -e POSTGRES_PASSWORD=spaces -e POSTGRES_DB=spaces \
+            pgvector/pgvector:pg17
+          for _ in $(seq 1 30); do
+            docker exec arm64db pg_isready -U spaces -d spaces >/dev/null 2>&1 && break; sleep 2
+          done
+          START=$(date +%s)
+          docker run -d --name arm64app --platform linux/arm64 --network arm64net \
+            -e DATABASE_URL=postgresql://spaces:spaces@arm64db:5432/spaces \
+            -e MASTER_KEY="$(openssl rand -base64 32)" spaces:release-arm64
+          for _ in $(seq 1 180); do
+            docker logs arm64app 2>&1 | grep -q 'Listening' && break; sleep 5
+          done
+          docker logs arm64app 2>&1 | tee arm64.log | head -40
+          grep -F '[taxonomy] seeded' arm64.log
+          grep -F 'Listening' arm64.log
+          docker exec arm64app sh -c 'uname -m; grep ^Uid: /proc/1/status'
+          docker exec arm64app sh -c 'grep -qE "^Uid:[[:space:]]+1000[[:space:]]" /proc/1/status'
+          N="$(docker exec arm64db psql -U spaces -d spaces -qtAc 'select count(*) from drizzle.__drizzle_migrations')"
+          echo "migrations applied: $N"
+          [ "$N" -gt 0 ]
+          {
+            echo "### arm64 under QEMU"
+            echo
+            echo "- \`uname -m\` → aarch64; \`su-exec node id\` → $(sed -n 2p <<<"$OUT")"
+            echo "- booted, $N migrations applied, seeded, listening: $(( $(date +%s) - START ))s"
+          } >> "$GITHUB_STEP_SUMMARY"
+          docker rm -f arm64app arm64db
+          docker network rm arm64net
+
+      # The same smoke CI's `image-smoke` job runs, against the amd64 variant
+      # of the archive that is about to be pushed.
+      - uses: ./.github/actions/image-smoke
+        with:
+          image: spaces:release-amd64
+
+      - name: Log in to GHCR
+        if: env.DRY_RUN != 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        if: env.DRY_RUN != 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # The archive, unchanged: --all keeps both platforms, --preserve-digests
+      # refuses any conversion that would change a digest. Both registries
+      # and both tags therefore name one manifest list.
+      - name: Push the archive to GHCR and Docker Hub
+        if: env.DRY_RUN != 'true'
+        run: |
+          set -euo pipefail
+          for IMAGE in "$GHCR_IMAGE" "$DOCKERHUB_IMAGE"; do
+            for TAG in "$VERSION" "$MINOR"; do
+              skopeo copy --all --preserve-digests \
+                --authfile "$HOME/.docker/config.json" \
+                "oci-archive:$ARCHIVE:$VERSION" "docker://$IMAGE:$TAG"
+            done
+          done
+          G="$(docker buildx imagetools inspect "$GHCR_IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)"
+          D="$(docker buildx imagetools inspect "$DOCKERHUB_IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)"
+          echo "GHCR $G"; echo "Docker Hub $D"
+          [ "$G" = "$D" ] || { echo "::error::the two registries hold different digests"; exit 1; }
+          [ "$G" = "$ARCHIVE_DIGEST" ] || { echo "::error::the pushed digest is not the archive's ($ARCHIVE_DIGEST)"; exit 1; }
+          echo "DIGEST=$G" >> "$GITHUB_ENV"
+
+      - uses: sigstore/cosign-installer@v3
+        if: env.DRY_RUN != 'true'
+
+      # Keyless: the certificate is issued to this workflow's OIDC identity
+      # (D16, image half). The digest is signed, never a tag.
+      - name: Sign the digest in both registries
+        if: env.DRY_RUN != 'true'
+        run: |
+          set -euo pipefail
+          cosign sign --yes "$GHCR_IMAGE@$DIGEST"
+          cosign sign --yes "$DOCKERHUB_IMAGE@$DIGEST"
+
+      - name: SLSA build provenance, attested to GHCR
+        if: env.DRY_RUN != 'true'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.GHCR_IMAGE }}
+          subject-digest: ${{ env.DIGEST }}
+          push-to-registry: true
+
+      - name: Verify the signatures and the provenance before finishing
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          IDENTITY="^https://github.com/${GITHUB_REPOSITORY}/\\.github/workflows/release\\.yml@refs/tags/core@"
+          for IMAGE in "$GHCR_IMAGE" "$DOCKERHUB_IMAGE"; do
+            cosign verify "$IMAGE@$DIGEST" \
+              --certificate-identity-regexp "$IDENTITY" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              | jq -c '.[0].critical'
+          done
+          gh attestation verify "oci://$GHCR_IMAGE@$DIGEST" --repo "$GITHUB_REPOSITORY"
+          {
+            echo "### Published $VERSION"
+            echo
+            echo "| registry | image | tags | carries |"
+            echo "| --- | --- | --- | --- |"
+            echo "| GHCR | \`$GHCR_IMAGE@$DIGEST\` | $VERSION, $MINOR | image, cosign signature, SLSA provenance |"
+            echo "| Docker Hub | \`$DOCKERHUB_IMAGE@$DIGEST\` | $VERSION, $MINOR | image, cosign signature |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dry run — what a real tag would have pushed
+        if: env.DRY_RUN == 'true'
+        run: |
+          {
+            echo "### Dry run — nothing pushed"
+            echo
+            echo "A \`core@$VERSION\` tag would push the archive built above ($ARCHIVE_DIGEST) to:"
+            echo
+            echo "${{ steps.meta.outputs.tags }}" | sed 's/^/- /'
+            echo
+            echo "then cosign-sign its digest in both registries, attest SLSA provenance to GHCR, and verify both."
+          } >> "$GITHUB_STEP_SUMMARY"

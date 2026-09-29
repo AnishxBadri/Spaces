@@ -478,6 +478,8 @@ ship's open questions ask for cosign + SLSA or nothing on images; sdk-21a is sep
 
 _Carried by_ `ship-8 (images) · sdk-21a (tarballs)`. _Blocks_ `sdk-21b`, `sdk-22`.
 
+**Image half decided 2026-09-29 (owner): option 1** — cosign keyless + SLSA provenance, built by SPA-187 (`.github/workflows/release.yml`) and recorded in CONTEXT.md under Hosting. The plugin half stays with sdk-21a.
+
 ### D26-worker-bundler
 
 **Which bundler produces the source-free worker image — tsup, which is not installed, or `vite build --ssr`, which is already in the toolchain?**

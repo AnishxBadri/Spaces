@@ -20,11 +20,12 @@
 # challenge and the redirect to https.
 services:
   app:
-    # The same build the base file names, spelled out so the overlay stands
-    # on its own; paths resolve against the project directory (the repo root).
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
+    # The same pinned image as the base file (SPA-187), spelled out so the
+    # overlay stands on its own. Developer override, as in the base file:
+    # build:
+    #   context: .
+    #   dockerfile: docker/Dockerfile
+    image: ghcr.io/anishxbadri/spaces:0.1.0
     # Contract #3 and auth trap #2, in one line. With a proxy in front, 3000
     # must not be published on the host: `curl http://<host>:3000` from
     # outside is refused because there is nothing listening there, which also

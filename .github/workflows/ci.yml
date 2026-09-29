@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The release workflow (SPA-187) calls this whole workflow for the tagged
+  # commit and publishes nothing unless every job here — the gates and
+  # `image-smoke` among them — is green for that exact commit.
+  workflow_call:
 
 jobs:
   checks:
@@ -384,11 +388,11 @@ jobs:
               environment:
                 MASTER_KEY: ${MASTER_KEY}
           YAML
-          SPLIT="-f docker-compose.yml -f docker-compose.split.yml -f docker-compose.split-ci.yml"
-          docker compose $SPLIT up -d --no-build --wait --wait-timeout 300
-          docker compose $SPLIT ps
-          W="$(docker compose $SPLIT ps -q worker)"
-          A="$(docker compose $SPLIT ps -q app)"
+          SPLIT=(-f docker-compose.yml -f docker-compose.split.yml -f docker-compose.split-ci.yml)
+          docker compose "${SPLIT[@]}" up -d --no-build --wait --wait-timeout 300
+          docker compose "${SPLIT[@]}" ps
+          W="$(docker compose "${SPLIT[@]}" ps -q worker)"
+          A="$(docker compose "${SPLIT[@]}" ps -q app)"
           [ "$(docker inspect -f '{{.State.Health.Status}}' "$W")" = healthy ]
           docker inspect -f '{{json .Config.Healthcheck.Test}}' "$W" | tee /dev/stderr | grep -F 'apps/worker/dist/health.mjs'
           sudo kill -STOP "$(docker inspect -f '{{.State.Pid}}' "$W")"
@@ -399,7 +403,7 @@ jobs:
           [ "$(docker inspect -f '{{.State.Health.Status}}' "$W")" = unhealthy ]
           [ "$(docker inspect -f '{{.State.Health.Status}}' "$A")" = healthy ]
           sudo kill -CONT "$(docker inspect -f '{{.State.Pid}}' "$W")"
-          docker compose $SPLIT down -v
+          docker compose "${SPLIT[@]}" down -v
 
       - name: Tear down
         if: always()
@@ -416,12 +420,11 @@ jobs:
   # artifact) and the same compose-override shape, not a third recipe. The
   # app must report db ok AND worker ok before the first spec, so a worker
   # that never comes up fails here, with the payload and the logs, and is
-  # never mistaken for a broken upload.
+  # never mistaken for a broken upload. The steps are the composite action
+  # .github/actions/image-smoke (SPA-187 moved them there to share them).
   image-smoke:
     runs-on: ubuntu-latest
     needs: image
-    env:
-      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -429,57 +432,11 @@ jobs:
           name: spaces-ci-image
       - name: Load the runtime image built by `image`
         run: gunzip -c spaces-ci.tar.gz | docker load
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      # The recipe lives in one place because the release workflow runs it
+      # too, against the amd64 variant of the image it is about to push.
+      - uses: ./.github/actions/image-smoke
         with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm --filter @spaces/e2e exec playwright install --with-deps chromium
-
-      - name: Compose the image with Postgres
-        run: |
-          set -euo pipefail
-          mkdir -p data
-          cat > docker-compose.ci.yml <<'YAML'
-          services:
-            app:
-              image: spaces:ci
-          YAML
-          docker compose up -d --wait --wait-timeout 300
-
-      - name: Wait for db ok and worker ok
-        run: |
-          set -euo pipefail
-          for _ in $(seq 1 90); do
-            H="$(curl -fsS http://localhost:3000/api/health || true)"
-            if jq -e '.db == "ok" and .worker.status == "ok"' <<<"$H" >/dev/null 2>&1; then
-              echo "$H"; exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::the app never reported db ok and worker ok — last /api/health: ${H:-no answer}"
-          docker compose logs app
-          exit 1
-
-      - name: Upload → preview specs (apps/e2e, image project)
-        env:
-          E2E_IMAGE_URL: http://localhost:3000
-        run: pnpm --filter @spaces/e2e exec playwright test
-
-      - name: App logs on failure
-        if: failure()
-        run: docker compose logs app
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: image-smoke-traces
-          path: apps/e2e/test-results/
-          retention-days: 7
-      - name: Tear down
-        if: always()
-        run: docker compose down -v || true
+          image: spaces:ci
 
   # Hostability contract #5 (CONTEXT.md): backup is both-or-neither, and
   # rollback is restore. Prose cannot prove that, so this job destroys the box
