@@ -578,9 +578,11 @@ Collapses to a drawer under a 48px top bar on mobile.
 `RecordHeader`: mono caps breadcrumb (`DEALS / 7C335C4A / OPENED 2026-07-29`), actions
 with key hints (Log interaction L · Task T · Move stage M), a 28px mark (1-bit dither
 tile, or ink initials for a person) beside the serif name and a square badge, then a
-56px readout strip of the numbers that matter. Body left: the property grid (three
-columns, hairline top and bottom, rules inside, 96px caps labels), then Notes, Ledger
-and Files as sections. Rail right on bone (360px): the stage stepper (one 8px segment
+56px readout strip of the numbers that matter. Body left: the property grid (two
+columns, hairline top and bottom, rules inside, 120px caps labels — three columns
+truncated their own labels at 1440 and went 2026-09-30), then Notes, Interactions,
+History and Files as sections, and Context as a head with a `show ›` and nothing under
+it until asked. Rail right on bone (360px): the stage stepper (one 8px segment
 per live stage, pine to the current one, hairline after), tasks, people. The rail is
 sticky; the body scrolls. Deals, companies, people, custom records, holdings and spaces
 share the parts.
@@ -595,7 +597,17 @@ share the parts.
   not evaluating — a company can sit here in no pipeline at all, and the lane says so.
 
 - **The Ledger.** Three lanes on rules — mono `MM-DD HH:MM`, mono caps type
-  (`CALL · STAGE · FILE · EDIT · BORN`), sans body. Attribute bursts expand in place.
+  (`CALL · STAGE · FILE · EDIT · BORN · INVEST · MARK`), sans body. Attribute bursts
+  expand in place. Since 2026-09-30 it is two sections, not one list: **Interactions**
+  (calls, emails, meetings — each with its `Write up` / `Open note`) under the composer
+  row, and **History** (stage moves, edits, filings, the portfolio's verbs) folded past
+  six rows behind `+ N more`. A call and `tagged into a space` never again share a lane.
+- **Notes** is one list: filed rows first, then the notes that merely mention the
+  record, stamped `mention` in the mono end lane. Empty is `No notes.`; the way in is
+  `note about this ›` in the head.
+- **Files** owns its head — `N files · size` and `upload` — and draws the dashed
+  dropzone only while the list is empty or a drag is over it; once files exist the rows
+  are the section and the whole of it is the target.
 - **The Composer Row.** Adding to a stream never starts from a corner button: a 36px
   row with a pine `+`, graphite hint text and the key that opens the real dialog
   (`+ Log a call, meeting, or note…  L`). The Tasks page grows it into the bone

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { optionLabel, refName } from './attributes/value-editor'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
+import { RecordSection } from './record/record-parts'
 import { writeUpInteraction } from '#/lib/server-fns'
 import { stamp } from '#/lib/timeline/stamp'
 import { cn } from '#/lib/utils'
@@ -64,6 +65,24 @@ export const VERB_LABELS: Record<string, string> = {
   'space.untagged': 'removed from a space',
   'entity.merged': 'merged a duplicate record',
   renamed: 'renamed this record',
+  'space.created': 'created this space',
+  'term.created': 'defined a term',
+  'mandate.created': 'wrote the mandate',
+  // The portfolio ledger's verbs (lib/portfolio/write.ts, holding.ts,
+  // reverse.ts). Read raw as `mark.added` on every company record until
+  // 2026-09-30; a producer's verb is pinned here by record-timeline.test.ts.
+  'holding.created': 'opened this holding',
+  'holding.writtenoff': 'wrote off this holding',
+  'investment.added': 'recorded a check',
+  'investment.voided': 'voided a check',
+  'investment.batch_voided': 'voided a batch of checks',
+  'round.added': 'added a round',
+  'mark.added': 'recorded a mark',
+  'mark.voided': 'voided a mark',
+  'mark.batch_voided': 'voided a batch of marks',
+  'distribution.added': 'recorded a distribution',
+  'distribution.voided': 'voided a distribution',
+  'distribution.batch_voided': 'voided a batch of distributions',
 }
 
 export const VERB_TYPES: Record<string, string> = {
@@ -83,6 +102,87 @@ export const VERB_TYPES: Record<string, string> = {
   'space.untagged': 'space',
   'entity.merged': 'merge',
   renamed: 'rename',
+  'space.created': 'born',
+  'term.created': 'term',
+  'mandate.created': 'mandate',
+  'holding.created': 'holding',
+  'holding.writtenoff': 'writeoff',
+  'investment.added': 'invest',
+  'investment.voided': 'void',
+  'investment.batch_voided': 'void',
+  'round.added': 'round',
+  'mark.added': 'mark',
+  'mark.voided': 'void',
+  'mark.batch_voided': 'void',
+  'distribution.added': 'distrib',
+  'distribution.voided': 'void',
+  'distribution.batch_voided': 'void',
+}
+
+/** How much history a record shows before the fold. */
+export const HISTORY_FOLD = 6
+
+/**
+ * The two ledgers of a record (2026-09-30). One flat list of nineteen rows
+ * gave a call the same weight as `tagged into a space`; the reader wants the
+ * conversations and can ask for the bookkeeping. **Interactions** — calls,
+ * emails, meetings, each with its way in to a write-up — under the composer
+ * row (DESIGN.md P7, the Composer Row: a stream is added to from a row, not
+ * a corner button). **History** — stage moves, attribute bursts, filings,
+ * the portfolio's verbs — folded past `HISTORY_FOLD` behind a `+ N more`
+ * row, the way the contract's question 17 asks a surface to bound itself.
+ */
+export function RecordLedger({
+  items,
+  registry,
+  refNames,
+  composer,
+}: {
+  items: Items
+  registry: Array<RegistryEntry>
+  refNames?: RefNames | undefined
+  /** The composer row — a `LogInteractionDialog` trigger; none on a custom record. */
+  composer?: React.ReactNode
+}) {
+  const interactions = items.filter((i) => i.type === 'interaction')
+  const history = items.filter((i) => i.type !== 'interaction')
+  const [unfolded, setUnfolded] = useState(false)
+  const shown =
+    unfolded || history.length <= HISTORY_FOLD
+      ? history
+      : history.slice(0, HISTORY_FOLD)
+  const hidden = history.length - shown.length
+  return (
+    <>
+      <RecordSection rule label="Interactions" meta={`${interactions.length}`}>
+        {composer}
+        <RecordTimeline
+          items={interactions}
+          registry={registry}
+          refNames={refNames}
+          empty={composer ? null : 'None logged.'}
+        />
+      </RecordSection>
+      <RecordSection rule label="History" meta={`${history.length}`}>
+        <RecordTimeline
+          items={shown}
+          registry={registry}
+          refNames={refNames}
+          last={hidden === 0}
+        />
+        {hidden > 0 ? (
+          <button
+            type="button"
+            onClick={() => setUnfolded(true)}
+            className="focus-ring-inset flex h-row w-full items-center gap-3 text-left mono text-micro text-graphite hover:text-foreground"
+          >
+            <span className="text-primary">+</span>
+            {hidden} more
+          </button>
+        ) : null}
+      </RecordSection>
+    </>
+  )
 }
 
 function Row({
@@ -118,18 +218,26 @@ export function RecordTimeline({
   items,
   registry,
   refNames,
+  empty = 'Nothing yet.',
+  last: lastRow = true,
 }: {
   items: Items
   registry: Array<RegistryEntry>
   refNames?: RefNames | undefined
+  /** The line an empty list shows; `null` shows nothing (a composer row is already there). */
+  empty?: string | null
+  /** False when a fold row follows, so the last entry keeps its rule. */
+  last?: boolean
 }) {
   if (items.length === 0) {
-    return <p className="py-2 text-label text-graphite">Nothing yet.</p>
+    return empty === null ? null : (
+      <p className="py-2 text-label text-graphite">{empty}</p>
+    )
   }
   return (
     <ul>
       {items.map((item, i) => {
-        const last = i === items.length - 1
+        const last = lastRow && i === items.length - 1
         if (item.type === 'macro') {
           return (
             <Row

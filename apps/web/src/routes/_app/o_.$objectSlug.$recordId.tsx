@@ -20,12 +20,11 @@ import {
   RailSection,
   RecordBody,
   RecordHeader,
-  RecordSection,
 } from '#/components/record/record-parts'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
-import { RecordTimeline } from '#/components/record-timeline'
+import { RecordLedger } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
@@ -334,27 +333,14 @@ function ObjectRecordPage() {
         </AiCellsProvider>
 
         <RecordNotes
-          recordName={record.name}
           filed={notes.filed}
           mentions={notes.mentions}
           onNewNote={newNoteAboutThis}
         />
 
-        <RecordSection
-          rule
-          label="Ledger"
-          meta={`${timeline.length} entr${timeline.length === 1 ? 'y' : 'ies'}`}
-        >
-          <RecordTimeline items={timeline} registry={registry} />
-        </RecordSection>
+        <RecordLedger items={timeline} registry={registry} />
 
-        <RecordSection
-          rule
-          label="Files"
-          meta={`${documents.length} file${documents.length === 1 ? '' : 's'}`}
-        >
-          <RecordFiles entityId={record.id} documents={documents} />
-        </RecordSection>
+        <RecordFiles entityId={record.id} documents={documents} />
 
         <RecordContext entityId={record.id} />
       </RecordBody>

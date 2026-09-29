@@ -32,7 +32,7 @@ import { SummarizeRecordButton } from '#/components/summarize'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
-import { RecordTimeline } from '#/components/record-timeline'
+import { RecordLedger } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
 import { recordPath } from '#/lib/record-path'
@@ -379,7 +379,6 @@ function PersonRecordPage() {
         </AiCellsProvider>
 
         <RecordNotes
-          recordName={person.name}
           filed={notes.filed}
           mentions={notes.mentions}
           onNewNote={newNoteAboutThis}
@@ -435,34 +434,28 @@ function PersonRecordPage() {
           </RecordSection>
         ))}
 
-        <RecordSection
-          rule
-          label="Ledger"
-          meta={`${timeline.length} entr${timeline.length === 1 ? 'y' : 'ies'}`}
-        >
-          <LogInteractionDialog
-            seed={{ id: person.id, name: person.name, kind: 'person' }}
-            trigger={
-              <button className="focus-ring-inset flex h-row w-full items-center gap-3 border-t border-b border-rule text-left">
-                <span className="mono text-micro text-primary">+</span>
-                <span className="min-w-0 truncate text-ui text-graphite">
-                  Log a call, meeting, or note…
-                </span>
-                <span className="flex-1" />
-                <KeyHint>L</KeyHint>
-              </button>
-            }
-          />
-          <RecordTimeline items={timeline} registry={registry} />
-        </RecordSection>
+        <RecordLedger
+          items={timeline}
+          registry={registry}
 
-        <RecordSection
-          rule
-          label="Files"
-          meta={`${documents.length} file${documents.length === 1 ? '' : 's'}`}
-        >
-          <RecordFiles entityId={person.id} documents={documents} />
-        </RecordSection>
+          composer={
+            <LogInteractionDialog
+              seed={{ id: person.id, name: person.name, kind: 'person' }}
+              trigger={
+                <button className="focus-ring-inset flex h-row w-full items-center gap-3 border-t border-b border-rule text-left">
+                  <span className="mono text-micro text-primary">+</span>
+                  <span className="min-w-0 truncate text-ui text-graphite">
+                    Log a call, meeting, or note…
+                  </span>
+                  <span className="flex-1" />
+                  <KeyHint>L</KeyHint>
+                </button>
+              }
+            />
+          }
+        />
+
+        <RecordFiles entityId={person.id} documents={documents} />
 
         <RecordContext entityId={person.id} />
       </RecordBody>

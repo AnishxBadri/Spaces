@@ -23,21 +23,16 @@ type Term = Awaited<ReturnType<typeof listTerms>>[number]
 
 export function SpaceGlossary({
   spaceId,
-  spaceName,
   terms,
 }: {
   spaceId: string
-  spaceName: string
   terms: Array<Term>
 }) {
   const router = useRouter()
   const [adding, setAdding] = useState(false)
 
   return (
-    <LedgerSection
-      label="Glossary"
-      count={`${terms.length} · auto-links in every note filed into ${spaceName}`}
-    >
+    <LedgerSection label="Glossary" count={`${terms.length}`}>
       {terms.map((t) => (
         <TermRow key={t.id} term={t} />
       ))}
@@ -63,9 +58,7 @@ export function SpaceGlossary({
               +
             </span>
             <span className="min-w-0 flex-1 truncate text-ui text-graphite">
-              {terms.length === 0
-                ? 'Define a term — worth its weight when you are learning a space'
-                : 'Define a term… name, aliases, what it means here'}
+              {terms.length === 0 ? 'Define a term…' : 'Define another…'}
             </span>
             <kbd className="shrink-0 mono text-micro text-graphite">↵</kbd>
           </button>

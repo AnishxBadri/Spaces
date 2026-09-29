@@ -4,8 +4,8 @@ import { cn } from '#/lib/utils'
 /**
  * P7 — Record page anatomy (Instrument, 2026-09-10). Header: breadcrumb,
  * actions, serif name + badge, a readout strip of the numbers that matter.
- * Body left: property grid (three columns, hairline top and bottom, rules
- * inside), then the sections — notes, ledger, files. Rail right on bone:
+ * Body left: property grid (two columns, hairline top and bottom, rules
+ * inside), then the sections — notes, interactions, history, files. Rail right on bone:
  * stage stepper, readouts, people. Every part is markup only; the pages
  * keep their data and handlers.
  */
@@ -141,14 +141,14 @@ export function RecordSection({
   )
 }
 
-/** Three columns of label + value cells; hairline top and bottom, rules
- *  inside. Cells are `PropertyCell`s (RailField renders one). */
+/** Two columns of label + value cells; hairline top and bottom, rules
+ *  inside. Cells are `PropertyCell`s (RailField renders one). Three columns
+ *  until 2026-09-30 — at 1440 wide they truncated their own labels
+ *  (`CLOSE REAS…`, `BUSINESS M…`) and every URL. */
 export function PropertyGrid({ children }: { children: ReactNode }) {
   return (
     <div className="border-t border-hairline">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-        {children}
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2">{children}</div>
       <div className="-mt-px border-t border-hairline" />
     </div>
   )
@@ -201,7 +201,7 @@ export function PropertyCell({
   return (
     <div
       className={cn(
-        'relative flex min-h-[2.125rem] flex-col justify-center border-r border-b border-rule px-3 py-1 max-md:border-r-0 md:max-xl:[&:nth-child(2n)]:border-r-0 xl:[&:nth-child(3n)]:border-r-0',
+        'relative flex min-h-[2.125rem] flex-col justify-center border-r border-b border-rule px-3 py-1 max-md:border-r-0 md:[&:nth-child(2n)]:border-r-0',
         className,
       )}
     >
@@ -209,7 +209,7 @@ export function PropertyCell({
         <span aria-hidden className={rejectPaneClass(reject)} />
       )}
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex w-24 shrink-0 items-center gap-1 field-label text-graphite">
+        <div className="flex w-30 shrink-0 items-center gap-1 field-label text-graphite">
           {label}
         </div>
         <div className="min-w-0 flex-1">{children}</div>

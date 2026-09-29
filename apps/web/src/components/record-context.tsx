@@ -1,5 +1,4 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
 import { Switch } from '#/components/ui/switch'
@@ -13,11 +12,10 @@ import { getRecordContext } from '#/lib/server-fns'
  * spec-ai-substrate §1 / §8 step 1: the non-AI "everything about this
  * record" view). One component for all four record pages.
  *
- * Closed on first render the way SPA-67's inherited lane is: a native
- * `<details>` with no `open`, so the server's first paint is already the
- * closed one. Nothing is fetched until the reader opens it — the loaders do
- * not call `getRecordContext`, so a record page pays nothing for a section
- * nobody expanded.
+ * Closed on first render — component state, false on every mount, so the
+ * server's first paint is already the closed one. Nothing is fetched until
+ * the reader opens it — the loaders do not call `getRecordContext`, so a
+ * record page pays nothing for a section nobody expanded.
  *
  * `Similar judgments` (SPA-139) switches on the assembler's judgment-memory
  * mode: other deals' close_reasons and terminal-stage notes that read like
@@ -57,6 +55,12 @@ export function RecordContext({ entityId }: { entityId: string }) {
   })
   const items = query.data?.items
 
+  // Closed at rest and drawing nothing but its head: the section is a
+  // debugging view of the assembler's ranking, and a record page at 8am
+  // owes it one line, not a row that explains itself (2026-09-30). `open`
+  // drives the fetch as the `<details>` did — nothing loads until asked.
+  const [open, setOpen] = useState(false)
+
   return (
     <LedgerSection
       label="Context"
@@ -65,21 +69,22 @@ export function RecordContext({ entityId }: { entityId: string }) {
           ? null
           : `${String(items.length)} item${items.length === 1 ? '' : 's'}`
       }
-    >
-      <li>
-        <details
-          className="group/context"
-          onToggle={(e) => {
-            if (e.currentTarget.open) setOpened(true)
+      link={
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => {
+            setOpen((v) => !v)
+            setOpened(true)
           }}
+          className="focus-ring text-primary hover:underline"
         >
-          <summary className="focus-ring flex h-row cursor-pointer list-none items-center gap-2 border-b border-rule mono text-micro text-graphite transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
-            <ChevronRight
-              className="size-3 shrink-0 transition-transform group-open/context:rotate-90"
-              strokeWidth={2}
-            />
-            what the assembler sees, ranked
-          </summary>
+          {open ? 'hide' : 'show ›'}
+        </button>
+      }
+    >
+      {open ? (
+        <li>
           {/* No pin, no switch: the lane has no vector space to look in and
               never falls back to words (lib/context/similar.ts), so a switch
               that could only ever return nothing is not offered. */}
@@ -101,8 +106,8 @@ export function RecordContext({ entityId }: { entityId: string }) {
               error={query.error}
             />
           </ol>
-        </details>
-      </li>
+        </li>
+      ) : null}
     </LedgerSection>
   )
 }

@@ -25,14 +25,13 @@ import {
   RailSection,
   RecordBody,
   RecordHeader,
-  RecordSection,
   PropertyGrid,
   StageStepper,
 } from '#/components/record/record-parts'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
 import { RecordContext } from '#/components/record-context'
-import { RecordTimeline } from '#/components/record-timeline'
+import { RecordLedger } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
@@ -392,44 +391,33 @@ function DealRecordPage() {
         </AiCellsProvider>
 
         <RecordNotes
-          recordName={deal.name}
           filed={notes.filed}
           mentions={notes.mentions}
           onNewNote={newNoteAboutThis}
         />
 
-        <RecordSection
-          rule
-          label="Ledger"
-          meta={`${timeline.length} entr${timeline.length === 1 ? 'y' : 'ies'}`}
-        >
-          <LogInteractionDialog
-            seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
-            trigger={
-              <button className="focus-ring-inset flex h-row w-full items-center gap-3 border-t border-b border-rule text-left">
-                <span className="mono text-micro text-primary">+</span>
-                <span className="min-w-0 truncate text-ui text-graphite">
-                  Log a call, meeting, or note…
-                </span>
-                <span className="flex-1" />
-                <KeyHint>L</KeyHint>
-              </button>
-            }
-          />
-          <RecordTimeline
-            items={timeline}
-            registry={registry}
-            refNames={refNames}
-          />
-        </RecordSection>
+        <RecordLedger
+          items={timeline}
+          registry={registry}
+          refNames={refNames}
+          composer={
+            <LogInteractionDialog
+              seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
+              trigger={
+                <button className="focus-ring-inset flex h-row w-full items-center gap-3 border-t border-b border-rule text-left">
+                  <span className="mono text-micro text-primary">+</span>
+                  <span className="min-w-0 truncate text-ui text-graphite">
+                    Log a call, meeting, or note…
+                  </span>
+                  <span className="flex-1" />
+                  <KeyHint>L</KeyHint>
+                </button>
+              }
+            />
+          }
+        />
 
-        <RecordSection
-          rule
-          label="Files"
-          meta={`${documents.length} file${documents.length === 1 ? '' : 's'}`}
-        >
-          <RecordFiles entityId={deal.id} documents={documents} />
-        </RecordSection>
+        <RecordFiles entityId={deal.id} documents={documents} />
 
         <RecordContext entityId={deal.id} />
       </RecordBody>

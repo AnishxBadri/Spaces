@@ -380,9 +380,7 @@ function SpacePage() {
                 +
               </span>
               <span className="min-w-0 flex-1 truncate text-ui text-graphite">
-                {spc.filed.length === 0
-                  ? 'Write the memo — what this space is, why it matters, what would make it investible'
-                  : 'File another — a market map, a teardown, a second memo'}
+                {spc.filed.length === 0 ? 'Write the memo…' : 'File another…'}
               </span>
               <span className="shrink-0 text-graphite">
                 <KeyHint>N</KeyHint>
@@ -513,7 +511,7 @@ function SpacePage() {
           </LedgerSection>
         ) : null}
 
-        <SpaceGlossary spaceId={spc.id} spaceName={spc.name} terms={terms} />
+        <SpaceGlossary spaceId={spc.id} terms={terms} />
       </RecordBody>
     </div>
   )

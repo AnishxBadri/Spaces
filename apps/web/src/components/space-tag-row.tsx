@@ -88,9 +88,7 @@ export function TagCompanyRow({
             +
           </span>
           <span className="min-w-0 flex-1 truncate text-ui text-graphite">
-            {taggedIds.size === 0
-              ? `Tag a company into ${spaceName} — by name, as many as belong here`
-              : 'Tag another company… by name'}
+            {taggedIds.size === 0 ? 'Tag a company…' : 'Tag another company…'}
           </span>
           <kbd className="shrink-0 mono text-micro text-graphite">↵</kbd>
         </button>

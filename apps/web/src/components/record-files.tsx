@@ -24,6 +24,7 @@ import {
   OpenSourceButton,
 } from './document-source'
 import { DocumentTile } from './document-tile'
+import { RecordSection } from './record/record-parts'
 import { KIND_ICONS } from './editor/mention'
 import { SummarizeRowButton, useSummarizer } from './summarize'
 import type { Summarizer } from './summarize'
@@ -196,20 +197,25 @@ export function RecordFiles({
       }}
       className="flex flex-col"
     >
-      <div className="flex h-8 items-center justify-between border-t border-rule">
-        <p className="mono text-micro text-graphite">
-          {documents.length === 0
-            ? 'decks, memos, cap tables — drop them here'
-            : `${documents.length} file${documents.length === 1 ? '' : 's'} · ${formatBytes(documents.reduce((n, d) => n + (d.sizeBytes ?? 0), 0))}`}
-        </p>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="focus-ring flex items-center gap-1 mono text-micro text-primary hover:underline"
-        >
-          <Upload className="size-3" strokeWidth={2} />
-          upload
-        </button>
+      <RecordSection
+        rule
+        label="Files"
+        meta={
+          documents.length === 0
+            ? '0 files'
+            : `${documents.length} file${documents.length === 1 ? '' : 's'} · ${formatBytes(documents.reduce((n, d) => n + (d.sizeBytes ?? 0), 0))}`
+        }
+        action={
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="focus-ring flex items-center gap-1 text-primary hover:underline"
+          >
+            <Upload className="size-3" strokeWidth={2} />
+            upload
+          </button>
+        }
+      >
         <input
           ref={inputRef}
           type="file"
@@ -220,76 +226,84 @@ export function RecordFiles({
             e.target.value = ''
           }}
         />
-      </div>
 
-      {documents.length > 0 || pending.length > 0 ? (
-        <ul className="flex flex-col">
-          {pending.map((p) => (
-            <li
-              key={p.key}
-              className="flex h-9 items-center gap-2.5 border-t border-rule text-ui"
-            >
-              <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper">
-                {p.error ? (
-                  <FileIcon
-                    className="size-3 text-destructive"
-                    strokeWidth={1.75}
-                  />
-                ) : (
-                  <Loader2
-                    className="size-3 animate-spin text-graphite motion-reduce:animate-none"
-                    strokeWidth={1.75}
-                  />
-                )}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{p.name}</span>
-              <span
-                className={cn(
-                  'mono text-micro',
-                  p.error ? 'text-destructive' : 'text-graphite',
-                )}
+        {documents.length > 0 || pending.length > 0 ? (
+          <ul className="flex flex-col border-b border-rule">
+            {pending.map((p) => (
+              <li
+                key={p.key}
+                className="flex h-9 items-center gap-2.5 border-t border-rule text-ui"
               >
-                {p.error ?? PHASE_LABELS[p.phase]}
-              </span>
-            </li>
-          ))}
-          {documents.map((doc) => (
-            <DocumentRow
-              key={doc.id}
-              doc={doc}
-              reader={deckReaderFor(doc)}
-              keyTerms={keyTermsFor(doc)}
-              vision={visionFor(doc)}
-              summarizer={
-                doc.extractionStatus === 'done' ? summarizerFor(doc.id) : null
-              }
-              onPreview={() => setPreviewing(doc)}
-            />
-          ))}
-        </ul>
-      ) : null}
+                <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper">
+                  {p.error ? (
+                    <FileIcon
+                      className="size-3 text-destructive"
+                      strokeWidth={1.75}
+                    />
+                  ) : (
+                    <Loader2
+                      className="size-3 animate-spin text-graphite motion-reduce:animate-none"
+                      strokeWidth={1.75}
+                    />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                <span
+                  className={cn(
+                    'mono text-micro',
+                    p.error ? 'text-destructive' : 'text-graphite',
+                  )}
+                >
+                  {p.error ?? PHASE_LABELS[p.phase]}
+                </span>
+              </li>
+            ))}
+            {documents.map((doc) => (
+              <DocumentRow
+                key={doc.id}
+                doc={doc}
+                reader={deckReaderFor(doc)}
+                keyTerms={keyTermsFor(doc)}
+                vision={visionFor(doc)}
+                summarizer={
+                  doc.extractionStatus === 'done' ? summarizerFor(doc.id) : null
+                }
+                onPreview={() => setPreviewing(doc)}
+              />
+            ))}
+          </ul>
+        ) : null}
 
-      {/* The dropzone: dashed hairline at rest, pine dashed on the selection
-          wash while a drag is over it. Click opens the picker. */}
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className={cn(
-          'focus-ring mt-2 flex h-18 w-full flex-col items-center justify-center gap-1 border border-dashed transition-colors',
-          dragging
-            ? 'border-primary bg-selected text-primary'
-            : 'border-hairline bg-paper text-foreground hover:bg-bone',
-        )}
-      >
-        <span className="text-ui">
-          {dragging ? 'Release to attach' : 'Drop files, or click'}
-        </span>
-        <span className="mono text-field text-graphite">
-          {dragging
-            ? 'they stay on this server'
-            : 'stays on this server · files get their text extracted, links get fetched'}
-        </span>
-      </button>
+        {/* The dropzone: dashed hairline at rest, pine dashed on the selection
+          wash while a drag is over it. Click opens the picker. Drawn only
+          while there is nothing to list, or while a drag is over the section
+          — once files exist the rows are the section and the whole of it
+          is the drop target (2026-09-30: the box under a list, and the
+          sentence under the box, were saying the same thing three times). */}
+        {documents.length === 0 && pending.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className={cn(
+              'focus-ring flex h-18 w-full flex-col items-center justify-center gap-1 border border-dashed transition-colors',
+              dragging
+                ? 'border-primary bg-selected text-primary'
+                : 'border-hairline bg-paper text-foreground hover:bg-bone',
+            )}
+          >
+            <span className="text-ui">
+              {dragging ? 'Release to attach' : 'Drop files, or click'}
+            </span>
+            <span className="mono text-field text-graphite">
+              files or a link
+            </span>
+          </button>
+        ) : dragging ? (
+          <div className="flex h-9 items-center justify-center border border-dashed border-primary bg-selected text-ui text-primary">
+            Release to attach
+          </div>
+        ) : null}
+      </RecordSection>
 
       <DocumentPreview
         doc={previewing}

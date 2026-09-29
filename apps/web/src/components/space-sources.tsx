@@ -227,8 +227,7 @@ export function SpaceSources({
                 +
               </span>
               <span className="min-w-0 flex-1 truncate text-ui text-graphite">
-                No sources yet — drop a deck, a report or an article to file it
-                into this space.
+                Drop a deck, a report or an article…
               </span>
             </button>
           </LedgerRow>

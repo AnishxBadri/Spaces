@@ -121,6 +121,15 @@ architecture to a reviewer; the person at 8am needs the value.
   with _because_ or _never_, it is doctrine and comes out of the surface.
 - **Card feet** carry one status token and one action. Settings rows carry help
   only when the label does not explain itself.
+- **An empty section is one short line.** It states absence — `No notes.`,
+  `Nothing realized yet.` — and never instructs: the way in is the head's control
+  or the composer row, which are already there. A composer's hint text is an
+  ellipsis invitation (`Write the memo…`, `Tag a company…`), not a sentence about
+  what the section is for. Subheads inside a section are not a way to explain it:
+  when rows come in two lanes, the lane is a mark in the row's mono end lane
+  (`mention · note · 09-21`), never a second caps head over an empty list. The
+  shipped precedent is `/portfolio/$holdingId`; the record page's Notes, Files and
+  Context sections were brought to it 2026-09-30.
 
 ---
 
@@ -352,7 +361,8 @@ Twenty questions. A merge needs a yes to each.
 20. **Commentary** — one mono commentary line per section and none in a row or a
     cell; provenance a mark or a hover except for a machine write; consequence text
     only beside the control that commits it; no sentence on the surface that starts
-    with _because_ or _never_? (§1, "The Commentary Rule")
+    with _because_ or _never_; every empty section one short line that states
+    absence, no subhead over an empty list? (§1, "The Commentary Rule")
 
 ### afk or hitl
 

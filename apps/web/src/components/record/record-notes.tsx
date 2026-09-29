@@ -2,15 +2,16 @@ import { Link } from '@tanstack/react-router'
 import { RecordSection } from '#/components/record/record-parts'
 
 /**
- * A record's Notes section, in the two lanes the filing decision draws
- * (CONTEXT.md → Filed vs referenced): what was deliberately filed against
- * this record, and what merely names it. Composed on `RecordSection`, the
- * record shape's own primitive — no new anatomy.
+ * A record's Notes section: one list, in the two lanes the filing decision
+ * draws (CONTEXT.md → Filed vs referenced). What was filed against this
+ * record comes first, in the order `listRecordNotesProgram` hands it; what
+ * merely names the record follows, and says so with a `mention` stamp in
+ * the row's mono end lane. The lane is a mark on the row, not a subhead
+ * over it — two caps heads and two sentences for zero notes was the
+ * commentary drift the design contract names (2026-09-30).
  *
- * The lanes are supplied already split and already ordered by
- * `listRecordNotesProgram`; this file decides nothing about membership or
- * order, so the company / person / deal / custom pages of notes-1b share one
- * rule rather than four renderings of it.
+ * Membership and order are decided upstream; this file renders and the
+ * company / person / deal / custom pages share one rule.
  */
 
 export type RecordNoteRow = {
@@ -21,22 +22,30 @@ export type RecordNoteRow = {
 }
 
 export function RecordNotes({
-  recordName,
   filed,
   mentions,
   onNewNote,
 }: {
-  recordName: string
   filed: Array<RecordNoteRow>
   mentions: Array<RecordNoteRow>
   onNewNote: () => void
 }) {
+  const rows = [
+    ...filed.map((n) => ({ ...n, lane: 'filed' as const })),
+    ...mentions.map((n) => ({ ...n, lane: 'mention' as const })),
+  ]
   return (
     <RecordSection
       label="Notes"
-      meta={`${filed.length} filed · ${mentions.length} mention${
-        mentions.length === 1 ? '' : 's'
-      }`}
+      meta={
+        rows.length === 0
+          ? '0'
+          : mentions.length === 0
+            ? `${filed.length}`
+            : `${filed.length} filed · ${mentions.length} mention${
+                mentions.length === 1 ? '' : 's'
+              }`
+      }
       action={
         <button
           type="button"
@@ -47,36 +56,9 @@ export function RecordNotes({
         </button>
       }
     >
-      <NoteLane
-        label="Filed here"
-        rows={filed}
-        empty={`Nothing is filed against ${recordName} yet. “Note about this” files one here.`}
-      />
-      <NoteLane
-        label="Mentions this"
-        rows={mentions}
-        empty={`No other note names ${recordName}. @mention it and the note lands here.`}
-      />
-    </RecordSection>
-  )
-}
-
-/** One lane: a caps head, then rows on rules, or the lane's own empty line. */
-function NoteLane({
-  label,
-  rows,
-  empty,
-}: {
-  label: string
-  rows: Array<RecordNoteRow>
-  empty: string
-}) {
-  return (
-    <div className="flex flex-col pt-2 first:pt-0">
-      <h3 className="pb-1 label-caps text-graphite">{label}</h3>
       {rows.length === 0 ? (
         <p className="border-t border-rule py-2 text-label text-graphite">
-          {empty}
+          No notes.
         </p>
       ) : (
         <ol>
@@ -92,8 +74,9 @@ function NoteLane({
                 </span>
                 <span className="flex-1" />
                 {/* The mono lane the row ends on — the instrument's filing
-                    stamp: what kind of note this is, and when it last moved. */}
+                    stamp: which lane, what kind of note, when it last moved. */}
                 <span className="shrink-0 mono text-micro text-graphite">
+                  {n.lane === 'mention' ? 'mention · ' : ''}
                   {n.kind} · {n.updatedAt.slice(5, 10)}
                 </span>
               </Link>
@@ -101,6 +84,6 @@ function NoteLane({
           ))}
         </ol>
       )}
-    </div>
+    </RecordSection>
   )
 }

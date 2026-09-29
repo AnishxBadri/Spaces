@@ -95,8 +95,7 @@ export function SpaceContacts({
               —
             </span>
             <span className="min-w-0 flex-1 truncate text-ui text-graphite">
-              No one tagged into {spaceName} yet — tag a founder or an operator
-              from their record.
+              No one tagged in yet.
             </span>
           </LedgerRow>
         ) : null}
