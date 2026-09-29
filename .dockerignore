@@ -1,17 +1,43 @@
+# The build context is the repo root (`docker build -f docker/Dockerfile .`,
+# and `context: .` in every compose file), so this is the file Docker reads —
+# it looks beside the context, not beside docker/Dockerfile.
+#
 # Docker ignore patterns are anchored at the build context root and do not
-# recurse on their own — `node_modules` would only match /node_modules. Since
-# the tree moved under apps/web, every path that can appear more than once in
-# the workspace is written `**/`.
+# recurse on their own — `node_modules` would only match /node_modules. Every
+# path that can appear once per workspace package is written `**/`.
+#
+# What gets through is exactly what `turbo prune --docker` needs to cut the
+# workspace: the root manifests, the lockfile, turbo.json, and each package's
+# files. The prune stage copies the context whole; anything it would not keep
+# is excluded here so it does not bust that layer's cache either.
+
+# Installs and build output, in any package — the image makes its own.
 **/node_modules
 **/.output
 **/.nitro
 **/.tanstack
+**/.turbo
+**/dist
+**/coverage
+out
+
+# Runtime state and operator files: never inside an image.
 data
-.git
+backups
 .env
 .env.*
-*.md
-!README.md
-packages/db/drizzle/**/*.snapshot.json
+**/.env
+**/.env.*
+
+# Developer and repo tooling the image never reads.
+.git
+.github
+.claude
 .vscode
 .impeccable
+docs
+*.md
+!README.md
+
+# drizzle-kit's diff snapshots; the migrator reads only the SQL and the journal.
+packages/db/drizzle/**/*.snapshot.json

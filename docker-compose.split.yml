@@ -11,16 +11,24 @@
 # than by an HTTP endpoint (CONTEXT.md hostability contract 4).
 #
 # `app` keeps its name so the overlay merges onto it; ROLE=web turns it into
-# the web half. Naming the built image once means compose builds it once and
-# the worker starts the same bytes.
+# the web half. Both services name the same image and the same build, so the
+# worker starts the same bytes the web half does, whichever compose builds
+# first; the build block is spelled out here too rather than inherited, so
+# the overlay is explicit about what it builds (SPA-183).
 services:
   app:
     image: spaces:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     environment:
       ROLE: web
 
   worker:
     image: spaces:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-spaces}:${POSTGRES_PASSWORD:-spaces}@db:5432/${POSTGRES_DB:-spaces}
       APP_URL: ${APP_URL:-http://localhost:3000}

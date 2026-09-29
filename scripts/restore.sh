@@ -102,6 +102,10 @@ BASE="$(basename "$DATA_DIR")"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 STAGE_DB="${PGDB}_restore_$STAMP"
 STAGE_DIR="$PARENT/.restore-$STAMP"
+# The unpacked tree's last stop before the swap: a sibling of $DATA_DIR, so
+# the swap is a rename inside one directory. See "the staged tree moves
+# beside" below for why it cannot be a rename out of $STAGE_DIR.
+STAGE_TREE="$PARENT/.$BASE.restore-$STAMP"
 KEPT_DB="${PGDB}_prerestore_$STAMP"
 KEPT_DIR="$PARENT/$BASE.prerestore-$STAMP"
 
@@ -155,6 +159,13 @@ fi
 
 cleanup_stage() {
   rm -rf "$STAGE_DIR" 2>/dev/null || true
+  # Owned by uid 1000 once the chown below has run, which an operator who is
+  # not root cannot delete — so borrow root the same way the chown does.
+  if [ -e "$STAGE_TREE" ] && ! rm -rf "$STAGE_TREE" 2>/dev/null; then
+    compose run --rm -T --no-deps --user 0:0 --entrypoint sh \
+      -v "$(abs "$PARENT"):/parent" db -c "rm -rf '/parent/$(basename "$STAGE_TREE")'" \
+      >/dev/null 2>&1 || true
+  fi
   maint -c "drop database if exists \"$STAGE_DB\"" >/dev/null 2>&1 || true
 }
 
@@ -196,11 +207,25 @@ else
   echo '[restore] stored credential is unrecoverable.' >&2
 fi
 
+# The staged tree moves beside $DATA_DIR now, while it still belongs to
+# whoever is running this script, and only then is it given to uid 1000.
+# Linux lets a directory be renamed into a *different* parent only by someone
+# who can write the directory itself (its `..` entry changes), and after the
+# chown below that is uid 1000 alone. Renaming it out of $STAGE_DIR after the
+# chown is what the `roundtrip` CI job's ordinary-user restore died on
+# (`mv: cannot move './.restore-…/data' to './data': Permission denied`,
+# red on main since before project 16; found and fixed by SPA-183). A rename
+# inside one directory needs only that directory to be writable, which the
+# operator's own ./ is — so the swap below never needs root.
+mv "$STAGE_DIR/$BASE" "$STAGE_TREE" ||
+  fail "could not move the unpacked tree beside $DATA_DIR"
+rmdir "$STAGE_DIR" 2>/dev/null || true
+
 # Ownership needs root. An operator running as root gets it directly; anyone
 # else borrows it inside a container, the same trick the entrypoint uses.
-if ! chown -R 1000:1000 "$STAGE_DIR/$BASE" 2>/dev/null; then
+if ! chown -R 1000:1000 "$STAGE_TREE" 2>/dev/null; then
   compose run --rm -T --no-deps --user 0:0 --entrypoint sh \
-    -v "$(abs "$STAGE_DIR/$BASE"):/restored" db -c \
+    -v "$(abs "$STAGE_TREE"):/restored" db -c \
     'set -e; chown -R 1000:1000 /restored
      if [ -f /restored/secret.key ]; then chmod 600 /restored/secret.key; fi' ||
     fail "could not give $BASE to uid 1000 — run this as root, or chown -R 1000:1000 $DATA_DIR afterwards"
@@ -236,13 +261,12 @@ if [ -e "$DATA_DIR" ]; then
   fi
   DIR_KEPT=1
 fi
-if ! mv "$STAGE_DIR/$BASE" "$DATA_DIR"; then
+if ! mv "$STAGE_TREE" "$DATA_DIR"; then
   [ "$DIR_KEPT" = 0 ] || mv "$KEPT_DIR" "$DATA_DIR" || true
   undo_db
   fail "could not move the restored tree into $DATA_DIR"
 fi
 
-rmdir "$STAGE_DIR" 2>/dev/null || true
 trap - INT TERM
 
 # An empty target database was scaffolding, not data — drop it. One that held

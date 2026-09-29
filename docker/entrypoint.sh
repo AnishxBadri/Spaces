@@ -61,7 +61,7 @@ fi
 # invocation names its package's tsconfig: `#/…` and `#web/…` resolve from
 # tsconfig `paths` and tsx reads the tsconfig from its cwd, which is /app and
 # has none — without the flag the first `#/` specifier is
-# ERR_INVALID_MODULE_SPECIFIER (the Dockerfile says why at length).
+# ERR_INVALID_MODULE_SPECIFIER (docker/Dockerfile says why at length).
 node_modules/.bin/tsx --tsconfig apps/web/tsconfig.json apps/web/src/db/boot.ts
 
 ROLE="${ROLE:-all}"

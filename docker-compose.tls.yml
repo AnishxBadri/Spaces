@@ -20,6 +20,11 @@
 # challenge and the redirect to https.
 services:
   app:
+    # The same build the base file names, spelled out so the overlay stands
+    # on its own; paths resolve against the project directory (the repo root).
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     # Contract #3 and auth trap #2, in one line. With a proxy in front, 3000
     # must not be published on the host: `curl http://<host>:3000` from
     # outside is refused because there is nothing listening there, which also

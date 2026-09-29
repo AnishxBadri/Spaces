@@ -3,7 +3,12 @@ name: spaces
 # Two containers, two volumes. Full env surface documented in CONTEXT.md.
 services:
   app:
-    build: .
+    # Context is the repo root: the Dockerfile's prune stage cuts the whole
+    # workspace. It lives in docker/ (docs/spec-plugin-sdk.md §2), so it is
+    # named rather than found.
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     # image: ghcr.io/OWNER/spaces:TAG   # once images are published, pin a tag
     ports:
       - '3000:3000'

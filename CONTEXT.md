@@ -2440,9 +2440,14 @@ Standing debt:
 - **Rollback is unsafe and undocumented.** Migrations are forward-only and auto-apply, so
   pulling an older tag runs old code against a new schema. The upgrade doc must say _back
   up first_.
-- **No published images yet.** Compose still says `build: .` — installing means building
-  on the target box (583MB of node_modules for a 9.3MB `.output`; tight on 2GB RAM, fails
-  on 1GB). Project 16's GHCR multi-arch pipeline is the fix and the biggest adoption win.
+- **No published images yet.** Compose still builds (from `docker/Dockerfile` with the
+  repo root as context, since SPA-183), so installing means building on the target box
+  (tight on 2GB RAM, fails on 1GB). SPA-183 (mono-13a) cut what gets built: the image
+  installs its runtime node_modules from `turbo prune @spaces/worker` (the web process
+  runs from its self-contained `.output`), `@spaces/config`'s eslint plugins stopped
+  being prod dependencies, and `COPY --chown` replaced a recursive chown that stored
+  node_modules twice — 1.9 GB → 756 MB on disk, 327 → 150 MB content, measured on one
+  daemon. Project 16's GHCR multi-arch pipeline is the fix and the biggest adoption win.
 
 ## UI craft debt (catalogued 2026-07 · token pass shipped 2026-08)
 

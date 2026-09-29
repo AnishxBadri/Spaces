@@ -62,22 +62,57 @@ jobs:
       - name: turbo run build
         run: pnpm run build
 
-  # Hostability contract #1 (CONTEXT.md): the entrypoint owns /data. A macOS
-  # bind mount rewrites ownership on the way through, so a Linux runner is the
-  # only place the trap is real. Deliberately a separate job: it builds an
-  # image and must never sit in front of the gates above.
-  hostability:
+  # The runtime image, built once per run as its own named job (SPA-183), so
+  # a broken build is red under its own name rather than as the first step of
+  # whichever job happened to try it. Also the build guard (SPA-152): the
+  # image stopped building the day lefthook arrived — `prepare` needs git,
+  # alpine has none — and nothing in CI noticed. The checkout's .git is
+  # excluded by .dockerignore, which is exactly the failing case. No push —
+  # the image leaves this job as an artifact, and `hostability` and
+  # `roundtrip` load those exact bytes instead of each building their own.
+  # Deliberately not a dependency of `checks`: it must never sit in front of
+  # the gates.
+  image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Build the runtime image (docker/Dockerfile, context = repo root)
+        run: docker build -f docker/Dockerfile -t spaces:ci .
+      - name: Record its size
+        run: |
+          set -euo pipefail
+          docker images spaces:ci
+          BYTES="$(docker image inspect -f '{{.Size}}' spaces:ci)"
+          {
+            echo "### Runtime image"
+            echo
+            echo "| image | size |"
+            echo "| --- | --- |"
+            echo "| spaces:ci | $(( BYTES / 1024 / 1024 )) MiB ($BYTES bytes) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Hand the image to the jobs that boot it
+        run: docker save spaces:ci | gzip -1 > spaces-ci.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spaces-ci-image
+          path: spaces-ci.tar.gz
+          retention-days: 1
 
-      # Also the build guard (SPA-152). The image stopped building the day
-      # lefthook arrived — `prepare` needs git, alpine has none — and nothing
-      # in CI noticed. This step is that alarm; it runs on a checkout whose
-      # .git is excluded by .dockerignore, which is exactly the failing case.
-      # No push: proving it builds is the whole job.
-      - name: Build the runtime image
-        run: docker build -t spaces:ci .
+  # Hostability contract #1 (CONTEXT.md): the entrypoint owns /data. A macOS
+  # bind mount rewrites ownership on the way through, so a Linux runner is the
+  # only place the trap is real. Deliberately a separate job: it boots an
+  # image and must never sit in front of the gates above.
+  hostability:
+    runs-on: ubuntu-latest
+    needs: image
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: spaces-ci-image
+      - name: Load the runtime image built by `image`
+        run: gunzip -c spaces-ci.tar.gz | docker load
 
       - name: Mis-owned ./data — repairs, drops to 1000, takes an upload
         run: |
@@ -186,6 +221,53 @@ jobs:
           docker exec unpriv sh -c 'grep -qE "^Uid:[[:space:]]+1000[[:space:]]" /proc/1/status'
           docker rm -f unpriv
 
+      # Hostability contract 4: a ROLE starts its own process and nothing
+      # else. Both containers share a database of their own, created empty
+      # here, so no heartbeat the compose `app`'s worker ever wrote can answer
+      # for them: ROLE=web alone must report the worker `absent` (no
+      # worker_heartbeat row at all), and ROLE=worker — which serves no HTTP —
+      # is proven through the heartbeat, by the image's own HEALTHCHECK
+      # command and then by the web container's /api/health flipping to ok.
+      - name: ROLE=web and ROLE=worker each start only their process
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            exec -T db createdb -U spaces roles
+          ROLE_DB=postgresql://spaces:spaces@db:5432/roles
+          sudo mkdir -p roledata && sudo chown 1000:1000 roledata
+          docker run -d --name roleweb --network "$NET" -p 3001:3000 \
+            -e DATABASE_URL="$ROLE_DB" -e MASTER_KEY="$MASTER_KEY" -e ROLE=web \
+            -v "$PWD/roledata:/data" spaces:ci
+          for _ in $(seq 1 60); do
+            curl -fsS http://localhost:3001/api/health >/dev/null 2>&1 && break; sleep 2
+          done
+          H="$(curl -fsS http://localhost:3001/api/health)"
+          echo "$H"
+          jq -e '.worker.status == "absent"' <<<"$H"
+          docker exec roleweb ps -o args | tee roleweb.ps
+          grep -q 'server/index.mjs' roleweb.ps
+          if grep -q 'worker/src/index.ts' roleweb.ps; then
+            echo 'ROLE=web started a worker' >&2; exit 1
+          fi
+
+          docker run -d --name roleworker --network "$NET" \
+            -e DATABASE_URL="$ROLE_DB" -e MASTER_KEY="$MASTER_KEY" -e ROLE=worker \
+            -v "$PWD/roledata:/data" spaces:ci
+          HEALTH='node_modules/.bin/tsx --tsconfig apps/worker/tsconfig.json apps/worker/src/health.ts'
+          for _ in $(seq 1 60); do
+            docker exec roleworker sh -c "$HEALTH" >/dev/null 2>&1 && break; sleep 2
+          done
+          docker exec roleworker sh -c "$HEALTH"
+          docker exec roleworker ps -o args | tee roleworker.ps
+          grep -q 'worker/src/index.ts' roleworker.ps
+          if grep -q 'server/index.mjs' roleworker.ps; then
+            echo 'ROLE=worker started a web server' >&2; exit 1
+          fi
+          H="$(curl -fsS http://localhost:3001/api/health)"
+          echo "$H"
+          jq -e '.worker.status == "ok"' <<<"$H"
+          docker rm -f roleweb roleworker
+
       - name: Supervision contract survives the privilege drop
         run: |
           set -euo pipefail
@@ -223,7 +305,7 @@ jobs:
         if: always()
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v || true
-          docker rm -f sup unpriv nochown 2>/dev/null || true
+          docker rm -f sup unpriv nochown roleweb roleworker 2>/dev/null || true
 
   # Hostability contract #5 (CONTEXT.md): backup is both-or-neither, and
   # rollback is restore. Prose cannot prove that, so this job destroys the box
@@ -238,13 +320,17 @@ jobs:
   # the half of the backup that everything else is worthless without.
   roundtrip:
     runs-on: ubuntu-latest
+    needs: image
     env:
       COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build the runtime image
-        run: docker build -t spaces:ci .
+      - uses: actions/download-artifact@v4
+        with:
+          name: spaces-ci-image
+      - name: Load the runtime image built by `image`
+        run: gunzip -c spaces-ci.tar.gz | docker load
 
       - name: Boot, then plant a document, its blob and a credential
         run: |
