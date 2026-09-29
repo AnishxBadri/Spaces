@@ -18,7 +18,7 @@ import {
   validateMapping,
 } from '@spaces/core/import/mapping'
 import { summarizeReferences } from '@spaces/core/import/references'
-import { createAttributeProgram } from '#/lib/attributes/create'
+import { createAttributeProgram } from '@spaces/core/writes/attributes/create'
 import {
   lookupReferences,
   referenceColumnsOf,

@@ -10,8 +10,8 @@ import {
 } from '@spaces/db/schema'
 import type { EntityValues } from '@spaces/db/schema/entities'
 import { normalizeName } from '@spaces/core/entities/normalize'
-import { normalizeIdentityValue } from '#/lib/entities/resolve'
-import { provenanceOf } from '#/lib/entities/provenance'
+import { normalizeIdentityValue } from '@spaces/core/writes/entities/resolve'
+import { provenanceOf } from '@spaces/core/writes/entities/provenance'
 
 /**
  * One side of an inbox pair, read off the record (SPA-76).

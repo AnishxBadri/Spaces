@@ -10,7 +10,7 @@ import {
   interactionEntity,
   link,
 } from '@spaces/db/schema'
-import { objectIdForKind } from '../attributes/objects'
+import { objectIdForKind } from '@spaces/core/writes/attributes/objects'
 import { compileConditions } from './sql'
 import { entityValuesResolver } from './resolve'
 import { listScope } from './scope'

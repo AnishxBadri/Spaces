@@ -3,10 +3,10 @@ import { sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
 import { canReadNoteSql } from '#/lib/search/query'
-import { ContextQueryFailed } from './errors'
-import type { Candidate } from './rank'
-import { ref } from './ref'
-import { truncate } from './render'
+import { ContextQueryFailed } from '@spaces/core/context/errors'
+import type { Candidate } from '@spaces/core/context/rank'
+import { ref } from '@spaces/core/context/ref'
+import { truncate } from '@spaces/core/context/render'
 
 /**
  * The judgment-memory lane (SPA-139; docs/spec-ai-substrate.md §1 — "rank

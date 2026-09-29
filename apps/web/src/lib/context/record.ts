@@ -3,12 +3,15 @@ import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { note } from '@spaces/db/schema'
 import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
-import { canRead } from '#/lib/notes/visibility'
-import { ContextEntityNotFound, ContextQueryFailed } from './errors'
+import { canRead } from '@spaces/core/read-policy'
+import {
+  ContextEntityNotFound,
+  ContextQueryFailed,
+} from '@spaces/core/context/errors'
 import { assembleProgram } from './assemble'
 import type { ContextLeak } from './assemble'
 import { resolveRefsProgram } from './names'
-import type { ContextKind } from './types'
+import type { ContextKind } from '@spaces/core/context/types'
 
 /**
  * The record page's Context section, as one program: assemble the record for

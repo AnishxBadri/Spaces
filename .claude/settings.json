@@ -11,5 +11,12 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "mcp__Linear__save_issue",
+      "mcp__Linear__save_comment",
+      "mcp__Linear__save_status_update"
+    ]
   }
 }

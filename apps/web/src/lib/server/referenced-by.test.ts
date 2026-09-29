@@ -25,9 +25,10 @@ const actorId = async () => {
 
 /** A person, and `n` deals whose `referred_by` is that person. */
 async function referredDeals(tag: string, names: Array<string>) {
-  const { resolveEntity } = await import('../entities/resolve')
-  const { setValues } = await import('../attributes/values')
-  const { objectIdForKindAsync } = await import('../attributes/objects')
+  const { resolveEntity } = await import('@spaces/core/writes/entities/resolve')
+  const { setValues } = await import('@spaces/core/writes/attributes/values')
+  const { objectIdForKindAsync } =
+    await import('@spaces/core/writes/attributes/objects')
   const { db } = await import('@spaces/db')
   const { entity } = await import('@spaces/db/schema')
 
@@ -91,7 +92,8 @@ describe('the person page — referred deals', () => {
   })
 
   it('gives a person referred on nothing no group, so the page shows no heading', async () => {
-    const { resolveEntity } = await import('../entities/resolve')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const { groupReferencedBy, referencedByRows } = await import('./shared')
 
     const tag = randomUUID().slice(0, 8)
@@ -107,7 +109,7 @@ describe('the person page — referred deals', () => {
   })
 
   it('drops a deal from the section when its referred_by is cleared', async () => {
-    const { setValues } = await import('../attributes/values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { groupReferencedBy, referencedByRows } = await import('./shared')
 
     const tag = randomUUID().slice(0, 8)
@@ -127,8 +129,9 @@ describe('the person page — referred deals', () => {
   })
 
   it('gives a second record-reference attribute its own heading, no page edit', async () => {
-    const { setValues } = await import('../attributes/values')
-    const { objectIdForKindAsync } = await import('../attributes/objects')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { groupReferencedBy, referencedByRows } = await import('./shared')
     const { db } = await import('@spaces/db')
     const { attribute } = await import('@spaces/db/schema')
@@ -168,7 +171,7 @@ describe('the person page — referred deals', () => {
 
 describe('the custom-record page — referenced by, unchanged', () => {
   it('still gets the flat rows it rendered before the query moved', async () => {
-    const { setValues } = await import('../attributes/values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { referencedByRows } = await import('./shared')
     const { recordPath } = await import('#/lib/record-path')
     const { db } = await import('@spaces/db')

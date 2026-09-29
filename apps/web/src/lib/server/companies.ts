@@ -12,11 +12,15 @@ import {
   space,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
-import { addIdentityAlias, resolveEntity } from '../entities/resolve'
-import { jsonString } from '#/lib/json'
+import {
+  addIdentityAlias,
+  resolveEntity,
+} from '@spaces/core/writes/entities/resolve'
+import { jsonString } from '@spaces/core/json'
 import { requireUser } from './shared'
+import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { pagedListInput, pageOptions } from '#/lib/views/page-input'
-import type { SetValuesResult } from '../attributes/values'
+import type { SetValuesResult } from '@spaces/core/writes/attributes/values'
 
 export const listCompanies = createServerFn().handler(async () => {
   await requireUser()
@@ -67,7 +71,7 @@ export const createCompany = createServerFn({ method: 'POST' })
   .validator(createCompanyInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const result = await resolveEntity({
+    const { reembed, ...result } = await resolveEntity({
       kind: 'company',
       ...(data.name ? { name: data.name } : {}),
       ...(data.domain ? { keys: { domain: data.domain } } : {}),
@@ -75,6 +79,9 @@ export const createCompany = createServerFn({ method: 'POST' })
       createdBy: u.id,
       values: data.values,
     })
+    // The birth's embeddable values, queued once the resolve has returned —
+    // core hands them back rather than reaching the queue (SPA-174/175).
+    for (const s of reembed) await enqueueSourceEmbed(s)
 
     if (result.action === 'created') {
       await db.insert(activity).values({
@@ -235,14 +242,16 @@ export const updateRecord = createServerFn({ method: 'POST' })
       // (backend-paradigm ratchet); the values patch below is untouched and
       // stays Promise-shaped until it is open for behavioural change.
       const { effectFn } = await import('./effect')
-      const { renameRecordProgram } = await import('../entities/rename')
+      const { renameRecordProgram } =
+        await import('@spaces/core/writes/entities/rename')
       await effectFn(renameRecordProgram)(u.id, {
         id: data.id,
         name: data.name,
       })
     }
     if (data.patch && Object.keys(data.patch).length > 0) {
-      const { setValues } = await import('../attributes/values')
+      const { setValues } =
+        await import('@spaces/core/writes/attributes/values')
       // The identity outcome is the only thing this call returns that the
       // client cannot recompute: the claim was decided inside the write's
       // transaction. Threaded out so the editing surfaces can say so
@@ -254,6 +263,10 @@ export const updateRecord = createServerFn({ method: 'POST' })
       })
       identity = result.identity
       identityValues = result.identityValues
+      // After the commit: the embeddable values this write set, queued here
+      // because core hands them back rather than reaching the queue
+      // (SPA-174/175).
+      for (const s of result.reembed) await enqueueSourceEmbed(s)
       // The pipeline→portfolio seam: a deal reaching Invested births a
       // holding (idempotent — follow-ons land on the existing one).
       if (data.patch.stage === 'invested') {

@@ -2,15 +2,16 @@ import { Effect } from 'effect'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, note } from '@spaces/db/schema'
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/core/json'
 import {
   syncExtractedMentions,
   termMentionsIn,
 } from '#/lib/glossary/link-terms'
 import type { MentionDiff } from '#/lib/glossary/link-terms'
 import { NoteNotFound, NoteQueryFailed } from '#/lib/notes/delete'
-import { canRead } from '#/lib/notes/visibility'
-import { enqueueSourceEmbed, noteSource } from '#/lib/ai/chunk-sources'
+import { canRead } from '@spaces/core/read-policy'
+import { noteSource } from '@spaces/core/writes/ai/chunk-sources'
+import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 
 /**
  * Saving a note (converted to Effect by SPA-34, which opened it to run the

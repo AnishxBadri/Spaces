@@ -40,8 +40,10 @@ const nameAliases = async (entityId: string) => {
 
 describe('renaming a record', () => {
   it('keeps a company findable by the name it used to have', async () => {
-    const { renameRecordProgram } = await import('./rename')
-    const { resolveEntity } = await import('./resolve')
+    const { renameRecordProgram } =
+      await import('@spaces/core/writes/entities/rename')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const { entitySearchRows } = await import('../search/rows')
     const { normalizeName } = await import('@spaces/core/entities/normalize')
     const { Effect } = await import('effect')
@@ -85,9 +87,10 @@ describe('renaming a record', () => {
   })
 
   it('records the alias for a custom record too, as manual provenance', async () => {
-    const { renameRecordProgram } = await import('./rename')
+    const { renameRecordProgram } =
+      await import('@spaces/core/writes/entities/rename')
     const { createObjectProgram, createRecordProgram } =
-      await import('../attributes/object-registry')
+      await import('@spaces/core/writes/attributes/object-registry')
     const { entitySearchRows } = await import('../search/rows')
     const { normalizeName } = await import('@spaces/core/entities/normalize')
     const { Effect } = await import('effect')
@@ -133,8 +136,10 @@ describe('renaming a record', () => {
   })
 
   it('is insert-if-absent: renaming back adds no duplicate row', async () => {
-    const { renameRecordProgram } = await import('./rename')
-    const { resolveEntity } = await import('./resolve')
+    const { renameRecordProgram } =
+      await import('@spaces/core/writes/entities/rename')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const { Effect } = await import('effect')
     const tag = randomUUID().slice(0, 8)
     const actor = await actorId()
@@ -163,8 +168,10 @@ describe('renaming a record', () => {
 describe('the dedupe card — "Also seen as"', () => {
   it('never lists the record’s own current name', async () => {
     const { entityContext } = await import('../inbox/context')
-    const { resolveEntity } = await import('./resolve')
-    const { renameRecordProgram } = await import('./rename')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
+    const { renameRecordProgram } =
+      await import('@spaces/core/writes/entities/rename')
     const { normalizeName } = await import('@spaces/core/entities/normalize')
     const { Effect } = await import('effect')
     const tag = randomUUID().slice(0, 8)

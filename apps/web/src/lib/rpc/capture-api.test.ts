@@ -13,7 +13,7 @@ import { MAX_CAPTURE_BYTES, formatBytes } from '@spaces/core/documents'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { listDocumentsProgram } from '#/lib/documents/shelf'
 import { describeExternalOrigin } from '#/lib/server/external-origin'
-import { storage } from '#/lib/storage'
+import { storage } from '@spaces/core/writes/storage'
 import { createApiTokenProgram } from '#/lib/tokens/store'
 import type { ApiClient } from './api'
 import {

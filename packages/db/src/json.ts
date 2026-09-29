@@ -7,8 +7,8 @@
  * It lives here, and not in `apps/web/src/lib/json.ts`, because eight schema
  * files claim it and packages/db imports nothing internal (SPA-142). The
  * runtime narrowings that go with it — `jsonString`, `jsonRecord`,
- * `jsonValue` — are readers, not columns, and stayed in the app, which
- * re-exports this type so no caller's import changed.
+ * `jsonValue` — are readers, not columns, and live in `@spaces/core/json`
+ * (in the app until SPA-176), which re-exports this type.
  */
 export type Json =
   string | number | boolean | null | Array<Json> | { [k: string]: Json }

@@ -60,7 +60,7 @@ async function aSpace(tag: string): Promise<string> {
 
 /** Real bytes, so "the blob is still there" is about a file and not a call. */
 async function aBlob(tag: string): Promise<string> {
-  const { storage } = await import('#/lib/storage')
+  const { storage } = await import('@spaces/core/writes/storage')
   const bytes = Buffer.from(`deck ${tag}\n`, 'utf8')
   const sha = createHash('sha256').update(bytes).digest('hex')
   await storage().put(sha, bytes, { mime: 'text/plain' })
@@ -141,7 +141,7 @@ describe('a document filed in N places', () => {
     const { db } = await import('@spaces/db')
     const { document } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     const { fileDocumentProgram, unfileDocumentProgram } = await programs()
     const tag = randomUUID().slice(0, 8)
     const me = await actorId()

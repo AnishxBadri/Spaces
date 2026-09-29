@@ -1,10 +1,10 @@
 {
-  "//": "The pure half of the domain (mono-7): portfolio maths, the two display-format modules, the glossary automaton, the due-date grammar, the view-filter matcher, document extraction and policy, identity normalization, the attribute registry's pure quartet, and (mono-9c) both halves of the web→worker queue seam. The property this package exists to hold is stated as a test, not a convention — `src/purity.test.ts` fails the build on a `drizzle-orm` import, a React import, a `process.env` read, or a value (as opposed to type) import of @spaces/db.",
+  "//": "The domain, in two halves that one test keeps apart (mono-7, narrowed by SPA-174). The pure half: portfolio maths, the two display-format modules, the glossary automaton, the due-date grammar, the view-filter matcher, document extraction and policy, identity normalization, the attribute registry's pure quartet, and (mono-9c) both halves of the web→worker queue seam. The db-coupled half lives under `src/writes/` and nowhere else — the attribute write path lands there (SPA-174), because the plugin SDK's Facts port sits on top of it. `src/purity.test.ts` names the two halves by directory: a `drizzle-orm` import or a value import of @spaces/db fails the build in a pure directory and is allowed under `writes/`; a React import fails it anywhere; a `process.env` read fails it everywhere but `writes/vault/` (MASTER_KEY, DATA_DIR; SPA-176) and `writes/storage/` (STORAGE_DRIVER, S3_*, APP_URL; SPA-178), the two directories allowed to.",
   "name": "@spaces/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "//exports": "Source entry points, not a build output: every consumer is bundled by vite or loaded by tsx/vitest, all of which resolve TypeScript through `exports`. One subpath per domain, so an `#/lib/<domain>/<module>` import became `@spaces/core/<domain>/<module>` with nothing else changing — `./documents` is spelled twice because the old bare-directory specifier resolved to its index.",
+  "//exports": "Source entry points, not a build output: every consumer is bundled by vite or loaded by tsx/vitest, all of which resolve TypeScript through `exports`. One subpath per domain, so an `#/lib/<domain>/<module>` import became `@spaces/core/<domain>/<module>` with nothing else changing — `./documents` is spelled twice because the old bare-directory specifier resolved to its index. `./writes/*` is the db-coupled half (SPA-174/175): `#/lib/attributes/<module>` became `@spaces/core/writes/attributes/<module>`, `#/lib/entities/<module>` became `@spaces/core/writes/entities/<module>`, `#/lib/views/store` became `@spaces/core/writes/views/store`, and `#/lib/ai/chunk-sources` became `@spaces/core/writes/ai/chunk-sources`. `./views/target` is the view-target type and key, pure and client-safe, which `writes/views/store.ts` takes its address from. `./context/*` (SPA-179) is the pure half of the context assembler — the ranker, the ref grammar, the renderer, the citation formatter, the tagged errors and the types, snapshots included — and `./read-policy` is `canRead`, the one read predicate; the db-coupled assembler itself (`assemble`, `names`, `similar`, `record`) is still apps/web's, held there by `similar.ts`'s reach into the AI substrate's embedding pin and the search lane's SQL predicate (see SPA-179). `./writes/vault` (SPA-176) is the BYOK vault — `index.ts` over the credential table, with `./writes/vault/key` and `./writes/vault/crypto` beside it — and `./json` is the three jsonb readers (`jsonString`, `jsonRecord`, `jsonValue`) that the vault's write boundary and the app both use; the `Json` type itself stays declared at the columns, in `@spaces/db/json`. `./writes/boot` (SPA-177) is the boot composition — migrate, system attributes, starter taxonomy (`./writes/seeds/taxonomy`), value-index reconcile (`./writes/attributes/reconcile`) — which `apps/web/src/db/boot.ts` wraps in a process. `./writes/storage` (SPA-178) is the blob backend — `storage()` and the `Storage` port — and `./writes/storage/local` is deliberately public too: `LocalStorage`, `blobPath`, `signBlobToken` and `verifyBlobToken` are what apps/web's `/api/blob/$key` route serves a signed download with, so they are part of the surface rather than a route reaching into a package's internals.",
   "exports": {
     "./format": "./src/format.ts",
     "./portfolio/*": "./src/portfolio/*.ts",
@@ -15,7 +15,14 @@
     "./documents": "./src/documents/index.ts",
     "./documents/*": "./src/documents/*.ts",
     "./entities/normalize": "./src/entities/normalize.ts",
+    "./context/*": "./src/context/*.ts",
+    "./read-policy": "./src/read-policy.ts",
     "./attributes/*": "./src/attributes/*.ts",
+    "./views/target": "./src/views/target.ts",
+    "./writes/*": "./src/writes/*.ts",
+    "./writes/vault": "./src/writes/vault/index.ts",
+    "./writes/storage": "./src/writes/storage/index.ts",
+    "./json": "./src/json.ts",
     "./queue/*": "./src/queue/*.ts",
     "./timeline/*": "./src/timeline/*.ts",
     "./ai/*": "./src/ai/*.ts",
@@ -26,8 +33,13 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
-  "//dependencies": "unpdf, mammoth and fflate arrived with documents/extract.ts, tldts with entities/normalize.ts, zod with the attribute value validators, pg-boss with queue/sender.ts (mono-9c) — the sender is pure in the sense this package means it, because it is handed its connection string rather than reading one. Not here, and the test enforces it: drizzle-orm, react, and anything that reads the environment.",
+  "//dependencies": "unpdf, mammoth and fflate arrived with documents/extract.ts, tldts with entities/normalize.ts, zod with the attribute value validators, pg-boss with queue/sender.ts (mono-9c) — the sender is pure in the sense this package means it, because it is handed its connection string rather than reading one. @spaces/db, drizzle-orm and effect arrived with the db-coupled half (SPA-174): @spaces/db is the one internal dependency spec §2 allows core, and only `src/writes/` may import a value from it — everywhere else the reach stays `import type`, which the purity test enforces. @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner arrived with the s3 driver (SPA-178). Still not here, and the test enforces that too: react, @tanstack/*, and — outside `writes/vault/` and `writes/storage/` — anything that reads the environment.",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1101.0",
+    "@aws-sdk/s3-request-presigner": "^3.1101.0",
+    "@spaces/db": "workspace:*",
+    "drizzle-orm": "^0.45.1",
+    "effect": "4.0.0-rc.112",
     "fflate": "^0.8.3",
     "mammoth": "^1.12.0",
     "pg-boss": "^12.26.3",
@@ -35,12 +47,14 @@
     "unpdf": "^1.8.0",
     "zod": "^4.3.6"
   },
-  "//devDependencies": "@spaces/db is a devDependency on purpose: spec §2 allows core → db, but only for the column payload types (`AttributeOptions`, `SelectOption`, `ObjectKind`, `BadgeColor`, the view condition shapes), which `import type` erases at compile. A runtime dependency would mean core can reach the database, which is the one thing this package promises it cannot.",
+  "//devDependencies": "dotenv and pg are the test harness's (`vitest.config.ts` loads the workspace `.env.local` through @spaces/db/test-db, and the global setup migrates `spaces_test_core1`), imported by no shipping code.",
   "devDependencies": {
     "@spaces/config": "workspace:*",
-    "@spaces/db": "workspace:*",
     "@types/node": "^22.10.2",
+    "@types/pg": "^8.15.6",
+    "dotenv": "^17.3.1",
     "eslint": "^9.20.0",
+    "pg": "^8.16.3",
     "typescript": "^6.0.2",
     "vitest": "^4.1.10"
   }

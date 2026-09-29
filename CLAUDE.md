@@ -29,8 +29,8 @@ block before designing anything); synthesis in `docs/ARCHITECTURE.md`; ADRs in
 
 ```
 docker compose -f docker-compose.dev.yml up -d   # Postgres :5432 + MinIO :9000
-pnpm dev                                          # vite, port 3000
-pnpm worker                                       # background worker
+pnpm dev                                          # turbo `dev`: vite on :3000 and the worker (tsx watch)
+pnpm worker                                       # the worker alone (apps/worker, no watch)
 ```
 
 - **pnpm workspace since 2026-09-19 (SPA-101).** The app is `apps/web`
@@ -39,10 +39,57 @@ pnpm worker                                       # background worker
   journal, `drizzle.config.ts`, `ENTITY_REFS`, the worker heartbeat, the
   downgrade guard and `runMigrations()`** (SPA-142) — it depends on
   drizzle-orm, pg and zod and on nothing internal, so don't reach into
-  `apps/web` from it. `packages/*` is where `core` and `sdk` land later.
-  What stayed at the root: `eslint.config.js` + `eslint-rules/`,
-  `prettier.config.js`, `lefthook.yml`, `scripts/`, `docker/`, `docs/`,
-  `.env.local` and `data/`.
+  `apps/web` from it. **`packages/core` (`@spaces/core`) is the domain in
+  two halves that `src/purity.test.ts` keeps apart by directory** (mono-7,
+  narrowed by SPA-174): everything outside `src/writes/` computes and may
+  reach `@spaces/db` for types only; `src/writes/` is the db-coupled half —
+  the attribute engine (`writes/attributes/*`, with `seed.ts`), the identity
+  write path (`writes/entities/*`: resolve, merge, sweep, delete, rename,
+  provenance), the view store, `chunk-sources` (SPA-174/175), the BYOK
+  vault (`writes/vault/*`, SPA-176), the blob backend (`writes/storage/*`,
+  SPA-178; `./writes/storage/local`'s token helpers are public on purpose for
+  the blob route) and the boot composition (`writes/boot.ts` with
+  `writes/seeds/taxonomy.ts`, SPA-177; `apps/web/src/db/boot.ts` is the
+  process shell that runs it) — and is the only place in core a `drizzle-orm` import or a
+  `db` value import passes. The pure half also holds the context assembler's
+  ranker, ref grammar and renderer (`context/*`) and `canRead`
+  (`read-policy.ts`, SPA-179; the db-coupled assembler is still
+  `apps/web/src/lib/context/`). Neither half imports React, and only
+  `writes/vault/` (MASTER_KEY, DATA_DIR) and `writes/storage/`
+  (STORAGE_DRIVER, S3_*) read `process.env` — which is why
+  `enqueueSourceEmbed` stayed in
+  `apps/web/src/lib/ai/enqueue-embed.ts`: core's write paths hand back
+  `reembed` and the server fn queues it. The jsonb readers are
+  `@spaces/core/json`. `packages/*` is where `sdk` lands later.
+  **`packages/config` (`@spaces/config`) holds the shared configuration since
+  SPA-180: `tsconfig.base.json`, the eslint base (`eslint.base.js`, with
+  the architecture zones and the spec §2 boundary rules) and its rule
+  modules in `eslint-rules/` (gate 5's `instrument/vocabulary`),
+  `prettier.base.js`, and `fixtures/{sdk,plugins}` — the two directories
+  the sdk and plugin zones are fenced against until those packages exist.**
+  **`apps/worker` (`@spaces/worker`) is the worker process since SPA-181
+  (mono-11a)**: the pg-boss host (`src/index.ts`), `runJob`, the heartbeat,
+  the container health command and every job module under `src/jobs/`,
+  lifted out of `apps/web/src/worker` as a move. It depends on
+  `@spaces/core`, `@spaces/db` and pg-boss and never on apps/web as a
+  package — but its jobs still import server modules that have not left
+  `apps/web/src/lib` (the AI lanes, arrival, documents, import, search, the
+  queue sender). Those cross through **`#web/*`**, an alias in
+  `apps/worker/tsconfig.json` and `vitest.config.ts` that means
+  `apps/web/src/*`; the eslint worker zone allows it for `lib/` and `test/`
+  only, bans `#/` and any relative climb into apps/web outright, and lists
+  every crossing specifier in its comment
+  (`packages/config/eslint.base.js`, `WORKER_NEVER_WEB_NEVER_PLUGINS`). The
+  fence narrows as lib/ moves into core; when the list is empty the alias
+  goes. `#/` is deliberately absent from the worker, like db and core. Start
+  it with `pnpm worker` from the root (a plain `--filter` proxy) or
+  `corepack pnpm worker` inside `apps/worker`; `pnpm dev` now runs it too,
+  under turbo's persistent `dev` task, in watch mode.
+  What stayed at the root: `eslint.config.js` and `prettier.config.js` as
+  one-line shims re-exporting `@spaces/config/eslint` and
+  `@spaces/config/prettier` (both tools look their config up from the cwd,
+  and a copy inside a package would re-base the root-relative zone globs),
+  `lefthook.yml`, `scripts/`, `docker/`, `docs/`, `.env.local` and `data/`.
 - **Turbo runs the graph since 2026-09-19 (SPA-127).** `turbo.json` declares
   `dev`, `build`, `lint`, `typecheck`, `test` and `generate-routes`, and the
   root scripts for those six go through `turbo run` instead of
@@ -84,7 +131,12 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
   reach by construction. The grain is a database per vitest worker —
   `apps/web` runs `maxWorkers: 4` on `pool: 'forks'` against
   `spaces_test_web1…4`; `packages/db` runs `fileParallelism: false` against
-  `spaces_test_db1` — because a truncate must not be able to reach a file
+  `spaces_test_db1`, `packages/core` the same against `spaces_test_core1`
+  (SPA-174/175; core's `vitest.seed.ts` seeds the system attributes and the
+  fixture user, which apps/web's seed composes and adds the taxonomy to),
+  and `apps/worker` runs `maxWorkers: 4` against `spaces_test_worker1…4`
+  with its own harness pair and a seed composed like apps/web's (SPA-181) —
+  because a truncate must not be able to reach a file
   running at the same moment in another worker. Drop any `spaces_test*`
   database any time; the next run rebuilds it. With Postgres down the setup
   fails once, naming the connection string, instead of ten files each
@@ -92,20 +144,24 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
   answers with Postgres stopped, even for `entity-refs.test.ts`. The harness
   is `packages/db/src/test-db.ts` plus the `vitest.setup.ts` /
   `vitest.global-setup.ts` pair in each package; it never drops a database,
-  only creates and truncates.
+  only creates and truncates. A global setup that seeds the reference
+  database passes its seed to `prepareTestDatabase` so it runs inside the
+  harness advisory lock — three packages seed it and turbo runs them at
+  once (SPA-181 review).
 
 ## Gates before any commit
 
 1. `pnpm typecheck` → `turbo run typecheck typecheck:root` — **not** a bare
    `pnpm exec tsc --noEmit`. There is a tsconfig per package now: the root
-   one covers `scripts/` and `eslint-rules/` (that is the `typecheck:root`
-   half), and `apps/web/tsconfig.json` and `packages/db/tsconfig.json` cover
-   their own source (the `typecheck` half, one task per package). The root
-   script runs them all; a bare root `tsc` would pass while typechecking
-   none of them.
-2. `pnpm test` → `turbo run test` (`vitest run` in `apps/web` and in
-   `packages/db`, which carries its own vitest config) — must be fully
-   green
+   one covers `scripts/` and the two config shims (that is the
+   `typecheck:root` half), and `apps/web`, `packages/db`, `packages/core`
+   and `packages/config` (whose `eslint-rules/` and zone fixtures were the
+   root half's until SPA-180) each cover their own source (the `typecheck`
+   half, one task per package). The root script runs them all; a bare root
+   `tsc` would pass while typechecking none of them.
+2. `pnpm test` → `turbo run test` (`vitest run` in `apps/web`, `apps/worker`,
+   `packages/db` and `packages/core`, each with its own vitest config) —
+   must be fully green
 3. prettier on touched files (root: `pnpm exec prettier --check <files>`) —
    not a turbo task; it is per-file, not per-package
 4. `pnpm lint` → `turbo run lint lint:root` — must be zero errors (the old
@@ -115,7 +171,7 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
    deleting the guard.
 5. Instrument vocabulary only — **`pnpm lint` covers it**, there is no separate
    gate and no grep any more (2026-09-18). `instrument/vocabulary`
-   (`eslint-rules/vocabulary.js`, at the repo root) reads className literals
+   (`packages/config/eslint-rules/vocabulary.js`) reads className literals
    and `cn()`/`cva()` string arguments in `apps/web/src/**/*.tsx` and names the
    Instrument replacement in the message, so gate 4 and the pre-commit hook
    enforce it for free; since SPA-52 it also rejects a raw colour there (a hex,
@@ -133,19 +189,25 @@ copies, and the checklist a reviewer runs. The gates are its mechanical floor.
 A second run of a gate with nothing changed is a cache hit that replays the
 first run's output. That is safe only because the inputs are honest: `test`
 and `typecheck` hash the whole package plus `.env.local`, the lockfile and
-`packages/config/tsconfig.base.json`; `lint` hashes `eslint.config.js` and
-`eslint-rules/**` too, so editing gate 5's rule re-runs gate 4. If you add a
-file the gates read from outside `apps/web`, add it to `turbo.json` — a task
-whose inputs miss it will replay a pass that checked nothing. A file in
-another _workspace package_ is the exception: turbo already folds an internal
-dependency's files into the consumer's hash, so editing
-`packages/db/src/test-db.ts` invalidates `@spaces/web#test` with no entry
-here (verified by SPA-143). `--force` re-runs a task regardless.
+`packages/config/tsconfig.base.json`; `lint` hashes the root shim,
+`packages/config/eslint.base.js` and `packages/config/eslint-rules/**`
+too, so editing gate 5's rule or a boundary zone re-runs gate 4 in every
+package (verified by SPA-180: a comment edit in `vocabulary.js` turned four
+cache hits into four misses). If you add a file the gates read from outside
+the package, add it to `turbo.json` — a task whose inputs miss it will replay
+a pass that checked nothing. A file in another _workspace package_ is the
+exception: turbo already folds an internal dependency's files into the
+consumer's hash, so editing `packages/db/src/test-db.ts` invalidates
+`@spaces/web#test` with no entry here (verified by SPA-143) — the `lint`
+inputs name `packages/config` anyway, so the gate does not lean on that
+property. `--force` re-runs a task regardless.
 
 Pre-commit hooks (lefthook) run prettier + eslint on staged files from the
-repo root; pre-push runs `pnpm run typecheck`, which is turbo over every
-package that has one — `@spaces/web`, `@spaces/db`, `@spaces/core` — plus the
-`typecheck:root` half, so no package can be typechecked by nobody.
+repo root, where the two shims hand both tools `packages/config`'s settings;
+pre-push runs `pnpm run typecheck`, which is turbo over every package that
+has one — `@spaces/web`, `@spaces/worker`, `@spaces/db`, `@spaces/core`,
+`@spaces/config` — plus the `typecheck:root` half, so no package can be
+typechecked by nobody.
 CI (`.github/workflows/ci.yml`) runs the same root commands, **one named step
 per gate** against a real Postgres: prettier, `pnpm run lint` (which carries
 gate 5, since it is an eslint rule), `pnpm run typecheck`, `boot.ts` against
@@ -164,7 +226,7 @@ harness derives `spaces_test*` from it, so the suite never writes the
 - `undefined` is a type, not a state: optional means the caller may omit it
   (`exactOptionalPropertyTypes`).
 - Attribute values have one write path, which validates, logs, and links
-  (`no-restricted-syntax` on `entity.values`; `apps/web/src/lib/attributes/values.ts`).
+  (`no-restricted-syntax` on `entity.values`; `packages/core/src/writes/attributes/values.ts`).
 - Portfolio history is append-only; a correction is a compensating event
   (D12, built by SPA-150 — `apps/web/src/lib/portfolio/reverse.ts`, the
   `<table>_reverses_unique` partial indexes, `packages/core/src/portfolio/reversal.ts`).
@@ -205,7 +267,8 @@ anyway. Don't re-litigate it from the flag list.
   exception to "schema changed → db:generate". `reconcileValueIndexes()`
   (`packages/db/src/value-indexes.ts`) diffs `pg_indexes` against the flagged,
   unarchived attributes and mints/drops `CONCURRENTLY`; it runs at boot beside
-  `seedSystemAttributes()` (`apps/web/src/db/boot.ts`) and from the attribute
+  `seedSystemAttributes()` (`packages/core/src/writes/boot.ts`, which
+  `apps/web/src/db/boot.ts` runs) and from the attribute
   server fns **after** the write commits — never inside a transaction, which
   `CREATE INDEX CONCURRENTLY` forbids. A failed mint is logged, the attribute
   stays usable, and the next boot retries. **Never add one to the drizzle
@@ -225,7 +288,7 @@ anyway. Don't re-litigate it from the flag list.
   drizzle's metadata and needs no database, but since SPA-143 its package's
   global setup does, so `pnpm exec turbo run test --filter=@spaces/db` wants
   Postgres up like everything else. A `custom` merge strategy
-  still needs its section in `apps/web/src/lib/entities/merge.ts` **and** its
+  still needs its section in `packages/core/src/writes/entities/merge.ts` **and** its
   snapshot. This was the worst bug of a review cycle; there is no unmerge
   executor — the snapshot convention is the only contract.
 

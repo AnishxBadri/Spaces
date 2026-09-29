@@ -14,7 +14,7 @@ async function world() {
   const { user } = await import('@spaces/db/schema/auth')
   const { duplicateCandidate, suggestion } = await import('@spaces/db/schema')
   const { eq } = await import('drizzle-orm')
-  const { resolveEntity } = await import('#/lib/entities/resolve')
+  const { resolveEntity } = await import('@spaces/core/writes/entities/resolve')
   const { proposeProgram } = await import('#/lib/ai/propose')
 
   const me = (await db.select({ id: user.id }).from(user).limit(1)).at(0)

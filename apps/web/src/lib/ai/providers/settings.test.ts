@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
 import { credential } from '@spaces/db/schema'
 import { FIXTURE_ACTOR } from '../../../../vitest.seed'
-import { resolveCredential, storeCredential } from '#/lib/vault'
+import { resolveCredential, storeCredential } from '@spaces/core/writes/vault'
 import {
   listAiProvidersHandler,
   saveAiKeyHandler,

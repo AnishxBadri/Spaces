@@ -3,9 +3,11 @@ import { fileURLToPath } from 'node:url'
 import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
-// eslint-rules/ stays at the workspace root: it is loaded by the root
-// eslint.config.js, and one lint vocabulary serves every package.
-import instrument, { NAMED_STEPS } from '../../../../eslint-rules/vocabulary.js'
+// eslint-rules/ is packages/config's (SPA-180), loaded by the eslint base
+// beside it; one lint vocabulary serves every package.
+import instrument, {
+  NAMED_STEPS,
+} from '../../../../packages/config/eslint-rules/vocabulary.js'
 
 /**
  * SPA-16: the Instrument vocabulary is the only vocabulary, and the thing that

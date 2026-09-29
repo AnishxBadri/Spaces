@@ -59,7 +59,7 @@ import {
   updateRecord,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
-import { jsonRecord, jsonString } from '#/lib/json'
+import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { EntityValues } from '@spaces/db/schema/entities'
 
 /**

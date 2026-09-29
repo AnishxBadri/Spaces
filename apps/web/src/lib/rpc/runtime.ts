@@ -7,7 +7,7 @@ import { Layer } from 'effect'
  * at the seam).
  *
  * It has the worker's shape on purpose, not a second composition. `runJob`
- * (`apps/web/src/worker/run-job.ts`) takes a closed `Layer.Layer<TServices>` —
+ * (`apps/worker/src/run-job.ts`) takes a closed `Layer.Layer<TServices>` —
  * no construction error, no requirements — and provides it to one program;
  * this is the same closed `Layer.Layer<WebServices>`, provided to the HTTP
  * router instead. And it is empty for the same reason all but two of the
@@ -15,7 +15,7 @@ import { Layer } from 'effect'
  * `capture.hello` has no I/O at all. The two are not one module yet
  * because there is nothing to share: the worker has no process-wide Layer,
  * only per-job ones, and its one non-empty service (`ExtractionStore`) lives
- * under `src/worker/`, which the web process may not import. The first
+ * in `apps/worker`, which the web process may not import. The first
  * service both processes need goes in a module both can import, and each
  * seam adds it here and to its `runJob` call.
  *

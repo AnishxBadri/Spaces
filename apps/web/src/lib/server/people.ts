@@ -11,9 +11,13 @@ import {
   space,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
-import { addIdentityAlias, resolveEntity } from '../entities/resolve'
-import { jsonString } from '#/lib/json'
+import {
+  addIdentityAlias,
+  resolveEntity,
+} from '@spaces/core/writes/entities/resolve'
+import { jsonString } from '@spaces/core/json'
 import { groupReferencedBy, referencedByRows, requireUser } from './shared'
+import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { pagedListInput, pageOptions } from '#/lib/views/page-input'
 
 export const listPeople = createServerFn().handler(async () => {
@@ -99,7 +103,7 @@ export const createPerson = createServerFn({ method: 'POST' })
   .validator(createPersonInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const result = await resolveEntity({
+    const { reembed, ...result } = await resolveEntity({
       kind: 'person',
       name: data.name,
       keys: data.email ? { email: data.email } : undefined,
@@ -107,6 +111,9 @@ export const createPerson = createServerFn({ method: 'POST' })
       createdBy: u.id,
       values: data.values,
     })
+    // The birth's embeddable values, queued once the resolve has returned —
+    // core hands them back rather than reaching the queue (SPA-174/175).
+    for (const s of reembed) await enqueueSourceEmbed(s)
     if (data.companyId) {
       await db
         .insert(link)

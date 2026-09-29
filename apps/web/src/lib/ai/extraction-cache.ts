@@ -4,9 +4,9 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { extractionCache } from '@spaces/db/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
-import type { ContextItem } from '#/lib/context/types'
-import { jsonValue } from '#/lib/json'
-import type { Json } from '#/lib/json'
+import type { ContextItem } from '@spaces/core/context/types'
+import { jsonValue } from '@spaces/core/json'
+import type { Json } from '@spaces/core/json'
 import { completeProgram, laneTargetProgram } from './complete'
 import type {
   CompleteFailure,

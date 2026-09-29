@@ -3,8 +3,8 @@ import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { activity, document, entity, link, suggestion } from '@spaces/db/schema'
 import type { suggestionKind } from '@spaces/db/schema'
-import { jsonRecord } from '#/lib/json'
-import type { Json } from '#/lib/json'
+import { jsonRecord } from '@spaces/core/json'
+import type { Json } from '@spaces/core/json'
 import { proposalRefs, toPatch, validateProposal } from '@spaces/core/ai/schema'
 import type { ProposalIssue } from '@spaces/core/ai/schema'
 import { identityPayloadSchema } from '@spaces/core/ai/identity'
@@ -12,17 +12,21 @@ import { documentKindPayloadSchema } from '@spaces/core/ai/document-kind'
 import { spaceTagPayloadSchema } from '@spaces/core/ai/space-tag'
 import { toObjectKind } from '@spaces/core/attributes/registry'
 import type { AttributeDef } from '@spaces/core/attributes/registry'
-import { objectIdForKindAsync } from '#/lib/attributes/objects'
+import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import {
   AttributeValidationError,
   EntityNotFound,
   getRegistryByObjectId,
   setValuesInTx,
-} from '#/lib/attributes/values'
-import type { Actor, SetValuesResult, Tx } from '#/lib/attributes/values'
-import { resolveEntity } from '#/lib/entities/resolve'
-import type { ResolveResult } from '#/lib/entities/resolve'
-import { canonicalId } from '#/lib/entities/sweep'
+} from '@spaces/core/writes/attributes/values'
+import type {
+  Actor,
+  SetValuesResult,
+  Tx,
+} from '@spaces/core/writes/attributes/values'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import type { ResolveResult } from '@spaces/core/writes/entities/resolve'
+import { canonicalId } from '@spaces/core/writes/entities/sweep'
 import { notePayloadSchema } from '@spaces/core/ai/note'
 import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
 import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'

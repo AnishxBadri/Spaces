@@ -19,7 +19,8 @@ describe('recordContextProgram', () => {
     const { entity, link, note } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
     const { eq } = await import('drizzle-orm')
-    const { resolveEntity } = await import('#/lib/entities/resolve')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const { recordContextProgram } = await import('./record')
 
     const [me] = await db.select({ id: user.id }).from(user).limit(1)

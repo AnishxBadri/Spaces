@@ -19,9 +19,9 @@ import { readNotePayload } from '@spaces/core/ai/note'
 import { QUEUES } from '@spaces/core/queue/names'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { enqueued } from '#/test/queue-stub'
-import { jsonValue } from '#/lib/json'
-import type { Json } from '#/lib/json'
-import { resolveEntity } from '#/lib/entities/resolve'
+import { jsonValue } from '@spaces/core/json'
+import type { Json } from '@spaces/core/json'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
   blocksToMarkdown,
   noteBodyFromMarkdown,

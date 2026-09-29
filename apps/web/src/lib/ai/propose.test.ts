@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/core/json'
 import type { Decider } from './propose'
 
 /**
@@ -11,7 +11,7 @@ import type { Decider } from './propose'
  */
 
 async function setup() {
-  const { resolveEntity } = await import('#/lib/entities/resolve')
+  const { resolveEntity } = await import('@spaces/core/writes/entities/resolve')
   const { db } = await import('@spaces/db')
   const { user } = await import('@spaces/db/schema/auth')
   const accepter = (
@@ -130,7 +130,8 @@ describe('propose → accept', () => {
     const { db } = await import('@spaces/db')
     const { attribute, attributeEvent, suggestion } =
       await import('@spaces/db/schema')
-    const { objectIdForKindAsync } = await import('#/lib/attributes/objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { and, eq } = await import('drizzle-orm')
     const { accepter, entityId } = await setup()
 
@@ -292,7 +293,8 @@ describe('bulk accept', () => {
   async function archiveSeed() {
     const { db } = await import('@spaces/db')
     const { attribute } = await import('@spaces/db/schema')
-    const { objectIdForKindAsync } = await import('#/lib/attributes/objects')
+    const { objectIdForKindAsync } =
+      await import('@spaces/core/writes/attributes/objects')
     const { and, eq } = await import('drizzle-orm')
     const where = and(
       eq(attribute.objectId, await objectIdForKindAsync('company')),

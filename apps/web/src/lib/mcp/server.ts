@@ -10,7 +10,7 @@ import {
 import { authenticateBearerProgram } from '#/lib/tokens/store'
 import type { TokenUser } from '#/lib/tokens/store'
 import { getRecordProgram, resolveEntityRefProgram } from './tools'
-import { jsonValue } from '#/lib/json'
+import { jsonValue } from '@spaces/core/json'
 import { proposeSuggestionProgram } from './tools-propose'
 import { listRegistryProgram, searchRecordsProgram } from './tools-read'
 

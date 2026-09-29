@@ -17,7 +17,7 @@
     "./value-indexes": "./src/value-indexes.ts",
     "./test-db": "./src/test-db.ts"
   },
-  "//bin": "Migrations only — guard, then `migrate()`, then exit. The boot composition that also seeds is apps/web's (`apps/web/src/db/boot.ts`), and moves to core at mono-9a.",
+  "//bin": "Migrations only — guard, then `migrate()`, then exit. The boot composition that also seeds is `@spaces/core/writes/boot` (SPA-177), which `apps/web/src/db/boot.ts` runs as a process; this package composes nothing above the schema.",
   "bin": {
     "spaces-db-migrate": "./src/bin/migrate.ts"
   },

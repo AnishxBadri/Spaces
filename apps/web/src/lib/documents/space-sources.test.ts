@@ -36,7 +36,7 @@ async function aSpace(tag: string): Promise<string> {
 }
 
 async function aBlob(tag: string): Promise<string> {
-  const { storage } = await import('#/lib/storage')
+  const { storage } = await import('@spaces/core/writes/storage')
   const bytes = Buffer.from(`deck ${tag}\n`, 'utf8')
   const sha = createHash('sha256').update(bytes).digest('hex')
   await storage().put(sha, bytes, { mime: 'text/plain' })

@@ -31,10 +31,13 @@ import {
  */
 export default async function setup() {
   const env = loadWorkspaceEnv()
-  const { url } = await prepareTestDatabase(env)
-
-  const { seedTestDatabase } = await import('./vitest.seed.ts')
-  await seedTestDatabase()
+  // The seed runs inside the harness lock (SPA-181 review): apps/worker and
+  // packages/core seed the same reference database from their own setups,
+  // and turbo runs the four `test` tasks at once.
+  const { url } = await prepareTestDatabase(env, async () => {
+    const { seedTestDatabase } = await import('./vitest.seed.ts')
+    await seedTestDatabase()
+  })
 
   const { db } = await import('@spaces/db')
   // The workers open their own pools; this one belongs to the setup process

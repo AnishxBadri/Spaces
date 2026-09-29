@@ -13,7 +13,8 @@ import { describe, expect, it } from 'vitest'
 describe('provenanceOf', () => {
   it('reads the class for a manually-added company', async () => {
     const { provenanceOf } = await import('./shared')
-    const { resolveEntity } = await import('../entities/resolve')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const tag = randomUUID().slice(0, 8)
 
     const co = await resolveEntity({
@@ -29,7 +30,8 @@ describe('provenanceOf', () => {
 
   it('names the integration, not the word "integration"', async () => {
     const { provenanceOf } = await import('./shared')
-    const { resolveEntity } = await import('../entities/resolve')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const { db } = await import('@spaces/db')
     const { integration } = await import('@spaces/db/schema')
     const tag = randomUUID().slice(0, 8)

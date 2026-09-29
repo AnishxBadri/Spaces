@@ -18,7 +18,7 @@ async function deps() {
   const schema = await import('@spaces/db/schema')
   const { user } = await import('@spaces/db/schema/auth')
   const { resolveRefsProgram, MISSING_LABEL } = await import('./names')
-  const { ref } = await import('./ref')
+  const { ref } = await import('@spaces/core/context/ref')
   const me = (await db.select({ id: user.id }).from(user).limit(1)).at(0)
   if (!me) throw new Error('the test seed has no user')
   const resolve = (refs: ReadonlyArray<string>) =>
@@ -259,7 +259,8 @@ describe('resolveRefs — deleted targets', () => {
 
   it('reaches /inbox and the record timeline as missing — neither consumer fails', async () => {
     const d = await deps()
-    const { resolveEntity } = await import('#/lib/entities/resolve')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const { proposeProgram, acceptProgram } = await import('#/lib/ai/propose')
     const { listInboxProgram } = await import('#/lib/inbox/queue')
     const { recordTimelineProgram } = await import('#/lib/timeline/record')
@@ -358,7 +359,9 @@ describe('resolveRefs — cost', () => {
 
 describe('cite.ts is the one renderer', () => {
   it('is called only from names.ts, and no other file in src formats a ref', () => {
-    const src = join(import.meta.dirname, '..', '..')
+    // Both source trees: `cite.ts` is @spaces/core's since SPA-179 (the pure
+    // half of lib/context moved), `names.ts` is still this app's.
+    const root = join(import.meta.dirname, '..', '..', '..', '..', '..')
     const files: Array<string> = []
     const walk = (dir: string) => {
       for (const name of readdirSync(dir)) {
@@ -368,15 +371,18 @@ describe('cite.ts is the one renderer', () => {
           files.push(path)
       }
     }
-    walk(src)
-    const rel = (f: string) => relative(src, f)
+    walk(join(root, 'apps/web/src'))
+    walk(join(root, 'packages/core/src'))
+    const rel = (f: string) => relative(root, f)
+    const citeTs = 'packages/core/src/context/cite.ts'
+    const namesTs = 'apps/web/src/lib/context/names.ts'
 
     // Whoever calls `cite(` renders a ref; only the resolver may.
     const callers = files
       .filter((f) => /\bcite\(/.test(readFileSync(f, 'utf8')))
       .map(rel)
       .sort()
-    expect(callers).toEqual(['lib/context/cite.ts', 'lib/context/names.ts'])
+    expect(callers).toEqual([namesTs, citeTs])
 
     // Nobody else builds a `CiteLookup` or re-derives a label from a parse:
     // the words "· chunk" and the mandate / history fallbacks live in cite.ts.
@@ -391,11 +397,11 @@ describe('cite.ts is the one renderer', () => {
       })
       .map(rel)
       .sort()
-    expect(renderers).toEqual(['lib/context/cite.ts', 'lib/context/names.ts'])
+    expect(renderers).toEqual([namesTs, citeTs])
 
     // And cite.ts stays pure: the grammar and a type are all it imports.
     const imports = [
-      ...readFileSync(join(src, 'lib/context/cite.ts'), 'utf8').matchAll(
+      ...readFileSync(join(root, citeTs), 'utf8').matchAll(
         /^import .* from '([^']+)'$/gm,
       ),
     ].map((m) => m[1])

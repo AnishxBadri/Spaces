@@ -28,8 +28,10 @@ async function actorId() {
 /** A select attribute on a core object, plus its option ids. */
 async function stageAttribute(kind: 'company' | 'person') {
   const { Effect } = await import('effect')
-  const { createAttributeProgram } = await import('../attributes/create')
-  const { objectIdForKind } = await import('../attributes/objects')
+  const { createAttributeProgram } =
+    await import('@spaces/core/writes/attributes/create')
+  const { objectIdForKind } =
+    await import('@spaces/core/writes/attributes/objects')
   const { db } = await import('@spaces/db')
   const { attribute } = await import('@spaces/db/schema')
   const { eq } = await import('drizzle-orm')
@@ -187,7 +189,7 @@ describe('listCompaniesTable — paged, counted and filtered in SQL', () => {
   it('drops a row edited out of the active filter, and the count follows', async () => {
     const { Effect } = await import('effect')
     const { listCompaniesPageProgram } = await import('./directory')
-    const { setValues } = await import('../attributes/values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { slug, inId, outId } = await stageAttribute('company')
     const { tag } = await companies(slug, inId, outId)
 
@@ -264,7 +266,7 @@ describe('listPeopleTable — paged, counted and filtered in SQL', () => {
   it('narrows the text box on an email, and drops a stranded row on refetch', async () => {
     const { Effect } = await import('effect')
     const { listPeoplePageProgram } = await import('./directory')
-    const { setValues } = await import('../attributes/values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { slug, inId, outId } = await stageAttribute('person')
     const { tag } = await people(slug, inId, outId)
 

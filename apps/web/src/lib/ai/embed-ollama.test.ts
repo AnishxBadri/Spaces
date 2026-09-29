@@ -6,7 +6,7 @@ import { aiUsage, credential, workspace } from '@spaces/db/schema'
 import type { WorkspaceSettings } from '@spaces/db/schema/workspace'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { fakeOllama } from '#/test/fake-ollama'
-import { readWorkspaceCredential } from '#/lib/vault'
+import { readWorkspaceCredential } from '@spaces/core/writes/vault'
 import { embedMessage, embedProgram } from './embed'
 import {
   clearSensitiveSlotProgram,

@@ -18,7 +18,7 @@ import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { useColumnRun } from '#/components/views/column-run'
 import { cn } from '#/lib/utils'
-import { jsonRecord } from '#/lib/json'
+import { jsonRecord } from '@spaces/core/json'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import {

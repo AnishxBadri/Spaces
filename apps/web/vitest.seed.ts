@@ -1,7 +1,13 @@
-import { db } from '@spaces/db'
-import { user } from '@spaces/db/schema/auth'
-import { seedSystemAttributes } from '#/lib/attributes/seed'
-import { seedStarterTaxonomy } from '#/lib/seeds/taxonomy'
+// Relative, not a package specifier: `vitest.seed.ts` is a harness file
+// outside core's `exports`, and the fixture user has to be the same row in
+// both suites' databases, so it is defined once, there.
+import {
+  FIXTURE_ACTOR,
+  seedCoreTestDatabase,
+} from '../../packages/core/vitest.seed.ts'
+import { seedStarterTaxonomy } from '@spaces/core/writes/seeds/taxonomy'
+
+export { FIXTURE_ACTOR }
 
 /**
  * Everything the suite assumes a database already has, in one function so the
@@ -22,28 +28,17 @@ import { seedStarterTaxonomy } from '#/lib/seeds/taxonomy'
  */
 
 /**
- * One better-auth user row, id and email fixed so reruns are the same row.
- * `.test` is reserved by RFC 2606, so this address can never be someone's.
- *
- * This is the hole a "just migrate it" harness falls into: sites across the
- * suite do `select id from user limit 1` and use what comes back as the
- * acting user, which on the dev database was whoever logged in first. A
- * database that has never seen the app has no such row, and those files go
- * red on `actor.id` of undefined.
+ * The fixture user is the hole a "just migrate it" harness falls into: sites
+ * across the suite do `select id from user limit 1` and use what comes back
+ * as the acting user, which on the dev database was whoever logged in first.
+ * A database that has never seen the app has no such row, and those files go
+ * red on `actor.id` of undefined. Since SPA-174/175 it is core's
+ * `vitest.seed.ts` that inserts it, with the system attributes — both suites
+ * need both — and this composition adds the one seed only apps/web wants.
  */
-export const FIXTURE_ACTOR = {
-  id: 'spa143-fixture-actor',
-  name: 'Test Fixture',
-  email: 'fixture@spaces.test',
-  emailVerified: true,
-}
-
 export async function seedTestDatabase(): Promise<void> {
-  // The three CORE_OBJECTS rows and SYSTEM_ATTRIBUTES;
-  // `objectIdForKindAsync('company')` is a precondition of half the
-  // DB-coupled files.
-  await seedSystemAttributes()
+  // The three CORE_OBJECTS rows, SYSTEM_ATTRIBUTES and the fixture user.
+  await seedCoreTestDatabase()
   // The handful of starter spaces.
   await seedStarterTaxonomy()
-  await db.insert(user).values(FIXTURE_ACTOR).onConflictDoNothing()
 }

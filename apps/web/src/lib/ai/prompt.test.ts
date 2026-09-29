@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ContextItem } from '#/lib/context/types'
+import type { ContextItem } from '@spaces/core/context/types'
 import { renderBlock, renderPrompt } from './prompt'
 
 /**

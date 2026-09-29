@@ -1,6 +1,6 @@
 import { entity, note } from '@spaces/db/schema'
 import type { NoteBody } from '@spaces/db/schema/kinds'
-import type { Tx } from '#/lib/entities/resolve'
+import type { Tx } from '@spaces/core/writes/entities/resolve'
 
 /**
  * The birth of an arrived message's body note (SPA-56; D30, D49), inside the

@@ -37,8 +37,8 @@ import type {
   ConditionValue,
   ViewExtra,
 } from '@spaces/core/views/filter'
-import { viewTarget } from '#/lib/views/target'
-import type { ViewRow, ViewSort } from '#/lib/views/store'
+import { viewTarget } from '@spaces/core/views/target'
+import type { ViewRow, ViewSort } from '@spaces/core/writes/views/store'
 import type { ViewCount } from '#/lib/views/counts'
 
 /**

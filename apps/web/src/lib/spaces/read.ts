@@ -25,7 +25,7 @@ import {
   spaceInheritedSourcesProgram,
   spaceSourcesProgram,
 } from '#/lib/documents/space-sources'
-import { jsonString } from '#/lib/json'
+import { jsonString } from '@spaces/core/json'
 import { filedNotesProgram } from '#/lib/notes/filed'
 import {
   spaceContactsProgram,

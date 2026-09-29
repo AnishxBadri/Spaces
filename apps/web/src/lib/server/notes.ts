@@ -11,7 +11,7 @@ import {
   space,
 } from '@spaces/db/schema'
 import { canRead, requireUser } from './shared'
-import { jsonValue } from '#/lib/json'
+import { jsonValue } from '@spaces/core/json'
 
 export const createNote = createServerFn({ method: 'POST' })
   .validator(

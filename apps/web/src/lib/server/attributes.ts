@@ -5,7 +5,7 @@ import { db } from '@spaces/db'
 import { BADGE_COLORS } from '@spaces/core/attributes/colors'
 import { aiConfigInput } from '@spaces/core/ai/attribute-ai'
 import { requireAdmin, requireUser } from './shared'
-import { jsonValue } from '#/lib/json'
+import { jsonValue } from '@spaces/core/json'
 
 export const listRegistry = createServerFn()
   .validator(
@@ -26,7 +26,8 @@ export const listRegistry = createServerFn()
     // auth stays promise-land outside the program.
     await requireUser()
     const { attribute } = await import('@spaces/db/schema')
-    const { objectIdForKind } = await import('../attributes/objects')
+    const { objectIdForKind } =
+      await import('@spaces/core/writes/attributes/objects')
     const { effectFn } = await import('./effect')
     const { Effect } = await import('effect')
 
@@ -92,7 +93,8 @@ export const reorderAttributes = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     await requireAdmin()
-    const { reorderAttributesProgram } = await import('../attributes/update')
+    const { reorderAttributesProgram } =
+      await import('@spaces/core/writes/attributes/update')
     const { effectFn } = await import('./effect')
     return effectFn(reorderAttributesProgram)(data.objectId, data.ids)
   })
@@ -165,7 +167,8 @@ export const updateAttribute = createServerFn({ method: 'POST' })
     // Creating an attribute stays member (the "+ Add column" flow): additive,
     // and a two-person fund should not need ceremony to add a field.
     await requireAdmin()
-    const { updateAttributeProgram } = await import('../attributes/update')
+    const { updateAttributeProgram } =
+      await import('@spaces/core/writes/attributes/update')
     const { effectFn } = await import('./effect')
     const result = await effectFn(updateAttributeProgram)(data)
     // After the write commits, never inside it: `CREATE INDEX CONCURRENTLY`
@@ -175,7 +178,7 @@ export const updateAttribute = createServerFn({ method: 'POST' })
     // reconciler and leaves the attribute usable; the next boot retries.
     if (data.indexed !== undefined || data.archived !== undefined) {
       const { reconcileAttributeIndexes } =
-        await import('../attributes/reconcile')
+        await import('@spaces/core/writes/attributes/reconcile')
       await reconcileAttributeIndexes()
     }
     return result
@@ -242,7 +245,8 @@ export const createAttribute = createServerFn({ method: 'POST' })
     // to add a field. Reshaping (rename, options, archive) is admin — see
     // updateAttribute.
     const u = await requireUser()
-    const { createAttributeProgram } = await import('../attributes/create')
+    const { createAttributeProgram } =
+      await import('@spaces/core/writes/attributes/create')
     const { effectFn } = await import('./effect')
     const result = await effectFn(createAttributeProgram)({
       ...data,
@@ -251,7 +255,7 @@ export const createAttribute = createServerFn({ method: 'POST' })
     // Same rule as the update path: after the insert commits.
     if (data.indexed) {
       const { reconcileAttributeIndexes } =
-        await import('../attributes/reconcile')
+        await import('@spaces/core/writes/attributes/reconcile')
       await reconcileAttributeIndexes()
     }
     return result

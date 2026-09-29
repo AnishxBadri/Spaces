@@ -8,7 +8,7 @@ import { workerHeartbeat } from './schema/worker.ts'
  *
  * The worker writes through `beat()`; two readers ask the same question of
  * the same row — the unauthenticated `/api/health` route and the
- * `ROLE=worker` container's own health command (`src/worker/health.ts`),
+ * `ROLE=worker` container's own health command (`apps/worker/src/health.ts`),
  * which has no HTTP server to ask. They share this module so the threshold
  * has exactly one definition: `classifyBeat` takes it as an argument and
  * both callers pass `STALE_AFTER`, so a second literal threshold cannot

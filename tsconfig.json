@@ -1,17 +1,15 @@
 {
-  "//": "The root tsconfig covers what did not move: the operator scripts under scripts/ and the two root config files. apps/web has its own (apps/web/tsconfig.json); `pnpm typecheck` runs both, which is why gate 1 is `pnpm typecheck` and not a bare `tsc --noEmit`. eslint's type-aware rules find this file as the nearest tsconfig for scripts/**.",
+  "//": "The root tsconfig covers what did not move: scripts/ (shell only today; the glob stays for the first .ts operator script) and the two config shims, which `checkJs` reads — and through their re-exports eslint.base.js, prettier.base.js and vocabulary.js in packages/config, so the `// @ts-check` those files carry is a gate-1 claim since SPA-180 and not an editor hint (eslint-rules/ itself moved there and is in that package's tsconfig). Every package has its own tsconfig; `pnpm typecheck` runs them all, which is why gate 1 is `pnpm typecheck` and not a bare `tsc --noEmit`. eslint's type-aware rules find this file as the nearest tsconfig for scripts/**.",
 
   "extends": "./packages/config/tsconfig.base.json",
 
-  "include": [
-    "scripts/**/*.ts",
-    "eslint-rules/**/*.ts",
-    "eslint.config.js",
-    "prettier.config.js"
-  ],
+  "include": ["scripts/**/*.ts", "eslint.config.js", "prettier.config.js"],
   "exclude": ["node_modules", "apps", "packages"],
 
   "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "types": ["node"],
     "paths": {
       "#/*": ["./apps/web/src/*"]
     }

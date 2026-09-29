@@ -9,6 +9,7 @@ RUN corepack enable
 # importer for must be here or --frozen-lockfile fails.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
+COPY apps/worker/package.json ./apps/worker/
 COPY packages/config/package.json ./packages/config/
 COPY packages/db/package.json ./packages/db/
 COPY packages/core/package.json ./packages/core/
@@ -29,15 +30,18 @@ WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
+COPY apps/worker/package.json ./apps/worker/
 COPY packages/config/package.json ./packages/config/
 COPY packages/db/package.json ./packages/db/
 COPY packages/core/package.json ./packages/core/
-# --node-linker=hoisted, and only here. apps/web's `src/` lands at /app/src, so
-# the worker and the boot entry resolve their dependencies from
-# /app/node_modules. pnpm's default isolated linker would put them in
-# apps/web/node_modules as symlinks into ../../node_modules/.pnpm, and those
-# relative links break the moment the directory is copied anywhere else.
-# Hoisted writes one flat tree at /app/node_modules that copies as-is.
+# --node-linker=hoisted, and only here. Every workspace package keeps its
+# path under /app in the final stage, and node resolves a dependency by
+# walking up from the importing file — apps/web/src and apps/worker/src both
+# reach /app/node_modules. pnpm's default isolated linker would put each
+# package's dependencies in its own node_modules as symlinks into
+# ../../node_modules/.pnpm, and those relative links break the moment the
+# directory is copied anywhere else. Hoisted writes one flat tree at
+# /app/node_modules that copies as-is.
 # It also links no workspace package: this stage has only the manifests, so
 # there is nothing for `@spaces/db` to point at and pnpm leaves it out
 # entirely. The final stage makes that link by hand, once packages/db is
@@ -55,41 +59,51 @@ ENV NODE_ENV=production \
 # contract #1). ~20KB; no init system, no gosu-sized Go binary.
 RUN apk add --no-cache su-exec
 
-# Runtime needs: .output (web), apps/web's src (worker + the boot entry via
-# tsx), packages/db's src + drizzle (schema, migrator and the journal),
+# Runtime needs: apps/web's .output (web) and src (the boot entry via tsx),
+# apps/worker's src (the worker and its health command via tsx; SPA-181),
+# packages/db's src + drizzle (schema, migrator and the journal),
 # packages/core's src (the worker's extractor lives there since SPA-144), prod
 # node_modules (pg-boss, drizzle-orm, unpdf, mammoth, fflate, tsx).
 #
-# apps/web's tree is still flattened back onto /app — /app/src and
-# /app/package.json sit exactly where they did — but packages/db is NOT
-# flattened: it keeps its workspace path, because `node_modules/@spaces/db` is
-# a relative symlink into it and the migrator resolves the journal from its own
-# `import.meta.url`. So the journal now lives at /app/packages/db/drizzle, and
-# that is the path an "older image" fixture has to mount over (CI's
-# `hostability` job does exactly that). /app/drizzle no longer exists.
-# packages/core keeps its workspace path for the same symlink reason; it has
-# no journal, so its src is all that comes along.
+# Every workspace package keeps its workspace path under /app — apps/web,
+# apps/worker, packages/config, packages/db, packages/core — because the
+# relations between them are relative: `node_modules/@spaces/db` and
+# `@spaces/core` are relative symlinks into packages/, the migrator resolves
+# the journal from its own `import.meta.url` (so it lives at
+# /app/packages/db/drizzle, the path CI's `hostability` job mounts an "older
+# image" fixture over), every tsconfig `extends` names `../../packages/config`,
+# and apps/worker's tsconfig points `#web/*` at `../web/src`. Until SPA-181
+# apps/web alone was flattened onto /app (/app/src, /app/.output); the worker
+# moving out is what made the layout have to be the workspace's own.
 #
-# tsconfig.json comes along because tsx resolves `#/…` from tsconfig `paths`
-# and NOT from package.json `imports` — Node rejects `#/*` as an internal
-# imports key outright — so without it `tsx src/db/boot.ts` dies on the
-# first `#/` specifier. It now extends packages/config, so the base file is
-# placed at the `../../` the extends names, which from /app is /packages.
-# packages/db's own tsconfig is deliberately not copied: nothing in the image
-# typechecks, and its `extends` would dangle.
+# The two app tsconfigs come along because tsx resolves `#/…` (and the
+# worker's `#web/…`) from tsconfig `paths` and NOT from package.json `imports`
+# — Node rejects `#/*` as an internal imports key outright
+# (ERR_INVALID_MODULE_SPECIFIER), so `#/…` has never resolved under plain
+# Node and works only through tsx. And tsx reads the tsconfig from its *cwd*:
+# main's image flattened apps/web onto /app so /app/tsconfig.json was found
+# by accident of layout; with every package at its workspace path there is no
+# tsconfig at /app, so every tsx invocation — the boot entry, both worker
+# lines in the entrypoint and the HEALTHCHECK below — passes `--tsconfig
+# <package>/tsconfig.json` explicitly (SPA-181 review: the image did not
+# boot without it). Both extend packages/config/tsconfig.base.json, copied to
+# the path the extends names. packages/db's and packages/core's own tsconfigs
+# are deliberately not copied: nothing in the image typechecks.
 COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=build /app/apps/web/.output ./.output
-COPY apps/web/package.json apps/web/tsconfig.json ./
-COPY packages/config/tsconfig.base.json /packages/config/tsconfig.base.json
+COPY --from=build /app/apps/web/.output ./apps/web/.output
+COPY apps/web/package.json apps/web/tsconfig.json ./apps/web/
+COPY apps/web/src ./apps/web/src
+COPY apps/worker/package.json apps/worker/tsconfig.json ./apps/worker/
+COPY apps/worker/src ./apps/worker/src
+COPY packages/config/package.json packages/config/tsconfig.base.json ./packages/config/
 COPY packages/db/package.json ./packages/db/
 COPY packages/db/src ./packages/db/src
 COPY packages/db/drizzle ./packages/db/drizzle
 COPY packages/core/package.json ./packages/core/
 COPY packages/core/src ./packages/core/src
-COPY apps/web/src ./src
 COPY docker/entrypoint.sh /entrypoint.sh
 # The two links the prod-deps install could not make (see above). Without the
-# first, `tsx src/db/boot.ts` dies on `Cannot find package '@spaces/db'`;
+# first, `tsx apps/web/src/db/boot.ts` dies on `Cannot find package '@spaces/db'`;
 # without the second, the worker dies on `@spaces/core/documents/extract` the
 # first time a document is uploaded. The app's own source imports both by
 # name, and node needs a node_modules entry whose package.json carries the
@@ -116,7 +130,7 @@ EXPOSE 3000
 # The timeout is 10s for the worker branch: tsx has to boot and connect.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s \
   CMD if [ "${ROLE:-all}" = worker ]; then \
-        node_modules/.bin/tsx src/worker/health.ts; \
+        node_modules/.bin/tsx --tsconfig apps/worker/tsconfig.json apps/worker/src/health.ts; \
       else \
         wget -qO- http://127.0.0.1:3000/api/health || exit 1; \
       fi

@@ -18,7 +18,7 @@ import {
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { blobIsReferenced } from '#/lib/documents/blob-refs'
-import { storage } from '#/lib/storage'
+import { storage } from '@spaces/core/writes/storage'
 import {
   defineImportBatchProgram,
   discardImportBatchProgram,

@@ -15,7 +15,7 @@ import {
 import type { SourceClass } from '@spaces/db/schema'
 
 /** Closed JSON type — Start's serializer rejects `unknown`. */
-export type { Json } from '#/lib/json'
+export type { Json } from '@spaces/core/json'
 
 export async function requireUser() {
   const session = await auth.api.getSession({
@@ -42,8 +42,8 @@ export async function requireAdmin() {
  * dragging `getRequest` into the client bundle (SPA-155). Re-exported here so
  * the server-fn modules keep importing them from where they always did.
  */
-export { canRead } from '#/lib/notes/visibility'
-export { provenanceOf } from '#/lib/entities/provenance'
+export { canRead } from '@spaces/core/read-policy'
+export { provenanceOf } from '@spaces/core/writes/entities/provenance'
 
 /** ltree labels: [a-z0-9_] only. */
 export function toLabel(name: string): string {
@@ -431,7 +431,8 @@ export async function deleteDocumentWithBlobGc(
   ).at(0)
   if (!row) return { ok: true }
 
-  const { deleteEntityProgram } = await import('#/lib/entities/delete')
+  const { deleteEntityProgram } =
+    await import('@spaces/core/writes/entities/delete')
   const { effectFn } = await import('./effect')
   await effectFn(deleteEntityProgram)(id)
 

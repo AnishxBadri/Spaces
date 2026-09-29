@@ -34,16 +34,17 @@ import {
   user,
   view,
 } from '@spaces/db/schema'
-import { createAttributeProgram } from '#/lib/attributes/create'
-import { birthValues } from '#/lib/attributes/defaults'
+import { createAttributeProgram } from '@spaces/core/writes/attributes/create'
+import { birthValues } from '@spaces/core/writes/attributes/defaults'
 import {
   createObjectProgram,
   createRecordProgram,
-} from '#/lib/attributes/object-registry'
-import { objectIdForKindAsync } from '#/lib/attributes/objects'
-import { getRegistry, setValues } from '#/lib/attributes/values'
-import { resolveEntity } from '#/lib/entities/resolve'
-import { storage } from '#/lib/storage'
+} from '@spaces/core/writes/attributes/object-registry'
+import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
+import { getRegistry, setValues } from '@spaces/core/writes/attributes/values'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
+import { storage } from '@spaces/core/writes/storage'
 import type { ObjectKind } from '@spaces/core/attributes/registry'
 
 /**
@@ -2688,7 +2689,7 @@ async function seedDeals(
 
     for (let i = 1; i < d.path.length; i++) {
       const last = i === d.path.length - 1
-      await setValues({
+      const written = await setValues({
         entityId: ent.id,
         actor: { type: 'user', id: ownerId },
         patch: await known('deal', {
@@ -2700,6 +2701,9 @@ async function seedDeals(
           ...(last && d.closeReason ? { close_reason: d.closeReason } : {}),
         }),
       })
+      // A close reason is the one embeddable value; queued as the server fn
+      // would (SPA-174/175: core hands the sources back).
+      for (const s of written.reembed) await enqueueSourceEmbed(s)
     }
 
     // Stage events first (ordered as written), then everything else back to

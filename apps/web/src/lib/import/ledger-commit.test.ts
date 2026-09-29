@@ -18,7 +18,7 @@ import { isLedgerPlan } from '@spaces/core/import/ledger'
 import { enqueued } from '#/test/queue-stub'
 import { truncateAndReseed } from '#/test/reseed'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { resolveEntity } from '#/lib/entities/resolve'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { effectFn } from '#/lib/server/effect'
 import { loadHoldingDetail, loadHoldingEvents } from '#/lib/portfolio/detail'
 import { addInvestmentProgram, addMarkProgram } from '#/lib/portfolio/write'
@@ -500,7 +500,7 @@ describe('nothing overwritten', () => {
       './ledger.ts',
       '../portfolio/write.ts',
       '../portfolio/holding.ts',
-      '../../worker/jobs/import-commit.ts',
+      '../../../../worker/src/jobs/import-commit.ts',
     ]) {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8')
       expect(source.match(EVENT_TABLE_WRITE), file).toBeNull()

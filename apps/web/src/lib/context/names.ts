@@ -11,9 +11,9 @@ import {
   term,
 } from '@spaces/db/schema'
 import { ContextQueryFailed } from './assemble'
-import { cite } from './cite'
-import type { CiteLookup } from './cite'
-import { parseRef } from './ref'
+import { cite } from '@spaces/core/context/cite'
+import type { CiteLookup } from '@spaces/core/context/cite'
+import { parseRef } from '@spaces/core/context/ref'
 
 /**
  * The one ref resolver (SPA-18 built the lookup, SPA-119 made it the reader):

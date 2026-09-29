@@ -31,7 +31,8 @@ const nouns = () => {
 /** A custom object with `domain` declared, and the user who declared it. */
 async function fundWithDomainKey() {
   const { Effect } = await import('effect')
-  const { createObjectProgram } = await import('./object-registry')
+  const { createObjectProgram } =
+    await import('@spaces/core/writes/attributes/object-registry')
   const { db } = await import('@spaces/db')
   const { user } = await import('@spaces/db/schema/auth')
   const [actor] = await db.select({ id: user.id }).from(user).limit(1)
@@ -52,7 +53,8 @@ async function makeRecord(
   values?: Record<string, unknown>,
 ) {
   const { Effect } = await import('effect')
-  const { createRecordProgram } = await import('./object-registry')
+  const { createRecordProgram } =
+    await import('@spaces/core/writes/attributes/object-registry')
   const row = await Effect.runPromise(
     createRecordProgram({
       objectId,
@@ -115,7 +117,7 @@ async function candidateFor(a: string, b: string) {
 
 describe('identity-backed attribute writes', () => {
   it('mirrors the value into entity_alias, in the transaction that wrote it', async () => {
-    const { setValues } = await import('./values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { db } = await import('@spaces/db')
     const { attributeEvent } = await import('@spaces/db/schema')
     const { and, eq } = await import('drizzle-orm')
@@ -156,7 +158,7 @@ describe('identity-backed attribute writes', () => {
   })
 
   it('a second record claiming the same domain gets a candidate, its value, and no alias', async () => {
-    const { setValues } = await import('./values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { objectId, actorId } = await fundWithDomainKey()
     const tag = randomUUID().slice(0, 8)
     const domain = `contested-${tag}.com`
@@ -188,7 +190,7 @@ describe('identity-backed attribute writes', () => {
   })
 
   it('a unique violation raised inside the write is a suggestion, not a lost transaction', async () => {
-    const { setValues } = await import('./values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { db } = await import('@spaces/db')
     const { entityAlias } = await import('@spaces/db/schema')
     const { objectId, actorId } = await fundWithDomainKey()
@@ -252,7 +254,7 @@ describe('identity-backed attribute writes', () => {
   })
 
   it('re-writing the value you already own is already_own, not a second row', async () => {
-    const { setValues } = await import('./values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { objectId, actorId } = await fundWithDomainKey()
     const tag = randomUUID().slice(0, 8)
     const domain = `steady-${tag}.com`
@@ -273,7 +275,7 @@ describe('identity-backed attribute writes', () => {
   })
 
   it('clearing the value releases the claim, and another record may take it', async () => {
-    const { setValues } = await import('./values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { objectId, actorId } = await fundWithDomainKey()
     const tag = randomUUID().slice(0, 8)
     const domain = `released-${tag}.com`
@@ -314,7 +316,7 @@ describe('identity-backed attribute writes', () => {
   })
 
   it('changing the value retires the claim the old one made', async () => {
-    const { setValues } = await import('./values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { objectId, actorId } = await fundWithDomainKey()
     const tag = randomUUID().slice(0, 8)
     const id = await makeRecord(objectId, actorId, `Mover ${tag}`, {
@@ -332,7 +334,7 @@ describe('identity-backed attribute writes', () => {
   })
 
   it('refuses a value that normalizes to nothing, and only when the key is declared', async () => {
-    const { setValues } = await import('./values')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { valueValidator } = await import('@spaces/core/attributes/registry')
     const { objectId, actorId } = await fundWithDomainKey()
     const tag = randomUUID().slice(0, 8)

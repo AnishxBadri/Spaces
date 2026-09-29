@@ -41,7 +41,7 @@ import {
   noteDropInsertPos,
 } from '#/lib/documents/note-drop'
 import { searchEntities } from '#/lib/server-fns'
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/core/json'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 
 const schema = BlockNoteSchema.create({

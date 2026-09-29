@@ -14,8 +14,10 @@ import type { Condition } from '@spaces/core/views/filter'
 
 async function fixture() {
   const { Effect } = await import('effect')
-  const { createObjectProgram } = await import('../attributes/object-registry')
-  const { createAttributeProgram } = await import('../attributes/create')
+  const { createObjectProgram } =
+    await import('@spaces/core/writes/attributes/object-registry')
+  const { createAttributeProgram } =
+    await import('@spaces/core/writes/attributes/create')
   const { db } = await import('@spaces/db')
   const { attribute, entity } = await import('@spaces/db/schema')
   const { user } = await import('@spaces/db/schema/auth')

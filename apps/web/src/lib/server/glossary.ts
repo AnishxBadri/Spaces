@@ -116,7 +116,8 @@ export const deleteTerm = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const { deleteEntityProgram } = await import('../entities/delete')
+    const { deleteEntityProgram } =
+      await import('@spaces/core/writes/entities/delete')
     const { effectFn } = await import('./effect')
     await effectFn(deleteEntityProgram)(data.id)
     return { ok: true }

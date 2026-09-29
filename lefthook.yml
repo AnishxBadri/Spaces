@@ -2,9 +2,10 @@
 # Pre-commit stays fast: format + lint only what's staged.
 # The full gates (tsc, vitest) run in CI and before push.
 #
-# Everything here runs from the repo root, where prettier, eslint and their
-# configs live; {staged_files} are root-relative paths, so apps/web files are
-# covered without a per-package hook.
+# Everything here runs from the repo root, where prettier and eslint run and
+# their config shims live (the configuration itself is packages/config's since
+# SPA-180; the shims re-export it); {staged_files} are root-relative paths, so
+# every package's files are covered without a per-package hook.
 
 pre-commit:
   parallel: false
@@ -21,8 +22,8 @@ pre-commit:
 pre-push:
   jobs:
     # `turbo run typecheck typecheck:root` — one tsc per package (@spaces/web,
-    # @spaces/db, @spaces/core) plus the root tsconfig (scripts/ + the root
-    # config files). A bare `tsc --noEmit` at the root would typecheck the
-    # scripts and silently skip all three packages.
+    # @spaces/worker, @spaces/db, @spaces/core, @spaces/config) plus the root
+    # tsconfig (scripts/ + the two config shims). A bare `tsc --noEmit` at the
+    # root would typecheck the shims and silently skip every package.
     - name: typecheck
       run: pnpm run typecheck

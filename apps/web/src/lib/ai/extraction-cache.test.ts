@@ -16,10 +16,10 @@ import {
 import { schemaFor } from '@spaces/core/ai/schema'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { enqueued } from '#/test/queue-stub'
-import { createAttributeProgram } from '#/lib/attributes/create'
-import { resolveEntity } from '#/lib/entities/resolve'
+import { createAttributeProgram } from '@spaces/core/writes/attributes/create'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { deleteDocumentWithBlobGc } from '#/lib/server/shared'
-import { storage } from '#/lib/storage'
+import { storage } from '@spaces/core/writes/storage'
 import { extractionSchemaKey } from './extraction-cache'
 import { registryFor, rejectProgram } from './propose'
 import {

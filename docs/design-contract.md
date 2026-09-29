@@ -48,7 +48,7 @@ the page gutter is 32 (`px-8`). Heights: row 36 (`h-row`), control 32, small 26,
 ### The named type steps (`DESIGN.md` §3)
 
 Eight steps, fixed rem, never fluid. The list is the `--text-*` custom properties in
-`apps/web/src/styles.css` and the `NAMED_STEPS` table in `eslint-rules/vocabulary.js`,
+`apps/web/src/styles.css` and the `NAMED_STEPS` table in `packages/config/eslint-rules/vocabulary.js`,
 which a test keeps in sync.
 
 | step      | size / leading | role                                |
@@ -292,7 +292,7 @@ list a new page would have to come back and amend.
 ### The mechanical floor
 
 The five gates in `CLAUDE.md`. Gate 5 is `instrument/vocabulary`
-(`eslint-rules/vocabulary.js`), which reads `className` literals and the string
+(`packages/config/eslint-rules/vocabulary.js`), which reads `className` literals and the string
 arguments of `cn()` / `cva()` in `apps/web/src/**/*.tsx` and names the replacement in
 every message — a banned class, an unnamed size, or a raw colour (a hex or an
 `rgb()`/`oklch()` spelled into a class; `var(--…)` is the sanctioned form). Green gates mean the vocabulary is spelled correctly. A surface can pass

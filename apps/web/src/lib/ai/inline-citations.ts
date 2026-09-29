@@ -1,4 +1,4 @@
-import { parseRef } from '#/lib/context/ref'
+import { parseRef } from '@spaces/core/context/ref'
 
 /**
  * Citations written into the text (SPA-66). A model is handed context as

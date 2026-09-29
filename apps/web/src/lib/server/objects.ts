@@ -156,7 +156,7 @@ export const createObject = createServerFn({ method: 'POST' })
     const { requireAdmin } = await import('./shared')
     const u = await requireAdmin()
     const { createObjectProgram } =
-      await import('../attributes/object-registry')
+      await import('@spaces/core/writes/attributes/object-registry')
     const { effectFn } = await import('./effect')
     return effectFn(createObjectProgram)({ ...data, createdBy: u.id })
   })
@@ -181,7 +181,7 @@ export const updateObject = createServerFn({ method: 'POST' })
     const { requireAdmin } = await import('./shared')
     const u = await requireAdmin()
     const { updateObjectProgram } =
-      await import('../attributes/object-registry')
+      await import('@spaces/core/writes/attributes/object-registry')
     const { effectFn } = await import('./effect')
     // Declaring a key creates an attribute, and an attribute has an author.
     const { identityKeys, ...patch } = data
@@ -323,13 +323,18 @@ export const createObjectRecord = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { createRecordProgram } =
-      await import('../attributes/object-registry')
+      await import('@spaces/core/writes/attributes/object-registry')
     const { effectFn } = await import('./effect')
-    return effectFn(createRecordProgram)({
+    const { enqueueSourceEmbed } = await import('#/lib/ai/enqueue-embed')
+    const { reembed, ...born } = await effectFn(createRecordProgram)({
       objectId: data.objectId,
       name: data.name,
       values: data.values,
       actor: { type: 'user', id: u.id },
       source: 'manual',
     })
+    // Queued after the commit, here, because core hands the sources back
+    // rather than reaching the queue (SPA-174/175).
+    for (const s of reembed) await enqueueSourceEmbed(s)
+    return born
   })

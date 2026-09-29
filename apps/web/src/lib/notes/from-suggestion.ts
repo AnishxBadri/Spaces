@@ -1,7 +1,7 @@
 import { entity, link, note } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import type { NotePayload } from '@spaces/core/ai/note'
-import type { Tx } from '#/lib/attributes/values'
+import type { Tx } from '@spaces/core/writes/attributes/values'
 import { noteBodyFromMarkdown } from './markdown-blocks'
 
 /**

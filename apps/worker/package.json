@@ -1,0 +1,36 @@
+{
+  "//": "The worker process (docs/spec-plugin-sdk.md §2 `apps/worker`; SPA-181, mono-11a): the pg-boss host, `runJob`, the heartbeat, the container health command and every job module, lifted out of apps/web/src/worker as a move. It depends on @spaces/core, @spaces/db and pg-boss and never on apps/web as a package — but the job modules still import server modules that have not left apps/web/src/lib (the AI lanes, arrival, documents, import, search, the queue sender), and those cross through the `#web/*` alias declared in tsconfig.json, which the eslint worker zone allows for `lib/` and `test/` only and lists specifier by specifier. The fence narrows as lib/ moves into core; when the list is empty the alias goes. `#/` is deliberately absent, as in packages/db and packages/core: every import here is relative, a real dependency, or a named crossing.",
+  "name": "@spaces/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "worker": "dotenv -e ../../.env.local -- tsx src/index.ts",
+    "dev": "dotenv -e ../../.env.local -- tsx watch src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "//dependencies": "What the worker's own files import, at apps/web's versions: the job modules reach the AI SDK's types, readability and linkedom for the URL clip, drizzle and the db handle, Effect, pg-boss and zod. The modules crossed into through `#web/*` resolve their own dependencies from apps/web, where they still live.",
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "@spaces/core": "workspace:*",
+    "@spaces/db": "workspace:*",
+    "ai": "^7.0.111",
+    "drizzle-orm": "^0.45.1",
+    "effect": "4.0.0-rc.112",
+    "linkedom": "^0.18.13",
+    "pg-boss": "^12.26.3",
+    "tsx": "^4.23.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "dotenv-cli": "^11.0.0",
+    "eslint": "^9.20.0",
+    "pdf-lib": "^1.17.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.10"
+  }
+}

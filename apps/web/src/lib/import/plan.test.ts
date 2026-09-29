@@ -5,12 +5,12 @@ import { db } from '@spaces/db'
 import { attribute, importBatch, importRow, objectDef } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { awaitingDecision, whyOf } from '@spaces/core/import/plan'
-import { createObjectProgram } from '#/lib/attributes/object-registry'
+import { createObjectProgram } from '@spaces/core/writes/attributes/object-registry'
 import {
   RESOLVE_NEEDS_NAME_OR_KEY,
   previewResolve,
   resolveEntity,
-} from '#/lib/entities/resolve'
+} from '@spaces/core/writes/entities/resolve'
 import { beginImportMappingProgram, mapImportColumnProgram } from './mapping'
 import {
   decideImportCollisionProgram,

@@ -1,7 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { company, document, entity, link, user } from '@spaces/db/schema'
-import { resolveSecret, storeCredential } from '#/lib/vault'
+import { resolveSecret, storeCredential } from '@spaces/core/writes/vault'
 
 /**
  * The backup round trip's fixture, run inside the app container by the

@@ -129,7 +129,8 @@ export const saveRecordAsTemplate = createServerFn({ method: 'POST' })
     if (!row || !['company', 'person', 'deal'].includes(row.kind)) {
       throw new Error('Record not found')
     }
-    const { getRegistry } = await import('../attributes/values')
+    const { getRegistry } =
+      await import('@spaces/core/writes/attributes/values')
     const core = toObjectKind(row.kind)
     if (!core) throw new Error('Record not found')
     const registry = await getRegistry(core)

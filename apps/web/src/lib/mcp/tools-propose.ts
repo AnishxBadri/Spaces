@@ -2,12 +2,12 @@ import { Effect } from 'effect'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, note } from '@spaces/db/schema'
-import { jsonRecord } from '#/lib/json'
-import type { Json } from '#/lib/json'
+import { jsonRecord } from '@spaces/core/json'
+import type { Json } from '@spaces/core/json'
 import { proposeProgram, SuggestionInvalid } from '#/lib/ai/propose'
 import type { SuggestionFailure } from '#/lib/ai/propose'
-import { EntityNotFound } from '#/lib/attributes/values'
-import { canRead } from '#/lib/notes/visibility'
+import { EntityNotFound } from '@spaces/core/writes/attributes/values'
+import { canRead } from '@spaces/core/read-policy'
 import {
   McpToolQueryFailed,
   McpToolRefused,

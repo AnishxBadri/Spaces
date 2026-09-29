@@ -42,7 +42,7 @@ import { Button } from '#/components/ui/button'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { localToday } from '@spaces/core/tasks/parse-due'
 import { useHotkey } from '#/lib/use-hotkey'
-import { jsonString } from '#/lib/json'
+import { jsonString } from '@spaces/core/json'
 import {
   countOpenSuggestions,
   createNote,

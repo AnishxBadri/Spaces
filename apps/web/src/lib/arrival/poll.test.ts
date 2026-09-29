@@ -20,12 +20,12 @@ import { user } from '@spaces/db/schema/auth'
 import { FakeImapServer } from '#/test/fake-imap'
 import { truncateAndReseed } from '#/test/reseed'
 import { enqueued } from '#/test/queue-stub'
-import { canRead } from '#/lib/notes/visibility'
+import { canRead } from '@spaces/core/read-policy'
 import { recordTimelineProgram } from '#/lib/timeline/record'
 import {
   createObjectProgram,
   createRecordProgram,
-} from '#/lib/attributes/object-registry'
+} from '@spaces/core/writes/attributes/object-registry'
 import { entityContext } from '#/lib/inbox/context'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { MAILBOX, OUTLOOK_FORWARD, bcc, gmailForward } from './fixtures'

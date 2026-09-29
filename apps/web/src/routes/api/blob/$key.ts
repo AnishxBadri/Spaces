@@ -2,7 +2,11 @@ import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { Readable } from 'node:stream'
 import { createFileRoute } from '@tanstack/react-router'
-import { LocalStorage, blobPath, verifyBlobToken } from '#/lib/storage/local'
+import {
+  LocalStorage,
+  blobPath,
+  verifyBlobToken,
+} from '@spaces/core/writes/storage/local'
 
 /**
  * The local driver's "presigned URL" endpoint. The HMAC token is the

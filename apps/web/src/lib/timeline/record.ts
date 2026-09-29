@@ -12,7 +12,7 @@ import {
   link,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/core/json'
 import { resolveRefsProgram } from '#/lib/context/names'
 import type { ResolvedRef } from '#/lib/context/names'
 

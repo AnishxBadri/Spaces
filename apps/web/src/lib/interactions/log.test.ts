@@ -314,7 +314,8 @@ describe('logInteractionProgram', () => {
 describe('deleting a write-up', () => {
   it('orphans the interaction rather than taking the meeting with it', async () => {
     const { logInteractionProgram } = await import('./log')
-    const { deleteEntityProgram } = await import('#/lib/entities/delete')
+    const { deleteEntityProgram } =
+      await import('@spaces/core/writes/entities/delete')
     const { db } = await import('@spaces/db')
     const { interaction } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')

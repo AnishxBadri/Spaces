@@ -17,7 +17,7 @@ import {
  * The overall status and the HTTP code are driven by the database alone.
  * A stale or absent worker is still 200/'ok', because a worker-only outage
  * must never fail a healthy web container's HEALTHCHECK and restart it; the
- * worker's own container answers for the worker (src/worker/health.ts).
+ * worker's own container answers for the worker (apps/worker/src/health.ts).
  * Postgres being down is the only 503.
  */
 export const Route = createFileRoute('/api/health')({

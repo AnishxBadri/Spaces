@@ -3,7 +3,7 @@ import { and, asc, eq, isNull, notExists, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@spaces/db'
 import { entity, entitySpace, link, person } from '@spaces/db/schema'
-import { jsonString } from '#/lib/json'
+import { jsonString } from '@spaces/core/json'
 
 /**
  * Contacts — the people of one space (SPA-99), the second half of CONTEXT's

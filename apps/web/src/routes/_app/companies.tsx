@@ -59,7 +59,7 @@ import {
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { cn } from '#/lib/utils'
-import { jsonRecord } from '#/lib/json'
+import { jsonRecord } from '@spaces/core/json'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import {
   countOpenInbox,

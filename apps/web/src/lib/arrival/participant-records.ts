@@ -4,8 +4,11 @@ import { db } from '@spaces/db'
 import { mailbox } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { registrableDomain } from '@spaces/core/entities/normalize'
-import { resolveEntity } from '#/lib/entities/resolve'
-import type { ResolveResult, ResolveSource } from '#/lib/entities/resolve'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import type {
+  ResolveResult,
+  ResolveSource,
+} from '@spaces/core/writes/entities/resolve'
 import { isFreeEmailDomain } from './free-email-domains'
 import type { ArrivalMessage } from './message'
 import { decideParticipants } from './participants'

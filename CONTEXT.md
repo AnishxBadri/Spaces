@@ -246,16 +246,17 @@ only file that speaks them. No import in `apps/web` changed; the behaviour —
 matchers, validators, seeded `SYSTEM_ATTRIBUTES`, the badge palette — stayed
 in the app.
 
-The seam deliberately left open is seeding. `packages/db` exports
-`runMigrations()` and a bin that runs migrations and stops; the boot
-composition — migrate, then `seedSystemAttributes`, then `seedStarterTaxonomy`,
-as one command, which is what the container entrypoint and `pnpm
-db:migrate:run` both invoke — lives in `apps/web/src/db/boot.ts`. That is
-interim: the two seeds are core concerns wearing an app's clothes, and
-**`mono-9a` moves them into `packages/core` and the composition with them**.
-The one-command contract survives both moves; what must never happen is
-`packages/db` growing a seed, because then the schema package would depend on
-the product.
+The seam that was deliberately left open — seeding — closed with SPA-177
+(2026-09-29). `packages/db` exports `runMigrations()` and a bin that runs
+migrations and stops; the boot composition — migrate, then
+`seedSystemAttributes`, then `seedStarterTaxonomy`, then the value-index
+reconcile, as one command — is `@spaces/core/writes/boot`, and
+`apps/web/src/db/boot.ts` is the process around it (the APP_URL and DATA_DIR
+log lines, argv, the exit code), which is what the container entrypoint and
+`pnpm db:migrate:run` both invoke. The one-command contract survived the
+move; what must never happen is `packages/db` growing a seed, because then
+the schema package would depend on the product — `runMigrations()` stays a
+library function core composes, never the reverse.
 
 Two mechanical facts the move turned on. The migrations folder is resolved
 from `import.meta.url`, never from cwd — it used to be the literal
@@ -913,7 +914,7 @@ enum branch in any registry read. `description` landed 2026-09 (migration
     where the declaration becomes a claim: an attribute carrying
     `options.identityKey` mirrors its value into `entity_alias` through
     `claimIdentityAlias`, in the transaction that wrote the value and its
-    `attribute_event` (`apps/web/src/lib/entities/resolve.ts`). Four things
+    `attribute_event` (`packages/core/src/writes/entities/resolve.ts`). Four things
     the build settled. **The alias insert sits in a savepoint** — a
     concurrent writer's `23505` rolls back the nested transaction alone and
     becomes a `duplicate_candidate`, never a lost value write. **The value

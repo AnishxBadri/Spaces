@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
-import { resolveCredential } from '#/lib/vault'
-import type { ResolvedCredential } from '#/lib/vault'
+import { resolveCredential } from '@spaces/core/writes/vault'
+import type { ResolvedCredential } from '@spaces/core/writes/vault'
 import { CredentialReadFailed, NoCredential } from '../index'
 import type { ResolveModelFailure } from '../index'
 import { readProviderMeta } from '../meta'

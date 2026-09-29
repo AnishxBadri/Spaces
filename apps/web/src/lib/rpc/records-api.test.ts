@@ -14,8 +14,8 @@ import {
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { createObjectProgram } from '#/lib/attributes/object-registry'
-import { objectIdForKind } from '#/lib/attributes/objects'
+import { createObjectProgram } from '@spaces/core/writes/attributes/object-registry'
+import { objectIdForKind } from '@spaces/core/writes/attributes/objects'
 import {
   listCompaniesPageProgram,
   listDealsPageProgram,
