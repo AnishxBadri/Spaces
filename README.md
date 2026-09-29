@@ -27,8 +27,8 @@ This is a pnpm workspace (since 2026-09-19).
 ```
 apps/web/            the app — @spaces/web. src/ and the configs it owns
 packages/db/         @spaces/db — drizzle schema, the drizzle/ journal, migrator
-packages/config/     tsconfig.base.json, shared by every package
-eslint.config.js     one lint vocabulary for the workspace (+ eslint-rules/)
+packages/config/     tsconfig.base.json, the eslint base (+ eslint-rules/) and prettier config, shared by every package
+eslint.config.js     shim — re-exports packages/config's (prettier.config.js likewise)
 scripts/             backup.sh, restore.sh — operator scripts
 docker/              entrypoint.sh, Caddyfile
 ```

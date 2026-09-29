@@ -41,8 +41,8 @@ jobs:
       - name: Gate 3 — prettier
         run: pnpm exec prettier --check .
       # `pnpm run lint`, not `eslint apps/web/src`: since SPA-142 there is a
-      # second package with source in it, and the root halves (eslint-rules/,
-      # scripts/) are in the same graph. It also carries gate 5 — the Instrument
+      # second package with source in it, and the root half (scripts/) and
+      # packages/config (the rules themselves) are in the same graph. It also carries gate 5 — the Instrument
       # vocabulary is the `instrument/vocabulary` eslint rule, not a grep.
       - name: Gates 4 and 5 — eslint (carries instrument/vocabulary)
         run: pnpm run lint

@@ -61,9 +61,17 @@ pnpm worker                                       # background worker
   `apps/web/src/lib/ai/enqueue-embed.ts`: core's write paths hand back
   `reembed` and the server fn queues it. The jsonb readers are
   `@spaces/core/json`. `packages/*` is where `sdk` lands later.
-  What stayed at the root: `eslint.config.js` + `eslint-rules/`,
-  `prettier.config.js`, `lefthook.yml`, `scripts/`, `docker/`, `docs/`,
-  `.env.local` and `data/`.
+  **`packages/config` (`@spaces/config`) holds the shared configuration since
+  SPA-180: `tsconfig.base.json`, the eslint base (`eslint.base.js`, with
+  the architecture zones and the spec §2 boundary rules) and its rule
+  modules in `eslint-rules/` (gate 5's `instrument/vocabulary`),
+  `prettier.base.js`, and `fixtures/{sdk,plugins}` — the two directories
+  the sdk and plugin zones are fenced against until those packages exist.**
+  What stayed at the root: `eslint.config.js` and `prettier.config.js` as
+  one-line shims re-exporting `@spaces/config/eslint` and
+  `@spaces/config/prettier` (both tools look their config up from the cwd,
+  and a copy inside a package would re-base the root-relative zone globs),
+  `lefthook.yml`, `scripts/`, `docker/`, `docs/`, `.env.local` and `data/`.
 - **Turbo runs the graph since 2026-09-19 (SPA-127).** `turbo.json` declares
   `dev`, `build`, `lint`, `typecheck`, `test` and `generate-routes`, and the
   root scripts for those six go through `turbo run` instead of
@@ -122,11 +130,12 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
 
 1. `pnpm typecheck` → `turbo run typecheck typecheck:root` — **not** a bare
    `pnpm exec tsc --noEmit`. There is a tsconfig per package now: the root
-   one covers `scripts/` and `eslint-rules/` (that is the `typecheck:root`
-   half), and `apps/web/tsconfig.json` and `packages/db/tsconfig.json` cover
-   their own source (the `typecheck` half, one task per package). The root
-   script runs them all; a bare root `tsc` would pass while typechecking
-   none of them.
+   one covers `scripts/` and the two config shims (that is the
+   `typecheck:root` half), and `apps/web`, `packages/db`, `packages/core`
+   and `packages/config` (whose `eslint-rules/` and zone fixtures were the
+   root half's until SPA-180) each cover their own source (the `typecheck`
+   half, one task per package). The root script runs them all; a bare root
+   `tsc` would pass while typechecking none of them.
 2. `pnpm test` → `turbo run test` (`vitest run` in `apps/web` and in
    `packages/db`, which carries its own vitest config) — must be fully
    green
@@ -139,7 +148,7 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
    deleting the guard.
 5. Instrument vocabulary only — **`pnpm lint` covers it**, there is no separate
    gate and no grep any more (2026-09-18). `instrument/vocabulary`
-   (`eslint-rules/vocabulary.js`, at the repo root) reads className literals
+   (`packages/config/eslint-rules/vocabulary.js`) reads className literals
    and `cn()`/`cva()` string arguments in `apps/web/src/**/*.tsx` and names the
    Instrument replacement in the message, so gate 4 and the pre-commit hook
    enforce it for free; since SPA-52 it also rejects a raw colour there (a hex,
@@ -157,19 +166,24 @@ copies, and the checklist a reviewer runs. The gates are its mechanical floor.
 A second run of a gate with nothing changed is a cache hit that replays the
 first run's output. That is safe only because the inputs are honest: `test`
 and `typecheck` hash the whole package plus `.env.local`, the lockfile and
-`packages/config/tsconfig.base.json`; `lint` hashes `eslint.config.js` and
-`eslint-rules/**` too, so editing gate 5's rule re-runs gate 4. If you add a
-file the gates read from outside `apps/web`, add it to `turbo.json` — a task
-whose inputs miss it will replay a pass that checked nothing. A file in
-another _workspace package_ is the exception: turbo already folds an internal
-dependency's files into the consumer's hash, so editing
-`packages/db/src/test-db.ts` invalidates `@spaces/web#test` with no entry
-here (verified by SPA-143). `--force` re-runs a task regardless.
+`packages/config/tsconfig.base.json`; `lint` hashes the root shim,
+`packages/config/eslint.base.js` and `packages/config/eslint-rules/**`
+too, so editing gate 5's rule or a boundary zone re-runs gate 4 in every
+package (verified by SPA-180: a comment edit in `vocabulary.js` turned four
+cache hits into four misses). If you add a file the gates read from outside
+the package, add it to `turbo.json` — a task whose inputs miss it will replay
+a pass that checked nothing. A file in another _workspace package_ is the
+exception: turbo already folds an internal dependency's files into the
+consumer's hash, so editing `packages/db/src/test-db.ts` invalidates
+`@spaces/web#test` with no entry here (verified by SPA-143) — the `lint`
+inputs name `packages/config` anyway, so the gate does not lean on that
+property. `--force` re-runs a task regardless.
 
 Pre-commit hooks (lefthook) run prettier + eslint on staged files from the
-repo root; pre-push runs `pnpm run typecheck`, which is turbo over every
-package that has one — `@spaces/web`, `@spaces/db`, `@spaces/core` — plus the
-`typecheck:root` half, so no package can be typechecked by nobody.
+repo root, where the two shims hand both tools `packages/config`'s settings;
+pre-push runs `pnpm run typecheck`, which is turbo over every package that
+has one — `@spaces/web`, `@spaces/db`, `@spaces/core`, `@spaces/config` —
+plus the `typecheck:root` half, so no package can be typechecked by nobody.
 CI (`.github/workflows/ci.yml`) runs the same root commands, **one named step
 per gate** against a real Postgres: prettier, `pnpm run lint` (which carries
 gate 5, since it is an eslint rule), `pnpm run typecheck`, `boot.ts` against

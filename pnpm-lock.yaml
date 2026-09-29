@@ -11,33 +11,18 @@ importers:
       '@spaces/config':
         specifier: workspace:*
         version: link:packages/config
-      '@tanstack/eslint-config':
-        specifier: ^0.4.0
-        version: 0.4.0(@typescript-eslint/utils@8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
       '@types/node':
         specifier: ^22.10.2
         version: 22.20.1
       eslint:
         specifier: ^9.20.0
         version: 9.39.5(jiti@2.7.0)
-      eslint-plugin-drizzle:
-        specifier: ^0.2.3
-        version: 0.2.3(eslint@9.39.5(jiti@2.7.0))
-      eslint-plugin-import-x:
-        specifier: ^4.17.1
-        version: 4.17.1(@typescript-eslint/utils@8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.5(jiti@2.7.0))
-      eslint-plugin-react-hooks:
-        specifier: ^7.1.1
-        version: 7.1.1(eslint@9.39.5(jiti@2.7.0))
       lefthook:
         specifier: ^2.1.12
         version: 2.1.12
       prettier:
         specifier: ^3.8.1
         version: 3.9.6
-      prettier-plugin-tailwindcss:
-        specifier: ^0.8.1
-        version: 0.8.1(prettier@3.9.6)
       turbo:
         specifier: 2.11.2
         version: 2.11.2
@@ -216,9 +201,6 @@ importers:
       '@tanstack/devtools-vite':
         specifier: ^0.8.3
         version: 0.8.3(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(vite@8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))
-      '@tanstack/eslint-config':
-        specifier: ^0.4.0
-        version: 0.4.0(@typescript-eslint/utils@8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
       '@tanstack/router-cli':
         specifier: ^1.132.0
         version: 1.167.21
@@ -249,18 +231,9 @@ importers:
       eslint:
         specifier: ^9.20.0
         version: 9.39.5(jiti@2.7.0)
-      eslint-plugin-drizzle:
-        specifier: ^0.2.3
-        version: 0.2.3(eslint@9.39.5(jiti@2.7.0))
-      eslint-plugin-react-hooks:
-        specifier: ^7.1.1
-        version: 7.1.1(eslint@9.39.5(jiti@2.7.0))
       prettier:
         specifier: ^3.8.1
         version: 3.9.6
-      prettier-plugin-tailwindcss:
-        specifier: ^0.8.1
-        version: 0.8.1(prettier@3.9.6)
       typescript:
         specifier: ^6.0.2
         version: 6.0.3
@@ -271,7 +244,36 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@22.20.1)(vite@8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))
 
-  packages/config: {}
+  packages/config:
+    dependencies:
+      '@tanstack/eslint-config':
+        specifier: ^0.4.0
+        version: 0.4.0(@typescript-eslint/utils@8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
+      eslint-plugin-drizzle:
+        specifier: ^0.2.3
+        version: 0.2.3(eslint@9.39.5(jiti@2.7.0))
+      eslint-plugin-import-x:
+        specifier: ^4.17.1
+        version: 4.17.1(@typescript-eslint/utils@8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.5(jiti@2.7.0))
+      eslint-plugin-react-hooks:
+        specifier: ^7.1.1
+        version: 7.1.1(eslint@9.39.5(jiti@2.7.0))
+      prettier-plugin-tailwindcss:
+        specifier: ^0.8.1
+        version: 0.8.1(prettier@3.9.6)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      eslint:
+        specifier: ^9.20.0
+        version: 9.39.5(jiti@2.7.0)
+      prettier:
+        specifier: ^3.8.1
+        version: 3.9.6
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
 
   packages/core:
     dependencies:

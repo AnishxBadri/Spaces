@@ -1,13 +1,6 @@
 //  @ts-check
 
-/** @type {import('prettier').Config} */
-const config = {
-  semi: false,
-  singleQuote: true,
-  trailingComma: 'all',
-  plugins: ['prettier-plugin-tailwindcss'],
-  tailwindStylesheet: './apps/web/src/styles.css',
-  tailwindFunctions: ['cn', 'cva'],
-}
-
-export default config
+// The formatter configuration lives in packages/config (SPA-180); prettier
+// walks up from each file and finds it here, so the pre-commit hook, CI's
+// `prettier --check .` and every editor read the same settings from the root.
+export { default } from '@spaces/config/prettier'

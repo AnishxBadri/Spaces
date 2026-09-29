@@ -19,10 +19,10 @@ docs/
   spec-*.md             buildable specs (attribute engine / custom objects; AI substrate)
   CODEBASE.md           this file
 pnpm-workspace.yaml     the workspace: apps/* + packages/* (SPA-101, 2026-09-19)
-eslint.config.js        one lint vocabulary for every package
-eslint-rules/           instrument/vocabulary (gate 5), loaded by the config above
-prettier.config.js · lefthook.yml   root-owned formatting and git hooks
-packages/config/        tsconfig.base.json — the shared compilerOptions
+eslint.config.js · prettier.config.js   shims re-exporting packages/config's (SPA-180)
+lefthook.yml            root-owned git hooks
+packages/config/        tsconfig.base.json, eslint.base.js + eslint-rules/ (gate 5, the
+                        architecture zones), prettier.base.js
 apps/web/               the app (@spaces/web)
   drizzle/              generated SQL migrations, numbered (0001…0023)
   src/                  everything below

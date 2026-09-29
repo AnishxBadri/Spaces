@@ -1,9 +1,36 @@
 {
+  "//": "The workspace's shared configuration, finished by SPA-180: `tsconfig.base.json` (mono-1), the eslint base (`eslint.base.js`, with the architecture zones) and the `instrument/vocabulary` rule beside it in `eslint-rules/`, and the prettier config (`prettier.base.js`). Neither carries the name its tool auto-discovers, on purpose: an `eslint.config.js` here would be the config ESLint found first when linting this package, with every root-relative glob re-based to this directory (found by SPA-180 — it broke `@spaces/config#lint` on the first run). Every package extends the tsconfig by path; eslint and prettier are reached through the two root shims (`eslint.config.js`, `prettier.config.js` at the repo root re-export `./eslint` and `./prettier`), because both tools look a config up from the cwd and a copy inside a package would re-base the root-relative zone globs. `fixtures/` holds the two directories the sdk and plugin zones are fenced against until `packages/sdk` (sdk-3) and `plugins/*` exist; each holds one empty module and nothing else.",
   "name": "@spaces/config",
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./eslint": "./eslint.base.js",
+    "./prettier": "./prettier.base.js",
+    "./tsconfig.base.json": "./tsconfig.base.json"
+  },
   "files": [
-    "tsconfig.base.json"
-  ]
+    "tsconfig.base.json",
+    "eslint.base.js",
+    "eslint-rules",
+    "prettier.base.js"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "//dependencies": "What the eslint base and the prettier config import. They resolve from this directory, so they are this package's dependencies and no longer the root's; eslint, prettier and typescript stay the root's too, because the binaries run from there (lefthook, CI, `pnpm exec`).",
+  "dependencies": {
+    "@tanstack/eslint-config": "^0.4.0",
+    "eslint-plugin-drizzle": "^0.2.3",
+    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier-plugin-tailwindcss": "^0.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "eslint": "^9.20.0",
+    "prettier": "^3.8.1",
+    "typescript": "^6.0.2"
+  }
 }

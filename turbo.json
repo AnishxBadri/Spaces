@@ -4,9 +4,11 @@
 // reads.
 //
 // `lint` and `typecheck` each come in two halves because two configs own two
-// disjoint file sets: eslint.config.js and the root tsconfig cover what stayed
-// at the repo root (eslint-rules/, scripts/, the root config files), and
-// apps/web's own tsconfig covers the app. The root halves are root tasks
+// disjoint file sets: the root tsconfig covers what stayed at the repo root
+// (scripts/ and the two config shims), and each package's own tsconfig covers
+// the package — since SPA-180 that includes packages/config, whose
+// eslint-rules/ and zone fixtures were the root half's until the lint
+// configuration moved in there. The root halves are root tasks
 // (`//#lint:root`, `//#typecheck:root`) because that code is not in any
 // package; the package halves are ordinary tasks so `turbo run lint
 // --filter=@spaces/db` means something when db, core and sdk land. Neither
@@ -88,21 +90,31 @@
       "outputs": []
     },
 
-    // eslint.config.js and eslint-rules/ live at the repo root and decide what
-    // this package's lint run reports — gate 5 (instrument/vocabulary) is one
-    // of those rule files — so both are inputs even though neither is in the
-    // package.
+    // The lint configuration decides what this package's lint run reports —
+    // gate 5 (instrument/vocabulary) is one of its rule files — so it is an
+    // input even though none of it is in the package. Since SPA-180 it lives
+    // in packages/config (eslint.base.js + eslint-rules/), reached through
+    // the root shim; every package also depends on @spaces/config, which
+    // folds its files into the hash a second way, but the input is spelled
+    // out so a rule edit re-runs every lint task by construction and not by
+    // a property of the graph.
     "lint": {
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/eslint.config.js",
-        "$TURBO_ROOT$/eslint-rules/**"
+        "$TURBO_ROOT$/packages/config/eslint.base.js",
+        "$TURBO_ROOT$/packages/config/eslint-rules/**"
       ],
       "outputs": []
     },
 
     "//#lint:root": {
-      "inputs": ["eslint.config.js", "eslint-rules/**", "scripts/**"],
+      "inputs": [
+        "eslint.config.js",
+        "packages/config/eslint.base.js",
+        "packages/config/eslint-rules/**",
+        "scripts/**"
+      ],
       "outputs": []
     },
 
@@ -110,11 +122,12 @@
     // apps/web/src, so if anything under scripts/ ever imports `#/`,
     // apps/web/src/** has to join this list — which is why SPA-101 moved the
     // roundtrip fixture into apps/web instead.
+    // eslint-rules/** left this list with SPA-180: it is packages/config's
+    // now, under that package's own `typecheck` task.
     "//#typecheck:root": {
       "inputs": [
         "tsconfig.json",
         "scripts/**",
-        "eslint-rules/**",
         "eslint.config.js",
         "prettier.config.js"
       ],
