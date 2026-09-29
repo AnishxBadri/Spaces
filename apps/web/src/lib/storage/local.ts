@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { MAX_UPLOAD_BYTES } from '@spaces/core/documents'
-import { dataDir, loadMasterKey } from '#/lib/vault/key'
+import { dataDir, loadMasterKey } from '@spaces/core/writes/vault/key'
 import type { Storage } from './types'
 
 /**

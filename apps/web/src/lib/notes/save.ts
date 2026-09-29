@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, note } from '@spaces/db/schema'
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/core/json'
 import {
   syncExtractedMentions,
   termMentionsIn,

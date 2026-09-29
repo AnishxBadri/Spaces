@@ -10,9 +10,11 @@ import { describe, expect, it } from 'vitest'
  * attribute registry — nothing there may reach a database. The db-coupled
  * half is `src/writes/` and nothing else: the attribute write path the plugin
  * SDK's Facts port will sit on, which needs drizzle and the `db` handle by
- * definition. Neither half may reach a renderer or the environment. All of
- * that is a claim that rots in a week unless something checks it, so this is
- * that something.
+ * definition. Neither half may reach a renderer, and one directory in the
+ * db-coupled half — `writes/vault/`, which resolves MASTER_KEY and DATA_DIR
+ * (SPA-176) — is the only one that may read the environment. All of that is
+ * a claim that rots in a week unless something checks it, so this is that
+ * something.
  *
  * Three of the four forbidden strings would be in this file if they were
  * written out, and the acceptance criterion greps the whole of
@@ -38,6 +40,15 @@ const DB_PKG = `@spaces/${'db'}`
  */
 const DB_COUPLED_DIRS: ReadonlyArray<string> = ['writes/']
 
+/**
+ * The directories, relative to `src/`, where an environment read is allowed
+ * — the vault, whose whole job is to resolve MASTER_KEY and DATA_DIR (SPA-176).
+ * Narrower than DB_COUPLED_DIRS on purpose: the write paths beside it take a
+ * transaction or a connection string and read nothing; an enqueue that would
+ * have needed DATABASE_URL stayed in apps/web for exactly this reason.
+ */
+const ENV_READING_DIRS: ReadonlyArray<string> = ['writes/vault/']
+
 type Source = { path: string; text: string }
 
 const sources: Array<Source> = readdirSync(SRC, {
@@ -52,6 +63,10 @@ const isDbCoupled = (path: string) =>
 
 const pure = sources.filter((s) => !isDbCoupled(s.path))
 const dbCoupled = sources.filter((s) => isDbCoupled(s.path))
+
+const mayReadEnv = (path: string) =>
+  ENV_READING_DIRS.some((dir) => path.startsWith(dir))
+const readsEnv = (s: Source) => s.text.includes(ENV_READ)
 
 /**
  * Every module specifier a file imports from or re-exports from, including
@@ -144,9 +159,23 @@ describe('@spaces/core is pure outside src/writes/', () => {
     expect(offenders.map((s) => s.path)).toEqual([])
   })
 
-  it('reads no environment, in either half', () => {
-    const offenders = sources.filter((s) => s.text.includes(ENV_READ))
+  it('reads no environment outside the vault', () => {
+    const offenders = sources.filter((s) => !mayReadEnv(s.path) && readsEnv(s))
     expect(offenders.map((s) => s.path)).toEqual([])
+  })
+
+  /**
+   * Same earning-its-keep rule as the driver allowlist: a directory named as
+   * env-reading has to hold a module that reads it, or the exemption is a
+   * hole with nothing behind it.
+   */
+  it('every env-reading directory holds a module that reads the environment', () => {
+    for (const dir of ENV_READING_DIRS) {
+      const here = sources.filter((s) => s.path.startsWith(dir))
+      expect(here.filter(readsEnv).length, dir).toBeGreaterThan(0)
+    }
+    // …and it is a subset of the db-coupled half, never a third half.
+    for (const dir of ENV_READING_DIRS) expect(isDbCoupled(dir)).toBe(true)
   })
 
   /**
@@ -184,6 +213,14 @@ describe('@spaces/core is pure outside src/writes/', () => {
     expect(isDbCoupled(inWrites.path)).toBe(true)
     // …and the pure-half checks would never see it: they run over `pure`.
     expect(pure.some((s) => isDbCoupled(s.path))).toBe(false)
+
+    // The env read, likewise: named in a write path, caught; in the vault, not.
+    const env: Source = {
+      path: 'writes/attributes/scratch.ts',
+      text: `const x = ${ENV_READ}.DATABASE_URL\n`,
+    }
+    expect(readsEnv(env) && !mayReadEnv(env.path)).toBe(true)
+    expect(mayReadEnv('writes/vault/scratch.ts')).toBe(true)
   })
 
   it('declares no dependency on a renderer', () => {

@@ -1,4 +1,4 @@
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/core/json'
 
 /**
  * Markdown → BlockNote blocks, on the server (SPA-66). Pure: no DOM, no

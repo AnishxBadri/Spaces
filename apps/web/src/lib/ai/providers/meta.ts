@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/core/json'
 
 /**
  * What an LLM provider's `credential.meta` holds (SPA-29). The column is an

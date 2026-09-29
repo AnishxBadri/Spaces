@@ -1,4 +1,5 @@
 import { runMigrations } from '@spaces/db/migrate'
+import { dataDir } from '@spaces/core/writes/vault/key'
 import { logExternalOrigin } from '#/lib/server/external-origin'
 
 /**
@@ -23,6 +24,12 @@ async function main() {
   // ahead of the downgrade guard costs nothing, and a refused boot still
   // tells the operator which origin this image thought it had.
   logExternalOrigin()
+  // Where secret.key, the setup token and the blobs live, said once per boot
+  // (SPA-176): an unset DATA_DIR resolves to `<workspace root>/data`, and
+  // the failure this line exists to make visible is the quiet one — a wrong
+  // directory means a freshly generated key and every stored credential
+  // unreadable, with nothing thrown.
+  console.log(`[data] DATA_DIR resolved to ${dataDir()}`)
 
   // argv[2], when present, names the migrations folder. Nothing in the boot
   // path passes it — `@spaces/db` resolves its own journal from

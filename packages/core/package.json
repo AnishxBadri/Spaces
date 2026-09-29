@@ -1,10 +1,10 @@
 {
-  "//": "The domain, in two halves that one test keeps apart (mono-7, narrowed by SPA-174). The pure half: portfolio maths, the two display-format modules, the glossary automaton, the due-date grammar, the view-filter matcher, document extraction and policy, identity normalization, the attribute registry's pure quartet, and (mono-9c) both halves of the web→worker queue seam. The db-coupled half lives under `src/writes/` and nowhere else — the attribute write path lands there (SPA-174), because the plugin SDK's Facts port sits on top of it. `src/purity.test.ts` names the two halves by directory: a `drizzle-orm` import or a value import of @spaces/db fails the build in a pure directory and is allowed under `writes/`; a React import or a `process.env` read fails it anywhere.",
+  "//": "The domain, in two halves that one test keeps apart (mono-7, narrowed by SPA-174). The pure half: portfolio maths, the two display-format modules, the glossary automaton, the due-date grammar, the view-filter matcher, document extraction and policy, identity normalization, the attribute registry's pure quartet, and (mono-9c) both halves of the web→worker queue seam. The db-coupled half lives under `src/writes/` and nowhere else — the attribute write path lands there (SPA-174), because the plugin SDK's Facts port sits on top of it. `src/purity.test.ts` names the two halves by directory: a `drizzle-orm` import or a value import of @spaces/db fails the build in a pure directory and is allowed under `writes/`; a React import fails it anywhere; a `process.env` read fails it everywhere but `writes/vault/`, which resolves MASTER_KEY and DATA_DIR (SPA-176) and is the one directory allowed to.",
   "name": "@spaces/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "//exports": "Source entry points, not a build output: every consumer is bundled by vite or loaded by tsx/vitest, all of which resolve TypeScript through `exports`. One subpath per domain, so an `#/lib/<domain>/<module>` import became `@spaces/core/<domain>/<module>` with nothing else changing — `./documents` is spelled twice because the old bare-directory specifier resolved to its index. `./writes/*` is the db-coupled half (SPA-174/175): `#/lib/attributes/<module>` became `@spaces/core/writes/attributes/<module>`, `#/lib/entities/<module>` became `@spaces/core/writes/entities/<module>`, `#/lib/views/store` became `@spaces/core/writes/views/store`, and `#/lib/ai/chunk-sources` became `@spaces/core/writes/ai/chunk-sources`. `./views/target` is the view-target type and key, pure and client-safe, which `writes/views/store.ts` takes its address from.",
+  "//exports": "Source entry points, not a build output: every consumer is bundled by vite or loaded by tsx/vitest, all of which resolve TypeScript through `exports`. One subpath per domain, so an `#/lib/<domain>/<module>` import became `@spaces/core/<domain>/<module>` with nothing else changing — `./documents` is spelled twice because the old bare-directory specifier resolved to its index. `./writes/*` is the db-coupled half (SPA-174/175): `#/lib/attributes/<module>` became `@spaces/core/writes/attributes/<module>`, `#/lib/entities/<module>` became `@spaces/core/writes/entities/<module>`, `#/lib/views/store` became `@spaces/core/writes/views/store`, and `#/lib/ai/chunk-sources` became `@spaces/core/writes/ai/chunk-sources`. `./views/target` is the view-target type and key, pure and client-safe, which `writes/views/store.ts` takes its address from. `./writes/vault` (SPA-176) is the BYOK vault — `index.ts` over the credential table, with `./writes/vault/key` and `./writes/vault/crypto` beside it — and `./json` is the three jsonb readers (`jsonString`, `jsonRecord`, `jsonValue`) that the vault's write boundary and the app both use; the `Json` type itself stays declared at the columns, in `@spaces/db/json`.",
   "exports": {
     "./format": "./src/format.ts",
     "./portfolio/*": "./src/portfolio/*.ts",
@@ -18,6 +18,8 @@
     "./attributes/*": "./src/attributes/*.ts",
     "./views/target": "./src/views/target.ts",
     "./writes/*": "./src/writes/*.ts",
+    "./writes/vault": "./src/writes/vault/index.ts",
+    "./json": "./src/json.ts",
     "./queue/*": "./src/queue/*.ts",
     "./timeline/*": "./src/timeline/*.ts",
     "./ai/*": "./src/ai/*.ts",

@@ -13,7 +13,7 @@ import {
   redact,
   resolveSecretById,
   storeCredential,
-} from '#/lib/vault'
+} from '@spaces/core/writes/vault'
 import { probe } from './imap'
 import type { MailboxInput } from './input'
 

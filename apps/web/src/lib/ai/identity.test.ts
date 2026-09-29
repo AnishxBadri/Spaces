@@ -14,7 +14,7 @@ import {
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { listInboxProgram } from '#/lib/inbox/queue'
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/core/json'
 import {
   SuggestionInvalid,
   acceptProgram,

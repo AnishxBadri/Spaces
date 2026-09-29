@@ -15,7 +15,7 @@ import {
 import type { SourceClass } from '@spaces/db/schema'
 
 /** Closed JSON type — Start's serializer rejects `unknown`. */
-export type { Json } from '#/lib/json'
+export type { Json } from '@spaces/core/json'
 
 export async function requireUser() {
   const session = await auth.api.getSession({

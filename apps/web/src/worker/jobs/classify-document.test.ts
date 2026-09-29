@@ -19,7 +19,7 @@ import { enqueued } from '#/test/queue-stub'
 import { birthDocumentProgram } from '#/lib/documents/birth'
 import { onDocumentExtracted } from '#/lib/documents/on-extracted'
 import { offersReadDeck } from '#/lib/documents/read-deck-gate'
-import { storeCredential } from '#/lib/vault'
+import { storeCredential } from '@spaces/core/writes/vault'
 import {
   CLASSIFY_OPTIONS,
   classifyDocumentProgram,

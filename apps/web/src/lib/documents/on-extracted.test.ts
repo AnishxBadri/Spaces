@@ -12,7 +12,7 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { enqueued } from '#/test/queue-stub'
 import { setAiRouteProgram } from '#/lib/ai/route'
-import { storeCredential } from '#/lib/vault'
+import { storeCredential } from '@spaces/core/writes/vault'
 import { birthDocumentProgram } from './birth'
 import { onDocumentExtracted } from './on-extracted'
 

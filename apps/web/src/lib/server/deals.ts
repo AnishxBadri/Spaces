@@ -5,7 +5,7 @@ import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
 import { attributeEvent, entity, link } from '@spaces/db/schema'
 import { mandate } from '@spaces/db/schema/workspace'
-import { jsonString } from '#/lib/json'
+import { jsonString } from '@spaces/core/json'
 import type { EntityValues } from '@spaces/db/schema/entities'
 import { requireUser } from './shared'
 

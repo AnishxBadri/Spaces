@@ -5,7 +5,7 @@ import { db } from '@spaces/db'
 import { BADGE_COLORS } from '@spaces/core/attributes/colors'
 import { aiConfigInput } from '@spaces/core/ai/attribute-ai'
 import { requireAdmin, requireUser } from './shared'
-import { jsonValue } from '#/lib/json'
+import { jsonValue } from '@spaces/core/json'
 
 export const listRegistry = createServerFn()
   .validator(

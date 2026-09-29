@@ -4,7 +4,7 @@ import { entity, note } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { template } from '@spaces/db/schema/templates'
 import { canRead } from '#/lib/notes/visibility'
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/core/json'
 
 /**
  * Note-template capture and stamp (SPA-131), minus the request context.

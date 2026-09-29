@@ -1,7 +1,7 @@
 import { BlockNoteEditor } from '@blocknote/core'
 import { describe, expect, it } from 'vitest'
-import { jsonValue } from '#/lib/json'
-import type { Json } from '#/lib/json'
+import { jsonValue } from '@spaces/core/json'
+import type { Json } from '@spaces/core/json'
 import {
   blocksToMarkdown,
   markdownToBlocks,

@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FIXTURE_ACTOR } from '../../../../vitest.seed'
-import { storeCredential } from '#/lib/vault'
+import { storeCredential } from '@spaces/core/writes/vault'
 import { resolveLanguageModel } from './index'
 import {
   ANTHROPIC_DEFAULT_MODEL,

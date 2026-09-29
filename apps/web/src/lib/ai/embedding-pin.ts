@@ -6,7 +6,7 @@ import type {
   EmbeddingPinSetting,
   EmbeddingSlotSetting,
 } from '@spaces/db/schema/workspace'
-import { readWorkspaceCredential } from '#/lib/vault'
+import { readWorkspaceCredential } from '@spaces/core/writes/vault'
 import { readProviderMeta } from './providers/meta'
 import {
   EMBEDDING_PROVIDER_INFO,

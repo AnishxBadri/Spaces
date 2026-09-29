@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { dataDir } from '#/lib/vault/key'
+import { dataDir } from '@spaces/core/writes/vault/key'
 
 /**
  * The /setup one-time token — CONTEXT.md's first-run trap #2. Between

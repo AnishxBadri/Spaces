@@ -4,8 +4,8 @@ import type { Json } from '@spaces/db/json'
 /**
  * The closed JSON type every `jsonb()` column is typed against. It is
  * declared at the columns that claim it — `@spaces/db/json` — and re-exported
- * here so the app's hundred-odd `#/lib/json` imports read the same name they
- * always did (SPA-142).
+ * here so the app's `@spaces/core/json` imports (until SPA-176, `#/lib/json`)
+ * read the same name they always did (SPA-142).
  */
 export type { Json }
 

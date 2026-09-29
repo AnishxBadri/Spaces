@@ -29,7 +29,7 @@ import {
 } from '#/lib/ai/embedding-pin'
 import { saveEmbeddingKeyProgram } from '#/lib/ai/providers/embed/settings'
 import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
-import { storeCredential } from '#/lib/vault'
+import { storeCredential } from '@spaces/core/writes/vault'
 import { fakeOllama } from '#/test/fake-ollama'
 import { RESUME_SLACK_MS, runEmbedBackfill } from './embed-backfill'
 

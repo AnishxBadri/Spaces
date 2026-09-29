@@ -4,7 +4,7 @@ import {
   readWorkspaceCredential,
   redact,
   storeCredential,
-} from '#/lib/vault'
+} from '@spaces/core/writes/vault'
 import type { CredentialMeta } from '@spaces/db/schema/vault'
 import { effectFn } from '#/lib/server/effect'
 import { requireAdmin } from '#/lib/server/shared'

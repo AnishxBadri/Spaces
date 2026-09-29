@@ -15,7 +15,7 @@ import {
   addIdentityAlias,
   resolveEntity,
 } from '@spaces/core/writes/entities/resolve'
-import { jsonString } from '#/lib/json'
+import { jsonString } from '@spaces/core/json'
 import { groupReferencedBy, referencedByRows, requireUser } from './shared'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { pagedListInput, pageOptions } from '#/lib/views/page-input'

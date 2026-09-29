@@ -45,12 +45,14 @@ pnpm worker                                       # background worker
   reach `@spaces/db` for types only; `src/writes/` is the db-coupled half —
   the attribute engine (`writes/attributes/*`, with `seed.ts`), the identity
   write path (`writes/entities/*`: resolve, merge, sweep, delete, rename,
-  provenance), the view store and `chunk-sources` (SPA-174/175) — and is the
-  only place in core a `drizzle-orm` import or a `db` value import passes.
-  Neither half imports React or reads `process.env`, which is why
-  `enqueueSourceEmbed` stayed in `apps/web/src/lib/ai/enqueue-embed.ts`: core's
-  write paths hand back `reembed` and the server fn queues it. `packages/*`
-  is where `sdk` lands later.
+  provenance), the view store, `chunk-sources` (SPA-174/175) and the BYOK
+  vault (`writes/vault/*`, SPA-176) — and is the only place in core a
+  `drizzle-orm` import or a `db` value import passes. Neither half imports
+  React, and only `writes/vault/` reads `process.env` (MASTER_KEY, DATA_DIR)
+  — which is why `enqueueSourceEmbed` stayed in
+  `apps/web/src/lib/ai/enqueue-embed.ts`: core's write paths hand back
+  `reembed` and the server fn queues it. The jsonb readers are
+  `@spaces/core/json`. `packages/*` is where `sdk` lands later.
   What stayed at the root: `eslint.config.js` + `eslint-rules/`,
   `prettier.config.js`, `lefthook.yml`, `scripts/`, `docker/`, `docs/`,
   `.env.local` and `data/`.

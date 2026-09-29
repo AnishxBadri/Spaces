@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/core/json'
 import type { Decider } from './propose'
 
 /**

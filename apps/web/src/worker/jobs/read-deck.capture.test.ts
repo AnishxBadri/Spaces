@@ -29,7 +29,7 @@ import { handleApiRequest } from '#/lib/rpc/api'
 import { API_PREFIX, CAPTURE_SCHEMA_VERSION } from '#/lib/rpc/versions'
 import { storage } from '#/lib/storage'
 import { createApiTokenProgram } from '#/lib/tokens/store'
-import { storeCredential } from '#/lib/vault'
+import { storeCredential } from '@spaces/core/writes/vault'
 import { readDeckData, runReadDeck } from './read-deck'
 
 /**

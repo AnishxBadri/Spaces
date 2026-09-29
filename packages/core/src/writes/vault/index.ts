@@ -4,7 +4,7 @@ import { db } from '@spaces/db'
 import { credential } from '@spaces/db/schema'
 import { credentialKind, credentialScope } from '@spaces/db/schema/vault'
 import type { CredentialMeta } from '@spaces/db/schema/vault'
-import { jsonValue } from '#/lib/json'
+import { jsonValue } from '../../json'
 import { decryptSecret, encryptSecret, redact } from './crypto'
 
 export { redact }

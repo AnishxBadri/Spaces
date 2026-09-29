@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import { aiRoute, credential } from '@spaces/db/schema'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { storeCredential } from '#/lib/vault'
+import { storeCredential } from '@spaces/core/writes/vault'
 import { aiRouteInput } from './lanes'
 import {
   aiRouteProgram,

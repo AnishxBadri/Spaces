@@ -7,7 +7,7 @@ import { and, count, eq, gt, isNull } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { invite, user } from '@spaces/db/schema/auth'
 import { clearSetupToken, verifySetupToken } from '#/lib/setup-token'
-import { loadMasterKey } from '#/lib/vault/key'
+import { loadMasterKey } from '@spaces/core/writes/vault/key'
 
 /**
  * Session-signing secret is derived from the master key (HKDF, distinct

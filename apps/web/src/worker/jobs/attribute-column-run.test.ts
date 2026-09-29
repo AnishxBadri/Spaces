@@ -18,7 +18,7 @@ import { optionProposalLine } from '@spaces/core/ai/attribute-ai'
 import { QUEUES } from '@spaces/core/queue/names'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { enqueued } from '#/test/queue-stub'
-import { storeCredential } from '#/lib/vault'
+import { storeCredential } from '@spaces/core/writes/vault'
 import { attributeRunProgram } from '#/lib/ai/attribute-run'
 import {
   columnRunKey,
