@@ -1,0 +1,12 @@
+{
+  "extends": "../../packages/config/tsconfig.base.json",
+
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "test-results", "playwright-report"],
+
+  "compilerOptions": {
+    // Node for the harness (child_process, pg), and Playwright ships its own
+    // types. No `paths`: this package imports nothing internal.
+    "types": ["node"]
+  }
+}

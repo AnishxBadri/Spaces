@@ -94,13 +94,22 @@ One language, TypeScript, one codebase. Two processes (web, worker), two contain
 Server functions live in `src/lib/server/`, one file per domain, re-exported through the
 `#/lib/server-fns` barrel (split 2026-08 at ~2,900 lines, before auth/mandate/templates
 each added a domain). Pin discipline (2026-08): no `latest` version specifiers — TanStack
-deps pinned to resolved versions; upgrades are deliberate events. The prod worker runs
-TypeScript via tsx (one build pipeline, accepted 2026-08); bundle it when an image actually
-ships — **the bundler is open as of 2026-09-15 and it is not ~~esbuild~~**: `docs/spec-plugin-sdk.md`
-§2 (2026-09-13) says tsup, and roadmap D26-worker-bundler recommends `vite build --ssr` (no new
-dependency, the rolldown pipeline the web build already uses) and is awaiting the owner's call,
-carried by `mono-13b`. Record whichever wins here. esbuild is present only as vite's transitive
-build dependency.
+deps pinned to resolved versions; upgrades are deliberate events. ~~The prod worker runs
+TypeScript via tsx~~ — **D26, decided 2026-09-29 (owner), built by SPA-185 (`mono-13b`): the image's
+node entries are bundled with `vite build --ssr`, not tsup.** Three entries: the worker
+(`apps/worker/dist/index.mjs`), its ROLE=worker health command (`dist/health.mjs`) — both from
+`apps/worker/vite.config.ts` — and the boot/migrate entry (`apps/web/dist/boot.mjs`, from
+`apps/web/vite.boot.config.ts`, the second half of apps/web's `build`). The reason: vite 8 is
+already the toolchain, its rolldown pipeline builds the web app, and nothing distinguishes a
+second bundler for three Node entry points — so the tiebreaker is the frozen-dependency instinct
+the hostability contract runs on: no new dependency. The rule inside the bundles: the workspace's
+own code (`@spaces/*`, `#/`, the `#web/*` crossings) is inlined; every npm package stays a runtime
+import from the image's pruned node_modules, so pg, pg-boss, unpdf, mammoth and the rest load
+exactly as they do in dev. The drizzle journal is never bundled — the boot entry is handed
+`/app/packages/db/drizzle` as argv[2], because `@spaces/db` resolves it from its own
+`import.meta.url`, which inside a bundle is the bundle's directory. tsx stays a devDependency for
+`pnpm worker`/`pnpm dev` and the harnesses; it is not in the image. esbuild is present only as
+vite's transitive build dependency.
 
 ### Backend paradigm (decided 2026-09-04, "future" branch deliberation)
 
@@ -1969,6 +1978,35 @@ Rules that decide adoption:
   as Next's `NEXT_PUBLIC_*`; a prebuilt image cannot be reconfigured at `docker run` otherwise.
 - Prebuilt multi-arch image (arm64 matters) on GHCR + Docker Hub.
   Non-root UID 1000. Docs tell people to pin tags, not `latest`.
+  **Built by SPA-187 (ship-8), `.github/workflows/release.yml`:** a `core@X.Y.Z` tag
+  (refused unless X.Y.Z is the root `package.json` version) runs the tagged commit's whole
+  CI, `image-smoke` included, then builds linux/amd64 + linux/arm64 once into an OCI
+  archive, smokes the amd64 variant, boots the arm64 variant under QEMU, and pushes that
+  archive unchanged — one digest — to `ghcr.io/anishxbadri/spaces` and
+  `docker.io/<owner>/spaces`.
+  - **Tag policy (decided 2026-09-29, owner): the exact version and major.minor —
+    `0.1.0` and `0.1` — and never `latest`.** Reason: the docs tell operators to pin, and a
+    moving `latest` would contradict them in the one place they look; it would also make
+    ship-11's upgrade matrix ("last release → this commit") ambiguous, because "last
+    release" has to be a tag that names one thing. `X.Y` moves with patch releases and
+    is the most an operator should float on; migrations make anything wider a schema jump.
+  - **Signing (D16, image half; decided 2026-09-29, owner): cosign keyless via GitHub
+    Actions OIDC, plus a SLSA build-provenance attestation.** The digest is signed, never a
+    tag, in both registries; provenance (`actions/attest-build-provenance`) is pushed to
+    GHCR. GHCR therefore carries image + signature + provenance, Docker Hub image +
+    signature. The release job runs both checks before it ends; an operator runs the same:
+
+    ```
+    cosign verify <image>@<digest> \
+      --certificate-identity-regexp '^https://github.com/AnishxBadri/Spaces/\.github/workflows/release\.yml@refs/tags/core@' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com
+    gh attestation verify oci://ghcr.io/anishxbadri/spaces@<digest> --repo AnishxBadri/Spaces
+    ```
+
+    **Plugins use a different scheme on purpose** — an offline ed25519/minisign signature over the tarball,
+    verified by the loader (`sdk-21a`): the image's verifier is a person with cosign and a
+    network, the plugin's is our own Node process on a box that may have neither. Two
+    schemes matched to two verifiers (roadmap D16).
 - **Onboarding direction lives on the surface, not in the wizard (decided
   2026-08-07).** Goal: the user thinks in spaces from minute one. Considered a
   wizard "name your markets" step; rejected — same question asked one screen
@@ -2138,8 +2176,12 @@ Decisions worth keeping:
   inspection, not a destination — a route would make the back button undo reading position.
   Known limits: whole file loads into memory (no `Range` support in blob route or preview —
   fine for 5–30MB decks, slow for a 200MB scan); Office preview depends on the worker
-  running, PDF and images do not; no automated test — a Playwright upload→preview→assert
-  test is the natural first CI case.
+  running, PDF and images do not. ~~No automated test~~ — **since SPA-186 (2026-09-29) the
+  upload→preview→assert test exists and gates releases**: CI's `image-smoke` job composes
+  the image built for the commit, waits for db ok + worker ok, and Chromium uploads a DOCX
+  whose preview must show the worker's text and a PDF that must draw to a canvas without
+  a navigation while its download stays `attachment` + `application/octet-stream`
+  (`apps/e2e/specs/image/`).
 - **Delete is real, and GCs the blob when no other row shares its digest.** A misfiled upload
   the operator can't remove is worse than the audit trail it costs.
 - Deferred by name: URL clip (`origin: 'url'`, `@mozilla/readability` + `linkedom`) moves to
@@ -2420,7 +2462,8 @@ claim a storage advantage (Twenty has the same local-default/S3-opt-in answer);
 claim the research half, two-container ops, BYOK-to-Ollama, the investor schema,
 and the financial engine.
 
-Post-v1 backlog unchanged: dark theme, Playwright preview smoke test, a **capture
+Post-v1 backlog unchanged: dark theme, ~~Playwright preview smoke test~~ (landed early:
+SPA-186's `image-smoke`), a **capture
 extension** (folkX-style, surveyed 2026-08: add a founder/company from LinkedIn without
 leaving the page — just another `resolveEntity()` caller pointed at the operator's own
 instance; BYOK-shaped by nature), then integrations
@@ -2440,9 +2483,15 @@ Standing debt:
 - **Rollback is unsafe and undocumented.** Migrations are forward-only and auto-apply, so
   pulling an older tag runs old code against a new schema. The upgrade doc must say _back
   up first_.
-- **No published images yet.** Compose still says `build: .` — installing means building
-  on the target box (583MB of node_modules for a 9.3MB `.output`; tight on 2GB RAM, fails
-  on 1GB). Project 16's GHCR multi-arch pipeline is the fix and the biggest adoption win.
+- ~~**No published images yet.**~~ **Closed by SPA-187** once the owner pushes
+  `core@0.1.0`: every compose file pins `ghcr.io/anishxbadri/spaces:0.1.0` (the build
+  stanza stays, commented, as the developer override), so installing is a pull. Before
+  that, compose built on the target box (tight on 2GB RAM, fails on 1GB). SPA-183 (mono-13a) cut what gets built: the image
+  installs its runtime node_modules from `turbo prune @spaces/worker` (the web process
+  runs from its self-contained `.output`), `@spaces/config`'s eslint plugins stopped
+  being prod dependencies, and `COPY --chown` replaced a recursive chown that stored
+  node_modules twice — 1.9 GB → 756 MB on disk, 327 → 150 MB content, measured on one
+  daemon. Project 16's GHCR multi-arch pipeline is the fix and the biggest adoption win.
 
 ## UI craft debt (catalogued 2026-07 · token pass shipped 2026-08)
 

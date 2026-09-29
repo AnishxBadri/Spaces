@@ -1,0 +1,84 @@
+# The image smoke (SPA-186), as one recipe two workflows run: CI's
+# `image-smoke` job against the image built for a PR, and the release
+# workflow (SPA-187) against the amd64 variant of the exact image it is about
+# to push. The caller has checked the repo out and has the image in the local
+# daemon under `inputs.image`.
+#
+# Compose the image with Postgres (the same compose-override shape as the
+# `hostability` job), wait until /api/health says db ok AND worker ok — a
+# worker that never reports fails here, with the payload and the logs, never
+# inside a click — then run apps/e2e's image project: a DOCX previews the
+# worker's text, a PDF draws to a canvas and downloads as an opaque
+# attachment.
+name: image-smoke
+description: Upload → preview in Chromium against a composed image
+inputs:
+  image:
+    description: The local image to compose (e.g. spaces:ci)
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: pnpm
+    - shell: bash
+      run: pnpm install --frozen-lockfile
+    - name: Install Chromium
+      shell: bash
+      run: pnpm --filter @spaces/e2e exec playwright install --with-deps chromium
+
+    - name: Compose the image with Postgres
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+      run: |
+        set -euo pipefail
+        mkdir -p data
+        cat > docker-compose.ci.yml <<YAML
+        services:
+          app:
+            image: ${IMAGE}
+            pull_policy: never
+        YAML
+        echo "COMPOSE_FILE=docker-compose.yml:docker-compose.ci.yml" >> "$GITHUB_ENV"
+        COMPOSE_FILE=docker-compose.yml:docker-compose.ci.yml \
+          docker compose up -d --no-build --wait --wait-timeout 300
+
+    - name: Wait for db ok and worker ok
+      shell: bash
+      run: |
+        set -euo pipefail
+        for _ in $(seq 1 90); do
+          H="$(curl -fsS http://localhost:3000/api/health || true)"
+          if jq -e '.db == "ok" and .worker.status == "ok"' <<<"$H" >/dev/null 2>&1; then
+            echo "$H"; exit 0
+          fi
+          sleep 2
+        done
+        echo "::error::the app never reported db ok and worker ok — last /api/health: ${H:-no answer}"
+        docker compose logs app
+        exit 1
+
+    - name: Upload → preview specs (apps/e2e, image project)
+      shell: bash
+      env:
+        E2E_IMAGE_URL: http://localhost:3000
+      run: pnpm --filter @spaces/e2e exec playwright test
+
+    - name: App logs on failure
+      if: failure()
+      shell: bash
+      run: docker compose logs app
+    - uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: image-smoke-traces-${{ github.job }}
+        path: apps/e2e/test-results/
+        retention-days: 7
+    - name: Tear down
+      if: always()
+      shell: bash
+      run: docker compose down -v || true

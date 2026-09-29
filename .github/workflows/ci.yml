@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The release workflow (SPA-187) calls this whole workflow for the tagged
+  # commit and publishes nothing unless every job here — the gates and
+  # `image-smoke` among them — is green for that exact commit.
+  workflow_call:
 
 jobs:
   checks:
@@ -62,22 +66,114 @@ jobs:
       - name: turbo run build
         run: pnpm run build
 
-  # Hostability contract #1 (CONTEXT.md): the entrypoint owns /data. A macOS
-  # bind mount rewrites ownership on the way through, so a Linux runner is the
-  # only place the trap is real. Deliberately a separate job: it builds an
-  # image and must never sit in front of the gates above.
-  hostability:
+  # The browser suite (SPA-184): `pnpm e2e` — turbo builds @spaces/web, the
+  # harness boots it twice against databases it creates on this service and
+  # drops, and a headless Chromium drives the login gate, the first-run
+  # window and closed signup. Additive: its own job, after nothing and in
+  # front of nothing, and none of the gates above change for it. The trace of
+  # a failed spec is uploaded; a green run uploads nothing.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: spaces
+          POSTGRES_PASSWORD: spaces
+          POSTGRES_DB: spaces
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U spaces -d spaces"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://spaces:spaces@localhost:5432/spaces
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Chromium only, with its system libraries. Test tooling on the runner,
+      # never in the image: the Dockerfile's prune scopes cannot reach
+      # @spaces/e2e.
+      - name: Install Chromium
+        run: pnpm --filter @spaces/e2e exec playwright install --with-deps chromium
+      - name: pnpm e2e
+        run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-traces
+          path: apps/e2e/test-results/
+          retention-days: 7
+
+  # The runtime image, built once per run as its own named job (SPA-183), so
+  # a broken build is red under its own name rather than as the first step of
+  # whichever job happened to try it. Also the build guard (SPA-152): the
+  # image stopped building the day lefthook arrived — `prepare` needs git,
+  # alpine has none — and nothing in CI noticed. The checkout's .git is
+  # excluded by .dockerignore, which is exactly the failing case. No push —
+  # the image leaves this job as an artifact, and `hostability` and
+  # `roundtrip` load those exact bytes instead of each building their own.
+  # Deliberately not a dependency of `checks`: it must never sit in front of
+  # the gates.
+  image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Build the runtime image (docker/Dockerfile, context = repo root)
+        run: docker build -f docker/Dockerfile -t spaces:ci .
+      # SPA-185: the image runs bundles with plain node. No application source
+      # and no tsx may be in it — a regression here is a build that quietly
+      # went back to running src/ through a loader.
+      - name: No source and no tsx in the image
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint sh spaces:ci -c 'ls /app; ls /app/apps/web/dist /app/apps/worker/dist /app/packages/db'
+          SRC="$(docker run --rm --entrypoint sh spaces:ci -c 'find /app -type d -name src -not -path "*/node_modules/*"')"
+          [ -z "$SRC" ] || { echo "source directories in the image: $SRC" >&2; exit 1; }
+          N="$(docker run --rm --entrypoint sh spaces:ci -c 'ls node_modules/.bin | grep -c tsx || true')"
+          [ "$N" = 0 ] || { echo "tsx is in the image ($N)" >&2; exit 1; }
+      - name: Record its size
+        run: |
+          set -euo pipefail
+          docker images spaces:ci
+          BYTES="$(docker image inspect -f '{{.Size}}' spaces:ci)"
+          {
+            echo "### Runtime image"
+            echo
+            echo "| image | size |"
+            echo "| --- | --- |"
+            echo "| spaces:ci | $(( BYTES / 1024 / 1024 )) MiB ($BYTES bytes) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Hand the image to the jobs that boot it
+        run: docker save spaces:ci | gzip -1 > spaces-ci.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spaces-ci-image
+          path: spaces-ci.tar.gz
+          retention-days: 1
 
-      # Also the build guard (SPA-152). The image stopped building the day
-      # lefthook arrived — `prepare` needs git, alpine has none — and nothing
-      # in CI noticed. This step is that alarm; it runs on a checkout whose
-      # .git is excluded by .dockerignore, which is exactly the failing case.
-      # No push: proving it builds is the whole job.
-      - name: Build the runtime image
-        run: docker build -t spaces:ci .
+  # Hostability contract #1 (CONTEXT.md): the entrypoint owns /data. A macOS
+  # bind mount rewrites ownership on the way through, so a Linux runner is the
+  # only place the trap is real. Deliberately a separate job: it boots an
+  # image and must never sit in front of the gates above.
+  hostability:
+    runs-on: ubuntu-latest
+    needs: image
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: spaces-ci-image
+      - name: Load the runtime image built by `image`
+        run: gunzip -c spaces-ci.tar.gz | docker load
 
       - name: Mis-owned ./data — repairs, drops to 1000, takes an upload
         run: |
@@ -107,7 +203,7 @@ jobs:
           docker compose exec -T app sh -c 'grep ^Uid: /proc/1/status'
           docker compose exec -T app sh -c 'grep -qE "^Uid:[[:space:]]+1000[[:space:]]" /proc/1/status'
           docker compose exec -T app ps -o user,args | tee /dev/stderr \
-            | grep -E '^node .*(server/index.mjs|worker/src/index.ts)'
+            | grep -E '^node .*(server/index.mjs|worker/dist/index.mjs)'
           # upload through the HTTP API (the local driver's presigned PUT)
           head -c 4096 /dev/urandom > payload.bin
           KEY="$(sha256sum payload.bin | cut -d' ' -f1)"
@@ -186,6 +282,53 @@ jobs:
           docker exec unpriv sh -c 'grep -qE "^Uid:[[:space:]]+1000[[:space:]]" /proc/1/status'
           docker rm -f unpriv
 
+      # Hostability contract 4: a ROLE starts its own process and nothing
+      # else. Both containers share a database of their own, created empty
+      # here, so no heartbeat the compose `app`'s worker ever wrote can answer
+      # for them: ROLE=web alone must report the worker `absent` (no
+      # worker_heartbeat row at all), and ROLE=worker — which serves no HTTP —
+      # is proven through the heartbeat, by the image's own HEALTHCHECK
+      # command and then by the web container's /api/health flipping to ok.
+      - name: ROLE=web and ROLE=worker each start only their process
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            exec -T db createdb -U spaces roles
+          ROLE_DB=postgresql://spaces:spaces@db:5432/roles
+          sudo mkdir -p roledata && sudo chown 1000:1000 roledata
+          docker run -d --name roleweb --network "$NET" -p 3001:3000 \
+            -e DATABASE_URL="$ROLE_DB" -e MASTER_KEY="$MASTER_KEY" -e ROLE=web \
+            -v "$PWD/roledata:/data" spaces:ci
+          for _ in $(seq 1 60); do
+            curl -fsS http://localhost:3001/api/health >/dev/null 2>&1 && break; sleep 2
+          done
+          H="$(curl -fsS http://localhost:3001/api/health)"
+          echo "$H"
+          jq -e '.worker.status == "absent"' <<<"$H"
+          docker exec roleweb ps -o args | tee roleweb.ps
+          grep -q 'server/index.mjs' roleweb.ps
+          if grep -q 'worker/dist/index.mjs' roleweb.ps; then
+            echo 'ROLE=web started a worker' >&2; exit 1
+          fi
+
+          docker run -d --name roleworker --network "$NET" \
+            -e DATABASE_URL="$ROLE_DB" -e MASTER_KEY="$MASTER_KEY" -e ROLE=worker \
+            -v "$PWD/roledata:/data" spaces:ci
+          HEALTH='node apps/worker/dist/health.mjs'
+          for _ in $(seq 1 60); do
+            docker exec roleworker sh -c "$HEALTH" >/dev/null 2>&1 && break; sleep 2
+          done
+          docker exec roleworker sh -c "$HEALTH"
+          docker exec roleworker ps -o args | tee roleworker.ps
+          grep -q 'worker/dist/index.mjs' roleworker.ps
+          if grep -q 'server/index.mjs' roleworker.ps; then
+            echo 'ROLE=worker started a web server' >&2; exit 1
+          fi
+          H="$(curl -fsS http://localhost:3001/api/health)"
+          echo "$H"
+          jq -e '.worker.status == "ok"' <<<"$H"
+          docker rm -f roleweb roleworker
+
       - name: Supervision contract survives the privilege drop
         run: |
           set -euo pipefail
@@ -196,14 +339,14 @@ jobs:
               -e DATABASE_URL=postgresql://spaces:spaces@db:5432/spaces \
               -e MASTER_KEY="$MASTER_KEY" -v "$PWD/supdata:/data" spaces:ci
             for _ in $(seq 1 60); do
-              docker exec sup pgrep -f '[w]orker/src/index.ts' >/dev/null 2>&1 && return 0
+              docker exec sup pgrep -f '[w]orker/dist/index.mjs' >/dev/null 2>&1 && return 0
               sleep 2
             done
             docker logs sup; return 1
           }
           # worker death stops the container, non-zero
           run_sup
-          docker exec sup sh -c 'kill "$(pgrep -f "[w]orker/src/index.ts" | head -1)"'
+          docker exec sup sh -c 'kill "$(pgrep -f "[w]orker/dist/index.mjs" | head -1)"'
           for _ in $(seq 1 30); do
             [ "$(docker inspect -f '{{.State.Running}}' sup)" = false ] && break; sleep 1
           done
@@ -219,11 +362,81 @@ jobs:
           [ "$(docker inspect -f '{{.State.ExitCode}}' sup)" -eq 0 ]
           docker rm -f sup
 
+      # Hostability contract 4 in the two-container shape (SPA-185): the
+      # ROLE=worker container's HEALTHCHECK is the bundled health entry, and it
+      # is what notices a worker that stopped working. The process is frozen
+      # (SIGSTOP from the host, so the container keeps running and nothing
+      # restarts it) rather than killed — a dead PID 1 ends the container,
+      # which proves supervision, not health. Its heartbeat ages past 60s, the
+      # check fails three times, and Docker calls it unhealthy; the web
+      # container, whose check is HTTP, stays healthy throughout.
+      - name: Split roles — a stopped worker goes unhealthy, web stays healthy
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v
+          sudo mkdir -p data && sudo chown 1000:1000 data
+          cat > docker-compose.split-ci.yml <<'YAML'
+          services:
+            app:
+              image: spaces:ci
+              pull_policy: never
+              environment:
+                MASTER_KEY: ${MASTER_KEY}
+            worker:
+              image: spaces:ci
+              pull_policy: never
+              environment:
+                MASTER_KEY: ${MASTER_KEY}
+          YAML
+          SPLIT=(-f docker-compose.yml -f docker-compose.split.yml -f docker-compose.split-ci.yml)
+          docker compose "${SPLIT[@]}" up -d --no-build --wait --wait-timeout 300
+          docker compose "${SPLIT[@]}" ps
+          W="$(docker compose "${SPLIT[@]}" ps -q worker)"
+          A="$(docker compose "${SPLIT[@]}" ps -q app)"
+          [ "$(docker inspect -f '{{.State.Health.Status}}' "$W")" = healthy ]
+          docker inspect -f '{{json .Config.Healthcheck.Test}}' "$W" | tee /dev/stderr | grep -F 'apps/worker/dist/health.mjs'
+          sudo kill -STOP "$(docker inspect -f '{{.State.Pid}}' "$W")"
+          for _ in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' "$W")" = unhealthy ] && break; sleep 5
+          done
+          docker inspect -f '{{range .State.Health.Log}}{{.ExitCode}} {{.Output}}{{end}}' "$W"
+          [ "$(docker inspect -f '{{.State.Health.Status}}' "$W")" = unhealthy ]
+          [ "$(docker inspect -f '{{.State.Health.Status}}' "$A")" = healthy ]
+          sudo kill -CONT "$(docker inspect -f '{{.State.Pid}}' "$W")"
+          docker compose "${SPLIT[@]}" down -v
+
       - name: Tear down
         if: always()
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v || true
-          docker rm -f sup unpriv nochown 2>/dev/null || true
+          docker compose -f docker-compose.yml -f docker-compose.split.yml -f docker-compose.split-ci.yml down -v 2>/dev/null || true
+          docker rm -f sup unpriv nochown roleweb roleworker 2>/dev/null || true
+
+  # Upload → preview in a real browser against the image built for this
+  # commit (SPA-186): one job that is both the browser smoke and the image
+  # smoke. The name is a contract — the release workflow (ship-8) requires
+  # `image-smoke` before it pushes an image anywhere; rename it only with
+  # every reference. Same image bytes as `hostability` (the `image` job's
+  # artifact) and the same compose-override shape, not a third recipe. The
+  # app must report db ok AND worker ok before the first spec, so a worker
+  # that never comes up fails here, with the payload and the logs, and is
+  # never mistaken for a broken upload. The steps are the composite action
+  # .github/actions/image-smoke (SPA-187 moved them there to share them).
+  image-smoke:
+    runs-on: ubuntu-latest
+    needs: image
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: spaces-ci-image
+      - name: Load the runtime image built by `image`
+        run: gunzip -c spaces-ci.tar.gz | docker load
+      # The recipe lives in one place because the release workflow runs it
+      # too, against the amd64 variant of the image it is about to push.
+      - uses: ./.github/actions/image-smoke
+        with:
+          image: spaces:ci
 
   # Hostability contract #5 (CONTEXT.md): backup is both-or-neither, and
   # rollback is restore. Prose cannot prove that, so this job destroys the box
@@ -238,13 +451,34 @@ jobs:
   # the half of the backup that everything else is worthless without.
   roundtrip:
     runs-on: ubuntu-latest
+    needs: image
     env:
       COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build the runtime image
-        run: docker build -t spaces:ci .
+      - uses: actions/download-artifact@v4
+        with:
+          name: spaces-ci-image
+      - name: Load the runtime image built by `image`
+        run: gunzip -c spaces-ci.tar.gz | docker load
+
+      # The fixture runs inside the app container, which has no tsx and no
+      # source since SPA-185 — so it is bundled here the way the boot entry
+      # is (apps/web/vite.boot.config.ts, `--ssr` naming another entry): the
+      # workspace code inlined, every npm import left to the image's own
+      # node_modules. Built on the runner, copied in, run with plain node.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Bundle the roundtrip fixture
+        run: |
+          pnpm --filter @spaces/web exec vite build --config vite.boot.config.ts \
+            --ssr scripts/roundtrip-fixture.ts --outDir ../../fixture --emptyOutDir
+          ls -la fixture
 
       - name: Boot, then plant a document, its blob and a credential
         run: |
@@ -285,8 +519,8 @@ jobs:
             "http://localhost:3000/api/blob/$KEY?exp=$EXP&sig=$SIG")"
           [ "$CODE" = 201 ]
 
-          docker compose cp apps/web/scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
-          docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
+          docker compose cp fixture/roundtrip-fixture.mjs app:/app/roundtrip-fixture.mjs
+          docker compose exec -T app node /app/roundtrip-fixture.mjs \
             plant --blob="$KEY" --size="$(stat -c%s payload.bin)" --secret="$SECRET"
           echo "NET=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q db)")" >> "$GITHUB_ENV"
 
@@ -343,8 +577,8 @@ jobs:
           set -euo pipefail
           docker compose up -d --wait --wait-timeout 300
           curl -fsS http://localhost:3000/api/health
-          docker compose cp apps/web/scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
-          docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
+          docker compose cp fixture/roundtrip-fixture.mjs app:/app/roundtrip-fixture.mjs
+          docker compose exec -T app node /app/roundtrip-fixture.mjs \
             verify --blob="$KEY" --secret="$SECRET"
           export MASTER_KEY="$MASTER_KEY_BEFORE"
           EXP="$(( ($(date +%s) + 600) * 1000 ))"
@@ -388,8 +622,8 @@ jobs:
           [ "$LEFT" = 0 ]
           # and the workspace is still there, untouched
           docker compose up -d --wait --wait-timeout 300
-          docker compose cp apps/web/scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
-          docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
+          docker compose cp fixture/roundtrip-fixture.mjs app:/app/roundtrip-fixture.mjs
+          docker compose exec -T app node /app/roundtrip-fixture.mjs \
             verify --blob="$KEY" --secret="$SECRET"
 
       - name: An older image refuses the restored database (ship-4's guard)

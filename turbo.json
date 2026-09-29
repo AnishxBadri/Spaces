@@ -70,11 +70,23 @@
 
     // Default inputs — every non-gitignored file in the package. vite reads the
     // app source, the route tree, vite.config.ts, tsconfig.json and
-    // package.json, so anything narrower would under-invalidate.
+    // package.json, so anything narrower would under-invalidate. `dist/**` is
+    // the node bundles since SPA-185: apps/web's boot entry and apps/worker's
+    // index + health (`vite build --ssr`), which the image runs instead of
+    // tsx. The worker's bundle pulls in apps/web/src through `#web/*`; that is
+    // a file in another workspace package that is not a dependency, so turbo
+    // would not fold it into @spaces/worker's hash on its own — hence the
+    // explicit input on `@spaces/worker#build` below.
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$"],
-      "outputs": [".output/**", ".nitro/**", ".tanstack/**"]
+      "outputs": [".output/**", ".nitro/**", ".tanstack/**", "dist/**"]
+    },
+
+    "@spaces/worker#build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/web/src/**"],
+      "outputs": ["dist/**"]
     },
 
     // .env.local is a globalDependency and DATABASE_URL a globalEnv because
@@ -91,6 +103,25 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$"],
       "outputs": []
+    },
+
+    // The browser suite (SPA-184): `pnpm e2e`, never part of `pnpm test`.
+    // Only apps/e2e has the script, so only it runs; it depends on the web
+    // build because the harness serves apps/web/.output — `pnpm e2e` builds
+    // the app first, and a cache hit there is fine (build's inputs are
+    // honest). Never cached itself: it boots servers and a browser against
+    // databases it creates, and a replayed pass would have checked nothing.
+    // Playwright's own variables pass through so a machine can point it at
+    // a browser it already has; CI and GITHUB_ACTIONS switch its reporter.
+    "e2e": {
+      "dependsOn": ["@spaces/web#build"],
+      "cache": false,
+      "passThroughEnv": [
+        "PLAYWRIGHT_BROWSERS_PATH",
+        "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH",
+        "CI",
+        "GITHUB_ACTIONS"
+      ]
     },
 
     // The lint configuration decides what this package's lint run reports —

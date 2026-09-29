@@ -29,7 +29,7 @@ apps/web/               the app (@spaces/web)
   src/                  everything below
 docker-compose.yml      production self-host (app + pgvector), build-from-source
 docker-compose.dev.yml  dev Postgres :5432 + MinIO :9000
-Dockerfile + docker/entrypoint.sh   web+worker supervision, auto-migrate on boot
+docker/Dockerfile + entrypoint.sh  pruned image (turbo prune), web+worker supervision, auto-migrate on boot
 scripts/backup.sh       both-or-neither backup (pg_dump + ./data tarball)
 ```
 

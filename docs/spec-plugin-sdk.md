@@ -81,10 +81,12 @@ Rules the turbo graph and `no-restricted-imports` enforce:
 
 Versioning: changesets; core and each plugin version independently. CI
 builds the image on `core@x` tags and a plugin release on
-`plugin-<id>@x` tags. The worker gets bundled (tsup) so `src/` + `tsx`
-leave the image. Package scope is `@spaces/*` from the first package —
-the SDK name is public-facing and the one place the DealOS→Spaces rename
-would otherwise bake in.
+`plugin-<id>@x` tags. The worker gets bundled (`vite build --ssr` — D26,
+decided 2026-09-29; this line said tsup until SPA-185 built it) so `src/`
+
+- `tsx` leave the image. Package scope is `@spaces/*` from the first package —
+  the SDK name is public-facing and the one place the DealOS→Spaces rename
+  would otherwise bake in.
 
 Migration from today's flat tree, each a shippable PR: workspace scaffold
 with everything under `apps/web` unchanged → extract `packages/db`

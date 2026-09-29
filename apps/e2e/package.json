@@ -1,0 +1,21 @@
+{
+  "//": "The browser suite (SPA-184, ship-6; docs/spec-plugin-sdk.md §13.8). Playwright against the app as CI runs it: `vite build`'s apps/web/.output served by node, booted by apps/web/src/db/boot.ts against a database this harness creates and drops. It imports nothing internal — no `@spaces/*`, no `#/` — because it tests the product from outside, over HTTP and through a real Chromium; the eslint zone in packages/config/eslint.base.js holds that. The two workspace packages it reaches, it reaches as processes (the boot entry and the server bundle), never as modules. No `test` script on purpose: `pnpm test` is the unit suite and stays exactly that; `pnpm e2e` is this. Playwright is a devDependency of this package and of nothing that ships — the image's prune scopes (@spaces/web, @spaces/worker) cannot reach it.",
+  "name": "@spaces/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.15.6",
+    "eslint": "^9.20.0",
+    "pg": "^8.16.3",
+    "typescript": "^6.0.2"
+  }
+}

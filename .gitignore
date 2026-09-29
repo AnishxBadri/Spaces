@@ -21,6 +21,11 @@ data/
 # backup.sh output — a dump and every blob, never in git
 backups/
 
+# Playwright's per-run output (traces, the saved admin session) — CI uploads
+# it as an artifact on failure; it is never source (SPA-184)
+apps/e2e/test-results/
+apps/e2e/playwright-report/
+
 # NOT docs/ — an over-broad `docs/*` rule landed here 2026-09-07 inside an
 # unrelated commit and silently stopped the decision record from being
 # committed (CONTEXT.md and ARCHITECTURE.md point at specs that were never

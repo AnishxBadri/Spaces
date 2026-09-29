@@ -19,18 +19,16 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
-  "//dependencies": "What the eslint base and the prettier config import. They resolve from this directory, so they are this package's dependencies and no longer the root's; eslint, prettier and typescript stay the root's too, because the binaries run from there (lefthook, CI, `pnpm exec`).",
-  "dependencies": {
+  "//devDependencies": "What the eslint base and the prettier config import, plus the tools themselves. They resolve from this directory, so they are this package's and no longer the root's; eslint, prettier and typescript stay the root's too, because the binaries run from there (lefthook, CI, `pnpm exec`). All of it is devDependencies and none of it dependencies (SPA-183): this package is configuration, read only at development time, and a `pnpm install --prod` installs every workspace importer's dependencies — so the plugins listed as dependencies put eslint, typescript-eslint and typescript into the image's runtime node_modules, which runs none of them. A devDependency of a private workspace package is still installed and linked here in every developer and CI checkout.",
+  "devDependencies": {
     "@tanstack/eslint-config": "^0.4.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.20.0",
     "eslint-plugin-drizzle": "^0.2.3",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "prettier-plugin-tailwindcss": "^0.8.1"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.2",
-    "eslint": "^9.20.0",
     "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "typescript": "^6.0.2"
   }
 }

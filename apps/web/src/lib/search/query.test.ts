@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { recordPath } from '../record-path'
 
 /**
@@ -187,6 +187,15 @@ async function deps() {
 }
 
 describe('searchAllProgram', () => {
+  // The first `deps()` pays for transforming and loading effect, drizzle and
+  // the whole search module graph — on a loaded CI runner that alone crept
+  // from ~2.5s to over the 5s test timeout (SPA-184 found it red twice), so
+  // the typo test was failing for its imports, not its search. Paying it
+  // here, under its own budget, leaves each test timing only what it tests.
+  beforeAll(async () => {
+    await deps()
+  }, 30_000)
+
   it('finds a company by a typo in its name', async () => {
     const { newEntity, search } = await deps()
     const id = await newEntity('company', 'Orbital Composites')

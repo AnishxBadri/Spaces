@@ -11,6 +11,7 @@
     "build": "turbo run build",
     "generate-routes": "turbo run generate-routes",
     "test": "turbo run test",
+    "e2e": "turbo run e2e",
     "lint": "turbo run lint lint:root",
     "typecheck": "turbo run typecheck typecheck:root",
     "lint:root": "eslint scripts --no-error-on-unmatched-pattern",
