@@ -144,7 +144,10 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
   answers with Postgres stopped, even for `entity-refs.test.ts`. The harness
   is `packages/db/src/test-db.ts` plus the `vitest.setup.ts` /
   `vitest.global-setup.ts` pair in each package; it never drops a database,
-  only creates and truncates.
+  only creates and truncates. A global setup that seeds the reference
+  database passes its seed to `prepareTestDatabase` so it runs inside the
+  harness advisory lock — three packages seed it and turbo runs them at
+  once (SPA-181 review).
 
 ## Gates before any commit
 

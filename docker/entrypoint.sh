@@ -57,8 +57,12 @@ fi
 
 # Migrations auto-run on every boot — no `docker exec` step, ever.
 # Paths are the workspace's own since SPA-181 (apps/web, apps/worker under
-# /app); the supervision block below is unchanged but for them.
-node_modules/.bin/tsx apps/web/src/db/boot.ts
+# /app); the supervision block below is unchanged but for them. Every tsx
+# invocation names its package's tsconfig: `#/…` and `#web/…` resolve from
+# tsconfig `paths` and tsx reads the tsconfig from its cwd, which is /app and
+# has none — without the flag the first `#/` specifier is
+# ERR_INVALID_MODULE_SPECIFIER (the Dockerfile says why at length).
+node_modules/.bin/tsx --tsconfig apps/web/tsconfig.json apps/web/src/db/boot.ts
 
 ROLE="${ROLE:-all}"
 
@@ -67,7 +71,7 @@ case "$ROLE" in
     exec node apps/web/.output/server/index.mjs
     ;;
   worker)
-    exec node_modules/.bin/tsx apps/worker/src/index.ts
+    exec node_modules/.bin/tsx --tsconfig apps/worker/tsconfig.json apps/worker/src/index.ts
     ;;
   all)
     # Two processes, one container: pg-boss worker + Nitro web server.
@@ -79,7 +83,7 @@ case "$ROLE" in
     # the web PID alone left a crashed worker invisible — a "healthy"
     # container where extraction silently never runs. `wait -n` isn't in
     # busybox ash, so poll.
-    node_modules/.bin/tsx apps/worker/src/index.ts &
+    node_modules/.bin/tsx --tsconfig apps/worker/tsconfig.json apps/worker/src/index.ts &
     WORKER_PID=$!
     node apps/web/.output/server/index.mjs &
     WEB_PID=$!

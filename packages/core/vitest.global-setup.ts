@@ -20,14 +20,15 @@ import {
  *
  * With Postgres down this fails once, naming the connection string, instead
  * of one ECONNREFUSED per db-coupled file — `prepareTestDatabase` holds the
- * harness advisory lock across create-and-migrate because turbo runs the
- * three `test` tasks in parallel.
+ * harness advisory lock across create, migrate and the reference seed
+ * (passed as the callback) because turbo runs the four `test` tasks in
+ * parallel and apps/web and apps/worker seed the same database.
  */
 export default async function setup() {
-  const { url } = await prepareTestDatabase(loadWorkspaceEnv())
-
-  const { seedCoreTestDatabase } = await import('./vitest.seed.ts')
-  await seedCoreTestDatabase()
+  const { url } = await prepareTestDatabase(loadWorkspaceEnv(), async () => {
+    const { seedCoreTestDatabase } = await import('./vitest.seed.ts')
+    await seedCoreTestDatabase()
+  })
 
   const { db } = await import('@spaces/db')
   // The worker opens its own pool; this one belongs to the setup process and

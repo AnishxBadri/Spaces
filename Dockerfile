@@ -78,11 +78,17 @@ RUN apk add --no-cache su-exec
 #
 # The two app tsconfigs come along because tsx resolves `#/…` (and the
 # worker's `#web/…`) from tsconfig `paths` and NOT from package.json `imports`
-# — Node rejects `#/*` as an internal imports key outright — so without them
-# `tsx apps/web/src/db/boot.ts` dies on its first `#/` specifier and the
-# worker on its first `#web/`. Both extend packages/config/tsconfig.base.json,
-# copied to the path the extends names. packages/db's and packages/core's own
-# tsconfigs are deliberately not copied: nothing in the image typechecks.
+# — Node rejects `#/*` as an internal imports key outright
+# (ERR_INVALID_MODULE_SPECIFIER), so `#/…` has never resolved under plain
+# Node and works only through tsx. And tsx reads the tsconfig from its *cwd*:
+# main's image flattened apps/web onto /app so /app/tsconfig.json was found
+# by accident of layout; with every package at its workspace path there is no
+# tsconfig at /app, so every tsx invocation — the boot entry, both worker
+# lines in the entrypoint and the HEALTHCHECK below — passes `--tsconfig
+# <package>/tsconfig.json` explicitly (SPA-181 review: the image did not
+# boot without it). Both extend packages/config/tsconfig.base.json, copied to
+# the path the extends names. packages/db's and packages/core's own tsconfigs
+# are deliberately not copied: nothing in the image typechecks.
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/apps/web/.output ./apps/web/.output
 COPY apps/web/package.json apps/web/tsconfig.json ./apps/web/
@@ -124,7 +130,7 @@ EXPOSE 3000
 # The timeout is 10s for the worker branch: tsx has to boot and connect.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s \
   CMD if [ "${ROLE:-all}" = worker ]; then \
-        node_modules/.bin/tsx apps/worker/src/health.ts; \
+        node_modules/.bin/tsx --tsconfig apps/worker/tsconfig.json apps/worker/src/health.ts; \
       else \
         wget -qO- http://127.0.0.1:3000/api/health || exit 1; \
       fi

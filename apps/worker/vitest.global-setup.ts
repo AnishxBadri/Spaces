@@ -14,17 +14,18 @@ import {
  * that buys it must not reach a file running in another worker. `spaces_test`
  * stays the reference database every package migrates and nothing writes
  * rows into; `prepareTestDatabase` holds the harness advisory lock across
- * create-and-migrate because turbo runs the four `test` tasks in parallel.
+ * create, migrate and the reference seed because turbo runs the four `test`
+ * tasks in parallel — apps/web and packages/core seed the same database.
  *
  * Every import of app code is dynamic and below `prepareTestDatabase`,
  * because `@spaces/db`'s `db` builds its pool from `process.env.DATABASE_URL`
  * at import time.
  */
 export default async function setup() {
-  const { url } = await prepareTestDatabase(loadWorkspaceEnv())
-
-  const { seedTestDatabase } = await import('./vitest.seed.ts')
-  await seedTestDatabase()
+  const { url } = await prepareTestDatabase(loadWorkspaceEnv(), async () => {
+    const { seedTestDatabase } = await import('./vitest.seed.ts')
+    await seedTestDatabase()
+  })
 
   const { db } = await import('@spaces/db')
   // The workers open their own pools; this one belongs to the setup process

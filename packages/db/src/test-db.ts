@@ -270,13 +270,21 @@ async function ensureDatabase(url: string): Promise<boolean> {
 }
 
 /**
- * Derive, create if absent, migrate — and point `process.env.DATABASE_URL`
+ * Derive, create if absent, migrate, seed — and point `process.env.DATABASE_URL`
  * at the result before returning, because `@spaces/db`'s `db` builds its pool
  * from that variable at *import* time. A caller that seeds must therefore
- * `await import` its seeds after this resolves, not at the top of its file.
+ * `await import` its seeds after this resolves, not at the top of its file —
+ * or, better, pass `seed`, which runs inside the harness lock (SPA-181
+ * review): the reference database is seeded by three global setups now
+ * (apps/web, apps/worker, packages/core), turbo runs their `test` tasks in
+ * parallel, and two insert-if-absent seeders released from the lock at the
+ * same moment both saw "absent" and both inserted the system attributes. A
+ * seed run before the lock is released finds the rows the previous seeder
+ * left and inserts nothing.
  */
 export async function prepareTestDatabase(
   env: Record<string, string | undefined>,
+  seed?: () => Promise<void>,
 ): Promise<TestDatabaseReady> {
   const url = resolveTestDatabaseUrl(env)
   const source = env.DATABASE_URL
@@ -286,7 +294,7 @@ export async function prepareTestDatabase(
         `[test-db] the derived test database is the same as DATABASE_URL (${redact(source)}). Refusing — the suite would write to the database the app is showing.`,
       )
 
-  return prepareDatabase(url)
+  return prepareDatabase(url, seed)
 }
 
 /**
@@ -296,7 +304,10 @@ export async function prepareTestDatabase(
  * `resolveTestDatabaseUrl` derived, so the "is this the app's database"
  * guard has already run on the name they were derived from.
  */
-export async function prepareDatabase(url: string): Promise<TestDatabaseReady> {
+export async function prepareDatabase(
+  url: string,
+  seed?: () => Promise<void>,
+): Promise<TestDatabaseReady> {
   const created = await ensureDatabase(url)
 
   const client = await connect(url, 'the test database')
@@ -312,6 +323,10 @@ export async function prepareDatabase(url: string): Promise<TestDatabaseReady> {
     console.log(
       `[test-db] ${name} ${created ? 'created' : 'reused'} — ${outcome.known} migrations known, ${outcome.applied} already applied, ${outcome.known - outcome.applied} applied now`,
     )
+    // Still under the lock: `DATABASE_URL` already names this database, so a
+    // seed that imports `@spaces/db` here opens its pool on it, and a second
+    // setup waiting on the lock seeds after this one has finished.
+    if (seed) await seed()
     return {
       url,
       created,
