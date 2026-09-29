@@ -2476,11 +2476,16 @@ trigger that revives it.
 Standing debt:
 
 - ~~**Test-db harness.**~~ **Closed 2026-09-19 (SPA-143, SPA-145)** — the suite owns `spaces_test*`, one database per vitest worker, truncated per file. See CLAUDE.md, _Dev environment_.
-- **`./data` ownership landmine.** The Dockerfile `chown`s `/data` at build, but the
+- ~~**`./data` ownership landmine.**~~ **Closed: fixed structurally by ship-2 (the
+  entrypoint repairs `/data` as root, then drops to 1000), documented by SPA-188
+  (`docs/install.md`, _Ownership_ — the `chown` line appears only for a container pinned
+  to a non-root user).** _Earlier text, kept:_ The Dockerfile `chown`s `/data` at build, but the
   compose bind mount overlays it with host ownership at runtime. Wrong UID on a Linux
   host → cannot write blobs or generate `secret.key`, and it **fails at first upload, not
   at boot**. macOS hides it. Docs need `chown -R 1000:1000 ./data`.
-- **Rollback is unsafe and undocumented.** Migrations are forward-only and auto-apply, so
+- ~~**Rollback is unsafe and undocumented.**~~ **Closed: unsafe rollback is refused by the
+  downgrade guard (ship-5, `packages/db/src/downgrade-guard.ts`); the upgrade order and the
+  restore-based rollback are `docs/upgrade.md` (SPA-188).** _Earlier text, kept:_ Migrations are forward-only and auto-apply, so
   pulling an older tag runs old code against a new schema. The upgrade doc must say _back
   up first_.
 - ~~**No published images yet.**~~ **Closed by SPA-187** once the owner pushes
