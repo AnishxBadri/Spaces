@@ -51,7 +51,10 @@ pnpm worker                                       # background worker
   the blob route) and the boot composition (`writes/boot.ts` with
   `writes/seeds/taxonomy.ts`, SPA-177; `apps/web/src/db/boot.ts` is the
   process shell that runs it) — and is the only place in core a `drizzle-orm` import or a
-  `db` value import passes. Neither half imports React, and only
+  `db` value import passes. The pure half also holds the context assembler's
+  ranker, ref grammar and renderer (`context/*`) and `canRead`
+  (`read-policy.ts`, SPA-179; the db-coupled assembler is still
+  `apps/web/src/lib/context/`). Neither half imports React, and only
   `writes/vault/` (MASTER_KEY, DATA_DIR) and `writes/storage/`
   (STORAGE_DRIVER, S3_*) read `process.env` — which is why
   `enqueueSourceEmbed` stayed in

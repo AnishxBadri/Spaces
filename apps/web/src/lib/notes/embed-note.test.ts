@@ -22,7 +22,7 @@ import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
 import { assembleProgram } from '#/lib/context/assemble'
 import { searchAllProgram } from '#/lib/search/query'
 import { clearQueryEmbeddingCache } from '#/lib/search/query-embedding'
-import { canRead } from '#/lib/notes/visibility'
+import { canRead } from '@spaces/core/read-policy'
 import { embedSourceProgram, noteEmbedText } from '#/lib/ai/embed-source'
 import { saveNoteProgram } from './save'
 

@@ -12,8 +12,8 @@ import {
 import { user } from '@spaces/db/schema/auth'
 import type { Json } from '@spaces/db/json'
 import { getRegistryByObjectId } from '@spaces/core/writes/attributes/values'
-import { renderAttribute } from '#/lib/context/render'
-import { canRead } from '#/lib/notes/visibility'
+import { renderAttribute } from '@spaces/core/context/render'
+import { canRead } from '@spaces/core/read-policy'
 
 /**
  * The read half of the MCP surface's record tool (SPA-23, spec §5):

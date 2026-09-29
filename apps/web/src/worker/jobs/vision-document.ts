@@ -10,7 +10,7 @@ import type { CompleteFailure } from '#/lib/ai/complete'
 import { callStep, withRun } from '#/lib/ai/run'
 import type { RunScope } from '#/lib/ai/run'
 import { sensitivityFor } from '#/lib/ai/sensitivity-for'
-import { ref } from '#/lib/context/ref'
+import { ref } from '@spaces/core/context/ref'
 import type { SensitivityRead } from '#/lib/ai/sensitivity-for'
 import {
   VISION_CHARS_PER_PAGE,

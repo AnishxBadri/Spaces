@@ -42,7 +42,7 @@ export async function requireAdmin() {
  * dragging `getRequest` into the client bundle (SPA-155). Re-exported here so
  * the server-fn modules keep importing them from where they always did.
  */
-export { canRead } from '#/lib/notes/visibility'
+export { canRead } from '@spaces/core/read-policy'
 export { provenanceOf } from '@spaces/core/writes/entities/provenance'
 
 /** ltree labels: [a-z0-9_] only. */

@@ -9,7 +9,7 @@ import {
 } from '#/lib/glossary/link-terms'
 import type { MentionDiff } from '#/lib/glossary/link-terms'
 import { NoteNotFound, NoteQueryFailed } from '#/lib/notes/delete'
-import { canRead } from '#/lib/notes/visibility'
+import { canRead } from '@spaces/core/read-policy'
 import { noteSource } from '@spaces/core/writes/ai/chunk-sources'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 

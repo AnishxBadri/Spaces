@@ -7,7 +7,7 @@ import type { Json } from '@spaces/core/json'
 import { proposeProgram, SuggestionInvalid } from '#/lib/ai/propose'
 import type { SuggestionFailure } from '#/lib/ai/propose'
 import { EntityNotFound } from '@spaces/core/writes/attributes/values'
-import { canRead } from '#/lib/notes/visibility'
+import { canRead } from '@spaces/core/read-policy'
 import {
   McpToolQueryFailed,
   McpToolRefused,

@@ -34,13 +34,17 @@ import {
   ContextEntityNotFound,
   ContextLeak,
   ContextQueryFailed,
-} from './errors'
-import { rank } from './rank'
-import type { Candidate, RankResult } from './rank'
-import { ref } from './ref'
+} from '@spaces/core/context/errors'
+import { rank } from '@spaces/core/context/rank'
+import type { Candidate, RankResult } from '@spaces/core/context/rank'
+import { ref } from '@spaces/core/context/ref'
 import { SIMILAR_TOP_N, similarCandidatesProgram } from './similar'
-import { renderAttribute, renderEvent, truncate } from './render'
-import type { ContextEdge } from './types'
+import {
+  renderAttribute,
+  renderEvent,
+  truncate,
+} from '@spaces/core/context/render'
+import type { ContextEdge } from '@spaces/core/context/types'
 
 /**
  * The assembler, fetch half (docs/spec-ai-substrate.md §1; Effect-first per

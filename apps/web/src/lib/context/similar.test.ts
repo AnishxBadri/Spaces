@@ -17,7 +17,7 @@ import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
 import { assembleProgram } from './assemble'
 import type { AssembleResult } from './assemble'
 import { resolveRefsProgram } from './names'
-import { ref } from './ref'
+import { ref } from '@spaces/core/context/ref'
 import { SIMILAR_MAX_DISTANCE, SIMILAR_TOP_N } from './similar'
 
 /**

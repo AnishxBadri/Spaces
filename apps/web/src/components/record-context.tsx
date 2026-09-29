@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
 import { Switch } from '#/components/ui/switch'
 import { formatSince } from '@spaces/core/format'
-import type { ContextKind } from '#/lib/context/types'
+import type { ContextKind } from '@spaces/core/context/types'
 import type { RecordContextItem } from '#/lib/context/record'
 import { getRecordContext } from '#/lib/server-fns'
 

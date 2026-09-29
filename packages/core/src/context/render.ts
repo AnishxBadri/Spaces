@@ -1,5 +1,5 @@
-import type { AttributeDef } from '@spaces/core/attributes/registry'
-import { fmtMoney } from '@spaces/core/portfolio/format'
+import type { AttributeDef } from '../attributes/registry'
+import { fmtMoney } from '../portfolio/format'
 
 /**
  * Plain-text renderings for ContextItems. Pure: values in, one line out.

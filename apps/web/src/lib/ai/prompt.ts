@@ -1,4 +1,4 @@
-import type { ContextItem } from '#/lib/context/types'
+import type { ContextItem } from '@spaces/core/context/types'
 
 /**
  * The prompt renderer behind `complete()` (docs/spec-ai-substrate.md §4, the
