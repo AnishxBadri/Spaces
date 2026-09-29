@@ -15,8 +15,9 @@ import type { SettingsCrumb } from './settings-nav'
  *   - the **mono eyebrow**, `SETTINGS · <GROUP>` — the group is the one the
  *     section's row names in `SETTINGS_SECTIONS`, so there are three and a
  *     section cannot invent a fourth;
- *   - the **serif title** on the page step (`title-serif`, 22px — the 18px
- *     spelling SPA-17 recorded as a gap is gone with the second head);
+ *   - the **serif title** in `title-serif` (28/32, the page head every
+ *     surface uses — the 18px spelling SPA-17 recorded as a gap is gone
+ *     with the second head);
  *   - **one sans sentence** under it, graphite, optional — what the section
  *     decides, never instructions and never doctrine;
  *   - an optional **action** right — the one primary of the section;

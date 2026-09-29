@@ -105,7 +105,6 @@ function ObjectAttributesPage() {
               {live} attribute{live === 1 ? '' : 's'} on every{' '}
               {object.singular.toLowerCase()}
             </span>
-            <span>types are fixed · rename, reorder, archive</span>
             {archivedCount > 0 ? <span>{archivedCount} archived</span> : null}
             {isAdmin ? null : <span>reshaping is admin-only</span>}
           </>

@@ -227,7 +227,7 @@ row is a decision, not a cell.
 `SettingsSection` and `SettingsRow`
 (`apps/web/src/components/settings/settings-section.tsx`). The section is the page
 (2026-09-30): the shell draws no head of its own, so the section head is P1 — mono
-`SETTINGS · …` eyebrow, serif title on the page step, one optional sans sentence that
+`SETTINGS · …` eyebrow, serif title in `title-serif`, one optional sans sentence that
 says what the section decides, the one action right, hairline under; 48px rows on
 rules with the control right. The nav left is the chassis grammar one level in: bone,
 caps group labels, 30px rows, counts in the right lane. A ledger inside the section takes a `field-label` head on

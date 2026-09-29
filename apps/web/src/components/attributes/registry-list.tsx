@@ -13,7 +13,8 @@ import { cn } from '#/lib/utils'
  * One object's registry as a settings ledger (spec §7; Instrument
  * "Settings — Object" board): a caps column head on a hairline, rows on
  * rules — grip · name (+ description, + option badges) · type · constraints
- * · origin · order/edit — and a mono foot that says what the order feeds.
+ * · origin · order/edit — and a mono foot with the live count and the
+ * reorder keys.
  * Drag or ↑↓ persists sort_order, which every table and rail reads.
  * Archived attributes wait in a collapsed section below — never deleted,
  * values intact, one click from coming back. Keyed on the object row, so a
@@ -156,11 +157,8 @@ export function RegistryList({
             </li>
           ) : null}
         </ol>
-        <div className="flex h-8 items-center justify-between gap-4 mono text-micro text-graphite">
+        <div className="flex h-8 items-center mono text-micro text-graphite">
           <span>{ordered.length} live · drag ⋮⋮ or ↑↓ to reorder</span>
-          <span className="max-md:hidden">
-            order feeds every table and rail · types never change
-          </span>
         </div>
       </section>
 
@@ -177,7 +175,7 @@ export function RegistryList({
             </span>
             <span className="label-caps text-foreground">Archived</span>
             <span className="mono text-micro text-graphite">
-              {archived.length} · values kept, one click back
+              {archived.length}
             </span>
           </button>
           {showArchived ? (
