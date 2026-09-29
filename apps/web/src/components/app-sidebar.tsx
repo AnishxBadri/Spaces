@@ -322,6 +322,27 @@ export function AppSidebar({
             <Upload className="size-3.5 shrink-0" strokeWidth={1.75} />
             <span className="min-w-0 flex-1 truncate text-left">Upload</span>
           </button>
+          {/* Settings is a page you cannot otherwise see exists — until
+              2026-09-30 it lived only in the account menu and behind G , */}
+          <Link
+            to="/settings"
+            onClick={onNavigate}
+            className={cn(
+              'flex h-[1.875rem] w-full items-center gap-2.5 rounded-md border border-transparent px-2.5 text-ui text-foreground transition-colors',
+              'hover:bg-bone-deep',
+              'focus-ring',
+            )}
+            activeProps={{
+              className: 'border-rule bg-paper font-medium hover:bg-paper',
+              'aria-current': 'page',
+            }}
+          >
+            <Settings className="size-3.5 shrink-0" strokeWidth={1.75} />
+            <span className="min-w-0 flex-1 truncate text-left">Settings</span>
+            <span className="mono text-micro font-normal text-graphite">
+              G ,
+            </span>
+          </Link>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -502,6 +523,16 @@ function CollapsedSidebar({
           >
             <Upload className="size-3.5" strokeWidth={1.75} />
           </button>
+        </IconTip>
+        <IconTip label="Settings">
+          <Link
+            to="/settings"
+            aria-label="Settings"
+            className="focus-ring-inset flex h-10 w-12 items-center justify-center border-t border-rule text-graphite transition-colors hover:bg-bone-deep hover:text-foreground aria-[current=page]:text-foreground"
+            activeProps={{ 'aria-current': 'page' }}
+          >
+            <Settings className="size-3.5" strokeWidth={1.75} />
+          </Link>
         </IconTip>
         <DropdownMenu>
           <IconTip label={user.name}>

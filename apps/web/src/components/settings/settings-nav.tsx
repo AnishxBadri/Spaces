@@ -14,7 +14,7 @@ import { cn } from '#/lib/utils'
  *
  * The groups mirror the chassis: `workspace` (the deployment and who is in
  * it), `objects` (what it records), `capital` (what it prices). The group is
- * also the crumb the section prints — `SETTINGS / WORKSPACE` — so a section
+ * also the eyebrow the section prints — `SETTINGS · WORKSPACE` — so a section
  * cannot name a place the nav does not have.
  *
  * `settings-nav.test.ts` fails naming both sections when two rows claim one
@@ -27,8 +27,8 @@ export const SETTINGS_GROUP_IDS = ['workspace', 'objects', 'capital'] as const
 export type SettingsGroupId = (typeof SETTINGS_GROUP_IDS)[number]
 
 /**
- * What each group is called in the crumb. `label-caps` prints it uppercase,
- * so `Capital` reads `SETTINGS / CAPITAL`.
+ * What each group is called — the caps label over its rows in the nav, and
+ * the section's eyebrow (`SETTINGS · CAPITAL`). One name, printed twice.
  */
 export const SETTINGS_CRUMBS = {
   workspace: 'Workspace',
@@ -147,34 +147,50 @@ const ROW =
   'flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent px-2.5 text-ui whitespace-nowrap transition-colors'
 
 /**
- * The section nav: a ledger of rows on bone, current section = paper + rule +
- * medium weight (the No-Bar Rule — never a pine edge).
+ * The section nav: the chassis grammar one level in (2026-09-30). Caps group
+ * labels the way the chassis prints OBJECTS and CAPITAL, 30px rows, current
+ * section = paper + rule + medium weight (the No-Bar Rule — never a pine
+ * edge), and a count in the right lane where the shell has one — the lane
+ * the chassis uses for a chord or a count.
  *
  * Below `md` the same rows become a horizontal strip above the content,
  * scrolling on x inside their own container, with the rules between groups
  * drawn as vertical hairlines instead of horizontal ones. One component, two
  * orientations: no drawer, no second list to keep in step.
  */
-export function SettingsNav({ isAdmin }: { isAdmin: boolean }) {
+export function SettingsNav({
+  isAdmin,
+  counts = {},
+}: {
+  isAdmin: boolean
+  /** A count for the right lane, keyed by the row's path. */
+  counts?: Partial<Record<SettingsSectionRow['to'], number>>
+}) {
   return (
     <nav
       aria-label="Settings sections"
       className={cn(
         'flex shrink-0 gap-3 overflow-x-auto border-b border-hairline bg-bone px-3 py-2',
-        'md:w-52 md:flex-col md:gap-0 md:overflow-x-visible md:border-r md:border-b-0 md:px-3 md:py-3',
+        'md:w-52 md:flex-col md:gap-0 md:overflow-x-visible md:border-r md:border-b-0 md:px-3 md:pt-3 md:pb-3',
       )}
     >
       {SETTINGS_GROUP_IDS.map((id, i) => (
         <div
           key={id}
           className={cn(
-            'flex shrink-0 gap-1 md:flex-col md:gap-0.5',
+            'flex shrink-0 items-center gap-1 md:flex-col md:items-stretch md:gap-0.5',
             i > 0 &&
-              'border-l border-hairline pl-3 md:mt-2 md:border-t md:border-l-0 md:pt-2 md:pl-0',
+              'border-l border-hairline pl-3 md:mt-5 md:border-l-0 md:pl-0',
           )}
         >
-          {SETTINGS_GROUPS[id].map((row) =>
-            sectionLocked(row, isAdmin) ? (
+          <div className="hidden h-6 items-center px-2.5 md:flex">
+            <span className="field-label leading-4 font-medium text-graphite">
+              {SETTINGS_CRUMBS[id]}
+            </span>
+          </div>
+          {SETTINGS_GROUPS[id].map((row) => {
+            const count = counts[row.to]
+            return sectionLocked(row, isAdmin) ? (
               <span
                 key={row.to}
                 aria-disabled="true"
@@ -200,9 +216,14 @@ export function SettingsNav({ isAdmin }: { isAdmin: boolean }) {
                 }}
               >
                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
+                {count !== undefined ? (
+                  <span className="shrink-0 mono text-micro font-normal text-graphite">
+                    {count}
+                  </span>
+                ) : null}
               </Link>
-            ),
-          )}
+            )
+          })}
         </div>
       ))}
     </nav>

@@ -8,18 +8,18 @@ import type { SettingsCrumb } from './settings-nav'
  * because a section is a child route, and a child route cannot import a
  * sibling's local.
  *
- * The anatomy, top to bottom:
+ * Since 2026-09-30 the section *is* the page: the shell draws no title of
+ * its own, so this head is the P1 page head and not a second one under it.
+ * Top to bottom:
  *
- *   - a **serif title** on the 18px spelling the settings head has always
- *     used (`font-serif text-lg`); there is no named 18 step and SPA-26 did
- *     not add one — SPA-17 records the gap;
- *   - **one sans sentence** under it, graphite — what the section decides,
- *     never instructions;
- *   - the **mono crumb** on the right, `SETTINGS / <GROUP>` in caps: the
- *     group is the one the section's row names in `SETTINGS_SECTIONS`, so
- *     there are three crumbs and a section cannot invent a fourth;
- *   - an optional **action** left of the crumb — the one primary of the
- *     section (`New object`);
+ *   - the **mono eyebrow**, `SETTINGS · <GROUP>` — the group is the one the
+ *     section's row names in `SETTINGS_SECTIONS`, so there are three and a
+ *     section cannot invent a fourth;
+ *   - the **serif title** on the page step (`title-serif`, 22px — the 18px
+ *     spelling SPA-17 recorded as a gap is gone with the second head);
+ *   - **one sans sentence** under it, graphite, optional — what the section
+ *     decides, never instructions and never doctrine;
+ *   - an optional **action** right — the one primary of the section;
  *   - a **hairline under** the head, then the rows.
  *
  * Rows are `SettingsRow`: 48px on a rule, label and hint left, the control
@@ -35,27 +35,26 @@ export function SettingsSection({
   children,
 }: {
   title: string
-  blurb: ReactNode
-  /** The section's group, printed caps as `SETTINGS / WORKSPACE`. */
+  /** One sentence, what the section decides. Omit when the title says it. */
+  blurb?: ReactNode
+  /** The section's group, printed caps in the eyebrow as `SETTINGS · WORKSPACE`. */
   crumb: SettingsCrumb
   action?: ReactNode
   children: ReactNode
 }) {
   return (
     <section className="flex flex-col">
-      <div className="flex items-end justify-between gap-6 border-b border-hairline pb-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="font-serif text-lg leading-5.5 font-semibold">
-            {title}
-          </h2>
-          <p className="text-ui text-graphite">{blurb}</p>
+      <div className="flex items-end justify-between gap-6 border-b border-hairline pb-4">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <div className="mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
+            Settings · {crumb}
+          </div>
+          <h1 className="title-serif">{title}</h1>
+          {blurb ? <p className="text-ui text-graphite">{blurb}</p> : null}
         </div>
-        <div className="flex shrink-0 items-center gap-3">
-          {action}
-          <span className="label-caps font-normal whitespace-nowrap text-graphite">
-            Settings / {crumb}
-          </span>
-        </div>
+        {action ? (
+          <div className="flex shrink-0 items-center gap-3">{action}</div>
+        ) : null}
       </div>
       {children}
     </section>

@@ -52,11 +52,7 @@ function WorkspaceSection({
   }
 
   return (
-    <SettingsSection
-      title="Workspace"
-      blurb="The deployment's name. It sits in the chassis next to the mark."
-      crumb="Workspace"
-    >
+    <SettingsSection title="Workspace" crumb="Workspace">
       <SettingsRow
         label="Name"
         hint={

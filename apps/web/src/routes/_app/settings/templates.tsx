@@ -46,7 +46,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
   return (
     <SettingsSection
       title="Templates"
-      blurb="Saved patterns for notes, records, and space breakdowns. Create one from any existing note, record, or space — “Save as template”."
+      blurb="Saved patterns for notes, records, and space breakdowns."
       crumb="Workspace"
     >
       {templates.length === 0 ? (

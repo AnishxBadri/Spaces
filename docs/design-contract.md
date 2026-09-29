@@ -225,9 +225,12 @@ row is a decision, not a cell.
 **A settings section** — Integrations, Connections, Providers, Routing.
 → **the FX ledger**, `apps/web/src/routes/_app/settings/currency.tsx`, built from
 `SettingsSection` and `SettingsRow`
-(`apps/web/src/components/settings/settings-section.tsx`). Serif title, one sans
-sentence, a mono `SETTINGS / …` crumb right, hairline under; 48px rows on rules with
-the control right. A ledger inside the section takes a `field-label` head on
+(`apps/web/src/components/settings/settings-section.tsx`). The section is the page
+(2026-09-30): the shell draws no head of its own, so the section head is P1 — mono
+`SETTINGS · …` eyebrow, serif title on the page step, one optional sans sentence that
+says what the section decides, the one action right, hairline under; 48px rows on
+rules with the control right. The nav left is the chassis grammar one level in: bone,
+caps group labels, 30px rows, counts in the right lane. A ledger inside the section takes a `field-label` head on
 `border-y-hairline` with lanes shared by head and rows, and its foot says what the
 model does.
 
@@ -240,13 +243,13 @@ pending sections (Providers, Routing, Usage, Integrations, the manifest form, in
 OAuth, Connections, Binding health, and the two embeddings slices) all take this one
 answer. The row carries the path, the label, the `group` it joins — `workspace`,
 `objects`, `capital`, the same three the chassis uses — and `admin`. The group is also
-the crumb the section prints, so `SETTINGS / CAPITAL` cannot name a place the nav does
+the eyebrow the section prints, so `SETTINGS · CAPITAL` cannot name a place the nav does
 not have; `admin: true` draws the row graphite for a member with `admin` in the right
 lane rather than a link into a page that refuses, and changes no guard. Below `md` the
 nav is the same rows as a horizontal strip above the content. `/settings` redirects to
 the first row. `settings-nav.test.ts` holds the grammar the way `nav-grammar.test.ts`
-holds the chassis'. The shell's loader carries what its readout counts; a section that
-needs anything else loads it in its own child route's loader. A page that is _about_
+holds the chassis'. The shell's loader carries what the nav's right lane counts; a
+section that needs anything else loads it in its own child route's loader. A page that is _about_
 one record rather than a section of settings stays outside the shell — that is why
 `settings_.objects.$objectSlug.tsx` keeps its escaping `_`.
 

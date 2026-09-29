@@ -117,7 +117,7 @@ function ProvidersSection({
   return (
     <SettingsSection
       title="AI providers"
-      blurb="Which model providers this workspace calls, with whose key. Keys are encrypted at rest and never shown again."
+      blurb="Which model providers this workspace calls, with whose key."
       crumb="Workspace"
     >
       <div className="flex flex-col pt-5">

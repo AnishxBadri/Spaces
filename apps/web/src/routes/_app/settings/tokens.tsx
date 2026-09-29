@@ -95,7 +95,7 @@ function TokensRoute() {
   return (
     <SettingsSection
       title="API tokens"
-      blurb="Tokens that let your own assistant read Spaces as you, over MCP, and open the API for the scopes you tick. Each is shown once and stored only as a hash."
+      blurb="Tokens that let your own assistant read Spaces as you, over MCP, for the scopes you tick."
       crumb="Workspace"
     >
       <form onSubmit={create} className="flex flex-col">

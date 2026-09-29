@@ -108,7 +108,7 @@ function FxSection({
   return (
     <SettingsSection
       title="Currency & FX rates"
-      blurb="Every holding is priced in the base currency. Rates are entered by hand and dated; a missing rate leaves the holding unpriced, never guessed."
+      blurb="Every holding is priced in the base currency; a missing rate leaves it unpriced."
       crumb="Capital"
     >
       <SettingsRow

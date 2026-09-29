@@ -50,7 +50,7 @@ function ObjectsSection({
   return (
     <SettingsSection
       title="Objects"
-      blurb="The records you keep and the attributes on each. Open one to rename, reorder, archive, or add attributes — types are fixed."
+      blurb="The records you keep and the attributes on each."
       crumb="Objects"
       action={
         isAdmin ? (
