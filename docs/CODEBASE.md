@@ -18,9 +18,11 @@ docs/
                         setup token, the TLS overlay, backup) — SPA-188 (ship-10)
   upgrade.md            backup → tag → pull/up, the downgrade guard, rollback by restore,
                         the pre-rename (dealos) migration — SPA-188
-                        Deliberately not here: the PaaS templates (ship-12, deploy/), a
+                        Deliberately not here: the PaaS templates (deploy/, below), a
                         comparison page, and a marketing site (apps/site is deferred until
                         the first doc page has to be public; docs/ is what it would read)
+deploy/                 one-click templates — coolify/, railway/, render/, unraid/ — and the
+                        README that says which a human has deployed (SPA-190, ship-12)
   ARCHITECTURE.md       full product synthesis (fastest onboarding read)
   adr/                  formal ADRs (e.g. 0001 deals-are-an-object)
   survey-*.md           prior-art studies (Twenty sync; Attio attribute model)

@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!--
+  Spaces on Unraid (SPA-190, ship-12): the app container. Unraid has no
+  compose, so the two-container shape is two Community Applications
+  templates: this one and spaces-postgres.xml, which must be installed and
+  running first. Docker → Add Container → Template → this file's URL.
+-->
+<Container version="2">
+  <Name>spaces</Name>
+  <Repository>ghcr.io/anishxbadri/spaces:0.1.0</Repository>
+  <Registry>https://github.com/AnishxBadri/Spaces/pkgs/container/spaces</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/AnishxBadri/Spaces/issues</Support>
+  <Project>https://github.com/AnishxBadri/Spaces</Project>
+  <ReadMe>https://github.com/AnishxBadri/Spaces/blob/main/docs/install.md</ReadMe>
+  <Overview>
+    Self-hosted deal management for angel and private-capital investing. Pinned to the published image ghcr.io/anishxbadri/spaces:0.1.0 (never latest); upgrading is changing that tag on purpose, after a backup.
+
+    Needs the spaces-postgres container from the same template set (pgvector/pgvector:pg17 — the migrations need pgvector 0.8 or newer; a plain Postgres fails at the first migration). Set DATABASE_URL to it and APP_URL to the address you open in the browser: Unraid assigns no domain, so this is http://your-unraid-ip:3000 on a LAN, or https://your-domain once a reverse proxy sits in front (the app never terminates TLS, and cookies are Secure only when APP_URL says https).
+
+    The Data path holds blobs and the auto-generated secret.key. Lose `./data/secret.key` and every stored credential is unrecoverable. (On Unraid, ./data is the Data path, mounted at /data.) Back it up together with the database.
+
+    First run: the setup token is printed to this container's log (Docker → spaces → Logs): `[setup] First-run setup token: …`. Open the WebUI at /setup and paste it. Local embeddings through Ollama are opt-in and need a container of their own.
+  </Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/AnishxBadri/Spaces/main/deploy/unraid/spaces.xml</TemplateURL>
+  <Requires>spaces-postgres (deploy/unraid/spaces-postgres.xml), running, with the password you set there in DATABASE_URL below.</Requires>
+  <Config Name="WebUI port" Target="3000" Default="3000" Mode="tcp" Description="The port the app listens on. APP_URL must name the same port." Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/spaces/data" Mode="rw" Description="Blobs and secret.key. The container repairs the ownership of this path itself on every start." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/spaces/data</Config>
+  <Config Name="DATABASE_URL" Target="DATABASE_URL" Default="postgresql://spaces:CHANGE-ME@192.168.1.10:5432/spaces" Mode="" Description="The spaces-postgres container: postgresql://spaces:&lt;its POSTGRES_PASSWORD&gt;@&lt;your Unraid IP&gt;:&lt;its host port&gt;/spaces" Type="Variable" Display="always" Required="true" Mask="true">postgresql://spaces:CHANGE-ME@192.168.1.10:5432/spaces</Config>
+  <Config Name="APP_URL" Target="APP_URL" Default="http://192.168.1.10:3000" Mode="" Description="Scheme and host the browser uses to reach Spaces: http://&lt;your Unraid IP&gt;:3000 on a LAN, https://&lt;domain&gt; behind a reverse proxy." Type="Variable" Display="always" Required="true" Mask="false">http://192.168.1.10:3000</Config>
+  <Config Name="MASTER_KEY" Target="MASTER_KEY" Default="" Mode="" Description="Optional. Leave empty and the key is generated into the Data path as secret.key on first start." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+</Container>

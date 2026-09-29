@@ -323,6 +323,7 @@ single-container default, either process dying stops the container and
 
 ## Not covered here
 
-One-click templates for Coolify, Railway, Render and Unraid are a separate
-piece of work and are not on this page. Nor is a comparison with hosted
-tools, or a marketing site; this repository's `docs/` is the only source.
+One-click templates for Coolify, Railway, Render and Unraid live under
+[deploy/](../deploy/README.md), with their own page saying which platforms
+have been tested. A comparison with hosted tools and a marketing site are
+not written; this repository's `docs/` is the only source.

@@ -37,6 +37,18 @@ Everything the app owns is `./data` beside the compose file and the
 - [docs/upgrade.md](docs/upgrade.md): back up, change the tag, pull and up;
   why an older image refuses a newer database; rollback by restore.
 
+### One-click templates
+
+The same two containers, written for four platforms, under
+[deploy/](deploy/README.md): [Coolify](deploy/coolify/spaces.yaml),
+[Railway](deploy/railway/template.json), [Render](deploy/render/render.yaml)
+and [Unraid](deploy/unraid/spaces.xml). Each pins the published tag,
+provisions Postgres with pgvector 0.8 or newer, wires `APP_URL` to the
+platform's domain where the platform can say what it is, and keeps `/data`
+on a persistent volume. As of 2026-09-29 **none of the four has been
+deployed by a human yet**; the table in `deploy/README.md` says which have,
+and when.
+
 ## Developing
 
 From a clean clone:
