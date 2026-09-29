@@ -1,4 +1,4 @@
-import { isNumericType } from '@spaces/core/views/filter'
+import { isNumericType } from '../../views/filter'
 import { reconcileValueIndexes } from '@spaces/db/value-indexes'
 import type { ValueIndexOutcome } from '@spaces/db/value-indexes'
 

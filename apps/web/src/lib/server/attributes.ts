@@ -178,7 +178,7 @@ export const updateAttribute = createServerFn({ method: 'POST' })
     // reconciler and leaves the attribute usable; the next boot retries.
     if (data.indexed !== undefined || data.archived !== undefined) {
       const { reconcileAttributeIndexes } =
-        await import('../attributes/reconcile')
+        await import('@spaces/core/writes/attributes/reconcile')
       await reconcileAttributeIndexes()
     }
     return result
@@ -255,7 +255,7 @@ export const createAttribute = createServerFn({ method: 'POST' })
     // Same rule as the update path: after the insert commits.
     if (data.indexed) {
       const { reconcileAttributeIndexes } =
-        await import('../attributes/reconcile')
+        await import('@spaces/core/writes/attributes/reconcile')
       await reconcileAttributeIndexes()
     }
     return result

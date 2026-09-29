@@ -232,7 +232,7 @@ describe('the paged list plan', () => {
     const { attribute } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
     const { reconcileAttributeIndexes } =
-      await import('#/lib/attributes/reconcile')
+      await import('@spaces/core/writes/attributes/reconcile')
 
     // Before: nothing to use, so the object is read whole and sorted.
     const cold = await pagePlan(fx.objectId)

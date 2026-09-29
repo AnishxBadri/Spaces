@@ -1,4 +1,4 @@
-import { runMigrations } from '@spaces/db/migrate'
+import { boot } from '@spaces/core/writes/boot'
 import { dataDir } from '@spaces/core/writes/vault/key'
 import { logExternalOrigin } from '#/lib/server/external-origin'
 
@@ -7,13 +7,11 @@ import { logExternalOrigin } from '#/lib/server/external-origin'
  * (migrations auto-run, no `docker exec` step) and usable in dev as
  * `pnpm db:migrate:run`.
  *
- * It is the composition, and only the composition: migrate, then system
- * attributes, then the starter taxonomy, in that order, as one command. The
- * migration half belongs to `@spaces/db` and knows nothing about seeds; the
- * two seeds belong to core-to-be and live in apps/web today. That is the
- * interim shape recorded in CONTEXT.md ("packages/db — what moved and what
- * did not") — mono-9a moves the seeds into core and this file with them,
- * and the one-command contract survives both moves.
+ * The composition — migrate, then system attributes, then the starter
+ * taxonomy, then the value-index reconcile, as one command — is
+ * `@spaces/core`'s `boot()` since SPA-177. What is left here is the process:
+ * the two lines an operator reads at the top of `docker compose logs app`,
+ * the argv a test hands over, and the exit code.
  */
 async function main() {
   // The entrypoint runs this before either process starts, for every ROLE,
@@ -34,32 +32,12 @@ async function main() {
   // argv[2], when present, names the migrations folder. Nothing in the boot
   // path passes it — `@spaces/db` resolves its own journal from
   // `import.meta.url`, so this runs identically from any cwd. It is how
-  // `boot.test.ts` boots this entry against deliberately truncated journals,
-  // and it defeats nothing: the guard runs against whatever folder is named.
+  // `boot.test.ts` boots this entry against deliberately truncated journals.
   const folder = process.argv.at(2)
-  const outcome = await runMigrations(
+  const outcome = await boot(
     folder === undefined ? undefined : { migrationsFolder: folder },
   )
-  if (outcome.kind === 'refused') process.exit(1)
-
-  // System attributes: insert-if-absent on every boot; user edits survive.
-  const { seedSystemAttributes } =
-    await import('@spaces/core/writes/attributes/seed')
-  await seedSystemAttributes()
-  // Starter taxonomy: first boot only, so deleted nodes stay deleted.
-  const { seedStarterTaxonomy } = await import('#/lib/seeds/taxonomy')
-  await seedStarterTaxonomy()
-  // Per-attribute `values` indexes: the same insert-if-absent shape one line
-  // up, for a set of objects drizzle's journal cannot hold because it is a
-  // function of user data rather than of the schema (SPA-93). It runs after
-  // the system seed because the seed is what declares `deal.stage` flagged
-  // on a fresh database, and it is the retry for every mint an earlier boot
-  // or an interrupted `CREATE INDEX CONCURRENTLY` left undone. Never fatal:
-  // an unindexed attribute is a slow list, not a broken one.
-  const { reconcileAttributeIndexes } =
-    await import('#/lib/attributes/reconcile')
-  await reconcileAttributeIndexes()
-  process.exit(0)
+  process.exit(outcome.kind === 'refused' ? 1 : 0)
 }
 
 main().catch((err) => {

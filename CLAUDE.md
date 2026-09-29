@@ -46,9 +46,11 @@ pnpm worker                                       # background worker
   the attribute engine (`writes/attributes/*`, with `seed.ts`), the identity
   write path (`writes/entities/*`: resolve, merge, sweep, delete, rename,
   provenance), the view store, `chunk-sources` (SPA-174/175), the BYOK
-  vault (`writes/vault/*`, SPA-176) and the blob backend (`writes/storage/*`,
+  vault (`writes/vault/*`, SPA-176), the blob backend (`writes/storage/*`,
   SPA-178; `./writes/storage/local`'s token helpers are public on purpose for
-  the blob route) — and is the only place in core a `drizzle-orm` import or a
+  the blob route) and the boot composition (`writes/boot.ts` with
+  `writes/seeds/taxonomy.ts`, SPA-177; `apps/web/src/db/boot.ts` is the
+  process shell that runs it) — and is the only place in core a `drizzle-orm` import or a
   `db` value import passes. Neither half imports React, and only
   `writes/vault/` (MASTER_KEY, DATA_DIR) and `writes/storage/`
   (STORAGE_DRIVER, S3_*) read `process.env` — which is why
@@ -224,7 +226,8 @@ anyway. Don't re-litigate it from the flag list.
   exception to "schema changed → db:generate". `reconcileValueIndexes()`
   (`packages/db/src/value-indexes.ts`) diffs `pg_indexes` against the flagged,
   unarchived attributes and mints/drops `CONCURRENTLY`; it runs at boot beside
-  `seedSystemAttributes()` (`apps/web/src/db/boot.ts`) and from the attribute
+  `seedSystemAttributes()` (`packages/core/src/writes/boot.ts`, which
+  `apps/web/src/db/boot.ts` runs) and from the attribute
   server fns **after** the write commits — never inside a transaction, which
   `CREATE INDEX CONCURRENTLY` forbids. A failed mint is logged, the attribute
   stays usable, and the next boot retries. **Never add one to the drizzle

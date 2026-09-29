@@ -5,7 +5,7 @@ import {
   FIXTURE_ACTOR,
   seedCoreTestDatabase,
 } from '../../packages/core/vitest.seed.ts'
-import { seedStarterTaxonomy } from '#/lib/seeds/taxonomy'
+import { seedStarterTaxonomy } from '@spaces/core/writes/seeds/taxonomy'
 
 export { FIXTURE_ACTOR }
 
