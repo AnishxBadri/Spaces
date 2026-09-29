@@ -408,6 +408,79 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.split.yml -f docker-compose.split-ci.yml down -v 2>/dev/null || true
           docker rm -f sup unpriv nochown roleweb roleworker 2>/dev/null || true
 
+  # Upload → preview in a real browser against the image built for this
+  # commit (SPA-186): one job that is both the browser smoke and the image
+  # smoke. The name is a contract — the release workflow (ship-8) requires
+  # `image-smoke` before it pushes an image anywhere; rename it only with
+  # every reference. Same image bytes as `hostability` (the `image` job's
+  # artifact) and the same compose-override shape, not a third recipe. The
+  # app must report db ok AND worker ok before the first spec, so a worker
+  # that never comes up fails here, with the payload and the logs, and is
+  # never mistaken for a broken upload.
+  image-smoke:
+    runs-on: ubuntu-latest
+    needs: image
+    env:
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: spaces-ci-image
+      - name: Load the runtime image built by `image`
+        run: gunzip -c spaces-ci.tar.gz | docker load
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --filter @spaces/e2e exec playwright install --with-deps chromium
+
+      - name: Compose the image with Postgres
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          cat > docker-compose.ci.yml <<'YAML'
+          services:
+            app:
+              image: spaces:ci
+          YAML
+          docker compose up -d --wait --wait-timeout 300
+
+      - name: Wait for db ok and worker ok
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 90); do
+            H="$(curl -fsS http://localhost:3000/api/health || true)"
+            if jq -e '.db == "ok" and .worker.status == "ok"' <<<"$H" >/dev/null 2>&1; then
+              echo "$H"; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::the app never reported db ok and worker ok — last /api/health: ${H:-no answer}"
+          docker compose logs app
+          exit 1
+
+      - name: Upload → preview specs (apps/e2e, image project)
+        env:
+          E2E_IMAGE_URL: http://localhost:3000
+        run: pnpm --filter @spaces/e2e exec playwright test
+
+      - name: App logs on failure
+        if: failure()
+        run: docker compose logs app
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: image-smoke-traces
+          path: apps/e2e/test-results/
+          retention-days: 7
+      - name: Tear down
+        if: always()
+        run: docker compose down -v || true
+
   # Hostability contract #5 (CONTEXT.md): backup is both-or-neither, and
   # rollback is restore. Prose cannot prove that, so this job destroys the box
   # and puts it back: up → plant a document, its blob and a credential →

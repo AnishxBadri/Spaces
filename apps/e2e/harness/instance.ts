@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Client } from 'pg'
+import { setupTokensIn } from './admin.ts'
 import type { ChildProcess } from 'node:child_process'
 
 /**
@@ -213,10 +214,7 @@ export async function startInstance(name: string): Promise<Instance> {
 
 /** Every setup token this instance has printed to its log, oldest first. */
 export async function printedSetupTokens(logFile: string): Promise<string[]> {
-  const text = await readFile(logFile, 'utf8')
-  return [...text.matchAll(/First-run setup token: ([0-9a-f]{32})/g)].flatMap(
-    (m) => m.at(1) ?? [],
-  )
+  return setupTokensIn(await readFile(logFile, 'utf8'))
 }
 
 /** Rows in `public` of one database, summed — the before/after check. */

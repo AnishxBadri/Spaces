@@ -1,15 +1,14 @@
-import { mkdirSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { chromium } from '@playwright/test'
+import { createAdmin } from './admin.ts'
 import {
   maintenance,
-  printedSetupTokens,
   publicRowCount,
   sourceDatabaseUrl,
   startInstance,
   withDatabase,
 } from './instance.ts'
-import { ADMIN, ENV, launchOptions } from './shared.ts'
+import { ENV } from './shared.ts'
 import type { FullConfig } from '@playwright/test'
 import type { Instance } from './instance.ts'
 
@@ -45,9 +44,12 @@ export default async function globalSetup(config: FullConfig) {
     started.push(firstrun, main)
 
     const outputDir = config.projects.at(0)?.outputDir ?? 'test-results'
-    mkdirSync(outputDir, { recursive: true })
     const storageState = join(outputDir, 'admin.storage.json')
-    await createAdmin(main, storageState)
+    await createAdmin(
+      main.url,
+      () => readFile(main.logFile, 'utf8'),
+      storageState,
+    )
 
     process.env[ENV.firstrunUrl] = firstrun.url
     process.env[ENV.firstrunLog] = firstrun.logFile
@@ -116,30 +118,4 @@ async function countOutsideRows(): Promise<Map<string, number>> {
   for (const name of names)
     counts.set(name, await publicRowCount(withDatabase(source, name)))
   return counts
-}
-
-/** The first-run flow, in a real browser, against `main`. */
-async function createAdmin(main: Instance, storageState: string) {
-  const browser = await chromium.launch(launchOptions())
-  try {
-    const page = await browser.newPage()
-    // Loading /setup is what prints the token (getSetupState), so the log
-    // is read after the page is up, never before.
-    await page.goto(`${main.url}/setup`)
-    await page.getByLabel('Setup token').waitFor()
-    const token = (await printedSetupTokens(main.logFile)).at(-1)
-    if (token === undefined)
-      throw new Error(`[e2e] no setup token in ${main.logFile}`)
-
-    await page.getByLabel('Setup token').fill(token)
-    await page.getByLabel('Workspace name').fill('E2E Holdings')
-    await page.getByLabel('Your name').fill(ADMIN.name)
-    await page.getByLabel('Email', { exact: true }).fill(ADMIN.email)
-    await page.getByLabel('Password', { exact: true }).fill(ADMIN.password)
-    await page.getByRole('button', { name: 'Create account' }).click()
-    await page.getByText('Start with demo data?').waitFor()
-    await page.context().storageState({ path: storageState })
-  } finally {
-    await browser.close()
-  }
 }

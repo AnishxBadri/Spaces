@@ -8,9 +8,23 @@ import { launchOptions } from './harness/shared.ts'
  * instances and its returned function tears them down — see
  * harness/global-setup.ts.
  */
+/**
+ * Two ways to run, one harness (SPA-186 added the second):
+ *
+ *   default         global setup boots the built app twice against throwaway
+ *                   databases; the specs under specs/ (not specs/image/) run.
+ *   E2E_IMAGE_URL   the image smoke: CI has composed the image built for this
+ *                   commit with Postgres and passes its address; nothing is
+ *                   booted, global setup only waits for db ok + worker ok and
+ *                   signs in, and only specs/image/ runs. The job is
+ *                   `image-smoke` in .github/workflows/ci.yml.
+ */
+const imageUrl = process.env.E2E_IMAGE_URL
+const image = imageUrl !== undefined && imageUrl !== ''
+
 export default defineConfig({
   testDir: './specs',
-  globalSetup: './harness/global-setup.ts',
+  globalSetup: image ? './harness/image-setup.ts' : './harness/global-setup.ts',
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -23,5 +37,21 @@ export default defineConfig({
     trace: 'retain-on-failure',
     launchOptions: launchOptions(),
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: image
+    ? [
+        {
+          name: 'image',
+          testMatch: 'image/**/*.spec.ts',
+          // The worker has to extract a DOCX before its preview can pass.
+          timeout: 90_000,
+          use: { ...devices['Desktop Chrome'] },
+        },
+      ]
+    : [
+        {
+          name: 'chromium',
+          testIgnore: 'image/**',
+          use: { ...devices['Desktop Chrome'] },
+        },
+      ],
 })

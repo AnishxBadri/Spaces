@@ -115,7 +115,11 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
   (never `spaces`, never `spaces_test*` — it checks row counts before and
   after), and Chromium drives the login gate, the first-run window and closed
   signup. It has no `test` script, so `pnpm test` never runs it; CI runs it in
-  its own `e2e` job. It imports nothing internal (eslint zone). First run on a
+  its own `e2e` job. With `E2E_IMAGE_URL` set it runs the other project instead
+  — `specs/image/`, upload→preview against an already-composed container, the
+  admin made from the token in `docker compose logs app` — which is CI's
+  `image-smoke` job and the check a release requires (SPA-186). It imports
+  nothing internal (eslint zone). First run on a
   new machine: `pnpm --filter @spaces/e2e exec playwright install chromium`,
   or point `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` at a Chromium you have.
 - If the Docker daemon is down: `open -a Docker` first.

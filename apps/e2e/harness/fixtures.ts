@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { test as base } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { Client } from 'pg'
 import { ENV, fromEnv } from './shared.ts'
 import type { EnvName } from './shared.ts'
@@ -53,7 +54,14 @@ function target(urlVar: EnvName, logVar: EnvName, dbVar: EnvName): Target {
  */
 // The fixture callback is named `provide`, not Playwright's usual `use`: the
 // react-hooks lint rule reads any call to `use()` as React's hook.
-export const test = base.extend<{ main: Target; firstRun: Target }>({
+export const test = base.extend<{
+  main: Target
+  firstRun: Target
+  /** The composed image's address (SPA-186's project only). */
+  imageUrl: string
+  /** A page signed in as the admin global setup created. */
+  adminPage: Page
+}>({
   // eslint-disable-next-line no-empty-pattern -- Playwright's fixture signature
   main: async ({}, provide) => {
     await provide(target(ENV.mainUrl, ENV.mainLog, ENV.mainDb))
@@ -61,6 +69,17 @@ export const test = base.extend<{ main: Target; firstRun: Target }>({
   // eslint-disable-next-line no-empty-pattern -- Playwright's fixture signature
   firstRun: async ({}, provide) => {
     await provide(target(ENV.firstrunUrl, ENV.firstrunLog, ENV.firstrunDb))
+  },
+  // eslint-disable-next-line no-empty-pattern -- Playwright's fixture signature
+  imageUrl: async ({}, provide) => {
+    await provide(fromEnv(ENV.imageUrl))
+  },
+  adminPage: async ({ browser }, provide) => {
+    const context = await browser.newContext({
+      storageState: fromEnv(ENV.adminStorage),
+    })
+    await provide(await context.newPage())
+    await context.close()
   },
 })
 

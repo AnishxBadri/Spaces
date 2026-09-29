@@ -13,6 +13,12 @@ export const ENV = {
   mainLog: 'E2E_MAIN_LOG',
   mainDb: 'E2E_MAIN_DATABASE_URL',
   adminStorage: 'E2E_ADMIN_STORAGE',
+  /**
+   * Set by the caller, not by a setup: the composed image to smoke (SPA-186).
+   * When present the suite runs the image project instead of booting its
+   * own instances — see playwright.config.ts.
+   */
+  imageUrl: 'E2E_IMAGE_URL',
 } as const
 
 export type EnvName = (typeof ENV)[keyof typeof ENV]

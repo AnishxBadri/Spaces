@@ -2147,8 +2147,12 @@ Decisions worth keeping:
   inspection, not a destination — a route would make the back button undo reading position.
   Known limits: whole file loads into memory (no `Range` support in blob route or preview —
   fine for 5–30MB decks, slow for a 200MB scan); Office preview depends on the worker
-  running, PDF and images do not; no automated test — a Playwright upload→preview→assert
-  test is the natural first CI case.
+  running, PDF and images do not. ~~No automated test~~ — **since SPA-186 (2026-09-29) the
+  upload→preview→assert test exists and gates releases**: CI's `image-smoke` job composes
+  the image built for the commit, waits for db ok + worker ok, and Chromium uploads a DOCX
+  whose preview must show the worker's text and a PDF that must draw to a canvas without
+  a navigation while its download stays `attachment` + `application/octet-stream`
+  (`apps/e2e/specs/image/`).
 - **Delete is real, and GCs the blob when no other row shares its digest.** A misfiled upload
   the operator can't remove is worse than the audit trail it costs.
 - Deferred by name: URL clip (`origin: 'url'`, `@mozilla/readability` + `linkedom`) moves to
@@ -2429,7 +2433,8 @@ claim a storage advantage (Twenty has the same local-default/S3-opt-in answer);
 claim the research half, two-container ops, BYOK-to-Ollama, the investor schema,
 and the financial engine.
 
-Post-v1 backlog unchanged: dark theme, Playwright preview smoke test, a **capture
+Post-v1 backlog unchanged: dark theme, ~~Playwright preview smoke test~~ (landed early:
+SPA-186's `image-smoke`), a **capture
 extension** (folkX-style, surveyed 2026-08: add a founder/company from LinkedIn without
 leaving the page — just another `resolveEntity()` caller pointed at the operator's own
 instance; BYOK-shaped by nature), then integrations
