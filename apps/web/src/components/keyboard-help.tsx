@@ -47,6 +47,7 @@ export function KeyboardHelp({
           <div className="flex min-w-0 flex-1 flex-col">
             <Group label="Create">
               <Row label="Task · from Today or Tasks" keys="T" />
+              <Row label="Task dates · fri, in 2w, next month" keys="↵" />
               <Row label="Note · from Notes or a space" keys="N" />
               <Row label="Space · from Spaces" keys="S" />
               <Row label="Attribute · from an object's settings" keys="A" />

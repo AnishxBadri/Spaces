@@ -297,12 +297,12 @@ function TodayPage() {
           { label: 'Overdue', value: overdue, tone: 'bad', to: '/tasks' },
           { label: 'Due today', value: dueToday, to: '/tasks' },
           {
-            label: `Idle deals · >${IDLE_DEAL_DAYS}d`,
+            label: 'Idle deals',
             value: idleDeals.length,
             to: '/deals',
           },
           {
-            label: `Stale marks · >${STALE_MARK_DAYS}d`,
+            label: 'Stale marks',
             value: staleHoldings.length,
             to: '/portfolio',
           },
@@ -388,8 +388,7 @@ function TodayPage() {
                     >
                       <span className="mono text-micro text-primary">+</span>
                       <span className="min-w-0 truncate text-ui text-graphite">
-                        Add a task… natural dates work: “fri”, “in 2w”, “next
-                        month”
+                        Add a task…
                       </span>
                       <span className="flex-1" />
                       <KeyHint>T</KeyHint>
@@ -403,7 +402,7 @@ function TodayPage() {
           {idleDeals.length > 0 ? (
             <LedgerSection
               label="Idle in stage"
-              count={`${idleDeals.length} · over ${IDLE_DEAL_DAYS}d, from the stage log`}
+              count={`${idleDeals.length} · >${IDLE_DEAL_DAYS}d`}
               link={
                 <Link to="/deals" className="focus-ring hover:text-foreground">
                   board ›
@@ -432,13 +431,21 @@ function TodayPage() {
                           {stageLabel(d.stage)}
                         </Badge>
                       </span>
-                      <ReferenceBar
-                        value={days}
-                        median={med}
-                        scale={idleScale}
-                      />
-                      <span className="mono text-micro text-graphite">
-                        {med === null ? 'no median' : `med ${med}d`}
+                      {/* The stage's median is the tick on the bar; the
+                          number is the hover, not a lane of its own. */}
+                      <span
+                        className="flex shrink-0"
+                        title={
+                          med === null
+                            ? 'No median for this stage yet'
+                            : `Median ${Math.round(med)}d in ${stageLabel(d.stage)}`
+                        }
+                      >
+                        <ReferenceBar
+                          value={days}
+                          median={med}
+                          scale={idleScale}
+                        />
                       </span>
                       <span className="flex-1" />
                       <LedgerFigure tone={past ? 'bad' : undefined}>
@@ -454,7 +461,7 @@ function TodayPage() {
           {staleHoldings.length > 0 ? (
             <LedgerSection
               label="Stale marks"
-              count={`${staleHoldings.length} · no mark in ${STALE_MARK_DAYS}d`}
+              count={`${staleHoldings.length} · >${STALE_MARK_DAYS}d`}
               link={
                 <Link
                   to="/portfolio"
