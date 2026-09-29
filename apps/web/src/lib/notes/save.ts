@@ -10,7 +10,8 @@ import {
 import type { MentionDiff } from '#/lib/glossary/link-terms'
 import { NoteNotFound, NoteQueryFailed } from '#/lib/notes/delete'
 import { canRead } from '#/lib/notes/visibility'
-import { enqueueSourceEmbed, noteSource } from '#/lib/ai/chunk-sources'
+import { noteSource } from '@spaces/core/writes/ai/chunk-sources'
+import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 
 /**
  * Saving a note (converted to Effect by SPA-34, which opened it to run the

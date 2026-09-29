@@ -2,28 +2,25 @@ import { Effect, Schema } from 'effect'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute } from '@spaces/db/schema'
-import { nextBadgeColor } from '@spaces/core/attributes/colors'
+import { nextBadgeColor } from '../../attributes/colors'
 import { validateDefault } from './defaults'
-import { objectIdForKind } from '@spaces/core/writes/attributes/objects'
-import { deriveOptionIds } from '@spaces/core/attributes/options'
+import { objectIdForKind } from './objects'
+import { deriveOptionIds } from '../../attributes/options'
 import {
   IDENTITY_KEY_ATTRIBUTES,
   slugifyAttributeName,
-} from '@spaces/core/attributes/registry'
+} from '../../attributes/registry'
 import { AttributeQueryFailed } from './update'
-import type {
-  ObjectQueryFailed,
-  SystemObjectNotSeeded,
-} from '@spaces/core/writes/attributes/objects'
-import type { BadgeColor } from '@spaces/core/attributes/colors'
-import type { Json } from '#/lib/json'
+import type { ObjectQueryFailed, SystemObjectNotSeeded } from './objects'
+import type { BadgeColor } from '../../attributes/colors'
+import type { Json } from '@spaces/db/json'
 import type {
   AttributeOptions,
   AttributeType,
   IdentityKey,
   ObjectKind,
   SelectOption,
-} from '@spaces/core/attributes/registry'
+} from '../../attributes/registry'
 
 /**
  * Attribute creation as an Effect program (spec §7 dialog, §3 lifecycle).

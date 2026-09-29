@@ -27,7 +27,7 @@ import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
 import { recordContextProgram } from '#/lib/context/record'
 import type { ContextItem } from '#/lib/context/types'
-import { updateAttributeProgram } from '#/lib/attributes/update'
+import { updateAttributeProgram } from '@spaces/core/writes/attributes/update'
 import { completeMessage, completeProgram, laneTargetProgram } from './complete'
 import type { CompleteFailure, SensitiveRouteRefused } from './complete'
 import {

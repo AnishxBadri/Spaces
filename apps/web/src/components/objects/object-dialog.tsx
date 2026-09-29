@@ -17,7 +17,10 @@ import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { KeyHint } from '#/components/page-header'
-import { slugifyNoun, suggestPlural } from '#/lib/object-nouns'
+import {
+  slugifyNoun,
+  suggestPlural,
+} from '@spaces/core/attributes/object-nouns'
 import { OBJECT_ICONS, OBJECT_ICON_NAMES } from '#/lib/object-icons'
 import { createObject, updateObject } from '#/lib/server-fns'
 import {

@@ -12,7 +12,7 @@ import { entity, link, note } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { apiToken } from '@spaces/db/schema/tokens'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { resolveEntity } from '#/lib/entities/resolve'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { getRecordContextHandler } from '#/lib/context/record-handler'
 import {
   createApiTokenProgram,
@@ -22,8 +22,8 @@ import {
 import { handleMcpRequest } from './server'
 import { searchAllHandler } from '#/lib/search/search-all-handler'
 import { setMemberBannedHandler } from '#/lib/members/suspend'
-import { createObjectProgram } from '#/lib/attributes/object-registry'
-import { createAttributeProgram } from '#/lib/attributes/create'
+import { createObjectProgram } from '@spaces/core/writes/attributes/object-registry'
+import { createAttributeProgram } from '@spaces/core/writes/attributes/create'
 import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
 
 /**

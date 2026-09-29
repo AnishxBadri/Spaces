@@ -9,7 +9,7 @@ import {
   UNIVERSAL_HEADER,
   UNIVERSAL_ROWS,
 } from '@spaces/core/import/ledger.fixtures'
-import { resolveEntity } from '#/lib/entities/resolve'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
   beginLedgerMappingProgram,
   decideLedgerRowProgram,

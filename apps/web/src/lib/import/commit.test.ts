@@ -20,8 +20,8 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import {
   createObjectProgram,
   createRecordProgram,
-} from '#/lib/attributes/object-registry'
-import { resolveEntity } from '#/lib/entities/resolve'
+} from '@spaces/core/writes/attributes/object-registry'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { birthDealProgram, dealFromDialog } from '#/lib/deals/birth'
 import { beginImportMappingProgram } from './mapping'
 import { decideImportCollisionProgram, planImportProgram } from './plan'

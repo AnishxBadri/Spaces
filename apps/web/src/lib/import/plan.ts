@@ -18,7 +18,7 @@ import {
   normalizeIdentityValue,
   normalizeKeys,
   previewResolve,
-} from '#/lib/entities/resolve'
+} from '@spaces/core/writes/entities/resolve'
 import { mappingObjectOf, mappingProblemsOf, readColumns } from './mapping'
 import { lookupReferences, referenceColumnsOf } from './references'
 import {

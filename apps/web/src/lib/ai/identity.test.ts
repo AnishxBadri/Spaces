@@ -12,7 +12,7 @@ import {
   suggestion,
 } from '@spaces/db/schema'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { resolveEntity } from '#/lib/entities/resolve'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { listInboxProgram } from '#/lib/inbox/queue'
 import type { Json } from '#/lib/json'
 import {

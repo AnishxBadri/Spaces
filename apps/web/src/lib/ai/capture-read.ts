@@ -3,7 +3,7 @@ import type { db } from '@spaces/db'
 import { aiRun, objectDef } from '@spaces/db/schema'
 import { CORE_OBJECTS, OBJECT_KINDS } from '@spaces/core/attributes/registry'
 import type { ObjectKind } from '@spaces/core/attributes/registry'
-import type { Tx } from '#/lib/attributes/values'
+import type { Tx } from '@spaces/core/writes/attributes/values'
 
 /**
  * A captured page, read (SPA-134; CONTEXT.md integration map #8). A capture

@@ -32,9 +32,9 @@ import { setAiRouteProgram } from '#/lib/ai/route'
 import {
   createObjectProgram,
   createRecordProgram,
-} from '#/lib/attributes/object-registry'
-import { createAttributeProgram } from '#/lib/attributes/create'
-import { updateAttributeProgram } from '#/lib/attributes/update'
+} from '@spaces/core/writes/attributes/object-registry'
+import { createAttributeProgram } from '@spaces/core/writes/attributes/create'
+import { updateAttributeProgram } from '@spaces/core/writes/attributes/update'
 import { JobPermanent } from '../run-job'
 import { runAttributeRun } from './attribute-run'
 

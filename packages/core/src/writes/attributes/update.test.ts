@@ -39,33 +39,6 @@ describe('UpdateAttributePatch shape', () => {
   })
 })
 
-describe('updateAttributeInput (zod boundary)', () => {
-  it('strips type, slug, targetKind and multi rather than carrying them', async () => {
-    const { updateAttributeInput } = await import('../server/attributes')
-    const parsed = updateAttributeInput.parse({
-      id: randomUUID(),
-      name: 'Renamed',
-      type: 'text',
-      slug: 'renamed',
-      config: { code: 'eur', targetKind: 'company', multi: true },
-    })
-    expect(parsed).toEqual({
-      id: parsed.id,
-      name: 'Renamed',
-      config: { code: 'EUR' },
-    })
-  })
-
-  it('carries an option archive flag', async () => {
-    const { updateAttributeInput } = await import('../server/attributes')
-    const parsed = updateAttributeInput.parse({
-      id: randomUUID(),
-      options: [{ id: 'a', label: 'A', archived: true }],
-    })
-    expect(parsed.options).toEqual([{ id: 'a', label: 'A', archived: true }])
-  })
-})
-
 // ---------------------------------------------------------------------------
 // The per-field rules, against the test database.
 // ---------------------------------------------------------------------------
@@ -80,8 +53,7 @@ async function makeAttribute(
 ) {
   const { db } = await import('@spaces/db')
   const { attribute } = await import('@spaces/db/schema')
-  const { objectIdForKindAsync } =
-    await import('@spaces/core/writes/attributes/objects')
+  const { objectIdForKindAsync } = await import('./objects')
   const objectId = await objectIdForKindAsync('company')
   const row = (
     await db
@@ -436,19 +408,5 @@ describe('updateAttributeProgram — the ai key', () => {
     )
     expect(err).toBeInstanceOf(AttributeConfigRejected)
     expect((await readOptions(rating.id)).ai).toBeUndefined()
-  })
-
-  it('the zod boundary carries ai and its null', async () => {
-    const { updateAttributeInput } = await import('../server/attributes')
-    const id = randomUUID()
-    expect(
-      updateAttributeInput.parse({
-        id,
-        config: { ai: { mode: 'summarize', prompt: ' Why now? ' } },
-      }).config,
-    ).toEqual({ ai: { mode: 'summarize', prompt: 'Why now?' } })
-    expect(
-      updateAttributeInput.parse({ id, config: { ai: null } }).config,
-    ).toEqual({ ai: null })
   })
 })

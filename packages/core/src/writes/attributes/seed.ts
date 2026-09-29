@@ -5,8 +5,8 @@ import {
   CORE_OBJECTS,
   OBJECT_KINDS,
   SYSTEM_ATTRIBUTES,
-} from '@spaces/core/attributes/registry'
-import type { ObjectKind } from '@spaces/core/attributes/registry'
+} from '../../attributes/registry'
+import type { ObjectKind } from '../../attributes/registry'
 
 /**
  * Idempotent system seed — runs on every boot (after migrations). Inserts

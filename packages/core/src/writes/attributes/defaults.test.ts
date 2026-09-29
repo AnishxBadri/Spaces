@@ -79,8 +79,7 @@ describe('birthValues', () => {
 
   it('fills blanks with resolved defaults, supplied wins, actor is honest', async () => {
     const { resolveEntity } = await import('../entities/resolve')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
+    const { objectIdForKindAsync } = await import('./objects')
     const { db } = await import('@spaces/db')
     const { attribute, attributeEvent, entity } =
       await import('@spaces/db/schema')
@@ -169,8 +168,7 @@ describe('birthValues', () => {
 
   it('an integration-sourced create names its integration on the birth events', async () => {
     const { resolveEntity } = await import('../entities/resolve')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
+    const { objectIdForKindAsync } = await import('./objects')
     const { db } = await import('@spaces/db')
     const { attribute, attributeEvent, entity, integration } =
       await import('@spaces/db/schema')
@@ -225,8 +223,7 @@ describe('birthValues', () => {
     const { Effect } = await import('effect')
     const { updateAttributeProgram, AttributeConfigRejected } =
       await import('./update')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
+    const { objectIdForKindAsync } = await import('./objects')
     const { db } = await import('@spaces/db')
     const { attribute } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')

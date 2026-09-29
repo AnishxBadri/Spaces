@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { deriveOptionIds, slugifyOption } from '@spaces/core/attributes/options'
+import { deriveOptionIds, slugifyOption } from '../../attributes/options'
 import type { CreateAttributeInput } from './create'
 
 describe('option ids (pure)', () => {
@@ -162,8 +162,7 @@ describe('reorderAttributesProgram', () => {
     const { createAttributeProgram } = await import('./create')
     const { reorderAttributesProgram } = await import('./update')
     const { getRegistryByObjectId } = await import('./values')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
+    const { objectIdForKindAsync } = await import('./objects')
     const { db } = await import('@spaces/db')
     const { user } = await import('@spaces/db/schema/auth')
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)

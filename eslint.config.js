@@ -52,7 +52,7 @@ const NO_DIRECT_ENTITY_VALUES = {
   selector:
     "CallExpression[callee.property.name='set'][callee.object.callee.property.name='update'][callee.object.arguments.0.name='entity'] > ObjectExpression > Property[key.name='values']",
   message:
-    'entity.values has one write path — go through setValues (apps/web/src/lib/attributes/values.ts) so validation, attribute_event, and reference links stay in one transaction.',
+    'entity.values has one write path — go through setValues (packages/core/src/writes/attributes/values.ts) so validation, attribute_event, and reference links stay in one transaction.',
 }
 
 export default [
@@ -198,13 +198,16 @@ export default [
     rules: { 'no-restricted-syntax': ['error', NO_DIRECT_ENTITY_VALUES] },
   },
   // setValues itself, the merge executor (which rewrites values under its own
-  // snapshot contract), the seeds and the tests set values directly.
+  // snapshot contract), the seeds and the tests set values directly. The two
+  // modules moved to @spaces/core with SPA-174/175 and the exemption moved
+  // with them.
   {
     files: [
-      'apps/web/src/lib/attributes/values.ts',
-      'apps/web/src/lib/entities/merge.ts',
+      'packages/core/src/writes/attributes/values.ts',
+      'packages/core/src/writes/entities/merge.ts',
       'apps/web/src/lib/seeds/**',
       'apps/web/src/**/*.test.ts',
+      'packages/core/src/**/*.test.ts',
     ],
     rules: { 'no-restricted-syntax': ['error', NO_INTL_NUMBER_FORMAT] },
   },

@@ -2,7 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import type { db } from '@spaces/db'
 import { entity, entitySpace, space } from '@spaces/db/schema'
 import type { tagSource } from '@spaces/db/schema'
-import type { Tx } from '#/lib/attributes/values'
+import type { Tx } from '@spaces/core/writes/attributes/values'
 
 /**
  * The one insert that tags a record into a space (SPA-103). Two callers:

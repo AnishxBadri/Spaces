@@ -42,11 +42,15 @@ pnpm worker                                       # background worker
   `apps/web` from it. **`packages/core` (`@spaces/core`) is the domain in
   two halves that `src/purity.test.ts` keeps apart by directory** (mono-7,
   narrowed by SPA-174): everything outside `src/writes/` computes and may
-  reach `@spaces/db` for types only; `src/writes/` is the db-coupled half
-  (the attribute engine lands there as `@spaces/core/writes/attributes/*`)
-  and is the only place in core a `drizzle-orm` import or a `db` value import
-  passes. Neither half imports React or reads `process.env`. `packages/*` is
-  where `sdk` lands later.
+  reach `@spaces/db` for types only; `src/writes/` is the db-coupled half —
+  the attribute engine (`writes/attributes/*`, with `seed.ts`), the identity
+  write path (`writes/entities/*`: resolve, merge, sweep, delete, rename,
+  provenance), the view store and `chunk-sources` (SPA-174/175) — and is the
+  only place in core a `drizzle-orm` import or a `db` value import passes.
+  Neither half imports React or reads `process.env`, which is why
+  `enqueueSourceEmbed` stayed in `apps/web/src/lib/ai/enqueue-embed.ts`: core's
+  write paths hand back `reembed` and the server fn queues it. `packages/*`
+  is where `sdk` lands later.
   What stayed at the root: `eslint.config.js` + `eslint-rules/`,
   `prettier.config.js`, `lefthook.yml`, `scripts/`, `docker/`, `docs/`,
   `.env.local` and `data/`.
@@ -92,9 +96,9 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
   `apps/web` runs `maxWorkers: 4` on `pool: 'forks'` against
   `spaces_test_web1…4`; `packages/db` runs `fileParallelism: false` against
   `spaces_test_db1`, and `packages/core` the same against `spaces_test_core1`
-  (SPA-174; no seeds there — the two seeds are still apps/web's, so a core
-  file that needs a system object row inserts it) — because a truncate must
-  not be able to reach a file
+  (SPA-174/175; core's `vitest.seed.ts` seeds the system attributes and the
+  fixture user, which apps/web's seed composes and adds the taxonomy to) —
+  because a truncate must not be able to reach a file
   running at the same moment in another worker. Drop any `spaces_test*`
   database any time; the next run rebuilds it. With Postgres down the setup
   fails once, naming the connection string, instead of ten files each
@@ -174,7 +178,7 @@ harness derives `spaces_test*` from it, so the suite never writes the
 - `undefined` is a type, not a state: optional means the caller may omit it
   (`exactOptionalPropertyTypes`).
 - Attribute values have one write path, which validates, logs, and links
-  (`no-restricted-syntax` on `entity.values`; `apps/web/src/lib/attributes/values.ts`).
+  (`no-restricted-syntax` on `entity.values`; `packages/core/src/writes/attributes/values.ts`).
 - Portfolio history is append-only; a correction is a compensating event
   (D12, built by SPA-150 — `apps/web/src/lib/portfolio/reverse.ts`, the
   `<table>_reverses_unique` partial indexes, `packages/core/src/portfolio/reversal.ts`).
@@ -235,7 +239,7 @@ anyway. Don't re-litigate it from the flag list.
   drizzle's metadata and needs no database, but since SPA-143 its package's
   global setup does, so `pnpm exec turbo run test --filter=@spaces/db` wants
   Postgres up like everything else. A `custom` merge strategy
-  still needs its section in `apps/web/src/lib/entities/merge.ts` **and** its
+  still needs its section in `packages/core/src/writes/entities/merge.ts` **and** its
   snapshot. This was the worst bug of a review cycle; there is no unmerge
   executor — the snapshot convention is the only contract.
 

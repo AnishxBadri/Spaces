@@ -45,14 +45,14 @@ async function similarity(a: string, b: string): Promise<number> {
 async function newObject(singular: string, plural: string, createdBy: string) {
   const { Effect } = await import('effect')
   const { createObjectProgram } =
-    await import('#/lib/attributes/object-registry')
+    await import('@spaces/core/writes/attributes/object-registry')
   return Effect.runPromise(createObjectProgram({ singular, plural, createdBy }))
 }
 
 async function newRecord(objectId: string, name: string, userId: string) {
   const { Effect } = await import('effect')
   const { createRecordProgram } =
-    await import('#/lib/attributes/object-registry')
+    await import('@spaces/core/writes/attributes/object-registry')
   return Effect.runPromise(
     createRecordProgram({
       objectId,
@@ -127,7 +127,8 @@ describe('dedupeSweepData', () => {
 describe('dedupe sweep job', () => {
   it('finds two records renamed into similarity after birth', async () => {
     const { Effect } = await import('effect')
-    const { renameRecordProgram } = await import('#/lib/entities/rename')
+    const { renameRecordProgram } =
+      await import('@spaces/core/writes/entities/rename')
     const { normalizeName } = await import('@spaces/core/entities/normalize')
 
     const me = await actorId()
@@ -243,7 +244,7 @@ describe('dedupe sweep job', () => {
     const { db } = await import('@spaces/db')
     const { entity } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
-    const { MERGEABLE } = await import('#/lib/entities/merge')
+    const { MERGEABLE } = await import('@spaces/core/writes/entities/merge')
     const { objectIdForKindAsync } =
       await import('@spaces/core/writes/attributes/objects')
 

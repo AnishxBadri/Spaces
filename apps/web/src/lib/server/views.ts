@@ -7,8 +7,8 @@ import {
   exactlyOneObjectRefMessage,
   objectKeyFields,
   surfaceKey,
-} from '../views/target'
-import type { SurfaceKey, ViewTarget } from '../views/target'
+} from '@spaces/core/views/target'
+import type { SurfaceKey, ViewTarget } from '@spaces/core/views/target'
 import type { ViewCount } from '../views/counts'
 import { requireUser } from './shared'
 
@@ -68,7 +68,7 @@ export const listViews = createServerFn()
   .validator(surfaceKey)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { listViewsProgram } = await import('../views/store')
+    const { listViewsProgram } = await import('@spaces/core/writes/views/store')
     const target = await resolveTarget(data)
     const views = await Effect.runPromise(listViewsProgram(target, u.id))
     // Null on a surface with no object row — the same equivalence the
@@ -84,7 +84,7 @@ export const saveView = createServerFn({ method: 'POST' })
   .validator(saveKey)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { saveViewProgram } = await import('../views/store')
+    const { saveViewProgram } = await import('@spaces/core/writes/views/store')
     const { effectFn } = await import('./effect')
     const target = await resolveTarget(data)
     return effectFn(saveViewProgram)(
@@ -106,7 +106,8 @@ export const deleteView = createServerFn({ method: 'POST' })
   .validator(deleteKey)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { deleteViewProgram } = await import('../views/store')
+    const { deleteViewProgram } =
+      await import('@spaces/core/writes/views/store')
     const { effectFn } = await import('./effect')
     return effectFn(deleteViewProgram)(
       { id: data.id, surface: data.surface },

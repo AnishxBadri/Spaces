@@ -13,8 +13,8 @@ import {
   matchIdentity,
   normalizeIdentityValue,
   normalizeKeys,
-} from '#/lib/entities/resolve'
-import { canonicalId } from '#/lib/entities/sweep'
+} from '@spaces/core/writes/entities/resolve'
+import { canonicalId } from '@spaces/core/writes/entities/sweep'
 import { ImportFailed } from './stage'
 import type {
   CoreIdentityKey,

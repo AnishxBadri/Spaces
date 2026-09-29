@@ -50,15 +50,13 @@ async function candidatesFor(id: string) {
 
 async function newObject(singular: string, plural: string, createdBy: string) {
   const { Effect } = await import('effect')
-  const { createObjectProgram } =
-    await import('#/lib/attributes/object-registry')
+  const { createObjectProgram } = await import('../attributes/object-registry')
   return Effect.runPromise(createObjectProgram({ singular, plural, createdBy }))
 }
 
 async function newRecord(objectId: string, name: string, userId: string) {
   const { Effect } = await import('effect')
-  const { createRecordProgram } =
-    await import('#/lib/attributes/object-registry')
+  const { createRecordProgram } = await import('../attributes/object-registry')
   return Effect.runPromise(
     createRecordProgram({
       objectId,
@@ -74,7 +72,7 @@ describe('createRecordProgram birth alias', () => {
     const { db } = await import('@spaces/db')
     const { entityAlias } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
-    const { normalizeName } = await import('@spaces/core/entities/normalize')
+    const { normalizeName } = await import('../../entities/normalize')
 
     const me = await actorId()
     const tag = randomUUID().slice(0, 8)
@@ -210,9 +208,8 @@ describe('sweepNameSimilarity', () => {
     const { entity } = await import('@spaces/db/schema')
     const { renameRecordProgram } = await import('./rename')
     const { sweepNameSimilarity } = await import('./sweep')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
-    const { normalizeName } = await import('@spaces/core/entities/normalize')
+    const { objectIdForKindAsync } = await import('../attributes/objects')
+    const { normalizeName } = await import('../../entities/normalize')
     const { MERGEABLE } = await import('./merge')
 
     const me = await actorId()

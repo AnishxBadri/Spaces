@@ -9,14 +9,14 @@ import { db } from '@spaces/db'
 import { attributeEvent, entity, note, suggestion } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { resolveEntity } from '#/lib/entities/resolve'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
   acceptProgram,
   proposeProgram,
   SuggestionInvalid,
 } from '#/lib/ai/propose'
 import type { Decider } from '#/lib/ai/propose'
-import type { Actor } from '#/lib/attributes/values'
+import type { Actor } from '@spaces/core/writes/attributes/values'
 import { listInboxProgram } from '#/lib/inbox/queue'
 import { createApiTokenProgram } from '#/lib/tokens/store'
 import { handleMcpRequest } from './server'

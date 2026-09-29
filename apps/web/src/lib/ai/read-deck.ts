@@ -16,7 +16,7 @@ import type {
 } from '@spaces/core/ai/schema'
 import { identityPayloadOf } from '@spaces/core/ai/identity'
 import { QUEUES } from '@spaces/core/queue/names'
-import { getRegistryByObjectId } from '#/lib/attributes/values'
+import { getRegistryByObjectId } from '@spaces/core/writes/attributes/values'
 import { recordContextProgram } from '#/lib/context/record'
 import { ref } from '#/lib/context/ref'
 import type { ContextItem } from '#/lib/context/types'

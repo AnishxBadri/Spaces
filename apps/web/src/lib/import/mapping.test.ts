@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import { attribute, importBatch, importRow, objectDef } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
-import { createAttributeProgram } from '#/lib/attributes/create'
-import { createObjectProgram } from '#/lib/attributes/object-registry'
+import { createAttributeProgram } from '@spaces/core/writes/attributes/create'
+import { createObjectProgram } from '@spaces/core/writes/attributes/object-registry'
 import {
   beginImportMappingProgram,
   createImportAttributeProgram,

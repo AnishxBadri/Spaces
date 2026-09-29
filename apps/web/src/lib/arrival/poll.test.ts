@@ -25,7 +25,7 @@ import { recordTimelineProgram } from '#/lib/timeline/record'
 import {
   createObjectProgram,
   createRecordProgram,
-} from '#/lib/attributes/object-registry'
+} from '@spaces/core/writes/attributes/object-registry'
 import { entityContext } from '#/lib/inbox/context'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { MAILBOX, OUTLOOK_FORWARD, bcc, gmailForward } from './fixtures'

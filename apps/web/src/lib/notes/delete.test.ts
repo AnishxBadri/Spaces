@@ -314,7 +314,7 @@ describe('deleteNote', () => {
   })
 
   it('refuses the mandate’s note by name, in words the dialog can show', async () => {
-    const { Blocked } = await import('#/lib/entities/delete')
+    const { Blocked } = await import('@spaces/core/writes/entities/delete')
     const { deleteNoteProgram, noteDeleteImpactProgram, noteDeleteMessage } =
       await import('./delete')
     const { db } = await import('@spaces/db')

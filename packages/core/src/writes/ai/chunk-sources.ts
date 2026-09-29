@@ -2,18 +2,21 @@ import { and, eq } from 'drizzle-orm'
 import type { db } from '@spaces/db'
 import { chunk } from '@spaces/db/schema'
 import type { entity } from '@spaces/db/schema'
-import { QUEUES } from '@spaces/core/queue/names'
-import { enqueue } from '#/lib/queue'
 
 /**
- * Which texts beyond a document's are chunked, and the enqueue that gets
- * them chunked (SPA-132; docs/spec-ai-substrate.md §7 and §9 — "embed on
+ * Which texts beyond a document's are chunked, and the key that gets them
+ * chunked once (SPA-132; docs/spec-ai-substrate.md §7 and §9 — "embed on
  * `document.extracted` (and note save, `close_reason`) with no dialog").
  *
  * Kept light on purpose: the write paths that decide *when* a source needs
  * re-chunking — `saveNoteProgram` and `setValuesInTx` — import this and not
  * the embed program, which pulls in every provider adapter. The worker's
  * `chunk.embed` job (`worker/jobs/embed-source.ts`) runs the program.
+ *
+ * The enqueue itself is not here (SPA-174/175): it reaches the queue, which
+ * reads DATABASE_URL, and core may not read the environment. Core's write
+ * paths hand back the sources they would have queued (`reembed`), and
+ * apps/web's `lib/ai/enqueue-embed.ts` is the one place that queues them.
  */
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -65,15 +68,6 @@ export const attributeSource = (
  */
 export const embedSourceKey = (s: EmbedSource): string =>
   `${s.sourceKind}:${s.sourceKey}:${s.entityId}`
-
-/** Never throws, like every enqueue: a failed send leaves the old chunks. */
-export function enqueueSourceEmbed(s: EmbedSource): Promise<string | null> {
-  return enqueue(
-    QUEUES.embedSource,
-    { entityId: s.entityId, sourceKind: s.sourceKind, sourceKey: s.sourceKey },
-    { singletonKey: embedSourceKey(s) },
-  )
-}
 
 /** A source's chunks, gone — the clear half, inside the caller's write. */
 export async function deleteSourceChunks(

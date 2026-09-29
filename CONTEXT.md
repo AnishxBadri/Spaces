@@ -913,7 +913,7 @@ enum branch in any registry read. `description` landed 2026-09 (migration
     where the declaration becomes a claim: an attribute carrying
     `options.identityKey` mirrors its value into `entity_alias` through
     `claimIdentityAlias`, in the transaction that wrote the value and its
-    `attribute_event` (`apps/web/src/lib/entities/resolve.ts`). Four things
+    `attribute_event` (`packages/core/src/writes/entities/resolve.ts`). Four things
     the build settled. **The alias insert sits in a savepoint** — a
     concurrent writer's `23505` rolls back the nested transaction alone and
     becomes a `duplicate_candidate`, never a lost value write. **The value

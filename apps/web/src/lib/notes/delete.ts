@@ -7,8 +7,8 @@ import {
   Blocked,
   deleteEntityProgram,
   deleteRefusalProgram,
-} from '#/lib/entities/delete'
-import type { DeleteQueryFailed } from '#/lib/entities/delete'
+} from '@spaces/core/writes/entities/delete'
+import type { DeleteQueryFailed } from '@spaces/core/writes/entities/delete'
 import { canRead } from '#/lib/server/shared'
 
 /**

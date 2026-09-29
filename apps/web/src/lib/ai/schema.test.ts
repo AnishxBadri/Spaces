@@ -18,10 +18,11 @@ describe('registry → JSON schema, on a user-built object', () => {
   it('compiles a "Fund" with a select, a currency and a record_reference, and round-trips a proposal through planPatch', async () => {
     const { Effect } = await import('effect')
     const { createObjectProgram } =
-      await import('#/lib/attributes/object-registry')
-    const { createAttributeProgram } = await import('#/lib/attributes/create')
+      await import('@spaces/core/writes/attributes/object-registry')
+    const { createAttributeProgram } =
+      await import('@spaces/core/writes/attributes/create')
     const { getRegistryByObjectId, planPatch } =
-      await import('#/lib/attributes/values')
+      await import('@spaces/core/writes/attributes/values')
     const { schemaFor, toPatch, validateProposal } =
       await import('@spaces/core/ai/schema')
     const { db } = await import('@spaces/db')

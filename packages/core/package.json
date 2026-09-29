@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "//exports": "Source entry points, not a build output: every consumer is bundled by vite or loaded by tsx/vitest, all of which resolve TypeScript through `exports`. One subpath per domain, so an `#/lib/<domain>/<module>` import became `@spaces/core/<domain>/<module>` with nothing else changing — `./documents` is spelled twice because the old bare-directory specifier resolved to its index. `./writes/attributes/*` is the db-coupled attribute engine (SPA-174): `#/lib/attributes/<module>` became `@spaces/core/writes/attributes/<module>`.",
+  "//exports": "Source entry points, not a build output: every consumer is bundled by vite or loaded by tsx/vitest, all of which resolve TypeScript through `exports`. One subpath per domain, so an `#/lib/<domain>/<module>` import became `@spaces/core/<domain>/<module>` with nothing else changing — `./documents` is spelled twice because the old bare-directory specifier resolved to its index. `./writes/*` is the db-coupled half (SPA-174/175): `#/lib/attributes/<module>` became `@spaces/core/writes/attributes/<module>`, `#/lib/entities/<module>` became `@spaces/core/writes/entities/<module>`, `#/lib/views/store` became `@spaces/core/writes/views/store`, and `#/lib/ai/chunk-sources` became `@spaces/core/writes/ai/chunk-sources`. `./views/target` is the view-target type and key, pure and client-safe, which `writes/views/store.ts` takes its address from.",
   "exports": {
     "./format": "./src/format.ts",
     "./portfolio/*": "./src/portfolio/*.ts",
@@ -16,7 +16,8 @@
     "./documents/*": "./src/documents/*.ts",
     "./entities/normalize": "./src/entities/normalize.ts",
     "./attributes/*": "./src/attributes/*.ts",
-    "./writes/attributes/*": "./src/writes/attributes/*.ts",
+    "./views/target": "./src/views/target.ts",
+    "./writes/*": "./src/writes/*.ts",
     "./queue/*": "./src/queue/*.ts",
     "./timeline/*": "./src/timeline/*.ts",
     "./ai/*": "./src/ai/*.ts",

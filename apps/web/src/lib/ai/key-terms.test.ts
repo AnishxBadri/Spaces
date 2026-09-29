@@ -21,7 +21,7 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { enqueued } from '#/test/queue-stub'
 import { jsonValue } from '#/lib/json'
 import type { Json } from '#/lib/json'
-import { resolveEntity } from '#/lib/entities/resolve'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
   blocksToMarkdown,
   noteBodyFromMarkdown,

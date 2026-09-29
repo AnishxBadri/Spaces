@@ -12,7 +12,7 @@ import {
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import type { EntityValues } from '@spaces/db/schema/entities'
-import { resolveEntity } from '#/lib/entities/resolve'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 
 /**
  * Demo data — opt-in at setup, never automatic.

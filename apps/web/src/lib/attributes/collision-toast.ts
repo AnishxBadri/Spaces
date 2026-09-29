@@ -1,4 +1,4 @@
-import type { IdentityOutcome } from '../entities/resolve'
+import type { IdentityOutcome } from '@spaces/core/writes/entities/resolve'
 
 /**
  * The one sentence a losing identity write owes the operator (SPA-97).

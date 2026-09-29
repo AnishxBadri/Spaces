@@ -37,7 +37,7 @@ import {
 } from '#/lib/documents/registry'
 import { projectDocument } from '#/lib/documents/project'
 import { recordPath } from '#/lib/record-path'
-import type { ViewRow } from '#/lib/views/store'
+import type { ViewRow } from '@spaces/core/writes/views/store'
 import { getSession, listDocuments, listViews } from '#/lib/server-fns'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 

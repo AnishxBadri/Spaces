@@ -7,10 +7,10 @@ import {
   AttributeValidationError,
   EntityNotFound,
   setValuesInTx,
-} from '#/lib/attributes/values'
-import type { Tx } from '#/lib/attributes/values'
-import { enqueueSourceEmbed } from '#/lib/ai/chunk-sources'
-import type { EmbedSource } from '#/lib/ai/chunk-sources'
+} from '@spaces/core/writes/attributes/values'
+import type { Tx } from '@spaces/core/writes/attributes/values'
+import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
+import type { EmbedSource } from '@spaces/core/writes/ai/chunk-sources'
 import { birthHolding } from '#/lib/portfolio/holding'
 
 /**

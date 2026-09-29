@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ViewSnapshot } from '#/components/views/view-bar'
+import type { SaveViewInput } from './store'
 
 // The 'view store' half of what used to be views/filter.test.ts. The pure
 // condition tests moved to @spaces/core with filter.ts (mono-7); this block
@@ -15,8 +15,7 @@ describe('view store', () => {
       deleteViewProgram,
       ViewForbidden,
     } = await import('./store')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
+    const { objectIdForKindAsync } = await import('../attributes/objects')
     const { db } = await import('@spaces/db')
     const { user } = await import('@spaces/db/schema/auth')
     const [me] = await db.select({ id: user.id }).from(user).limit(1)
@@ -103,8 +102,7 @@ describe('view store', () => {
   it('lists an object view under its object target only', async () => {
     const { Effect } = await import('effect')
     const { listViewsProgram, saveViewProgram } = await import('./store')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
+    const { objectIdForKindAsync } = await import('../attributes/objects')
     const { db } = await import('@spaces/db')
     const { user } = await import('@spaces/db/schema/auth')
     const [me] = await db.select({ id: user.id }).from(user).limit(1)
@@ -162,8 +160,7 @@ describe('view store', () => {
       ViewForbidden,
       ViewNotFound,
     } = await import('./store')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
+    const { objectIdForKindAsync } = await import('../attributes/objects')
     const { db } = await import('@spaces/db')
     const { user } = await import('@spaces/db/schema/auth')
     const [me] = await db.select({ id: user.id }).from(user).limit(1)
@@ -277,9 +274,11 @@ describe('view store', () => {
 
   // docsurf-12a: the shelf's half of the round-trip, and the mirror of
   // 'lists an object view under its object target only' above. /documents
-  // saves the same `ViewSnapshot` the four object lists save — the literal is
-  // typed as one, so the claim that the bar's shape is the store's shape is
-  // the compiler's and not the test's — and reads it back on first paint:
+  // saves the same snapshot the four object lists save — the literal is
+  // typed as the store's own input, and the bar's `ViewSnapshot`
+  // (components/views/view-bar.tsx) is checked against the same input where
+  // it calls the server fn, so the two shapes cannot drift — and reads it
+  // back on first paint:
   // column visibility keyed by the shelf's own column ids, and a sort naming
   // one of them. Column *widths* are absent by design: `view.columns` is
   // Record<string, boolean>, so widths stay in useTablePrefs.
@@ -296,7 +295,10 @@ describe('view store', () => {
     }
 
     // The demo, exactly: hide three columns, sort by size, save it shared.
-    const snapshot: ViewSnapshot = {
+    const snapshot: Pick<
+      SaveViewInput,
+      'filter' | 'sort' | 'columns' | 'extra'
+    > = {
       filter: [],
       sort: { id: 'size', desc: true },
       columns: { kind: false, records: false, extraction: false },

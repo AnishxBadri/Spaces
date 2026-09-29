@@ -6,7 +6,7 @@ import { jsonRecord } from '#/lib/json'
 import type { Json } from '#/lib/json'
 import { proposeProgram, SuggestionInvalid } from '#/lib/ai/propose'
 import type { SuggestionFailure } from '#/lib/ai/propose'
-import { EntityNotFound } from '#/lib/attributes/values'
+import { EntityNotFound } from '@spaces/core/writes/attributes/values'
 import { canRead } from '#/lib/notes/visibility'
 import {
   McpToolQueryFailed,

@@ -24,7 +24,8 @@ async function actorId(): Promise<string> {
 
 describe('entityContext — the noun and the link', () => {
   it('reads a core company as its registry row, not as its kind', async () => {
-    const { resolveEntity } = await import('#/lib/entities/resolve')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const { entityContext } = await import('#/lib/inbox/context')
     const { recordPath } = await import('#/lib/record-path')
 
@@ -43,7 +44,7 @@ describe('entityContext — the noun and the link', () => {
   it("gives a custom record its object's own singular and route", async () => {
     const { Effect } = await import('effect')
     const { createObjectProgram, createRecordProgram } =
-      await import('#/lib/attributes/object-registry')
+      await import('@spaces/core/writes/attributes/object-registry')
     const { entityContext } = await import('#/lib/inbox/context')
     const { recordPath } = await import('#/lib/record-path')
 
@@ -103,7 +104,7 @@ describe('entityContext — the colliding side still shows its domain', () => {
   it('reads the record’s identity-key value when no alias was won', async () => {
     const { Effect } = await import('effect')
     const { createObjectProgram, createRecordProgram } =
-      await import('#/lib/attributes/object-registry')
+      await import('@spaces/core/writes/attributes/object-registry')
     const { entityContext } = await import('#/lib/inbox/context')
 
     const actor = await actorId()
@@ -150,7 +151,8 @@ describe('entityContext — the colliding side still shows its domain', () => {
   })
 
   it('leaves a core company pair reading its aliases, not a fallback', async () => {
-    const { resolveEntity } = await import('#/lib/entities/resolve')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const { entityContext } = await import('#/lib/inbox/context')
 
     const co = await resolveEntity({

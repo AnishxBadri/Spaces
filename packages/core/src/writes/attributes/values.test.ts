@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { valueValidator } from '@spaces/core/attributes/registry'
+import { valueValidator } from '../../attributes/registry'
 import type {
   AttributeDef,
   AttributeOptions,
   AttributeType,
-} from '@spaces/core/attributes/registry'
-import type { Json } from '#/lib/json'
+} from '../../attributes/registry'
+import type { Json } from '@spaces/db/json'
 
 describe('valueValidator', () => {
   it('validates select against options', () => {
@@ -154,8 +154,7 @@ describe('required means can’t-clear (all types)', () => {
   it('rejects an explicit clear per type family, allows born-empty', async () => {
     const { resolveEntity } = await import('../entities/resolve')
     const { setValues, AttributeValidationError } = await import('./values')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
+    const { objectIdForKindAsync } = await import('./objects')
     const { db } = await import('@spaces/db')
     const { attribute } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')

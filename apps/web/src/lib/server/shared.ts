@@ -43,7 +43,7 @@ export async function requireAdmin() {
  * the server-fn modules keep importing them from where they always did.
  */
 export { canRead } from '#/lib/notes/visibility'
-export { provenanceOf } from '#/lib/entities/provenance'
+export { provenanceOf } from '@spaces/core/writes/entities/provenance'
 
 /** ltree labels: [a-z0-9_] only. */
 export function toLabel(name: string): string {
@@ -431,7 +431,8 @@ export async function deleteDocumentWithBlobGc(
   ).at(0)
   if (!row) return { ok: true }
 
-  const { deleteEntityProgram } = await import('#/lib/entities/delete')
+  const { deleteEntityProgram } =
+    await import('@spaces/core/writes/entities/delete')
   const { effectFn } = await import('./effect')
   await effectFn(deleteEntityProgram)(id)
 

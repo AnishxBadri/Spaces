@@ -33,27 +33,27 @@ import {
 } from '@spaces/core/import/commit'
 import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue, jobsByKey } from '#/lib/queue'
-import { resolveEntityInTx } from '#/lib/entities/resolve'
-import { sweepNameSimilarity } from '#/lib/entities/sweep'
+import { resolveEntityInTx } from '@spaces/core/writes/entities/resolve'
+import { sweepNameSimilarity } from '@spaces/core/writes/entities/sweep'
 import {
   AttributeValidationError,
   EntityNotFound,
   setValuesInTx,
-} from '#/lib/attributes/values'
+} from '@spaces/core/writes/attributes/values'
 import {
   ObjectRejected,
   createRecordInTxProgram,
   sweepRecordName,
-} from '#/lib/attributes/object-registry'
-import { enqueueSourceEmbed } from '#/lib/ai/chunk-sources'
+} from '@spaces/core/writes/attributes/object-registry'
+import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { birthDealProgram } from '#/lib/deals/birth'
 import { recordPath } from '#/lib/record-path'
 import { mappingObjectOf } from './mapping'
 import { commitLedgerProgram, loadLedgerReceiptProgram } from './ledger-commit'
 import { ImportFailed, ImportNotFound, ImportRefused } from './stage'
 import type { LedgerReceipt } from './ledger-commit'
-import type { Tx } from '#/lib/attributes/values'
-import type { EmbedSource } from '#/lib/ai/chunk-sources'
+import type { Tx } from '@spaces/core/writes/attributes/values'
+import type { EmbedSource } from '@spaces/core/writes/ai/chunk-sources'
 import type {
   CoreIdentityKey,
   ObjectKind,

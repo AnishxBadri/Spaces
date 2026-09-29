@@ -4,9 +4,9 @@ import { db } from '@spaces/db'
 import { attribute, attributeEvent, entity, link } from '@spaces/db/schema'
 import type { attributeEventSource } from '@spaces/db/schema'
 import type { EntityValues } from '@spaces/db/schema/entities'
-import type { Json } from '#/lib/json'
-import { resolveDefault } from '@spaces/core/attributes/default-values'
-import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
+import type { Json } from '@spaces/db/json'
+import { resolveDefault } from '../../attributes/default-values'
+import { objectIdForKindAsync } from './objects'
 import {
   claimIdentityAlias,
   normalizeIdentityValue,
@@ -16,16 +16,15 @@ import type { IdentityOutcome, ResolveSource } from '../entities/resolve'
 import {
   attributeSource,
   deleteSourceChunks,
-  enqueueSourceEmbed,
   isEmbeddableAttribute,
 } from '../ai/chunk-sources'
 import type { EmbedSource } from '../ai/chunk-sources'
-import { toObjectKind, valueValidator } from '@spaces/core/attributes/registry'
+import { toObjectKind, valueValidator } from '../../attributes/registry'
 import type {
   AttributeDef,
   IdentityKey,
   ObjectKind,
-} from '@spaces/core/attributes/registry'
+} from '../../attributes/registry'
 
 /**
  * The one write path for attribute values. Validates against the registry,
@@ -289,9 +288,10 @@ export type SetValuesResult = {
   identityValues: Record<string, string>
   /**
    * The embeddable values this write set (SPA-132), to be chunked once it
-   * has committed. `setValuesEffect` enqueues them; a caller that owns the
-   * transaction owns that step too. A clear is not here: its chunks were
-   * deleted inside the write.
+   * has committed. The caller queues them — apps/web's `enqueueSourceEmbed`
+   * — because the queue reads the environment and core may not
+   * (SPA-174/175); a caller that owns the transaction owned that step
+   * already. A clear is not here: its chunks were deleted inside the write.
    */
   reembed: Array<EmbedSource>
 }
@@ -515,10 +515,9 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
         ? cause
         : new ValuesWriteFailed({ cause }),
   })
-  // After commit, silently (spec-ai-substrate §9: "automatic once enabled"):
-  // the job runs with or without a pin, and an enqueue never throws.
-  for (const source of result.reembed)
-    yield* Effect.promise(() => enqueueSourceEmbed(source))
+  // `result.reembed` is the caller's to queue once this returns, silently
+  // (spec-ai-substrate §9: "automatic once enabled"). Until SPA-174/175 the
+  // loop was here; it moved out with the enqueue, which core cannot hold.
   return result
 })
 

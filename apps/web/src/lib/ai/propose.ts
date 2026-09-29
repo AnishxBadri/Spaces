@@ -18,11 +18,15 @@ import {
   EntityNotFound,
   getRegistryByObjectId,
   setValuesInTx,
-} from '#/lib/attributes/values'
-import type { Actor, SetValuesResult, Tx } from '#/lib/attributes/values'
-import { resolveEntity } from '#/lib/entities/resolve'
-import type { ResolveResult } from '#/lib/entities/resolve'
-import { canonicalId } from '#/lib/entities/sweep'
+} from '@spaces/core/writes/attributes/values'
+import type {
+  Actor,
+  SetValuesResult,
+  Tx,
+} from '@spaces/core/writes/attributes/values'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import type { ResolveResult } from '@spaces/core/writes/entities/resolve'
+import { canonicalId } from '@spaces/core/writes/entities/sweep'
 import { notePayloadSchema } from '@spaces/core/ai/note'
 import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
 import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'

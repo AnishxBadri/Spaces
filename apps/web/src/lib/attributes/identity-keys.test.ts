@@ -17,7 +17,8 @@ const nouns = () => {
 describe('object identity keys', () => {
   it('materializes the backing attribute of every declared key, in the same write', async () => {
     const { Effect } = await import('effect')
-    const { createObjectProgram } = await import('./object-registry')
+    const { createObjectProgram } =
+      await import('@spaces/core/writes/attributes/object-registry')
     const { db } = await import('@spaces/db')
     const { attribute, objectDef } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
@@ -67,7 +68,7 @@ describe('object identity keys', () => {
   it('leaves no object row behind when a key is refused', async () => {
     const { Effect } = await import('effect')
     const { createObjectProgram, ObjectRejected } =
-      await import('./object-registry')
+      await import('@spaces/core/writes/attributes/object-registry')
     const { db } = await import('@spaces/db')
     const { objectDef } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
@@ -119,8 +120,10 @@ describe('object identity keys', () => {
 
   it('declares nothing when no key is ticked — the object is still born empty', async () => {
     const { Effect } = await import('effect')
-    const { createObjectProgram } = await import('./object-registry')
-    const { getRegistryByObjectId } = await import('./values')
+    const { createObjectProgram } =
+      await import('@spaces/core/writes/attributes/object-registry')
+    const { getRegistryByObjectId } =
+      await import('@spaces/core/writes/attributes/values')
     const { db } = await import('@spaces/db')
     const { objectDef } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
@@ -142,9 +145,10 @@ describe('object identity keys', () => {
 
   it('refuses identityKey config a type cannot carry', async () => {
     const { Effect } = await import('effect')
-    const { createObjectProgram } = await import('./object-registry')
+    const { createObjectProgram } =
+      await import('@spaces/core/writes/attributes/object-registry')
     const { createAttributeProgram, AttributeCreateRejected } =
-      await import('./create')
+      await import('@spaces/core/writes/attributes/create')
     const { db } = await import('@spaces/db')
     const { user } = await import('@spaces/db/schema/auth')
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)
@@ -167,9 +171,12 @@ describe('object identity keys', () => {
 
   it('refuses to archive a backing attribute while its key is declared, naming the object', async () => {
     const { Effect } = await import('effect')
-    const { createObjectProgram } = await import('./object-registry')
-    const { createAttributeProgram } = await import('./create')
-    const { updateAttributeProgram } = await import('./update')
+    const { createObjectProgram } =
+      await import('@spaces/core/writes/attributes/object-registry')
+    const { createAttributeProgram } =
+      await import('@spaces/core/writes/attributes/create')
+    const { updateAttributeProgram } =
+      await import('@spaces/core/writes/attributes/update')
     const { db } = await import('@spaces/db')
     const { attribute } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
@@ -248,7 +255,7 @@ describe('revising an object’s identity keys', () => {
   it('accepts a revision while empty and refuses one once a record exists', async () => {
     const { Effect } = await import('effect')
     const { createObjectProgram, createRecordProgram, updateObjectProgram } =
-      await import('./object-registry')
+      await import('@spaces/core/writes/attributes/object-registry')
     const { db } = await import('@spaces/db')
     const { attribute, objectDef } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
@@ -352,7 +359,7 @@ describe('revising an object’s identity keys', () => {
   it('deletes the backing attribute row when a key is dropped from an empty object', async () => {
     const { Effect } = await import('effect')
     const { createObjectProgram, updateObjectProgram } =
-      await import('./object-registry')
+      await import('@spaces/core/writes/attributes/object-registry')
     const { db } = await import('@spaces/db')
     const { attribute } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
@@ -399,7 +406,7 @@ describe('revising an object’s identity keys', () => {
   it('counts a merged-away record — it still holds the values the key justified', async () => {
     const { Effect } = await import('effect')
     const { createObjectProgram, createRecordProgram, updateObjectProgram } =
-      await import('./object-registry')
+      await import('@spaces/core/writes/attributes/object-registry')
     const { db } = await import('@spaces/db')
     const { attribute, entity } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')

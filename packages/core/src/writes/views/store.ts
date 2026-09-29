@@ -2,9 +2,9 @@ import { Effect, Schema } from 'effect'
 import { and, asc, eq, or } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { view } from '@spaces/db/schema'
-import type { Condition, ViewExtra, ViewSort } from '@spaces/core/views/filter'
+import type { Condition, ViewExtra, ViewSort } from '../../views/filter'
 import type { ViewColumns, ViewSurface } from '@spaces/db/schema/views'
-import type { ViewTarget } from './target'
+import type { ViewTarget } from '../../views/target'
 
 export type { ViewSort, ViewSurface, ViewTarget }
 

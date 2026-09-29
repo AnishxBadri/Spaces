@@ -14,7 +14,8 @@ describe('assembleProgram', () => {
   const ids: Record<string, string> = {}
 
   it('assembles the record for two users, deterministically', async () => {
-    const { resolveEntity } = await import('#/lib/entities/resolve')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const { assembleProgram } = await import('./assemble')
     const { Effect } = await import('effect')
     const { db } = await import('@spaces/db')

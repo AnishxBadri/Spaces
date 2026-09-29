@@ -259,7 +259,8 @@ describe('resolveRefs — deleted targets', () => {
 
   it('reaches /inbox and the record timeline as missing — neither consumer fails', async () => {
     const d = await deps()
-    const { resolveEntity } = await import('#/lib/entities/resolve')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
     const { proposeProgram, acceptProgram } = await import('#/lib/ai/propose')
     const { listInboxProgram } = await import('#/lib/inbox/queue')
     const { recordTimelineProgram } = await import('#/lib/timeline/record')

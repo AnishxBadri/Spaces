@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { QUEUES } from '@spaces/core/queue/names'
 import { embedSourceProgram } from '#/lib/ai/embed-source'
 import type { EmbedSourceInput } from '#/lib/ai/embed-source'
-import type { EmbedSource } from '#/lib/ai/chunk-sources'
+import type { EmbedSource } from '@spaces/core/writes/ai/chunk-sources'
 import { JobPermanent, JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 

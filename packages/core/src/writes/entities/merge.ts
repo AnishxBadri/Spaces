@@ -17,7 +17,7 @@ import type {
   EntityValues,
   MergeSnapshotEntry,
 } from '@spaces/db/schema/entities'
-import type { Json } from '#/lib/json'
+import type { Json } from '@spaces/db/json'
 import { activity } from '@spaces/db/schema/activity'
 import {
   distribution,

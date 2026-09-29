@@ -10,26 +10,24 @@ import {
   CORE_ONLY_IDENTITY_MESSAGE,
   IDENTITY_KEYS,
   IDENTITY_KEY_ATTRIBUTES,
-} from '@spaces/core/attributes/registry'
-import { recordNameAlias } from '#/lib/entities/resolve'
-import { sweepNameSimilarityEffect } from '#/lib/entities/sweep'
-import { normalizeName } from '@spaces/core/entities/normalize'
-import { slugifyNoun, suggestPlural } from '#/lib/object-nouns'
+} from '../../attributes/registry'
+import { recordNameAlias } from '../entities/resolve'
+import { sweepNameSimilarityEffect } from '../entities/sweep'
+import { normalizeName } from '../../entities/normalize'
+import { slugifyNoun, suggestPlural } from '../../attributes/object-nouns'
 import type { AttributeCreateRejected, Tx } from './create'
 import type { AttributeQueryFailed } from './update'
 import type {
   ObjectQueryFailed as CoreObjectQueryFailed,
   SystemObjectNotSeeded,
-} from '@spaces/core/writes/attributes/objects'
-import type { IdentityKey } from '@spaces/core/attributes/registry'
+} from './objects'
+import type { IdentityKey } from '../../attributes/registry'
 import {
   AttributeValidationError,
   EntityNotFound,
   setValuesInTx,
 } from './values'
 import type { Actor, EventSource, ValuesWriteFailed } from './values'
-import { enqueueSourceEmbed } from '#/lib/ai/chunk-sources'
-import type { EmbedSource } from '#/lib/ai/chunk-sources'
 
 /**
  * Custom objects (spec §9, two-tier model). An object is an attribute bag
@@ -479,7 +477,7 @@ export type CreateRecordInput = {
  */
 export type CreateRecordResult = { id: string } & Pick<
   BirthValuesResult,
-  'identity' | 'identityValues'
+  'identity' | 'identityValues' | 'reembed'
 >
 
 /** The object a record is born into: live, custom, not archived. */
@@ -519,7 +517,7 @@ async function birthRecordInTx(
   input: CreateRecordInput,
   objectId: string,
   name: string,
-): Promise<CreateRecordResult & { reembed: Array<EmbedSource> }> {
+): Promise<CreateRecordResult> {
   const userId = input.actor.type === 'user' ? input.actor.id : null
   const ent = (
     await tx
@@ -572,8 +570,10 @@ type CreateRecordFailure =
 
 /**
  * Birth of a custom record: `birthRecordInTx` in its own transaction, then —
- * once it has committed — the embeddable values queued and the fuzzy sweep
- * every other record gets. The birth alias is the `name` one — non-identity,
+ * once it has committed — the fuzzy sweep every other record gets, with the
+ * embeddable values handed back as `reembed` for the caller to queue (the
+ * enqueue reads the environment, which core may not; SPA-174/175). The
+ * birth alias is the `name` one — non-identity,
  * because a name is history rather than a claim — and it is what puts the
  * record in front of pg_trgm and in `searchEntities`' alias lane. Identity
  * aliases arrive by the other door: a supplied value for an attribute
@@ -592,14 +592,8 @@ export const createRecordProgram = Effect.fn('createRecordProgram')(function* (
       db.transaction((tx) => birthRecordInTx(tx, input, object.id, name)),
     catch: birthFailure,
   })
-  for (const source of born.reembed)
-    yield* Effect.promise(() => enqueueSourceEmbed(source))
   yield* sweepRecordName(born.id, name)
-  return {
-    id: born.id,
-    identity: born.identity,
-    identityValues: born.identityValues,
-  }
+  return born
 })
 
 /**
@@ -630,7 +624,7 @@ export const createRecordInTxProgram = Effect.fn('createRecordInTxProgram')(
     tx: Tx,
     input: CreateRecordInput,
   ): Effect.fn.Return<
-    CreateRecordResult & { name: string; reembed: Array<EmbedSource> },
+    CreateRecordResult & { name: string },
     CreateRecordFailure
   > {
     const name = input.name.trim()

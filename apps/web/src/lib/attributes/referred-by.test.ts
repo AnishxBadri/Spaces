@@ -17,7 +17,8 @@ describe('deal.referred_by — seeding', () => {
     const { db } = await import('@spaces/db')
     const { attribute, objectDef } = await import('@spaces/db/schema')
     const { and, eq } = await import('drizzle-orm')
-    const { seedSystemAttributes } = await import('./seed')
+    const { seedSystemAttributes } =
+      await import('@spaces/core/writes/attributes/seed')
     const { SYSTEM_ATTRIBUTES } =
       await import('@spaces/core/attributes/registry')
 
@@ -78,8 +79,10 @@ describe('deal.referred_by — seeding', () => {
 
 describe('deal.referred_by — the write path', () => {
   it('writes the uuid into values and exactly one references link; clearing removes it', async () => {
-    const { resolveEntity } = await import('../entities/resolve')
-    const { setValues, AttributeValidationError } = await import('./values')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
+    const { setValues, AttributeValidationError } =
+      await import('@spaces/core/writes/attributes/values')
     const { db } = await import('@spaces/db')
     const { attributeEvent, entity, link } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
@@ -173,8 +176,9 @@ describe('deal.referred_by — the write path', () => {
 
 describe('deal.referred_by — backlinks', () => {
   it('puts the deal on the referrer through the existing backlink path', async () => {
-    const { resolveEntity } = await import('../entities/resolve')
-    const { setValues } = await import('./values')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
     const { assembleProgram } = await import('#/lib/context/assemble')
     const { Effect } = await import('effect')
     const { db } = await import('@spaces/db')

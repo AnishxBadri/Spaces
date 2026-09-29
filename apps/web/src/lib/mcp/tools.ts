@@ -11,7 +11,7 @@ import {
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import type { Json } from '@spaces/db/json'
-import { getRegistryByObjectId } from '#/lib/attributes/values'
+import { getRegistryByObjectId } from '@spaces/core/writes/attributes/values'
 import { renderAttribute } from '#/lib/context/render'
 import { canRead } from '#/lib/notes/visibility'
 

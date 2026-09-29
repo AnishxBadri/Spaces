@@ -11,7 +11,7 @@ import type { Decider } from './propose'
  */
 
 async function setup() {
-  const { resolveEntity } = await import('#/lib/entities/resolve')
+  const { resolveEntity } = await import('@spaces/core/writes/entities/resolve')
   const { db } = await import('@spaces/db')
   const { user } = await import('@spaces/db/schema/auth')
   const accepter = (

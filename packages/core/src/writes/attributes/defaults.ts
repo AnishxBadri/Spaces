@@ -14,7 +14,7 @@ export {
   isIsoDuration,
   resolveDefault,
   validateDefault,
-} from '@spaces/core/attributes/default-values'
+} from '../../attributes/default-values'
 
 /**
  * Default values (spec §4, grilled 2026-09). A default is a standing human
@@ -54,7 +54,7 @@ export type BirthValuesInput = {
  */
 export type BirthValuesResult = Pick<
   SetValuesResult,
-  'defaulted' | 'identity' | 'identityValues'
+  'defaulted' | 'identity' | 'identityValues' | 'reembed'
 >
 
 export const birthValuesEffect = Effect.fn('birthValues')(function* (
@@ -68,14 +68,15 @@ export const birthValuesEffect = Effect.fn('birthValues')(function* (
       ([, v]) => v !== undefined && v !== null && v !== '',
     ),
   )
-  const { defaulted, identity, identityValues } = yield* setValuesEffect({
-    entityId: opts.entityId,
-    patch: supplied,
-    actor: opts.actor,
-    ...(opts.suppliedSource ? { source: opts.suppliedSource } : {}),
-    fillDefaults: { now: opts.now ?? new Date() },
-  })
-  return { defaulted, identity, identityValues }
+  const { defaulted, identity, identityValues, reembed } =
+    yield* setValuesEffect({
+      entityId: opts.entityId,
+      patch: supplied,
+      actor: opts.actor,
+      ...(opts.suppliedSource ? { source: opts.suppliedSource } : {}),
+      fillDefaults: { now: opts.now ?? new Date() },
+    })
+  return { defaulted, identity, identityValues, reembed }
 })
 
 /** Promise seam for creation paths the ratchet hasn't converted yet. */

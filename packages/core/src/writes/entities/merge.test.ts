@@ -510,7 +510,7 @@ describe('mergeEntities', () => {
   it('repoints referred_by on every deal that named the loser', async () => {
     const { resolveEntity } = await import('./resolve')
     const { mergeEntities } = await import('./merge')
-    const { setValues } = await import('#/lib/attributes/values')
+    const { setValues } = await import('../attributes/values')
     const { db } = await import('@spaces/db')
     const { attributeEvent, entity, link } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
@@ -586,73 +586,6 @@ describe('mergeEntities', () => {
     expect(repointEvent.to).toBe(winner.entityId)
   })
 
-  it("repoints both companies' open suggestions onto the winner (SPA-46)", async () => {
-    const { Effect } = await import('effect')
-    const { resolveEntity } = await import('./resolve')
-    const { mergeEntities } = await import('./merge')
-    const { proposeProgram } = await import('#/lib/ai/propose')
-    const { db } = await import('@spaces/db')
-    const { mergeEvent, suggestion } = await import('@spaces/db/schema')
-    const { user } = await import('@spaces/db/schema/auth')
-    const { eq, inArray } = await import('drizzle-orm')
-
-    const tag = randomUUID().slice(0, 8)
-    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
-    const winner = await resolveEntity({
-      kind: 'company',
-      name: `SuggestCo ${tag}`,
-      keys: { domain: `suggest-w-${tag}.example` },
-      source: { class: 'manual' },
-    })
-    const loser = await resolveEntity({
-      kind: 'company',
-      name: `SuggestCo ${tag} (dup)`,
-      keys: { domain: `suggest-l-${tag}.example` },
-      source: { class: 'manual' },
-    })
-    const propose = (entityId: string, location: string) =>
-      Effect.runPromise(
-        proposeProgram({
-          entityId,
-          kind: 'attribute_patch',
-          payload: {
-            location: { value: location, refs: ['doc:d#p1'], confidence: 0.7 },
-          },
-          proposedBy: { type: 'system' },
-        }),
-      )
-    const onWinner = await propose(winner.entityId, 'Paris')
-    const onLoser = await propose(loser.entityId, 'Lyon')
-
-    const { mergeEventId } = await mergeEntities({
-      winnerId: winner.entityId,
-      loserId: loser.entityId,
-      mergedBy: actor.id,
-    })
-
-    const rows = await db
-      .select()
-      .from(suggestion)
-      .where(inArray(suggestion.id, [onWinner.id, onLoser.id]))
-    expect(rows).toHaveLength(2)
-    for (const r of rows) {
-      expect(r.entityId).toBe(winner.entityId)
-      expect(r.status).toBe('open')
-    }
-
-    // The repoint is in the snapshot like every other generic column.
-    const [ev] = await db
-      .select({ snapshot: mergeEvent.snapshot })
-      .from(mergeEvent)
-      .where(eq(mergeEvent.id, mergeEventId))
-    expect(ev.snapshot).toContainEqual({
-      table: 'suggestion',
-      action: 'repointed',
-      pk: { id: onLoser.id },
-      old: { entityId: loser.entityId },
-    })
-  })
-
   it('refuses cross-kind and self merges', async () => {
     const { resolveEntity } = await import('./resolve')
     const { mergeEntities } = await import('./merge')
@@ -698,7 +631,7 @@ describe('mergeEntities', () => {
   it('refuses two custom records of different objects and writes nothing', async () => {
     const { Effect } = await import('effect')
     const { createObjectProgram, createRecordProgram } =
-      await import('#/lib/attributes/object-registry')
+      await import('../attributes/object-registry')
     const { mergeEntities } = await import('./merge')
     const { db } = await import('@spaces/db')
     const { attributeEvent, entity, link, mergeEvent } =
@@ -767,11 +700,10 @@ describe('mergeEntities', () => {
   it('merges two records of one custom object through the generic registry loop', async () => {
     const { Effect } = await import('effect')
     const { createObjectProgram, createRecordProgram } =
-      await import('#/lib/attributes/object-registry')
-    const { createAttributeProgram } = await import('#/lib/attributes/create')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
-    const { setValues } = await import('#/lib/attributes/values')
+      await import('../attributes/object-registry')
+    const { createAttributeProgram } = await import('../attributes/create')
+    const { objectIdForKindAsync } = await import('../attributes/objects')
+    const { setValues } = await import('../attributes/values')
     const { mergeEntities } = await import('./merge')
     const { db } = await import('@spaces/db')
     const {

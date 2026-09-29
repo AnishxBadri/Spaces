@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { slugifyNoun, suggestPlural } from '#/lib/object-nouns'
+import { slugifyNoun, suggestPlural } from '../../attributes/object-nouns'
 
 describe('object nouns (pure)', () => {
   it('suggests plurals and slugs from the plural', () => {
@@ -30,8 +30,7 @@ describe('custom objects', () => {
     } = await import('./object-registry')
     const { createAttributeProgram } = await import('./create')
     const { setValues, getRegistryByObjectId } = await import('./values')
-    const { objectIdForKindAsync } =
-      await import('@spaces/core/writes/attributes/objects')
+    const { objectIdForKindAsync } = await import('./objects')
     const { db } = await import('@spaces/db')
     const { entity, link, objectDef } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')

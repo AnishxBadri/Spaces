@@ -93,7 +93,8 @@ export const reorderAttributes = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     await requireAdmin()
-    const { reorderAttributesProgram } = await import('../attributes/update')
+    const { reorderAttributesProgram } =
+      await import('@spaces/core/writes/attributes/update')
     const { effectFn } = await import('./effect')
     return effectFn(reorderAttributesProgram)(data.objectId, data.ids)
   })
@@ -166,7 +167,8 @@ export const updateAttribute = createServerFn({ method: 'POST' })
     // Creating an attribute stays member (the "+ Add column" flow): additive,
     // and a two-person fund should not need ceremony to add a field.
     await requireAdmin()
-    const { updateAttributeProgram } = await import('../attributes/update')
+    const { updateAttributeProgram } =
+      await import('@spaces/core/writes/attributes/update')
     const { effectFn } = await import('./effect')
     const result = await effectFn(updateAttributeProgram)(data)
     // After the write commits, never inside it: `CREATE INDEX CONCURRENTLY`
@@ -243,7 +245,8 @@ export const createAttribute = createServerFn({ method: 'POST' })
     // to add a field. Reshaping (rename, options, archive) is admin — see
     // updateAttribute.
     const u = await requireUser()
-    const { createAttributeProgram } = await import('../attributes/create')
+    const { createAttributeProgram } =
+      await import('@spaces/core/writes/attributes/create')
     const { effectFn } = await import('./effect')
     const result = await effectFn(createAttributeProgram)({
       ...data,

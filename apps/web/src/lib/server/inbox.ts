@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { duplicateCandidate } from '@spaces/db/schema'
-import { mergeEntities } from '../entities/merge'
+import { mergeEntities } from '@spaces/core/writes/entities/merge'
 import { requireUser } from './shared'
 
 /**

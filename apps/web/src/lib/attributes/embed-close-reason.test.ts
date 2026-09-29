@@ -6,18 +6,21 @@ import { db } from '@spaces/db'
 import { chunk, entity, workspace } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { EMBEDDABLE_ATTRIBUTES } from '#/lib/ai/chunk-sources'
+import { EMBEDDABLE_ATTRIBUTES } from '@spaces/core/writes/ai/chunk-sources'
 import { pinEmbeddingProgram } from '#/lib/ai/embedding-pin'
 import { saveEmbeddingKeyProgram } from '#/lib/ai/providers/embed/settings'
 import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
 import { embedSourceProgram } from '#/lib/ai/embed-source'
-import { setValuesEffect } from './values'
+import { setValuesEffect } from '@spaces/core/writes/attributes/values'
+import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 
 /**
  * SPA-132 (ai-12b): a deal's `close_reason` is an attribute value, so it is
  * chunked through the one write path rather than a bespoke hook. A set
- * through `setValuesEffect` queues `chunk.embed` with `source_kind:
- * 'attribute'` and `source_key: 'close_reason'` after the write commits; a
+ * through `setValuesEffect` hands the source back as `reembed`, and the
+ * caller — the server fn; here, `write` — queues `chunk.embed` with
+ * `source_kind: 'attribute'` and `source_key: 'close_reason'` after the write
+ * commits (SPA-174/175 moved the enqueue out of core with the write path); a
  * clear deletes the chunks inside the write's own transaction. The job's
  * program is `embedSourceProgram`, run here as the worker runs it (the
  * worker's own outcome mapping is `worker/jobs/embed-source.test.ts`).
@@ -37,8 +40,13 @@ async function newRecord(kind: 'deal' | 'company', name: string) {
   return row.id
 }
 
-const write = (entityId: string, patch: Record<string, unknown>) =>
-  Effect.runPromise(setValuesEffect({ entityId, patch, actor }))
+const write = async (entityId: string, patch: Record<string, unknown>) => {
+  const result = await Effect.runPromise(
+    setValuesEffect({ entityId, patch, actor }),
+  )
+  for (const s of result.reembed) await enqueueSourceEmbed(s)
+  return result
+}
 
 const runJob = (
   entityId: string,

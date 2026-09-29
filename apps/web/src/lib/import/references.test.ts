@@ -11,8 +11,8 @@ import {
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { referenceLands, whyOf } from '@spaces/core/import/plan'
-import { createAttributeProgram } from '#/lib/attributes/create'
-import { resolveEntity } from '#/lib/entities/resolve'
+import { createAttributeProgram } from '@spaces/core/writes/attributes/create'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import {
   beginImportMappingProgram,
   loadImportMappingProgram,

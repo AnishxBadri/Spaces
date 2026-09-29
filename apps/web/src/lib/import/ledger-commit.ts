@@ -13,9 +13,9 @@ import {
 import { emptyRun } from '@spaces/core/import/commit'
 import { isLedgerPlan } from '@spaces/core/import/ledger'
 import { ledgerVoidLine, missingRates } from '@spaces/core/import/ledger-commit'
-import { resolveEntityInTx } from '#/lib/entities/resolve'
-import { sweepNameSimilarity } from '#/lib/entities/sweep'
-import { enqueueSourceEmbed } from '#/lib/ai/chunk-sources'
+import { resolveEntityInTx } from '@spaces/core/writes/entities/resolve'
+import { sweepNameSimilarity } from '@spaces/core/writes/entities/sweep'
+import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { baseCurrency, loadFxRates } from '#/lib/portfolio/detail'
 import {
   HoldingNotFound,
@@ -26,8 +26,8 @@ import {
   addRoundProgram,
 } from '#/lib/portfolio/write'
 import { ImportFailed, ImportRefused } from './stage'
-import type { Tx } from '#/lib/attributes/values'
-import type { EmbedSource } from '#/lib/ai/chunk-sources'
+import type { Tx } from '@spaces/core/writes/attributes/values'
+import type { EmbedSource } from '@spaces/core/writes/ai/chunk-sources'
 import type { CommitRun } from '@spaces/core/import/commit'
 import type {
   LedgerCommitted,

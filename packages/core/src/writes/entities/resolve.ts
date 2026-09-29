@@ -8,7 +8,7 @@ import {
   person,
 } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
-import type { CoreIdentityKey } from '@spaces/core/attributes/registry'
+import type { CoreIdentityKey } from '../../attributes/registry'
 import type { Actor, EventSource } from '../attributes/values'
 import type { EmbedSource } from '../ai/chunk-sources'
 import { canonicalId, suggestDuplicate, sweepNameSimilarity } from './sweep'
@@ -20,7 +20,7 @@ import {
   normalizeEmail,
   normalizeLinkedin,
   normalizeName,
-} from '@spaces/core/entities/normalize'
+} from '../../entities/normalize'
 
 /**
  * THE choke point. Every creator of a person or a company — manual, deck,
@@ -105,6 +105,13 @@ export type ResolveResult = {
   action: 'attached' | 'created'
   /** Which key matched, when attached. */
   matchedOn?: CoreIdentityKey
+  /**
+   * The embeddable values the birth set (SPA-132), for the caller to queue
+   * once this has returned; empty on an attach. `setValuesEffect` used to
+   * queue them itself; the enqueue reads the environment, which core may
+   * not, so it is handed back (SPA-174/175).
+   */
+  reembed: Array<EmbedSource>
 }
 
 /**
@@ -305,6 +312,7 @@ export async function resolveEntity(
       entityId: match.entityId,
       action: 'attached',
       matchedOn: match.key.kind,
+      reembed: [],
     }
   }
 
@@ -313,7 +321,7 @@ export async function resolveEntity(
   // Every resolvable kind is an object record now, so every one carries an
   // object row — the ghost kind that had none was deleted (clean-1).
   const objectId = await (
-    await import('@spaces/core/writes/attributes/objects')
+    await import('../attributes/objects')
   ).objectIdForKindAsync(input.kind)
   const created = await db.transaction((tx) =>
     insertResolved(tx, input, keys, name, canonicalName, objectId),
@@ -330,7 +338,7 @@ export async function resolveEntity(
   // `entity.source_ref` points at. The two provenance stories on a record
   // now come from one argument and cannot disagree.
   const { birthValues } = await import('../attributes/defaults')
-  await birthValues({
+  const { reembed } = await birthValues({
     entityId: created.id,
     actor: birthActor(input.source, input.createdBy),
     supplied: input.values,
@@ -343,7 +351,7 @@ export async function resolveEntity(
     )
   }
 
-  return { entityId: created.id, action: 'created' }
+  return { entityId: created.id, action: 'created', reembed }
 }
 
 /**
@@ -412,13 +420,13 @@ export type ResolveInTxInput = ResolveInput & {
 }
 
 /**
- * `resolveEntity`'s result, plus the two steps that must wait for the
- * caller's commit: the name the fuzzy sweep runs on (null on an attach, or
- * on a record born from a key alone) and the embeddable values the birth set.
+ * `resolveEntity`'s result, plus the step that must wait for the caller's
+ * commit: the name the fuzzy sweep runs on (null on an attach, or on a
+ * record born from a key alone). The embeddable values ride in `reembed`,
+ * which every resolve result carries.
  */
 export type ResolveInTxResult = ResolveResult & {
   sweepName: string | null
-  reembed: Array<EmbedSource>
 }
 
 /**
@@ -455,8 +463,7 @@ export async function resolveEntityInTx(
     }
   }
   const canonicalName = name ?? keys[0].valueNorm
-  const { objectIdForKindAsync } =
-    await import('@spaces/core/writes/attributes/objects')
+  const { objectIdForKindAsync } = await import('../attributes/objects')
   const objectId = await objectIdForKindAsync(input.kind)
   const created = await insertResolved(
     tx,
