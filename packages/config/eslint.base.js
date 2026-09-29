@@ -166,6 +166,21 @@ const WORKER_NEVER_WEB_NEVER_PLUGINS = {
   message:
     'The worker imports @spaces/core and @spaces/sdk, never the web app; a plugin is a runtime import() from the plugin directory, never a compile-time import (docs/spec-plugin-sdk.md §2: "worker → core, sdk. Never plugins/* at compile time"). Until the modules under apps/web/src/lib move into core, the one allowed crossing is `#web/lib/*` (and `#web/test/*` from a test), listed in the zone comment — never `#/`, never a relative path into apps/web.',
 }
+// The browser suite (SPA-184) tests the product from outside — over HTTP,
+// through a real Chromium, and by running the boot entry and the server
+// bundle as processes. It imports nothing internal: no workspace package,
+// no `#/` alias, no relative climb into another package. A spec that
+// reached into @spaces/db for a row count would be testing the module, not
+// the product; the harness talks to Postgres through `pg` like any client.
+const E2E_IMPORTS_NOTHING_INTERNAL = {
+  regex: [
+    '^@spaces/',
+    '^#',
+    climbsInto(['apps', 'packages', 'plugins', 'web', 'worker']),
+  ].join('|'),
+  message:
+    '@spaces/e2e imports nothing internal — no @spaces/* package, no #/ alias, no relative path into another package. It drives the built app over HTTP and in a browser, and boots it as a process (apps/e2e/harness/instance.ts); a spec that imported the code would be testing the module, not the product.',
+}
 // Unproven against the real package until sdk-3 births it; proved against
 // packages/config/fixtures/sdk.
 const SDK_IMPORTS_NOTHING_INTERNAL = {
@@ -330,6 +345,15 @@ export default [
       'no-restricted-imports': [
         'error',
         { patterns: [WORKER_NEVER_WEB_NEVER_PLUGINS] },
+      ],
+    },
+  },
+  {
+    files: ['apps/e2e/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [E2E_IMPORTS_NOTHING_INTERNAL] },
       ],
     },
   },

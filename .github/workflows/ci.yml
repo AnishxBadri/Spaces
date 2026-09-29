@@ -62,6 +62,52 @@ jobs:
       - name: turbo run build
         run: pnpm run build
 
+  # The browser suite (SPA-184): `pnpm e2e` — turbo builds @spaces/web, the
+  # harness boots it twice against databases it creates on this service and
+  # drops, and a headless Chromium drives the login gate, the first-run
+  # window and closed signup. Additive: its own job, after nothing and in
+  # front of nothing, and none of the gates above change for it. The trace of
+  # a failed spec is uploaded; a green run uploads nothing.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: spaces
+          POSTGRES_PASSWORD: spaces
+          POSTGRES_DB: spaces
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U spaces -d spaces"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://spaces:spaces@localhost:5432/spaces
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Chromium only, with its system libraries. Test tooling on the runner,
+      # never in the image: the Dockerfile's prune scopes cannot reach
+      # @spaces/e2e.
+      - name: Install Chromium
+        run: pnpm --filter @spaces/e2e exec playwright install --with-deps chromium
+      - name: pnpm e2e
+        run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-traces
+          path: apps/e2e/test-results/
+          retention-days: 7
+
   # The runtime image, built once per run as its own named job (SPA-183), so
   # a broken build is red under its own name rather than as the first step of
   # whichever job happened to try it. Also the build guard (SPA-152): the

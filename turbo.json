@@ -93,6 +93,25 @@
       "outputs": []
     },
 
+    // The browser suite (SPA-184): `pnpm e2e`, never part of `pnpm test`.
+    // Only apps/e2e has the script, so only it runs; it depends on the web
+    // build because the harness serves apps/web/.output — `pnpm e2e` builds
+    // the app first, and a cache hit there is fine (build's inputs are
+    // honest). Never cached itself: it boots servers and a browser against
+    // databases it creates, and a replayed pass would have checked nothing.
+    // Playwright's own variables pass through so a machine can point it at
+    // a browser it already has; CI and GITHUB_ACTIONS switch its reporter.
+    "e2e": {
+      "dependsOn": ["@spaces/web#build"],
+      "cache": false,
+      "passThroughEnv": [
+        "PLAYWRIGHT_BROWSERS_PATH",
+        "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH",
+        "CI",
+        "GITHUB_ACTIONS"
+      ]
+    },
+
     // The lint configuration decides what this package's lint run reports —
     // gate 5 (instrument/vocabulary) is one of its rule files — so it is an
     // input even though none of it is in the package. Since SPA-180 it lives
