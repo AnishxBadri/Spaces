@@ -37,13 +37,16 @@ const NO_INTL_NUMBER_FORMAT = {
 // The web app used to take `QueueName` from `#/worker/queues`, which is the
 // whole reason `apps/worker` could not be lifted out without web following it
 // (SPA-146). Both halves of the seam live in @spaces/core now, so the edge can
-// be a rule rather than a convention. Declared once and composed below because
-// a later flat-config block replaces an earlier block's options for the same
-// rule rather than merging with them — the trap that silenced one of these
-// selectors for a whole cycle (SPA-101).
+// be a rule rather than a convention — and since SPA-181 the worker is
+// `apps/worker`, its own package, so this resolved-path zone catches a
+// relative reach into it; the specifier form (`@spaces/worker`, a climb
+// spelled `worker/`) is WEB_NEVER_PLUGINS_NEVER_WORKER below. Declared once
+// and composed below because a later flat-config block replaces an earlier
+// block's options for the same rule rather than merging with them — the trap
+// that silenced one of these selectors for a whole cycle (SPA-101).
 const NO_WEB_INTO_WORKER = {
   target: './apps/web/src',
-  from: './apps/web/src/worker',
+  from: './apps/worker',
   message:
     'The web app never imports the worker (spec §2). Queue names and the sender live in @spaces/core/queue/*.',
 }
@@ -85,9 +88,9 @@ const NO_DIRECT_ENTITY_VALUES = {
 // `packages/sdk` (sdk-3) and `plugins/*`. Their zones are written now, so the
 // packages grow up inside the fence, and are fenced against
 // `packages/config/fixtures/{sdk,plugins}` until then — that is where their
-// failing case runs. The worker zone is the third: `apps/worker` lands in
-// mono-11a (SPA-181), which is where it gets its failing-case test; until
-// then its glob matches nothing and the zone is unproven.
+// failing case runs. The worker zone was the third until mono-11a (SPA-181)
+// lifted `apps/worker` out of apps/web/src/worker; it is proved now, with
+// one deliberate opening described at the zone.
 /** @param {ReadonlyArray<string>} names */
 const internal = (names) => `^@spaces/(${names.join('|')})(/|$)`
 /** @param {ReadonlyArray<string>} dirs */
@@ -115,22 +118,53 @@ const CORE_IMPORTS_DB_AND_SDK_ONLY = {
 const WEB_NEVER_PLUGINS_NEVER_WORKER = {
   regex: [
     internal(['worker', PLUGIN_PKG]),
-    // `worker` bare: apps/worker once mono-11a lifts it out, and until then
-    // apps/web/src/worker itself, which NO_WEB_INTO_WORKER already fences.
+    // `worker` bare: `../../worker/` from apps/web/src is apps/worker since
+    // SPA-181; NO_WEB_INTO_WORKER is the resolved-path form of the same edge.
     climbsInto(['apps/worker', 'plugins', 'worker']),
   ].join('|'),
   message:
     'The web app imports @spaces/core and @spaces/sdk, never a plugin and never the worker (docs/spec-plugin-sdk.md §2: "web → core, sdk. Never plugins/*, never worker"). Plugin code runs in apps/worker only; web renders from manifests.',
 }
-// Unproven until apps/worker exists — mono-11a (SPA-181) lifts the worker out
-// of apps/web/src/worker and is where this zone gets its failing-case test.
+// Proved since SPA-181 (mono-11a), which lifted the worker out of
+// apps/web/src/worker into apps/worker — with one opening the spec does not
+// have, taken on the issue's option (a): the job modules still import server
+// modules that have not left apps/web/src/lib (the AI lanes, arrival,
+// documents, import, search, the queue sender), so the worker may cross into
+// `apps/web/src/lib/**` — and its tests into `apps/web/src/test/**` — through
+// the `#web/*` alias its tsconfig declares, and nowhere else: `#/` is banned
+// here outright (the worker has no `#/` of its own, and a web module reached
+// by that spelling would hide the crossing), and a relative climb into
+// apps/web is banned so every crossing is greppable as `#web/`. The fence
+// narrows as lib/ moves into core; the day the list below is empty, the
+// alias and this paragraph go.
+//
+// The crossing list (2026-09-29, `grep -rho "'#web/[^']*'" apps/worker/src`),
+// shipping code first:
+//   lib/ai/{attribute-run, classify-document, column-run, complete,
+//     embed-backfill, embed-document, embed-source, key-terms, read-deck,
+//     read-deck-summarize, run, sensitivity-for, suggest-spaces, summarize,
+//     vision}
+//   lib/arrival/{poll, schedule}
+//   lib/documents/{blob-refs, fetch-guard, on-extracted, vision-gate}
+//   lib/glossary/link-terms · lib/import/commit · lib/queue · lib/server/env
+// and, from tests only:
+//   lib/ai/{embed-chunks, embedding-pin, propose, route, providers/embed/ids,
+//     providers/embed/settings}
+//   lib/arrival/{fixtures, settings} · lib/context/record
+//   lib/documents/{birth, clip, intake, prepare, read-deck-gate, shelf,
+//     space-sources} · lib/import/{mapping, plan} · lib/inbox/queue
+//   lib/rpc/{api, versions} · lib/search/{query, query-embedding}
+//   lib/server/shared · lib/tokens/store
+//   test/{fake-imap, fake-ollama, minimal-pdf, queue-stub, reseed}
 const WORKER_NEVER_WEB_NEVER_PLUGINS = {
   regex: [
     internal(['web', PLUGIN_PKG]),
+    '^#/',
+    '^#web/(?!lib/|test/)',
     climbsInto(['apps/web', 'plugins', 'web']),
   ].join('|'),
   message:
-    'The worker imports @spaces/core and @spaces/sdk, never the web app; a plugin is a runtime import() from the plugin directory, never a compile-time import (docs/spec-plugin-sdk.md §2: "worker → core, sdk. Never plugins/* at compile time").',
+    'The worker imports @spaces/core and @spaces/sdk, never the web app; a plugin is a runtime import() from the plugin directory, never a compile-time import (docs/spec-plugin-sdk.md §2: "worker → core, sdk. Never plugins/* at compile time"). Until the modules under apps/web/src/lib move into core, the one allowed crossing is `#web/lib/*` (and `#web/test/*` from a test), listed in the zone comment — never `#/`, never a relative path into apps/web.',
 }
 // Unproven against the real package until sdk-3 births it; proved against
 // packages/config/fixtures/sdk.
@@ -255,9 +289,7 @@ export default [
     },
   },
   // The web boundary over the rest of the app (spec §2, SPA-180). routes/ and
-  // components/ carry it in the block above; the worker directory is in scope
-  // here — it is web code until mono-11a, and a plugin import is banned there
-  // as everywhere in web.
+  // components/ carry it in the block above.
   {
     files: ['apps/web/src/**'],
     ignores: ['apps/web/src/routes/**', 'apps/web/src/components/**'],
@@ -322,14 +354,11 @@ export default [
   // …and the worker edge again, over the rest of the app. The block above
   // owns routes/ and components/, where this rule's options would be replaced
   // rather than extended, so those two are excluded here and carry the zone in
-  // their own list. The worker excludes itself: it is allowed to be the worker.
+  // their own list. (The worker used to exclude itself here; since SPA-181 it
+  // is apps/worker and not under this glob at all.)
   {
     files: ['apps/web/src/**'],
-    ignores: [
-      'apps/web/src/routes/**',
-      'apps/web/src/components/**',
-      'apps/web/src/worker/**',
-    ],
+    ignores: ['apps/web/src/routes/**', 'apps/web/src/components/**'],
     rules: {
       'import/no-restricted-paths': [
         'error',
@@ -393,6 +422,7 @@ export default [
   {
     files: [
       'apps/web/src/**/*.{ts,tsx}',
+      'apps/worker/src/**/*.ts',
       'packages/db/src/**/*.ts',
       'packages/core/src/**/*.ts',
     ],
@@ -411,9 +441,15 @@ export default [
   // Guard against accidental full-table update/delete (portfolio event
   // tables are append-only by design). packages/db is in scope too: the
   // schema moved there in SPA-142 and so did `heartbeat.ts`, which writes;
-  // packages/core since SPA-174, when its `src/writes/` half began to.
+  // packages/core since SPA-174, when its `src/writes/` half began to;
+  // apps/worker since SPA-181, when the jobs moved there.
   {
-    files: ['apps/web/src/**', 'packages/db/src/**', 'packages/core/src/**'],
+    files: [
+      'apps/web/src/**',
+      'apps/worker/src/**',
+      'packages/db/src/**',
+      'packages/core/src/**',
+    ],
     plugins: { drizzle },
     rules: {
       'drizzle/enforce-delete-with-where': [

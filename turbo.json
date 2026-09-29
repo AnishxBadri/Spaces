@@ -20,7 +20,10 @@
 // Since SPA-142 there is a second package with source in it, `@spaces/db`,
 // carrying its own `test`, `typecheck` and `lint` scripts. Nothing here
 // needed changing for it — that is what the package-task shape was for — but
-// it is why `--filter=@spaces/db` now means something.
+// it is why `--filter=@spaces/db` now means something. The same held for
+// `@spaces/core` (SPA-174), `@spaces/config` (SPA-180) and `@spaces/worker`
+// (SPA-181): each joined `dev`, `test`, `typecheck` and `lint` by carrying
+// the script, with no entry here.
 {
   "$schema": "https://turbo.build/schema.json",
 

@@ -17,12 +17,18 @@ import { describe, expect, it } from 'vitest'
  *     own — the extract job, the URL clip, and the dev seed — and none of
  *     those files calls a model;
  *   - the one file that both calls a model and writes a document's text is
- *     `worker/jobs/vision-document.ts`, and it writes it through
+ *     `apps/worker/src/jobs/vision-document.ts`, and it writes it through
  *     extraction's statement (`ExtractionStore.markExtracted`), naming no
  *     column of `document` itself.
  */
 
-const SRC = resolve(fileURLToPath(new URL('.', import.meta.url)), '../..')
+// Both source trees (SPA-181): the writers are split between apps/web (the
+// dev seed) and apps/worker (the jobs). Paths are repo-relative.
+const ROOT = resolve(
+  fileURLToPath(new URL('.', import.meta.url)),
+  '../../../../..',
+)
+const TREES = ['apps/web/src', 'apps/worker/src']
 
 function sources(dir: string): Array<string> {
   return readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
@@ -32,10 +38,12 @@ function sources(dir: string): Array<string> {
   })
 }
 
-const files = sources(SRC).map((path) => ({
-  path: relative(SRC, path),
-  text: readFileSync(path, 'utf8'),
-}))
+const files = TREES.flatMap((tree) => sources(join(ROOT, tree))).map(
+  (path) => ({
+    path: relative(ROOT, path),
+    text: readFileSync(path, 'utf8'),
+  }),
+)
 
 /** A statement against the `document` table that sets `extracted_text`. */
 const writesText = (text: string): boolean =>
@@ -56,9 +64,9 @@ describe('vision is the only sanctioned direct AI write to a document', () => {
   it('the statements that write extracted_text are extraction’s, and none calls a model', () => {
     const writers = files.filter((f) => writesText(f.text))
     expect(writers.map((f) => f.path).sort()).toEqual([
-      'lib/seeds/dev.ts',
-      'worker/jobs/clip-document.ts',
-      'worker/jobs/extract-document.ts',
+      'apps/web/src/lib/seeds/dev.ts',
+      'apps/worker/src/jobs/clip-document.ts',
+      'apps/worker/src/jobs/extract-document.ts',
     ])
     expect(writers.filter((f) => callsModel(f.text))).toEqual([])
   })
@@ -68,12 +76,12 @@ describe('vision is the only sanctioned direct AI write to a document', () => {
       .filter((f) => callsModel(f.text))
       .filter((f) => writesText(f.text) || marksExtracted(f.text))
       .map((f) => f.path)
-    expect(aiWriters).toEqual(['worker/jobs/vision-document.ts'])
+    expect(aiWriters).toEqual(['apps/worker/src/jobs/vision-document.ts'])
   })
 
   it('and it writes through extraction’s statement, naming no document column', () => {
     const vision = files.find(
-      (f) => f.path === 'worker/jobs/vision-document.ts',
+      (f) => f.path === 'apps/worker/src/jobs/vision-document.ts',
     )
     expect(vision).toBeDefined()
     expect(vision?.text).toMatch(/store\.markExtracted\(/)

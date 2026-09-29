@@ -19,7 +19,7 @@ import type {
  * resolves the default rather than throwing — and writes the answer onto
  * every chunk the entity owns, whatever its `source_kind`.
  *
- * Two callers: the embed job (`../../worker/jobs/embed-document.ts`), which
+ * Two callers: the embed job (`apps/worker/src/jobs/embed-document.ts`), which
  * stamps the chunks it has just written, and storage-18, which will restamp
  * when a binding's sensitivity or a record's filing changes. Nothing else
  * may set the column; an insert leaves it at its default and this corrects

@@ -38,6 +38,6 @@ services:
       app:
         condition: service_healthy
     # No ports: the worker serves nothing. Its HEALTHCHECK reads its own
-    # worker_heartbeat row (src/worker/health.ts), so `docker ps` flips it to
+    # worker_heartbeat row (apps/worker/src/health.ts), so `docker ps` flips it to
     # unhealthy within a minute of the worker process stopping.
     restart: unless-stopped

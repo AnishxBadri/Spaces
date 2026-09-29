@@ -1,0 +1,18 @@
+{
+  "//": "Two path aliases, both pointing at apps/web/src, for two different readers (SPA-181). `#web/*` is the worker's own spelling of a crossing into the web tree — the eslint worker zone allows it for lib/ and test/ and lists every specifier that uses it. `#/*` is never written in this package (the zone bans it here) and exists for the web modules the worker loads through `#web/*`, which import each other as `#/lib/…`: tsx resolves `#/` from tsconfig `paths` and reads one tsconfig per process, this one when the worker runs, so without the entry the first web module loaded would die on its first `#/` specifier. Under tsc the same entry resolves those modules' imports exactly as apps/web's own package.json `imports` does. Both entries go when lib/ has moved into core.",
+
+  "extends": "../../packages/config/tsconfig.base.json",
+
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"],
+
+  "compilerOptions": {
+    "paths": {
+      "#web/*": ["../web/src/*"],
+      "#/*": ["../web/src/*"]
+    },
+    // node:crypto, node:stream and `process` in the jobs; nothing here
+    // renders, so no `vite/client`.
+    "types": ["node"]
+  }
+}

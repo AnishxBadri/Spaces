@@ -29,8 +29,8 @@ block before designing anything); synthesis in `docs/ARCHITECTURE.md`; ADRs in
 
 ```
 docker compose -f docker-compose.dev.yml up -d   # Postgres :5432 + MinIO :9000
-pnpm dev                                          # vite, port 3000
-pnpm worker                                       # background worker
+pnpm dev                                          # turbo `dev`: vite on :3000 and the worker (tsx watch)
+pnpm worker                                       # the worker alone (apps/worker, no watch)
 ```
 
 - **pnpm workspace since 2026-09-19 (SPA-101).** The app is `apps/web`
@@ -67,6 +67,24 @@ pnpm worker                                       # background worker
   modules in `eslint-rules/` (gate 5's `instrument/vocabulary`),
   `prettier.base.js`, and `fixtures/{sdk,plugins}` — the two directories
   the sdk and plugin zones are fenced against until those packages exist.**
+  **`apps/worker` (`@spaces/worker`) is the worker process since SPA-181
+  (mono-11a)**: the pg-boss host (`src/index.ts`), `runJob`, the heartbeat,
+  the container health command and every job module under `src/jobs/`,
+  lifted out of `apps/web/src/worker` as a move. It depends on
+  `@spaces/core`, `@spaces/db` and pg-boss and never on apps/web as a
+  package — but its jobs still import server modules that have not left
+  `apps/web/src/lib` (the AI lanes, arrival, documents, import, search, the
+  queue sender). Those cross through **`#web/*`**, an alias in
+  `apps/worker/tsconfig.json` and `vitest.config.ts` that means
+  `apps/web/src/*`; the eslint worker zone allows it for `lib/` and `test/`
+  only, bans `#/` and any relative climb into apps/web outright, and lists
+  every crossing specifier in its comment
+  (`packages/config/eslint.base.js`, `WORKER_NEVER_WEB_NEVER_PLUGINS`). The
+  fence narrows as lib/ moves into core; when the list is empty the alias
+  goes. `#/` is deliberately absent from the worker, like db and core. Start
+  it with `pnpm worker` from the root (a plain `--filter` proxy) or
+  `corepack pnpm worker` inside `apps/worker`; `pnpm dev` now runs it too,
+  under turbo's persistent `dev` task, in watch mode.
   What stayed at the root: `eslint.config.js` and `prettier.config.js` as
   one-line shims re-exporting `@spaces/config/eslint` and
   `@spaces/config/prettier` (both tools look their config up from the cwd,
@@ -113,9 +131,11 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
   reach by construction. The grain is a database per vitest worker —
   `apps/web` runs `maxWorkers: 4` on `pool: 'forks'` against
   `spaces_test_web1…4`; `packages/db` runs `fileParallelism: false` against
-  `spaces_test_db1`, and `packages/core` the same against `spaces_test_core1`
+  `spaces_test_db1`, `packages/core` the same against `spaces_test_core1`
   (SPA-174/175; core's `vitest.seed.ts` seeds the system attributes and the
-  fixture user, which apps/web's seed composes and adds the taxonomy to) —
+  fixture user, which apps/web's seed composes and adds the taxonomy to),
+  and `apps/worker` runs `maxWorkers: 4` against `spaces_test_worker1…4`
+  with its own harness pair and a seed composed like apps/web's (SPA-181) —
   because a truncate must not be able to reach a file
   running at the same moment in another worker. Drop any `spaces_test*`
   database any time; the next run rebuilds it. With Postgres down the setup
@@ -136,9 +156,9 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
    root half's until SPA-180) each cover their own source (the `typecheck`
    half, one task per package). The root script runs them all; a bare root
    `tsc` would pass while typechecking none of them.
-2. `pnpm test` → `turbo run test` (`vitest run` in `apps/web` and in
-   `packages/db`, which carries its own vitest config) — must be fully
-   green
+2. `pnpm test` → `turbo run test` (`vitest run` in `apps/web`, `apps/worker`,
+   `packages/db` and `packages/core`, each with its own vitest config) —
+   must be fully green
 3. prettier on touched files (root: `pnpm exec prettier --check <files>`) —
    not a turbo task; it is per-file, not per-package
 4. `pnpm lint` → `turbo run lint lint:root` — must be zero errors (the old
@@ -182,8 +202,9 @@ property. `--force` re-runs a task regardless.
 Pre-commit hooks (lefthook) run prettier + eslint on staged files from the
 repo root, where the two shims hand both tools `packages/config`'s settings;
 pre-push runs `pnpm run typecheck`, which is turbo over every package that
-has one — `@spaces/web`, `@spaces/db`, `@spaces/core`, `@spaces/config` —
-plus the `typecheck:root` half, so no package can be typechecked by nobody.
+has one — `@spaces/web`, `@spaces/worker`, `@spaces/db`, `@spaces/core`,
+`@spaces/config` — plus the `typecheck:root` half, so no package can be
+typechecked by nobody.
 CI (`.github/workflows/ci.yml`) runs the same root commands, **one named step
 per gate** against a real Postgres: prettier, `pnpm run lint` (which carries
 gate 5, since it is an eslint rule), `pnpm run typecheck`, `boot.ts` against

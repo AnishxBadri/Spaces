@@ -162,7 +162,13 @@ describe('onDocumentExtracted — classify routed', () => {
 
 // ---------- the single author ----------
 
-const SRC = resolve(fileURLToPath(new URL('.', import.meta.url)), '../..')
+// Both source trees (SPA-181): the author is apps/web's, its callers are
+// apps/worker's jobs. Paths are repo-relative.
+const ROOT = resolve(
+  fileURLToPath(new URL('.', import.meta.url)),
+  '../../../../..',
+)
+const TREES = ['apps/web/src', 'apps/worker/src']
 
 function sources(dir: string): Array<string> {
   return readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
@@ -172,10 +178,12 @@ function sources(dir: string): Array<string> {
   })
 }
 
-const files = sources(SRC).map((path) => ({
-  path: relative(SRC, path),
-  text: readFileSync(path, 'utf8'),
-}))
+const files = TREES.flatMap((tree) => sources(join(ROOT, tree))).map(
+  (path) => ({
+    path: relative(ROOT, path),
+    text: readFileSync(path, 'utf8'),
+  }),
+)
 
 describe('document.extracted has one author', () => {
   it('onDocumentExtracted is called from extract-document.ts, once, and nowhere else', () => {
@@ -184,7 +192,7 @@ describe('document.extracted has one author', () => {
     )
     // The definition is `Effect.fn('onDocumentExtracted')(…)` and does not
     // match; what is left is the one call on extraction's success path.
-    expect(calls).toEqual(['worker/jobs/extract-document.ts'])
+    expect(calls).toEqual(['apps/worker/src/jobs/extract-document.ts'])
   })
 
   it('the store seam is called by extraction and by the vision write, and nobody else', () => {
@@ -196,8 +204,8 @@ describe('document.extracted has one author', () => {
       [...f.text.matchAll(/\bstore\.onExtracted\(/g)].map(() => f.path),
     )
     expect(calls.sort()).toEqual([
-      'worker/jobs/extract-document.ts',
-      'worker/jobs/vision-document.ts',
+      'apps/worker/src/jobs/extract-document.ts',
+      'apps/worker/src/jobs/vision-document.ts',
     ])
   })
 
@@ -207,8 +215,8 @@ describe('document.extracted has one author', () => {
       [...f.text.matchAll(followOn)].map((m) => `${f.path} ${m[1]}`),
     )
     expect(enqueuers.sort()).toEqual([
-      'lib/documents/on-extracted.ts classifyDocument',
-      'lib/documents/on-extracted.ts embedDocument',
+      'apps/web/src/lib/documents/on-extracted.ts classifyDocument',
+      'apps/web/src/lib/documents/on-extracted.ts embedDocument',
     ])
   })
 })

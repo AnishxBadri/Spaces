@@ -56,16 +56,18 @@ if ! (touch "$PROBE" && rm -f "$PROBE") 2>/dev/null; then
 fi
 
 # Migrations auto-run on every boot — no `docker exec` step, ever.
-node_modules/.bin/tsx src/db/boot.ts
+# Paths are the workspace's own since SPA-181 (apps/web, apps/worker under
+# /app); the supervision block below is unchanged but for them.
+node_modules/.bin/tsx apps/web/src/db/boot.ts
 
 ROLE="${ROLE:-all}"
 
 case "$ROLE" in
   web)
-    exec node .output/server/index.mjs
+    exec node apps/web/.output/server/index.mjs
     ;;
   worker)
-    exec node_modules/.bin/tsx src/worker/index.ts
+    exec node_modules/.bin/tsx apps/worker/src/index.ts
     ;;
   all)
     # Two processes, one container: pg-boss worker + Nitro web server.
@@ -77,9 +79,9 @@ case "$ROLE" in
     # the web PID alone left a crashed worker invisible — a "healthy"
     # container where extraction silently never runs. `wait -n` isn't in
     # busybox ash, so poll.
-    node_modules/.bin/tsx src/worker/index.ts &
+    node_modules/.bin/tsx apps/worker/src/index.ts &
     WORKER_PID=$!
-    node .output/server/index.mjs &
+    node apps/web/.output/server/index.mjs &
     WEB_PID=$!
     # EC distinguishes operator stop from crash: the trap is the one place
     # we know the shutdown was asked for — exit 0 there, 1 everywhere else,

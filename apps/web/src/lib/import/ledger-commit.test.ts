@@ -500,7 +500,7 @@ describe('nothing overwritten', () => {
       './ledger.ts',
       '../portfolio/write.ts',
       '../portfolio/holding.ts',
-      '../../worker/jobs/import-commit.ts',
+      '../../../../worker/src/jobs/import-commit.ts',
     ]) {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8')
       expect(source.match(EVENT_TABLE_WRITE), file).toBeNull()

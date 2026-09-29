@@ -5,12 +5,12 @@ Self-hosted deal management for angel and private-capital investing.
 ## Getting started (from a clean clone)
 
 ```bash
-pnpm install                                      # links apps/web and packages/config
+pnpm install                                      # links apps/web, apps/worker and packages/*
 docker compose -f docker-compose.dev.yml up -d    # Postgres :5432 (+ MinIO :9000)
 $EDITOR .env.local                                # the two values below
 pnpm db:migrate:run                               # migrations + system attributes
 pnpm dev                                          # http://localhost:3000
-pnpm worker                                       # in a second terminal
+pnpm worker                                       # in a second terminal (or let `pnpm dev` run it)
 ```
 
 `.env.local` lives at the **repo root** and needs two values:
@@ -26,6 +26,7 @@ This is a pnpm workspace (since 2026-09-19).
 
 ```
 apps/web/            the app — @spaces/web. src/ and the configs it owns
+apps/worker/         the pg-boss worker — @spaces/worker (SPA-181); its jobs still reach apps/web/src/lib through `#web/*`
 packages/db/         @spaces/db — drizzle schema, the drizzle/ journal, migrator
 packages/config/     tsconfig.base.json, the eslint base (+ eslint-rules/) and prettier config, shared by every package
 eslint.config.js     shim — re-exports packages/config's (prettier.config.js likewise)
@@ -37,16 +38,16 @@ Every script below runs **from the repo root**; each is a proxy that delegates
 with `pnpm --filter`. Inside a package, `#/` always means that package's own
 `src/`, so `#/lib/server/deals` in `apps/web` is `apps/web/src/lib/server/deals`.
 
-| command               | what it does                                 |
-| --------------------- | -------------------------------------------- |
-| `pnpm dev`            | vite dev server on :3000                     |
-| `pnpm worker`         | the pg-boss worker                           |
-| `pnpm build`          | production build into `apps/web/.output`     |
-| `pnpm test`           | vitest (needs Postgres up)                   |
-| `pnpm typecheck`      | every tsconfig — root, apps/web, packages/db |
-| `pnpm lint`           | eslint, including the design-token rule      |
-| `pnpm db:migrate:run` | run migrations and reseed system attributes  |
-| `pnpm db:generate`    | generate a migration after a schema change   |
+| command               | what it does                                  |
+| --------------------- | --------------------------------------------- |
+| `pnpm dev`            | vite dev server on :3000 + the worker (watch) |
+| `pnpm worker`         | the pg-boss worker alone (apps/worker)        |
+| `pnpm build`          | production build into `apps/web/.output`      |
+| `pnpm test`           | vitest (needs Postgres up)                    |
+| `pnpm typecheck`      | every tsconfig — root, apps/_, packages/_     |
+| `pnpm lint`           | eslint, including the design-token rule       |
+| `pnpm db:migrate:run` | run migrations and reseed system attributes   |
+| `pnpm db:generate`    | generate a migration after a schema change    |
 
 # Self-hosting over HTTPS
 
@@ -148,7 +149,7 @@ healthcheck and restart it. Only an unreachable database answers 503 with
 
 The worker container runs no HTTP server, so its `HEALTHCHECK` is not a wget —
 the Dockerfile branches on `$ROLE` and a `ROLE=worker` container asks its own
-row instead (`src/worker/health.ts`, exit 0 fresh / 1 stale). Stop the worker
+row instead (`apps/worker/src/health.ts`, exit 0 fresh / 1 stale). Stop the worker
 process and `docker ps` shows that container `unhealthy` within a minute while
 the web container stays `healthy`. A graceful stop leaves the row in place on
 purpose: staleness is the signal, so the operator can still see when the

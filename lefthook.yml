@@ -22,8 +22,8 @@ pre-commit:
 pre-push:
   jobs:
     # `turbo run typecheck typecheck:root` — one tsc per package (@spaces/web,
-    # @spaces/db, @spaces/core) plus the root tsconfig (scripts/ + the root
-    # config files). A bare `tsc --noEmit` at the root would typecheck the
-    # scripts and silently skip all three packages.
+    # @spaces/worker, @spaces/db, @spaces/core, @spaces/config) plus the root
+    # tsconfig (scripts/ + the two config shims). A bare `tsc --noEmit` at the
+    # root would typecheck the shims and silently skip every package.
     - name: typecheck
       run: pnpm run typecheck

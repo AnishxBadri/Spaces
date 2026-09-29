@@ -23,6 +23,7 @@ eslint.config.js · prettier.config.js   shims re-exporting packages/config's (S
 lefthook.yml            root-owned git hooks
 packages/config/        tsconfig.base.json, eslint.base.js + eslint-rules/ (gate 5, the
                         architecture zones), prettier.base.js
+apps/worker/            the pg-boss worker (@spaces/worker, SPA-181) — src/index.ts, run-job.ts, jobs/
 apps/web/               the app (@spaces/web)
   drizzle/              generated SQL migrations, numbered (0001…0023)
   src/                  everything below
@@ -134,12 +135,16 @@ entity-referencing column that skips the registry fails CI by name. The
 still hand-walks its tables, and closing that loop is what stops a new edge
 table from silently vanishing from "everything about this record".
 
-### 5. Worker — `src/worker/` (pg-boss)
+### 5. Worker — `apps/worker/src/` (pg-boss; its own package since SPA-181)
 
-CPU-bound work only; web must never run it inline. Currently
-`jobs/extract-document.ts` (text extraction/embedding). Dev runs it as
-`pnpm worker`; prod entrypoint supervises both processes (either dies →
-container exits).
+CPU-bound work only; web must never run it inline. `index.ts` registers every
+queue and runs each job through `run-job.ts`; the jobs are under `jobs/`
+(extract, embed ×3, clip, read-deck, classify, suggest-spaces, the two sweeps,
+summarize, the attribute runs, key terms, vision, poll-mailbox, import-commit).
+The jobs still import server modules from `apps/web/src/lib` through the
+`#web/*` alias, which the eslint worker zone allows and lists. Dev runs it as
+`pnpm worker` (or under `pnpm dev`); prod entrypoint supervises both processes
+(either dies → container exits).
 
 ### 6. Components — `src/components/`
 

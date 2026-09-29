@@ -171,12 +171,12 @@ describe('intakeDocumentProgram', () => {
     })
 
     // Birth handed the row to the worker, which is not running here. Driving
-    // the extract job itself needs to import `#/worker/**`, and spec §2's
+    // the extract job itself needs to import from apps/worker, and spec §2's
     // seam — `web → core, sdk, never worker`, an eslint zone since SPA-146 —
     // forbids that from `lib/`. So the other half of this arrival, the one
     // that reaches extraction_status 'done' off these exact bytes, is
-    // `src/worker/jobs/extract-document.arrival.test.ts`, on the worker's
-    // side of the line where the import is legal.
+    // `apps/worker/src/jobs/extract-document.arrival.test.ts`, on the
+    // worker's side of the line where the import is legal.
     const { QUEUES } = await import('@spaces/core/queue/names')
     const { enqueued } = await import('#/test/queue-stub')
     expect(enqueued).toEqual([
@@ -329,12 +329,20 @@ describe('intakeDocumentProgram', () => {
  */
 describe('one writer of bytes, per lane', () => {
   const src = resolve(fileURLToPath(new URL('.', import.meta.url)), '../..')
+  // Both source trees (SPA-181): intake is apps/web's lane, the clip job's
+  // PDF branch is apps/worker's. Paths are repo-relative.
+  const root = resolve(src, '../../..')
+  const trees = ['apps/web/src', 'apps/worker/src']
 
   function sourcesContaining(needle: string): Array<string> {
-    return readdirSync(src, { recursive: true, encoding: 'utf8' })
-      .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
-      .filter((f) => !f.startsWith('lib/seeds/'))
-      .filter((f) => readFileSync(join(src, f), 'utf8').includes(needle))
+    return trees
+      .flatMap((tree) =>
+        readdirSync(join(root, tree), { recursive: true, encoding: 'utf8' })
+          .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
+          .filter((f) => !f.startsWith('lib/seeds/'))
+          .map((f) => join(tree, f)),
+      )
+      .filter((f) => readFileSync(join(root, f), 'utf8').includes(needle))
       .sort()
   }
 
@@ -351,14 +359,14 @@ describe('one writer of bytes, per lane', () => {
    */
   it('has exactly two storage().put( outside tests and seeds', () => {
     expect(sourcesContaining('storage().put(')).toEqual([
-      'lib/documents/intake.ts',
-      'worker/jobs/clip-document.ts',
+      'apps/web/src/lib/documents/intake.ts',
+      'apps/worker/src/jobs/clip-document.ts',
     ])
   })
 
   it('has exactly one caller of putContentAddressed, the blob route', () => {
     expect(sourcesContaining('.putContentAddressed(')).toEqual([
-      'routes/api/blob/$key.ts',
+      'apps/web/src/routes/api/blob/$key.ts',
     ])
   })
 
@@ -380,7 +388,7 @@ describe('one writer of bytes, per lane', () => {
       readFileSync(join(src, 'lib/documents/intake.ts'), 'utf8'),
     ).toContain('clip-document.ts')
     expect(
-      readFileSync(join(src, 'worker/jobs/clip-document.ts'), 'utf8'),
+      readFileSync(join(root, 'apps/worker/src/jobs/clip-document.ts'), 'utf8'),
     ).toContain('lib/documents/intake.ts')
   })
 })

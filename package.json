@@ -15,7 +15,7 @@
     "typecheck": "turbo run typecheck typecheck:root",
     "lint:root": "eslint scripts --no-error-on-unmatched-pattern",
     "typecheck:root": "tsc --noEmit",
-    "worker": "pnpm --filter @spaces/web worker",
+    "worker": "pnpm --filter @spaces/worker worker",
     "preview": "pnpm --filter @spaces/web preview",
     "db:migrate:run": "pnpm --filter @spaces/web db:migrate:run",
     "db:seed": "pnpm --filter @spaces/web db:seed",
