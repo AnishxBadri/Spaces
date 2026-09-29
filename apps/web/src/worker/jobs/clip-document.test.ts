@@ -300,7 +300,7 @@ describe('clipDocument', () => {
    */
   describe('a PDF response', () => {
     it('hashes, stores and enqueues extraction — the same row shape as an upload', async () => {
-      const { storage } = await import('#/lib/storage')
+      const { storage } = await import('@spaces/core/writes/storage')
       const { QUEUES } = await import('@spaces/core/queue/names')
       const { enqueued } = await import('#/test/queue-stub')
 
@@ -342,7 +342,7 @@ describe('clipDocument', () => {
     })
 
     it('reads the magic bytes when the server mislabels the type', async () => {
-      const { storage } = await import('#/lib/storage')
+      const { storage } = await import('@spaces/core/writes/storage')
       const bytes = minimalPdf('Mislabelled')
       const sha = createHash('sha256').update(bytes).digest('hex')
       stubFetch(() =>
@@ -369,7 +369,7 @@ describe('clipDocument', () => {
     })
 
     it('shares one blob with an identical uploaded file', async () => {
-      const { storage } = await import('#/lib/storage')
+      const { storage } = await import('@spaces/core/writes/storage')
       const { blobIsReferenced } = await import('#/lib/documents/blob-refs')
       const { intakeDocumentProgram } = await import('#/lib/documents/intake')
       const { Effect } = await import('effect')
@@ -414,7 +414,7 @@ describe('clipDocument', () => {
     })
 
     it('records a PDF over the byte cap as failed, storing nothing', async () => {
-      const { storage } = await import('#/lib/storage')
+      const { storage } = await import('@spaces/core/writes/storage')
       const { enqueued } = await import('#/test/queue-stub')
 
       // One byte past the cap. `guardedFetch` counts off the stream, so the
@@ -464,7 +464,7 @@ describe('clipDocument', () => {
       const { listDocumentsProgram } = await import('#/lib/documents/shelf')
       const { spaceSourcesProgram } =
         await import('#/lib/documents/space-sources')
-      const { storage } = await import('#/lib/storage')
+      const { storage } = await import('@spaces/core/writes/storage')
 
       const tag = randomUUID().slice(0, 8)
       const spaceId = await createSpaceRow(

@@ -10,7 +10,7 @@ import { guessDocumentKind } from '@spaces/core/documents'
 import { QUEUES } from '@spaces/core/queue/names'
 import { guardedFetch } from '#/lib/documents/fetch-guard'
 import { enqueue } from '#/lib/queue'
-import { storage } from '#/lib/storage'
+import { storage } from '@spaces/core/writes/storage'
 import { JobPermanent, JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 

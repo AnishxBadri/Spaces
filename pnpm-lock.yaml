@@ -275,6 +275,12 @@ importers:
 
   packages/core:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.1101.0
+        version: 3.1101.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: ^3.1101.0
+        version: 3.1101.0
       '@spaces/db':
         specifier: workspace:*
         version: link:../db

@@ -18,7 +18,7 @@ import { FakeImapServer } from '#/test/fake-imap'
 import { minimalPdf } from '#/test/minimal-pdf'
 import { enqueued } from '#/test/queue-stub'
 import { truncateAndReseed } from '#/test/reseed'
-import { storage } from '#/lib/storage'
+import { storage } from '@spaces/core/writes/storage'
 import { searchAllProgram } from '#/lib/search/query'
 import {
   MAILBOX,

@@ -139,7 +139,7 @@ describe('intakeDocumentProgram', () => {
     const sha = shaOf(bytes)
     const companyId = await aCompany(tag)
     const integrationId = await anIntegration(tag)
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
 
     const { id, deduped } = await intake({
       stream: Readable.from([bytes]),
@@ -191,7 +191,7 @@ describe('intakeDocumentProgram', () => {
     const bytes = minimalPdf(`Already here ${tag}`)
     const sha = shaOf(bytes)
     const companyId = await aCompany(tag)
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
 
     // The same bytes, already arrived from another provider.
     await storage().put(sha, bytes, { mime: 'application/pdf' })
@@ -216,7 +216,7 @@ describe('intakeDocumentProgram', () => {
 
   it('destroys a source past MAX_UPLOAD_BYTES that declared no size, storing nothing', async () => {
     const tag = randomUUID().slice(0, 8)
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     const { documentIntakeMessage } = await import('./intake')
     const put = vi.spyOn(storage(), 'put')
 
@@ -270,7 +270,7 @@ describe('intakeDocumentProgram', () => {
 
   it('arrives a generated 200 MB fixture with peak RSS growth under 96 MB', async () => {
     const tag = randomUUID().slice(0, 8)
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
 
     // 64 KiB × 3200 = 200 MiB, generated a chunk at a time. Never a Buffer of
     // the whole thing: that is the failure mode this bound exists to catch.
@@ -366,9 +366,14 @@ describe('one writer of bytes, per lane', () => {
     expect(
       readFileSync(join(src, 'lib/documents/intake.ts'), 'utf8'),
     ).toContain('putContentAddressed')
-    expect(readFileSync(join(src, 'lib/storage/local.ts'), 'utf8')).toContain(
-      'lib/documents/intake.ts',
-    )
+    // The local driver lives in @spaces/core since SPA-178; the lane it
+    // names is still this app's.
+    expect(
+      readFileSync(
+        join(src, '../../../packages/core/src/writes/storage/local.ts'),
+        'utf8',
+      ),
+    ).toContain('lib/documents/intake.ts')
     // And the clip's own branch, both ways: why it does not reuse intake,
     // and — in intake — why intake does not serve it.
     expect(

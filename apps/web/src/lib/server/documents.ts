@@ -6,7 +6,7 @@ import { user } from '@spaces/db/schema/auth'
 import { document, entity, jobRun, link } from '@spaces/db/schema'
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
 import { QUEUES } from '@spaces/core/queue/names'
-import { storage } from '../storage'
+import { storage } from '@spaces/core/writes/storage'
 import {
   deleteDocumentWithBlobGc,
   documentFilingEdges,

@@ -57,7 +57,7 @@ async function aSpace(tag: string): Promise<string> {
  * needs the master key, which only signs URLs.
  */
 async function aBlob(tag: string): Promise<string> {
-  const { storage } = await import('#/lib/storage')
+  const { storage } = await import('@spaces/core/writes/storage')
   const bytes = Buffer.from(`deck ${tag}\n`, 'utf8')
   const sha = createHash('sha256').update(bytes).digest('hex')
   await storage().put(sha, bytes, { mime: 'text/plain' })
@@ -266,7 +266,7 @@ describe('deleting a filed document', () => {
     const { db } = await import('@spaces/db')
     const { document, entity } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     const { deleteDocumentWithBlobGc } = await import('./shared')
     const tag = randomUUID().slice(0, 8)
     const sha = await aBlob(tag)

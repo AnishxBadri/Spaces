@@ -60,7 +60,7 @@ async function prepareAndPut(
 ): Promise<{ sha: string; alreadyStored: boolean }> {
   const { Effect } = await import('effect')
   const { prepareBlobUploadProgram } = await import('#/lib/documents/prepare')
-  const { storage } = await import('#/lib/storage')
+  const { storage } = await import('@spaces/core/writes/storage')
   const { sha, bytes } = shaOf(tag)
   const out = await Effect.runPromise(
     prepareBlobUploadProgram({
@@ -122,7 +122,7 @@ async function fileIt(sha: string, tag: string, entityId: string) {
 
 describe('a prepare with no finalize', () => {
   it('leaves the bytes and a pending row, and the grace period decides', async () => {
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     const tag = randomUUID().slice(0, 8)
     const { sha } = await prepareAndPut(tag)
 
@@ -156,7 +156,7 @@ describe('a prepare with no finalize', () => {
 
 describe('a prepare followed by a finalize', () => {
   it('leaves no pending row, and the sweep never touches a filed blob', async () => {
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     const tag = randomUUID().slice(0, 8)
     const { sha } = await prepareAndPut(tag)
     expect(await pendingRows(sha)).toEqual([{ sha }])
@@ -192,7 +192,7 @@ describe('a prepare followed by a finalize', () => {
   })
 
   it('survives one of two rows being deleted, and goes with the last', async () => {
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     const { deleteDocumentWithBlobGc } = await import('#/lib/server/shared')
     const tag = randomUUID().slice(0, 8)
     const { sha } = await prepareAndPut(tag)
@@ -212,7 +212,7 @@ describe('a prepare followed by a finalize', () => {
     const { db } = await import('@spaces/db')
     const { extractionCache } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     const cached = (sha: string) =>
       db
         .select({ sha: extractionCache.blobSha })
@@ -248,7 +248,7 @@ describe('the alreadyStored short circuit', () => {
   it('writes no pending row when the store already holds the blob', async () => {
     const { db } = await import('@spaces/db')
     const { pendingBlob } = await import('@spaces/db/schema')
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     const tag = randomUUID().slice(0, 8)
     const { sha, bytes } = shaOf(tag)
 
@@ -290,7 +290,7 @@ describe('the alreadyStored short circuit', () => {
 
     // The operator tries again. A second prepare is an upload starting over,
     // so it must not inherit the abandoned attempt's remaining grace.
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     await storage().delete(sha)
     await prepareAndPut(tag)
 

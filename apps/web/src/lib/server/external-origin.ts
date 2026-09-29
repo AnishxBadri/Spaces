@@ -7,7 +7,7 @@
  * thing that decides the scheme: it is the auth `baseURL`, which is what
  * makes Better Auth's session cookie Secure (`src/lib/auth.ts`); it is the
  * origin of invite links (`src/lib/server/members.ts`); and it is the origin
- * of local blob presign URLs (`src/lib/storage/local.ts`). All three strip a
+ * of local blob presign URLs (`packages/core/src/writes/storage/local.ts`). All three strip a
  * trailing slash and nothing else, so this module does the same — a path
  * component in APP_URL is preserved, because those three preserve it.
  *

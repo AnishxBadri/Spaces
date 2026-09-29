@@ -17,7 +17,7 @@ import { FakeImapServer } from '#/test/fake-imap'
 import { minimalPdf } from '#/test/minimal-pdf'
 import { truncateAndReseed } from '#/test/reseed'
 import { enqueued } from '#/test/queue-stub'
-import { storage } from '#/lib/storage'
+import { storage } from '@spaces/core/writes/storage'
 import {
   countUnfiledProgram,
   listDocumentsProgram,

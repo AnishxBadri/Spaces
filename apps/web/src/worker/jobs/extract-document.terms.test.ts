@@ -138,7 +138,7 @@ describe('document extraction links the glossary terms the deck mentions', () =>
     ).at(0)
     expect(row?.extractionStatus).toBe('done')
 
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     if (row?.blobSha) await storage().delete(row.blobSha)
   })
 })

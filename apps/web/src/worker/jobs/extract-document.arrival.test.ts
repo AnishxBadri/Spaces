@@ -116,7 +116,7 @@ describe('a server-lane arrival, through the existing extract job', () => {
     // The provider's own tree, stored verbatim — a label, never a key (§5.3).
     expect(row?.sourcePath).toBe('Data room/Legal/SHA.pdf')
 
-    const { storage } = await import('#/lib/storage')
+    const { storage } = await import('@spaces/core/writes/storage')
     if (row?.blobSha) await storage().delete(row.blobSha)
   })
 })

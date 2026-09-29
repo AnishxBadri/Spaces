@@ -11,8 +11,9 @@ import { describe, expect, it } from 'vitest'
  * half is `src/writes/` and nothing else: the attribute write path the plugin
  * SDK's Facts port will sit on, which needs drizzle and the `db` handle by
  * definition. Neither half may reach a renderer, and one directory in the
- * db-coupled half — `writes/vault/`, which resolves MASTER_KEY and DATA_DIR
- * (SPA-176) — is the only one that may read the environment. All of that is
+ * db-coupled half — `writes/vault/` (MASTER_KEY, DATA_DIR; SPA-176) and
+ * `writes/storage/` (STORAGE_DRIVER, S3_*; SPA-178) — may read the
+ * environment, and no other. All of that is
  * a claim that rots in a week unless something checks it, so this is that
  * something.
  *
@@ -42,12 +43,17 @@ const DB_COUPLED_DIRS: ReadonlyArray<string> = ['writes/']
 
 /**
  * The directories, relative to `src/`, where an environment read is allowed
- * — the vault, whose whole job is to resolve MASTER_KEY and DATA_DIR (SPA-176).
- * Narrower than DB_COUPLED_DIRS on purpose: the write paths beside it take a
- * transaction or a connection string and read nothing; an enqueue that would
- * have needed DATABASE_URL stayed in apps/web for exactly this reason.
+ * — the vault, whose whole job is to resolve MASTER_KEY and DATA_DIR
+ * (SPA-176), and the blob backend, which picks its driver by STORAGE_DRIVER
+ * and configures s3 from S3_* (SPA-178). Narrower than DB_COUPLED_DIRS on
+ * purpose: the write paths beside them take a transaction or a connection
+ * string and read nothing; an enqueue that would have needed DATABASE_URL
+ * stayed in apps/web for exactly this reason.
  */
-const ENV_READING_DIRS: ReadonlyArray<string> = ['writes/vault/']
+const ENV_READING_DIRS: ReadonlyArray<string> = [
+  'writes/vault/',
+  'writes/storage/',
+]
 
 type Source = { path: string; text: string }
 
@@ -159,7 +165,7 @@ describe('@spaces/core is pure outside src/writes/', () => {
     expect(offenders.map((s) => s.path)).toEqual([])
   })
 
-  it('reads no environment outside the vault', () => {
+  it('reads no environment outside the vault and the blob backend', () => {
     const offenders = sources.filter((s) => !mayReadEnv(s.path) && readsEnv(s))
     expect(offenders.map((s) => s.path)).toEqual([])
   })

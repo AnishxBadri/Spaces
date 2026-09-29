@@ -44,7 +44,7 @@ import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { getRegistry, setValues } from '@spaces/core/writes/attributes/values'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
-import { storage } from '#/lib/storage'
+import { storage } from '@spaces/core/writes/storage'
 import type { ObjectKind } from '@spaces/core/attributes/registry'
 
 /**

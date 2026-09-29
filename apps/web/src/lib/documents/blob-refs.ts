@@ -1,7 +1,7 @@
 import { count, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { document, extractionCache, importBatch } from '@spaces/db/schema'
-import { storage } from '#/lib/storage'
+import { storage } from '@spaces/core/writes/storage'
 
 /**
  * **Is any row still on this digest?** A document, or since SPA-164 a

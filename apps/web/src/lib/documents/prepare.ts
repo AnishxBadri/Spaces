@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { db } from '@spaces/db'
 import { pendingBlob } from '@spaces/db/schema'
-import { storage } from '#/lib/storage'
+import { storage } from '@spaces/core/writes/storage'
 
 /**
  * **The first half of an upload** — the call that hands out a URL, and the

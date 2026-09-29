@@ -45,11 +45,14 @@ pnpm worker                                       # background worker
   reach `@spaces/db` for types only; `src/writes/` is the db-coupled half —
   the attribute engine (`writes/attributes/*`, with `seed.ts`), the identity
   write path (`writes/entities/*`: resolve, merge, sweep, delete, rename,
-  provenance), the view store, `chunk-sources` (SPA-174/175) and the BYOK
-  vault (`writes/vault/*`, SPA-176) — and is the only place in core a
-  `drizzle-orm` import or a `db` value import passes. Neither half imports
-  React, and only `writes/vault/` reads `process.env` (MASTER_KEY, DATA_DIR)
-  — which is why `enqueueSourceEmbed` stayed in
+  provenance), the view store, `chunk-sources` (SPA-174/175), the BYOK
+  vault (`writes/vault/*`, SPA-176) and the blob backend (`writes/storage/*`,
+  SPA-178; `./writes/storage/local`'s token helpers are public on purpose for
+  the blob route) — and is the only place in core a `drizzle-orm` import or a
+  `db` value import passes. Neither half imports React, and only
+  `writes/vault/` (MASTER_KEY, DATA_DIR) and `writes/storage/`
+  (STORAGE_DRIVER, S3_*) read `process.env` — which is why
+  `enqueueSourceEmbed` stayed in
   `apps/web/src/lib/ai/enqueue-embed.ts`: core's write paths hand back
   `reembed` and the server fn queues it. The jsonb readers are
   `@spaces/core/json`. `packages/*` is where `sdk` lands later.
