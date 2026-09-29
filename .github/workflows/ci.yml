@@ -124,6 +124,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build the runtime image (docker/Dockerfile, context = repo root)
         run: docker build -f docker/Dockerfile -t spaces:ci .
+      # SPA-185: the image runs bundles with plain node. No application source
+      # and no tsx may be in it — a regression here is a build that quietly
+      # went back to running src/ through a loader.
+      - name: No source and no tsx in the image
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint sh spaces:ci -c 'ls /app; ls /app/apps/web/dist /app/apps/worker/dist /app/packages/db'
+          SRC="$(docker run --rm --entrypoint sh spaces:ci -c 'find /app -type d -name src -not -path "*/node_modules/*"')"
+          [ -z "$SRC" ] || { echo "source directories in the image: $SRC" >&2; exit 1; }
+          N="$(docker run --rm --entrypoint sh spaces:ci -c 'ls node_modules/.bin | grep -c tsx || true')"
+          [ "$N" = 0 ] || { echo "tsx is in the image ($N)" >&2; exit 1; }
       - name: Record its size
         run: |
           set -euo pipefail
@@ -188,7 +199,7 @@ jobs:
           docker compose exec -T app sh -c 'grep ^Uid: /proc/1/status'
           docker compose exec -T app sh -c 'grep -qE "^Uid:[[:space:]]+1000[[:space:]]" /proc/1/status'
           docker compose exec -T app ps -o user,args | tee /dev/stderr \
-            | grep -E '^node .*(server/index.mjs|worker/src/index.ts)'
+            | grep -E '^node .*(server/index.mjs|worker/dist/index.mjs)'
           # upload through the HTTP API (the local driver's presigned PUT)
           head -c 4096 /dev/urandom > payload.bin
           KEY="$(sha256sum payload.bin | cut -d' ' -f1)"
@@ -292,20 +303,20 @@ jobs:
           jq -e '.worker.status == "absent"' <<<"$H"
           docker exec roleweb ps -o args | tee roleweb.ps
           grep -q 'server/index.mjs' roleweb.ps
-          if grep -q 'worker/src/index.ts' roleweb.ps; then
+          if grep -q 'worker/dist/index.mjs' roleweb.ps; then
             echo 'ROLE=web started a worker' >&2; exit 1
           fi
 
           docker run -d --name roleworker --network "$NET" \
             -e DATABASE_URL="$ROLE_DB" -e MASTER_KEY="$MASTER_KEY" -e ROLE=worker \
             -v "$PWD/roledata:/data" spaces:ci
-          HEALTH='node_modules/.bin/tsx --tsconfig apps/worker/tsconfig.json apps/worker/src/health.ts'
+          HEALTH='node apps/worker/dist/health.mjs'
           for _ in $(seq 1 60); do
             docker exec roleworker sh -c "$HEALTH" >/dev/null 2>&1 && break; sleep 2
           done
           docker exec roleworker sh -c "$HEALTH"
           docker exec roleworker ps -o args | tee roleworker.ps
-          grep -q 'worker/src/index.ts' roleworker.ps
+          grep -q 'worker/dist/index.mjs' roleworker.ps
           if grep -q 'server/index.mjs' roleworker.ps; then
             echo 'ROLE=worker started a web server' >&2; exit 1
           fi
@@ -324,14 +335,14 @@ jobs:
               -e DATABASE_URL=postgresql://spaces:spaces@db:5432/spaces \
               -e MASTER_KEY="$MASTER_KEY" -v "$PWD/supdata:/data" spaces:ci
             for _ in $(seq 1 60); do
-              docker exec sup pgrep -f '[w]orker/src/index.ts' >/dev/null 2>&1 && return 0
+              docker exec sup pgrep -f '[w]orker/dist/index.mjs' >/dev/null 2>&1 && return 0
               sleep 2
             done
             docker logs sup; return 1
           }
           # worker death stops the container, non-zero
           run_sup
-          docker exec sup sh -c 'kill "$(pgrep -f "[w]orker/src/index.ts" | head -1)"'
+          docker exec sup sh -c 'kill "$(pgrep -f "[w]orker/dist/index.mjs" | head -1)"'
           for _ in $(seq 1 30); do
             [ "$(docker inspect -f '{{.State.Running}}' sup)" = false ] && break; sleep 1
           done
@@ -347,10 +358,54 @@ jobs:
           [ "$(docker inspect -f '{{.State.ExitCode}}' sup)" -eq 0 ]
           docker rm -f sup
 
+      # Hostability contract 4 in the two-container shape (SPA-185): the
+      # ROLE=worker container's HEALTHCHECK is the bundled health entry, and it
+      # is what notices a worker that stopped working. The process is frozen
+      # (SIGSTOP from the host, so the container keeps running and nothing
+      # restarts it) rather than killed — a dead PID 1 ends the container,
+      # which proves supervision, not health. Its heartbeat ages past 60s, the
+      # check fails three times, and Docker calls it unhealthy; the web
+      # container, whose check is HTTP, stays healthy throughout.
+      - name: Split roles — a stopped worker goes unhealthy, web stays healthy
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v
+          sudo mkdir -p data && sudo chown 1000:1000 data
+          cat > docker-compose.split-ci.yml <<'YAML'
+          services:
+            app:
+              image: spaces:ci
+              pull_policy: never
+              environment:
+                MASTER_KEY: ${MASTER_KEY}
+            worker:
+              image: spaces:ci
+              pull_policy: never
+              environment:
+                MASTER_KEY: ${MASTER_KEY}
+          YAML
+          SPLIT="-f docker-compose.yml -f docker-compose.split.yml -f docker-compose.split-ci.yml"
+          docker compose $SPLIT up -d --no-build --wait --wait-timeout 300
+          docker compose $SPLIT ps
+          W="$(docker compose $SPLIT ps -q worker)"
+          A="$(docker compose $SPLIT ps -q app)"
+          [ "$(docker inspect -f '{{.State.Health.Status}}' "$W")" = healthy ]
+          docker inspect -f '{{json .Config.Healthcheck.Test}}' "$W" | tee /dev/stderr | grep -F 'apps/worker/dist/health.mjs'
+          sudo kill -STOP "$(docker inspect -f '{{.State.Pid}}' "$W")"
+          for _ in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' "$W")" = unhealthy ] && break; sleep 5
+          done
+          docker inspect -f '{{range .State.Health.Log}}{{.ExitCode}} {{.Output}}{{end}}' "$W"
+          [ "$(docker inspect -f '{{.State.Health.Status}}' "$W")" = unhealthy ]
+          [ "$(docker inspect -f '{{.State.Health.Status}}' "$A")" = healthy ]
+          sudo kill -CONT "$(docker inspect -f '{{.State.Pid}}' "$W")"
+          docker compose $SPLIT down -v
+
       - name: Tear down
         if: always()
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v || true
+          docker compose -f docker-compose.yml -f docker-compose.split.yml -f docker-compose.split-ci.yml down -v 2>/dev/null || true
           docker rm -f sup unpriv nochown roleweb roleworker 2>/dev/null || true
 
   # Hostability contract #5 (CONTEXT.md): backup is both-or-neither, and
@@ -377,6 +432,23 @@ jobs:
           name: spaces-ci-image
       - name: Load the runtime image built by `image`
         run: gunzip -c spaces-ci.tar.gz | docker load
+
+      # The fixture runs inside the app container, which has no tsx and no
+      # source since SPA-185 — so it is bundled here the way the boot entry
+      # is (apps/web/vite.boot.config.ts, `--ssr` naming another entry): the
+      # workspace code inlined, every npm import left to the image's own
+      # node_modules. Built on the runner, copied in, run with plain node.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Bundle the roundtrip fixture
+        run: |
+          pnpm --filter @spaces/web exec vite build --config vite.boot.config.ts \
+            --ssr scripts/roundtrip-fixture.ts --outDir ../../fixture --emptyOutDir
+          ls -la fixture
 
       - name: Boot, then plant a document, its blob and a credential
         run: |
@@ -417,8 +489,8 @@ jobs:
             "http://localhost:3000/api/blob/$KEY?exp=$EXP&sig=$SIG")"
           [ "$CODE" = 201 ]
 
-          docker compose cp apps/web/scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
-          docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
+          docker compose cp fixture/roundtrip-fixture.mjs app:/app/roundtrip-fixture.mjs
+          docker compose exec -T app node /app/roundtrip-fixture.mjs \
             plant --blob="$KEY" --size="$(stat -c%s payload.bin)" --secret="$SECRET"
           echo "NET=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q db)")" >> "$GITHUB_ENV"
 
@@ -475,8 +547,8 @@ jobs:
           set -euo pipefail
           docker compose up -d --wait --wait-timeout 300
           curl -fsS http://localhost:3000/api/health
-          docker compose cp apps/web/scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
-          docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
+          docker compose cp fixture/roundtrip-fixture.mjs app:/app/roundtrip-fixture.mjs
+          docker compose exec -T app node /app/roundtrip-fixture.mjs \
             verify --blob="$KEY" --secret="$SECRET"
           export MASTER_KEY="$MASTER_KEY_BEFORE"
           EXP="$(( ($(date +%s) + 600) * 1000 ))"
@@ -520,8 +592,8 @@ jobs:
           [ "$LEFT" = 0 ]
           # and the workspace is still there, untouched
           docker compose up -d --wait --wait-timeout 300
-          docker compose cp apps/web/scripts/roundtrip-fixture.ts app:/app/roundtrip-fixture.ts
-          docker compose exec -T app node_modules/.bin/tsx /app/roundtrip-fixture.ts \
+          docker compose cp fixture/roundtrip-fixture.mjs app:/app/roundtrip-fixture.mjs
+          docker compose exec -T app node /app/roundtrip-fixture.mjs \
             verify --blob="$KEY" --secret="$SECRET"
 
       - name: An older image refuses the restored database (ship-4's guard)

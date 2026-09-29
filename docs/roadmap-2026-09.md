@@ -487,6 +487,8 @@ mono-13b removes src/ and tsx from the image, and docker/entrypoint.sh currently
 - **`vite build --ssr` with three entries — worker, migrate, ROLE=worker health** — No new dependency, one bundler in the repo, same rolldown pipeline the web build already uses. _Reversal cost:_ Trivial: a build script and a config file.
 - **tsup** — A second bundler and its config idiom, for a build the existing one can do. _Reversal cost:_ Trivial.
 
+**Decided 2026-09-29 (owner): Option 1, `vite build --ssr`.** Built by SPA-185 (`mono-13b`) and recorded in CONTEXT.md (Stack, under the pin-discipline paragraph).
+
 **Recommendation:** Option 1, with whichever wins recorded in CONTEXT and the reason stated.  
 Nothing distinguishes the two for three Node entry points, and the tiebreaker is the frozen-dependency instinct the whole hostability contract runs on. The slice stays hitl only because someone should confirm the three entries actually boot in the pruned image.
 

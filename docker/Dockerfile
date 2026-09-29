@@ -12,23 +12,28 @@
 #   prune      the workspace cut twice — once to what building the web app
 #              needs (@spaces/web + @spaces/worker and their workspace deps),
 #              once to what the image *runs* (@spaces/worker and its deps)
-#   build      installs the first cut and runs `vite build` → apps/web/.output
+#   build      installs the first cut and runs both packages' `build`:
+#              apps/web/.output (the web app), apps/web/dist/boot.mjs, and
+#              apps/worker/dist/{index,health}.mjs (SPA-185, `vite build --ssr`)
 #   prod-deps  installs the second cut, --prod — the image's node_modules
-#   (final)    .output + the runtime sources + prod-deps' node_modules
+#   (final)    .output, the three bundles, the drizzle SQL, node_modules —
+#              no application source and no tsx
 #
 # Why the runtime cut is the worker's alone: the web process runs from
 # apps/web/.output, which Nitro bundles self-contained (its own
 # .output/server/node_modules is a few kB of traced files). /app/node_modules
-# serves only what tsx runs — the boot entry, the worker, its health command —
-# so apps/web's own dependency list (vite, rolldown, blocknote, lucide, the
+# serves only the three node bundles — the boot entry, the worker, its health
+# command — whose npm imports stay runtime imports, so apps/web's own
+# dependency list (vite, rolldown, blocknote, lucide, the
 # radix set, fonts, typescript through peers) has no business being
 # installed. apps/worker/package.json declares everything the worker process
 # loads, including what it reaches through the `#web/*` crossings, and the
 # boot entry's closure is a subset of it.
 #
-# The worker and the boot entry still run through tsx from source in this
-# stage of the project; mono-13b bundles them (vite build --ssr) and src/
-# leaves the image.
+# Bundler: `vite build --ssr` (D26, CONTEXT.md). The bundles inline the
+# workspace's own code (@spaces/db, @spaces/core, apps/web's server modules the
+# worker crosses into) and import every npm package from node_modules at run
+# time; apps/worker/vite.config.ts and apps/web/vite.boot.config.ts say why.
 
 FROM node:22-alpine AS base
 WORKDIR /app
@@ -62,7 +67,7 @@ COPY --from=prune /app/out/build/json/ ./
 COPY --from=prune /app/out/build/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY --from=prune /app/out/build/full/ ./
-RUN pnpm --filter @spaces/web build
+RUN pnpm --filter @spaces/web --filter @spaces/worker build
 
 FROM base AS prod-deps
 COPY --from=prune /app/out/runtime/json/ ./
@@ -80,6 +85,16 @@ COPY --from=prune /app/out/runtime/pnpm-lock.yaml ./
 # entirely. The final stage makes that link by hand, once packages/db is
 # really there.
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts --node-linker=hoisted
+# tsx is nobody's dependency here any more (SPA-185 moved it to
+# devDependencies in apps/web and apps/worker; the image runs bundles with
+# plain node), yet the install above still brings it: the worker's bundle
+# imports better-auth (lib/server/shared.ts → lib/auth.ts), and the lockfile
+# snapshot of better-auth resolves its optional peers — drizzle-kit, vite —
+# against the workspace, and both of those carry tsx. A frozen install cannot
+# skip resolved peers (auto-install-peers is recorded in the lockfile), so the
+# one package this image promises not to contain is removed by name, and CI's
+# `image` job asserts it stays gone.
+RUN rm -rf node_modules/tsx node_modules/.bin/tsx
 
 FROM node:22-alpine
 WORKDIR /app
@@ -92,69 +107,38 @@ ENV NODE_ENV=production \
 # contract #1). ~20KB; no init system, no gosu-sized Go binary.
 RUN apk add --no-cache su-exec
 
-# Runtime needs: apps/web's .output (web) and src (the boot entry via tsx,
-# and the modules the worker crosses into through `#web/*`), apps/worker's
-# src (the worker and its health command via tsx; SPA-181), packages/db's
-# src + drizzle (schema, migrator and the journal), packages/core's src (the
-# worker's extractor lives there since SPA-144), and prod-deps' node_modules
-# (pg-boss, drizzle-orm, unpdf, mammoth, fflate, tsx, the AI providers).
-# Every source comes from the prune's out/build/full, so a file outside the
-# pruned workspace cannot reach the image by accident.
+# Runtime needs, and nothing else (SPA-185): apps/web/.output (the web
+# process), apps/web/dist/boot.mjs (migrate → seeds → value-index reconcile,
+# run by the entrypoint before either process), apps/worker/dist/index.mjs
+# (the worker) and dist/health.mjs (the ROLE=worker HEALTHCHECK), the drizzle
+# journal, and prod-deps' node_modules. No `src/` anywhere, no tsconfig, no
+# tsx: the bundles are plain ESM that node runs as-is.
 #
-# Every workspace package keeps its workspace path under /app — apps/web,
-# apps/worker, packages/config, packages/db, packages/core — because the
-# relations between them are relative: `node_modules/@spaces/db` and
-# `@spaces/core` are relative symlinks into packages/, the migrator resolves
-# the journal from its own `import.meta.url` (so it lives at
-# /app/packages/db/drizzle, the path CI's `roundtrip` job mounts an "older
-# image" fixture over), every tsconfig `extends` names `../../packages/config`,
-# and apps/worker's tsconfig points `#web/*` at `../web/src`. Until SPA-181
-# apps/web alone was flattened onto /app (/app/src, /app/.output); the worker
-# moving out is what made the layout have to be the workspace's own.
+# The journal keeps its workspace path, /app/packages/db/drizzle — the
+# directory CI's `roundtrip` job mounts an "older image" journal over. It is
+# never bundled: the downgrade guard compares the database against the
+# directory. `@spaces/db` finds it from its own `import.meta.url`, which in a
+# bundle is the bundle's directory, so the entrypoint names the folder to the
+# boot entry explicitly (its argv[2]).
 #
-# The two app tsconfigs come along because tsx resolves `#/…` (and the
-# worker's `#web/…`) from tsconfig `paths` and NOT from package.json `imports`
-# — Node rejects `#/*` as an internal imports key outright
-# (ERR_INVALID_MODULE_SPECIFIER), so `#/…` has never resolved under plain
-# Node and works only through tsx. And tsx reads the tsconfig from its *cwd*:
-# main's image flattened apps/web onto /app so /app/tsconfig.json was found
-# by accident of layout; with every package at its workspace path there is no
-# tsconfig at /app, so every tsx invocation — the boot entry, both worker
-# lines in the entrypoint and the HEALTHCHECK below — passes `--tsconfig
-# <package>/tsconfig.json` explicitly (SPA-181 review: the image did not
-# boot without it). Both extend packages/config/tsconfig.base.json, copied to
-# the path the extends names. packages/db's and packages/core's own tsconfigs
-# are deliberately not copied: nothing in the image typechecks.
+# Until SPA-185 this block also carried apps/*/src, packages/*/src, two
+# tsconfigs and hand-made `node_modules/@spaces/{db,core}` links, because tsx
+# resolved `#/` from tsconfig `paths` read from its cwd and Node rejects `#/*`
+# outright (the SPA-181 review: the image did not boot without `--tsconfig`).
+# Bundling resolves every alias and workspace import at build time, so all of
+# that went with tsx.
 #
 # Every COPY into /app carries --chown=node:node rather than one `chown -R
 # node:node /app` at the end. The ownership is the same; the recursive chown
 # was not free — it rewrites every file it touches into a new layer, so the
-# image carried node_modules twice (SPA-183 measured it: most of the
-# difference between the image's content size and its size on disk).
-ARG FULL=/app/out/build/full
+# image carried node_modules twice (SPA-183 measured it).
 COPY --chown=node:node --from=prod-deps /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/apps/web/.output ./apps/web/.output
-COPY --chown=node:node --from=prune ${FULL}/apps/web/package.json ${FULL}/apps/web/tsconfig.json ./apps/web/
-COPY --chown=node:node --from=prune ${FULL}/apps/web/src ./apps/web/src
-COPY --chown=node:node --from=prune ${FULL}/apps/worker/package.json ${FULL}/apps/worker/tsconfig.json ./apps/worker/
-COPY --chown=node:node --from=prune ${FULL}/apps/worker/src ./apps/worker/src
-COPY --chown=node:node --from=prune ${FULL}/packages/config/package.json ${FULL}/packages/config/tsconfig.base.json ./packages/config/
-COPY --chown=node:node --from=prune ${FULL}/packages/db/package.json ./packages/db/
-COPY --chown=node:node --from=prune ${FULL}/packages/db/src ./packages/db/src
-COPY --chown=node:node --from=prune ${FULL}/packages/db/drizzle ./packages/db/drizzle
-COPY --chown=node:node --from=prune ${FULL}/packages/core/package.json ./packages/core/
-COPY --chown=node:node --from=prune ${FULL}/packages/core/src ./packages/core/src
+COPY --chown=node:node --from=build /app/apps/web/dist ./apps/web/dist
+COPY --chown=node:node --from=build /app/apps/worker/dist ./apps/worker/dist
+COPY --chown=node:node --from=prune /app/out/build/full/packages/db/drizzle ./packages/db/drizzle
 COPY docker/entrypoint.sh /entrypoint.sh
-# The two links the prod-deps install could not make (see above). Without the
-# first, `tsx apps/web/src/db/boot.ts` dies on `Cannot find package '@spaces/db'`;
-# without the second, the worker dies on `@spaces/core/documents/extract` the
-# first time a document is uploaded. The app's own source imports both by
-# name, and node needs a node_modules entry whose package.json carries the
-# `exports` map. Relative, so they survive the copy and a re-rooted /app.
-RUN mkdir -p node_modules/@spaces \
-    && ln -s ../../packages/db node_modules/@spaces/db \
-    && ln -s ../../packages/core node_modules/@spaces/core \
-    && chown -h node:node node_modules/@spaces node_modules/@spaces/db node_modules/@spaces/core /app \
+RUN chown node:node /app \
     && chmod +x /entrypoint.sh && mkdir -p /data && chown -R node:node /data
 
 # No `USER node`: the entrypoint starts as root so it can repair the ownership
@@ -171,10 +155,11 @@ EXPOSE 3000
 # asks its own worker_heartbeat row through the same threshold /api/health
 # uses; web and all keep the HTTP check, whose payload now carries the
 # worker's status without letting a stale worker fail the web container.
-# The timeout is 10s for the worker branch: tsx has to boot and connect.
+# The worker branch runs the bundled health entry with plain node (SPA-185) —
+# it was the one thing that would otherwise have pinned tsx in the image.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s \
   CMD if [ "${ROLE:-all}" = worker ]; then \
-        node_modules/.bin/tsx --tsconfig apps/worker/tsconfig.json apps/worker/src/health.ts; \
+        node apps/worker/dist/health.mjs; \
       else \
         wget -qO- http://127.0.0.1:3000/api/health || exit 1; \
       fi

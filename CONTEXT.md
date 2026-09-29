@@ -94,13 +94,22 @@ One language, TypeScript, one codebase. Two processes (web, worker), two contain
 Server functions live in `src/lib/server/`, one file per domain, re-exported through the
 `#/lib/server-fns` barrel (split 2026-08 at ~2,900 lines, before auth/mandate/templates
 each added a domain). Pin discipline (2026-08): no `latest` version specifiers — TanStack
-deps pinned to resolved versions; upgrades are deliberate events. The prod worker runs
-TypeScript via tsx (one build pipeline, accepted 2026-08); bundle it when an image actually
-ships — **the bundler is open as of 2026-09-15 and it is not ~~esbuild~~**: `docs/spec-plugin-sdk.md`
-§2 (2026-09-13) says tsup, and roadmap D26-worker-bundler recommends `vite build --ssr` (no new
-dependency, the rolldown pipeline the web build already uses) and is awaiting the owner's call,
-carried by `mono-13b`. Record whichever wins here. esbuild is present only as vite's transitive
-build dependency.
+deps pinned to resolved versions; upgrades are deliberate events. ~~The prod worker runs
+TypeScript via tsx~~ — **D26, decided 2026-09-29 (owner), built by SPA-185 (`mono-13b`): the image's
+node entries are bundled with `vite build --ssr`, not tsup.** Three entries: the worker
+(`apps/worker/dist/index.mjs`), its ROLE=worker health command (`dist/health.mjs`) — both from
+`apps/worker/vite.config.ts` — and the boot/migrate entry (`apps/web/dist/boot.mjs`, from
+`apps/web/vite.boot.config.ts`, the second half of apps/web's `build`). The reason: vite 8 is
+already the toolchain, its rolldown pipeline builds the web app, and nothing distinguishes a
+second bundler for three Node entry points — so the tiebreaker is the frozen-dependency instinct
+the hostability contract runs on: no new dependency. The rule inside the bundles: the workspace's
+own code (`@spaces/*`, `#/`, the `#web/*` crossings) is inlined; every npm package stays a runtime
+import from the image's pruned node_modules, so pg, pg-boss, unpdf, mammoth and the rest load
+exactly as they do in dev. The drizzle journal is never bundled — the boot entry is handed
+`/app/packages/db/drizzle` as argv[2], because `@spaces/db` resolves it from its own
+`import.meta.url`, which inside a bundle is the bundle's directory. tsx stays a devDependency for
+`pnpm worker`/`pnpm dev` and the harnesses; it is not in the image. esbuild is present only as
+vite's transitive build dependency.
 
 ### Backend paradigm (decided 2026-09-04, "future" branch deliberation)
 

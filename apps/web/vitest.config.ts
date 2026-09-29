@@ -66,6 +66,15 @@ export default defineConfig({
     // run twenty-four files against one database.
     pool: 'forks',
     maxWorkers: TEST_WORKERS,
+    // 15s, not vitest's 5s. Most DB-backed files import their modules
+    // dynamically inside the first test (`@spaces/db` builds its pool from a
+    // DATABASE_URL vitest.setup.ts rewrites per file), so that test also pays
+    // for transforming effect, drizzle and the module graph under test —
+    // cold, in four forks at once. On CI's runner that alone reached 4.2–4.4s
+    // on main (query.test's typo test, propose.test's first) and crossed 5s
+    // on the project-16 branch twice, in whichever file drew the short straw
+    // (SPA-185). A real hang still fails, three times later.
+    testTimeout: 15_000,
     setupFiles: ['./vitest.setup.ts'],
   },
 })

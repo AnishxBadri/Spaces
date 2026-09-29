@@ -56,13 +56,12 @@ if ! (touch "$PROBE" && rm -f "$PROBE") 2>/dev/null; then
 fi
 
 # Migrations auto-run on every boot — no `docker exec` step, ever.
-# Paths are the workspace's own since SPA-181 (apps/web, apps/worker under
-# /app); the supervision block below is unchanged but for them. Every tsx
-# invocation names its package's tsconfig: `#/…` and `#web/…` resolve from
-# tsconfig `paths` and tsx reads the tsconfig from its cwd, which is /app and
-# has none — without the flag the first `#/` specifier is
-# ERR_INVALID_MODULE_SPECIFIER (docker/Dockerfile says why at length).
-node_modules/.bin/tsx --tsconfig apps/web/tsconfig.json apps/web/src/db/boot.ts
+# Every process is a bundle run by plain node since SPA-185 (D26, `vite build
+# --ssr`): no tsx, no `--tsconfig`, no src/. The boot entry is told where the
+# journal is — argv[2] — because `@spaces/db` resolves it from its own
+# import.meta.url, which inside a bundle is the bundle's directory; the
+# journal stays at its workspace path (docker/Dockerfile says why).
+node apps/web/dist/boot.mjs "$PWD/packages/db/drizzle"
 
 ROLE="${ROLE:-all}"
 
@@ -71,7 +70,7 @@ case "$ROLE" in
     exec node apps/web/.output/server/index.mjs
     ;;
   worker)
-    exec node_modules/.bin/tsx --tsconfig apps/worker/tsconfig.json apps/worker/src/index.ts
+    exec node apps/worker/dist/index.mjs
     ;;
   all)
     # Two processes, one container: pg-boss worker + Nitro web server.
@@ -83,7 +82,7 @@ case "$ROLE" in
     # the web PID alone left a crashed worker invisible — a "healthy"
     # container where extraction silently never runs. `wait -n` isn't in
     # busybox ash, so poll.
-    node_modules/.bin/tsx --tsconfig apps/worker/tsconfig.json apps/worker/src/index.ts &
+    node apps/worker/dist/index.mjs &
     WORKER_PID=$!
     node apps/web/.output/server/index.mjs &
     WEB_PID=$!
