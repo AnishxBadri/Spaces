@@ -581,8 +581,12 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Selected text is always ink on the wash: text that is white on an ink or
+     pine surface (primary buttons, the bulk bar) would otherwise vanish on
+     the light green. */
   ::selection {
     background: var(--selected);
+    color: var(--foreground);
   }
 
   /* Interaction Engineering (DESIGN.md): no double-tap zoom on controls; on
@@ -667,6 +671,17 @@
 }
 .mention-chip:hover {
   border-color: var(--hairline);
+}
+/* Inside a note body the chip is an anchor under BlockNote's shadcn sheet,
+   which sends every editor anchor back to the browser's own link —
+   `.bn-shadcn .bn-editor a { color: revert; text-decoration: revert }`, 0-2-1
+   against `.mention-chip`'s 0-1-0 — so the chip kept its box and was inked
+   default blue, underlined. Naming the vendor's scope once more wins on
+   specificity rather than on which sheet loads last
+   (`components/editor/mention-chip.test.ts`). */
+.bn-shadcn .bn-editor a.mention-chip {
+  color: var(--foreground);
+  text-decoration: none;
 }
 
 /* Glossary auto-link — a hint, not a link: one hairline on the inner grid

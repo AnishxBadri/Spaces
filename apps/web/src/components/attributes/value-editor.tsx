@@ -13,6 +13,7 @@ import { Badge } from '#/components/ui/badge'
 import { Checkbox } from '#/components/ui/checkbox'
 import { liveOptions, optionState } from '@spaces/core/attributes/options'
 import { formatDate, formatNumber } from '@spaces/core/format'
+import { fmtMoney } from '@spaces/core/portfolio/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 import type { AttributeOptions } from '@spaces/core/attributes/registry'
@@ -307,9 +308,21 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
     committed.current = display
   }, [display])
   // A number with a precision setting reads formatted (grouping, fixed
-  // decimals) until it's being edited; the stored number is untouched.
+  // decimals) until it's being edited, and so does money — `$150,000` in the
+  // attribute's own currency, not `150000`. The stored number is untouched;
+  // focus hands back the raw figure to edit.
   const precision = def.type === 'number' ? def.options?.precision : undefined
-  const formatted = precision !== undefined && !focused
+  const currency =
+    def.type === 'currency' ? (def.options?.code ?? 'USD') : undefined
+  const formatted =
+    (precision !== undefined || currency !== undefined) && !focused
+  const atRest = (raw: string): string => {
+    if (currency === undefined) return formatNumber(raw, precision)
+    const n = Number(raw)
+    return raw.trim() === '' || !Number.isFinite(n)
+      ? raw
+      : fmtMoney(n, currency)
+  }
 
   function commit() {
     if (draft === committed.current) return
@@ -335,7 +348,7 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
     <input
       type={inputType}
       inputMode={def.type === 'number' ? 'decimal' : undefined}
-      value={formatted ? formatNumber(draft, precision) : draft}
+      value={formatted ? atRest(draft) : draft}
       autoFocus={autoFocus}
       aria-label={def.name}
       placeholder="—"

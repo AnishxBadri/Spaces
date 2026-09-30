@@ -25,7 +25,8 @@ import {
   setTaskDone,
 } from '#/lib/server-fns'
 import { useBornRows } from '#/lib/born-rows'
-import { fmtMoney, fmtMultiple } from '@spaces/core/portfolio/format'
+import { fmtMoney } from '@spaces/core/portfolio/format'
+import { PortfolioHeadlineRail } from '#/components/portfolio-headline'
 import { localToday } from '@spaces/core/tasks/parse-due'
 
 /**
@@ -258,7 +259,6 @@ function TodayPage() {
     funnel.medianDaysInStage[stage] ?? null
 
   const ledger = activity.slice(0, 8)
-  const totalValue = holdings.rollup.unrealized + holdings.rollup.realized
 
   return (
     <div className="flex min-h-full flex-col">
@@ -515,20 +515,9 @@ function TodayPage() {
                   {holdings.holdings.length === 1 ? '' : 's'}
                 </span>
               </div>
-              <RailReadout
-                label="Invested"
-                value={fmtMoney(
-                  holdings.rollup.costBasis,
-                  holdings.baseCurrency,
-                )}
-              />
-              <RailReadout
-                label="Value"
-                value={fmtMoney(totalValue, holdings.baseCurrency)}
-              />
-              <RailReadout
-                label="MOIC"
-                value={fmtMultiple(holdings.rollup.moic)}
+              <PortfolioHeadlineRail
+                rollup={holdings.rollup}
+                baseCurrency={holdings.baseCurrency}
               />
               {missingRates > 0 ? (
                 <div className="flex h-row items-center justify-between border-t border-rule">
@@ -596,15 +585,6 @@ function TodayPage() {
           ) : null}
         </aside>
       </div>
-    </div>
-  )
-}
-
-function RailReadout({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex h-row items-center justify-between border-t border-rule">
-      <span className="field-label text-graphite">{label}</span>
-      <span className="mono text-ui font-medium">{value}</span>
     </div>
   )
 }

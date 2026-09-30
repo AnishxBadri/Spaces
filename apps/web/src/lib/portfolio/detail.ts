@@ -13,6 +13,7 @@ import { user } from '@spaces/db/schema/auth'
 import { holdingMetrics } from '@spaces/core/portfolio/metrics'
 import type { HoldingEvents } from '@spaces/core/portfolio/metrics'
 import { ownership } from '@spaces/core/portfolio/ownership'
+import { portfolioRollup } from '@spaces/core/portfolio/rollup'
 import type { FxRate } from '@spaces/core/portfolio/fx'
 
 /**
@@ -216,6 +217,94 @@ export async function loadHoldingEvents(
     })
   }
   return byHolding
+}
+
+/**
+ * The book — every holding with its metrics and ownership, and the roll-up.
+ * This is the one read behind Portfolio and Today; the roll-up and the
+ * headline figures both surfaces print are `@spaces/core/portfolio/rollup`,
+ * so neither can compute a total of its own.
+ */
+export async function loadPortfolio(asOf?: string) {
+  const [base, rates, rows] = await Promise.all([
+    baseCurrency(),
+    loadFxRates(),
+    db
+      .select({
+        id: holding.id,
+        companyId: holding.companyId,
+        openedAt: holding.openedAt,
+        companyName: entity.canonicalName,
+      })
+      .from(holding)
+      .innerJoin(entity, eq(entity.id, holding.companyId))
+      .orderBy(asc(holding.openedAt)),
+  ])
+  // Rounds power the ownership ledger — one query for every company,
+  // fetched alongside the events (independent queries, one round-trip).
+  const companyIds = rows.map((r) => r.companyId)
+  const [loaded, roundRows] = await Promise.all([
+    loadHoldingEvents(rows.map((r) => r.id)),
+    companyIds.length > 0
+      ? db
+          .select({
+            companyId: round.companyId,
+            date: round.date,
+            kind: round.kind,
+            sharesOutstanding: round.sharesOutstanding,
+          })
+          .from(round)
+          .where(inArray(round.companyId, companyIds))
+          .orderBy(asc(round.date))
+      : Promise.resolve([]),
+  ])
+  const roundsByCompany = new Map<
+    string,
+    Array<{ date: string; kind: string; sharesOutstanding: number | null }>
+  >()
+  for (const r of roundRows) {
+    const list = roundsByCompany.get(r.companyId) ?? []
+    list.push({
+      date: r.date,
+      kind: r.kind,
+      sharesOutstanding: num(r.sharesOutstanding),
+    })
+    roundsByCompany.set(r.companyId, list)
+  }
+
+  const empty: LoadedHolding = {
+    events: { investments: [], marks: [], distributions: [] },
+    ownershipInputs: [],
+  }
+  const holdings = rows.map((r) => {
+    const l = loaded.get(r.id) ?? empty
+    return {
+      ...r,
+      metrics: holdingMetrics(l.events, {
+        baseCurrency: base,
+        fxRates: rates,
+        asOf,
+      }),
+      ownership: ownership(
+        l.ownershipInputs,
+        roundsByCompany.get(r.companyId) ?? [],
+        asOf,
+      ),
+    }
+  })
+
+  return {
+    baseCurrency: base,
+    holdings,
+    rollup: portfolioRollup(
+      holdings.map((h) => ({
+        id: h.id,
+        events: (loaded.get(h.id) ?? empty).events,
+        metrics: h.metrics,
+      })),
+      { baseCurrency: base, fxRates: rates, asOf },
+    ),
+  }
 }
 
 /** The tear-sheet read: every event, plus computed metrics and ownership. */

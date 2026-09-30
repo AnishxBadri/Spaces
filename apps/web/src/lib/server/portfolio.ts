@@ -1,20 +1,12 @@
 import { createServerFn } from '@tanstack/react-start'
-import { asc, eq, inArray } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, workspace } from '@spaces/db/schema'
-import { fxRate, holding, round } from '@spaces/db/schema/portfolio'
-import { holdingMetrics } from '@spaces/core/portfolio/metrics'
+import { workspace } from '@spaces/db/schema'
+import { fxRate } from '@spaces/db/schema/portfolio'
 import type { MetricsResult } from '@spaces/core/portfolio/metrics'
-import { ownership } from '@spaces/core/portfolio/ownership'
 import type { Ownership } from '@spaces/core/portfolio/ownership'
-import {
-  baseCurrency,
-  loadFxRates,
-  loadHoldingEvents,
-  num,
-} from '../portfolio/detail'
-import type { LoadedHolding } from '../portfolio/detail'
+import { baseCurrency, loadFxRates, loadPortfolio } from '../portfolio/detail'
 import { birthHolding, requireUser } from './shared'
 
 /**
@@ -29,117 +21,14 @@ import { birthHolding, requireUser } from './shared'
  */
 
 /**
- * The Portfolio surface's data: per-holding metrics in native-or-base,
- * plus a base-currency roll-up. Holdings missing fx rates surface the gap
- * instead of polluting totals with fake conversions.
+ * The book: per-holding metrics in native-or-base, plus the base-currency
+ * roll-up. Portfolio and Today both read it; the body is `loadPortfolio`.
  */
 export const listHoldings = createServerFn()
   .validator(z.object({ asOf: z.string().optional() }).optional())
   .handler(async ({ data }) => {
     await requireUser()
-    const asOf = data?.asOf
-    const [base, rates, rows] = await Promise.all([
-      baseCurrency(),
-      loadFxRates(),
-      db
-        .select({
-          id: holding.id,
-          companyId: holding.companyId,
-          openedAt: holding.openedAt,
-          companyName: entity.canonicalName,
-        })
-        .from(holding)
-        .innerJoin(entity, eq(entity.id, holding.companyId))
-        .orderBy(asc(holding.openedAt)),
-    ])
-    // Rounds power the ownership ledger — one query for every company,
-    // fetched alongside the events (independent queries, one round-trip).
-    const companyIds = rows.map((r) => r.companyId)
-    const [loaded, roundRows] = await Promise.all([
-      loadHoldingEvents(rows.map((r) => r.id)),
-      companyIds.length > 0
-        ? db
-            .select({
-              companyId: round.companyId,
-              date: round.date,
-              kind: round.kind,
-              sharesOutstanding: round.sharesOutstanding,
-            })
-            .from(round)
-            .where(inArray(round.companyId, companyIds))
-            .orderBy(asc(round.date))
-        : Promise.resolve([]),
-    ])
-    const roundsByCompany = new Map<
-      string,
-      Array<{ date: string; kind: string; sharesOutstanding: number | null }>
-    >()
-    for (const r of roundRows) {
-      const list = roundsByCompany.get(r.companyId) ?? []
-      list.push({
-        date: r.date,
-        kind: r.kind,
-        sharesOutstanding: num(r.sharesOutstanding),
-      })
-      roundsByCompany.set(r.companyId, list)
-    }
-
-    const empty: LoadedHolding = {
-      events: { investments: [], marks: [], distributions: [] },
-      ownershipInputs: [],
-    }
-    const holdings = rows.map((r) => {
-      const l = loaded.get(r.id) ?? empty
-      return {
-        ...r,
-        metrics: holdingMetrics(l.events, {
-          baseCurrency: base,
-          fxRates: rates,
-          asOf,
-        }),
-        ownership: ownership(
-          l.ownershipInputs,
-          roundsByCompany.get(r.companyId) ?? [],
-          asOf,
-        ),
-      }
-    })
-
-    // Roll-up: everything forced to base; holdings with missing rates are
-    // excluded and reported, never silently converted at 1.0. A holding
-    // whose display metrics are already base-denominated (the common case:
-    // single currency = base) is reused, not recomputed.
-    const totals = { costBasis: 0, realized: 0, unrealized: 0 }
-    const excluded: Array<string> = []
-    for (const [i, r] of rows.entries()) {
-      const display = holdings[i].metrics
-      const inBase =
-        display.ok && display.metrics.currency === base
-          ? display
-          : holdingMetrics((loaded.get(r.id) ?? empty).events, {
-              baseCurrency: base,
-              fxRates: rates,
-              asOf,
-              reportIn: 'base',
-            })
-      if (!inBase.ok) {
-        excluded.push(r.id)
-        continue
-      }
-      totals.costBasis += inBase.metrics.costBasis
-      totals.realized += inBase.metrics.realized
-      totals.unrealized += inBase.metrics.unrealized
-    }
-    const totalValue = totals.realized + totals.unrealized
-    return {
-      baseCurrency: base,
-      holdings,
-      rollup: {
-        ...totals,
-        moic: totals.costBasis > 0 ? totalValue / totals.costBasis : null,
-        excludedForMissingRates: excluded,
-      },
-    }
+    return loadPortfolio(data?.asOf)
   })
 
 export type HoldingDetail = {

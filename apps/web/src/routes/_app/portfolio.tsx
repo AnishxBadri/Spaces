@@ -13,6 +13,7 @@ import { EmptyState } from '#/components/empty-state'
 import { IconBadge, RecordLinkCell } from '#/components/table/cells'
 import { RecordTable, TableToolbar } from '#/components/table/record-table'
 import { PageHeader } from '#/components/page-header'
+import { PortfolioHeadlineStrip } from '#/components/portfolio-headline'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { listHoldings } from '#/lib/server-fns'
 import {
@@ -211,25 +212,10 @@ function PortfolioPage() {
         ) : (
           <>
             <div className="mb-4 flex flex-wrap items-baseline gap-x-8 gap-y-2">
-              <RollupStat
-                label="Invested"
-                value={fmtMoney(rollup.costBasis, data.baseCurrency, {
-                  compact: true,
-                })}
+              <PortfolioHeadlineStrip
+                rollup={rollup}
+                baseCurrency={data.baseCurrency}
               />
-              <RollupStat
-                label="Current value"
-                value={fmtMoney(rollup.unrealized, data.baseCurrency, {
-                  compact: true,
-                })}
-              />
-              <RollupStat
-                label="Realized"
-                value={fmtMoney(rollup.realized, data.baseCurrency, {
-                  compact: true,
-                })}
-              />
-              <RollupStat label="MOIC" value={fmtMultiple(rollup.moic)} />
               {rollup.excludedForMissingRates.length > 0 ? (
                 <span className="text-ui text-destructive">
                   {rollup.excludedForMissingRates.length} holding
@@ -256,15 +242,6 @@ function PortfolioPage() {
           </>
         )}
       </div>
-    </div>
-  )
-}
-
-function RollupStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <span className="text-label text-graphite">{label}</span>
-      <span className="tabular text-ui font-medium">{value}</span>
     </div>
   )
 }
