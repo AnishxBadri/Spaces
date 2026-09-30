@@ -7,6 +7,8 @@ import { createNodeResolver } from 'eslint-plugin-import-x'
 import reactHooks from 'eslint-plugin-react-hooks'
 // @ts-expect-error eslint-plugin-drizzle 0.2.3 ships no declaration file; the day it does, this line fails and comes out.
 import drizzle from 'eslint-plugin-drizzle'
+import * as astroParser from 'astro-eslint-parser'
+import tsParser from '@typescript-eslint/parser'
 import instrument from './eslint-rules/vocabulary.js'
 
 // The repo root: two levels above this file, which lives in packages/config
@@ -180,6 +182,28 @@ const E2E_IMPORTS_NOTHING_INTERNAL = {
   ].join('|'),
   message:
     '@spaces/e2e imports nothing internal — no @spaces/* package, no #/ alias, no relative path into another package. It drives the built app over HTTP and in a browser, and boots it as a process (apps/e2e/harness/instance.ts); a spec that imported the code would be testing the module, not the product.',
+}
+// The marketing and docs site (docs/spec-plugin-sdk.md §2: `apps/site/`,
+// Vercel, never in the image). It is a static page about the product, so it
+// imports nothing internal, exactly like the browser suite: no workspace
+// package, no `#` alias, no relative climb into another package. A feature
+// list imported from @spaces/core would put the site in the image's prune
+// graph the day core gained a dependency on it, and would couple a Vercel
+// build to the app's toolchain. What the site shows of the product it copies
+// (the Instrument tokens into src/styles/site.css) or syncs as files at build
+// time (docs/assets → public/, src/integrations/sync-assets.ts), never
+// imports. The failing case: `import { fmtMoney } from
+// '@spaces/core/portfolio/format'` in apps/site/src, in a .ts file or an
+// .astro frontmatter alike (the .astro parser block below is what makes the
+// second one visible to this rule).
+const SITE_IMPORTS_NOTHING_INTERNAL = {
+  regex: [
+    '^@spaces/',
+    '^#',
+    climbsInto(['apps', 'packages', 'plugins', 'web', 'worker', 'e2e']),
+  ].join('|'),
+  message:
+    '@spaces/site imports nothing internal — no @spaces/* package, no # alias, no relative path into another package. It is marketing and docs, deployed to Vercel and never in the image (docs/spec-plugin-sdk.md §2); copy what it needs to show, or sync it as a file from docs/assets (docs/site.md).',
 }
 // Unproven against the real package until sdk-3 births it; proved against
 // packages/config/fixtures/sdk.
@@ -357,6 +381,31 @@ export default [
       ],
     },
   },
+  // .astro files are parsed only so the zone below can read their imports:
+  // the frontmatter goes through the TypeScript parser, without type
+  // information, and no rule set is turned on here. Without this block
+  // `eslint .` in apps/site never opens an .astro file, and an import there
+  // would pass the zone unread.
+  {
+    files: ['apps/site/**/*.astro'],
+    languageOptions: {
+      parser: astroParser,
+      parserOptions: {
+        parser: tsParser,
+        extraFileExtensions: ['.astro'],
+        sourceType: 'module',
+      },
+    },
+  },
+  {
+    files: ['apps/site/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [SITE_IMPORTS_NOTHING_INTERNAL] },
+      ],
+    },
+  },
   {
     files: ['packages/sdk/**', 'packages/config/fixtures/sdk/**'],
     rules: {
@@ -447,6 +496,7 @@ export default [
     files: [
       'apps/web/src/**/*.{ts,tsx}',
       'apps/worker/src/**/*.ts',
+      'apps/site/src/**/*.ts',
       'packages/db/src/**/*.ts',
       'packages/core/src/**/*.ts',
     ],
@@ -512,6 +562,8 @@ export default [
       '**/.nitro/**',
       '**/.tanstack/**',
       '**/dist/**',
+      // Astro's generated type declarations (`astro sync`, `astro check`).
+      '**/.astro/**',
     ],
   },
 ]

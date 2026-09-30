@@ -19,6 +19,9 @@ export const ENV = {
    * own instances — see playwright.config.ts.
    */
   imageUrl: 'E2E_IMAGE_URL',
+  /** The screenshot pipeline's one instance (playwright.screenshots.config.ts). */
+  shotsUrl: 'E2E_SHOTS_URL',
+  shotsDb: 'E2E_SHOTS_DATABASE_URL',
 } as const
 
 export type EnvName = (typeof ENV)[keyof typeof ENV]

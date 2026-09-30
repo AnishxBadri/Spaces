@@ -11,11 +11,11 @@ pre-commit:
   parallel: false
   jobs:
     - name: prettier
-      glob: '*.{ts,tsx,js,jsx,css,md,json,yml,yaml}'
+      glob: '*.{ts,tsx,js,jsx,astro,css,md,json,yml,yaml}'
       run: pnpm exec prettier --write {staged_files}
       stage_fixed: true
     - name: eslint
-      glob: '*.{ts,tsx,js,jsx}'
+      glob: '*.{ts,tsx,js,jsx,astro}'
       run: pnpm exec eslint --fix {staged_files}
       stage_fixed: true
 

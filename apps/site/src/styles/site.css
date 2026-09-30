@@ -1,0 +1,356 @@
+/*
+ * Instrument, for the public site. The values are copied from
+ * apps/web/src/styles.css (the materials block and the @theme type steps),
+ * not imported: the site imports nothing from the workspace, and a Vercel
+ * build must not depend on the app's Tailwind pipeline. If a token changes
+ * there, change it here.
+ *
+ * Light only, by decision (DESIGN.md). Radius 2px on controls, 0 elsewhere.
+ * No shadows, no gradients, nothing round.
+ */
+
+:root {
+  --paper: #ffffff;
+  --bone: #f4f3ef;
+  --bone-deep: #e9e7e1;
+  --hairline: #1c1c1a;
+  --rule: #d6d4cd;
+  --graphite: #5c5b56;
+  --ink: oklch(0.24 0.012 155);
+  --pine: oklch(0.55 0.14 155);
+  --pine-hover: oklch(0.5 0.14 155);
+  --selected: oklch(0.962 0.022 155);
+  --radius: 0.125rem;
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Source Serif 4 Variable', Georgia, serif;
+  --font-mono:
+    'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* The product's named steps (DESIGN.md §3) … */
+  --text-field: 0.625rem;
+  --text-micro: 0.6875rem;
+  --text-label: 0.75rem;
+  --text-ui: 0.8125rem;
+  --text-body: 0.875rem;
+  --text-title: 0.9375rem;
+  --text-page: 1.375rem;
+  --text-display: 1.625rem;
+  /* … and three a reading page needs that the app does not: prose, a section
+     head and the one headline. Fixed rem, stepped at one breakpoint. */
+  --text-prose: 1.0625rem;
+  --text-section: 1.875rem;
+  --text-hero: 3.25rem;
+
+  --gutter: 2rem;
+  --measure: 72rem;
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@media (max-width: 40rem) {
+  :root {
+    --gutter: 1rem;
+    --text-section: 1.5rem;
+    --text-hero: 2.25rem;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.25rem;
+  font-feature-settings:
+    'cv11' 1,
+    'ss01' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 1px solid var(--hairline);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--selected);
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ul,
+ol,
+figure,
+pre {
+  margin: 0;
+}
+
+.wrap {
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* ---- the three voices ------------------------------------------------- */
+
+/* Inter's cv11/ss01 are set on body; JetBrains Mono reads the same tags as
+   different glyphs, and its ligatures turn `://` and `->` into one shape.
+   Everything mono prints exactly the characters it was given. */
+.mono,
+.label-caps,
+.field-label,
+code,
+pre,
+.copy,
+.figure figcaption {
+  font-feature-settings: normal;
+  font-variant-ligatures: none;
+}
+
+.serif {
+  font-family: var(--font-serif);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.label-caps {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--graphite);
+}
+
+.field-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-field);
+  line-height: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--graphite);
+}
+
+.graphite {
+  color: var(--graphite);
+}
+
+/* ---- controls ------------------------------------------------------------ */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.25rem;
+  padding-inline: 0.875rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-ui);
+  font-weight: 500;
+  line-height: 1.25rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 150ms var(--ease-out-quart),
+    border-color 150ms var(--ease-out-quart);
+}
+
+.button:hover {
+  background: var(--bone);
+}
+
+.button.primary {
+  border-color: var(--pine);
+  background: var(--pine);
+  color: #ffffff;
+}
+
+.button.primary:hover {
+  border-color: var(--pine-hover);
+  background: var(--pine-hover);
+}
+
+.button .key {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  opacity: 0.75;
+}
+
+/* Inline code and the copyable block, shared by the landing page and docs. */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+.codeblock {
+  position: relative;
+}
+
+pre {
+  overflow-x: auto;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: var(--bone);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  line-height: 1.25rem;
+  tab-size: 2;
+}
+
+pre code {
+  font-size: inherit;
+}
+
+.copy {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  height: 1.375rem;
+  padding-inline: 0.375rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--graphite);
+  font-family: var(--font-mono);
+  font-size: var(--text-field);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms var(--ease-out-quart);
+}
+
+.codeblock:hover .copy,
+.copy:focus-visible,
+.copy[data-state='done'] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .copy {
+    opacity: 1;
+  }
+}
+
+.copy:hover {
+  color: var(--ink);
+  border-color: var(--hairline);
+}
+
+/* A figure: 1px hairline frame, no shadow, a mono caption on a rule. */
+
+.figure {
+  border: 1px solid var(--hairline);
+  background: var(--paper);
+}
+
+.figure img,
+.figure .pending {
+  aspect-ratio: 1440 / 900;
+  width: 100%;
+}
+
+/* The dither plate (Shot.astro): a canvas over the image's own box, one
+   pixel per CSS pixel, scaled up without smoothing so a dot stays a dot.
+   The sweep clips it from the top (clip-path), uncovering the image.
+   Until the script has laid it down, html.dz (set inline by index.astro when
+   motion is allowed) keeps the image hidden so it never shows full-tone
+   first; if the script never arrives the image appears after 3s anyway. */
+
+.shot-box {
+  position: relative;
+}
+
+.shot-box > canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--paper);
+  image-rendering: pixelated;
+}
+
+html.dz .shot-box:not(.dz-live) > img {
+  visibility: hidden;
+  animation: dz-failsafe 0s 3s forwards;
+}
+
+@keyframes dz-failsafe {
+  to {
+    visibility: visible;
+  }
+}
+
+.figure .pending {
+  display: grid;
+  place-items: center;
+  background: var(--bone);
+  color: var(--graphite);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.figure figcaption {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--hairline);
+  background: var(--bone);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1rem;
+  color: var(--graphite);
+}
+
+.figure figcaption .n {
+  color: var(--ink);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

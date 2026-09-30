@@ -124,6 +124,23 @@
       ]
     },
 
+    // The README and marketing captures: `pnpm screenshots`, apps/e2e's
+    // second Playwright config (playwright.screenshots.config.ts). Shaped
+    // exactly like `e2e` — it serves the same built app, so it depends on the
+    // web build, and it is never cached: its output is PNGs written into
+    // docs/assets/screenshots/ from a database it seeds and drops, and a
+    // replayed run would have written nothing. Not in `test` or `e2e`.
+    "screenshots": {
+      "dependsOn": ["@spaces/web#build"],
+      "cache": false,
+      "passThroughEnv": [
+        "PLAYWRIGHT_BROWSERS_PATH",
+        "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH",
+        "CI",
+        "GITHUB_ACTIONS"
+      ]
+    },
+
     // The lint configuration decides what this package's lint run reports —
     // gate 5 (instrument/vocabulary) is one of its rule files — so it is an
     // input even though none of it is in the package. Since SPA-180 it lives

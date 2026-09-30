@@ -1,0 +1,55 @@
+---
+import { GITHUB, LICENSE } from '../links'
+---
+
+<footer class="foot">
+  <div class="wrap row">
+    <p class="serif line">
+      Built by one investor for one investor; team-ready.
+    </p>
+    <ul class="meta mono">
+      <li><a href={LICENSE}>AGPL-3.0</a></li>
+      <li><a href={GITHUB}>GitHub</a></li>
+      <li><a href="/docs">Docs</a></li>
+      <li>v0.1.0</li>
+    </ul>
+  </div>
+</footer>
+
+<style>
+  .foot {
+    margin-top: 6rem;
+    border-top: 1px solid var(--hairline);
+    background: var(--bone);
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem 2rem;
+    padding-block: 1.5rem 2rem;
+  }
+  .line {
+    font-size: var(--text-title);
+    line-height: 1.375rem;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+    padding: 0;
+    list-style: none;
+    color: var(--graphite);
+    font-size: var(--text-micro);
+    line-height: 1rem;
+  }
+  .meta a {
+    text-decoration: none;
+  }
+  .meta a:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+</style>

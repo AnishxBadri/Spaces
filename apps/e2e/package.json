@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "e2e": "playwright test",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },

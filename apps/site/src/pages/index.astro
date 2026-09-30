@@ -1,0 +1,516 @@
+---
+import Base from '../layouts/Base.astro'
+import Shot from '../components/Shot.astro'
+import { FEATURES, NEXT, WHY } from '../content/landing'
+import { COMPOSE_RAW, GITHUB, IMAGE, ROADMAP } from '../links'
+
+const readout = [
+  { label: 'Containers', value: 'app · postgres' },
+  { label: 'Database', value: 'Postgres 17 + pgvector' },
+  { label: 'Image', value: 'amd64 · arm64' },
+  { label: 'AI', value: 'BYOK · Ollama' },
+  { label: 'License', value: 'AGPL-3.0' },
+]
+
+const install = `curl -O ${COMPOSE_RAW}
+docker compose up -d
+docker compose logs app | grep setup`
+---
+
+<Base
+  title="Spaces, the deal book you run yourself"
+  description="Open-source, self-hosted deal management for angel and private-capital investors. Your box, your data, bring-your-own-key AI."
+>
+  <main>
+    <script is:inline>
+      // Before the figures parse: with motion allowed, their images wait
+      // hidden for the dither overlay (Shot.astro) instead of flashing in.
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches)
+        document.documentElement.classList.add('dz')
+    </script>
+    <section class="hero wrap">
+      <div class="hero-head">
+        <div class="hero-field" aria-hidden="true"></div>
+        <p class="eyebrow label-caps">Open source · Self-hosted · AGPL-3.0</p>
+        <h1 class="serif headline">The deal book you run yourself.</h1>
+        <p class="sub">
+          Spaces is deal management for angel and private-capital investing. It
+          runs on your box and keeps your data in your own Postgres, and every
+          AI and data provider is bring-your-own-key. Research, pipeline,
+          documents and the portfolio ledger share one graph, so a company that
+          reaches your pipeline arrives with the notes you already wrote on it.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="/docs/self-host"
+            >Self-host in 5 minutes</a
+          >
+          <a class="button" href={GITHUB}>
+            Star on GitHub <span class="key" aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </div>
+      <div class="hero-shot">
+        <Shot
+          name="hero"
+          alt="Spaces open on a workspace, with the sidebar and a record table."
+          fig="Fig. 1"
+          caption="Spaces 0.1.0"
+          eager
+        />
+      </div>
+      <dl class="readout">
+        {
+          readout.map((r) => (
+            <div>
+              <dt class="field-label">{r.label}</dt>
+              <dd class="mono">{r.value}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </section>
+
+    <section class="section wrap" aria-labelledby="why">
+      <header class="head">
+        <p class="label-caps">Why self-host</p>
+        <h2 id="why" class="serif">
+          Your fund's book belongs on your machine.
+        </h2>
+      </header>
+      <ol class="why">
+        {
+          WHY.map((w) => (
+            <li>
+              <span class="n mono">{w.n}</span>
+              <h3 class="serif">{w.title}</h3>
+              <p>{w.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <section id="features" class="section wrap" aria-labelledby="features-h">
+      <header class="head">
+        <p class="label-caps">What ships in 0.1.0</p>
+        <h2 id="features-h" class="serif">
+          A CRM that already speaks investing.
+        </h2>
+      </header>
+      {
+        FEATURES.map((f, i) => (
+          <article
+            id={f.id}
+            class:list={['feature', { flip: i % 2 === 1 }]}
+            aria-labelledby={`${f.id}-h`}
+          >
+            <div class="copy-col">
+              <p class="label-caps">
+                <span class="idx">{String(i + 1).padStart(2, '0')}</span>
+                {f.label}
+              </p>
+              <h3 id={`${f.id}-h`} class="serif">
+                {f.title}
+              </h3>
+              {f.body.map((p) => (
+                <p class="body">{p}</p>
+              ))}
+              <ul class="facts mono">
+                {f.facts.map((x) => (
+                  <li>{x}</li>
+                ))}
+              </ul>
+            </div>
+            <div class="shot-col">
+              <Shot
+                name={f.shot}
+                alt={f.alt}
+                fig={`Fig. ${i + 2}`}
+                caption={f.caption}
+              />
+            </div>
+          </article>
+        ))
+      }
+    </section>
+
+    <section class="section wrap" aria-labelledby="next">
+      <header class="head split">
+        <div>
+          <p class="label-caps">In progress · not in 0.1.0</p>
+          <h2 id="next" class="serif">Coming next.</h2>
+        </div>
+        <a class="more mono" href={ROADMAP}>docs/roadmap ↗</a>
+      </header>
+      <ul class="ledger">
+        {
+          NEXT.map((n) => (
+            <li>
+              <span class="name">{n.name}</span>
+              <span class="graphite what">{n.body}</span>
+              <span class="state field-label">in progress</span>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section id="self-host" class="section wrap" aria-labelledby="self-host-h">
+      <div class="host">
+        <div class="host-copy">
+          <p class="label-caps">Self-host</p>
+          <h2 id="self-host-h" class="serif">
+            Two containers and one directory.
+          </h2>
+          <p class="body">
+            Pull the compose file, start it, and open <code>/setup</code> with the
+            token the app prints in its log. Migrations run on boot. The only state
+            is the Postgres volume and <code>./data</code>, and you back them up
+            together.
+          </p>
+          <a class="button" href="/docs/self-host">Read the self-host guide</a>
+        </div>
+        <div class="host-code">
+          <pre><code>{install}</code></pre>
+          <dl class="facts-table">
+            <div>
+              <dt class="field-label">Containers</dt>
+              <dd>app (web + worker) and Postgres 17 with pgvector</dd>
+            </div>
+            <div>
+              <dt class="field-label">Image</dt>
+              <dd class="mono">{IMAGE}</dd>
+            </div>
+            <div>
+              <dt class="field-label">Supply chain</dt>
+              <dd>
+                cosign-signed, SLSA provenance, linux/amd64 and linux/arm64
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </section>
+  </main>
+</Base>
+
+<script>
+  import { mountField } from '../scripts/field'
+
+  const host = document.querySelector<HTMLElement>('.hero-field')
+  const words = document.querySelectorAll('.hero-head > :not(.hero-field)')
+  const edge = document.querySelector('.hero-shot')
+  if (host && edge) mountField(host, [...words], edge)
+</script>
+
+<style>
+  /* ---- hero ---- */
+  .hero {
+    padding-top: 4.5rem;
+    isolation: isolate;
+  }
+  .hero-head {
+    position: relative;
+  }
+  /* Full-bleed, from under the nav's hairline down to the hero figure's top
+     rule exactly: field.ts measures the rule and sets `bottom` (the value
+     here is the same distance, for the first frame). The shader thins the
+     dots to nothing over the lower 40%, so the plate meets its frame. */
+  .hero-field {
+    position: absolute;
+    z-index: -1;
+    top: -4.5rem;
+    bottom: -3.5rem;
+    left: 50%;
+    width: 100vw;
+    translate: -50% 0;
+    pointer-events: none;
+  }
+  .hero-field :global(canvas) {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .eyebrow {
+    margin-bottom: 1.25rem;
+  }
+  .headline {
+    max-width: 16ch;
+    font-size: var(--text-hero);
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .sub {
+    max-width: 38rem;
+    margin-top: 1.5rem;
+    color: var(--graphite);
+    font-size: var(--text-prose);
+    line-height: 1.625rem;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2rem;
+  }
+  .hero-shot {
+    margin-top: 3.5rem;
+  }
+  .readout {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    margin: 0;
+    border: 1px solid var(--hairline);
+    border-top: 0;
+  }
+  .readout > div {
+    padding: 0.75rem;
+    border-left: 1px solid var(--rule);
+  }
+  .readout > div:first-child {
+    border-left: 0;
+  }
+  .readout dd {
+    margin: 0.375rem 0 0;
+    font-size: var(--text-ui);
+    line-height: 1.25rem;
+  }
+  @media (max-width: 52rem) {
+    .readout {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .readout > div {
+      border-left: 0;
+      border-top: 1px solid var(--rule);
+    }
+    .readout > div:nth-child(even) {
+      border-left: 1px solid var(--rule);
+    }
+    .readout > div:nth-child(-n + 2) {
+      border-top: 0;
+    }
+  }
+
+  /* ---- sections ---- */
+  .section {
+    padding-top: 6rem;
+  }
+  .head {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .head h2 {
+    margin-top: 0.5rem;
+    font-size: var(--text-section);
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .split {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem 2rem;
+  }
+  .more {
+    color: var(--graphite);
+    font-size: var(--text-label);
+    text-decoration: none;
+  }
+  .more:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* ---- why ---- */
+  .why {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 0;
+    list-style: none;
+  }
+  .why li {
+    padding: 1.5rem 1.5rem 0;
+    border-left: 1px solid var(--rule);
+  }
+  .why li:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .why .n {
+    color: var(--graphite);
+    font-size: var(--text-label);
+  }
+  .why h3 {
+    margin-top: 0.75rem;
+    font-size: 1.25rem;
+    line-height: 1.625rem;
+    font-weight: 600;
+  }
+  .why p {
+    margin-top: 0.5rem;
+    color: var(--graphite);
+    font-size: var(--text-body);
+    line-height: 1.375rem;
+  }
+  @media (max-width: 52rem) {
+    .why {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .why li,
+    .why li:first-child {
+      padding: 1.25rem 0;
+      border-left: 0;
+      border-bottom: 1px solid var(--rule);
+    }
+  }
+
+  /* ---- features ---- */
+  .feature {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 3rem;
+    align-items: center;
+    padding-block: 3.5rem;
+    border-bottom: 1px solid var(--rule);
+    scroll-margin-top: 1rem;
+  }
+  .feature.flip .copy-col {
+    order: 2;
+  }
+  .idx {
+    margin-right: 0.75rem;
+    color: var(--ink);
+  }
+  .feature h3 {
+    margin-top: 0.75rem;
+    font-size: var(--text-display);
+    line-height: 2rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .body {
+    margin-top: 0.875rem;
+    font-size: var(--text-body);
+    line-height: 1.375rem;
+  }
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+    padding: 0;
+    list-style: none;
+    color: var(--graphite);
+    font-size: var(--text-micro);
+    line-height: 1rem;
+  }
+  .facts li + li::before {
+    content: '·';
+    margin-inline: 0.5rem;
+  }
+  @media (max-width: 52rem) {
+    .feature {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.5rem;
+      padding-block: 2.5rem;
+    }
+    .feature.flip .copy-col {
+      order: 0;
+    }
+  }
+
+  /* ---- coming next: a ledger ---- */
+  .ledger {
+    padding: 0;
+    list-style: none;
+  }
+  .ledger li {
+    display: grid;
+    grid-template-columns: 14rem minmax(0, 1fr) auto;
+    gap: 1.5rem;
+    align-items: baseline;
+    padding-block: 0.625rem;
+    border-bottom: 1px solid var(--rule);
+    font-size: var(--text-ui);
+    line-height: 1.25rem;
+  }
+  .ledger .name {
+    font-family: var(--font-serif);
+    font-size: var(--text-title);
+    font-weight: 600;
+  }
+  .ledger .state::before {
+    content: '';
+    display: inline-block;
+    width: 0.375rem;
+    height: 0.375rem;
+    margin-right: 0.5rem;
+    border: 1px solid var(--graphite);
+    vertical-align: 0.05rem;
+  }
+  @media (max-width: 40rem) {
+    .ledger li {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.25rem 1rem;
+    }
+    .ledger .what {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
+
+  /* ---- self-host ---- */
+  .host {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    gap: 3rem;
+    padding: 2rem;
+    border: 1px solid var(--hairline);
+    background: var(--bone);
+  }
+  .host h2 {
+    margin-top: 0.5rem;
+    font-size: var(--text-section);
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .host .button {
+    margin-top: 1.5rem;
+  }
+  .host-code :global(pre) {
+    border-color: var(--hairline);
+    background: var(--paper);
+  }
+  .facts-table {
+    margin: 1rem 0 0;
+  }
+  .facts-table > div {
+    display: grid;
+    grid-template-columns: 8rem minmax(0, 1fr);
+    gap: 1rem;
+    align-items: baseline;
+    padding-block: 0.5rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .facts-table dd {
+    margin: 0;
+    font-size: var(--text-ui);
+    line-height: 1.25rem;
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 52rem) {
+    .host {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2rem;
+      padding: 1.25rem;
+    }
+    .facts-table > div {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.25rem;
+    }
+  }
+</style>

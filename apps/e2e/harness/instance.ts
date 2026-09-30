@@ -42,6 +42,13 @@ export type Instance = {
   readonly databaseUrl: string
   readonly dataDir: string
   readonly logFile: string
+  /**
+   * Run a script of apps/web to completion against this instance — the same
+   * tsx, tsconfig, environment and log as its boot. The screenshot pipeline
+   * seeds the developer bench this way (`src/db/seed.ts`), as a process,
+   * because this package imports nothing internal.
+   */
+  readonly exec: (script: string, args?: ReadonlyArray<string>) => Promise<void>
   readonly stop: () => Promise<void>
 }
 
@@ -170,29 +177,31 @@ export async function startInstance(name: string): Promise<Instance> {
     rmSync(logFile, { force: true })
   }
 
-  try {
-    await maintenance((c) => c.query(`create database "${database}"`))
-
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      NODE_ENV: 'production',
-      DATABASE_URL: databaseUrl,
-      APP_URL: url,
-      DATA_DIR: dataDir,
-      MASTER_KEY,
-      PORT: String(port),
-      // Nothing the suite runs may reach a test database of the unit suite.
-      DATABASE_URL_TEST: '',
-    }
-
-    // The boot entry, exactly as the container runs it: tsx with the app's
-    // tsconfig (it resolves `#/` from tsconfig paths).
-    await runToEnd(
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    NODE_ENV: 'production',
+    DATABASE_URL: databaseUrl,
+    APP_URL: url,
+    DATA_DIR: dataDir,
+    MASTER_KEY,
+    PORT: String(port),
+    // Nothing the suite runs may reach a test database of the unit suite.
+    DATABASE_URL_TEST: '',
+  }
+  // tsx with the app's tsconfig (it resolves `#/` from tsconfig paths).
+  const exec = (script: string, args: ReadonlyArray<string> = []) =>
+    runToEnd(
       TSX,
-      ['--tsconfig', 'tsconfig.json', 'src/db/boot.ts'],
+      ['--tsconfig', 'tsconfig.json', script, ...args],
       env,
       logFile,
     )
+
+  try {
+    await maintenance((c) => c.query(`create database "${database}"`))
+
+    // The boot entry, exactly as the container runs it.
+    await exec('src/db/boot.ts')
 
     const log = createWriteStream(logFile, { flags: 'a' })
     const child = spawn(process.execPath, [SERVER_ENTRY], {
@@ -209,7 +218,7 @@ export async function startInstance(name: string): Promise<Instance> {
     throw err
   }
 
-  return { name, url, database, databaseUrl, dataDir, logFile, stop }
+  return { name, url, database, databaseUrl, dataDir, logFile, exec, stop }
 }
 
 /** Every setup token this instance has printed to its log, oldest first. */
@@ -235,4 +244,66 @@ export async function publicRowCount(connectionString: string) {
   } finally {
     await client.end()
   }
+}
+
+/**
+ * The databases this harness promises not to touch, whichever of them exist
+ * on the server right now: the one DATABASE_URL names (the dev database, or
+ * CI's `spaces`), and every database the unit suite owns — `<that>_test*`
+ * by default, or `<DATABASE_URL_TEST's name>*` when that override is set,
+ * the same derivation packages/db/src/test-db.ts makes.
+ */
+export async function countOutsideRows(): Promise<Map<string, number>> {
+  const source = sourceDatabaseUrl()
+  const nameOf = (url: URL) =>
+    decodeURIComponent(url.pathname.replace(/^\//, ''))
+  const own = nameOf(source)
+  const override = process.env.DATABASE_URL_TEST
+  const testPrefix =
+    override === undefined || override === ''
+      ? `${own}_test`
+      : nameOf(new URL(override))
+  const like = (prefix: string) => `${prefix.replace(/[\\_%]/g, '\\$&')}%`
+  const names = await maintenance(async (c) => {
+    const res = await c.query<{ datname: string }>(
+      `select datname from pg_database
+        where datname = $1 or datname like $2
+        order by datname`,
+      [own, like(testPrefix)],
+    )
+    return res.rows.map((r) => r.datname)
+  })
+  const counts = new Map<string, number>()
+  for (const name of names)
+    counts.set(name, await publicRowCount(withDatabase(source, name)))
+  return counts
+}
+
+/**
+ * The claim the harness makes, checked after every instance has stopped: the
+ * databases `countOutsideRows` counted hold exactly the rows they held
+ * before, and no `spaces_e2e_<this pid>_*` database was left behind.
+ */
+export async function assertUntouched(
+  before: Map<string, number>,
+): Promise<void> {
+  const after = await countOutsideRows()
+  const moved = [...before].filter(([db, n]) => after.get(db) !== n)
+  for (const [db, n] of before)
+    console.log(`[e2e] ${db}: ${n} rows before, ${after.get(db)} after`)
+  if (moved.length > 0)
+    throw new Error(
+      `[e2e] the run changed databases it must never touch: ${moved
+        .map(([db, n]) => `${db} ${n} → ${after.get(db)}`)
+        .join(', ')}`,
+    )
+  const left = await maintenance((c) =>
+    c.query<{ datname: string }>(
+      `select datname from pg_database where datname like 'spaces\\_e2e\\_${process.pid}\\_%'`,
+    ),
+  )
+  if (left.rows.length > 0)
+    throw new Error(
+      `[e2e] left databases behind: ${left.rows.map((r) => r.datname).join(', ')}`,
+    )
 }

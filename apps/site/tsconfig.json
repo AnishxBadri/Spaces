@@ -1,0 +1,12 @@
+{
+  "//": "Astro's strict preset, not packages/config/tsconfig.base.json: `astro check` wants its own module and jsx settings, and the site shares no source with the rest of the workspace. The three flags below are the base's stricter half, carried across by hand. No `paths`: this package imports nothing internal.",
+  "extends": "astro/tsconfigs/strict",
+  "include": [".astro/types.d.ts", "**/*"],
+  "exclude": ["dist", "node_modules", "public"],
+  "compilerOptions": {
+    "types": ["node"],
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  }
+}

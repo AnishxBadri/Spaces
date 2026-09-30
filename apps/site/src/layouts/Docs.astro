@@ -1,0 +1,283 @@
+---
+import type { MarkdownHeading } from 'astro'
+import Base from './Base.astro'
+import { GITHUB_DOCS } from '../links'
+
+interface Props {
+  frontmatter: { title: string; description: string; eyebrow: string }
+  headings: ReadonlyArray<MarkdownHeading>
+}
+
+const { frontmatter, headings } = Astro.props
+const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '')
+
+const pages = [
+  { href: '/docs', label: 'Overview' },
+  { href: '/docs/self-host', label: 'Self-host' },
+  { href: '/docs/architecture', label: 'Architecture' },
+]
+const sections = headings.filter((h) => h.depth === 2)
+---
+
+<Base
+  title={`${frontmatter.title} · Spaces docs`}
+  description={frontmatter.description}
+>
+  <div class="wrap docs">
+    <aside class="rail" aria-label="Docs">
+      <p class="field-label">Docs</p>
+      <ul class="pages">
+        {
+          pages.map((p) => {
+            const current = p.href === path
+            return (
+              <li>
+                <a href={p.href} aria-current={current ? 'page' : undefined}>
+                  {p.label}
+                </a>
+                {current && sections.length > 0 && (
+                  <ul class="toc">
+                    {sections.map((h) => (
+                      <li>
+                        <a href={`#${h.slug}`}>{h.text}</a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            )
+          })
+        }
+      </ul>
+      <a class="out mono" href={GITHUB_DOCS}>docs/ on GitHub ↗</a>
+    </aside>
+    <main class="page">
+      <p class="label-caps">{frontmatter.eyebrow}</p>
+      <h1 class="serif">{frontmatter.title}</h1>
+      <p class="lede">{frontmatter.description}</p>
+      <article class="prose">
+        <slot />
+      </article>
+    </main>
+  </div>
+</Base>
+
+<style>
+  .docs {
+    display: grid;
+    grid-template-columns: 13rem minmax(0, 1fr);
+    gap: 3rem;
+    padding-top: 2.5rem;
+  }
+  .rail {
+    position: sticky;
+    top: 1.5rem;
+    align-self: start;
+    padding-right: 1.5rem;
+    border-right: 1px solid var(--rule);
+  }
+  .pages,
+  .toc {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pages {
+    margin-top: 0.75rem;
+  }
+  .pages > li > a {
+    display: block;
+    padding: 0.3125rem 0 0.3125rem 0.625rem;
+    border-left: 2px solid transparent;
+    color: var(--graphite);
+    font-size: var(--text-ui);
+    line-height: 1.25rem;
+    text-decoration: none;
+  }
+  .pages > li > a:hover {
+    color: var(--ink);
+  }
+  .pages > li > a[aria-current='page'] {
+    border-left-color: var(--pine);
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .toc {
+    margin: 0.25rem 0 0.5rem 0.75rem;
+  }
+  .toc a {
+    display: block;
+    padding: 0.1875rem 0 0.1875rem 0.625rem;
+    border-left: 1px solid var(--rule);
+    color: var(--graphite);
+    font-size: var(--text-label);
+    line-height: 1rem;
+    text-decoration: none;
+  }
+  .toc a:hover {
+    color: var(--ink);
+    border-left-color: var(--hairline);
+  }
+  .out {
+    display: inline-block;
+    margin-top: 1.25rem;
+    color: var(--graphite);
+    font-size: var(--text-micro);
+    text-decoration: none;
+  }
+  .out:hover {
+    color: var(--ink);
+  }
+
+  .page {
+    min-width: 0;
+    max-width: 44rem;
+  }
+  .page h1 {
+    margin-top: 0.5rem;
+    font-size: 2.25rem;
+    line-height: 2.625rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  .lede {
+    margin-top: 0.75rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--hairline);
+    color: var(--graphite);
+    font-family: var(--font-serif);
+    font-size: 1.1875rem;
+    line-height: 1.75rem;
+  }
+
+  @media (max-width: 52rem) {
+    .docs {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.5rem;
+      padding-top: 1.5rem;
+    }
+    .rail {
+      position: static;
+      padding: 0 0 1rem;
+      border-right: 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .pages {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0 1rem;
+    }
+    .toc {
+      display: none;
+    }
+    .out {
+      margin-top: 0.5rem;
+    }
+    .page h1 {
+      font-size: 1.75rem;
+      line-height: 2.125rem;
+    }
+  }
+
+  /* ---- the markdown body: serif prose, mono code on bone, 1px rules ---- */
+  .prose {
+    font-family: var(--font-serif);
+    font-size: var(--text-prose);
+    line-height: 1.75rem;
+  }
+  .prose :global(h2) {
+    margin: 3rem 0 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--hairline);
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    scroll-margin-top: 1rem;
+  }
+  .prose :global(h3) {
+    margin: 2rem 0 0.5rem;
+    font-size: 1.1875rem;
+    line-height: 1.625rem;
+    font-weight: 600;
+    scroll-margin-top: 1rem;
+  }
+  .prose :global(p),
+  .prose :global(ul),
+  .prose :global(ol),
+  .prose :global(.codeblock),
+  .prose :global(table),
+  .prose :global(blockquote) {
+    margin-top: 1rem;
+  }
+  .prose > :global(:first-child) {
+    margin-top: 1.5rem;
+  }
+  /* The lede's hairline is already above the first section. */
+  .prose > :global(h2:first-child) {
+    padding-top: 0;
+    border-top: 0;
+  }
+  .prose :global(ul),
+  .prose :global(ol) {
+    padding-left: 1.25rem;
+  }
+  .prose :global(li + li) {
+    margin-top: 0.25rem;
+  }
+  .prose :global(a) {
+    text-decoration-color: var(--rule);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  .prose :global(a:hover) {
+    text-decoration-color: var(--hairline);
+  }
+  .prose :global(:not(pre) > code) {
+    padding: 0.0625rem 0.3125rem;
+    border: 1px solid var(--rule);
+    background: var(--bone);
+    font-size: 0.8125em;
+  }
+  .prose :global(strong) {
+    font-weight: 700;
+  }
+  .prose :global(blockquote) {
+    margin-inline: 0;
+    padding: 0.75rem 1rem;
+    border-left: 2px solid var(--hairline);
+    background: var(--bone);
+  }
+  .prose :global(blockquote p:first-child) {
+    margin-top: 0;
+  }
+  .prose :global(table) {
+    display: block;
+    overflow-x: auto;
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-sans);
+    font-size: var(--text-ui);
+    line-height: 1.25rem;
+  }
+  .prose :global(th) {
+    padding: 0.5rem 1rem 0.5rem 0;
+    border-bottom: 1px solid var(--hairline);
+    color: var(--graphite);
+    font-family: var(--font-mono);
+    font-size: var(--text-field);
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .prose :global(td) {
+    padding: 0.5rem 1rem 0.5rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  .prose :global(td:first-child) {
+    white-space: nowrap;
+  }
+</style>

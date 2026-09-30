@@ -1,137 +1,251 @@
-# Spaces
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <img src="docs/assets/logo.svg" alt="Spaces" width="220">
+  </picture>
+</p>
 
-Self-hosted deal management for angel and private-capital investing.
+<p align="center">
+  <strong>The deal book you run yourself.</strong><br>
+  Self-hosted deal management for angel and private-capital investing.
+</p>
 
-## Getting started (from a clean clone)
+<p align="center">
+  <a href="https://github.com/AnishxBadri/Spaces/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/AnishxBadri/Spaces/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/AnishxBadri/Spaces/actions/workflows/release.yml"><img alt="Release" src="https://github.com/AnishxBadri/Spaces/actions/workflows/release.yml/badge.svg"></a>
+  <a href="https://github.com/AnishxBadri/Spaces/pkgs/container/spaces"><img alt="Image" src="https://img.shields.io/badge/ghcr.io-spaces%3A0.1.0-1c1c1a"></a>
+  <a href="LICENSE"><img alt="AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-1c1c1a"></a>
+</p>
+
+<p align="center">
+  <a href="#self-hosting">Self-host</a> ·
+  <a href="#what-you-get">Features</a> ·
+  <a href="#bring-your-own-keys">BYOK AI</a> ·
+  <a href="#whats-next">Roadmap</a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshots/hero.png" alt="Spaces — Today" width="100%">
+</p>
+
+---
+
+Spaces is an open-source, self-hosted deal-management OS for angels and small
+funds. Think Affinity or TagHash, except you run it, you own the data, and
+every AI or data provider is bring-your-own-key. It is not a horizontal CRM.
+It is opinionated for investors, and that constraint is the product.
+
+Two halves sit on one graph:
+
+- **Research** — spaces, notes, sources, a glossary. Slow, exploratory, no
+  pipeline. Your market map, compounding.
+- **Deals** — companies, people, deals, activity, a portfolio ledger. Fast,
+  structured, spreadsheet-grade.
+
+The seam is the point: a company entering the pipeline already carries the
+months of research you filed on it. Everything stays on your box. Nothing
+phones home.
+
+## Why self-host
+
+- **Funds do not put deal terms, decks and cap tables in someone else's SaaS.**
+  Two containers on a box you control, one `./data` directory to back up.
+- **Confidential decks never leave the building.** Point the AI at a local
+  Ollama and deep-tech or defence material stays off third-party APIs.
+- **Provider terms sit between you and the provider.** Enrichment and AI keys
+  are yours; Spaces holds them encrypted and never proxies them.
+- **Open schema, no lock-in.** Postgres you can query, blobs you can copy,
+  AGPL-3.0 so it stays that way.
+
+## What you get
+
+### Pipeline and deals
+
+A deal is a first-class object born from a deck, screened against your
+mandate, moved through stages that keep their history. Pass and lost are
+remembered, so the same company coming back next year lands on what you
+thought last time.
+
+<img src="docs/assets/screenshots/deals.png" alt="Deals pipeline" width="100%">
+
+### Records that speak investing
+
+Companies and people are seeded with the attributes an investor actually
+tracks (stage, round, geography, sector), and every object takes custom
+attributes with validation, change history and reference links. Duplicates
+are found by fuzzy name, domain and LinkedIn and merged without losing a row.
+
+<img src="docs/assets/screenshots/company.png" alt="Company record" width="100%">
+
+### Notes with context
+
+Notion-grade block notes, filed against companies, people, deals or spaces.
+A note can be private to you. Mention a company and the assembler pulls the
+right context, cited, into anything the AI drafts.
+
+<img src="docs/assets/screenshots/note.png" alt="A note" width="100%">
+
+### Documents and search
+
+Drop a deck, a memo, a data-room export. The worker extracts the text, the
+database indexes it (lexical, fuzzy and vector, all in Postgres), and a
+company's Files tab previews it without fetching anything off-origin.
+
+<img src="docs/assets/screenshots/documents.png" alt="Documents" width="100%">
+
+### A portfolio ledger an auditor would recognise
+
+Investments, marks, distributions and FX rates are append-only events. A
+correction is a compensating event, never an edit. Ownership, cost, value,
+MOIC and IRR are computed live from the ledger as of any date.
+
+<img src="docs/assets/screenshots/portfolio.png" alt="Portfolio" width="100%">
+
+### Spaces: a taxonomy you own
+
+A hierarchy of sectors and theses that companies, notes and glossary terms
+file into. The starter taxonomy is deliberately tiny. Yours grows with the
+research.
+
+<img src="docs/assets/screenshots/spaces.png" alt="Spaces" width="100%">
+
+### Import from a spreadsheet
+
+Map the columns once, preview what would land, commit. A re-run of the same
+file writes nothing.
+
+<img src="docs/assets/screenshots/import.png" alt="Import" width="100%">
+
+## Bring your own keys
+
+Every provider is configured in the app under **Settings → AI**, stored
+encrypted with a master key that lives only on your disk, and never leaves
+your deployment as anything but a request you chose to make.
+
+| Lane       | Providers                                     | Notes                                                      |
+| ---------- | --------------------------------------------- | ---------------------------------------------------------- |
+| Language   | Anthropic, OpenAI, Google, OpenRouter, Ollama | routed by lane and sensitivity; local-only lanes for decks |
+| Embeddings | OpenAI, Google, Voyage, Ollama                | pinned to one dimension per deployment; re-embed is a job  |
+| Enrichment | Apollo (in progress, via the plugin SDK)      | provider terms are between you and the provider            |
+
+AI writes are suggestions. Nothing the model produces lands on a record until
+you accept it.
+
+<img src="docs/assets/screenshots/settings-ai.png" alt="AI providers" width="100%">
+
+## Self-hosting
+
+Two containers, two volumes, one command. The image is multi-arch
+(`linux/amd64`, `linux/arm64`), published to GHCR and Docker Hub on every
+release, signed with cosign, and pinned by tag. There is no `latest`.
+
+### Requirements
+
+- Docker with Compose v2
+- A small VPS or a box under the desk, `amd64` or `arm64`.
+- A domain, if you want HTTPS. Optional.
+
+### First run
 
 ```bash
-pnpm install                                      # links apps/web, apps/worker and packages/*
-docker compose -f docker-compose.dev.yml up -d    # Postgres :5432 (+ MinIO :9000)
-$EDITOR .env.local                                # the two values below
-pnpm db:migrate:run                               # migrations + system attributes
-pnpm dev                                          # http://localhost:3000
-pnpm worker                                       # in a second terminal (or let `pnpm dev` run it)
+mkdir spaces && cd spaces
+curl -fsSLO https://raw.githubusercontent.com/AnishxBadri/Spaces/main/docker-compose.yml
+docker compose up -d
+docker compose logs app | grep "setup token"
 ```
 
-`.env.local` lives at the **repo root** and needs two values:
+Open `http://localhost:3000/setup`, paste the token, create the admin. The
+setup window closes the moment the first admin exists. Login lands on
+`/today`.
 
-```
-DATABASE_URL=postgresql://spaces:spaces@localhost:5432/spaces
-BETTER_AUTH_SECRET=<pnpm dlx @better-auth/cli secret>
-```
+Everything the app owns is in `./data` (blobs, the auto-generated
+`secret.key`) and the `spaces_pgdata` volume.
 
-## Repo layout
+### HTTPS
 
-This is a pnpm workspace (since 2026-09-19).
-
-```
-apps/web/            the app — @spaces/web. src/ and the configs it owns
-apps/worker/         the pg-boss worker — @spaces/worker (SPA-181); its jobs still reach apps/web/src/lib through `#web/*`
-packages/db/         @spaces/db — drizzle schema, the drizzle/ journal, migrator
-packages/config/     tsconfig.base.json, the eslint base (+ eslint-rules/) and prettier config, shared by every package
-eslint.config.js     shim — re-exports packages/config's (prettier.config.js likewise)
-scripts/             backup.sh, restore.sh — operator scripts
-docker/              entrypoint.sh, Caddyfile
-```
-
-Every script below runs **from the repo root**; each is a proxy that delegates
-with `pnpm --filter`. Inside a package, `#/` always means that package's own
-`src/`, so `#/lib/server/deals` in `apps/web` is `apps/web/src/lib/server/deals`.
-
-| command               | what it does                                  |
-| --------------------- | --------------------------------------------- |
-| `pnpm dev`            | vite dev server on :3000 + the worker (watch) |
-| `pnpm worker`         | the pg-boss worker alone (apps/worker)        |
-| `pnpm build`          | production build into `apps/web/.output`      |
-| `pnpm test`           | vitest (needs Postgres up)                    |
-| `pnpm typecheck`      | every tsconfig — root, apps/_, packages/_     |
-| `pnpm lint`           | eslint, including the design-token rule       |
-| `pnpm db:migrate:run` | run migrations and reseed system attributes   |
-| `pnpm db:generate`    | generate a migration after a schema change    |
-
-# Self-hosting over HTTPS
-
-The app never terminates TLS. A reverse proxy is always in front, and
-`APP_URL` is the single source of truth for scheme, cookies and every
-external link. Caddy is the worked example, shipped as an overlay:
+The app never terminates TLS. A reverse proxy sits in front, and `APP_URL`
+is the single source of truth for scheme, cookies and every external link.
+Caddy is the worked example, shipped as an overlay. It needs two more
+files beside the compose file:
 
 ```bash
+curl -fsSLO https://raw.githubusercontent.com/AnishxBadri/Spaces/main/docker-compose.tls.yml
+curl -fsSL --create-dirs -o docker/Caddyfile https://raw.githubusercontent.com/AnishxBadri/Spaces/main/docker/Caddyfile
+
 SPACES_DOMAIN=deals.example.com \
 APP_URL=https://deals.example.com \
 docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
 ```
 
-Point an A/AAAA record at the box and open 80 and 443 first — 80 is not
-optional, it carries the ACME challenge and the redirect to https. Caddy
-issues and renews the certificate on its own; `docker/Caddyfile` is one
-block, plus a commented variant for operators whose TLS is already
-terminated further upstream.
+Point an A/AAAA record at the box and open 80 and 443. Port 80 carries the
+ACME challenge and the redirect. Caddy issues and renews on its own, and the
+overlay stops publishing 3000 on the host.
 
-The overlay also stops publishing 3000 on the host. `curl http://<host>:3000`
-from outside is refused because nothing listens there, which incidentally
-closes the first-run window: between `compose up` and the creation of the
-first admin, `/setup` is reachable by anyone who can reach the port.
+Any other proxy needs exactly two things: a correct `APP_URL`, and a proxy
+that speaks plain HTTP to the app container on 3000. The app reads no
+forwarded headers at all, so a spoofed header cannot change a link, a cookie
+or a redirect.
 
-Every boot logs the decision it made, before anything serves traffic:
+> **The one trap.** An `http://` `APP_URL` behind an `https://` proxy fails
+> silently: the session cookie is set without `Secure`, the browser drops it,
+> and you land back on the login page with no error. Set `APP_URL` to the
+> scheme and host the **browser** sees. Boot warns loudly when it looks wrong.
 
-```
-[boot] external origin https://deals.example.com · cookies secure: yes · presign origin https://deals.example.com
-```
+### Environment
 
-## Trap 1 — an http APP_URL behind an https proxy
+Only two values are required. Everything else is optional and set from the
+app.
 
-This is the failure the contract exists to prevent, and it is silent.
-Reproduce it by leaving `APP_URL=http://deals.example.com` while Caddy serves
-the same host over https: the login form posts, the server answers 200 and
-sets a session cookie **without** the `Secure` flag, the browser on an https
-page drops it, and the next request is unauthenticated — so you land back on
-the login page with no error anywhere. Nothing is broken; the cookie simply
-never arrived.
+| Variable         | Required | Purpose                                                                                                                                     |
+| ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`   | yes      | Postgres 17 with pgvector. The compose file provides one.                                                                                   |
+| `APP_URL`        | yes      | The origin the browser sees, e.g. `https://deals.example.com`.                                                                              |
+| `MASTER_KEY`     | no       | Encrypts stored credentials. Auto-generated to `/data/secret.key`.                                                                          |
+| `STORAGE_DRIVER` | no       | `local` (default) or `s3`, then `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`. |
 
-Set `APP_URL` to the scheme and host the **browser** sees, never the scheme
-of the hop into the box. Boot warns loudly when `APP_URL` is `http://` and
-the host is not localhost:
+`STORAGE_DRIVER=s3` with R2 or B2 is how ephemeral-disk platforms (Fly,
+Railway, Render) run it.
 
-```
-[boot] WARNING: APP_URL is http:// on a non-local host (deals.example.com). Session cookies will not be Secure. …
-```
+### Backup and restore
 
-It is a warning, not a refusal — a plain-http install on a LAN is a
-legitimate configuration and keeps working.
-
-## nginx, Traefik, anything else
-
-Nothing here is Caddy-specific. An operator on another proxy needs exactly
-two things: a correct `APP_URL`, and a proxy that sets `X-Forwarded-Proto`
-for anything else downstream that cares. The app itself reads no forwarded
-headers at all — a test pins that no source file does — so a spoofed header
-cannot change a link, a cookie or a redirect. Proxy to the app container on
-port 3000 over plain HTTP and keep the host port unpublished.
-
-Blob downloads follow the same rule: presigned URLs for the local storage
-driver are built from `APP_URL`, not from the incoming request, so they come
-out `https://` and download back through the proxy.
-
-# Split roles — web and worker in separate containers
-
-The shipped compose runs one `ROLE=all` container, which is right for one
-box. To scale the two apart, overlay `docker-compose.split.yml`:
+The database and `./data` are worthless apart: blobs are content-addressed
+files with no filenames, and the rows that name them live in Postgres. The
+scripts treat the pair as one unit and refuse to produce half.
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.split.yml up -d
+./scripts/backup.sh                 # → ./backups/<timestamp>/  (pg_dump + data.tar), or nothing
+./scripts/restore.sh backups/<dir>  # stages both halves, swaps only when both loaded
 ```
 
-`app` becomes `ROLE=web` and a `worker` service joins it on the same `./data`
-and the same `DATABASE_URL`. The two halves talk only through Postgres.
+**Losing `secret.key` loses every stored credential.** Back up `./data`
+with the dump, every time. Cron `0 3 * * *` is a fine default.
 
-## Checking that the worker is actually running
+### Upgrading
 
-A crashed worker is the failure that looks healthy: the web container still
-serves, and extraction silently never runs. So the worker upserts one
-`worker_heartbeat` row on boot and every 15s, and both healthchecks read it.
+Back up, then change the image tag in `docker-compose.yml` on purpose and
+`docker compose up -d`. Migrations are forward-only and run on boot. Rollback
+is a restore, never an older image on a newer schema: the boot guard refuses
+to start an image older than the schema it finds.
 
-`GET /api/health` is unauthenticated and stays thin — a status, the database,
-and how long ago the worker last beat:
+Each release is `core@X.Y.Z` on GitHub. Both registries carry `X.Y.Z` and
+`X.Y`. GHCR also carries SLSA provenance, so you can verify what you run:
+
+```bash
+cosign verify ghcr.io/anishxbadri/spaces:0.1.0 \
+  --certificate-identity-regexp 'github.com/AnishxBadri/Spaces' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+### Scaling out and checking health
+
+The shipped compose runs one `ROLE=all` container. To split the web server
+from the worker, overlay `docker-compose.split.yml`. The two halves talk only
+through Postgres.
+
+`GET /api/health` is unauthenticated and thin: a status, the database, and
+how long ago the worker last beat.
 
 ```json
 {
@@ -141,264 +255,79 @@ and how long ago the worker last beat:
 }
 ```
 
-`worker.status` is `ok`, `stale` (no beat for 60s) or `absent` (no row yet).
-**A stale or absent worker does not change the HTTP code**: it stays 200 with
-`status: "ok"`, because a worker outage must never fail the web container's
-healthcheck and restart it. Only an unreachable database answers 503 with
-`status: "degraded"` and `db: "unreachable"`.
+A stale worker never fails the web container's healthcheck. Only an
+unreachable database answers 503. A `ROLE=worker` container's own
+healthcheck reads its heartbeat row, so `docker ps` shows it `unhealthy`
+within a minute of the process dying.
 
-The worker container runs no HTTP server, so its `HEALTHCHECK` is not a wget —
-the Dockerfile branches on `$ROLE` and a `ROLE=worker` container asks its own
-row instead (`apps/worker/src/health.ts`, exit 0 fresh / 1 stale). Stop the worker
-process and `docker ps` shows that container `unhealthy` within a minute while
-the web container stays `healthy`. A graceful stop leaves the row in place on
-purpose: staleness is the signal, so the operator can still see when the
-worker last beat.
-
-# Building For Production
-
-To build this application for production:
+### Local models
 
 ```bash
-pnpm build
+docker compose --profile ollama up -d
+docker compose exec ollama ollama pull nomic-embed-text
 ```
 
-## Styling
+Then save Ollama at `http://ollama:11434` under Settings → AI → Providers.
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+## What's next
 
-### Removing Tailwind CSS
+Shipped: everything above, on the entity graph, the attribute engine, the
+context assembler and the Effect-first backend. In progress, in order:
 
-If you prefer not to use Tailwind CSS:
+- **Plugin SDK** — `@spaces/sdk`. Integrations install from the running app
+  into `./data/plugins`, run only on the worker, and feed the graph through
+  typed claim lanes. They never extend the product.
+- **Enrichment** — Apollo first, with a daily credit cap and a 90-day cache.
+- **Mail and calendar** — Gmail and Google Calendar as forward-only syncers,
+  with the privacy default decided before the second partner connects.
+- **Storage sources** — Drive and Box on one read port. A bound data room.
+- **Researcher lane** — Exa, budgeted and attributed, proposing never writing.
 
-1. Remove the demo pages in `apps/web/src/routes/demo/`
-2. Replace the Tailwind import in `apps/web/src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `apps/web/vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `apps/web/package.json`
+The full sequence, with every decision and its options, is in
+[`docs/roadmap-2026-09.md`](docs/roadmap-2026-09.md). Not on the list: LP
+reporting, fund administration, a hosted SaaS. Different product, different
+buyer.
 
-## Linting & Formatting
+## How it's built
 
-This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
+```
+Browser (React) ── typed server functions ──┐
+                                            ├── Postgres 17 · data, jobs, search, vectors
+Worker (pg-boss · extraction · AI jobs) ────┘
+                                            └── ./data · blobs (local | S3) · secret.key
+```
+
+TanStack Start and React 19 on the front; Effect on the back; Postgres 17 as
+the one stateful service (Drizzle, pg-boss, tsvector and pg_trgm, ltree,
+pgvector); Better Auth; BlockNote; TanStack Table. The monorepo is pnpm and
+Turborepo: `apps/web`, `apps/worker`, `apps/e2e`, `apps/site`, `packages/db`,
+`packages/core`, `packages/config`, with `packages/sdk` and `plugins/*`
+arriving with the SDK.
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — every model, the stack,
+  the roadmap, in one read
+- [`CONTEXT.md`](CONTEXT.md) — the decision record, dated
+- [`docs/CODEBASE.md`](docs/CODEBASE.md) — where things live
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, the gates, how to pick
+  up an issue
+
+## Developing
 
 ```bash
-pnpm lint
-pnpm format
-pnpm check
+pnpm install
+docker compose -f docker-compose.dev.yml up -d   # Postgres :5432 + MinIO :9000
+cp .env.example .env.local                        # DATABASE_URL, BETTER_AUTH_SECRET
+pnpm db:migrate:run
+pnpm dev                                          # http://localhost:3000, worker in watch
+pnpm db:seed                                      # an invented fund's book, after /setup
 ```
 
-## Setting up Better Auth
+Gates: `pnpm typecheck`, `pnpm test`, `pnpm lint`, prettier. All four must be
+green before a commit. `pnpm e2e` drives the built app in Chromium and
+`pnpm screenshots` regenerates the images in this file. Details in
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-1. Generate and set the `BETTER_AUTH_SECRET` environment variable in your `.env.local`:
+## License
 
-   ```bash
-   pnpm dlx @better-auth/cli secret
-   ```
-
-2. Visit the [Better Auth documentation](https://www.better-auth.com) to unlock the full potential of authentication in your app.
-
-### Adding a Database (Optional)
-
-Better Auth can work in stateless mode, but to persist user data, add a database:
-
-```typescript
-// apps/web/src/lib/auth.ts
-import { betterAuth } from 'better-auth'
-import { Pool } from 'pg'
-
-export const auth = betterAuth({
-  database: new Pool({
-    connectionString: process.env.DATABASE_URL,
-  }),
-  // ... rest of config
-})
-```
-
-Then run migrations:
-
-```bash
-pnpm dlx @better-auth/cli migrate
-```
-
-## Shadcn
-
-Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
-Run it inside `apps/web`, which is where `components.json` lives.
-
-```bash
-cd apps/web && pnpm dlx shadcn@latest add button
-```
-
-## T3Env
-
-- You can use T3Env to add type safety to your environment variables.
-- Add Environment variables to the `apps/web/src/env.mjs` file.
-- Use the environment variables in your code.
-
-### Usage
-
-```ts
-import { env } from '#/env'
-
-console.log(env.VITE_APP_TITLE)
-```
-
-## Deploy with Nitro
-
-This project uses Nitro as a generic server adapter, so it can run on any Node-compatible host.
-
-```bash
-npm run build
-node dist/server/index.mjs
-```
-
-The build output is a self-contained Node server. To deploy, push the `dist/` directory to your host (Render, Fly.io, your own VPS, etc.) and run the server command above.
-
-For host-specific presets (Vercel, Netlify, Cloudflare, AWS Lambda, etc.) and tuning, see https://v3.nitro.build/deploy.
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `apps/web/src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./apps/web/src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from '@tanstack/react-router'
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `apps/web/src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+[AGPL-3.0](LICENSE). Run it, change it, ship it; if you serve a modified
+version to others, share the changes.

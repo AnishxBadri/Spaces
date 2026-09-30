@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" width="220" height="48" role="img" aria-label="Spaces">
+  <g transform="translate(4 8)">
+    <rect x="2" y="2" width="28" height="28" rx="2" fill="none" stroke="#1c1c1a" stroke-width="2"/>
+    <rect x="13" y="13" width="11" height="11" rx="1" fill="#1c1c1a"/>
+    <line x1="8" y1="8" x2="8" y2="24" stroke="#1c1c1a" stroke-width="2" stroke-linecap="round"/>
+    <line x1="8" y1="8" x2="24" y2="8" stroke="#1c1c1a" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <text x="50" y="34" font-family="'Source Serif 4', 'Source Serif Pro', Georgia, 'Times New Roman', serif" font-size="30" font-weight="600" letter-spacing="-0.5" fill="#1c1c1a">Spaces</text>
+</svg>

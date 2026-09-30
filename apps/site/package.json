@@ -1,0 +1,29 @@
+{
+  "//": "The public marketing and docs site (docs/spec-plugin-sdk.md §2: `apps/site/` is marketing/docs on Vercel, never in the image). Static Astro. It imports nothing internal (no `@spaces/*`, no `#/`, no relative climb into another package), which the eslint zone in packages/config/eslint.base.js holds; `@spaces/config` is here for the lint and prettier configuration only. Nothing depends on it, so `turbo prune @spaces/web @spaces/worker --docker` never reaches it. No `test` script on purpose: it is not in the unit-test graph. Screenshots and logos are not kept here; src/integrations/sync-assets.ts copies them from docs/assets on every dev and build (docs/site.md).",
+  "name": "@spaces/site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro sync && astro-check",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/source-serif-4": "^5.3.0",
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "astro": "^7.3.5",
+    "eslint": "^9.20.0",
+    "sharp": "0.35.5",
+    "typescript": "^6.0.2"
+  }
+}

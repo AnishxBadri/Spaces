@@ -1,0 +1,170 @@
+---
+import type { Screenshot } from '../integrations/sync-assets'
+
+interface Props {
+  name: Screenshot
+  alt: string
+  fig: string
+  caption: string
+  eager?: boolean
+}
+
+const { name, alt, fig, caption, eager = false } = Astro.props
+// Synced from docs/assets/screenshots at build start; a picture that has not
+// been taken yet draws a labelled bone panel of the same size instead.
+const present = __SCREENSHOTS__.includes(name)
+---
+
+<figure class="figure">
+  {
+    present ? (
+      <div class="shot-box" data-reveal={eager ? 'load' : 'view'}>
+        <img
+          src={`/screenshots/${name}.png`}
+          width="1440"
+          height="900"
+          alt={alt}
+          loading={eager ? 'eager' : 'lazy'}
+          decoding="async"
+        />
+      </div>
+    ) : (
+      <div class="pending" role="img" aria-label={alt}>
+        {name}.png · pending
+      </div>
+    )
+  }
+  <figcaption><span class="n">{fig}</span><span>{caption}</span></figcaption>
+</figure>
+
+<script>
+  import { DEBUG, easeInOut, plate, sweep, tween } from '../scripts/dither'
+
+  // Every screenshot is printed: a 1-bit plate of it lies over the picture
+  // and a line sweeps down, colour above, ink-on-paper below. The hero
+  // sweeps once on load, over 1100ms. A feature figure sweeps with the
+  // scroll: a print line sits at 70% of the viewport and the figure moves
+  // through it — 1-bit below the line, printed above — and it is back to
+  // 1-bit if scrolled back out. The plate lies over the image's own box, so the
+  // layout never moves, and leaves the page once the line has cleared the
+  // bottom. Reduced motion: none of this runs, and the inline script in
+  // index.astro never hid the images.
+
+  interface Fig {
+    box: HTMLElement
+    img: HTMLImageElement
+    canvas: HTMLCanvasElement
+    /** The width the plate was printed at; 0 before it is. */
+    w: number
+    busy: boolean
+  }
+
+  const loaded = (img: HTMLImageElement) => img.complete && img.naturalWidth > 0
+
+  // Print the plate if it is missing or the box has changed width since.
+  async function ensure(f: Fig): Promise<void> {
+    if (f.busy || !loaded(f.img) || f.w === Math.round(f.img.clientWidth))
+      return
+    f.busy = true
+    f.w = await plate(f.canvas, f.img)
+    f.busy = false
+  }
+
+  function mount(box: HTMLElement, img: HTMLImageElement): Fig {
+    const canvas = document.createElement('canvas')
+    canvas.setAttribute('aria-hidden', 'true')
+    canvas.width = canvas.height = 1
+    box.append(canvas)
+    box.classList.add('dz-live')
+    return { box, img, canvas, w: 0, busy: false }
+  }
+
+  async function hero(f: Fig): Promise<void> {
+    if (!loaded(f.img)) {
+      await new Promise((ok) => {
+        f.img.addEventListener('load', ok, { once: true })
+        f.img.addEventListener('error', ok, { once: true })
+      })
+    }
+    await ensure(f)
+    if (f.w > 0) await tween(1100, (t) => sweep(f.canvas, easeInOut(t)))
+    f.canvas.remove()
+  }
+
+  // Scroll progress: a print line fixed at 70% of the viewport; the figure
+  // passes through it. 0 while its top is below the line, 1 once its bottom
+  // has cleared it — so the line is always where the reader can see it.
+  const progress = (f: Fig, vh: number) => {
+    const r = f.box.getBoundingClientRect()
+    return Math.min(1, Math.max(0, (0.7 * vh - r.top) / r.height))
+  }
+
+  function place(f: Fig, p: number): void {
+    if (p >= 1) {
+      f.canvas.remove()
+      return
+    }
+    if (!f.canvas.isConnected) f.box.append(f.canvas)
+    void ensure(f)
+    sweep(f.canvas, p)
+  }
+
+  function features(figs: Fig[]): void {
+    const byBox = new Map(figs.map((f) => [f.box, f]))
+    const live = new Set<Fig>()
+    let raf = 0
+    let sum = 0
+    let frames = 0
+    const frame = () => {
+      raf = 0
+      const t0 = performance.now()
+      const vh = innerHeight
+      for (const f of live) place(f, progress(f, vh))
+      if (DEBUG) {
+        sum += performance.now() - t0
+        if (++frames === 60) {
+          const avg = (sum / 60).toFixed(3)
+          console.log(`[dither] sweep frame ${avg} ms (${live.size} in view)`)
+          sum = frames = 0
+        }
+      }
+    }
+    const kick = () => {
+      if (!raf && live.size) raf = requestAnimationFrame(frame)
+    }
+    // The bottom margin has a plate ready before a figure's edge shows.
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const f = e.target instanceof HTMLElement && byBox.get(e.target)
+          if (!f) continue
+          if (e.isIntersecting) live.add(f)
+          else {
+            live.delete(f)
+            place(f, progress(f, innerHeight))
+          }
+        }
+        kick()
+      },
+      { rootMargin: '0px 0px 25% 0px' },
+    )
+    for (const f of figs) {
+      io.observe(f.box)
+      f.img.addEventListener('load', kick, { once: true })
+    }
+    addEventListener('scroll', kick, { passive: true })
+    addEventListener('resize', kick)
+  }
+
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const figs: Fig[] = []
+    for (const box of document.querySelectorAll<HTMLElement>('.shot-box')) {
+      const img = box.querySelector('img')
+      if (!img) continue
+      const f = mount(box, img)
+      if (box.dataset.reveal === 'load') void hero(f)
+      else figs.push(f)
+    }
+    features(figs)
+  }
+</script>

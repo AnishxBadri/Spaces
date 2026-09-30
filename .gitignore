@@ -26,6 +26,15 @@ backups/
 apps/e2e/test-results/
 apps/e2e/playwright-report/
 
+# apps/site's copies of docs/assets, made by src/integrations/sync-assets.ts
+# on every dev and build; docs/assets is the one place they live. And Astro's
+# generated type declarations (`astro sync` / `astro check`).
+apps/site/public/screenshots/
+apps/site/public/logo.svg
+apps/site/public/logo-dark.svg
+apps/site/public/mark.svg
+apps/site/.astro/
+
 # NOT docs/ — an over-broad `docs/*` rule landed here 2026-09-07 inside an
 # unrelated commit and silently stopped the decision record from being
 # committed (CONTEXT.md and ARCHITECTURE.md point at specs that were never

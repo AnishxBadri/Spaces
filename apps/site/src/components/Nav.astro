@@ -1,0 +1,80 @@
+---
+import { GITHUB } from '../links'
+
+const path = Astro.url.pathname
+const inDocs = path === '/docs' || path.startsWith('/docs/')
+---
+
+<header class="nav">
+  <div class="wrap bar">
+    <a class="brand" href="/" aria-label="Spaces, home">
+      <img src="/mark.svg" width="20" height="20" alt="" />
+      <span class="serif">Spaces</span>
+    </a>
+    <nav aria-label="Site">
+      <a href="/#features">Features</a>
+      <a href="/#self-host">Self-host</a>
+      <a href="/docs" aria-current={inDocs ? 'page' : undefined}>Docs</a>
+      <a href={GITHUB}
+        >GitHub <span class="ext mono" aria-hidden="true">↗</span></a
+      >
+    </nav>
+  </div>
+</header>
+
+<style>
+  .nav {
+    border-bottom: 1px solid var(--hairline);
+    background: var(--paper);
+  }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+    min-height: 3.5rem;
+    padding-block: 0.625rem;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    text-decoration: none;
+  }
+  .brand span {
+    font-size: 1.1875rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.5rem;
+  }
+  nav a {
+    color: var(--graphite);
+    font-size: var(--text-ui);
+    line-height: 1.25rem;
+    text-decoration: none;
+    transition: color 150ms var(--ease-out-quart);
+  }
+  nav a:hover,
+  nav a[aria-current='page'] {
+    color: var(--ink);
+  }
+  nav a[aria-current='page'] {
+    text-decoration: underline;
+    text-decoration-color: var(--pine);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+  }
+  .ext {
+    font-size: var(--text-micro);
+  }
+  @media (max-width: 30rem) {
+    nav {
+      gap: 0.25rem 1rem;
+    }
+  }
+</style>
