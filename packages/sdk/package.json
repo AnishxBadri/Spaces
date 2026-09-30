@@ -1,0 +1,47 @@
+{
+  "//": "@spaces/sdk — the plugin contract (docs/spec-plugin-sdk.md §3–§6; born by SPA-191, sdk-3). The one package a plugin author imports. It depends on effect, zod and — from sdk-4b — tldts, and on nothing inside this repo (D55; `src/package.test.ts` pins the list, and the eslint sdk zone fails any @spaces/core or @spaces/db import). Own semver: `version` here is SDK_VERSION (`src/version.ts`, asserted equal by a test), and a plugin's `manifest.sdk` range is checked against it at load.",
+  "name": "@spaces/sdk",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "//exports": "A build output, unlike @spaces/core and @spaces/db: `tsc -p tsconfig.build.json` writes ESM and d.ts to dist/, because a plugin bundle leaves `@spaces/sdk` as a bare import that the host resolves at runtime with plain node (sdk-11), and a published package cannot hand node a .ts file. Inside the workspace turbo's `^build` edge builds it before any dependent's typecheck, test or lint. `./build` is the plugin build helper (vite config + manifest.json emission) — node-only, and the reason vite is an optional peer rather than a dependency. Its source is `src/plugin-build/`, not `src/build/`: the shared eslint config ignores every `build/` directory, and the helper was going unlinted there.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./build": {
+      "types": "./dist/plugin-build/index.d.ts",
+      "default": "./dist/plugin-build/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "vite": "^8.1.5"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}

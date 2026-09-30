@@ -1,7 +1,12 @@
-# The workspace. `apps/*` holds one app today (web); worker, site and
-# extension arrive later. `packages/*` is deliberately globbed rather than
-# listed so the db, core and sdk slots (docs/spec-plugin-sdk.md §2) need no
-# edit here when they land — config is the first tenant.
+# The workspace. `apps/*` holds the processes and the site; `packages/*` is
+# deliberately globbed rather than listed so a new package slot
+# (docs/spec-plugin-sdk.md §2) needs no edit here. `plugins/*` and
+# `plugins/_fixtures/*` joined with the SDK (SPA-191, sdk-3): each plugin is a
+# workspace package depending on @spaces/sdk only, and `_fixtures/` holds the
+# ones the loader and the SDK are tested with (echo first). The underscore
+# keeps the fixture directory itself from matching `plugins/*` as a package.
 packages:
   - 'apps/*'
   - 'packages/*'
+  - 'plugins/*'
+  - 'plugins/_fixtures/*'

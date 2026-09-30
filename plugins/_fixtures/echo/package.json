@@ -1,0 +1,30 @@
+{
+  "//": "The first plugin (SPA-191, sdk-3): a fixture, not a product — one `action` job that echoes its input, a real manifest authored as a TS const, and the build every plugin reuses (`@spaces/sdk/build`). Its one dependency is @spaces/sdk. effect and zod are peers, not dependencies, because that is what they are: the bundle leaves them as bare imports and the host resolves them to its own copies at load (sdk-11), so a plugin never ships a second Effect. `src/build.test.ts` builds it and checks both emitted files.",
+  "name": "@spaces/plugin-echo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
+    "zod": "^4.3.6"
+  }
+}

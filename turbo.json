@@ -149,7 +149,14 @@
     // folds its files into the hash a second way, but the input is spelled
     // out so a rule edit re-runs every lint task by construction and not by
     // a property of the graph.
+    // `^build` since SPA-191: @spaces/sdk is the first package whose
+    // `exports` point at a build output (dist/, ESM + d.ts), and the
+    // type-aware rules in a dependent's lint read those declarations — a
+    // plugin linted before the sdk is built sees every sdk import as
+    // unresolved. For every other package `^build` is a no-op or the same
+    // edge `typecheck` and `test` already carry.
     "lint": {
+      "dependsOn": ["^build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/eslint.config.js",

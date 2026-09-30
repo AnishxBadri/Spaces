@@ -60,13 +60,26 @@ pnpm worker                                       # the worker alone (apps/worke
   `enqueueSourceEmbed` stayed in
   `apps/web/src/lib/ai/enqueue-embed.ts`: core's write paths hand back
   `reembed` and the server fn queues it. The jsonb readers are
-  `@spaces/core/json`. `packages/*` is where `sdk` lands later.
+  `@spaces/core/json`.
+  **`packages/sdk` (`@spaces/sdk`) is the plugin contract since SPA-191
+  (sdk-3)**: the manifest (`manifestSchema`, `defineManifest`, no plugin
+  `kind` — D51), `SDK_VERSION` and `satisfiesSdk`, `definePlugin`, and the
+  plugin build (`@spaces/sdk/build`, a vite config every plugin reuses). It
+  depends on effect and zod (tldts from sdk-4b, D55) and nothing internal,
+  and — unlike db and core — its `exports` point at `dist/` (ESM + d.ts,
+  `tsc -p tsconfig.build.json`), because a plugin bundle leaves it as a bare
+  import node resolves at runtime; turbo's `^build` edge builds it before
+  any dependent's typecheck, test or lint. Its suite needs no Postgres.
+  **`plugins/*` and `plugins/_fixtures/*` are workspace packages** named
+  `@spaces/plugin-<id>`, depending on `@spaces/sdk` only (effect and zod are
+  peers the host provides); `plugins/_fixtures/echo` is the first.
   **`packages/config` (`@spaces/config`) holds the shared configuration since
   SPA-180: `tsconfig.base.json`, the eslint base (`eslint.base.js`, with
   the architecture zones and the spec §2 boundary rules) and its rule
   modules in `eslint-rules/` (gate 5's `instrument/vocabulary`),
-  `prettier.base.js`, and `fixtures/{sdk,plugins}` — the two directories
-  the sdk and plugin zones are fenced against until those packages exist.**
+  and `prettier.base.js`. The sdk and plugin zones are proved on the real
+  packages by `packages/sdk/src/fence.test.ts` (SPA-191 retired the
+  placeholder `fixtures/{sdk,plugins}` they were fenced against).**
   **`apps/worker` (`@spaces/worker`) is the worker process since SPA-181
   (mono-11a)**: the pg-boss host (`src/index.ts`), `runJob`, the heartbeat,
   the container health command and every job module under `src/jobs/`,
@@ -173,8 +186,8 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
    half, one task per package). The root script runs them all; a bare root
    `tsc` would pass while typechecking none of them.
 2. `pnpm test` → `turbo run test` (`vitest run` in `apps/web`, `apps/worker`,
-   `packages/db` and `packages/core`, each with its own vitest config) —
-   must be fully green
+   `packages/db`, `packages/core`, `packages/sdk` and each plugin under
+   `plugins/`, each with its own vitest config) — must be fully green
 3. prettier on touched files (root: `pnpm exec prettier --check <files>`) —
    not a turbo task; it is per-file, not per-package
 4. `pnpm lint` → `turbo run lint lint:root` — must be zero errors (the old
@@ -219,7 +232,7 @@ Pre-commit hooks (lefthook) run prettier + eslint on staged files from the
 repo root, where the two shims hand both tools `packages/config`'s settings;
 pre-push runs `pnpm run typecheck`, which is turbo over every package that
 has one — `@spaces/web`, `@spaces/worker`, `@spaces/db`, `@spaces/core`,
-`@spaces/config` — plus the `typecheck:root` half, so no package can be
+`@spaces/sdk`, `@spaces/config` and every `@spaces/plugin-*` — plus the `typecheck:root` half, so no package can be
 typechecked by nobody.
 CI (`.github/workflows/ci.yml`) runs the same root commands, **one named step
 per gate** against a real Postgres: prettier, `pnpm run lint` (which carries

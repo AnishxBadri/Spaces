@@ -1,0 +1,16 @@
+{
+  "manifestVersion": 1,
+  "id": "from-the-future",
+  "version": "3.0.0",
+  "sdk": "^2.0",
+  "name": "From the future",
+  "description": "Valid in shape; built against an sdk major this host does not have.",
+  "settings": { "type": "object", "properties": {} },
+  "jobs": {
+    "poll": {
+      "trigger": "schedule",
+      "uses": ["Http"],
+      "schedule": "*/15 * * * *"
+    }
+  }
+}
