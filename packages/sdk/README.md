@@ -27,6 +27,17 @@ import, and `src/fence.test.ts` proves it.
 - `definePlugin` — the bundle's default export; its `jobs` must carry exactly
   the manifest's job names.
 
+## Identity keys — `@spaces/sdk/identity` (sdk-4b)
+
+`normalizeDomain`, `registrableDomain`, `isFreeMailDomain`,
+`FREE_MAIL_DOMAINS`, `normalizeEmail`, `isRoleEmail`, `ROLE_PREFIXES`,
+`normalizeName`, `normalizeLinkedin`, `normalizeCin`, `normalizeUrl`,
+`domainHost`, `normalizePhone` — the only copy. `@spaces/core/entities/normalize`
+re-exports this module and `resolveEntity` runs it, so a plugin normalizes a
+claim's keys exactly as the choke point will (`app.stripe.co.uk` →
+`stripe.co.uk`; `careers@…` is never a person; `gmail.com` is never a
+company). `IdentityTest` uses the same functions.
+
 ## The frozen contract (sdk-4a) — `src/contract.ts`
 
 One file, to be read and reviewed as one; it moves only on an SDK major.

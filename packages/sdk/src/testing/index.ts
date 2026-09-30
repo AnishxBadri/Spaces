@@ -1,5 +1,11 @@
 import { Effect, Layer, Redacted } from 'effect'
 import { JobPermanent, JobRateLimited } from '../contract.ts'
+import {
+  normalizeCin,
+  normalizeDomain,
+  normalizeEmail,
+  normalizeLinkedin,
+} from '../identity/normalize.ts'
 import type {
   EntityId,
   IdentityKeys,
@@ -97,28 +103,18 @@ const counter = (prefix: string) => {
 // ---------------------------------------------------------------------------
 
 /**
- * The key forms the fake treats as equal. Deliberately small — enough that
- * `Stripe.com` and `https://www.stripe.com/` are one company in a test;
- * sdk-4b puts the real normalizers in this package, and the fake uses them.
+ * The key forms the fake treats as equal — the choke point's own
+ * normalizers (`@spaces/sdk/identity`, sdk-4b), key for key as
+ * `resolveEntity` maps them. A key that normalizes to nothing (a free-mail
+ * domain, a malformed email) identifies nothing, here as there.
  */
-const normalizeKey = (kind: keyof IdentityKeys, raw: string): string => {
-  const v = raw.trim().toLowerCase()
-  switch (kind) {
-    case 'domain':
-      return v
-        .replace(/^[a-z]+:\/\//, '')
-        .replace(/^www\./, '')
-        .replace(/[/?#].*$/, '')
-    case 'linkedin':
-      return v
-        .replace(/^[a-z]+:\/\//, '')
-        .replace(/^www\./, '')
-        .replace(/\/+$/, '')
-    case 'email':
-      return v
-    case 'cin':
-      return v.toUpperCase()
-  }
+const NORMALIZERS: {
+  readonly [K in keyof IdentityKeys]-?: (raw: string) => string | null
+} = {
+  domain: normalizeDomain,
+  email: normalizeEmail,
+  linkedin: normalizeLinkedin,
+  cin: normalizeCin,
 }
 
 const KEY_KINDS = ['domain', 'email', 'linkedin', 'cin'] as const
@@ -141,9 +137,8 @@ export const IdentityTest = (
   const keysOf = (keys: IdentityKeys) =>
     KEY_KINDS.flatMap((kind) => {
       const raw = keys[kind]
-      return raw === undefined
-        ? []
-        : [{ kind, norm: `${kind}:${normalizeKey(kind, raw)}` }]
+      const norm = raw === undefined ? null : NORMALIZERS[kind](raw)
+      return norm === null ? [] : [{ kind, norm: `${kind}:${norm}` }]
     })
   for (const [entityId, keys] of Object.entries(options.known ?? {})) {
     for (const k of keysOf(keys)) owners.set(k.norm, entityId)

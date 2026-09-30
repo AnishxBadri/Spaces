@@ -48,7 +48,12 @@
   ],
 
   "tasks": {
+    // `^build` since SPA-195: @spaces/core imports @spaces/sdk at runtime
+    // (the identity normalizers), and the sdk's exports point at dist/, so a
+    // fresh checkout's `pnpm dev` must build it before vite and the worker
+    // start. For every other package `^build` is a no-op.
     "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },

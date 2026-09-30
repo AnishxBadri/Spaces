@@ -67,12 +67,16 @@ pnpm worker                                       # the worker alone (apps/worke
   plugin build (`@spaces/sdk/build`, a vite config every plugin reuses) and
   the packer (`@spaces/sdk/pack`, SPA-193: ustar + ed25519; core's
   `plugins/verify.ts` is the other half, and `registry.json` and
-  `plugin-keys/` at the root are copied into the image). It
-  depends on effect and zod (tldts from sdk-4b, D55) and nothing internal,
+  `plugin-keys/` at the root are copied into the image), the port tags and
+  `@spaces/sdk/testing` (SPA-196), and the identity-key normalizers
+  (`@spaces/sdk/identity`, SPA-195 — `@spaces/core/entities/normalize` is a
+  re-export of it, so core imports the sdk at runtime). It
+  depends on effect, zod and tldts (D55) and nothing internal,
   and — unlike db and core — its `exports` point at `dist/` (ESM + d.ts,
   `tsc -p tsconfig.build.json`), because a plugin bundle leaves it as a bare
   import node resolves at runtime; turbo's `^build` edge builds it before
-  any dependent's typecheck, test or lint. Its suite needs no Postgres.
+  any dependent's `dev`, typecheck, test or lint, and the Dockerfile builds
+  it before web and the worker. Its suite needs no Postgres.
   **`plugins/*` and `plugins/_fixtures/*` are workspace packages** named
   `@spaces/plugin-<id>`, depending on `@spaces/sdk` only (effect and zod are
   peers the host provides); `plugins/_fixtures/echo` is the first.

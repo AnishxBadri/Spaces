@@ -491,6 +491,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Bundle the roundtrip fixture
         run: |
+          # @spaces/sdk first: its exports are dist/, and core imports it at
+          # runtime since SPA-195 (the identity normalizers).
+          pnpm --filter @spaces/sdk build
           pnpm --filter @spaces/web exec vite build --config vite.boot.config.ts \
             --ssr scripts/roundtrip-fixture.ts --outDir ../../fixture --emptyOutDir
           ls -la fixture

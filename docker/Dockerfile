@@ -67,7 +67,10 @@ COPY --from=prune /app/out/build/json/ ./
 COPY --from=prune /app/out/build/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY --from=prune /app/out/build/full/ ./
-RUN pnpm --filter @spaces/web --filter @spaces/worker build
+# @spaces/sdk first (SPA-195): its `exports` point at dist/, and since the
+# identity normalizers moved into it, core — and so both apps — import it at
+# runtime. pnpm runs a filtered `build` in dependency order.
+RUN pnpm --filter @spaces/sdk --filter @spaces/web --filter @spaces/worker build
 
 FROM base AS prod-deps
 COPY --from=prune /app/out/runtime/json/ ./

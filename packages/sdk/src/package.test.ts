@@ -16,10 +16,12 @@ const pkg = z
 
 describe('@spaces/sdk package.json', () => {
   // D55: "nothing internal", and a short third-party list a test pins.
-  // tldts joins with sdk-4b (the identity normalizers).
-  it('depends on effect and zod and nothing else', () => {
+  // tldts joined with sdk-4b: the identity normalizers need the public
+  // suffix list, and one normalizer on both sides of the port is the point.
+  it('depends on effect, zod and tldts and nothing else', () => {
     expect(pkg.dependencies).toEqual({
       effect: '4.0.0-rc.112',
+      tldts: '^7.4.9',
       zod: '^4.3.6',
     })
   })

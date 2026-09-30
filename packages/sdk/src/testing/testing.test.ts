@@ -57,6 +57,42 @@ describe('IdentityTest', () => {
     ])
   })
 
+  it('normalizes keys as the choke point does — the real normalizers', () => {
+    const identity = IdentityTest()
+    const [company, sub, freeMail, ada, adaDotted] = Effect.runSync(
+      Effect.gen(function* () {
+        const port = yield* Identity
+        return [
+          yield* port.resolve({
+            kind: 'company',
+            keys: { domain: 'stripe.co.uk' },
+          }),
+          yield* port.resolve({
+            kind: 'company',
+            keys: { domain: 'app.stripe.co.uk' },
+          }),
+          // A free-mail domain identifies nothing: a name-only birth.
+          yield* port.resolve({
+            kind: 'company',
+            keys: { domain: 'gmail.com' },
+            name: 'Gmail',
+          }),
+          yield* port.resolve({
+            kind: 'person',
+            keys: { email: 'ada.lovelace@gmail.com' },
+          }),
+          yield* port.resolve({
+            kind: 'person',
+            keys: { email: 'AdaLovelace+vc@gmail.com' },
+          }),
+        ]
+      }).pipe(Effect.provide(identity.layer)),
+    )
+    expect(sub.entityId).toBe(company.entityId)
+    expect(freeMail).toEqual({ entityId: 'entity-2', outcome: 'created' })
+    expect(adaDotted.entityId).toBe(ada.entityId)
+  })
+
   it('attaches to a known entity and reports alias outcomes', () => {
     const identity = IdentityTest({
       known: { 'entity-7': { domain: 'stripe.com' } },
