@@ -257,8 +257,7 @@ action:   run | { run, cost? }                                        // manifes
             cost: (input: { entityIds, fields? }) → { credits: number }   // D53, pure, action jobs only
 schedule: (input: { cursor: string | null }) → Effect<{ nextCursor: string | null }, JobError, R>   // Gmail, Calendar
 event:    (input: { event: DomainEvent }) → Effect<void, JobError, R>  // on: ['entity.created'] — enrich-on-create
-webhook:  { verify(req: { headers, body }) → boolean;                   // call recorders; §11 ingress
-            handle(input: { payload, receivedAt }) → Effect<void, JobError, R> }
+webhook:  (input: { payload, receivedAt }) → Effect<void, JobError, R>  // call recorders; §11 ingress
 file:     (input: { stream: ReadableStream<Uint8Array>, filename, mime }) → Effect<void, JobError, R>   // an importer
 ```
 
@@ -268,6 +267,16 @@ is `JobRetryable | JobRateLimited | JobPermanent`, the worker's three
 `DOMAIN_EVENTS` (`entity.created` in v1 — the manifest's `on` validates
 against it); `PORT_NAMES` is the §4 table minus Clock (Effect ships one) and
 is what `uses` validates against.
+
+**A webhook job has no `verify` (checkpoint review, 2026-10-01).** Plugin
+code runs only in the worker, after web has already answered the provider's
+request, so a plugin-side check could gate nothing; running it in web would
+break "web never executes plugin code". Signature checking is
+manifest-declared (`ingress.signature`) and done by core in web (sdk-23)
+before the payload is stored; the job is handed the stored payload like any
+other. If a provider ever needs a plugin-side check, it arrives as an
+optional field — a minor; shipping `verify` now and removing it later would
+have been a major.
 
 **A job calls ports; it does not return claims (D52).** Each write port
 calls its lane at once and returns what the lane decided —

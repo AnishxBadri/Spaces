@@ -9,9 +9,8 @@ export type LifecycleHook = () => Effect.Effect<void, unknown, unknown>
 /**
  * One job per name the manifest declares — no more, no fewer — each typed by
  * the trigger its manifest entry declares (D51; the shapes are
- * `contract.ts`'s). A `schedule` job must hand back `{ nextCursor }`; a
- * `webhook` job is `{ verify, handle }`; only an `action` job may carry
- * `cost` (D53).
+ * `contract.ts`'s). A `schedule` job must hand back `{ nextCursor }`, and
+ * only an `action` job may carry `cost` (D53).
  *
  * And each job's `R` is bounded by its `uses` (D51, sdk-5): the services it
  * may require are exactly the ports it declared, so a job that yields `Facts`

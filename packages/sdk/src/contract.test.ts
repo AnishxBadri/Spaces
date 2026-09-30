@@ -186,11 +186,8 @@ describe('definePlugin types each job by its trigger', () => {
       Effect.succeed({ nextCursor: cursor }),
     onCreate: ({ event }: { event: { entityId: string } }) =>
       event.entityId ? Effect.void : Effect.void,
-    push: {
-      verify: (req: { headers: Record<string, string> }) =>
-        'x-signature' in req.headers,
-      handle: () => Effect.void,
-    },
+    push: ({ payload }: { payload: unknown }) =>
+      payload === null ? Effect.void : Effect.void,
     importCsv: ({ filename }: { filename: string }) =>
       filename ? Effect.void : Effect.void,
   }
@@ -219,14 +216,14 @@ describe('definePlugin types each job by its trigger', () => {
     expect(typeof bad).toBe('function')
   })
 
-  it('refuses a webhook job without verify', () => {
+  it("refuses a webhook job shaped { verify, handle } — verification is core's", () => {
     const bad = () =>
       definePlugin({
         manifest,
         jobs: {
           ...good,
-          // @ts-expect-error — a webhook job is { verify, handle }
-          push: { handle: () => Effect.void },
+          // @ts-expect-error — a webhook job is a plain function of the stored payload
+          push: { verify: () => true, handle: () => Effect.void },
         },
       })
     expect(typeof bad).toBe('function')

@@ -72,7 +72,6 @@ export type {
   ScheduleJob,
   EventInput,
   EventJob,
-  WebhookRequest,
   WebhookInput,
   WebhookJob,
   FileInput,

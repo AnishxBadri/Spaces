@@ -334,28 +334,25 @@ export type EventJob<TServices = unknown> = (
   input: EventInput,
 ) => Effect.Effect<void, JobError, TServices>
 
-/** What the ingress stored: the raw request, headers lower-cased. */
-export type WebhookRequest = {
-  readonly headers: { readonly [name: string]: string }
-  readonly body: string
-}
+/** What the ingress stored, after core verified it. */
 export type WebhookInput = {
   readonly payload: JsonValue
   readonly receivedAt: IsoTimestamp
 }
 
 /**
- * `webhook` — call recorders. `verify` is pure and synchronous: the
- * plugin's own check of a request, on top of the manifest-declared
- * signature web verifies at the ingress (§11); `handle` runs as a job on
- * the stored payload.
+ * `webhook` — call recorders. A plain job on the stored payload, like the
+ * others. There is no plugin-side `verify` (checkpoint review, 2026-10-01):
+ * plugin code runs only in the worker, after web has already answered the
+ * provider, so a plugin check could gate nothing — and running one in web
+ * would break "web never executes plugin code". The signature is
+ * manifest-declared (`ingress.signature`) and core checks it in web (sdk-23)
+ * before the payload is stored. If a provider ever needs a plugin-side
+ * check, it arrives as an optional field — a minor.
  */
-export type WebhookJob<TServices = unknown> = {
-  readonly verify: (req: WebhookRequest) => boolean
-  readonly handle: (
-    input: WebhookInput,
-  ) => Effect.Effect<void, JobError, TServices>
-}
+export type WebhookJob<TServices = unknown> = (
+  input: WebhookInput,
+) => Effect.Effect<void, JobError, TServices>
 
 /** `file` — an importer: CSV, a WhatsApp export. Speaks claims, never a grid (D39). */
 export type FileInput = {

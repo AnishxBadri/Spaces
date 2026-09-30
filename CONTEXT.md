@@ -307,7 +307,10 @@ the lane decided (`Identity.resolve` → the entity id, `Facts.fill` → the
 refused conflicts); "claims" are the typed arguments of the write-port
 methods, semver-frozen, carrying no provenance field. No router, no batch,
 no handle grammar. An `action` job may declare a pure `cost` hook returning
-`{ credits }` in the provider's unit; spend is counted from receipts.
+`{ credits }` in the provider's unit; spend is counted from receipts. A
+`webhook` job is a plain job on the stored payload with no plugin `verify`
+(2026-10-01): the signature is manifest-declared (`ingress.signature`) and
+core checks it in web, because plugin code never runs there.
 
 **AI is substrate, not a plugin.** It sits _below_ the SDK as the `Ai`
 port: plugins consume the extract/classify/synthesize lanes, sensitivity
