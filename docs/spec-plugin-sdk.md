@@ -480,7 +480,7 @@ image                      core web + worker + loader + registry.json snapshot. 
 ./data/blobs               existing
 ./data/secret.key          existing
 ./data/plugins/<id>/<ver>/ bundle.mjs · manifest.json · migrations/     (+ current symlink)
-./data/plugins/lock.json   { core: '1.4.0', plugins: { apollo: '1.2.0' } }
+./data/plugins/lock.json   { core: '1.4.0', plugins: { apollo: { version: '1.2.0', sha256: '<bundle.mjs>' } } }
 postgres public.*          core
 postgres plugin_<id>.*     plugin, own journal
 integration                enabled rows
@@ -509,6 +509,17 @@ contract 5) stays true.
   `NOTIFY` crosses processes via Postgres. Same flow.
 - Three sources of truth, reconciled at boot: DB row = intent (enabled),
   disk = code present, `lock.json` = pinned versions for reproducibility.
+- **Pinned by sdk-11 (2026-10-01).** A lock entry carries the sha256 of the
+  `bundle.mjs` it pinned beside the version (`@spaces/core/plugins/lock`);
+  until the installer writes one, an absent file or entry loads the plugin
+  **unpinned** (said in its verdict line) and an entry that disagrees with
+  the bytes degrades it. The loader (`apps/worker/src/plugins/loader.ts`)
+  writes the validated manifest to `integration.manifest`, which web renders
+  from; `core.*` rows (the mailbox) are first-party and never reconciled;
+  a bundle's bare `effect` / `zod` / `@spaces/sdk` imports resolve to the
+  worker's own copies through a `node:module` resolve hook, which is why the
+  worker bundle leaves `@spaces/sdk` external and the image carries it in
+  `/app/node_modules`. `/api/health` lists `degradedPlugins`.
 
 ## 11. Workers and jobs
 

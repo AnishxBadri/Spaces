@@ -1,0 +1,28 @@
+{
+  "//": "A loader fixture (SPA-194, sdk-11), not a product: its manifest asks for sdk ^2.0, so the loader degrades it with the sentence satisfiesSdk writes. apps/worker's loader test reads its dist/.",
+  "name": "@spaces/plugin-old-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "zod": "^4.3.6"
+  }
+}

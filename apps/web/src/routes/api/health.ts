@@ -6,6 +6,7 @@ import {
   pingDb,
   readLastBeat,
 } from '@spaces/db/heartbeat'
+import { readDegradedPlugins } from '@spaces/db/plugin-health'
 
 /**
  * The compose/Docker healthcheck for `ROLE=web` and `ROLE=all` (CONTEXT.md
@@ -19,6 +20,11 @@ import {
  * must never fail a healthy web container's HEALTHCHECK and restart it; the
  * worker's own container answers for the worker (apps/worker/src/health.ts).
  * Postgres being down is the only 503.
+ *
+ * `degradedPlugins` (sdk-11) is `[{ id, version, reason }]` from the
+ * `integration` rows the worker's loader marked — read from the database,
+ * not from `/data`, so a `ROLE=web` container answers it too. A degraded
+ * plugin is not an unhealthy box: it never moves the status or the code.
  */
 export const Route = createFileRoute('/api/health')({
   server: {
@@ -32,14 +38,20 @@ export const Route = createFileRoute('/api/health')({
           new Date(),
           STALE_AFTER,
         )
+        const degradedPlugins = dbOk ? await readDegradedPlugins() : []
 
         if (!dbOk) {
           return Response.json(
-            { status: 'degraded', db: 'unreachable', worker },
+            { status: 'degraded', db: 'unreachable', worker, degradedPlugins },
             { status: 503 },
           )
         }
-        return Response.json({ status: 'ok', db: 'ok', worker })
+        return Response.json({
+          status: 'ok',
+          db: 'ok',
+          worker,
+          degradedPlugins,
+        })
       },
     },
   },

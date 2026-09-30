@@ -344,6 +344,85 @@ jobs:
           jq -e '.worker.status == "ok"' <<<"$H"
           docker rm -f roleweb roleworker
 
+      # SPA-194 (sdk-11): boot reconciliation inside the image, not only
+      # under tsx. The four loader fixtures are built on the runner, placed
+      # in a fresh data dir as the installer will place them (lock.json pins
+      # `tampered`, whose bundle is then edited), and a ROLE=all container
+      # boots against a database of its own. Its worker must print one
+      # verdict per plugin, `/api/health` must list the three degraded ones
+      # and stay ok, and the `core.mailbox` row must come through untouched.
+      # `echo` enabled is the proof that a bundle under /data resolves its
+      # bare effect / zod / @spaces/sdk imports to the image's own copies.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Build the four loader fixtures
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec turbo run build --filter=@spaces/plugin-echo \
+            --filter=@spaces/plugin-old-sdk --filter=@spaces/plugin-needs-key \
+            --filter=@spaces/plugin-tampered
+      - name: The loader's four-fixture boot, inside the image
+        run: |
+          set -euo pipefail
+          C="docker compose -f docker-compose.yml -f docker-compose.ci.yml"
+          $C exec -T db createdb -U spaces plugins
+          q() { $C exec -T db psql -U spaces -d plugins -v ON_ERROR_STOP=1 -At -c "$1"; }
+          for id in echo old-sdk needs-key tampered; do
+            mkdir -p "plugdata/plugins/$id/current"
+            cp "plugins/_fixtures/$id/dist/bundle.mjs" "plugins/_fixtures/$id/dist/manifest.json" \
+              "plugdata/plugins/$id/current/"
+          done
+          SHA="$(sha256sum plugdata/plugins/tampered/current/bundle.mjs | cut -d' ' -f1)"
+          printf '{"plugins":{"tampered":{"version":"0.1.0","sha256":"%s"}}}\n' "$SHA" \
+            > plugdata/plugins/lock.json
+          echo '// edited after the lock was written' >> plugdata/plugins/tampered/current/bundle.mjs
+          sudo chown -R 1000:1000 plugdata
+          health() { curl -fsS http://localhost:3002/api/health 2>/dev/null || true; }
+          wait_worker() {
+            for _ in $(seq 1 90); do
+              jq -e '.worker.status == "ok"' <<<"$(health)" >/dev/null 2>&1 && return 0
+              sleep 2
+            done
+            docker logs plugboot; return 1
+          }
+          docker run -d --name plugboot --network "$NET" -p 3002:3000 \
+            -e DATABASE_URL=postgresql://spaces:spaces@db:5432/plugins \
+            -e MASTER_KEY="$MASTER_KEY" -v "$PWD/plugdata:/data" spaces:ci
+          # First boot migrates the empty database; the rows go in after.
+          wait_worker
+          q "insert into integration (capability_id, version, enabled) values
+               ('echo', '0.1.0', true), ('old-sdk', '0.1.0', true),
+               ('needs-key', '0.1.0', true), ('tampered', '0.1.0', true)"
+          q "insert into integration (capability_id, version, enabled, status)
+               values ('core.mailbox', '1', true, 'enabled')"
+          MAILBOX="select row_to_json(i)::text || ' ' || xmin::text from integration i where capability_id = 'core.mailbox'"
+          BEFORE="$(q "$MAILBOX")"
+          docker restart plugboot
+          # Not wait_worker: the heartbeat from before the restart is still
+          # fresh. The verdicts are the signal — printed before any queue.
+          for _ in $(seq 1 90); do
+            [ "$(docker logs plugboot 2>&1 | grep -cF '[plugins]')" -ge 4 ] && break
+            sleep 2
+          done
+          docker logs plugboot 2>&1 | grep -F '[plugins]' | tee verdicts.txt
+          wait_worker
+          grep -xF '[plugins] echo 0.1.0: enabled (unpinned: no lock.json entry)' verdicts.txt
+          grep -xF '[plugins] needs-key: degraded — missing credential' verdicts.txt
+          grep -xF '[plugins] old-sdk: degraded — requires sdk ^2.0, host provides 1.0.0' verdicts.txt
+          grep -xF '[plugins] tampered: degraded — bundle sha does not match lock.json' verdicts.txt
+          [ "$(wc -l < verdicts.txt)" -eq 4 ]
+          H="$(health)"
+          echo "$H"
+          jq -e '.status == "ok" and ([.degradedPlugins[].id] == ["needs-key", "old-sdk", "tampered"])' <<<"$H"
+          q "select capability_id, status, manifest->>'id' from integration order by 1"
+          [ "$(q "select status || ' ' || (manifest->>'id') from integration where capability_id = 'echo'")" = 'enabled echo' ]
+          [ "$(q "$MAILBOX")" = "$BEFORE" ]
+          [ "$(docker inspect -f '{{.State.Running}}' plugboot)" = true ]
+          docker rm -f plugboot
+
       - name: Supervision contract survives the privilege drop
         run: |
           set -euo pipefail

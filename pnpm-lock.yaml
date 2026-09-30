@@ -324,6 +324,9 @@ importers:
       '@spaces/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@spaces/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       '@tanstack/react-start':
         specifier: ^1.168.32
         version: 1.168.32(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.0)(vite@8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.1))
@@ -364,6 +367,18 @@ importers:
       '@spaces/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@spaces/plugin-echo':
+        specifier: workspace:*
+        version: link:../../plugins/_fixtures/echo
+      '@spaces/plugin-needs-key':
+        specifier: workspace:*
+        version: link:../../plugins/_fixtures/needs-key
+      '@spaces/plugin-old-sdk':
+        specifier: workspace:*
+        version: link:../../plugins/_fixtures/old-sdk
+      '@spaces/plugin-tampered':
+        specifier: workspace:*
+        version: link:../../plugins/_fixtures/tampered
       '@types/node':
         specifier: ^22.10.2
         version: 22.20.1
@@ -584,6 +599,90 @@ importers:
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@22.20.1)(vite@8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.1))
+      zod:
+        specifier: ^4.3.6
+        version: 4.6.5
+
+  plugins/_fixtures/needs-key:
+    dependencies:
+      '@spaces/sdk':
+        specifier: workspace:*
+        version: link:../../../packages/sdk
+    devDependencies:
+      '@spaces/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
+      eslint:
+        specifier: ^9.20.0
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+      vite:
+        specifier: ^8.1.5
+        version: 8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.1)
+      zod:
+        specifier: ^4.3.6
+        version: 4.6.5
+
+  plugins/_fixtures/old-sdk:
+    dependencies:
+      '@spaces/sdk':
+        specifier: workspace:*
+        version: link:../../../packages/sdk
+    devDependencies:
+      '@spaces/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
+      eslint:
+        specifier: ^9.20.0
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+      vite:
+        specifier: ^8.1.5
+        version: 8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.1)
+      zod:
+        specifier: ^4.3.6
+        version: 4.6.5
+
+  plugins/_fixtures/tampered:
+    dependencies:
+      '@spaces/sdk':
+        specifier: workspace:*
+        version: link:../../../packages/sdk
+    devDependencies:
+      '@spaces/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
+      eslint:
+        specifier: ^9.20.0
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+      vite:
+        specifier: ^8.1.5
+        version: 8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.1)
       zod:
         specifier: ^4.3.6
         version: 4.6.5

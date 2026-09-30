@@ -386,6 +386,13 @@
       "when": 1790622705050,
       "tag": "0054_attribute_event_batch",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1790807552171,
+      "tag": "0055_integration_manifest",
+      "breakpoints": true
     }
   ]
 }

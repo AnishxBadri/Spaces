@@ -144,6 +144,16 @@ COPY --chown=node:node --from=build /app/apps/web/.output ./apps/web/.output
 COPY --chown=node:node --from=build /app/apps/web/dist ./apps/web/dist
 COPY --chown=node:node --from=build /app/apps/worker/dist ./apps/worker/dist
 COPY --chown=node:node --from=prune /app/out/build/full/packages/db/drizzle ./packages/db/drizzle
+# @spaces/sdk at runtime (sdk-11): the one workspace package the worker bundle
+# leaves as a bare import (apps/worker/vite.config.ts), because a plugin
+# bundle's own `@spaces/sdk` import is resolved by the loader's hook to the
+# copy the worker loaded — one set of port tags in the process. Copied, not
+# linked: prod-deps' hoisted install links no workspace package (see above),
+# and the sdk's own dependencies (effect, zod, tldts) are already in
+# /app/node_modules from it. Its package.json carries the `exports` map node
+# resolves `@spaces/sdk/identity` and `@spaces/sdk/build` through.
+COPY --chown=node:node --from=build /app/packages/sdk/package.json ./node_modules/@spaces/sdk/package.json
+COPY --chown=node:node --from=build /app/packages/sdk/dist ./node_modules/@spaces/sdk/dist
 # Plugin trust (SPA-193, D54): the committed plugin index and the public keys
 # this image trusts to sign plugins. Straight from the build context — neither
 # is a workspace package, so `turbo prune` does not carry them. The keys are

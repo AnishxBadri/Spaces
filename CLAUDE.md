@@ -105,6 +105,16 @@ pnpm worker                                       # the worker alone (apps/worke
   it with `pnpm worker` from the root (a plain `--filter` proxy) or
   `corepack pnpm worker` inside `apps/worker`; `pnpm dev` now runs it too,
   under turbo's persistent `dev` task, in watch mode.
+  **Its plugin loader (SPA-194, sdk-11) is `src/plugins/`**: boot
+  reconciliation of enabled `integration` rows against
+  `<dataDir>/plugins/<id>/current/`, before any queue registers, and a
+  `node:module` resolve hook (`host-resolve.ts`) that hands a bundle's bare
+  `effect`/`zod`/`@spaces/sdk` imports the worker's own copies — which is
+  why the worker's vite build leaves `@spaces/sdk` external and the image
+  copies it into `/app/node_modules`, and why its vitest config hands
+  `packages/sdk/dist` and plugin bundles to node. The loader fixtures
+  (`plugins/_fixtures/{old-sdk,needs-key,tampered}` beside echo) are its
+  devDependencies, so turbo builds them before its tests.
   What stayed at the root: `eslint.config.js` and `prettier.config.js` as
   one-line shims re-exporting `@spaces/config/eslint` and
   `@spaces/config/prettier` (both tools look their config up from the cwd,
