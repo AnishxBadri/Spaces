@@ -1,0 +1,63 @@
+# documentation: https://github.com/AnishxBadri/Spaces/blob/main/docs/install.md
+# slogan: Self-hosted deal management for angel and private-capital investing.
+# category: productivity
+# tags: crm, investing, deals, postgres, pgvector
+# port: 3000
+#
+# Spaces on Coolify (SPA-190, ship-12): the shipped two-container shape as a
+# Coolify compose service. New Resource → Docker Compose Empty → paste this
+# file; Coolify fills the SERVICE_* values (the domain it assigns, a generated
+# database password) and keeps them across deploys.
+#
+#   image      ghcr.io/anishxbadri/spaces:0.1.0 — pinned, never `latest`
+#   database   pgvector/pgvector:pg17 (pgvector 0.8.x; the migrations need
+#              >= 0.8), provisioned here, so no managed database is involved
+#   volumes    spaces-data is /data: blobs and the auto-generated secret.key.
+#              Lose `./data/secret.key` and every stored credential is unrecoverable.
+#              (On Coolify, ./data is the spaces-data volume, mounted at /data.)
+#   APP_URL    SERVICE_URL_APP_3000, the URL Coolify assigns to the app on port
+#              3000, scheme included — https when Coolify's proxy terminates TLS,
+#              which is what keeps the session cookie Secure
+#   Ollama     not included; local embeddings are opt-in (Settings → AI ·
+#              Providers) and take a host of their own
+#   token      the first-run setup token is in the app container's Logs:
+#              `[setup] First-run setup token: …`; open /setup and paste it
+services:
+  app:
+    image: ghcr.io/anishxbadri/spaces:0.1.0
+    environment:
+      - SERVICE_FQDN_APP_3000
+      - APP_URL=${SERVICE_URL_APP_3000}
+      - DATABASE_URL=postgresql://spaces:${SERVICE_PASSWORD_POSTGRES}@db:5432/spaces
+    volumes:
+      - spaces-data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/api/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      - POSTGRES_USER=spaces
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=spaces
+    volumes:
+      - spaces-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U spaces -d spaces']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  spaces-data:
+  spaces-pgdata:

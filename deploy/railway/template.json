@@ -1,0 +1,57 @@
+{
+  "//": [
+    "Spaces on Railway — the template, as the composer asks for it (SPA-190, ship-12).",
+    "Railway templates are composed in the dashboard (Templates → New Template) and have no",
+    "file format of their own; this file is the exact set of answers, one entry per composer",
+    "field, so the owner can build and publish the template without deciding anything, and so",
+    "a reviewer can diff it. Field names follow the composer's labels; `${{…}}` is Railway's",
+    "reference-variable syntax and is pasted verbatim.",
+    "",
+    "Database: Railway's managed Postgres is a plain image and does not carry pgvector, so the",
+    "template provisions pgvector/pgvector:pg17 (pgvector 0.8.x; the migrations need >= 0.8)",
+    "as its own service on a volume — never Railway's stock Postgres, which fails at the first",
+    "migration. Ollama is not provisioned; local embeddings are opt-in and need a host of",
+    "their own.",
+    "",
+    "The first-run setup token is printed to the app service's Deploy Logs:",
+    "`[setup] First-run setup token: …` — open the assigned URL at /setup and paste it."
+  ],
+  "services": {
+    "spaces": {
+      "source": { "image": "ghcr.io/anishxbadri/spaces:0.1.0" },
+      "variables": {
+        "DATABASE_URL": {
+          "value": "postgresql://${{Postgres.POSTGRES_USER}}:${{Postgres.POSTGRES_PASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/${{Postgres.POSTGRES_DB}}",
+          "description": "The pgvector Postgres this template provisions, over Railway's private network."
+        },
+        "APP_URL": {
+          "value": "https://${{RAILWAY_PUBLIC_DOMAIN}}",
+          "description": "The domain Railway assigns to this service, https because Railway terminates TLS. Cookies are Secure only when this matches what the browser sees; change it to your custom domain if you attach one."
+        }
+      },
+      "networking": { "public": { "port": 3000 } },
+      "healthcheckPath": "/api/health",
+      "restartPolicy": { "type": "ON_FAILURE", "maxRetries": 10 },
+      "volumes": [
+        {
+          "mountPath": "/data",
+          "description": "Blobs and the auto-generated secret.key. Lose `./data/secret.key` and every stored credential is unrecoverable. (On Railway, ./data is this volume, mounted at /data.)"
+        }
+      ]
+    },
+    "Postgres": {
+      "source": { "image": "pgvector/pgvector:pg17" },
+      "variables": {
+        "POSTGRES_USER": { "value": "spaces" },
+        "POSTGRES_PASSWORD": { "value": "${{secret(32)}}" },
+        "POSTGRES_DB": { "value": "spaces" },
+        "PGDATA": {
+          "value": "/var/lib/postgresql/data/pgdata",
+          "description": "A subdirectory, because Railway's volume root holds lost+found and initdb refuses a non-empty directory."
+        }
+      },
+      "networking": { "public": false },
+      "volumes": [{ "mountPath": "/var/lib/postgresql/data" }]
+    }
+  }
+}

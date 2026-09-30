@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!--
+  Spaces on Unraid (SPA-190, ship-12): the database container, the same
+  image the shipped compose file uses. Install and start this one first,
+  then spaces.xml with DATABASE_URL pointing at it.
+-->
+<Container version="2">
+  <Name>spaces-postgres</Name>
+  <Repository>pgvector/pgvector:pg17</Repository>
+  <Registry>https://hub.docker.com/r/pgvector/pgvector</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/AnishxBadri/Spaces/issues</Support>
+  <Project>https://github.com/pgvector/pgvector</Project>
+  <ReadMe>https://github.com/AnishxBadri/Spaces/blob/main/docs/install.md</ReadMe>
+  <Overview>
+    Postgres 17 with pgvector for Spaces — pgvector/pgvector:pg17 carries pgvector 0.8.x, and Spaces' migrations need 0.8 or newer; a plain postgres image fails at the first migration. Spaces creates its schema on its own first start; nothing to run here.
+
+    The Postgres data path is one half of a Spaces backup; the other half is the spaces container's Data path with secret.key. Lose `./data/secret.key` and every stored credential is unrecoverable. (On Unraid, ./data is the spaces container's Data path.) Back both up together.
+  </Overview>
+  <Category>Tools:</Category>
+  <TemplateURL>https://raw.githubusercontent.com/AnishxBadri/Spaces/main/deploy/unraid/spaces-postgres.xml</TemplateURL>
+  <Config Name="Postgres port" Target="5432" Default="5432" Mode="tcp" Description="The host port the spaces container's DATABASE_URL names." Type="Port" Display="always" Required="true" Mask="false">5432</Config>
+  <Config Name="Postgres data" Target="/var/lib/postgresql/data" Default="/mnt/user/appdata/spaces/pgdata" Mode="rw" Description="The database. Back it up with the spaces container's Data path." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/spaces/pgdata</Config>
+  <Config Name="POSTGRES_USER" Target="POSTGRES_USER" Default="spaces" Mode="" Description="" Type="Variable" Display="advanced" Required="true" Mask="false">spaces</Config>
+  <Config Name="POSTGRES_PASSWORD" Target="POSTGRES_PASSWORD" Default="" Mode="" Description="Choose one; it goes into the spaces container's DATABASE_URL." Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="POSTGRES_DB" Target="POSTGRES_DB" Default="spaces" Mode="" Description="" Type="Variable" Display="advanced" Required="true" Mask="false">spaces</Config>
+</Container>
