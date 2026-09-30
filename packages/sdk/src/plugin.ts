@@ -1,6 +1,7 @@
 import type { Effect } from 'effect'
 import type { JobFor } from './contract.ts'
 import type { AuthoredManifest } from './manifest.ts'
+import type { PortService } from './ports.ts'
 
 /** A lifecycle hook the loader runs when the integration is enabled/disabled. */
 export type LifecycleHook = () => Effect.Effect<void, unknown, unknown>
@@ -11,10 +12,16 @@ export type LifecycleHook = () => Effect.Effect<void, unknown, unknown>
  * `contract.ts`'s). A `schedule` job must hand back `{ nextCursor }`; a
  * `webhook` job is `{ verify, handle }`; only an `action` job may carry
  * `cost` (D53).
+ *
+ * And each job's `R` is bounded by its `uses` (D51, sdk-5): the services it
+ * may require are exactly the ports it declared, so a job that yields `Facts`
+ * without listing `'Facts'` fails typecheck here — the same grant the loader
+ * enforces at runtime, where the undeclared port is "service not found".
  */
 export type PluginJobs<TManifest extends AuthoredManifest> = {
   readonly [K in keyof TManifest['jobs']]: JobFor<
-    TManifest['jobs'][K]['trigger']
+    TManifest['jobs'][K]['trigger'],
+    PortService<TManifest['jobs'][K]['uses'][number]>
   >
 }
 

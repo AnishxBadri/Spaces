@@ -46,7 +46,31 @@ One file, to be read and reviewed as one; it moves only on an SDK major.
 - `StorageSource` (`src/storage-source.ts`) — a provider interface with a
   TODO body the storage area (project 20) owns.
 
-Port tags and the testing kit (`@spaces/sdk/testing`) arrive with sdk-5.
+## Ports (sdk-5) — `src/ports.ts`
+
+Twelve Effect service tags — `Identity`, `Facts`, `Content`, `Judgment`,
+`Receipts`, `Ai`, `Read`, `Secrets`, `Config`, `PluginDb`, `Http`, `Log` —
+each `class X extends Context.Service<X, Shape>()('spaces/sdk/X') {}`, with
+no implementations (core's `writes/ports/` implements them; the loader binds
+them to one integration row). The service keys are contract: a snapshot test
+pins them. Write ports take the claims and return what the lane decided
+(`resolve → { entityId, outcome }`, `fill → { conflicts }`, `store →
+{ receiptId }`, …) and fail with `JobError`. A job's `R` is bounded by its
+`uses`: yielding a port it did not declare fails typecheck. There is no Clock
+port — Effect ships one, and the plugin lint zone refuses `Date.now()` and
+`new Date()`. `configOf(manifest)` reads the config typed by the manifest's
+own settings schema.
+
+## Testing a plugin — `@spaces/sdk/testing` (sdk-5)
+
+In-memory Layers that record every call and mint deterministic ids
+(`entity-1`, `receipt-1`, …): `IdentityTest`, `FactsTest`, `ContentTest`,
+`JudgmentTest`, `ReceiptsTest`, `ReadTest`, `SecretsTest`, `ConfigTest`,
+`HttpTest` (scripted responses, exact request headers, a scripted 429 fails
+`JobRateLimited`) and `LogTest` — each `{ layer, calls }`. `testPorts(…)`
+builds all ten over one recorder. No database, no network:
+`plugins/_fixtures/echo/src/enrich.test.ts` runs a whole job on them, and CI
+runs it with `DATABASE_URL` unset. `Ai` and `PluginDb` have no fake yet.
 
 ## Writing a plugin
 

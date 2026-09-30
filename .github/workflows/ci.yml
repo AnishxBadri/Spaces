@@ -63,6 +63,13 @@ jobs:
         run: pnpm --filter @spaces/web exec tsx src/db/boot.ts
       - name: Gate 2 — vitest
         run: pnpm run test
+      # SPA-196 (sdk-5): a plugin's job runs on the SDK's test Layers with no
+      # database. The echo fixture's enrich job — resolve, receipt, fill — is
+      # re-run here with DATABASE_URL unset and no .env.local, so a test Layer
+      # that quietly reached Postgres would fail this step, not pass it.
+      # Straight vitest, not turbo: the SDK is built by the step above.
+      - name: The echo job runs with no database
+        run: env -u DATABASE_URL pnpm --filter @spaces/plugin-echo exec vitest run src/enrich.test.ts
       - name: turbo run build
         run: pnpm run build
 

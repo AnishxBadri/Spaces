@@ -4,11 +4,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "//exports": "A build output, unlike @spaces/core and @spaces/db: `tsc -p tsconfig.build.json` writes ESM and d.ts to dist/, because a plugin bundle leaves `@spaces/sdk` as a bare import that the host resolves at runtime with plain node (sdk-11), and a published package cannot hand node a .ts file. Inside the workspace turbo's `^build` edge builds it before any dependent's typecheck, test or lint. `./pack` (sdk-21a) is the packer and the ustar reader/writer core's verifier shares — node-only, like `./build`. `./build` is the plugin build helper (vite config + manifest.json emission) — node-only, and the reason vite is an optional peer rather than a dependency. Its source is `src/plugin-build/`, not `src/build/`: the shared eslint config ignores every `build/` directory, and the helper was going unlinted there.",
+  "//exports": "A build output, unlike @spaces/core and @spaces/db: `tsc -p tsconfig.build.json` writes ESM and d.ts to dist/, because a plugin bundle leaves `@spaces/sdk` as a bare import that the host resolves at runtime with plain node (sdk-11), and a published package cannot hand node a .ts file. Inside the workspace turbo's `^build` edge builds it before any dependent's typecheck, test or lint. `./testing` (sdk-5) is the in-memory port Layers a plugin's tests use — no node API, like the root. `./pack` (sdk-21a) is the packer and the ustar reader/writer core's verifier shares — node-only, like `./build`. `./build` is the plugin build helper (vite config + manifest.json emission) — node-only, and the reason vite is an optional peer rather than a dependency. Its source is `src/plugin-build/`, not `src/build/`: the shared eslint config ignores every `build/` directory, and the helper was going unlinted there.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
     },
     "./build": {
       "types": "./dist/plugin-build/index.d.ts",

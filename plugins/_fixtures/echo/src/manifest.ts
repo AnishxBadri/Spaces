@@ -19,10 +19,11 @@ export const manifest = defineManifest({
   }),
   jobs: {
     echo: { trigger: 'action', uses: ['Log'] },
-    // Resolve → store the receipt → fill (src/map.ts is its pure half).
+    // Read the domain → ask the provider → resolve → store the receipt →
+    // fill (src/map.ts is the pure half: payload in, claims out).
     enrich: {
       trigger: 'action',
-      uses: ['Identity', 'Receipts', 'Facts', 'Log'],
+      uses: ['Read', 'Http', 'Identity', 'Receipts', 'Facts', 'Log'],
     },
   },
   actions: [

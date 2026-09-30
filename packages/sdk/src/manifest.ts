@@ -217,7 +217,17 @@ export type JobDeclaration = Manifest['jobs'][string]
  */
 export type AuthoredManifest = Omit<Manifest, 'settings' | 'jobs'> & {
   readonly settings: z.ZodType
-  readonly jobs: { readonly [name: string]: JobDeclaration }
+  readonly jobs: { readonly [name: string]: AuthoredJob }
+}
+
+/**
+ * A job as authored. `uses` and `on` are readonly so a `const` literal keeps
+ * them as tuples — `['Identity']` stays `'Identity'`, not `PortName` — which
+ * is what lets `definePlugin` bound the job's `R` by exactly what it declared.
+ */
+export type AuthoredJob = Omit<JobDeclaration, 'uses' | 'on'> & {
+  readonly uses: ReadonlyArray<JobDeclaration['uses'][number]>
+  readonly on?: ReadonlyArray<NonNullable<JobDeclaration['on']>[number]>
 }
 
 /**

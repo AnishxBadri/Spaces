@@ -42,11 +42,15 @@ describe('the echo bundle', () => {
   })
 
   it('inlines no copy of either runtime', () => {
-    // An inlined dependency arrives as a `//#region ../node_modules/…` block;
-    // the fixture's own code is two small modules.
+    // An inlined dependency arrives as a `//#region ../node_modules/…` block.
     expect(bundle).not.toMatch(/node_modules/)
     expect(bundle).not.toMatch(/\bZodType\b|\bEffectTypeId\b/)
-    expect(bundle.length).toBeLessThan(4_000)
+    // Every region is the fixture's own source; an inlined package would
+    // add one of its own.
+    expect(
+      [...bundle.matchAll(/^\/\/#region (.+)$/gm)].map((m) => m[1]),
+    ).toEqual(['src/map.ts', 'src/manifest.ts', 'src/index.ts'])
+    expect(bundle.length).toBeLessThan(16_000)
   })
 })
 

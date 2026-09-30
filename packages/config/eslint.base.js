@@ -424,6 +424,27 @@ export default [
         'error',
         { patterns: [PLUGIN_IMPORTS_SDK_ONLY] },
       ],
+      // Clock is not a port (sdk-5): Effect ships one, and a job that reads
+      // the wall clock directly cannot be tested at a fixed time. The
+      // failing cases, asserted by packages/sdk/src/fence.test.ts:
+      // `Date.now()` and a bare `new Date()` in a plugin.
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Date',
+          property: 'now',
+          message:
+            'Plugin code reads time through Effect (`Clock.currentTimeMillis`, `DateTime.now`) — Clock is not an SDK port because Effect ships one, and the test Layers can fix it (sdk-5).',
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message:
+            'Plugin code reads time through Effect (`Clock.currentTimeMillis`, `DateTime.now`), not `new Date()` — Clock is not an SDK port because Effect ships one (sdk-5).',
+        },
+      ],
     },
   },
   // …and the worker edge again, over the rest of the app. The block above

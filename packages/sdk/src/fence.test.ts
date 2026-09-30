@@ -76,3 +76,41 @@ describe('the plugin fence', () => {
     expect(found).toEqual([])
   })
 })
+
+describe('the plugin clock rule (sdk-5: Clock is not a port)', () => {
+  const clockLint = new ESLint({
+    cwd: root,
+    ruleFilter: ({ ruleId }) =>
+      ruleId === 'no-restricted-properties' ||
+      ruleId === 'no-restricted-syntax',
+    overrideConfig: {
+      languageOptions: {
+        parserOptions: { project: null, projectService: false },
+      },
+    },
+  })
+  const lintClock = async (code: string) => {
+    const result = (
+      await clockLint.lintText(code, {
+        filePath: 'plugins/_fixtures/echo/src/clock.ts',
+      })
+    ).at(0)
+    return (result?.messages ?? []).map((m) => m.message)
+  }
+
+  it.each(['export const t = Date.now()\n', 'export const d = new Date()\n'])(
+    'refuses %s in a plugin',
+    async (code) => {
+      const found = await lintClock(code)
+      expect(found).toHaveLength(1)
+      expect(found[0]).toMatch(/Plugin code reads time through Effect/)
+    },
+  )
+
+  it('allows parsing a given date and reading time through Effect', async () => {
+    const found = await lintClock(
+      "import { Clock } from 'effect'\nexport const at = new Date('2026-09-30')\nexport const now = Clock.currentTimeMillis\n",
+    )
+    expect(found).toEqual([])
+  })
+})
