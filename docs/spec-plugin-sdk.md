@@ -1,7 +1,11 @@
 # Spec: the plugin SDK (ingestion adapters, the loader, and the registry)
 
 Status: design draft (2026-09-13/14, main-branch deliberation — grilled
-against the code, not yet built). Detailed contract behind the CONTEXT.md
+against the code, not yet built). **Amended 2026-09-30 at project 17's
+publish (`docs/decisions-2026-09.md` → Addenda 2026-09-30, D51–D58): kinds
+are gone — each job declares a trigger and the ports it uses (§3–§5); a job
+calls ports, it does not return claims (§5); plugin signing mechanics (§9).**
+Detailed contract behind the CONTEXT.md
 "Plugin architecture" decision (which reversed backend-paradigm decision 7).
 Builds on: the claim-type lanes (CONTEXT "Machine-write design"), the BYOK
 vault, `resolveEntity()`, the Effect ratchet, the AI substrate
@@ -14,9 +18,9 @@ framework (§1), Grafana's plugin loader and Backstage's extension points
 
 Twenty ships _apps_: custom objects, serverless functions, React components
 rendered inside their UI, AI skills — a platform play, Salesforce-shaped.
-We ship _ingestion adapters_. A plugin returns **claims**; core routes them
-through the existing lanes with the doctrine enforced in the port, not
-trusted to the plugin. No plugin React, no plugin db handle, no plugin DDL
+We ship _ingestion adapters_. A plugin writes **claims** through ports, and
+each port routes them into the existing lanes with the doctrine enforced in
+the port, not trusted to the plugin. No plugin React, no plugin db handle, no plugin DDL
 in `public.*`. Cost accepted: a third party cannot add a record-page panel
 or a new shape of thing — those land in core. That is the ratchet, not a
 gap.
@@ -59,7 +63,7 @@ apps/
 packages/
   db/             drizzle schema, public.* migrations, ENTITY_REFS, migrate
   core/           Effect services: ports/lanes, resolveEntity, setValues, vault, storage, jobs/, ai/
-  sdk/            @spaces/sdk — manifest, port interfaces, kind interfaces, claims, definePlugin, testing/
+  sdk/            @spaces/sdk — manifest, port interfaces, trigger shapes, claims, definePlugin, testing/
   config/         tsconfig.base, eslint, prettier
 plugins/
   apollo/ exa/ rss/ gmail/ google-drive/ …   each imports sdk only; builds to bundle.mjs + manifest.json + migrations/
@@ -69,8 +73,9 @@ registry.json     plugin index; committed; copied into the image
 
 Rules the turbo graph and `no-restricted-imports` enforce:
 
-- `sdk` → `effect`, `zod`. Nothing internal. **If sdk ever needs core, the
-  contract leaked.**
+- `sdk` → `effect`, `zod`, `tldts` (D55: the identity normalizers need the
+  public suffix list; a test pins this list). Nothing internal. **If sdk ever
+  needs core, the contract leaked.**
 - `core` → `db`, `sdk` (it _implements_ sdk's port interfaces). Never `web`.
 - `web` → `core`, `sdk` (manifest types only, to render settings/actions).
   Never `plugins/*`, never `worker`.
@@ -109,7 +114,6 @@ bundle.
   id: 'apollo',                          // the source_ref slug; immutable
   version: '1.2.0',
   sdk: '^1.0',                           // semver range against SDK_VERSION
-  kind: 'enricher',                      // §5
   name, description, icon?,
   requires: {
     credential?: { kind: 'enrichment' | 'search' | 'llm', scope: 'workspace' },
@@ -117,18 +121,27 @@ bundle.
   },
   settings: ZodSchema,                   // operator config; rendered by web; typed Config port
   jobs: {
-    [name]: { schedule?: cron, concurrency?: n, timeout?: '60s', retry?: n,
-              on?: ['entity.created'], interactive?: boolean }
+    [name]: {
+      trigger: 'action' | 'schedule' | 'event' | 'webhook' | 'file',   // §5 — fixes the job's input/output
+      uses: ['Identity', 'Facts', 'Http', …],                          // §4 — the ports this job is granted
+      schedule?: cron,                   // trigger = schedule
+      on?: ['entity.created'],           // trigger = event
+      concurrency?: n, timeout?: '60s', retry?: n, interactive?: boolean,
+    }
   },
-  ingress?: { signature: 'hmac-sha256' | 'none' },       // §11
-  actions?: [{ id, label, on: 'company' | 'person' | 'deal', job }],  // "Enrich" button, rendered by web
+  ingress?: { signature: 'hmac-sha256' | 'none' },       // §11 — any job with trigger = webhook
+  actions?: [{ id, label, on: 'company' | 'person' | 'deal', job }],  // "Enrich" button → an action-trigger job
   http?: { rateLimit?: { rpm: n } },
+  provides?: 'storage-source',           // §5 — a provider interface core calls into; not a job
   sensitivity?: 'inherit',               // storage-source bindings may override per binding
 }
 ```
 
 Slug frozen after first publish (the attribute-slug rule). `sdk` decides
-compat at load; `manifestVersion` decides whether web can render it.
+compat at load; `manifestVersion` decides whether web can render it. There
+is no plugin-level `kind` (D51): one plugin may carry a `schedule` job and a
+`webhook` job (Gmail), and is still one install, one integration row, one
+credential, one breaker.
 
 ## 4. Ports — the SDK contract
 
@@ -136,48 +149,48 @@ Effect service tags. A plugin _imports the interfaces_; core _implements_
 them over the real DB; the loader _provides_ the implementations bound to
 one `integration` row. The plugin never links against core.
 
-| port           | methods                                           | lane / doctrine enforced inside                                                          |
-| -------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `Identity`     | `resolve(kind, keys, name?)`, `addAlias`          | `resolveEntity`; identity collisions → `duplicate_candidate`, never an error             |
-| `Facts`        | `fill(entityId, values)`                          | `setValues`, fill-blanks only; conflict with a human value → suggestion                  |
-| `Content`      | `fileDocument`, `logInteraction`, `emitSignal`    | document pipeline / `interaction` / `signal`                                             |
-| `Judgment`     | `suggest(claim)`                                  | review inbox; never a silent write                                                       |
-| `Receipts`     | `store(entityId, raw)`                            | `enrichment_record` — the provenance anchor                                              |
-| `Ai`           | `complete(lane, items, schema?)`                  | AI substrate: lane routing, sensitivity gate, cost attributed to this integration        |
-| `Read`         | `entity(id)`, `search(q)`, later `context(id, …)` | `canRead` as actor `integration` — private notes never visible                           |
-| `Secrets`      | `get()`, `accessToken()`                          | vault decrypt in the worker only; scoped to this row's credential / connection           |
-| `Config`       | `get()`                                           | `integration.config`, typed by `manifest.settings`                                       |
-| `PluginDb`     | drizzle scoped to schema `plugin_<id>`            | own tables; cannot see `public.*` DDL                                                    |
-| `Http`         | rate-limited fetch                                | header-driven throttle (`Retry-After`, `X-RateLimit-*`), receipts logged, no raw `fetch` |
-| `Log`, `Clock` |                                                   | prefixed `[plugin:<id>]`                                                                 |
+| port           | methods                                           | lane / doctrine enforced inside                                                                      |
+| -------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `Identity`     | `resolve(kind, keys, name?)`, `addAlias`          | `resolveEntity`; identity collisions → `duplicate_candidate`, never an error                         |
+| `Facts`        | `fill(entityId, values)`                          | `setValues`, fill-blanks only; conflict with a human value → suggestion                              |
+| `Content`      | `fileDocument`, `logInteraction`, `emitSignal`    | document pipeline / `interaction` / `signal`                                                         |
+| `Judgment`     | `suggest(claim)`                                  | review inbox; never a silent write                                                                   |
+| `Receipts`     | `store(entityId, raw)`                            | `enrichment_record` — the provenance anchor                                                          |
+| `Ai`           | `complete(lane, items, schema?)`                  | AI substrate: lane routing, sensitivity gate, cost attributed to this integration                    |
+| `Read`         | `entity(id)`, `search(q)`, later `context(id, …)` | `canRead` as actor `integration` — private notes never visible; `search` lexical + fuzzy in v1 (D56) |
+| `Secrets`      | `get()`, `accessToken()`                          | vault decrypt in the worker only; scoped to this row's credential / connection                       |
+| `Config`       | `get()`                                           | `integration.config`, typed by `manifest.settings`                                                   |
+| `PluginDb`     | drizzle scoped to schema `plugin_<id>`            | own tables; cannot see `public.*` DDL                                                                |
+| `Http`         | rate-limited fetch                                | header-driven throttle (`Retry-After`, `X-RateLimit-*`), receipts logged, no raw `fetch`             |
+| `Log`, `Clock` |                                                   | prefixed `[plugin:<id>]`                                                                             |
 
 **Provenance is stamped by the port, not the plugin.** Every write carries
 `source_class: integration, source_ref: <integration.id>` and
 `attribute_event.actor_type: integration` (§8). A plugin cannot forge who
 wrote what.
 
-**Ports are granted per (integration, job), by kind.** The Layer the loader
-builds is the privilege boundary; the job's `R` type documents it; a
-bundle that lies in its types gets a runtime "service not found" because
-the host never handed the service over.
+**Ports are granted per (integration, job), by declaration (D51).** Each
+job lists the ports it uses (`jobs[name].uses`); the admin sees that list at
+install, like OAuth scopes; the Layer the loader builds holds exactly those
+ports and is the privilege boundary; the job's `R` type documents it and a
+job that yields a port it did not declare fails typecheck. A bundle that
+lies in its types gets a runtime "service not found" because the host never
+handed the service over. This replaced a frozen kind → ports table: v1
+loads first-party signed plugins only (§9), so the grant is a guardrail
+against bugs and a readout for the admin, not a sandbox — the doctrine that
+matters (fill-blanks only, conflicts become suggestions, provenance stamped
+by the port) lives inside the ports whatever the job declares. Layer built
+per `(integration, job)`, cached.
 
-| kind             | ports granted                                                     |
-| ---------------- | ----------------------------------------------------------------- |
-| `enricher`       | Identity, Facts, Receipts, Http, Secrets, Config, Read, Log       |
-| `researcher`     | Read, Content, Ai, Judgment, Http, Secrets, Config, Log           |
-| `syncer`         | Identity, Content, Judgment, Http, Secrets, Config, PluginDb, Log |
-| `ingress`        | Identity, Content, Judgment, Config, PluginDb, Log                |
-| `importer`       | Identity, Facts, Content, Judgment, Config, Log                   |
-| `poller`         | Content, Ai (classify only), Http, Config, PluginDb, Log          |
-| `storage-source` | Content, Http, Secrets, Config, PluginDb, Log                     |
+Two limits stay in core rather than in a table: `Ai` is metered and
+sensitivity-gated by the port whoever calls it (AI substrate spec), and a
+`storage-source` provider never calls `Ai` — core's `document.extracted`
+event fires core features on what it files (§5).
 
-Only `researcher` calls `Ai` freely; storage sources never do — core's
-`document.extracted` event fires core features (AI substrate §3 of that
-spec). Per job, not per plugin: Apollo `enrich` gets `Facts`; Apollo
-`estimateCost` gets only `Http`. Layer built per `(integration, job)`,
-cached.
-
-**Worked example — Exa (`researcher`):**
+**Worked example — Exa, one `action` job** (manifest:
+`research: { trigger: 'action', uses: ['Config', 'Http', 'Read', 'Content', 'Ai', 'Judgment', 'Log'] }`).
+This is the canonical shape (D52): the job calls ports, each port writes
+through its lane at once, and the plugin can react to what a port returns.
 
 ```ts
 research: ({ entityId }) =>
@@ -210,7 +223,7 @@ research: ({ entityId }) =>
       refs: hits.map((h) => h.url),
     })
   })
-// R = Config | Http | Read | Content | Ai | Judgment. No Facts, no Identity — research never fills fields.
+// R = Config | Http | Read | Content | Ai | Judgment. No Facts, no Identity — this job never declared them.
 ```
 
 The loader provides, for this row:
@@ -226,33 +239,60 @@ Layer.mergeAll(
   JudgmentLive({ proposedBy: row.id }),
   LogLive('[plugin:exa]'),
 )
-// FactsLive absent — by kind table, not by trust.
+// FactsLive absent — the job's `uses` did not name it.
 ```
 
-## 5. Kinds, interfaces, claims
+## 5. Triggers, port calls, claims (amended 2026-09-30, D51–D53)
 
-Each `kind` is a typed interface the bundle must implement. All return
-**claims**, never writes; core routes claims to lanes.
+There are no plugin kinds. A job declares a **trigger**, and the trigger
+fixes what the job is handed and what it hands back. The set is closed and
+semver-frozen with the SDK; a new trigger is a minor.
 
 ```ts
-enricher:       { enrichCompany(input) → Claim[]; enrichPerson(input) → Claim[]; estimateCost(n) → { credits } }
-researcher:     { research(entityId) → Claim[] }
-syncer:         { pull(cursor) → { claims: Claim[]; nextCursor } }              // Gmail, Calendar
-ingress:        { verify(req) → boolean; handle(payload) → Claim[] }            // call recorders
-importer:       { parse(file) → Claim[] }                                       // CSV, WhatsApp export
-poller:         { poll() → Item[] }                                             // RSS
-storage-source: { resolveLink(url); listFolder(id, cursor?); getFile(id); changes(cursor);
-                  putFile(folderId, name, stream); move; rename; ensureFolder(path); pickerConfig() }
-
-Claim = Identity | Fact | Content | Judgment
+action:   (input: { entityId }) → Effect<void, JobError, R>          // manifest actions[] — the "Enrich" button
+            cost?: (input: { entityIds, fields? }) → { credits: number }   // D53, pure, action jobs only
+schedule: (input: { cursor: string | null }) → Effect<{ nextCursor: string | null }, JobError, R>   // Gmail, Calendar
+event:    (input: { event: DomainEvent }) → Effect<void, JobError, R>  // on: ['entity.created'] — enrich-on-create
+webhook:  { verify(req) → boolean; handle(payload) → Effect<void, JobError, R> }   // call recorders; §11 ingress
+file:     (input: { stream, filename, mime }) → Effect<void, JobError, R>          // an importer: CSV, WhatsApp export
 ```
 
-`storage-source` plugins never decide filing — core's `resolveItem`
-(storage design, CONTEXT "Storage sources") maps folders to entities;
-the plugin is a bytes pipe with hints (`source_path`, folder names).
+**A job calls ports; it does not return claims (D52).** Each write port
+calls its lane at once and returns what the lane decided —
+`Identity.resolve` returns the entity id the next call uses, `Facts.fill`
+returns the conflicts it refused, `Content.logInteraction` returns the
+interaction id. "Claim" survives as the name of the **typed arguments of
+the write-port methods** (identity keys, a values record, an interaction, a
+signal, a document, a suggestion): that vocabulary is the semver-frozen
+surface, and no claim type carries a source, actor, actorType,
+integrationId or sourceRef field — provenance is the port's, from the bound
+row. There is no batch, no router and no handle grammar: dependency order is
+the order the job's code runs in, and each lane keeps its own idempotency
+(`resolveEntity` on identity keys, `Facts.fill` inside the row lock,
+interactions on `message_id`). An importer (the `file` trigger) still speaks
+claims, never a grid (D39) — it speaks them through Identity/Facts/Content.
 
-The existing `Enricher` interface stays as the `enricher` port; the
-manifest wraps it.
+**Cost (D53).** An `action` job may declare `cost`, a pure function of the
+input returning `{ credits }` in the provider's own unit. The host drops
+entities with a fresh receipt (90-day cache) first, asks `cost` about the
+rest, and refuses before any API call when the estimate does not fit the
+integration's remaining daily cap. Spend is counted from
+`Receipts.store(…, credits_used)`, never from the estimate; an
+under-estimate overruns by at most one batch.
+
+**Storage sources are a provider interface, not a job.** Core calls into
+them; they call nothing:
+
+```ts
+storage-source: { resolveLink(url); listFolder(id, cursor?); getFile(id); changes(cursor);
+                  putFile(folderId, name, stream); move; rename; ensureFolder(path); pickerConfig() }
+```
+
+A plugin that implements it says `provides: 'storage-source'` in the
+manifest. It never decides filing — core's `resolveItem` (storage design,
+CONTEXT "Storage sources") maps folders to entities; the plugin is a bytes
+pipe with hints (`source_path`, folder names). Its body is owned by the
+storage area (project 20).
 
 ## 6. `definePlugin()` and the testing kit
 
@@ -270,9 +310,11 @@ Returns a `Plugin` value; the loader wraps it into a scoped Layer and
 registers jobs under `plugin.<id>.<job>`.
 
 `@spaces/sdk/testing`: in-memory port Layers (`IdentityTest`, `FactsTest`,
-…) that record claims. A plugin author tests "given this provider JSON, it
-emits these claims" with no Postgres and no network. Core uses the same kit
-to test the loader.
+…) that record every port call and mint deterministic fake ids where a
+lane would return one. A plugin author tests "given this provider JSON, the
+job makes these calls" with no Postgres and no network. Core uses the same
+kit to test the loader. A DryRun Layer — the recorder in production, over
+`previewResolve` — is the later answer to an importer preview.
 
 Authoring loop: `pnpm create spaces-plugin` → template (manifest + one job
 
@@ -280,7 +322,7 @@ Authoring loop: `pnpm create spaces-plugin` → template (manifest + one job
   into a local `/data/plugins` → same loader as prod → `pack` → tarball +
   sha + sig → registry.
 
-**SDK versioning.** Own semver. New port method or kind = minor; changed
+**SDK versioning.** Own semver. New port method or trigger = minor; changed
 signature = major. Core exports `SDK_VERSION`; the loader checks
 `manifest.sdk`. Core keeps a shim Layer one major back so a core bump does
 not strand plugins overnight.
@@ -296,7 +338,7 @@ Grafana's discovery → bootstrap → validation → initialization, same beats.
 3. validate    manifest zod-parses; manifest.sdk satisfies SDK_VERSION; bundle sha matches lock.json
 4. import      const plugin = (await import(pathToFileURL(bundle))).default
 5. migrate     plugin/migrations/* in schema plugin_<id>, own journal table
-6. wire        Layer per (integration, job): ports allowed by kind, bound to row, credential, config
+6. wire        Layer per (integration, job): the ports the job's `uses` names, bound to row, credential, config
 7. register    boss.work('plugin.<id>.<job>', runJob(plugin.jobs[job], layer)); boss.schedule(...);
                ingress → row flag so web mounts /api/webhooks/<id>
 8. mark        integration.status = enabled | degraded (+ reason)
@@ -374,7 +416,17 @@ is ignored (env is an input to the vault, never the store). Required env
 stays `{DATABASE_URL, APP_URL}`.
 
 Trust: in-process Node has no sandbox. v1 loads first-party signed tarballs
-only; `--allow-unsigned` for development. Third-party or ToS-exposed code
+only. **Signing mechanics (D54, decided 2026-09-30; the scheme is D16's
+plugin half):** a detached raw ed25519 signature over the tarball, made and
+checked with `node:crypto` (no dependency, no network — what an air-gapped
+install needs); the public key is a file baked into the image and named by
+key id, so a rotation can trust two keys for one release, and it is never
+read from `registry.json` (whoever serves the registry would then choose the
+key); the private key is a GitHub Actions secret used only by the plugin
+release workflow. The development escape is a marker file,
+`./data/plugins/.allow-unsigned`, off by default: an unsigned plugin then
+loads with a warning on every boot and an "unsigned" badge on its
+Integrations row, and the required-env set stays `{DATABASE_URL, APP_URL}`. Third-party or ToS-exposed code
 → tier 2 companion.
 
 Same page: Installed (version, status, last run, last error, credits),

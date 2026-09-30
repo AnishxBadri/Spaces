@@ -199,9 +199,9 @@ ecosystem at the schema level, not just aesthetically.
 
 **Doctrine: plugins feed the graph; they never extend the product.** Twenty
 lets apps ship React, custom objects and serverless functions (a platform
-play). We ship ingestion adapters. A plugin returns _claims_; core routes
-them through the existing claim-type lanes with the doctrine enforced in the
-port, not trusted to the plugin. No plugin React, no plugin db handle, no
+play). We ship ingestion adapters. A plugin writes _claims_ through ports;
+each port routes them into the existing claim-type lanes with the doctrine
+enforced in the port, not trusted to the plugin. No plugin React, no plugin db handle, no
 plugin edits to `public.*`. Cost accepted: a third party cannot add a
 record-page panel or a new shape of thing — those land in core. That is the
 ratchet, not a gap.
@@ -215,7 +215,7 @@ apps/site       marketing/docs — never in the image
 apps/extension  MV3 capture
 packages/db     drizzle schema, public.* migrations, ENTITY_REFS
 packages/core   Effect services: ports/lanes, resolveEntity, setValues, vault, storage, ai/
-packages/sdk    @spaces/sdk — manifest + port interfaces + kind interfaces + definePlugin +
+packages/sdk    @spaces/sdk — manifest + port interfaces + trigger shapes + definePlugin +
                 testing kit. Types only. Own semver. Imports nothing from core/db (turbo-enforced).
 packages/ui     tokens + components shared by web and site
 plugins/<id>    imports sdk only; builds to a single ESM bundle + manifest.json + migrations/
@@ -288,10 +288,26 @@ interaction / signal) · `Judgment` (review inbox) · `Receipts`
 (canRead as integration) · `Secrets` (vault, worker-only decrypt) · `Config`
 (manifest-typed) · `PluginDb` (drizzle scoped to `plugin_<id>` schema) ·
 `Http` (rate-limited, header-driven throttle) · `Log`. **Ports are granted
-per (integration, job), by kind** — an enricher gets `Facts`, a researcher
-does not; the Layer the loader provides is the privilege boundary, and the
-job's `R` type documents it. Kinds: `enricher` · `researcher` · `syncer` ·
-`ingress` · `importer` · `poller`. Each returns claims, never writes.
+per (integration, job), by declaration** — each job names the ports it
+`uses`, the admin sees the list at install, and the Layer the loader
+provides holds exactly those; it is the privilege boundary, and the job's
+`R` type documents it.
+
+**Amended 2026-09-30 at project 17's publish (owner; D51–D58 in
+`docs/decisions-2026-09.md`, the contract in `docs/spec-plugin-sdk.md`
+§3–§5, §9).** There are **no plugin kinds**: the six-kind table bundled a
+trigger, an input/output shape and a port grant, and forced one provider to
+ship as several plugins (Gmail is a schedule job plus a webhook job). A job
+now declares a **trigger** — `action` · `schedule` · `event` · `webhook` ·
+`file` — which fixes what it is handed and returns, and the ports it `uses`.
+Storage sources stay a provider interface core calls into
+(`provides: 'storage-source'`), not a job. A job **calls ports; it does not
+return claims** — each write port calls its lane at once and returns what
+the lane decided (`Identity.resolve` → the entity id, `Facts.fill` → the
+refused conflicts); "claims" are the typed arguments of the write-port
+methods, semver-frozen, carrying no provenance field. No router, no batch,
+no handle grammar. An `action` job may declare a pure `cost` hook returning
+`{ credits }` in the provider's unit; spend is counted from receipts.
 
 **AI is substrate, not a plugin.** It sits _below_ the SDK as the `Ai`
 port: plugins consume the extract/classify/synthesize lanes, sensitivity
@@ -327,7 +343,10 @@ APP_URL}`.
   major back. Plugin upgrade is independent (fetch → verify → own migrations
   → swap `current`). Rollback of either = restore.
 - Trust: in-process Node has no sandbox, so v1 loads first-party signed
-  tarballs only (`--allow-unsigned` for development). Anything third-party
+  tarballs only — a detached raw ed25519 signature checked with
+  `node:crypto`, the public key baked into the image by key id (D54). The
+  development escape is a marker file `./data/plugins/.allow-unsigned`, off
+  by default, never an env var. Anything third-party
   or with a foreign runtime/ToS exposure (the WhatsApp bridge) is a
   companion container on a compose profile speaking to the webhook ingress
   with a PAT — its weight on its own profile. Companion design deferred.

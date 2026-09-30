@@ -231,3 +231,41 @@ Query-time embedding runs in web (`apps/web/src/lib/search/query-embedding.ts`),
 - **Web loads the model lazily when the pin is local** — simplest; kills the worker-only rule; +300 MB resident on web and inference on its loop. _Reversal cost:_ Moderate.
 
 **Not answered.** Carried by `ai-9c`, `hitl`, which records the answer in CONTEXT.md §Embeddings before building the seam. pg-boss round trips are seconds and are not an option.
+
+---
+
+## Addenda — 2026-09-30 (project 17's publish)
+
+_Eight decisions taken by the owner while publishing project 17 (the plugin SDK), one at a time, each against the code as it stood after project 15. D51 and D52 reshape the SDK contract; the rest pin what sdk-21a, sdk-4b, sdk-6b, sdk-7a and SPA-182 build. The contract they change is `docs/spec-plugin-sdk.md` §3–§5 and §9; CONTEXT.md's "Plugin architecture" block carries the summary._
+
+### D51-plugin-triggers-not-kinds
+
+**Does a plugin have a kind, and what grants its ports?** Answered: **no kinds.** Each job declares a `trigger` (`action` · `schedule` · `event` · `webhook` · `file`), which fixes its input and output, and the ports it `uses`, which the admin sees at install and the per-(integration, job) Layer grants exactly. `storage-source` stays a provider interface core calls into (`provides: 'storage-source'`). Rejected: one kind per plugin (Gmail ships as two installs), a kind per job (keeps a frozen port table that is not a security boundary — v1 loads only first-party signed plugins), and a set of kinds with the union of their ports (every job gets every port). Reason: a kind bundled trigger, shape and privilege; Zapier/n8n/Twenty split triggers from scopes, and the doctrine that matters lives inside the ports whatever the job declares. Carried by `sdk-3` (manifest) and `sdk-4a` (trigger shapes).
+
+### D52-ports-not-returned-claims
+
+**Does a job return claims for a core router, or call ports?** Answered: **it calls ports.** Each write port calls its lane at once and returns what the lane decided (`Identity.resolve` → the entity id; `Facts.fill` → the refused conflicts). "Claims" are the typed arguments of the write-port methods — the semver-frozen vocabulary, carrying no source/actor/integration field. No router, no batch, no handle grammar; the testing kit's recording Layers mint deterministic fake ids; a DryRun Layer over `previewResolve` is the later answer to an importer preview. Rejected: declarative claims (a handle grammar, a router and dependency ordering re-deriving rules the lanes already hold, and a job that cannot react to a refused fill) and both at once. D39 survives: an importer still speaks claims, never a grid. Carried by `sdk-4a` and `sdk-5`.
+
+### D53-cost-hook
+
+**What does `estimateCost` become?** Answered: an optional `cost` hook on an `action` job, a pure function of the input returning `{ credits: number }` in the provider's own unit. The host drops entities with a fresh receipt first, refuses before any API call when the estimate does not fit the integration's remaining daily cap, and counts spend only from `Receipts.store(…, credits_used)`. Carried by `sdk-4a` (shape); used by `sdk-16` (project 18).
+
+### D54-plugin-signing-mechanics
+
+**How is D16's plugin half built?** Answered: a detached raw ed25519 signature made and checked with `node:crypto` (no dependency, no network); the public key is a file baked into the image, named by key id so a rotation can trust two; never read from `registry.json`; the private key is a GitHub Actions secret used only by the plugin release workflow. The unsigned development escape is a marker file `./data/plugins/.allow-unsigned`, off by default, with a boot warning and an "unsigned" badge; the required-env set stays `{DATABASE_URL, APP_URL}`. Rejected: the minisign format via a library, the key in the registry or in env, an env-var escape, and no escape. Carried by `sdk-21a`.
+
+### D55-sdk-third-party-dependencies
+
+**May `@spaces/sdk` depend on `tldts`?** Answered: **yes.** The rule is "nothing internal", not "nothing third-party"; `normalizeDomain` needs the public suffix list and one normalizer on both sides of the port is the point of sdk-4b. A test pins the SDK's dependency list to `effect`, `zod`, `tldts`. Rejected: splitting the normalizer (plugin and choke point disagree on a domain) and vendoring the suffix list. Carried by `sdk-4b`.
+
+### D56-read-search-v1
+
+**What does `Read.search` cover in v1?** Answered: **lexical and fuzzy only.** sdk-6b moves the fused lexical statement and `canReadNoteSql` into core; the vector lane — pinned to web's embedding stack by `query-embedding.ts` — arrives later as an injected query-vector function, additively. Rejected: all three lanes now (drags the AI provider stack across the worker fence before any plugin needs it) and no `search` in v1. Carried by `sdk-6b`.
+
+### D57-signal-and-receipt-provenance
+
+**How do `signal` and `enrichment_record` say which integration wrote them?** Answered: **real columns, one migration, carried by sdk-7a** — `signal.source_class` + `source_ref` with the same check invariant as `entity`/`interaction`/`document`, and `enrichment_record.integration_id → integration(id)` beside the kept `provider` text. One migration keeps sdk-7b off the serial migration lane. Neither column references an entity, so no `ENTITY_REFS` entry. Rejected: the integration id as free text, and two migrations.
+
+### D58-assembler-similar-lane
+
+**What seam lets the context assembler into core (SPA-182)?** Answered: a narrow `SimilarLane` `Context.Service` in `packages/core/src/context/` — similar candidates for a scope plus the pin read `record.ts` needs. `assemble.ts`, `names.ts` and `record.ts` move to core; `similar.ts` stays in apps/web as the live Layer; tests get a stub Layer; `canRead` comes from `@spaces/core/read-policy`. Blocked by `sdk-5` (the house pattern) and `sdk-6b` (which owns moving `canReadNoteSql`). Rejected: a wide `ContextAssembler` service, and moving the embedding-pin substrate into core. It is also the shape the spec's later `Read.context(id)` takes. Carried by `SPA-182`, which joins project 17.
