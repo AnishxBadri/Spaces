@@ -175,6 +175,14 @@ jobs:
       - name: Load the runtime image built by `image`
         run: gunzip -c spaces-ci.tar.gz | docker load
 
+      # SPA-193 (D54): the plugin index and the trusted signing keys are baked
+      # into the image, at the paths @spaces/core/plugins/trust reads.
+      - name: registry.json and plugin-keys/ are in the image
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint sh spaces:ci -c \
+            'test -f /app/registry.json && test -d /app/plugin-keys && ls -la /app/plugin-keys && head -c 200 /app/registry.json'
+
       - name: Mis-owned ./data — repairs, drops to 1000, takes an upload
         run: |
           set -euo pipefail

@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "pack:plugin": "spaces-plugin-pack .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."

@@ -436,6 +436,9 @@ importers:
       '@spaces/db':
         specifier: workspace:*
         version: link:../db
+      '@spaces/sdk':
+        specifier: workspace:*
+        version: link:../sdk
       drizzle-orm:
         specifier: ^0.45.1
         version: 0.45.2(@types/pg@8.20.0)(kysely@0.29.4)(pg@8.22.0)

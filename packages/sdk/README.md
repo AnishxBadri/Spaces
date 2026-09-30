@@ -80,6 +80,19 @@ made vite the workspace's one bundler). `pnpm build` in a plugin writes:
 `vite` is an optional peer of this package: only `@spaces/sdk/build` uses it,
 and only at a plugin's build time.
 
+## Pack and sign — `@spaces/sdk/pack` (sdk-21a)
+
+`pnpm --filter <plugin> pack:plugin` (the `spaces-plugin-pack` bin) packs a
+built plugin's `dist/` into `dist/pack/<id>-<version>.tgz` + `.sha256`, and —
+with an ed25519 private key from `--key <file>` or `SPACES_PLUGIN_SIGNING_KEY`
+— a detached `.sig` and the `registry.json` entry `<id>-<version>.json`. The
+tarball is a gzip'd ustar written by this package's own reader/writer
+(`src/pack/tar.ts`: deterministic, no dependency); core's
+`@spaces/core/plugins/verify` reads it with the same reader. Key ids are
+content-derived (`keyIdOf`); the trusted public keys live in the repo's
+`plugin-keys/`, never in the registry. Without a key the pack is unsigned and
+loads only where `./data/plugins/.allow-unsigned` exists.
+
 ## This package's own build
 
 Unlike `@spaces/core` and `@spaces/db`, whose `exports` point at source,

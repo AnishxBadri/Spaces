@@ -1,6 +1,11 @@
-import { readFileSync } from 'node:fs'
+import { generateKeyPairSync, verify } from 'node:crypto'
+import { mkdtempSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { gunzipSync } from 'node:zlib'
 import { manifestSchema, satisfiesSdk, settingsJsonSchema } from '@spaces/sdk'
+import { packPlugin, readTar } from '@spaces/sdk/pack'
 import { build } from 'vite'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { manifest } from './manifest.ts'
@@ -56,5 +61,27 @@ describe('the echo manifest.json', () => {
   it('carries settings as the JSON Schema of the authored zod schema', () => {
     const parsed = manifestSchema.parse(emitted)
     expect(parsed.settings).toEqual(settingsJsonSchema(manifest.settings))
+  })
+})
+
+describe('the echo tarball (sdk-21a)', () => {
+  it('round-trips through the packer: signed, and unpacking to the same bytes', async () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+    const out = mkdtempSync(path.join(tmpdir(), 'spaces-echo-pack-'))
+    const packed = await packPlugin({
+      distDir: path.join(root, 'dist'),
+      outDir: out,
+      privateKey,
+    })
+    expect(path.basename(packed.tarball)).toBe('echo-0.1.0.tgz')
+    const tgz = readFileSync(packed.tarball)
+    expect(
+      verify(null, tgz, publicKey, Buffer.from(packed.sig ?? '', 'base64')),
+    ).toBe(true)
+    const files = readTar(gunzipSync(tgz))
+    expect(files.map((f) => f.path)).toEqual(['bundle.mjs', 'manifest.json'])
+    for (const f of files) {
+      expect(new TextDecoder().decode(f.data)).toBe(read(f.path))
+    }
   })
 })

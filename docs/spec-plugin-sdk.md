@@ -413,9 +413,15 @@ optional `DROP SCHEMA`.
 ## 9. Registry, signing, install from the running deployment
 
 ```
-registry.json  [{ id, version, sdk, kind, name, description, requires,
-                  tarball: url, sha256, sig, minCore? }]
+registry.json  [{ id, version, sdk, name, description, requires?,
+                  tarball: url, sha256, sig, keyId, minCore? }]     // no kind (D51)
 ```
+
+The format is `registryEntrySchema` in `@spaces/sdk/pack` (sdk-21a), which
+also packs: `<id>-<version>.tgz` (gzip'd ustar of manifest.json, bundle.mjs,
+migrations/) + `.sha256` + `.sig`. `verifyPlugin` is
+`@spaces/core/plugins/verify`; CONTEXT.md "Plugin architecture" records the
+key id format, the key directory and the tar choice.
 
 v0: tarballs on GitHub Releases, index committed in-repo and copied into
 the image (offline installs see the shipped list; live refresh when

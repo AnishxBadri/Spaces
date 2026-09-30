@@ -350,6 +350,28 @@ APP_URL}`.
   or with a foreign runtime/ToS exposure (the WhatsApp bridge) is a
   companion container on a compose profile speaking to the webhook ingress
   with a PAT — its weight on its own profile. Companion design deferred.
+- **Signing, as built (SPA-193, sdk-21a).** The **key id** is content-derived:
+  `ed25519-` + the first 16 hex digits of sha256 over the raw 32-byte public
+  key (`keyIdOf`, `@spaces/sdk/pack`), and a key file whose key does not hash
+  to its name is not trusted. The **key directory** is `plugin-keys/` at the
+  repo root, one PEM SPKI file per key (`<keyId>.pub`), copied into the image
+  at `/app/plugin-keys` and read by `@spaces/core/plugins/trust` (anchored to
+  the workspace root, else the cwd — fail-closed: a wrong directory trusts
+  nothing); it is empty until ship-9 mints the release key. The **tar
+  choice**: a hand-rolled ustar reader and writer in `@spaces/sdk/pack`
+  (deterministic: sorted entries, mtime 0, uid/gid 0, fixed modes), gzip'd
+  with `node:zlib` — no `tar` dependency, and the verifier refuses links,
+  devices, absolute paths and `..` by reading every header itself. The
+  artifact set is `<id>-<version>.tgz` + `.sha256` + `.sig` (base64 detached
+  ed25519) + the registry entry `<id>-<version>.json`; `registry.json` is a
+  committed array of entries `{ id, version, sdk, name, description,
+requires?, tarball, sha256, sig, keyId, minCore? }` — no `kind` (D51).
+  `verifyPlugin` (`@spaces/core/plugins/verify`) refuses with one of
+  `sha-mismatch · unknown-key · bad-signature · unsigned · unreadable ·
+unsafe-entry · manifest-missing · manifest-mismatch`, checking the
+  signature over the whole tarball before parsing a byte of it; with the
+  marker present an unsigned archive verifies with the warning
+  `unsigned (allowed by .allow-unsigned)`.
 
 **Workers and jobs.** pg-boss stays the queue (paradigm 6); the worker is a
 plain Node process whose handlers become Effect programs run by one

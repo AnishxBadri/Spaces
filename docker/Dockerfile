@@ -137,6 +137,13 @@ COPY --chown=node:node --from=build /app/apps/web/.output ./apps/web/.output
 COPY --chown=node:node --from=build /app/apps/web/dist ./apps/web/dist
 COPY --chown=node:node --from=build /app/apps/worker/dist ./apps/worker/dist
 COPY --chown=node:node --from=prune /app/out/build/full/packages/db/drizzle ./packages/db/drizzle
+# Plugin trust (SPA-193, D54): the committed plugin index and the public keys
+# this image trusts to sign plugins. Straight from the build context — neither
+# is a workspace package, so `turbo prune` does not carry them. The keys are
+# read from /app/plugin-keys by @spaces/core/plugins/trust (the cwd, since the
+# image has no workspace marker), never from registry.json and never from env.
+COPY --chown=node:node registry.json ./registry.json
+COPY --chown=node:node plugin-keys ./plugin-keys
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chown node:node /app \
     && chmod +x /entrypoint.sh && mkdir -p /data && chown -R node:node /data
