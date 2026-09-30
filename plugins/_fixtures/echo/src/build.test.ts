@@ -49,7 +49,7 @@ describe('the echo manifest.json', () => {
   it('parses under manifestSchema', () => {
     const parsed = manifestSchema.parse(emitted)
     expect(parsed.id).toBe('echo')
-    expect(Object.keys(parsed.jobs)).toEqual(['echo'])
+    expect(Object.keys(parsed.jobs)).toEqual(['echo', 'enrich'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
   })
 

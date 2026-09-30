@@ -1,0 +1,17 @@
+{
+  "organization": {
+    "id": "5f2a9c0e8b1d4a0012345678",
+    "name": "Northwind Robotics",
+    "website_url": "https://www.northwind-robotics.example",
+    "primary_domain": "northwind-robotics.example",
+    "linkedin_url": "http://www.linkedin.com/company/northwind-robotics",
+    "founded_year": 2019,
+    "short_description": "Warehouse picking robots that learn a new SKU from one demonstration.",
+    "city": "Pune",
+    "country": "India",
+    "estimated_num_employees": 84,
+    "industry": "machinery",
+    "keywords": ["robotics", "warehouse automation", "computer vision"]
+  },
+  "credits_consumed": 1
+}

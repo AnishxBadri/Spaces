@@ -99,6 +99,26 @@ describe('manifestSchema', () => {
       expect(issues(m)[0]).toMatch(/^jobs\.enrich\.uses: /)
     })
 
+    it('refuses a port that is not in PORT_NAMES, naming it', () => {
+      const m = base()
+      m.jobs.enrich = { trigger: 'action', uses: ['Identity', 'Clock'] }
+      const found = issues(m)
+      expect(found).toHaveLength(1)
+      expect(found[0]).toMatch(/^jobs\.enrich\.uses\.1: unknown port "Clock"/)
+    })
+
+    it('refuses an event that is not in DOMAIN_EVENTS, naming it', () => {
+      const m = base()
+      m.jobs.onUpdate = {
+        trigger: 'event',
+        uses: ['Facts'],
+        on: ['entity.updated'],
+      }
+      expect(issues(m)[0]).toMatch(
+        /^jobs\.onUpdate\.on\.0: unknown event "entity\.updated"/,
+      )
+    })
+
     it('requires schedule iff the trigger is schedule', () => {
       const m = base()
       m.jobs.sync = { trigger: 'schedule', uses: ['Http'] }

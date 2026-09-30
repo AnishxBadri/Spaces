@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DOMAIN_EVENTS, PORT_NAMES } from './contract.ts'
 import { isVersion, parseSdkRange } from './range.ts'
 
 /**
@@ -48,14 +49,29 @@ const CRON = /^\S+(?:\s+\S+){4}$/
 
 const jobSchema = z.strictObject({
   trigger: z.enum(TRIGGERS),
-  // The port names this job is granted. sdk-4a narrows this to the port-name
-  // list it exports; until then a non-empty list of names.
-  uses: z.array(z.string().min(1)).min(1),
+  // The ports this job is granted — the admin reads this list at install,
+  // and the loader's Layer holds exactly these (D51).
+  uses: z
+    .array(
+      z.enum(PORT_NAMES, {
+        error: (issue) =>
+          `unknown port ${JSON.stringify(issue.input)} — uses names ports from PORT_NAMES (${PORT_NAMES.join(', ')})`,
+      }),
+    )
+    .min(1),
   schedule: z
     .string()
     .regex(CRON, { error: 'schedule is a five-field cron expression' })
     .optional(),
-  on: z.array(z.string().min(1)).min(1).optional(),
+  on: z
+    .array(
+      z.enum(DOMAIN_EVENTS, {
+        error: (issue) =>
+          `unknown event ${JSON.stringify(issue.input)} — on names events from DOMAIN_EVENTS (${DOMAIN_EVENTS.join(', ')})`,
+      }),
+    )
+    .min(1)
+    .optional(),
   concurrency: z.int().positive().optional(),
   timeout: z
     .string()

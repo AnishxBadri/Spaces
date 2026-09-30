@@ -204,23 +204,26 @@ research: ({ entityId }) =>
       numResults: cfg.maxResults,
     })
     const content = yield* Content
-    for (const h of hits)
-      yield* content.emitSignal({
+    const refs: Array<Ref> = []
+    for (const h of hits) {
+      const { signalId } = yield* content.emitSignal({
+        _tag: 'signal',
         entityId,
         kind: 'web',
         url: h.url,
         title: h.title,
         publishedAt: h.date,
       })
+      refs.push(`event:${signalId}`) // cite the signal, not the URL (D4)
+    }
     const ai = yield* Ai
     const brief = yield* ai.complete('synthesize', toContextItems(hits))
     const judge = yield* Judgment
     yield* judge.suggest({
       entityId,
-      kind: 'note',
-      body: brief,
+      proposal: { kind: 'note', body: brief },
       rationale: 'Exa web research',
-      refs: hits.map((h) => h.url),
+      refs,
     })
   })
 // R = Config | Http | Read | Content | Ai | Judgment. No Facts, no Identity — this job never declared them.
@@ -249,13 +252,22 @@ fixes what the job is handed and what it hands back. The set is closed and
 semver-frozen with the SDK; a new trigger is a minor.
 
 ```ts
-action:   (input: { entityId }) → Effect<void, JobError, R>          // manifest actions[] — the "Enrich" button
-            cost?: (input: { entityIds, fields? }) → { credits: number }   // D53, pure, action jobs only
+action:   run | { run, cost? }                                        // manifest actions[] — the "Enrich" button
+            run:  (input: { entityId }) → Effect<void, JobError, R>
+            cost: (input: { entityIds, fields? }) → { credits: number }   // D53, pure, action jobs only
 schedule: (input: { cursor: string | null }) → Effect<{ nextCursor: string | null }, JobError, R>   // Gmail, Calendar
 event:    (input: { event: DomainEvent }) → Effect<void, JobError, R>  // on: ['entity.created'] — enrich-on-create
-webhook:  { verify(req) → boolean; handle(payload) → Effect<void, JobError, R> }   // call recorders; §11 ingress
-file:     (input: { stream, filename, mime }) → Effect<void, JobError, R>          // an importer: CSV, WhatsApp export
+webhook:  { verify(req: { headers, body }) → boolean;                   // call recorders; §11 ingress
+            handle(input: { payload, receivedAt }) → Effect<void, JobError, R> }
+file:     (input: { stream: ReadableStream<Uint8Array>, filename, mime }) → Effect<void, JobError, R>   // an importer
 ```
+
+The types are `packages/sdk/src/contract.ts` (sdk-4a), one file: `JobError`
+is `JobRetryable | JobRateLimited | JobPermanent`, the worker's three
+`runJob` outcomes under the same tags; `DomainEvent` is closed over
+`DOMAIN_EVENTS` (`entity.created` in v1 — the manifest's `on` validates
+against it); `PORT_NAMES` is the §4 table minus Clock (Effect ships one) and
+is what `uses` validates against.
 
 **A job calls ports; it does not return claims (D52).** Each write port
 calls its lane at once and returns what the lane decided —
@@ -271,6 +283,19 @@ the order the job's code runs in, and each lane keeps its own idempotency
 (`resolveEntity` on identity keys, `Facts.fill` inside the row lock,
 interactions on `message_id`). An importer (the `file` trigger) still speaks
 claims, never a grid (D39) — it speaks them through Identity/Facts/Content.
+
+The claims (sdk-4a): `IdentityClaim { kind: company | person, keys:
+{ domain?, email?, linkedin?, cin? }, name? }` and `AliasClaim`;
+`FactClaim { entityId, values, receiptId? }` — `receiptId` is evidence (it
+becomes the attribute events' `refs`), not provenance; `ReceiptClaim
+{ entityId, raw, creditsUsed? }`; the three Content claims tagged by `_tag`
+— `document { body: { stream } | { bytes }, filename, mime, kind?,
+fileAgainst, url? }`, `interaction { kind, occurredAt, entityIds (≥1),
+subject?, messageId?, threadId?, body? }`, `signal { entityId, kind,
+title?, url?, publishedAt?, payload? }`; `JudgmentClaim { entityId,
+proposal: { kind: 'note', body } | { kind: 'attribute', slug, value },
+rationale, refs }`, where a ref is the shipped grammar (D4) and a URL is
+not one — cite the signal it was emitted as.
 
 **Cost (D53).** An `action` job may declare `cost`, a pure function of the
 input returning `{ credits }` in the provider's own unit. The host drops
@@ -581,7 +606,8 @@ Layered; most value never touches a provider.
 5. **Loader + jobs.** Fixture plugins in `plugins/_fixtures/`: `echo`,
    `throws` (breaker), `old-sdk` (degraded), `needs-key`. Boot the loader on
    a temp dir; assert `integration.status`, registered queues, Layer
-   privilege (a `poller` calling `Facts` → "service not found"). pg-boss on
+   privilege (a job calling `Facts` without `uses: ['Facts']` → "service not
+   found"). pg-boss on
    the test DB for enqueue → run → status stream.
 6. **Real sandboxes, nightly, opt-in.** Dedicated Google Cloud project + Box
    developer account, secrets in CI, conformance for real; failures open an

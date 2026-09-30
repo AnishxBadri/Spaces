@@ -11,13 +11,22 @@ export const manifest = defineManifest({
   version: '0.1.0',
   sdk: '^1.0',
   name: 'Echo',
-  description: 'A fixture plugin: one action job that echoes its input.',
+  description:
+    'A fixture plugin: an action job that echoes its input, and one that maps a recorded provider payload to claims.',
   settings: z.object({
     greeting: z.string().default('hello'),
     times: z.int().min(1).max(3).default(1),
   }),
   jobs: {
     echo: { trigger: 'action', uses: ['Log'] },
+    // Resolve → store the receipt → fill (src/map.ts is its pure half).
+    enrich: {
+      trigger: 'action',
+      uses: ['Identity', 'Receipts', 'Facts', 'Log'],
+    },
   },
-  actions: [{ id: 'echo', label: 'Echo', on: 'company', job: 'echo' }],
+  actions: [
+    { id: 'echo', label: 'Echo', on: 'company', job: 'echo' },
+    { id: 'enrich', label: 'Enrich (fixture)', on: 'company', job: 'enrich' },
+  ],
 })

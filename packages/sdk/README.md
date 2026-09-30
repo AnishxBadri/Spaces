@@ -27,8 +27,26 @@ import, and `src/fence.test.ts` proves it.
 - `definePlugin` — the bundle's default export; its `jobs` must carry exactly
   the manifest's job names.
 
-Port tags, trigger shapes and claim types arrive with sdk-4a; the testing kit
-(`@spaces/sdk/testing`) with sdk-5.
+## The frozen contract (sdk-4a) — `src/contract.ts`
+
+One file, to be read and reviewed as one; it moves only on an SDK major.
+
+- `PORT_NAMES` — the twelve ports a job may list in `uses` (the spec §4
+  table minus Clock); the manifest validates `uses` against it.
+- The claims — the typed arguments of the write-port methods (D52):
+  `IdentityClaim`, `AliasClaim`, `FactClaim`, `ReceiptClaim`, the three
+  `_tag`-ged Content claims (`DocumentClaim`, `InteractionClaim`,
+  `SignalClaim`) and `JudgmentClaim`. None carries a source, actor or
+  integration field — provenance is the port's (`contract.test.ts`).
+- `Ref` — the shipped citation grammar (D4) as a type; a URL is not a ref.
+- The five trigger shapes and `JobFor<trigger>`, which `definePlugin` uses to
+  type each job by its manifest entry; the `cost` hook on action jobs (D53);
+  `DomainEvent` / `DOMAIN_EVENTS`; `JobError` (`JobRetryable`,
+  `JobRateLimited`, `JobPermanent` — the worker's tags).
+- `StorageSource` (`src/storage-source.ts`) — a provider interface with a
+  TODO body the storage area (project 20) owns.
+
+Port tags and the testing kit (`@spaces/sdk/testing`) arrive with sdk-5.
 
 ## Writing a plugin
 

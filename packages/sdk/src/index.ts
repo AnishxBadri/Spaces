@@ -1,8 +1,8 @@
 /**
- * @spaces/sdk — what a plugin imports (docs/spec-plugin-sdk.md §3–§6). This
- * slice (sdk-3) is the skeleton: the manifest, the version check and
- * `definePlugin`. Port tags, trigger shapes and claim types arrive in sdk-4a;
- * the testing kit in sdk-5.
+ * @spaces/sdk — what a plugin imports (docs/spec-plugin-sdk.md §3–§6): the
+ * manifest, the version check and `definePlugin` (sdk-3); the frozen
+ * contract — port names, claims, trigger shapes, the cost hook, job errors
+ * (sdk-4a, `contract.ts`). Port tags and the testing kit arrive in sdk-5.
  */
 export { SDK_VERSION } from './version.ts'
 export { satisfiesSdk, parseSdkRange, isVersion } from './range.ts'
@@ -22,4 +22,59 @@ export type {
   AuthoredManifest,
 } from './manifest.ts'
 export { definePlugin } from './plugin.ts'
-export type { Plugin, PluginJobs, JobFn, LifecycleHook } from './plugin.ts'
+export type { Plugin, PluginJobs, LifecycleHook } from './plugin.ts'
+export {
+  PORT_NAMES,
+  DOCUMENT_KINDS,
+  DOMAIN_EVENTS,
+  JobRetryable,
+  JobRateLimited,
+  JobPermanent,
+} from './contract.ts'
+export type {
+  JsonValue,
+  JsonObject,
+  EntityId,
+  IsoTimestamp,
+  Ref,
+  PortName,
+  IdentityKind,
+  IdentityKeys,
+  IdentityClaim,
+  AliasClaim,
+  FactValues,
+  FactClaim,
+  ReceiptClaim,
+  DocumentKind,
+  FilingTarget,
+  DocumentBytes,
+  DocumentClaim,
+  InteractionKind,
+  InteractionClaim,
+  SignalClaim,
+  ContentClaim,
+  NoteProposal,
+  AttributeProposal,
+  Proposal,
+  JudgmentClaim,
+  JobError,
+  DomainEventName,
+  DomainEvent,
+  ActionInput,
+  ActionRun,
+  CostInput,
+  CostHook,
+  ActionJob,
+  ScheduleInput,
+  ScheduleOutput,
+  ScheduleJob,
+  EventInput,
+  EventJob,
+  WebhookRequest,
+  WebhookInput,
+  WebhookJob,
+  FileInput,
+  FileJob,
+  JobFor,
+} from './contract.ts'
+export type { StorageSource } from './storage-source.ts'
