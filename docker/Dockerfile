@@ -67,10 +67,14 @@ COPY --from=prune /app/out/build/json/ ./
 COPY --from=prune /app/out/build/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY --from=prune /app/out/build/full/ ./
-# @spaces/sdk first (SPA-195): its `exports` point at dist/, and since the
-# identity normalizers moved into it, core — and so both apps — import it at
-# runtime. pnpm runs a filtered `build` in dependency order.
-RUN pnpm --filter @spaces/sdk --filter @spaces/web --filter @spaces/worker build
+# @spaces/sdk first, in its own step (SPA-195): its `exports` point at dist/,
+# and since the identity normalizers moved into it, core — and so both apps —
+# import it at runtime. Not one `--filter` list: pnpm orders filtered packages
+# by their direct dependencies only, and the apps reach the sdk through
+# @spaces/core, so a single call raced the worker's vite build against the
+# sdk's tsc (PR #4, "failed to resolve import @spaces/sdk/identity").
+RUN pnpm --filter @spaces/sdk build
+RUN pnpm --filter @spaces/web --filter @spaces/worker build
 
 FROM base AS prod-deps
 COPY --from=prune /app/out/runtime/json/ ./
