@@ -1,10 +1,17 @@
 ---
 import type { MarkdownHeading } from 'astro'
 import Base from './Base.astro'
+import Stack from '../components/Stack.astro'
 import { GITHUB_DOCS } from '../links'
 
 interface Props {
-  frontmatter: { title: string; description: string; eyebrow: string }
+  frontmatter: {
+    title: string
+    description: string
+    eyebrow: string
+    /** A figure drawn across the page above the text, by name. */
+    lead?: 'stack'
+  }
   headings: ReadonlyArray<MarkdownHeading>
 }
 
@@ -23,6 +30,13 @@ const sections = headings.filter((h) => h.depth === 2)
   title={`${frontmatter.title} · Spaces docs`}
   description={frontmatter.description}
 >
+  {
+    frontmatter.lead === 'stack' && (
+      <div class="lead">
+        <Stack />
+      </div>
+    )
+  }
   <div class="wrap docs">
     <aside class="rail" aria-label="Docs">
       <p class="field-label">Docs</p>
@@ -62,16 +76,58 @@ const sections = headings.filter((h) => h.depth === 2)
   </div>
 </Base>
 
+<script>
+  // A tiny copy button on every code block. Docs only: the landing page
+  // ships no JavaScript. Progressive: without clipboard access the block is
+  // still selectable text.
+  for (const pre of document.querySelectorAll('pre')) {
+    const box = document.createElement('div')
+    box.className = 'codeblock'
+    pre.replaceWith(box)
+    box.append(pre)
+    if (!('clipboard' in navigator)) continue
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'copy'
+    button.textContent = 'Copy'
+    button.setAttribute('aria-label', 'Copy to clipboard')
+    button.addEventListener('click', () => {
+      const text = pre.textContent ?? ''
+      navigator.clipboard.writeText(text.trimEnd()).then(
+        () => {
+          button.textContent = 'Copied'
+          button.dataset.state = 'done'
+          setTimeout(() => {
+            button.textContent = 'Copy'
+            delete button.dataset.state
+          }, 1400)
+        },
+        () => {
+          button.textContent = 'Select'
+        },
+      )
+    })
+    box.append(button)
+  }
+</script>
+
 <style>
+  /* A lead figure is drawn wider than the column, 1200px, shrinking below. */
+  .lead {
+    max-width: calc(var(--figure) + 2 * var(--gutter));
+    margin-inline: auto;
+    padding: 2.5rem var(--gutter) 0;
+  }
   .docs {
     display: grid;
     grid-template-columns: 13rem minmax(0, 1fr);
     gap: 3rem;
-    padding-top: 2.5rem;
+    padding-block: 2.5rem 6rem;
   }
   .rail {
     position: sticky;
-    top: 1.5rem;
+    /* Below the sticky nav bar and its hem (74px). */
+    top: 6.125rem;
     align-self: start;
     padding-right: 1.5rem;
     border-right: 1px solid var(--rule);
@@ -193,14 +249,14 @@ const sections = headings.filter((h) => h.depth === 2)
     line-height: 2rem;
     font-weight: 600;
     letter-spacing: -0.01em;
-    scroll-margin-top: 1rem;
+    scroll-margin-top: 4rem;
   }
   .prose :global(h3) {
     margin: 2rem 0 0.5rem;
     font-size: 1.1875rem;
     line-height: 1.625rem;
     font-weight: 600;
-    scroll-margin-top: 1rem;
+    scroll-margin-top: 4rem;
   }
   .prose :global(p),
   .prose :global(ul),

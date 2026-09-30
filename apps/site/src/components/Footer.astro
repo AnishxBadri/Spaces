@@ -1,54 +1,70 @@
 ---
+import { FOOTER_LINE } from '../content/landing'
 import { GITHUB, LICENSE } from '../links'
+
+const links = [
+  { href: '/docs', label: 'Docs' },
+  { href: GITHUB, label: 'GitHub' },
+  { href: LICENSE, label: 'AGPL-3.0' },
+]
 ---
 
 <footer class="foot">
   <div class="wrap row">
-    <p class="serif line">
-      Built by one investor for one investor; team-ready.
+    <p class="brand">
+      <img
+        class="logo"
+        style="--size:14px"
+        src="/mark.svg"
+        width="14"
+        height="14"
+        alt=""
+      />
+      <span>{FOOTER_LINE}</span>
     </p>
-    <ul class="meta mono">
-      <li><a href={LICENSE}>AGPL-3.0</a></li>
-      <li><a href={GITHUB}>GitHub</a></li>
-      <li><a href="/docs">Docs</a></li>
-      <li>v0.1.0</li>
-    </ul>
+    <p class="meta mono">
+      {
+        links.map((l) => (
+          <>
+            <a href={l.href}>{l.label}</a>
+            {' · '}
+          </>
+        ))
+      }v0.1.0
+    </p>
   </div>
 </footer>
 
 <style>
   .foot {
-    margin-top: 6rem;
-    border-top: 1px solid var(--hairline);
-    background: var(--bone);
+    border-top: 1px solid var(--rule);
   }
   .row {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    gap: 0.75rem 2rem;
-    padding-block: 1.5rem 2rem;
+    gap: 0.5rem 2rem;
+    padding-block: 28px;
   }
-  .line {
-    font-size: var(--text-title);
-    line-height: 1.375rem;
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--graphite);
+    font-size: var(--text-ui);
+    line-height: 16px;
   }
   .meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 1.25rem;
-    padding: 0;
-    list-style: none;
     color: var(--graphite);
-    font-size: var(--text-micro);
-    line-height: 1rem;
+    font-size: var(--text-label);
+    line-height: 16px;
   }
   .meta a {
     text-decoration: none;
   }
   .meta a:hover {
-    color: var(--ink);
+    color: var(--hairline);
     text-decoration: underline;
     text-underline-offset: 3px;
   }

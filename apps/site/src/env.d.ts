@@ -1,5 +1,8 @@
 /**
- * The screenshots that were present in docs/assets/screenshots when this
- * build started, defined by src/integrations/sync-assets.ts.
+ * The fragments that were present in docs/assets/screenshots/fragments when
+ * this build started, with their size in CSS pixels, defined by
+ * src/integrations/sync-assets.ts (its `FragmentSize`).
  */
-declare const __SCREENSHOTS__: ReadonlyArray<string>
+declare const __FRAGMENTS__: Readonly<
+  Record<string, { readonly width: number; readonly height: number }>
+>

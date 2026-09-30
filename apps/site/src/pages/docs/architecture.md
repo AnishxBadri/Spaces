@@ -3,6 +3,7 @@ layout: ../../layouts/Docs.astro
 eyebrow: Docs · Architecture
 title: Architecture
 description: Two Node processes, one database, one directory. What runs where, and how the repository is laid out.
+lead: stack
 ---
 
 ## The shape
@@ -35,17 +36,17 @@ A few rules hold the design together:
 
 A pnpm workspace, built with Turborepo. Each package's dependencies are an allow list, and lint rules ban the edges that must never exist.
 
-| Path              | What it is                                                                                         | State       |
-| ----------------- | -------------------------------------------------------------------------------------------------- | ----------- |
-| `apps/web`        | The app: routes, components, server functions. Knows no plugin code.                               | shipped     |
-| `apps/worker`     | The pg-boss host and every background job. The only process that will run plugin code.             | shipped     |
-| `apps/e2e`        | The browser suite: Playwright against the built app and the built image.                           | shipped     |
-| `apps/site`       | This site. Static, on Vercel, never in the image.                                                  | shipped     |
-| `packages/db`     | The Drizzle schema, the migration journal and the migrator. Imports nothing internal.              | shipped     |
-| `packages/core`   | The domain: the attribute engine, entity resolution and merge, the vault, storage, portfolio math. | shipped     |
-| `packages/config` | Shared TypeScript, ESLint and Prettier configuration, including the dependency rules.              | shipped     |
-| `packages/sdk`    | `@spaces/sdk`: the plugin manifest, port interfaces and `definePlugin`. Imports nothing internal.  | in progress |
-| `plugins/*`       | Integrations such as Apollo, RSS, Gmail and Google Drive. Each imports the SDK only.               | in progress |
+| Path              | What it is                                                                                         | State   |
+| ----------------- | -------------------------------------------------------------------------------------------------- | ------- |
+| `apps/web`        | The app: routes, components, server functions. Knows no plugin code.                               | shipped |
+| `apps/worker`     | The pg-boss host and every background job. The only process that runs plugin code.                 | shipped |
+| `apps/e2e`        | The browser suite: Playwright against the built app and the built image.                           | shipped |
+| `apps/site`       | This site. Static, on Vercel, never in the image.                                                  | shipped |
+| `packages/db`     | The Drizzle schema, the migration journal and the migrator. Imports nothing internal.              | shipped |
+| `packages/core`   | The domain: the attribute engine, entity resolution and merge, the vault, storage, portfolio math. | shipped |
+| `packages/config` | Shared TypeScript, ESLint and Prettier configuration, including the dependency rules.              | shipped |
+| `packages/sdk`    | `@spaces/sdk`: the plugin manifest, port interfaces and `definePlugin`. Imports nothing internal.  | shipped |
+| `plugins/*`       | Integrations such as Apollo, RSS, Gmail and Google Drive. Each imports the SDK only.               | shipped |
 
 The dependency rules:
 
@@ -56,7 +57,7 @@ The dependency rules:
 - `plugins/*` import `sdk` only, never `core` or `db`.
 - `db` imports nothing internal.
 
-**Plugins will not be in the image.** They will install from the running app into `./data/plugins`, run only on the worker, and write only through typed claim lanes, so `./data` stays the one thing you back up.
+**Plugins are not in the image.** They install from the running app into `./data/plugins`, run only on the worker, and write only through typed claim lanes, so `./data` stays the one thing you back up.
 
 ## The image
 

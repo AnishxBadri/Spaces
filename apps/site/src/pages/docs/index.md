@@ -16,7 +16,7 @@ The decision record lives beside the code, in [`docs/` on GitHub](https://github
 
 - `ARCHITECTURE.md`, the whole system model by model.
 - `CONTEXT.md` (at the repository root), every decision with its date and reasons, including the ones that were reversed.
-- `roadmap-2026-09.md`, what is shipped and what comes next.
+- `roadmap-2026-09.md`, the projects in the order they were built.
 - `design-contract.md` and `DESIGN.md`, the Instrument design system.
 - The specs: `spec-plugin-sdk.md`, `spec-ai-substrate.md`, `spec-attribute-engine.md`, `spec-storage-sources.md`.
 

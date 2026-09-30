@@ -1,0 +1,112 @@
+---
+import { plateUrl } from '../dither/stages'
+
+interface Props {
+  /** The composition's size in the design's pixels. */
+  width: number
+  height: number
+  /** The dither plate behind it, by name; it breathes with `<plate>-b`. */
+  plate: string
+  /** Bone under the plate (the orbit) or nothing, so paper shows. */
+  ground?: 'bone' | 'paper'
+  class?: string
+  label?: string
+}
+
+const {
+  width,
+  height,
+  plate,
+  ground = 'paper',
+  class: className,
+  label,
+} = Astro.props
+---
+
+<div
+  class:list={['scaled', className]}
+  style={`--w:${width};--h:${height}`}
+  role={label === undefined ? undefined : 'group'}
+  aria-label={label}
+>
+  <div
+    class="stage"
+    data-ground={ground}
+    style={[
+      `--plate:url(${plateUrl(plate)})`,
+      `--plate-b:url(${plateUrl(`${plate}-b`)})`,
+    ].join(';')}
+  >
+    <slot />
+  </div>
+</div>
+
+<style>
+  /*
+   * A composition drawn at a fixed size — the design's own pixels, with
+   * every card placed absolutely inside it — that shrinks as one piece when
+   * its column is narrower than it is. The wrapper holds the aspect ratio
+   * and is a size container; the stage inside is drawn at full size and
+   * scaled by the ratio of the two widths. CSS cannot divide one length by
+   * another yet, so the ratio is tan(atan2(100cqw, W)), which is exactly
+   * 100cqw / W as a plain number. Where that is unsupported the stage stays
+   * full size and the wrapper clips it, so the page never scrolls sideways.
+   *
+   * At its design width (the page at 1440, or anything wider) the scale is
+   * 1 and one plate pixel is one CSS pixel, which `pixelated` keeps a hard
+   * square. Below that the plate scales with the stage, so its dots stay
+   * under the rings and cards they were printed for.
+   */
+  .scaled {
+    position: relative;
+    width: 100%;
+    max-width: calc(var(--w) * 1px);
+    margin-inline: auto;
+    aspect-ratio: var(--w) / var(--h);
+    container-type: inline-size;
+    overflow: clip;
+  }
+
+  .stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(var(--w) * 1px);
+    height: calc(var(--h) * 1px);
+    transform-origin: 0 0;
+    transform: scale(min(1, tan(atan2(100cqw, calc(var(--w) * 1px)))));
+    background-image: var(--plate);
+    background-position: 0 0;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    isolation: isolate;
+  }
+  .stage[data-ground='bone'] {
+    background-color: var(--bone);
+  }
+  .stage > :global(*) {
+    image-rendering: auto;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /*
+     * The plate breathes: it swaps to one a density step up and back, a
+     * hard cut each way, never a fade (steps(1) holds each frame).
+     */
+    .stage {
+      animation: breathe 3.2s steps(1, end) infinite;
+    }
+  }
+
+  @keyframes breathe {
+    0% {
+      background-image: var(--plate);
+    }
+    50% {
+      background-image: var(--plate-b);
+    }
+    100% {
+      background-image: var(--plate);
+    }
+  }
+</style>

@@ -1,80 +1,225 @@
 ---
-import { GITHUB } from '../links'
+import { RIBBON } from '../content/landing'
+import { GITHUB, RELEASES } from '../links'
+import { plateUrl } from '../dither/stages'
 
+// `build.format: 'file'` names the home page /index.html at build time.
 const path = Astro.url.pathname
-const inDocs = path === '/docs' || path.startsWith('/docs/')
+  .replace(/\.html$/, '')
+  .replace(/\/(index)?$/, '')
+const isSelfHost = path === '/docs/self-host'
+const current = (href: string) => {
+  if (href === '/') return path === ''
+  if (href === '/docs') return path.startsWith('/docs') && !isSelfHost
+  return path === href
+}
+
+const links = [
+  { href: '/', label: 'Product' },
+  { href: '/#how-it-works', label: 'How it works' },
+  { href: '/docs/self-host', label: 'Self-host' },
+  { href: '/docs', label: 'Docs' },
+  { href: RELEASES, label: 'Changelog' },
+]
 ---
 
+<div class="ribbon">
+  <span class="tag mono"><span>{RIBBON.tag}</span></span>
+  <span class="msg">{RIBBON.text}</span>
+  <a class="go" href="/docs/self-host">{RIBBON.cta}</a>
+</div>
 <header class="nav">
   <div class="wrap bar">
     <a class="brand" href="/" aria-label="Spaces, home">
-      <img src="/mark.svg" width="20" height="20" alt="" />
+      <img
+        class="logo"
+        style="--size:20px"
+        src="/mark.svg"
+        width="20"
+        height="20"
+        alt=""
+      />
       <span class="serif">Spaces</span>
     </a>
     <nav aria-label="Site">
-      <a href="/#features">Features</a>
-      <a href="/#self-host">Self-host</a>
-      <a href="/docs" aria-current={inDocs ? 'page' : undefined}>Docs</a>
-      <a href={GITHUB}
-        >GitHub <span class="ext mono" aria-hidden="true">↗</span></a
-      >
+      {
+        links.map((l) => (
+          <a href={l.href} aria-current={current(l.href) ? 'page' : undefined}>
+            {l.label}
+          </a>
+        ))
+      }
     </nav>
+    <div class="actions">
+      <a class="star" href={GITHUB}>
+        <img
+          class="logo"
+          style="--size:15px"
+          src="/logos/github.svg"
+          width="15"
+          height="15"
+          alt=""
+        />
+        Star
+      </a>
+      <a class="cta" href="/docs/self-host">Self-host</a>
+    </div>
   </div>
+  <div class="hem" style={`--hem:url(${plateUrl('hem')})`}></div>
 </header>
 
 <style>
+  /* An ink ribbon above everything; it scrolls away with the page. */
+  .ribbon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-height: 34px;
+    padding-inline: var(--gutter);
+    background: var(--hairline);
+    color: var(--paper);
+    font-size: var(--text-ui);
+    line-height: 1rem;
+  }
+  /* The tag's small type sits in a 12/16 line, as the design draws it. */
+  .tag {
+    flex: none;
+    padding: 1px 6px;
+    border: 1px solid var(--paper);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .tag > span {
+    display: inline-block;
+    font-size: var(--text-micro);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 14px;
+  }
+  .go {
+    flex: none;
+    border-bottom: 1px solid var(--paper);
+    text-decoration: none;
+  }
+
+  /*
+   * The bar sticks; under its hairline hangs a hem of dither, dense at the
+   * line and gone by its ninth pixel (the `hem` plate, repeated across).
+   */
   .nav {
-    border-bottom: 1px solid var(--hairline);
-    background: var(--paper);
+    position: sticky;
+    top: 0;
+    z-index: 50;
   }
   .bar {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem 1.5rem;
-    min-height: 3.5rem;
-    padding-block: 0.625rem;
+    height: 64px;
+    background: var(--paper);
   }
+  /* The bar's paper runs edge to edge, not just across the column. */
+  .nav::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 10px;
+    z-index: -1;
+    background: var(--paper);
+  }
+  .hem {
+    height: 10px;
+    border-top: 1px solid var(--hairline);
+    background: var(--hem) 0 0 repeat-x;
+    image-rendering: pixelated;
+  }
+
   .brand {
-    display: inline-flex;
+    display: flex;
+    flex: none;
     align-items: center;
-    gap: 0.625rem;
+    gap: 10px;
+    width: 220px;
     text-decoration: none;
   }
   .brand span {
-    font-size: 1.1875rem;
+    color: var(--hairline);
+    font-size: 21px;
     font-weight: 600;
     letter-spacing: -0.01em;
+    line-height: 26px;
   }
+
   nav {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 1.5rem;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
   }
   nav a {
     color: var(--graphite);
-    font-size: var(--text-ui);
-    line-height: 1.25rem;
+    font-size: var(--text-body);
+    line-height: 18px;
     text-decoration: none;
-    transition: color 150ms var(--ease-out-quart);
+    white-space: nowrap;
   }
   nav a:hover,
   nav a[aria-current='page'] {
-    color: var(--ink);
+    color: var(--hairline);
   }
-  nav a[aria-current='page'] {
-    text-decoration: underline;
-    text-decoration-color: var(--pine);
-    text-decoration-thickness: 2px;
-    text-underline-offset: 6px;
+
+  .actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    width: 220px;
   }
-  .ext {
-    font-size: var(--text-micro);
+  .star {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 10px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    color: var(--hairline);
+    font-size: var(--text-ui);
+    line-height: 16px;
+    text-decoration: none;
   }
-  @media (max-width: 30rem) {
+  .star:hover {
+    border-color: var(--hairline);
+  }
+  .cta {
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    background: var(--pine);
+    color: #ffffff;
+    font-size: var(--text-ui);
+    font-weight: 500;
+    line-height: 16px;
+    text-decoration: none;
+  }
+  .cta:hover {
+    background: var(--pine-hover);
+  }
+
+  @media (max-width: 60rem) {
     nav {
-      gap: 0.25rem 1rem;
+      display: none;
+    }
+    .bar {
+      justify-content: space-between;
+    }
+    .brand,
+    .actions {
+      width: auto;
+    }
+  }
+  @media (max-width: 48rem) {
+    .msg {
+      display: none;
     }
   }
 </style>

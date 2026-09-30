@@ -33,6 +33,7 @@ apps/site/public/screenshots/
 apps/site/public/logo.svg
 apps/site/public/logo-dark.svg
 apps/site/public/mark.svg
+apps/site/public/logos/
 apps/site/.astro/
 
 # NOT docs/ — an over-broad `docs/*` rule landed here 2026-09-07 inside an

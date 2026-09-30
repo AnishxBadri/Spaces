@@ -1,0 +1,452 @@
+---
+import Scaled from './Scaled.astro'
+import {
+  AI_LAYER,
+  BOX_LABEL,
+  CARRIES,
+  JOINS,
+  MARKETS,
+  PLUGINS_LAYER,
+  PLUGIN_GROUPS,
+  SOCKETS,
+  SOCKETS_HEAD,
+  SPACES_LAYER,
+  STACK,
+  WATCHING,
+} from '../content/stack'
+import type { Layer } from '../content/stack'
+
+const at = (l: Layer) => `top:${l.y}px;height:${l.h}px`
+---
+
+<figure class="stack">
+  <Scaled
+    width={STACK.width}
+    height={STACK.height}
+    plate={STACK.name}
+    ground="bone"
+    label="Three layers on your box: the AI built into Spaces reads your spaces and suggests changes to them; plugins file what arrives into them"
+  >
+    <div class="mat"></div>
+    <p class="box mono">
+      <span class="box-label">{BOX_LABEL.label}</span>
+      <span class="box-note">{BOX_LABEL.note}</span>
+    </p>
+
+    <section class="layer" style={at(AI_LAYER)}>
+      <div class="about">
+        <p class="eyebrow mono">{AI_LAYER.eyebrow}</p>
+        <p class="title serif">{AI_LAYER.title}</p>
+        <p class="body">{AI_LAYER.body}</p>
+      </div>
+      <div class="sockets">
+        <p class="sockets-head mono">
+          <span class="caps">{SOCKETS_HEAD.label}</span>
+          <span>{SOCKETS_HEAD.note}</span>
+        </p>
+        <ul class="socket-row">
+          {
+            SOCKETS.map((s) => (
+              <li class:list={['socket', { local: s.local }]}>
+                <img
+                  class="logo"
+                  style="--size:24px"
+                  src={`/logos/${s.logo}`}
+                  width="24"
+                  height="24"
+                  alt=""
+                />
+                <span class="socket-name">{s.name}</span>
+                <span class="socket-note mono">{s.note}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </section>
+
+    <section class="layer spaces" style={at(SPACES_LAYER)}>
+      <div class="about">
+        <p class="eyebrow with-mark mono">
+          <img
+            class="logo"
+            style="--size:14px"
+            src="/mark.svg"
+            width="14"
+            height="14"
+            alt=""
+          />
+          {SPACES_LAYER.eyebrow}
+        </p>
+        <p class="title serif">{SPACES_LAYER.title}</p>
+        <p class="body">{SPACES_LAYER.body}</p>
+      </div>
+      <div class="map">
+        <ul class="markets">
+          {
+            MARKETS.map((m) => (
+              <li>
+                <span class="market">{m.name}</span>
+                {m.children.map((c) => (
+                  <span class="child">{c}</span>
+                ))}
+              </li>
+            ))
+          }
+          <li class="watching">
+            <span class="market">{WATCHING}</span>
+          </li>
+        </ul>
+        <p class="carries">
+          <span class="carries-label mono">
+            <span class="caps">{CARRIES.label}</span>
+          </span>
+          {CARRIES.items.map((c) => <span class="chip">{c}</span>)}
+        </p>
+      </div>
+    </section>
+
+    <section class="layer" style={at(PLUGINS_LAYER)}>
+      <div class="about">
+        <p class="eyebrow mono">{PLUGINS_LAYER.eyebrow}</p>
+        <p class="title serif">{PLUGINS_LAYER.title}</p>
+        <p class="body">{PLUGINS_LAYER.body}</p>
+      </div>
+      <ul class="groups">
+        {
+          PLUGIN_GROUPS.map((g) => (
+            <li>
+              <span class="caps group-label mono">{g.label}</span>
+              {g.items.map((item) => (
+                <span class="item">
+                  {item.logo !== undefined && (
+                    <img
+                      class="logo"
+                      style="--size:16px"
+                      src={`/logos/${item.logo}`}
+                      width="16"
+                      height="16"
+                      alt=""
+                    />
+                  )}
+                  {item.name}
+                </span>
+              ))}
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <svg
+      class="joins"
+      width={STACK.width}
+      height={STACK.height}
+      viewBox={`0 0 ${STACK.width} ${STACK.height}`}
+      aria-hidden="true"
+    >
+      {
+        JOINS.map((j) => (
+          <line
+            x1={j.line.x + 0.5}
+            y1={j.line.y1}
+            x2={j.line.x + 0.5}
+            y2={j.line.y2}
+          />
+        ))
+      }
+    </svg>
+    {
+      JOINS.map((j) => (
+        <p
+          class="join mono"
+          style={`left:${j.box.x}px;top:${j.box.y}px;width:${j.box.w}px`}
+        >
+          {j.label}
+        </p>
+      ))
+    }
+  </Scaled>
+</figure>
+
+<style>
+  .stack {
+    margin: 0;
+  }
+  /* The mat: the band of dots is the plate; inside it, paper. */
+  .mat {
+    position: absolute;
+    inset: 56px;
+    background: var(--paper);
+  }
+  .box,
+  .layer,
+  .join {
+    position: absolute;
+    margin: 0;
+  }
+  p {
+    margin: 0;
+  }
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .caps {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .box {
+    top: 16px;
+    left: 72px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border: 1px solid var(--hairline);
+    background: var(--paper);
+    font-size: var(--text-label);
+    line-height: 16px;
+  }
+  .box-label {
+    color: var(--hairline);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .box-note {
+    color: var(--graphite);
+  }
+
+  /* ---- a layer: what it is on the left, what is in it on the right ---- */
+  .layer {
+    left: 96px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    width: 1008px;
+    padding-inline: 24px;
+    border: 1px solid var(--hairline);
+    background: var(--paper);
+    color: var(--hairline);
+  }
+  .layer.spaces {
+    border-width: 2px;
+  }
+  .about {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 6px;
+    width: 250px;
+  }
+  .eyebrow {
+    color: var(--graphite);
+    font-size: var(--text-micro);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 14px;
+    text-transform: uppercase;
+  }
+  .with-mark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .title {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 28px;
+  }
+  .body {
+    color: var(--graphite);
+    font-size: var(--text-ui);
+    line-height: 19px;
+  }
+
+  /* ---- AI: the model sockets ---- */
+  .sockets {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sockets-head {
+    display: flex;
+    justify-content: space-between;
+    color: var(--graphite);
+    font-size: var(--text-micro);
+    line-height: 14px;
+  }
+  .sockets-head .caps {
+    font-weight: 500;
+  }
+  .socket-row {
+    display: flex;
+    gap: 10px;
+  }
+  .socket {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    padding: 12px;
+    border: 1px solid var(--rule);
+    background: var(--bone);
+  }
+  .socket.local {
+    border-color: var(--hairline);
+    background: var(--paper);
+  }
+  .socket img {
+    margin-bottom: 8px;
+  }
+  .socket-name {
+    font-size: var(--text-body);
+    font-weight: 500;
+    line-height: 18px;
+  }
+  .socket-note {
+    margin-top: 1px;
+    color: var(--graphite);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    line-height: 12px;
+  }
+  .local .socket-note {
+    color: var(--pine);
+  }
+
+  /* ---- your spaces: the map ---- */
+  .map {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .markets {
+    display: flex;
+    border-block: 1px solid var(--rule);
+  }
+  .markets li {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border-right: 1px solid var(--rule);
+  }
+  .markets li:last-child {
+    justify-content: center;
+    border-right: 0;
+  }
+  .market {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-body);
+    font-weight: 500;
+    line-height: 18px;
+  }
+  .market::before {
+    content: '';
+    flex: none;
+    width: 8px;
+    height: 8px;
+    background: var(--hairline);
+  }
+  .watching .market {
+    color: var(--graphite);
+    font-size: var(--text-ui);
+    font-weight: 400;
+    line-height: 16px;
+  }
+  .watching .market::before {
+    border: 1px dashed var(--graphite);
+    background: none;
+  }
+  .child {
+    padding-left: 16px;
+    color: var(--graphite);
+    font-size: var(--text-ui);
+    line-height: 16px;
+  }
+  .carries {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .carries-label {
+    padding-right: 6px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .carries-label > span {
+    display: inline-block;
+    color: var(--graphite);
+    font-size: 10px;
+    line-height: 12px;
+  }
+  .chip {
+    padding: 2px 7px;
+    border: 1px solid var(--rule);
+    font-size: var(--text-label);
+    line-height: 16px;
+  }
+
+  /* ---- plugins: the groups ---- */
+  .groups {
+    display: flex;
+    flex: 1;
+    align-self: stretch;
+  }
+  .groups li {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 30px 12px 0;
+    border-left: 1px solid var(--rule);
+  }
+  .group-label {
+    color: var(--graphite);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 12px;
+  }
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-label);
+    line-height: 16px;
+  }
+  /* A group with no marks is a plain list, set tighter. */
+  .groups li:first-child {
+    gap: 0;
+  }
+  .groups li:first-child .group-label {
+    margin-bottom: 8px;
+  }
+  .groups li:first-child .item {
+    line-height: 18px;
+  }
+
+  /* ---- joins ---- */
+  .joins {
+    position: absolute;
+    inset: 0;
+    stroke: var(--hairline);
+    stroke-width: 1;
+  }
+  .join {
+    padding-block: 2px;
+    border: 1px solid var(--hairline);
+    background: var(--paper);
+    color: var(--hairline);
+    font-size: var(--text-micro);
+    line-height: 14px;
+    text-align: center;
+  }
+</style>

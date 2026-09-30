@@ -6,7 +6,9 @@
  * there, change it here.
  *
  * Light only, by decision (DESIGN.md). Radius 2px on controls, 0 elsewhere.
- * No shadows, no gradients, nothing round.
+ * No gradients, no blur, nothing round; the only shadow is a hard ink offset
+ * on a picked-up screenshot. Texture is dither, and only on a figure or
+ * under the nav's hairline.
  */
 
 :root {
@@ -20,6 +22,11 @@
   --pine: oklch(0.55 0.14 155);
   --pine-hover: oklch(0.5 0.14 155);
   --selected: oklch(0.962 0.022 155);
+  /* Two of the app's stage badges, for the drawn cards on the landing page. */
+  --badge-slate: oklch(0.955 0.005 255);
+  --badge-slate-ink: oklch(0.45 0.014 255);
+  --badge-blue: oklch(0.955 0.022 250);
+  --badge-blue-ink: oklch(0.45 0.129 250);
   --radius: 0.125rem;
 
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
@@ -36,22 +43,22 @@
   --text-title: 0.9375rem;
   --text-page: 1.375rem;
   --text-display: 1.625rem;
-  /* … and three a reading page needs that the app does not: prose, a section
-     head and the one headline. Fixed rem, stepped at one breakpoint. */
+  /* … and the one a reading page needs that the app does not. The landing
+     page's display sizes (64, 44, 36, 34px) are the design's, set where they
+     are used. */
   --text-prose: 1.0625rem;
-  --text-section: 1.875rem;
-  --text-hero: 3.25rem;
 
   --gutter: 2rem;
-  --measure: 72rem;
+  /* 1120px of content inside the gutters. */
+  --measure: 74rem;
+  /* The two figures drawn wider than the column: the orbit and the stack. */
+  --figure: 1200px;
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 @media (max-width: 40rem) {
   :root {
     --gutter: 1rem;
-    --text-section: 1.5rem;
-    --text-hero: 2.25rem;
   }
 }
 
@@ -64,6 +71,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Anchors land below the sticky nav bar and its hem. */
+  scroll-padding-top: 5.5rem;
 }
 
 body {
@@ -87,6 +96,15 @@ img {
   height: auto;
 }
 
+/* A mark or a third-party logo: a fixed square box (--size), the drawing
+   contained in it whatever its own aspect (Ollama's is tall, Gmail's wide). */
+img.logo {
+  flex: none;
+  width: var(--size);
+  height: var(--size);
+  object-fit: contain;
+}
+
 a {
   color: inherit;
 }
@@ -96,8 +114,11 @@ a {
   outline-offset: 2px;
 }
 
+/* Selected text is always ink: white type on the ribbon, a pine button or an
+   ink card would otherwise vanish into the pale selection. */
 ::selection {
   background: var(--selected);
+  color: var(--hairline);
 }
 
 h1,
@@ -128,8 +149,7 @@ pre {
 .field-label,
 code,
 pre,
-.copy,
-.figure figcaption {
+.copy {
   font-feature-settings: normal;
   font-variant-ligatures: none;
 }
@@ -272,81 +292,6 @@ pre code {
 .copy:hover {
   color: var(--ink);
   border-color: var(--hairline);
-}
-
-/* A figure: 1px hairline frame, no shadow, a mono caption on a rule. */
-
-.figure {
-  border: 1px solid var(--hairline);
-  background: var(--paper);
-}
-
-.figure img,
-.figure .pending {
-  aspect-ratio: 1440 / 900;
-  width: 100%;
-}
-
-/* The dither plate (Shot.astro): a canvas over the image's own box, one
-   pixel per CSS pixel, scaled up without smoothing so a dot stays a dot.
-   The sweep clips it from the top (clip-path), uncovering the image.
-   Until the script has laid it down, html.dz (set inline by index.astro when
-   motion is allowed) keeps the image hidden so it never shows full-tone
-   first; if the script never arrives the image appears after 3s anyway. */
-
-.shot-box {
-  position: relative;
-}
-
-.shot-box > canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background: var(--paper);
-  image-rendering: pixelated;
-}
-
-html.dz .shot-box:not(.dz-live) > img {
-  visibility: hidden;
-  animation: dz-failsafe 0s 3s forwards;
-}
-
-@keyframes dz-failsafe {
-  to {
-    visibility: visible;
-  }
-}
-
-.figure .pending {
-  display: grid;
-  place-items: center;
-  background: var(--bone);
-  color: var(--graphite);
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.figure figcaption {
-  display: flex;
-  gap: 0.75rem;
-  align-items: baseline;
-  padding: 0.5rem 0.75rem;
-  border-top: 1px solid var(--hairline);
-  background: var(--bone);
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  line-height: 1rem;
-  color: var(--graphite);
-}
-
-.figure figcaption .n {
-  color: var(--ink);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  flex: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

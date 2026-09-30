@@ -1,7 +1,7 @@
 /** Every outbound link the site prints, spelled once. */
 export const GITHUB = 'https://github.com/AnishxBadri/Spaces'
 export const GITHUB_DOCS = `${GITHUB}/tree/main/docs`
-export const ROADMAP = `${GITHUB}/blob/main/docs/roadmap-2026-09.md`
+export const RELEASES = `${GITHUB}/releases`
 // The repository carries no LICENSE file yet, so the licence links to its text.
 export const LICENSE = 'https://www.gnu.org/licenses/agpl-3.0.html'
 export const COMPOSE_RAW =

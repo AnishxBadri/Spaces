@@ -1,0 +1,414 @@
+---
+import type { Detail, Rect } from '../content/landing'
+
+interface Props {
+  detail: Detail
+}
+
+const { detail } = Astro.props
+// Drawn cards are placed by their top-left and width; their height is the
+// content's (the rect's `h` is for the plate, which clears under it).
+const at = (r: Rect, z: number) =>
+  `left:${r.x}px;top:${r.y}px;width:${r.w}px;z-index:${z}`
+---
+
+{
+  detail.kind === 'research' && (
+    <>
+      <div class="card memo" style={at(detail.memo, 2)}>
+        <p class="filed">
+          <span class="k">{detail.memo.filed}</span>
+          <span class="where">{detail.memo.space}</span>
+        </p>
+        <p class="memo-title serif">{detail.memo.title}</p>
+        <p class="memo-body serif">{detail.memo.body}</p>
+        <p class="memo-body serif sentence">
+          <span>{detail.memo.before}</span>
+          <span class="gloss">{detail.memo.term}</span>
+          <span>{detail.memo.after}</span>
+        </p>
+        <p class="links">
+          {detail.memo.links.map((l) => (
+            <span class="link">{l}</span>
+          ))}
+        </p>
+      </div>
+      <div class="card term" style={at(detail.glossary, 3)}>
+        <p class="row-between">
+          <span class="term-name mono">{detail.glossary.term}</span>
+          <span class="term-where mono">{detail.glossary.where}</span>
+        </p>
+        <p class="term-body">{detail.glossary.body}</p>
+      </div>
+    </>
+  )
+}
+
+{
+  detail.kind === 'screen' && (
+    <div class="card" style={at(detail.card, 2)}>
+      <p class="card-head">
+        <span class="card-name serif">{detail.card.company}</span>
+        <span class="k">{detail.card.label}</span>
+      </p>
+      {detail.card.rows.map((r, i) => (
+        <p class:list={['history', { now: i > 0 }]}>
+          <span class="date mono">{r.date}</span>
+          <span class:list={['stage', r.tone]}>{r.stage}</span>
+          <span class:list={['note', { serif: r.quote, quote: r.quote }]}>
+            {r.note}
+          </span>
+        </p>
+      ))}
+    </div>
+  )
+}
+
+{
+  detail.kind === 'decide' && (
+    <div class="card" style={at(detail.card, 2)}>
+      <p class="asked">
+        <img
+          class="logo"
+          style="--size:14px"
+          src="/logos/claude.svg"
+          width="14"
+          height="14"
+          alt=""
+        />
+        <span class="k grow">{detail.card.asked}</span>
+        <span class="model mono">{detail.card.model}</span>
+      </p>
+      <div class="answer">
+        <p class="question">{detail.card.question}</p>
+        <p class="memo-body serif">{detail.card.answer}</p>
+        <p class="links sources">
+          {detail.card.sources.map((s) => (
+            <span class="link source mono">
+              <span>{s}</span>
+            </span>
+          ))}
+        </p>
+      </div>
+      <p class="decide">
+        <span class="k grow">{detail.card.foot}</span>
+        <span class="accept">{detail.card.accept}</span>
+        <span class="dismiss">{detail.card.dismiss}</span>
+      </p>
+    </div>
+  )
+}
+
+{
+  detail.kind === 'own' && (
+    <div class="card" style={at(detail.card, 2)}>
+      <p class="card-head">
+        <span class="card-name serif">{detail.card.name}</span>
+        <span class="k">{detail.card.label}</span>
+      </p>
+      <dl class="readout">
+        {detail.card.readout.map((r) => (
+          <div>
+            <dt class="k">{r.label}</dt>
+            <dd class="mono">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div class="ledger">
+        {detail.card.ledger.map((e) => (
+          <p class:list={['entry', { voided: e.voided }]}>
+            <span class="date mono">{e.date}</span>
+            <span class="kind mono">{e.kind}</span>
+            <span class="what">{e.note}</span>
+            <span class="amount mono">{e.amount}</span>
+          </p>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+<style>
+  /*
+   * The drawn cards: a piece of the product set by hand where a screenshot
+   * cannot say it (a memo with its glossary term, a deal's history, an AI
+   * answer with its sources, a holding's ledger). Paper, a 1px ink frame,
+   * Instrument's type steps; nothing here moves.
+   */
+  .card {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--hairline);
+    background: var(--paper);
+    color: var(--hairline);
+  }
+  .card p,
+  .card dl,
+  .card dd {
+    margin: 0;
+  }
+  .k {
+    flex: none;
+    color: var(--graphite);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    line-height: 12px;
+    text-transform: uppercase;
+  }
+  .grow {
+    flex: 1;
+  }
+  .row-between {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ---- 01: the memo and its term ---- */
+  .memo {
+    gap: 10px;
+    padding: 18px 20px 20px;
+  }
+  .filed {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .where {
+    padding: 1px 7px;
+    border: 1px solid var(--rule);
+    font-size: var(--text-label);
+    line-height: 16px;
+  }
+  .memo-title {
+    font-size: 21px;
+    font-weight: 600;
+    line-height: 26px;
+  }
+  .memo-body {
+    font-size: var(--text-body);
+    line-height: 22px;
+  }
+  .sentence {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .gloss {
+    border-bottom: 1px dotted var(--hairline);
+    background: var(--bone);
+  }
+  .links {
+    display: flex;
+    gap: 6px;
+    padding-top: 2px;
+  }
+  .sources {
+    padding-top: 0;
+  }
+  .link {
+    padding: 2px 7px;
+    border: 1px solid var(--rule);
+    background: var(--bone);
+    font-size: var(--text-label);
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .link.source > span {
+    display: inline-block;
+    font-size: 10px;
+    line-height: 12px;
+  }
+  .term {
+    gap: 4px;
+    padding: 10px 12px;
+    border: 0;
+    background: var(--hairline);
+    color: var(--paper);
+  }
+  .term-name {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 12px;
+    text-transform: uppercase;
+  }
+  .term-where {
+    color: var(--rule);
+    font-size: 10px;
+    line-height: 12px;
+  }
+  .term-body {
+    font-size: var(--text-label);
+    line-height: 17px;
+  }
+
+  /* ---- 02 and 04: a record's head ---- */
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .card-name {
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 22px;
+  }
+
+  /* ---- 02: the deal's history ---- */
+  .history {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .history.now {
+    border-bottom: 0;
+    background: var(--bone);
+  }
+  .date {
+    flex: none;
+    width: 78px;
+    color: var(--graphite);
+    font-size: var(--text-micro);
+    line-height: 14px;
+  }
+  .stage {
+    flex: none;
+    width: 74px;
+    padding: 1px 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 12px;
+    text-align: center;
+  }
+  .stage.slate {
+    background: var(--badge-slate);
+    color: var(--badge-slate-ink);
+  }
+  .stage.blue {
+    background: var(--badge-blue);
+    color: var(--badge-blue-ink);
+  }
+  .note {
+    font-size: var(--text-ui);
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .quote {
+    font-style: italic;
+  }
+
+  /* ---- 03: an answer, cited ---- */
+  .asked {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .model {
+    color: var(--graphite);
+    font-size: 10px;
+    line-height: 12px;
+  }
+  .answer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px 12px;
+  }
+  .question {
+    font-size: var(--text-body);
+    font-weight: 500;
+    line-height: 18px;
+  }
+  .decide {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--rule);
+    background: var(--bone);
+  }
+  .accept {
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    background: var(--pine);
+    color: #ffffff;
+    font-size: var(--text-label);
+    font-weight: 500;
+    line-height: 16px;
+  }
+  .dismiss {
+    font-size: var(--text-label);
+    line-height: 16px;
+  }
+
+  /* ---- 04: the holding ---- */
+  .readout {
+    display: flex;
+    border-bottom: 1px solid var(--rule);
+  }
+  .readout > div {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 16px;
+    border-right: 1px solid var(--rule);
+  }
+  .readout > div:last-child {
+    border-right: 0;
+  }
+  .readout dd {
+    font-size: var(--text-title);
+    line-height: 18px;
+  }
+  .ledger {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 16px 8px;
+  }
+  .entry {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 12px;
+    height: 30px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .entry:last-child {
+    border-bottom: 0;
+  }
+  .kind {
+    flex: none;
+    width: 58px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    line-height: 12px;
+    text-transform: uppercase;
+  }
+  .what {
+    flex: 1;
+    font-size: var(--text-ui);
+    line-height: 16px;
+  }
+  .amount {
+    font-size: var(--text-label);
+    line-height: 16px;
+  }
+  .voided .kind,
+  .voided .what,
+  .voided .amount {
+    color: var(--graphite);
+  }
+  .voided .what,
+  .voided .amount {
+    text-decoration: line-through 1px;
+  }
+</style>

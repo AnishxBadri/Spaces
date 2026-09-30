@@ -1,6 +1,10 @@
 ---
-import '@fontsource-variable/inter'
-import '@fontsource-variable/source-serif-4'
+import '@fontsource-variable/inter/opsz.css'
+// Source Serif with its optical-size axis, roman and italic: the display
+// sizes (the 64px headline, the 44px and 36px heads) are drawn from the
+// display cut as the design sets them, and the memo lines are italic.
+import '@fontsource-variable/source-serif-4/opsz.css'
+import '@fontsource-variable/source-serif-4/opsz-italic.css'
 import '@fontsource-variable/jetbrains-mono'
 import '../styles/site.css'
 import Nav from '../components/Nav.astro'
@@ -31,38 +35,5 @@ const { title, description } = Astro.props
     <Nav />
     <slot />
     <Footer />
-    <script>
-      // A tiny copy button on every code block. Progressive: without
-      // clipboard access the block is still selectable text.
-      for (const pre of document.querySelectorAll('pre')) {
-        const box = document.createElement('div')
-        box.className = 'codeblock'
-        pre.replaceWith(box)
-        box.append(pre)
-        if (!('clipboard' in navigator)) continue
-        const button = document.createElement('button')
-        button.type = 'button'
-        button.className = 'copy'
-        button.textContent = 'Copy'
-        button.setAttribute('aria-label', 'Copy to clipboard')
-        button.addEventListener('click', () => {
-          const text = pre.textContent ?? ''
-          navigator.clipboard.writeText(text.trimEnd()).then(
-            () => {
-              button.textContent = 'Copied'
-              button.dataset.state = 'done'
-              setTimeout(() => {
-                button.textContent = 'Copy'
-                delete button.dataset.state
-              }, 1400)
-            },
-            () => {
-              button.textContent = 'Select'
-            },
-          )
-        })
-        box.append(button)
-      }
-    </script>
   </body>
 </html>

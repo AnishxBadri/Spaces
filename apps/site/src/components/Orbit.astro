@@ -1,0 +1,377 @@
+---
+import Scaled from './Scaled.astro'
+import {
+  AI_RING,
+  BOX_RING,
+  DOES,
+  LOCAL_MODEL,
+  MODELS,
+  ORBIT,
+  PLUGINS,
+  SPACE_CARD,
+} from '../content/landing'
+import type { Tile } from '../content/landing'
+
+const at = (t: { x: number; y: number; w: number }) =>
+  `left:${t.x}px;top:${t.y}px;width:${t.w}px`
+const logo = (t: Tile) => (t.logo === undefined ? null : `/logos/${t.logo}`)
+const s = SPACE_CARD
+---
+
+<Scaled
+  width={ORBIT.width}
+  height={ORBIT.height}
+  plate={ORBIT.name}
+  ground="bone"
+  label="A space at the centre: the AI built into Spaces on the inner ring, the plugins on your box on the outer ring"
+>
+  <article class="space" style="left:426px;top:286px;width:348px">
+    <header class="space-head">
+      <p class="row-between">
+        <span class="k">{s.parent}</span>
+        <span class="tag"><span>{s.tag}</span></span>
+      </p>
+      <p class="space-name">
+        <img
+          class="logo"
+          style="--size:16px"
+          src="/mark.svg"
+          width="16"
+          height="16"
+          alt=""
+        />
+        <span class="serif">{s.name}</span>
+      </p>
+    </header>
+    <dl class="space-rows">
+      <div>
+        <dt class="k">Companies</dt>
+        <dd>{s.companies}</dd>
+      </div>
+      <div>
+        <dt class="k">Memos</dt>
+        <dd class="serif memo">{s.memo}</dd>
+      </div>
+      <div>
+        <dt class="k">Terms</dt>
+        <dd class="terms">
+          {s.terms.map((t) => <span class="term">{t}</span>)}
+        </dd>
+      </div>
+      <div class="center">
+        <dt class="k">Deals</dt>
+        <dd class="deal">
+          {s.deal}
+          <span class="badge mono"><span>{s.dealStage}</span></span>
+        </dd>
+      </div>
+    </dl>
+    <footer class="space-foot">
+      <span class="k">Inside</span>
+      {s.inside.map((c) => <span class="chip">{c}</span>)}
+      <span class="chip add">{s.add}</span>
+    </footer>
+  </article>
+
+  <p class="ring-ai mono" style={`left:${AI_RING.x}px;top:${AI_RING.y}px`}>
+    {AI_RING.label}
+  </p>
+  {
+    MODELS.map((m) => {
+      const src = logo(m)
+      return (
+        <p class="tile model" style={at(m)}>
+          {src !== null && (
+            <img
+              class="logo"
+              style="--size:16px"
+              src={src}
+              width="16"
+              height="16"
+              alt=""
+            />
+          )}
+          {m.label}
+        </p>
+      )
+    })
+  }
+  <p class="tile local" style={at(LOCAL_MODEL)}>
+    <span class="local-name">
+      <img
+        class="logo"
+        style="--size:16px"
+        src={`/logos/${LOCAL_MODEL.logo}`}
+        width="16"
+        height="16"
+        alt=""
+      />
+      {LOCAL_MODEL.label}
+    </span>
+    <span class="local-note mono">{LOCAL_MODEL.note}</span>
+  </p>
+  {
+    DOES.map((d) => (
+      <p class="does mono" style={at(d)}>
+        {d.label}
+      </p>
+    ))
+  }
+
+  <p class="ring-box mono" style={`left:${BOX_RING.x}px;top:${BOX_RING.y}px`}>
+    <span class="box-label">{BOX_RING.label}</span>
+    <span class="box-note">{BOX_RING.note}</span>
+  </p>
+  {
+    PLUGINS.map((p) => {
+      const src = logo(p)
+      return (
+        <p class="tile plugin" style={at(p)}>
+          {src !== null && (
+            <img
+              class="logo"
+              style="--size:15px"
+              src={src}
+              width="15"
+              height="15"
+              alt=""
+            />
+          )}
+          {p.label}
+        </p>
+      )
+    })
+  }
+</Scaled>
+
+<style>
+  /* Everything on the stage is placed in the design's pixels. */
+  .space,
+  .ring-ai,
+  .ring-box,
+  .tile,
+  .does {
+    position: absolute;
+    margin: 0;
+  }
+
+  /* ---- the space at the centre ---- */
+  .space {
+    border: 2px solid var(--hairline);
+    background: var(--paper);
+    color: var(--hairline);
+  }
+  .space p,
+  .space dl,
+  .space dd {
+    margin: 0;
+  }
+  .k {
+    flex: none;
+    color: var(--graphite);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    line-height: 12px;
+    text-transform: uppercase;
+  }
+  .space-head {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .row-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  /*
+   * A tag, a badge: small type in a wrapper that keeps a 12/16 line, as the
+   * design draws them, so the box is a 16px line plus its padding.
+   */
+  .tag,
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .tag > span,
+  .badge > span {
+    display: inline-block;
+    font-size: 10px;
+    line-height: 12px;
+  }
+  .tag {
+    padding: 1px 5px;
+    border: 1px solid var(--hairline);
+  }
+  .tag > span {
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .space-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .space-name .serif {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 26px;
+  }
+  .space-rows {
+    padding: 4px 14px 6px;
+  }
+  .space-rows > div {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding-block: 7px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .space-rows > div.center {
+    align-items: center;
+    border-bottom: 0;
+  }
+  .space-rows dt {
+    width: 70px;
+  }
+  .space-rows dd {
+    font-size: var(--text-ui);
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .memo {
+    font-style: italic;
+  }
+  .terms {
+    display: flex;
+    gap: 10px;
+  }
+  .term {
+    border-bottom: 1px dotted var(--graphite);
+  }
+  .deal {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .badge {
+    padding: 1px 5px;
+    background: var(--badge-blue);
+    color: var(--badge-blue-ink);
+  }
+  .space-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px 10px;
+    border-top: 1px solid var(--rule);
+    background: var(--bone);
+  }
+  .space-foot .k {
+    padding-right: 4px;
+  }
+  .chip {
+    padding-inline: 6px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    font-size: var(--text-label);
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .chip.add {
+    border: 1px dashed var(--graphite);
+    background: none;
+    color: var(--graphite);
+  }
+
+  /* ---- the rings' labels ---- */
+  .ring-ai {
+    width: 220px;
+    padding-block: 4px;
+    background: var(--hairline);
+    color: var(--paper);
+    font-size: var(--text-micro);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 14px;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  .ring-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    width: 200px;
+    padding-block: 5px;
+    border: 1px solid var(--hairline);
+    background: var(--paper);
+  }
+  .box-label {
+    color: var(--hairline);
+    font-size: var(--text-micro);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 14px;
+    text-transform: uppercase;
+  }
+  .box-note {
+    color: var(--graphite);
+    font-size: 10px;
+    line-height: 12px;
+  }
+
+  /* ---- tiles ---- */
+  .tile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--hairline);
+    font-size: var(--text-ui);
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .model {
+    height: 32px;
+    border-color: var(--hairline);
+    font-weight: 500;
+  }
+  .plugin {
+    height: 30px;
+  }
+  .local {
+    flex-direction: column;
+    gap: 2px;
+    padding-block: 6px;
+    border-color: var(--hairline);
+  }
+  .local-name {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 500;
+  }
+  .local-note {
+    color: var(--pine);
+    font-size: 10px;
+    line-height: 12px;
+  }
+  .does {
+    padding-block: 3px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--hairline);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    line-height: 12px;
+    text-align: center;
+  }
+</style>

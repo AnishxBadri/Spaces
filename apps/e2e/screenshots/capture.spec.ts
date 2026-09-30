@@ -228,12 +228,12 @@ test.beforeAll(async () => {
 })
 
 /** Load a route and wait for its data — network idle, then its selector. */
-async function open(page: Page, url: string, shot: Shot) {
+async function open(page: Page, url: string, ready: Shot['ready']) {
   await page.goto(url, { waitUntil: 'networkidle' })
   // Signed in: a lost session would land on /login and capture that. The
   // path only — a route may add its default search (/documents?filed=all).
   expect(new URL(page.url()).pathname).toBe(new URL(url).pathname)
-  await expect(shot.ready(page)).toBeVisible()
+  await expect(ready(page)).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
 }
 
@@ -265,7 +265,7 @@ async function captureAt1x(
   })
   try {
     const small = await context.newPage()
-    await open(small, url, shot)
+    await open(small, url, shot.ready)
     return await capture(small, file)
   } finally {
     await context.close()
@@ -277,7 +277,7 @@ for (const shot of SHOTS) {
     if (ids === null) throw new Error('[shots] ids were not read')
     const url = `${fromEnv(ENV.shotsUrl)}${shot.path(ids)}`
     const file = join(SHOTS_DIR, shot.file)
-    await open(page, url, shot)
+    await open(page, url, shot.ready)
     let size = await capture(page, file)
     let scale = '2x'
     if (size > BUDGET && shot.list === true) {
@@ -417,7 +417,7 @@ const FRAGMENTS: ReadonlyArray<Fragment> = [
   },
   {
     name: 'deal-pipeline',
-    path: (ids) => `/deals/${ids.deal}`,
+    path: (minted) => `/deals/${minted.deal}`,
     ready: heading,
     clip: async (page) => {
       const rail = page.locator('aside').last()
@@ -427,7 +427,7 @@ const FRAGMENTS: ReadonlyArray<Fragment> = [
   },
   {
     name: 'company-grid',
-    path: (ids) => `/companies/${ids.company}`,
+    path: (minted) => `/companies/${minted.company}`,
     ready: heading,
     clip: (page) =>
       boxOf(around(exact(page.locator('main'), 'Description'), 'Team size')),
@@ -441,18 +441,32 @@ const FRAGMENTS: ReadonlyArray<Fragment> = [
   },
   {
     name: 'note-memo',
-    path: (ids) => `/notes/${ids.memo}`,
+    path: (minted) => `/notes/${minted.memo}`,
     ready: (page) => page.getByRole('textbox', { name: 'Note title' }),
     clip: async (page) => {
       const title = await boxOf(
         page.getByRole('textbox', { name: 'Note title' }),
       )
-      const body = await boxOf(page.locator('main [contenteditable="true"]'))
+      const editor = page.locator('main [contenteditable="true"]')
+      const body = await boxOf(editor)
+      // The editor keeps an empty block at its foot; stop at the last line
+      // that has text in it (a mention chip is text too).
+      const inked = await editor.evaluate((el) => {
+        let bottom = 0
+        const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+        for (let n = walk.nextNode(); n !== null; n = walk.nextNode()) {
+          if ((n.textContent ?? '').trim() === '') continue
+          const range = document.createRange()
+          range.selectNodeContents(n)
+          bottom = Math.max(bottom, range.getBoundingClientRect().bottom)
+        }
+        return bottom
+      })
       return {
         x: body.x,
         y: title.y,
         width: body.width,
-        height: body.y + body.height - title.y,
+        height: inked + 8 - title.y,
       }
     },
   },
@@ -460,7 +474,7 @@ const FRAGMENTS: ReadonlyArray<Fragment> = [
     name: 'spaces-tree',
     path: () => '/spaces',
     ready: heading,
-    width: 1040,
+    width: 860,
     clip: async (page) => {
       const head = await boxOf(
         around(exact(page, 'Market map'), 'Companies').locator('xpath=..'),
@@ -476,7 +490,7 @@ const FRAGMENTS: ReadonlyArray<Fragment> = [
   },
   {
     name: 'holding-readout',
-    path: (ids) => `/portfolio/${ids.holding}`,
+    path: (minted) => `/portfolio/${minted.holding}`,
     ready: heading,
     clip: async (page) => {
       const main = page.locator('main')
@@ -487,7 +501,7 @@ const FRAGMENTS: ReadonlyArray<Fragment> = [
   },
   {
     name: 'holding-marks',
-    path: (ids) => `/portfolio/${ids.holding}`,
+    path: (minted) => `/portfolio/${minted.holding}`,
     ready: heading,
     clip: async (page) => {
       const marks = await boxOf(
@@ -507,15 +521,17 @@ const FRAGMENTS: ReadonlyArray<Fragment> = [
     name: 'ai-providers',
     path: () => '/settings/ai',
     ready: heading,
+    width: 1060,
     clip: async (page) => {
       const head = await boxOf(exact(page, 'Providers'))
-      // The list of the five: the nearest element holding the first and last.
-      const table = await boxOf(around(exact(page, 'Ollama'), 'Anthropic'))
+      // The Ollama row: its text up to the nearest element that also says
+      // `default` (the base-URL cell), which is the row itself.
+      const table = await boxOf(around(exact(page, 'Ollama'), 'default'))
       return {
         x: table.x,
-        y: head.y - 16,
+        y: head.y - 2,
         width: table.width,
-        height: table.y + table.height - head.y + 16,
+        height: table.y + table.height - head.y + 2,
       }
     },
   },
@@ -528,11 +544,7 @@ for (const fragment of FRAGMENTS) {
     if (fragment.width !== undefined)
       await page.setViewportSize({ width: fragment.width, height: 900 })
     const url = `${fromEnv(ENV.shotsUrl)}${fragment.path(ids)}`
-    await open(page, url, {
-      file: fragment.name,
-      path: fragment.path,
-      ready: fragment.ready,
-    })
+    await open(page, url, fragment.ready)
     const clip = await fragment.clip(page)
     const file = join(FRAGMENTS_DIR, `${fragment.name}.png`)
     await page.screenshot({
