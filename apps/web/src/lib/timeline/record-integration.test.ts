@@ -130,3 +130,106 @@ describe('the record timeline, for values a plugin filled', () => {
     })
   })
 })
+
+/**
+ * A document a plugin filed (sdk-8): `Content.fileDocument` runs core's
+ * intake as the integration, so `uploaded_by` and the activity row's
+ * `actor_id` are null — and the record page must still say who filed it.
+ * The Files tab reads the ref (`documentProvenance`, "via <capability>"),
+ * the timeline reads `meta.integrationId` off birth's `document.filed` row.
+ */
+describe('the record page, for a document a plugin filed', () => {
+  it('names the integration on the Files row and the timeline line, never a user', async () => {
+    const { db } = await import('@spaces/db')
+    const { document, entity, integration } = await import('@spaces/db/schema')
+    const { activity } = await import('@spaces/db/schema/activity')
+    const { and, eq } = await import('drizzle-orm')
+    const { Layer } = await import('effect')
+    const { Content } = await import('@spaces/sdk')
+    const { Enqueue } = await import('@spaces/core/queue/enqueue')
+    const { ContentLive } = await import('@spaces/core/writes/ports/content')
+    const { storage } = await import('@spaces/core/writes/storage')
+    const { documentProvenance } = await import('#/lib/server/shared')
+    const { recordTimelineProgram } = await import('./record')
+
+    const row = (
+      await db
+        .insert(integration)
+        .values({
+          capabilityId: 'importer',
+          version: '0.1.0',
+          enabled: true,
+          manifest: { id: 'importer', name: 'Importer' },
+        })
+        .returning()
+    ).at(0)
+    if (!row) throw new Error('no row')
+    const acme = (
+      await db
+        .insert(entity)
+        .values({ kind: 'company', canonicalName: 'Filed By Plugin Co' })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!acme) throw new Error('no company')
+
+    const bytes = new Uint8Array(
+      Buffer.from('%PDF-1.4\n% filed by a plugin\n%%EOF\n', 'utf8'),
+    )
+    const { documentId } = await Effect.runPromise(
+      Effect.gen(function* () {
+        return yield* (yield* Content).fileDocument({
+          _tag: 'document',
+          body: { bytes },
+          filename: 'plugin-deck.pdf',
+          mime: 'application/pdf',
+          kind: 'deck',
+          fileAgainst: [{ kind: 'record', entityId: acme.id }],
+        })
+      }).pipe(
+        Effect.provide(
+          ContentLive(row).pipe(
+            Layer.provide(
+              Layer.succeed(
+                Enqueue,
+                Enqueue.of({ enqueue: () => Effect.succeed(null) }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    )
+
+    const doc = (
+      await db
+        .select({ uploadedBy: document.uploadedBy, blobSha: document.blobSha })
+        .from(document)
+        .where(eq(document.entityId, documentId))
+    ).at(0)
+    expect(doc?.uploadedBy).toBeNull()
+    const line = (
+      await db
+        .select({ actorId: activity.actorId })
+        .from(activity)
+        .where(
+          and(
+            eq(activity.verb, 'document.filed'),
+            eq(activity.objectEntityId, documentId),
+          ),
+        )
+    ).at(0)
+    expect(line).toEqual({ actorId: null })
+
+    // The Files tab: "via importer", never a person's name.
+    expect((await documentProvenance([documentId])).get(documentId)).toEqual({
+      sourceClass: 'integration',
+      sourceCapability: 'importer',
+    })
+    // The timeline: "Importer filed a document", not "System".
+    const items = await Effect.runPromise(recordTimelineProgram(acme.id))
+    expect(
+      items.find((i) => i.type === 'macro' && i.verb === 'document.filed'),
+    ).toMatchObject({ actorName: 'Importer' })
+
+    if (doc?.blobSha) await storage().delete(doc.blobSha)
+  })
+})

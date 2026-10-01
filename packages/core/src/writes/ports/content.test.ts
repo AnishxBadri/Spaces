@@ -1,4 +1,4 @@
-import { Effect } from 'effect'
+import { Effect, Layer } from 'effect'
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
@@ -14,6 +14,7 @@ import {
 import { activity } from '@spaces/db/schema/activity'
 import { Content } from '@spaces/sdk'
 import type { InteractionClaim, SignalClaim } from '@spaces/sdk'
+import { Enqueue } from '../../queue/enqueue'
 import { resolveEntity } from '../entities/resolve'
 import { ContentLive } from './content'
 
@@ -35,15 +36,23 @@ const boundRow = async (capabilityId = 'researcher') => {
   return row
 }
 
+/** The interaction and signal lanes hand nothing back; fileDocument has its own file. */
+const EnqueueTest = Layer.succeed(
+  Enqueue,
+  Enqueue.of({ enqueue: () => Effect.succeed(null) }),
+)
+const live = (row: { id: string; capabilityId: string }) =>
+  ContentLive(row).pipe(Layer.provide(EnqueueTest))
+
 const run = <TValue>(
   row: { id: string; capabilityId: string },
   program: Effect.Effect<TValue, unknown, Content>,
-) => Effect.runPromise(program.pipe(Effect.provide(ContentLive(row))))
+) => Effect.runPromise(program.pipe(Effect.provide(live(row))))
 
 const runExit = <TValue>(
   row: { id: string; capabilityId: string },
   program: Effect.Effect<TValue, unknown, Content>,
-) => Effect.runPromiseExit(program.pipe(Effect.provide(ContentLive(row))))
+) => Effect.runPromiseExit(program.pipe(Effect.provide(live(row))))
 
 const logInteraction = (claim: InteractionClaim) =>
   Effect.gen(function* () {

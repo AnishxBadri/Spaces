@@ -1,0 +1,55 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the importer importDeck job, on the test Layers > resolves the company the filename names and files the deck against it 1`] = `
+[
+  {
+    "input": {
+      "keys": {
+        "domain": "acme-fusion.example",
+      },
+      "kind": "company",
+    },
+    "method": "resolve",
+    "output": {
+      "entityId": "entity-acme",
+      "outcome": "attached",
+    },
+    "port": "Identity",
+  },
+  {
+    "input": {
+      "_tag": "document",
+      "body": {
+        "stream": "<stream>",
+      },
+      "fileAgainst": [
+        {
+          "entityId": "entity-acme",
+          "kind": "record",
+        },
+      ],
+      "filename": "acme-fusion.example__series-a-deck.pdf",
+      "kind": "deck",
+      "mime": "application/pdf",
+    },
+    "method": "fileDocument",
+    "output": {
+      "documentId": "document-1",
+    },
+    "port": "Content",
+  },
+  {
+    "input": {
+      "fields": {
+        "documentId": "document-1",
+        "filed": true,
+        "filename": "acme-fusion.example__series-a-deck.pdf",
+      },
+      "message": "filed",
+    },
+    "method": "info",
+    "output": undefined,
+    "port": "Log",
+  },
+]
+`;

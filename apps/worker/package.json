@@ -38,6 +38,7 @@
   "devDependencies": {
     "@spaces/config": "workspace:*",
     "@spaces/plugin-echo": "workspace:*",
+    "@spaces/plugin-importer": "workspace:*",
     "@spaces/plugin-needs-key": "workspace:*",
     "@spaces/plugin-old-sdk": "workspace:*",
     "@spaces/plugin-tampered": "workspace:*",

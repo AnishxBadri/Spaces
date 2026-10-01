@@ -155,6 +155,22 @@ function actorUserId(actor: DocumentActor): string | null {
 }
 
 /**
+ * The activity row's half of an integration actor (sdk-8). `actor_id` is a
+ * user column and stays null, so the integration rides in `meta` under the
+ * keys the plugin ports write (`integrationMeta` in `../ports/identity.ts`)
+ * — `meta.integrationId` is what the record timeline names the row by,
+ * rather than "System". A person's or an unattributed filing adds nothing.
+ */
+function actorMeta(actor: DocumentActor): {
+  actorType?: 'integration'
+  integrationId?: string
+} {
+  return actor !== null && 'integrationId' in actor
+    ? { actorType: 'integration', integrationId: actor.integrationId }
+    : {}
+}
+
+/**
  * Every target must exist, must be live, and must agree with the mechanism
  * the caller named — checked **before** the dedupe read, because a mismatched
  * target would otherwise dedupe against the wrong edge table and answer
@@ -418,6 +434,7 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
             filename: input.filename,
             kind: input.kind,
             targets: targets.length,
+            ...actorMeta(input.actor),
           },
         })
 
