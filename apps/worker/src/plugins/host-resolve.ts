@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { HOST_PACKAGES } from '@spaces/sdk/build'
@@ -34,12 +35,24 @@ const isHostPackage = (specifier: string): boolean =>
     (pkg) => specifier === pkg || specifier.startsWith(`${pkg}/`),
   )
 
+const realpath = (p: string): string => {
+  try {
+    return realpathSync(p)
+  } catch {
+    return p
+  }
+}
+
 const roots = new Set<string>()
 let registered = false
 
 /** Route plugin bundles under `pluginsRoot` to the host's three packages. */
 export function resolvePluginImportsToHost(pluginsRoot: string): void {
-  const root = pathToFileURL(pluginsRoot).href.replace(/\/?$/, '/')
+  // Node hands the hook a module's *real* path as `parentURL` (symlinks
+  // resolved), so the root is compared as a real path too — macOS's
+  // `/var/folders/…` tmpdir is a symlink into `/private/var`, and a root
+  // spelled through it would never prefix the bundle's URL.
+  const root = pathToFileURL(realpath(pluginsRoot)).href.replace(/\/?$/, '/')
   roots.add(root)
   if (registered) return
   registered = true
