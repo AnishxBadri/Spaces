@@ -47,6 +47,9 @@ export function syncAssets(): AstroIntegration {
       'astro:config:setup': async ({ config, updateConfig, logger }) => {
         const assets = new URL('../../docs/assets/', config.root)
         const publicDir = config.publicDir
+        // Everything the site keeps in public/ is synced and gitignored, so a
+        // clean clone has no public/ at all; the first copy would ENOENT.
+        mkdirSync(publicDir, { recursive: true })
 
         const logos = LOGOS.filter((name) => {
           const from = new URL(name, assets)
