@@ -64,11 +64,15 @@ async function openCompany(page: Page, imageUrl: string) {
   }
 }
 
-/** The Files section's own input — the one beside its "upload" control. */
+/**
+ * The Files section's own input. The section's head holds the "upload"
+ * control and its body the hidden input (record-files.tsx), so the input is
+ * found through the section, not as the button's sibling.
+ */
 async function upload(page: Page, file: string) {
   await page
     .getByRole('button', { name: 'upload', exact: true })
-    .locator('xpath=following-sibling::input[@type="file"]')
+    .locator('xpath=ancestor::section[1]//input[@type="file"]')
     .setInputFiles(fixture(file))
   await expect(
     page.getByRole('button', { name: `Preview ${file}` }),
