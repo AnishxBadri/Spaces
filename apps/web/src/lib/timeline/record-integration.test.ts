@@ -48,3 +48,85 @@ describe('the record timeline, for a record a plugin birthed', () => {
     expect(birth).toMatchObject({ type: 'macro', actorName: 'apollo' })
   })
 })
+
+/**
+ * A value a plugin filled (sdk-9): the burst names the integration by its
+ * manifest `name` once the loader has stored one, and by its capability id
+ * until then — never as "An integration".
+ */
+describe('the record timeline, for values a plugin filled', () => {
+  it('names the burst by the manifest name, falling back to the capability id', async () => {
+    const { db } = await import('@spaces/db')
+    const { integration } = await import('@spaces/db/schema')
+    const { activity } = await import('@spaces/db/schema/activity')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
+    const { setValues } = await import('@spaces/core/writes/attributes/values')
+    const { integrationMeta } =
+      await import('@spaces/core/writes/ports/identity')
+    const { recordTimelineProgram } = await import('./record')
+
+    const insert = async (capabilityId: string, name: string | null) => {
+      const row = (
+        await db
+          .insert(integration)
+          .values({
+            capabilityId,
+            version: '1.0.0',
+            enabled: true,
+            manifest: name === null ? null : { id: capabilityId, name },
+          })
+          .returning()
+      ).at(0)
+      if (!row) throw new Error('no row')
+      return row
+    }
+    const named = await insert('echo', 'Echo enrichment')
+    const unnamed = await insert('pdl', null)
+
+    const born = async (name: string, domain: string) =>
+      (
+        await resolveEntity({
+          kind: 'company',
+          name,
+          keys: { domain },
+          source: { class: 'manual' },
+        })
+      ).entityId
+    const echoed = await born('Named Plugin Co', 'named-plugin.example')
+    const plain = await born('Unnamed Plugin Co', 'unnamed-plugin.example')
+    await setValues({
+      entityId: echoed,
+      patch: { founded_year: 2015 },
+      actor: { type: 'integration', id: named.id },
+      source: 'enrichment',
+    })
+    await setValues({
+      entityId: plain,
+      patch: { founded_year: 2016 },
+      actor: { type: 'integration', id: unnamed.id },
+      source: 'enrichment',
+    })
+    await db.insert(activity).values({
+      actorId: null,
+      verb: 'signal.emitted',
+      subjectEntityId: echoed,
+      meta: integrationMeta(named),
+    })
+
+    const echoItems = await Effect.runPromise(recordTimelineProgram(echoed))
+    expect(echoItems.find((i) => i.type === 'attrs')).toMatchObject({
+      actorType: 'integration',
+      integrationName: 'Echo enrichment',
+    })
+    expect(
+      echoItems.find((i) => i.type === 'macro' && i.verb === 'signal.emitted'),
+    ).toMatchObject({ actorName: 'Echo enrichment' })
+
+    const plainItems = await Effect.runPromise(recordTimelineProgram(plain))
+    expect(plainItems.find((i) => i.type === 'attrs')).toMatchObject({
+      actorType: 'integration',
+      integrationName: 'pdl',
+    })
+  })
+})
