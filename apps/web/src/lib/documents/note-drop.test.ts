@@ -62,7 +62,9 @@ async function dropOnNote(
   sha: string,
 ): Promise<{ id: string; deduped: boolean }> {
   const { Effect } = await import('effect')
-  const { birthDocumentProgram } = await import('./birth')
+  const { birthDocumentProgram } =
+    await import('@spaces/core/writes/documents/birth')
+  const { webEnqueue } = await import('#/lib/enqueue-live')
   return Effect.runPromise(
     birthDocumentProgram({
       blobSha: sha,
@@ -75,7 +77,7 @@ async function dropOnNote(
       provenance: {},
       fileAgainst: fileAgainstForNote(spaces),
       actor: { userId: await actorId() },
-    }),
+    }).pipe(Effect.provide(webEnqueue)),
   )
 }
 

@@ -11,6 +11,7 @@
     "./schema/*": "./src/schema/*.ts",
     "./entity-refs": "./src/entity-refs.ts",
     "./heartbeat": "./src/heartbeat.ts",
+    "./plugin-health": "./src/plugin-health.ts",
     "./migrate": "./src/migrate.ts",
     "./downgrade-guard": "./src/downgrade-guard.ts",
     "./json": "./src/json.ts",

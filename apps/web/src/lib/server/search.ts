@@ -1,33 +1,15 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
+import { entitySearchInput } from '@spaces/core/search/entity-search-input'
 import { requireUser } from './shared'
 
 /**
- * The validator stays here rather than beside the query in
- * `lib/search/rows.ts`: a server fn's `.validator()` survives into the client
- * bundle, and that module imports `db` (SPA-155). `rows.ts` takes the
- * inferred type, which is erased.
+ * The validator's schema is core's pure `search/entity-search-input`
+ * (SPA-198): a server fn's `.validator()` survives into the client bundle,
+ * so it must come from a module that imports no `db` (SPA-155); the query
+ * it feeds is `@spaces/core/writes/read/entity-search`, loaded lazily below.
  */
-const entitySearchInput = z.object({
-  q: z.string().max(120),
-  kinds: z
-    .array(
-      z.enum([
-        'company',
-        'person',
-        'deal',
-        'space',
-        'note',
-        'document',
-        'custom',
-      ]),
-    )
-    .optional(),
-  /** narrow to one object's records — a custom-object reference picker */
-  objectId: z.string().uuid().optional(),
-})
-
-export type EntitySearchInput = z.infer<typeof entitySearchInput>
+export type { EntitySearchInput } from '@spaces/core/search/entity-search-input'
 
 /** Autocomplete over entities — mentions and reference pickers share it. */
 export const searchEntities = createServerFn()

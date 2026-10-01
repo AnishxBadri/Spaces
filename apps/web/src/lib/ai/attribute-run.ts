@@ -25,7 +25,8 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { jsonRecord, jsonValue } from '@spaces/core/json'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
-import { recordContextProgram } from '#/lib/context/record'
+import { recordContextProgram } from '@spaces/core/writes/context/record'
+import { SimilarLaneLive } from './similar'
 import type { ContextItem } from '@spaces/core/context/types'
 import { updateAttributeProgram } from '@spaces/core/writes/attributes/update'
 import { completeMessage, completeProgram, laneTargetProgram } from './complete'
@@ -479,7 +480,10 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
     user: { id: input.userId },
     asOf: input.asOf ?? new Date().toISOString(),
     budgetChars: ATTRIBUTE_RUN_CONTEXT_CHARS,
-  }).pipe(Effect.mapError((cause) => new AttributeRunQueryFailed({ cause })))
+  }).pipe(
+    Effect.provide(SimilarLaneLive),
+    Effect.mapError((cause) => new AttributeRunQueryFailed({ cause })),
+  )
   const items: Array<ContextItem> = context.items.map((i) => ({
     ref: i.ref,
     kind: i.kind,

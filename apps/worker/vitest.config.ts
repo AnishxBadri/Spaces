@@ -45,5 +45,20 @@ export default defineConfig({
     pool: 'forks',
     maxWorkers: TEST_WORKERS,
     setupFiles: ['./vitest.setup.ts'],
+    // The plugin loader (sdk-11) imports bundles with node's own `import()`
+    // and a `node:module` resolve hook, as it does in production. Vitest's
+    // runner would otherwise transform a bundle itself and resolve its bare
+    // imports with vite's resolver, where the hook never runs; and it would
+    // inline the sdk's dist/ (a workspace link, not node_modules), giving the
+    // test a second copy of the tags the hook resolves plugins to. Both are
+    // handed to node, so the test sees exactly what the worker does.
+    server: {
+      deps: {
+        external: [
+          /[\\/]plugins[\\/][^\\/]+[\\/]current[\\/]/,
+          /[\\/]packages[\\/]sdk[\\/]dist[\\/]/,
+        ],
+      },
+    },
   },
 })

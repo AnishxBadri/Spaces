@@ -11,7 +11,8 @@ import type { JsonSchema } from '@spaces/core/ai/schema'
 import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
-import { recordContextProgram } from '#/lib/context/record'
+import { recordContextProgram } from '@spaces/core/writes/context/record'
+import { SimilarLaneLive } from './similar'
 import type { ContextItem } from '@spaces/core/context/types'
 import { completeMessage, completeProgram, laneTargetProgram } from './complete'
 import { callStep, suggestionOutputRef, withRun } from './run'
@@ -343,7 +344,10 @@ const suggestSpacesInRun = Effect.fn('suggestSpaces.inRun')(function* (
     user: { id: input.userId },
     asOf: input.asOf ?? new Date().toISOString(),
     budgetChars: SUGGEST_SPACES_CONTEXT_CHARS,
-  }).pipe(Effect.mapError((cause) => new SuggestSpacesQueryFailed({ cause })))
+  }).pipe(
+    Effect.provide(SimilarLaneLive),
+    Effect.mapError((cause) => new SuggestSpacesQueryFailed({ cause })),
+  )
   const items: Array<ContextItem> = context.items.map((i) => ({
     ref: i.ref,
     kind: i.kind,

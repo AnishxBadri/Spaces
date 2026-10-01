@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest'
  */
 
 const SRC = join(import.meta.dirname, '..', '..')
+const CORE = join(SRC, '..', '..', '..', 'packages', 'core', 'src')
 const read = (rel: string) => readFileSync(join(SRC, rel), 'utf8')
 const INSERT = /\.insert\(\s*entitySpace\s*\)/
 
@@ -49,13 +50,19 @@ describe('one entity_space insert for tagging', () => {
   })
 
   it('the only production modules inserting into entity_space are the known ones', () => {
-    const inserting = walk(SRC)
-      .filter((f) => !/\.test\.tsx?$/.test(f) && !f.includes('/seeds/'))
-      .filter((f) => INSERT.test(readFileSync(f, 'utf8')))
-      .map((f) => relative(SRC, f))
-      .sort()
+    // Document birth moved to core's write half (SPA-201), so core's source
+    // is walked too and named with a `core:` prefix.
+    const production = (root: string, prefix: string) =>
+      walk(root)
+        .filter((f) => !/\.test\.tsx?$/.test(f) && !f.includes('/seeds/'))
+        .filter((f) => INSERT.test(readFileSync(f, 'utf8')))
+        .map((f) => prefix + relative(root, f))
+    const inserting = [
+      ...production(SRC, ''),
+      ...production(CORE, 'core:'),
+    ].sort()
     expect(inserting).toEqual([
-      'lib/documents/birth.ts',
+      'core:writes/documents/birth.ts',
       'lib/documents/refile.ts',
       'lib/notes/create.ts',
       'lib/spaces/tag.ts',

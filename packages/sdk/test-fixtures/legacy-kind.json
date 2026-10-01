@@ -1,0 +1,11 @@
+{
+  "manifestVersion": 1,
+  "id": "apollo",
+  "version": "1.2.0",
+  "sdk": "^1.0",
+  "kind": "enricher",
+  "name": "Apollo",
+  "description": "A manifest written before D51, when a plugin had a kind.",
+  "settings": { "type": "object", "properties": {} },
+  "jobs": { "enrich": { "trigger": "action", "uses": ["Identity", "Facts"] } }
+}

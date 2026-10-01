@@ -305,7 +305,9 @@ describe('scratch', () => {
     const { setNoteKindProgram } = await import('./kind')
     const { listNoteRows } = await import('#/lib/notes/list-rows')
     const { getSpaceProgram } = await import('#/lib/spaces/read')
-    const { assembleProgram } = await import('#/lib/context/assemble')
+    const { assembleProgram } =
+      await import('@spaces/core/writes/context/assemble')
+    const { SimilarLaneLive } = await import('#/lib/ai/similar')
     const { db } = await import('@spaces/db')
     const { entity, entitySpace, link, space } =
       await import('@spaces/db/schema')
@@ -368,7 +370,7 @@ describe('scratch', () => {
           asOf: '2026-09-20T00:00:00Z',
           budgetChars: 8000,
         },
-      ),
+      ).pipe(Effect.provide(SimilarLaneLive)),
     )
     const item = assembled.items.find((x) => x.ref === `note:${id}`)
     expect(item?.kind).toBe('note')

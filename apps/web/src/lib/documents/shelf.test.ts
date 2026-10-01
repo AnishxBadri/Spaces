@@ -62,7 +62,9 @@ async function fileDocument(
   target: { kind: 'record' | 'space'; entityId: string },
 ): Promise<string> {
   const { Effect } = await import('effect')
-  const { birthDocumentProgram } = await import('#/lib/documents/birth')
+  const { birthDocumentProgram } =
+    await import('@spaces/core/writes/documents/birth')
+  const { webEnqueue } = await import('#/lib/enqueue-live')
   const { id } = await Effect.runPromise(
     birthDocumentProgram({
       blobSha: sha,
@@ -75,7 +77,7 @@ async function fileDocument(
       provenance: {},
       fileAgainst: [target],
       actor: { userId: await actorId() },
-    }),
+    }).pipe(Effect.provide(webEnqueue)),
   )
   return id
 }

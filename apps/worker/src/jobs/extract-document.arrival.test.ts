@@ -6,10 +6,12 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { minimalPdf } from '#web/test/minimal-pdf'
 import { JobContext } from '../run-job'
 import { ExtractionStore, extractDocument } from './extract-document'
+import { Enqueue } from '@spaces/core/queue/enqueue'
+import { enqueue as stubSend } from '#web/test/queue-stub'
 
 /**
  * The second half of SPA-130's arrival test, and it lives here rather than
- * beside `lib/documents/intake.test.ts` for one mechanical reason: spec §2's
+ * beside core's `writes/documents/intake.test.ts` for one mechanical reason: spec §2's
  * seam — `web → core, sdk. Never plugins/*, never worker` — is an eslint zone
  * (`import/no-restricted-paths`, SPA-146), so nothing under `lib/` may import
  * `#/worker/**`, a test included. The worker is allowed to be the worker, so
@@ -26,6 +28,10 @@ import { ExtractionStore, extractDocument } from './extract-document'
  * there is no pg-boss schema on a test database.
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
+
+// Birth's extraction enqueue is core's `Enqueue` service since SPA-201;
+// here it records into the same stub the mocked `#web/lib/queue` does.
+const stubEnqueue = Enqueue.fromSender({ enqueue: stubSend })
 
 beforeEach(async () => {
   const { enqueued } = await import('#web/test/queue-stub')
@@ -58,7 +64,8 @@ describe('a server-lane arrival, through the existing extract job', () => {
     const bytes = minimalPdf(phrase)
     const companyId = await aCompany(tag)
 
-    const { intakeDocumentProgram } = await import('#web/lib/documents/intake')
+    const { intakeDocumentProgram } =
+      await import('@spaces/core/writes/documents/intake')
     const { id } = await Effect.runPromise(
       intakeDocumentProgram({
         stream: Readable.from([bytes]),
@@ -71,7 +78,7 @@ describe('a server-lane arrival, through the existing extract job', () => {
         provenance: { sourcePath: 'Data room/Legal/SHA.pdf' },
         fileAgainst: [{ kind: 'record', entityId: companyId }],
         actor: { userId: await actorId() },
-      }),
+      }).pipe(Effect.provide(stubEnqueue)),
     )
 
     const { enqueued } = await import('#web/test/queue-stub')

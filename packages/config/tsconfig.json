@@ -1,14 +1,9 @@
 {
-  "//": "This package's own `typecheck` (SPA-180): the eslint base, the prettier config and vocabulary.js under `checkJs` — the `// @ts-check` they carry was an editor hint until now, because the root tsconfig listed the .js files without allowJs and so read none of them — plus the rule module's declaration file and the two zone fixtures. The root tsconfig used to include `eslint-rules/**`; it moved here with the directory, so `typecheck:root` covers `scripts/` and the two root shims.",
+  "//": "This package's own `typecheck` (SPA-180): the eslint base, the prettier config and vocabulary.js under `checkJs` — the `// @ts-check` they carry was an editor hint until now, because the root tsconfig listed the .js files without allowJs and so read none of them — plus the rule module's declaration file. (The two zone fixtures that stood in for packages/sdk and plugins/* were retired by SPA-191, which proves those zones on the real packages.) The root tsconfig used to include `eslint-rules/**`; it moved here with the directory, so `typecheck:root` covers `scripts/` and the two root shims.",
 
   "extends": "./tsconfig.base.json",
 
-  "include": [
-    "eslint-rules/**/*.ts",
-    "fixtures/**/*.ts",
-    "eslint.base.js",
-    "prettier.base.js"
-  ],
+  "include": ["eslint-rules/**/*.ts", "eslint.base.js", "prettier.base.js"],
   "exclude": ["node_modules"],
 
   "compilerOptions": {

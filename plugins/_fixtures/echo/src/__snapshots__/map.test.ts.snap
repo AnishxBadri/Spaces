@@ -1,0 +1,48 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the enrich mapping > turns a recorded organization payload into identity, receipt and fact claims 1`] = `
+{
+  "facts": {
+    "entityId": "entity-from-resolve",
+    "receiptId": "receipt-from-store",
+    "values": {
+      "description": "Warehouse picking robots that learn a new SKU from one demonstration.",
+      "founded_year": 2019,
+      "location": "Pune, India",
+    },
+  },
+  "identity": {
+    "keys": {
+      "domain": "northwind-robotics.example",
+      "linkedin": "http://www.linkedin.com/company/northwind-robotics",
+    },
+    "kind": "company",
+    "name": "Northwind Robotics",
+  },
+  "receipt": {
+    "creditsUsed": 1,
+    "entityId": "entity-from-resolve",
+    "raw": {
+      "credits_consumed": 1,
+      "organization": {
+        "city": "Pune",
+        "country": "India",
+        "estimated_num_employees": 84,
+        "founded_year": 2019,
+        "id": "5f2a9c0e8b1d4a0012345678",
+        "industry": "machinery",
+        "keywords": [
+          "robotics",
+          "warehouse automation",
+          "computer vision",
+        ],
+        "linkedin_url": "http://www.linkedin.com/company/northwind-robotics",
+        "name": "Northwind Robotics",
+        "primary_domain": "northwind-robotics.example",
+        "short_description": "Warehouse picking robots that learn a new SKU from one demonstration.",
+        "website_url": "https://www.northwind-robotics.example",
+      },
+    },
+  },
+}
+`;

@@ -20,9 +20,10 @@ let cached: Buffer | null = null
  * The workspace root — the directory holding `pnpm-workspace.yaml` — found by
  * walking up from this file. Null inside the image, which ships apps/web's
  * `src/` at `/app/src` with no workspace marker; there `DATA_DIR=/data` is set
- * by the Dockerfile and this never runs.
+ * by the Dockerfile and this never runs. Exported since SPA-193: the plugin
+ * key directory (`@spaces/core/plugins/trust`) anchors to it the same way.
  */
-function workspaceRoot(): string | null {
+export function workspaceRoot(): string | null {
   let dir = dirname(fileURLToPath(import.meta.url))
   for (;;) {
     if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir

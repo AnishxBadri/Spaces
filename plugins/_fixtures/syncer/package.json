@@ -1,0 +1,30 @@
+{
+  "//": "A fixture (SPA-200, sdk-7b), not a product: one sync-shaped `schedule` job that pages a stand-in mail provider from its cursor, resolves each participant through Identity, logs each message through Content.logInteraction keyed on its Message-ID, and hands back the next cursor. Its `uses` names no Facts — sdk-12a reuses it to prove a job that reaches for a port it did not declare fails. Tested on @spaces/sdk/testing's Layers with no database.",
+  "name": "@spaces/plugin-syncer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
+    "zod": "^4.3.6"
+  }
+}

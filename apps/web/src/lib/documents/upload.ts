@@ -5,10 +5,10 @@
  * through Node (CONTEXT.md → Storage). Only the row is filed through a server
  * fn.
  *
- * The other lane is `#/lib/documents/intake.ts` (SPA-130): bytes that arrive
- * server-side already — the URL clip's PDF response, a
- * plugin filing a document, the Drive walker — where Node holds the buffer and
- * hashes it itself. Two lanes, one writer: both end at
+ * The other lane is core's `writes/documents/intake.ts` (SPA-130, moved by
+ * SPA-201): bytes that arrive server-side already — the URL clip's PDF
+ * response, a plugin filing a document, the Drive walker — where Node holds
+ * the buffer and hashes it itself. Two lanes, one writer: both end at
  * `finalizeDocumentUpload`.
  *
  * So this is the one browser hasher — one grep for the WebCrypto digest call

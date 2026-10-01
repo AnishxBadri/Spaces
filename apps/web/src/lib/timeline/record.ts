@@ -12,9 +12,10 @@ import {
   link,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
+import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
-import { resolveRefsProgram } from '#/lib/context/names'
-import type { ResolvedRef } from '#/lib/context/names'
+import { resolveRefsProgram } from '@spaces/core/writes/context/names'
+import type { ResolvedRef } from '@spaces/core/writes/context/names'
 
 /**
  * Merged timeline: macro activity + attribute_event bursts. Bursts group
@@ -56,15 +57,25 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     )
     const userNames = new Map(users.map((u) => [u.id, u.name]))
 
-    // Capability id, not integration id: "apollo changed sector" is what the
-    // reader needs, and the row id is the join, not the name.
+    // A name, not the integration id: "Apollo changed sector" is what the
+    // reader needs, and the row id is the join, not the name (sdk-9). The
+    // manifest's `name` once the loader has validated the plugin
+    // (`integration.manifest`, sdk-11); the capability id before that, and
+    // for a first-party `core.*` row, which has no manifest.
     const integrations = yield* query(() =>
       db
-        .select({ id: integration.id, capabilityId: integration.capabilityId })
+        .select({
+          id: integration.id,
+          capabilityId: integration.capabilityId,
+          manifest: integration.manifest,
+        })
         .from(integration),
     )
-    const capabilityOf = new Map(
-      integrations.map((i) => [i.id, i.capabilityId]),
+    const integrationNames = new Map(
+      integrations.map((i) => [
+        i.id,
+        jsonString(jsonRecord(i.manifest).name) ?? i.capabilityId,
+      ]),
     )
 
     const macros = yield* query(() =>
@@ -73,6 +84,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           id: activity.id,
           verb: activity.verb,
           actorId: activity.actorId,
+          meta: activity.meta,
           at: activity.at,
         })
         .from(activity)
@@ -197,7 +209,14 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           type: 'macro' as const,
           id: m.id,
           verb: m.verb,
-          actorName: m.actorId ? (userNames.get(m.actorId) ?? null) : null,
+          // A plugin's port writes its activity with no user (sdk-7a): the
+          // integration it ran as is in `meta.integrationId`, and the row
+          // reads as that plugin's name, never as a person.
+          actorName: m.actorId
+            ? (userNames.get(m.actorId) ?? null)
+            : (integrationNames.get(
+                jsonString(jsonRecord(m.meta).integrationId) ?? '',
+              ) ?? null),
           at: m.at.toISOString(),
         })),
       ...bursts.map((b, i) => ({
@@ -206,12 +225,13 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
         actorType: b.actorType,
         actorName: b.actor ? (userNames.get(b.actor) ?? null) : null,
         /**
-         * The integration's manifest id. Null for every non-integration burst,
-         * and — the check constraint being a biconditional — never null for an
-         * integration one unless the join misses, which the FK prevents.
+         * The integration's manifest name, else its capability id. Null for
+         * every non-integration burst, and — the check constraint being a
+         * biconditional — never null for an integration one unless the join
+         * misses, which the FK prevents.
          */
-        capabilityId: b.actorRef
-          ? (capabilityOf.get(b.actorRef) ?? null)
+        integrationName: b.actorRef
+          ? (integrationNames.get(b.actorRef) ?? null)
           : null,
         source: b.source,
         at: b.at,

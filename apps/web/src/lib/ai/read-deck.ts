@@ -17,15 +17,19 @@ import type {
 import { identityPayloadOf } from '@spaces/core/ai/identity'
 import { QUEUES } from '@spaces/core/queue/names'
 import { getRegistryByObjectId } from '@spaces/core/writes/attributes/values'
-import { recordContextProgram } from '#/lib/context/record'
+import { recordContextProgram } from '@spaces/core/writes/context/record'
+import { SimilarLaneLive } from './similar'
 import { ref } from '@spaces/core/context/ref'
 import type { ContextItem } from '@spaces/core/context/types'
 import { jsonValue } from '@spaces/core/json'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
 import { storage } from '@spaces/core/writes/storage'
-import { captureObjectById, captureReadTask } from './capture-read'
-import type { CaptureObject } from './capture-read'
+import {
+  captureObjectById,
+  captureReadTask,
+} from '@spaces/core/writes/ai/capture-read'
+import type { CaptureObject } from '@spaces/core/writes/ai/capture-read'
 import { completeMessage } from './complete'
 import type { CompleteFailure } from './complete'
 import { cachedExtractProgram } from './extraction-cache'
@@ -85,8 +89,9 @@ import type {
  * against that object's registry — person for a profile, company for a
  * company page — through the same `cachedExtractProgram` call, the same
  * validator and the same `proposeProgram`, and what it proposes is anchored
- * on the captured document itself (`./capture-read.ts`), since a capture
- * usually names somebody we hold no record for. Read as a person, the schema
+ * on the captured document itself
+ * (`@spaces/core/writes/ai/capture-read`), since a capture usually names
+ * somebody we hold no record for. Read as a person, the schema
  * gains one field, `_subject` — a person reference, so its answer is the
  * same identity claim a deck's `founders` yields — and the page's subject
  * becomes one `identity` suggestion ahead of one `attribute_patch`. Every
@@ -518,6 +523,7 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
             asOf,
             budgetChars: READ_DECK_CONTEXT_CHARS,
           }).pipe(
+            Effect.provide(SimilarLaneLive),
             Effect.mapError((cause) => new ReadDeckQueryFailed({ cause })),
           )
     const items: Array<ContextItem> = [

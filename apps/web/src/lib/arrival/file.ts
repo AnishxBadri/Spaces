@@ -11,8 +11,7 @@ import {
   interaction,
   interactionEntity,
 } from '@spaces/db/schema'
-import type { NoteBody } from '@spaces/db/schema/kinds'
-import { insertBodyNote } from '#/lib/notes/body-note'
+import { writeIntegrationInteraction } from '@spaces/core/writes/interactions/write'
 import type { Address } from './forwarded'
 import type { ArrivalMessage } from './message'
 import { participantRecordsProgram } from './participant-records'
@@ -33,6 +32,13 @@ import type { AttachmentOutcome } from './attachment-filing'
  * **Everything in one transaction**, the interaction first: a duplicate
  * leaves no orphan body note behind, and a failed edge insert leaves no
  * bodyless interaction that the next poll would then skip as a duplicate.
+ *
+ * **The row, its body and its edges are core's writer** (SPA-200, sdk-7b):
+ * `writeIntegrationInteraction` (`@spaces/core/writes/interactions/write`)
+ * is the integration interaction lane, shared with the plugin SDK's
+ * `Content.logInteraction`. This module keeps what is the mailbox's own —
+ * who the participants are, which thread edges a reply inherits, and where
+ * the attachments file — and hands the writer the rest.
  *
  * **Participants become records first, then are matched** (SPA-86,
  * arrival-2). Before the transaction, `participantRecordsProgram` decides
@@ -100,9 +106,6 @@ export type Filed =
   | { kind: 'duplicate' }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
-
-/** A long mail is kept whole in `body_md` and capped here, not truncated at 1 MB by accident. */
-const MAX_BODY_CHARS = 200_000
 
 /** The entities an address list resolves to — people by email, companies by domain. */
 export async function matchParticipants(
@@ -215,20 +218,6 @@ async function threadEdges(tx: Tx, threadId: string): Promise<Array<string>> {
   return rows.map((r) => r.id)
 }
 
-/** Plain text → BlockNote paragraphs, one per line, so the editor opens it. */
-export function bodyBlocks(text: string): NoteBody {
-  return text.split('\n').map((line) =>
-    line.trim() === ''
-      ? { type: 'paragraph', content: [] }
-      : {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: line.replace(/\s+$/, ''), styles: {} },
-          ],
-        },
-  )
-}
-
 export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
   message: ArrivalMessage,
   ctx: FileContext,
@@ -241,48 +230,33 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
   const written = yield* Effect.tryPromise({
     try: () =>
       db.transaction(async (tx): Promise<Filed> => {
-        const row = (
-          await tx
-            .insert(interaction)
-            .values({
-              kind: 'email',
-              sourceClass: 'integration',
-              sourceRef: ctx.integrationId,
-              messageId: message.messageId,
-              threadId: message.threadId,
-              subject: message.subject,
-              occurredAt: message.occurredAt,
-            })
-            .onConflictDoNothing({ target: interaction.messageId })
-            .returning({ id: interaction.id })
-        ).at(0)
-        if (!row) return { kind: 'duplicate' }
-
-        const body = message.body.slice(0, MAX_BODY_CHARS)
-        const title = message.subject ?? ''
-        const noteId = await insertBodyNote(tx, {
-          title,
-          bodyJson: bodyBlocks(body),
-          bodyMd: body,
-          authorId: ctx.authorId,
+        const wrote = await writeIntegrationInteraction(tx, {
           integrationId: ctx.integrationId,
+          kind: 'email',
+          messageId: message.messageId,
+          threadId: message.threadId,
+          subject: message.subject,
+          occurredAt: message.occurredAt,
+          // Forwarding is the consent (D49): a forwarded body is born shared.
+          body: {
+            title: message.subject ?? '',
+            text: message.body,
+            authorId: ctx.authorId,
+            visibility: 'shared',
+          },
+          // Matched and inherited after the row exists, as before the
+          // extraction: the writer calls this inside the same transaction.
+          edges: async () => [
+            ...records.entityIds,
+            ...(await matchParticipants(tx, message.participants)),
+            ...(await threadEdges(tx, message.threadId)),
+          ],
         })
-        await tx
-          .update(interaction)
-          .set({ noteId })
-          .where(eq(interaction.id, row.id))
+        if (wrote.kind === 'duplicate') return wrote
+        if (wrote.noteId === null)
+          throw new Error('the mailbox writes a body for every interaction')
+        const { interactionId, noteId, edges } = wrote
 
-        const matched = await matchParticipants(tx, message.participants)
-        const inherited = await threadEdges(tx, message.threadId)
-        const edges = [
-          ...new Set([...records.entityIds, ...matched, ...inherited]),
-        ]
-        for (const entityId of edges) {
-          await tx
-            .insert(interactionEntity)
-            .values({ interactionId: row.id, entityId })
-            .onConflictDoNothing()
-        }
         const companyId = chooseFilingCompany(
           await companiesOf(tx, edges),
           message.from === null
@@ -291,7 +265,7 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
         )
         return {
           kind: 'written',
-          interactionId: row.id,
+          interactionId,
           noteId,
           edges: edges.length,
           companyId,

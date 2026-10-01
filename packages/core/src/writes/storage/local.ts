@@ -76,7 +76,7 @@ export class LocalStorage implements Storage {
    * **Local-only on purpose, and not on the `Storage` port** (SPA-130). Its
    * one caller is `routes/api/blob/$key.ts`, the browser lane's presigned
    * PUT, where the key is a *client's claim*. The server byte lane —
-   * `lib/documents/intake.ts` — measures the digest itself off the stream and
+   * `writes/documents/intake.ts`, beside this package's storage — measures the digest itself off the stream and
    * calls the port's plain `put` under it, so it needs no verification and S3
    * is never asked for one it cannot give. Two writers of bytes, one each,
    * and neither is the only one.

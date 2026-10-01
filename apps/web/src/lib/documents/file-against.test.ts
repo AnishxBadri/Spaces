@@ -66,7 +66,9 @@ async function drop(
   sha: string,
 ): Promise<{ id: string; deduped: boolean }> {
   const { Effect } = await import('effect')
-  const { birthDocumentProgram } = await import('./birth')
+  const { birthDocumentProgram } =
+    await import('@spaces/core/writes/documents/birth')
+  const { webEnqueue } = await import('#/lib/enqueue-live')
   const target = uploadTarget(mode, picked)
   expect(target).not.toBeNull()
   if (target === null) throw new Error('unreachable')
@@ -82,7 +84,7 @@ async function drop(
       provenance: {},
       fileAgainst: fileAgainstFor(target),
       actor: { userId: await actorId() },
-    }),
+    }).pipe(Effect.provide(webEnqueue)),
   )
 }
 

@@ -17,7 +17,7 @@ vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
  * row it never knew about.
  *
  * The server fns need a request context no test has, so these call the write
- * they delegate to — `birthDocumentProgram` in `#/lib/documents/birth`, which
+ * they delegate to — `birthDocumentProgram` in `@spaces/core/writes/documents/birth`, which
  * since SPA-113 is the single writer both edge kinds go through and which the
  * client barrel does not re-export. Imports are dynamic for the same reason as
  * the rest of the DB-coupled suite: `@spaces/db` builds its pool from
@@ -73,7 +73,9 @@ async function file(
   target: Target,
 ): Promise<{ id: string; deduped: boolean }> {
   const { Effect } = await import('effect')
-  const { birthDocumentProgram } = await import('#/lib/documents/birth')
+  const { birthDocumentProgram } =
+    await import('@spaces/core/writes/documents/birth')
+  const { webEnqueue } = await import('#/lib/enqueue-live')
   return Effect.runPromise(
     birthDocumentProgram({
       blobSha: sha,
@@ -86,7 +88,7 @@ async function file(
       provenance: {},
       fileAgainst: [target],
       actor: { userId: await actorId() },
-    }),
+    }).pipe(Effect.provide(webEnqueue)),
   )
 }
 
@@ -101,7 +103,8 @@ async function refusalOf(
   tag: string,
   target: Target,
 ): Promise<string> {
-  const { documentBirthMessage } = await import('#/lib/documents/birth')
+  const { documentBirthMessage } =
+    await import('@spaces/core/writes/documents/birth')
   try {
     await file(sha, tag, target)
   } catch (err) {

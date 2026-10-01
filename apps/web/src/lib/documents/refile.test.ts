@@ -68,7 +68,9 @@ async function aBlob(tag: string): Promise<string> {
 }
 
 async function aFiledDeck(tag: string, companyId: string): Promise<string> {
-  const { birthDocumentProgram } = await import('./birth')
+  const { birthDocumentProgram } =
+    await import('@spaces/core/writes/documents/birth')
+  const { webEnqueue } = await import('#/lib/enqueue-live')
   const { id } = await Effect.runPromise(
     birthDocumentProgram({
       blobSha: await aBlob(tag),
@@ -81,7 +83,7 @@ async function aFiledDeck(tag: string, companyId: string): Promise<string> {
       provenance: {},
       fileAgainst: [{ kind: 'record', entityId: companyId }],
       actor: { userId: await actorId() },
-    }),
+    }).pipe(Effect.provide(webEnqueue)),
   )
   return id
 }

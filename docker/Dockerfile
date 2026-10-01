@@ -67,6 +67,13 @@ COPY --from=prune /app/out/build/json/ ./
 COPY --from=prune /app/out/build/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY --from=prune /app/out/build/full/ ./
+# @spaces/sdk first, in its own step (SPA-195): its `exports` point at dist/,
+# and since the identity normalizers moved into it, core — and so both apps —
+# import it at runtime. Not one `--filter` list: pnpm orders filtered packages
+# by their direct dependencies only, and the apps reach the sdk through
+# @spaces/core, so a single call raced the worker's vite build against the
+# sdk's tsc (PR #4, "failed to resolve import @spaces/sdk/identity").
+RUN pnpm --filter @spaces/sdk build
 RUN pnpm --filter @spaces/web --filter @spaces/worker build
 
 FROM base AS prod-deps
@@ -137,6 +144,23 @@ COPY --chown=node:node --from=build /app/apps/web/.output ./apps/web/.output
 COPY --chown=node:node --from=build /app/apps/web/dist ./apps/web/dist
 COPY --chown=node:node --from=build /app/apps/worker/dist ./apps/worker/dist
 COPY --chown=node:node --from=prune /app/out/build/full/packages/db/drizzle ./packages/db/drizzle
+# @spaces/sdk at runtime (sdk-11): the one workspace package the worker bundle
+# leaves as a bare import (apps/worker/vite.config.ts), because a plugin
+# bundle's own `@spaces/sdk` import is resolved by the loader's hook to the
+# copy the worker loaded — one set of port tags in the process. Copied, not
+# linked: prod-deps' hoisted install links no workspace package (see above),
+# and the sdk's own dependencies (effect, zod, tldts) are already in
+# /app/node_modules from it. Its package.json carries the `exports` map node
+# resolves `@spaces/sdk/identity` and `@spaces/sdk/build` through.
+COPY --chown=node:node --from=build /app/packages/sdk/package.json ./node_modules/@spaces/sdk/package.json
+COPY --chown=node:node --from=build /app/packages/sdk/dist ./node_modules/@spaces/sdk/dist
+# Plugin trust (SPA-193, D54): the committed plugin index and the public keys
+# this image trusts to sign plugins. Straight from the build context — neither
+# is a workspace package, so `turbo prune` does not carry them. The keys are
+# read from /app/plugin-keys by @spaces/core/plugins/trust (the cwd, since the
+# image has no workspace marker), never from registry.json and never from env.
+COPY --chown=node:node registry.json ./registry.json
+COPY --chown=node:node plugin-keys ./plugin-keys
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chown node:node /app \
     && chmod +x /entrypoint.sh && mkdir -p /data && chown -R node:node /data

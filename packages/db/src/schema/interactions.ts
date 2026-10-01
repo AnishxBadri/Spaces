@@ -123,8 +123,26 @@ export const signal = pgTable(
     observedAt: timestamp('observed_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /**
+     * Who wrote the signal (D57, sdk-7a): the same pair `entity` and
+     * `entity_alias` carry. `source` stays as the display text; these two
+     * are the provenance a plugin cannot forge — `Content.emitSignal`
+     * (sdk-7b) writes the bound integration's id from the port, never from
+     * the plugin. Rows from before the column are `manual`.
+     */
+    sourceClass: sourceClass('source_class').notNull().default('manual'),
+    sourceRef: uuid('source_ref').references(() => integration.id),
   },
-  (t) => [index('signal_entity_idx').on(t.entityId)],
+  (t) => [
+    index('signal_entity_idx').on(t.entityId),
+    // The biconditional `entity_source_ref_invariant` spells, for the
+    // same reason: an integration row must say which integration, and no
+    // other class may claim one.
+    check(
+      'signal_source_ref_invariant',
+      sql`(${t.sourceClass} = 'integration') = (${t.sourceRef} IS NOT NULL)`,
+    ),
+  ],
 )
 
 /**
@@ -138,9 +156,16 @@ export const enrichmentRecord = pgTable(
     entityId: uuid('entity_id')
       .notNull()
       .references(() => entity.id),
+    /** Display text: the manifest id of the plugin that fetched it. */
     provider: text('provider').notNull(),
     raw: jsonb('raw').$type<Json>().notNull(),
     creditsUsed: integer('credits_used'),
+    /**
+     * The integration whose call this is (D57, sdk-7a), written by
+     * `Receipts.store` from the bound row. Nullable only for rows from
+     * before the column; the port always sets it.
+     */
+    integrationId: uuid('integration_id').references(() => integration.id),
     fetchedAt: timestamp('fetched_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

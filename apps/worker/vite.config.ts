@@ -43,8 +43,18 @@ export default defineConfig({
       // dependencies (unpdf, mammoth, @aws-sdk, fflate, tldts) resolve from
       // packages/core — so they were inlined, pdf.js and all. One rule here
       // rather than a package list to keep current.
+      //
+      // @spaces/sdk is the exception to the exception (sdk-11): it stays a
+      // runtime import from /app/node_modules. A plugin bundle's bare
+      // `@spaces/sdk` import is resolved by the loader's hook to the copy
+      // *this* process loaded, so the worker must load one from
+      // node_modules rather than carry an inlined copy of its own — an
+      // inlined sdk would be a second set of port tags, and every plugin
+      // job would fail "service not found". The Dockerfile puts the sdk's
+      // package.json and dist/ there.
       external: (id) =>
-        /^(node:|[a-z@])/.test(id) && !id.startsWith('@spaces/'),
+        /^(node:|[a-z@])/.test(id) &&
+        (!id.startsWith('@spaces/') || /^@spaces\/sdk(\/|$)/.test(id)),
       input: {
         index: 'src/index.ts',
         health: 'src/health.ts',

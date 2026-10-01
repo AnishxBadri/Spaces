@@ -3,7 +3,8 @@ import { Effect } from 'effect'
 import {
   documentIntakeMessage,
   intakeDocumentProgram,
-} from '#/lib/documents/intake'
+} from '@spaces/core/writes/documents/intake'
+import { webEnqueue } from '#/lib/enqueue-live'
 import type { MailAttachment, SortedAttachments } from './attachments'
 
 /**
@@ -12,7 +13,7 @@ import type { MailAttachment, SortedAttachments } from './attachments'
  * unfiled".
  *
  * **This lane adds nothing to the byte path.** Every part goes through
- * `intakeDocumentProgram` (`lib/documents/intake.ts`) — stream → sha → blob →
+ * `intakeDocumentProgram` (`writes/documents/intake.ts` in core) — stream → sha → blob →
  * `birthDocumentProgram` → edge → enqueue extract — which is the one writer
  * of `document` (`birth.test.ts`) and whose §3.4 rule is what makes the same
  * deck forwarded twice one row on the company, and the same deck on two
@@ -113,6 +114,8 @@ export const fileAttachmentsProgram = Effect.fn('fileAttachments')(function* (
           : [{ kind: 'record', entityId: ctx.companyId }],
       actor: { integrationId: ctx.integrationId },
     }).pipe(
+      // Birth's extraction enqueue, through the web sender (SPA-201).
+      Effect.provide(webEnqueue),
       Effect.map(() => null),
       Effect.catch((failure) => Effect.succeed(documentIntakeMessage(failure))),
     )

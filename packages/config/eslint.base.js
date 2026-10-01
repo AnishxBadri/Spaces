@@ -86,13 +86,14 @@ const NO_DIRECT_ENTITY_VALUES = {
 // unambiguous only while no package has a subdirectory named for a sibling
 // package, which none does; the message says which rule was tripped.
 //
-// Each rule's `files` is the package directory. Two packages are not born:
-// `packages/sdk` (sdk-3) and `plugins/*`. Their zones are written now, so the
-// packages grow up inside the fence, and are fenced against
-// `packages/config/fixtures/{sdk,plugins}` until then — that is where their
-// failing case runs. The worker zone was the third until mono-11a (SPA-181)
-// lifted `apps/worker` out of apps/web/src/worker; it is proved now, with
-// one deliberate opening described at the zone.
+// Each rule's `files` is the package directory. The sdk and plugin zones
+// were written by SPA-180 before either package existed and proved against
+// placeholder directories under packages/config/fixtures; SPA-191 (sdk-3)
+// birthed `packages/sdk` and the first plugin (`plugins/_fixtures/echo`)
+// inside the fence, retired the placeholders, and proves both zones on the
+// real packages (`packages/sdk/src/fence.test.ts`). The worker zone was
+// proved the same way when mono-11a (SPA-181) lifted `apps/worker` out of
+// apps/web/src/worker, with one deliberate opening described at the zone.
 /** @param {ReadonlyArray<string>} names */
 const internal = (names) => `^@spaces/(${names.join('|')})(/|$)`
 /** @param {ReadonlyArray<string>} dirs */
@@ -138,9 +139,10 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 // by that spelling would hide the crossing), and a relative climb into
 // apps/web is banned so every crossing is greppable as `#web/`. The fence
 // narrows as lib/ moves into core; the day the list below is empty, the
-// alias and this paragraph go.
+// alias and this paragraph go. SPA-201 (sdk-8a) took documents/{birth,
+// intake, prepare} off it: they are `@spaces/core/writes/documents/*` now.
 //
-// The crossing list (2026-09-29, `grep -rho "'#web/[^']*'" apps/worker/src`),
+// The crossing list (2026-10-01, `grep -rho "'#web/[^']*'" apps/worker/src`),
 // shipping code first:
 //   lib/ai/{attribute-run, classify-document, column-run, complete,
 //     embed-backfill, embed-document, embed-source, key-terms, read-deck,
@@ -152,9 +154,9 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 // and, from tests only:
 //   lib/ai/{embed-chunks, embedding-pin, propose, route, providers/embed/ids,
 //     providers/embed/settings}
-//   lib/arrival/{fixtures, settings} · lib/context/record
-//   lib/documents/{birth, clip, intake, prepare, read-deck-gate, shelf,
-//     space-sources} · lib/import/{mapping, plan} · lib/inbox/queue
+//   lib/arrival/{fixtures, settings}
+//   lib/documents/{clip, read-deck-gate, shelf, space-sources}
+//     · lib/import/{mapping, plan} · lib/inbox/queue
 //   lib/rpc/{api, versions} · lib/search/{query, query-embedding}
 //   lib/server/shared · lib/tokens/store
 //   test/{fake-imap, fake-ollama, minimal-pdf, queue-stub, reseed}
@@ -205,8 +207,10 @@ const SITE_IMPORTS_NOTHING_INTERNAL = {
   message:
     '@spaces/site imports nothing internal — no @spaces/* package, no # alias, no relative path into another package. It is marketing and docs, deployed to Vercel and never in the image (docs/spec-plugin-sdk.md §2); copy what it needs to show, or sync it as a file from docs/assets (docs/site.md).',
 }
-// Unproven against the real package until sdk-3 births it; proved against
-// packages/config/fixtures/sdk.
+// Proved on the real package by packages/sdk/src/fence.test.ts (SPA-191).
+// Third-party imports are the package.json's business, pinned by
+// packages/sdk/src/package.test.ts (D55); this zone is the "nothing
+// internal" half.
 const SDK_IMPORTS_NOTHING_INTERNAL = {
   regex: [
     internal(['core', 'db', 'web', 'worker', PLUGIN_PKG]),
@@ -214,10 +218,10 @@ const SDK_IMPORTS_NOTHING_INTERNAL = {
     climbsInto(['apps', 'plugins', 'packages/(core|db)', 'core', 'db']),
   ].join('|'),
   message:
-    '@spaces/sdk imports effect and zod and nothing internal — if sdk ever needs core, the contract leaked (docs/spec-plugin-sdk.md §2: "sdk → effect, zod. Nothing internal").',
+    '@spaces/sdk imports effect, zod and tldts and nothing internal — if sdk ever needs core, the contract leaked (docs/spec-plugin-sdk.md §2: "sdk → effect, zod, tldts. Nothing internal"; D55).',
 }
-// Unproven against a real plugin until plugins/* exists; proved against
-// packages/config/fixtures/plugins.
+// Proved on the first plugin, plugins/_fixtures/echo, by
+// packages/sdk/src/fence.test.ts (SPA-191).
 const PLUGIN_IMPORTS_SDK_ONLY = {
   regex: [
     internal(['core', 'db', 'web', 'worker', PLUGIN_PKG]),
@@ -228,7 +232,7 @@ const PLUGIN_IMPORTS_SDK_ONLY = {
     climbsInto(['apps', 'plugins', 'packages']),
   ].join('|'),
   message:
-    'A plugin imports @spaces/sdk only, never @spaces/core and never @spaces/db — it returns claims and core routes them (docs/spec-plugin-sdk.md §2: "plugins/* → sdk. Never core, db"; CONTEXT.md "Plugin architecture").',
+    'A plugin imports @spaces/sdk only, never @spaces/core and never @spaces/db — it calls the ports the host provides, and each port writes through its lane (docs/spec-plugin-sdk.md §2: "plugins/* → sdk. Never core, db"; D52; CONTEXT.md "Plugin architecture").',
 }
 
 export default [
@@ -339,12 +343,11 @@ export default [
       ],
     },
   },
-  // The other five package boundaries (spec §2, SPA-180). One block per
-  // package directory; the unproven three are named as such above, and the
-  // two fixture directories are the sdk and plugin zones' targets until the
-  // packages exist. The failing cases: `import { fmtMoney } from
+  // The other package boundaries (spec §2, SPA-180). One block per package
+  // directory. The failing cases: `import { fmtMoney } from
   // '@spaces/core/portfolio/format'` in packages/db, and `import { db } from
-  // '@spaces/db'` in fixtures/plugins — each fails with its rule's message.
+  // '@spaces/db'` in a plugin — each fails with its rule's message, and the
+  // sdk and plugin ones are asserted by packages/sdk/src/fence.test.ts.
   {
     files: ['packages/db/**'],
     rules: {
@@ -407,7 +410,7 @@ export default [
     },
   },
   {
-    files: ['packages/sdk/**', 'packages/config/fixtures/sdk/**'],
+    files: ['packages/sdk/**'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -416,11 +419,32 @@ export default [
     },
   },
   {
-    files: ['plugins/**', 'packages/config/fixtures/plugins/**'],
+    files: ['plugins/**'],
     rules: {
       'no-restricted-imports': [
         'error',
         { patterns: [PLUGIN_IMPORTS_SDK_ONLY] },
+      ],
+      // Clock is not a port (sdk-5): Effect ships one, and a job that reads
+      // the wall clock directly cannot be tested at a fixed time. The
+      // failing cases, asserted by packages/sdk/src/fence.test.ts:
+      // `Date.now()` and a bare `new Date()` in a plugin.
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Date',
+          property: 'now',
+          message:
+            'Plugin code reads time through Effect (`Clock.currentTimeMillis`, `DateTime.now`) — Clock is not an SDK port because Effect ships one, and the test Layers can fix it (sdk-5).',
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message:
+            'Plugin code reads time through Effect (`Clock.currentTimeMillis`, `DateTime.now`), not `new Date()` — Clock is not an SDK port because Effect ships one (sdk-5).',
+        },
       ],
     },
   },

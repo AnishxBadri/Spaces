@@ -22,25 +22,26 @@ type Items = Awaited<ReturnType<typeof getRecordTimeline>>
 
 /**
  * A burst names who attended to the values (typed actor, spec §4): a person
- * by name, an integration by the capability it installs, or the system — the
+ * by name, an integration by its plugin's name, or the system — the
  * merge executor's rewrites must never read as a teammate's edit, and two
  * integrations must never read as one.
  *
- * `capabilityId` comes off `attribute_event.actor_ref` → `integration`, so an
- * integration burst names the thing the reader configured ("apollo") rather
- * than the anonymous class of thing it belongs to. The fallback is
- * unreachable while the check constraint and the FK both hold; it exists
- * because a label has to render either way.
+ * `integrationName` comes off `attribute_event.actor_ref` → `integration` —
+ * the manifest's `name`, else the capability id (sdk-9) — so an integration
+ * burst names the thing the reader configured ("Apollo") rather than the
+ * anonymous class of thing it belongs to. The fallback is unreachable while
+ * the check constraint and the FK both hold; it exists because a label has
+ * to render either way.
  */
 function burstActorLabel(item: {
   actorType: 'user' | 'integration' | 'system'
   actorName: string | null
-  capabilityId: string | null
+  integrationName: string | null
   source: string
 }): string {
   if (item.actorType === 'user') return item.actorName ?? 'Someone'
   if (item.actorType === 'integration')
-    return item.capabilityId ?? 'Unnamed integration'
+    return item.integrationName ?? 'Unnamed integration'
   return item.source === 'merge' ? 'A merge' : 'System'
 }
 
@@ -68,6 +69,9 @@ export const VERB_LABELS: Record<string, string> = {
   'space.created': 'created this space',
   'term.created': 'defined a term',
   'mandate.created': 'wrote the mandate',
+  // A plugin's Content.emitSignal (packages/core/src/writes/ports/content.ts);
+  // the actor is the integration, named from `meta.integrationId`.
+  'signal.emitted': 'reported a signal',
   // The portfolio ledger's verbs (lib/portfolio/write.ts, holding.ts,
   // reverse.ts). Read raw as `mark.added` on every company record until
   // 2026-09-30; a producer's verb is pinned here by record-timeline.test.ts.
@@ -105,6 +109,7 @@ export const VERB_TYPES: Record<string, string> = {
   'space.created': 'born',
   'term.created': 'term',
   'mandate.created': 'mandate',
+  'signal.emitted': 'signal',
   'holding.created': 'holding',
   'holding.writtenoff': 'writeoff',
   'investment.added': 'invest',

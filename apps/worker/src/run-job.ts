@@ -1,10 +1,11 @@
-import { Cause, Context, Duration, Effect, Exit, Option, Schema } from 'effect'
+import { Cause, Context, Duration, Effect, Exit, Option } from 'effect'
 import type { Layer } from 'effect'
 import { eq } from 'drizzle-orm'
 import type { JobWithMetadata, PgBoss } from 'pg-boss'
 import type { z } from 'zod'
 import { db } from '@spaces/db'
 import { jobRun } from '@spaces/db/schema'
+import { JobPermanent, JobRateLimited, JobRetryable } from '@spaces/sdk'
 import type { JobRunStatus } from '@spaces/db/schema/jobs'
 
 /**
@@ -32,30 +33,17 @@ import type { JobRunStatus } from '@spaces/db/schema/jobs'
 // ---------------------------------------------------------------------------
 
 /**
- * The work may succeed on a later attempt: a network blip, a blob the store
- * has not replicated yet, a lock held elsewhere. Retry handling belongs to
- * the queue's retryLimit/retryBackoff — the wrapper never counts attempts.
+ * The three outcomes are the SDK's classes (sdk-11, checkpoint review of
+ * PR #4), not a second set sharing their tags: a plugin job's failure and a
+ * core job's are the same class, so `runJob` treats both identically.
+ * `JobRetryable` — may succeed on a later attempt; retry handling belongs to
+ * the queue's retryLimit/retryBackoff, the wrapper never counts attempts.
+ * `JobRateLimited` — a throttle, not a failure: the job is completed and
+ * re-sent with `startAfter`, so waiting on someone else's rate limit never
+ * burns the retry budget. `JobPermanent` — running it again would produce
+ * the same result; fail now, no retry.
  */
-export class JobRetryable extends Schema.TaggedError<JobRetryable>()(
-  'JobRetryable',
-  { reason: Schema.String },
-) {}
-
-/**
- * A throttle, not a failure. The job is completed and re-sent with
- * `startAfter`, so waiting on someone else's rate limit never burns the
- * retry budget that real failures need.
- */
-export class JobRateLimited extends Schema.TaggedError<JobRateLimited>()(
-  'JobRateLimited',
-  { reason: Schema.String, retryAfterMs: Schema.Number },
-) {}
-
-/** Running it again would produce the same result. Fail now, no retry. */
-export class JobPermanent extends Schema.TaggedError<JobPermanent>()(
-  'JobPermanent',
-  { reason: Schema.String },
-) {}
+export { JobPermanent, JobRateLimited, JobRetryable }
 
 export type JobFailure = JobRetryable | JobRateLimited | JobPermanent
 

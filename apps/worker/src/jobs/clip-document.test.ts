@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { minimalPdf } from '#web/test/minimal-pdf'
 import { JobContext } from '../run-job'
 import { CLIP_MAX_BYTES, clipDocument } from './clip-document'
+import { Enqueue } from '@spaces/core/queue/enqueue'
+import { enqueue as stubSend } from '#web/test/queue-stub'
 
 /**
  * document.clip driven end to end (SPA-117) — the row from `clipUrlProgram`,
@@ -24,6 +26,10 @@ import { CLIP_MAX_BYTES, clipDocument } from './clip-document'
  * `#/test/queue-stub`.
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
+
+// Birth's extraction enqueue is core's `Enqueue` service since SPA-201;
+// here it records into the same stub the mocked `#web/lib/queue` does.
+const stubEnqueue = Enqueue.fromSender({ enqueue: stubSend })
 
 beforeEach(async () => {
   const { enqueued } = await import('#web/test/queue-stub')
@@ -372,7 +378,7 @@ describe('clipDocument', () => {
       const { storage } = await import('@spaces/core/writes/storage')
       const { blobIsReferenced } = await import('#web/lib/documents/blob-refs')
       const { intakeDocumentProgram } =
-        await import('#web/lib/documents/intake')
+        await import('@spaces/core/writes/documents/intake')
       const { Effect } = await import('effect')
 
       const bytes = minimalPdf('The very same deck')
@@ -391,7 +397,7 @@ describe('clipDocument', () => {
           provenance: {},
           fileAgainst: [],
           actor: { userId: await actorId() },
-        }),
+        }).pipe(Effect.provide(stubEnqueue)),
       )
 
       stubFetch(() =>

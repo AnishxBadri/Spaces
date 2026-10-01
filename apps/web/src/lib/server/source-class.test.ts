@@ -80,7 +80,9 @@ describe('document provenance', () => {
     const { document } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
     const { documentProvenance } = await import('./shared')
-    const { birthDocumentProgram } = await import('#/lib/documents/birth')
+    const { birthDocumentProgram } =
+      await import('@spaces/core/writes/documents/birth')
+    const { webEnqueue } = await import('#/lib/enqueue-live')
     const tag = randomUUID().slice(0, 8)
 
     const { id } = await Effect.runPromise(
@@ -95,7 +97,7 @@ describe('document provenance', () => {
         provenance: {},
         fileAgainst: [{ kind: 'record', entityId: await aRecord(tag) }],
         actor: { userId: await actorId() },
-      }),
+      }).pipe(Effect.provide(webEnqueue)),
     )
 
     const row = (

@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute, attributeEvent, entity, link } from '@spaces/db/schema'
 import type { attributeEventSource } from '@spaces/db/schema'
@@ -266,6 +266,35 @@ export type SetValuesInput = {
    * same transaction and registry read as the supplied values.
    */
   fillDefaults?: { now: Date }
+  /**
+   * Fill-blanks mode (sdk-9, `Facts.fill`; spec-plugin-sdk §4, CONTEXT.md
+   * "Enrichment" — never overwrite a manually-edited field). Decided here,
+   * after the `FOR UPDATE` row lock, against the values the lock returned:
+   * deciding "blank" before the transaction is the read-modify-write race
+   * the lock exists to prevent. Per slug the patch changes:
+   *
+   * - blank (absent or null) → filled;
+   * - held, and the slug's latest `attribute_event` is this write's own
+   *   actor (same type and id) recording the value still held → updated in
+   *   place: machine-over-machine by the same integration is a fill;
+   * - held by anyone else — a person, another integration, a merge, a
+   *   value with no event at all → refused, written nowhere, and handed
+   *   back in `conflicts`. Disagreement between providers is normal;
+   *   last-write-wins would corrupt it.
+   *
+   * Validation still runs over the whole patch first, so a value the
+   * registry refuses fails the write (`AttributeValidationError`) whether
+   * or not its slug would have conflicted, and a required attribute's
+   * empty value is the same refused clear it is for a person.
+   */
+  fillBlanks?: true
+}
+
+/** A value fill-blanks mode refused: someone else's value is already there. */
+export type ValueConflict = {
+  slug: string
+  existing: Json
+  proposed: Json
 }
 
 /**
@@ -294,6 +323,60 @@ export type SetValuesResult = {
    * already. A clear is not here: its chunks were deleted inside the write.
    */
   reembed: Array<EmbedSource>
+  /**
+   * What fill-blanks mode refused (`SetValuesInput.fillBlanks`), in patch
+   * order, each with the value held and the value proposed. Always empty
+   * for a patch write.
+   */
+  conflicts: Array<ValueConflict>
+}
+
+/**
+ * Who wrote the value each held slug carries now: the latest
+ * `attribute_event` per slug, read inside the caller's transaction after the
+ * entity row lock — so a concurrent write to the same record has either
+ * committed (and is read here) or is waiting on the lock.
+ */
+async function lastWriters(tx: Tx, entityId: string, slugs: Array<string>) {
+  if (slugs.length === 0) return new Map<string, LastWriter>()
+  const rows = await tx
+    .selectDistinctOn([attributeEvent.attrSlug], {
+      slug: attributeEvent.attrSlug,
+      to: attributeEvent.to,
+      actorType: attributeEvent.actorType,
+      actorId: attributeEvent.actorId,
+      actorRef: attributeEvent.actorRef,
+    })
+    .from(attributeEvent)
+    .where(
+      and(
+        eq(attributeEvent.entityId, entityId),
+        inArray(attributeEvent.attrSlug, slugs),
+      ),
+    )
+    .orderBy(attributeEvent.attrSlug, desc(attributeEvent.at))
+  return new Map(rows.map((r) => [r.slug, r]))
+}
+
+type LastWriter = {
+  to: Json | null
+  actorType: Actor['type']
+  actorId: string | null
+  actorRef: string | null
+}
+
+/** The held value is this actor's own: its latest event is ours and still true. */
+const ownedBy = (actor: Actor, held: Json, last: LastWriter | undefined) => {
+  if (last === undefined || last.actorType !== actor.type) return false
+  if (JSON.stringify(last.to ?? null) !== JSON.stringify(held)) return false
+  switch (actor.type) {
+    case 'user':
+      return last.actorId === actor.id
+    case 'integration':
+      return last.actorRef === actor.id
+    case 'system':
+      return true
+  }
 }
 
 /**
@@ -318,6 +401,7 @@ export async function setValuesInTx(
     refs,
     batchId,
     fillDefaults,
+    fillBlanks,
   } = opts
   const actorId = actor.type === 'user' ? actor.id : null
   // The other half of the typed actor: set iff type = 'integration', which
@@ -360,7 +444,32 @@ export async function setValuesInTx(
 
   // Planning is synchronous and pure; a typed failure surfaces as a
   // throw here and is passed through untouched by the catch below.
-  const changes = Effect.runSync(planPatch(registry, current, patch))
+  const planned = Effect.runSync(planPatch(registry, current, patch))
+
+  // Fill-blanks mode: split the plan into what may land and what someone
+  // else already holds. Conflicted slugs leave the patch altogether — no
+  // event, no identity reconcile, no default — as if never named.
+  const conflicts: Array<ValueConflict> = []
+  let changes = planned
+  let effectivePatch = patch
+  if (fillBlanks) {
+    const writers = await lastWriters(
+      tx,
+      entityId,
+      planned.filter((c) => c.before !== null).map((c) => c.slug),
+    )
+    changes = []
+    for (const c of planned) {
+      if (c.before === null || ownedBy(actor, c.before, writers.get(c.slug)))
+        changes.push(c)
+      else
+        conflicts.push({ slug: c.slug, existing: c.before, proposed: c.value })
+    }
+    const refused = new Set(conflicts.map((c) => c.slug))
+    effectivePatch = Object.fromEntries(
+      Object.entries(patch).filter(([slug]) => !refused.has(slug)),
+    )
+  }
 
   // Birth mode: defaults for whatever the patch left blank, planned
   // against the same registry snapshot and written through their own
@@ -375,7 +484,7 @@ export async function setValuesInTx(
     const userId = actor.type === 'user' ? actor.id : null
     const defaultPatch: Record<string, unknown> = {}
     for (const def of registry) {
-      if (def.slug in patch) continue
+      if (def.slug in effectivePatch) continue
       // Absent and null both mean "blank" — a default fills either.
       if ((afterPatch[def.slug] ?? null) !== null) continue
       const v = resolveDefault(def, { now: fillDefaults.now, userId })
@@ -457,7 +566,7 @@ export async function setValuesInTx(
   // take the domain.
   const identity: Record<string, IdentityOutcome> = {}
   const identityValues: Record<string, string> = {}
-  for (const work of planIdentity(registry, current, patch, changes)) {
+  for (const work of planIdentity(registry, current, effectivePatch, changes)) {
     if (work.held !== null && work.held !== work.value) {
       await releaseIdentityAlias(tx, entityId, work.key, work.held)
     }
@@ -498,6 +607,7 @@ export async function setValuesInTx(
     defaulted: changes.filter((c) => c.door === 'default').map((c) => c.slug),
     identity,
     identityValues,
+    conflicts,
   }
 }
 

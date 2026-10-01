@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "suggestion_open_integration_unique" ON "suggestion" USING btree ("entity_id",jsonb_path_query_array("payload", '$.keyvalue().key'),md5(jsonb_path_query_array("payload", '$.*.value')::text)) WHERE "suggestion"."status" = 'open' AND "suggestion"."kind" = 'attribute_patch' AND "suggestion"."proposed_by_type" = 'integration';

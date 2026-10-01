@@ -50,6 +50,21 @@ export const integrationStatus = pgEnum('integration_status', [
  */
 export type IntegrationConfig = { [k: string]: Json }
 
+/**
+ * The plugin's validated `manifest.json`, as the loader last parsed it
+ * (sdk-11). Web renders actions, settings and ingress from this column and
+ * never reads `/data/plugins` — which is what keeps "web never executes
+ * plugin code" true when web and the worker are separate containers.
+ *
+ * Typed as JSON here, not as the SDK's `Manifest`: packages/db imports
+ * nothing internal (the eslint db zone). The loader writes only what
+ * `manifestSchema` accepted, and a reader that needs the fields decodes it
+ * with `manifestSchema` again — the one decode the principle asks for. Null
+ * until the loader has validated the plugin once, and always null for a
+ * first-party `core.*` row, which has no manifest.
+ */
+export type IntegrationManifest = { [k: string]: Json }
+
 export const integration = pgTable('integration', {
   id: uuid('id').primaryKey().defaultRandom(),
   /** `manifest.id` — the capability this row installs. */
@@ -64,6 +79,7 @@ export const integration = pgTable('integration', {
   enabled: boolean('enabled').notNull().default(false),
   status: integrationStatus('status').notNull().default('installing'),
   config: jsonb('config').$type<IntegrationConfig>().notNull().default({}),
+  manifest: jsonb('manifest').$type<IntegrationManifest>(),
   /** BYOK key (an Apollo token); null for a plugin that needs none. */
   credentialId: uuid('credential_id').references(() => credential.id),
   /** OAuth grant (a Gmail mailbox); null for a plugin that needs none. */

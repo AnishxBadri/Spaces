@@ -5,8 +5,9 @@ import { db } from '@spaces/db'
 import { chunk, document, entity, note } from '@spaces/db/schema'
 import type { NotePayload } from '@spaces/core/ai/note'
 import { QUEUES } from '@spaces/core/queue/names'
-import { assembleProgram } from '#/lib/context/assemble'
-import { resolveRefsProgram } from '#/lib/context/names'
+import { assembleProgram } from '@spaces/core/writes/context/assemble'
+import { resolveRefsProgram } from '@spaces/core/writes/context/names'
+import { SimilarLaneLive } from './similar'
 import { parseRef, ref } from '@spaces/core/context/ref'
 import type { ContextItem } from '@spaces/core/context/types'
 import { enqueue, jobsByKey } from '#/lib/queue'
@@ -371,7 +372,10 @@ const summarizeInRun = Effect.fn('summarize.inRun')(function* (
     const around = yield* assembleProgram(
       { entityId: documentId },
       { user, asOf, budgetChars: SUMMARIZE_CONTEXT_CHARS },
-    ).pipe(Effect.mapError((cause) => new SummarizeQueryFailed({ cause })))
+    ).pipe(
+      Effect.provide(SimilarLaneLive),
+      Effect.mapError((cause) => new SummarizeQueryFailed({ cause })),
+    )
     items = [...own, ...around.items]
   } else {
     source = {
@@ -382,7 +386,10 @@ const summarizeInRun = Effect.fn('summarize.inRun')(function* (
     const assembled = yield* assembleProgram(
       { entityId: record.id },
       { user, asOf, budgetChars: SUMMARIZE_CONTEXT_CHARS },
-    ).pipe(Effect.mapError((cause) => new SummarizeQueryFailed({ cause })))
+    ).pipe(
+      Effect.provide(SimilarLaneLive),
+      Effect.mapError((cause) => new SummarizeQueryFailed({ cause })),
+    )
     items = [...assembled.items]
   }
 

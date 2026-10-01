@@ -360,52 +360,24 @@ export async function documentFilingEdges(
 }
 
 /**
- * Where a document is filed (SPA-19). Two mechanisms, never mixed, exactly
- * the split notes already carry (CONTEXT.md → Sources are documents): a
- * record files through `link(tagged_in)`, a space files through
- * `entity_space`, which is what gives a space-filed document the
- * source/confidence provenance every other member of a space has.
- *
- * It is a discriminated union rather than a bare uuid because the old
- * `attachTo: string` made "a space is a link target" expressible, and the
- * whole of migration 0008 was undoing that for notes. Here the caller has to
- * say which mechanism it means, and the writer checks the entity agrees.
+ * Where a document is filed (SPA-19), and why a target refuses a filing —
+ * pure, and in `@spaces/core/documents/filing` since SPA-201 (sdk-8a), where
+ * document birth now lives. Re-exported here so the server fns, §3.3's
+ * re-file and the upload dialog keep importing them from where they always
+ * did.
  */
-export type DocumentFilingTarget =
-  { kind: 'record'; entityId: string } | { kind: 'space'; entityId: string }
-
-/**
- * Why this entity may not take this filing, or `null` if it may. Pure and
- * shared, so the server fn's early refusal and the writer's own guard cannot
- * drift apart — the server fn refuses before the storage probe's cost is
- * spent, the writer refuses whoever calls it without one.
- *
- * `space` and `document` are the two refusals on the record side: a space is
- * filed *into*, and a document filed against a document is a mention.
- */
-export function documentFilingRefusal(
-  target: DocumentFilingTarget,
-  entityKind: string,
-): string | null {
-  if (target.kind === 'space') {
-    return entityKind === 'space'
-      ? null
-      : `A document files into a space through entity_space — that target is a ${entityKind}.`
-  }
-  if (entityKind === 'space')
-    return 'A space is filed into, not against — file the document into it.'
-  if (entityKind === 'document')
-    return 'A document is filed against a record, not against another document.'
-  return null
-}
+export { documentFilingRefusal } from '@spaces/core/documents/filing'
+export type { DocumentFilingTarget } from '@spaces/core/documents/filing'
 
 /**
  * The dedupe guard and the writer both moved to `#/lib/documents/birth.ts`
- * (SPA-113). §3.1's one server path owns them together — the read has to
+ * (SPA-113), and from there to `@spaces/core/writes/documents/birth`
+ * (SPA-201). §3.1's one server path owns them together — the read has to
  * mirror the writer's table choice, and both had to widen to an **array** of
  * targets at once — and birth lives outside `lib/server/` so the barrel
- * cannot drag it into the browser. What stays here is `documentFilingRefusal`
- * above, which is pure and shared with §3.3's re-file.
+ * cannot drag it into the browser. What stays here is the re-export of
+ * `documentFilingRefusal` above, which is pure and shared with §3.3's
+ * re-file.
  */
 
 /**

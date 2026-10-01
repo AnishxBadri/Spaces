@@ -1,0 +1,16 @@
+{
+  "//": "The emit program behind `pnpm build`: ESM + d.ts into dist/. Relative imports are written with `.ts` like everywhere in the workspace, and `rewriteRelativeImportExtensions` turns them into `.js` in the output.",
+
+  "extends": "./tsconfig.json",
+
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"],
+
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  }
+}

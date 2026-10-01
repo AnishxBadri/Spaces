@@ -48,25 +48,69 @@ pnpm worker                                       # the worker alone (apps/worke
   provenance), the view store, `chunk-sources` (SPA-174/175), the BYOK
   vault (`writes/vault/*`, SPA-176), the blob backend (`writes/storage/*`,
   SPA-178; `./writes/storage/local`'s token helpers are public on purpose for
-  the blob route) and the boot composition (`writes/boot.ts` with
+  the blob route), the live plugin ports (`writes/ports/*`, SPA-197 on:
+  Layer constructors over the bound `integration` row — Config, Secrets,
+  Log, and Http with its per-process throttle; Read since SPA-198;
+  Identity and Receipts since SPA-199, whose provenance — `source_ref`,
+  `enrichment_record.integration_id`, `signal.source_class`/`source_ref`
+  (migration 0056) — comes from the row, never the plugin, and whose
+  handed-back work goes through core's `Enqueue` service
+  (`@spaces/core/queue/enqueue`; the worker's Live is
+  `apps/worker/src/plugins/enqueue.ts`, on `createSender`)), the
+  graph's read half (`writes/read/*`, SPA-198: MCP's `get_record` program,
+  `entitySearchRows`, and the lexical fused search statement with
+  `canReadNoteSql` — apps/web re-exports all three and keeps only the
+  semantic lane), the write lanes the ports and apps/web share — the
+  integration interaction writer (`writes/interactions/write.ts`, SPA-200:
+  row, body note, edges, dedupe by `message_id`; the mailbox and
+  `Content.logInteraction` both call it), document birth, intake and
+  prepare (`writes/documents/*`, SPA-201: the extraction enqueue is the
+  `Enqueue` service, which apps/web provides as `webEnqueue` from
+  `lib/enqueue-live.ts`), and `proposeProgram` (`writes/suggestions/
+propose.ts`, SPA-204, with migration 0057's partial unique index making an
+  identical open integration proposal a database no-op; the accept path
+  stays in apps/web) — and the boot composition (`writes/boot.ts` with
   `writes/seeds/taxonomy.ts`, SPA-177; `apps/web/src/db/boot.ts` is the
   process shell that runs it) — and is the only place in core a `drizzle-orm` import or a
   `db` value import passes. The pure half also holds the context assembler's
   ranker, ref grammar and renderer (`context/*`) and `canRead`
-  (`read-policy.ts`, SPA-179; the db-coupled assembler is still
-  `apps/web/src/lib/context/`). Neither half imports React, and only
+  (`read-policy.ts`, SPA-179) and the `SimilarLane` service tag
+  (`context/similar-lane.ts`, SPA-182/D58); the db-coupled assembler
+  (`assemble`, `names`, `record`) is `writes/context/*` and declares that
+  service, whose one live Layer is `apps/web/src/lib/ai/similar.ts` beside
+  the embedding pin it reads. Neither half imports React, and only
   `writes/vault/` (MASTER_KEY, DATA_DIR) and `writes/storage/`
   (STORAGE_DRIVER, S3_*) read `process.env` — which is why
   `enqueueSourceEmbed` stayed in
   `apps/web/src/lib/ai/enqueue-embed.ts`: core's write paths hand back
   `reembed` and the server fn queues it. The jsonb readers are
-  `@spaces/core/json`. `packages/*` is where `sdk` lands later.
+  `@spaces/core/json`.
+  **`packages/sdk` (`@spaces/sdk`) is the plugin contract since SPA-191
+  (sdk-3)**: the manifest (`manifestSchema`, `defineManifest`, no plugin
+  `kind` — D51), `SDK_VERSION` and `satisfiesSdk`, `definePlugin`, and the
+  plugin build (`@spaces/sdk/build`, a vite config every plugin reuses) and
+  the packer (`@spaces/sdk/pack`, SPA-193: ustar + ed25519; core's
+  `plugins/verify.ts` is the other half, and `registry.json` and
+  `plugin-keys/` at the root are copied into the image), the port tags and
+  `@spaces/sdk/testing` (SPA-196), and the identity-key normalizers
+  (`@spaces/sdk/identity`, SPA-195 — `@spaces/core/entities/normalize` is a
+  re-export of it, so core imports the sdk at runtime). It
+  depends on effect, zod and tldts (D55) and nothing internal,
+  and — unlike db and core — its `exports` point at `dist/` (ESM + d.ts,
+  `tsc -p tsconfig.build.json`), because a plugin bundle leaves it as a bare
+  import node resolves at runtime; turbo's `^build` edge builds it before
+  any dependent's `dev`, typecheck, test or lint, and the Dockerfile builds
+  it before web and the worker. Its suite needs no Postgres.
+  **`plugins/*` and `plugins/_fixtures/*` are workspace packages** named
+  `@spaces/plugin-<id>`, depending on `@spaces/sdk` only (effect and zod are
+  peers the host provides); `plugins/_fixtures/echo` is the first.
   **`packages/config` (`@spaces/config`) holds the shared configuration since
   SPA-180: `tsconfig.base.json`, the eslint base (`eslint.base.js`, with
   the architecture zones and the spec §2 boundary rules) and its rule
   modules in `eslint-rules/` (gate 5's `instrument/vocabulary`),
-  `prettier.base.js`, and `fixtures/{sdk,plugins}` — the two directories
-  the sdk and plugin zones are fenced against until those packages exist.**
+  and `prettier.base.js`. The sdk and plugin zones are proved on the real
+  packages by `packages/sdk/src/fence.test.ts` (SPA-191 retired the
+  placeholder `fixtures/{sdk,plugins}` they were fenced against).**
   **`apps/worker` (`@spaces/worker`) is the worker process since SPA-181
   (mono-11a)**: the pg-boss host (`src/index.ts`), `runJob`, the heartbeat,
   the container health command and every job module under `src/jobs/`,
@@ -85,6 +129,16 @@ pnpm worker                                       # the worker alone (apps/worke
   it with `pnpm worker` from the root (a plain `--filter` proxy) or
   `corepack pnpm worker` inside `apps/worker`; `pnpm dev` now runs it too,
   under turbo's persistent `dev` task, in watch mode.
+  **Its plugin loader (SPA-194, sdk-11) is `src/plugins/`**: boot
+  reconciliation of enabled `integration` rows against
+  `<dataDir>/plugins/<id>/current/`, before any queue registers, and a
+  `node:module` resolve hook (`host-resolve.ts`) that hands a bundle's bare
+  `effect`/`zod`/`@spaces/sdk` imports the worker's own copies — which is
+  why the worker's vite build leaves `@spaces/sdk` external and the image
+  copies it into `/app/node_modules`, and why its vitest config hands
+  `packages/sdk/dist` and plugin bundles to node. The loader fixtures
+  (`plugins/_fixtures/{old-sdk,needs-key,tampered}` beside echo) are its
+  devDependencies, so turbo builds them before its tests.
   What stayed at the root: `eslint.config.js` and `prettier.config.js` as
   one-line shims re-exporting `@spaces/config/eslint` and
   `@spaces/config/prettier` (both tools look their config up from the cwd,
@@ -173,8 +227,8 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
    half, one task per package). The root script runs them all; a bare root
    `tsc` would pass while typechecking none of them.
 2. `pnpm test` → `turbo run test` (`vitest run` in `apps/web`, `apps/worker`,
-   `packages/db` and `packages/core`, each with its own vitest config) —
-   must be fully green
+   `packages/db`, `packages/core`, `packages/sdk` and each plugin under
+   `plugins/`, each with its own vitest config) — must be fully green
 3. prettier on touched files (root: `pnpm exec prettier --check <files>`) —
    not a turbo task; it is per-file, not per-package
 4. `pnpm lint` → `turbo run lint lint:root` — must be zero errors (the old
@@ -219,7 +273,7 @@ Pre-commit hooks (lefthook) run prettier + eslint on staged files from the
 repo root, where the two shims hand both tools `packages/config`'s settings;
 pre-push runs `pnpm run typecheck`, which is turbo over every package that
 has one — `@spaces/web`, `@spaces/worker`, `@spaces/db`, `@spaces/core`,
-`@spaces/config` — plus the `typecheck:root` half, so no package can be
+`@spaces/sdk`, `@spaces/config` and every `@spaces/plugin-*` — plus the `typecheck:root` half, so no package can be
 typechecked by nobody.
 CI (`.github/workflows/ci.yml`) runs the same root commands, **one named step
 per gate** against a real Postgres: prettier, `pnpm run lint` (which carries

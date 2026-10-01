@@ -33,7 +33,7 @@ import { MAILBOX_CAPABILITY, saveMailboxProgram } from './settings'
 
 /**
  * SPA-115 against a real database: forwarded attachments go through the
- * documents intake (`lib/documents/intake.ts`) and land on the company the
+ * documents intake (core's `writes/documents/intake.ts`) and land on the company the
  * thread matched, or nowhere. The poll runs against the fake IMAP server as
  * in `poll.test.ts`; the byte half is the real intake over the real storage
  * driver, so "one blob" is a statement about the store, not a mock.

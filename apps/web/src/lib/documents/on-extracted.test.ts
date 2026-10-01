@@ -13,7 +13,8 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { enqueued } from '#/test/queue-stub'
 import { setAiRouteProgram } from '#/lib/ai/route'
 import { storeCredential } from '@spaces/core/writes/vault'
-import { birthDocumentProgram } from './birth'
+import { birthDocumentProgram } from '@spaces/core/writes/documents/birth'
+import { webEnqueue } from '#/lib/enqueue-live'
 import { onDocumentExtracted } from './on-extracted'
 
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
@@ -57,7 +58,7 @@ async function extracted(
         opts.sourcePath === undefined ? {} : { sourcePath: opts.sourcePath },
       fileAgainst: [],
       actor: { userId: USER },
-    }),
+    }).pipe(Effect.provide(webEnqueue)),
   )
   // Exempt from the one-writer rule: the fixture stands in for the job
   // whose tail this file tests.

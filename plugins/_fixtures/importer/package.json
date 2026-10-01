@@ -1,0 +1,30 @@
+{
+  "//": "A fixture (SPA-203, sdk-8), not a product: one importer-shaped `file` job that reads the company's domain off the filename, resolves it through Identity, and files the bytes against it through Content.fileDocument — core's intake on the live Layer, so the size meter, the dedupe and the extraction enqueue are the hand upload's. Its `uses` names no Facts: an importer of documents writes evidence, never an attribute. Tested on @spaces/sdk/testing's Layers with no database, and on the live ports by apps/worker's `importer-live.test.ts`.",
+  "name": "@spaces/plugin-importer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
+    "zod": "^4.3.6"
+  }
+}

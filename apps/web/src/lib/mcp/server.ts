@@ -6,7 +6,8 @@ import { z } from 'zod'
 import {
   DEFAULT_BUDGET_CHARS,
   recordContextProgram,
-} from '#/lib/context/record'
+} from '@spaces/core/writes/context/record'
+import { SimilarLaneLive } from '#/lib/ai/similar'
 import { authenticateBearerProgram } from '#/lib/tokens/store'
 import type { TokenUser } from '#/lib/tokens/store'
 import { getRecordProgram, resolveEntityRefProgram } from './tools'
@@ -99,7 +100,7 @@ export function buildMcpServer(reader: TokenUser): McpServer {
             budgetChars: budget ?? DEFAULT_BUDGET_CHARS,
             similar: false,
             taskText: task?.trim() ? task.trim() : undefined,
-          })
+          }).pipe(Effect.provide(SimilarLaneLive))
         }),
       ),
   )

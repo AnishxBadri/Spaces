@@ -11,7 +11,7 @@ import {
 import { MAX_UPLOAD_BYTES, formatBytes } from '@spaces/core/documents'
 import { GridRefused, readGrid } from '@spaces/core/import/read'
 import { reclaimBlobIfOrphaned } from '#/lib/documents/blob-refs'
-import { putBlobProgram } from '#/lib/documents/intake'
+import { putBlobProgram } from '@spaces/core/writes/documents/intake'
 import { storage } from '@spaces/core/writes/storage'
 import type { Grid, Sheet } from '@spaces/core/import/read'
 import type { ImportBatchStatus, ImportMode } from '@spaces/db/schema'

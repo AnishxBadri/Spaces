@@ -13,7 +13,7 @@ import { user } from '@spaces/db/schema/auth'
 import { apiToken } from '@spaces/db/schema/tokens'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
-import { getRecordContextHandler } from '#/lib/context/record-handler'
+import { getRecordContextHandler } from '#/lib/ai/record-context-handler'
 import {
   createApiTokenProgram,
   listApiTokensProgram,

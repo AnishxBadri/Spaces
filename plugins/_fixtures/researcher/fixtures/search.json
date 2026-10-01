@@ -1,0 +1,20 @@
+{
+  "requestId": "req_7a1c",
+  "results": [
+    {
+      "url": "https://news.example/2026/09/northwind-seed",
+      "title": "Northwind Robotics raises a $4M seed",
+      "publishedDate": "2026-09-28T07:30:00Z",
+      "score": 0.91,
+      "author": "A. Reporter"
+    },
+    {
+      "url": "https://blog.example/warehouse-robots",
+      "title": "Who is teaching warehouse robots new SKUs?",
+      "score": 0.64
+    },
+    {
+      "url": "https://jobs.example/northwind/ml-engineer"
+    }
+  ]
+}

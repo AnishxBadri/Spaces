@@ -204,23 +204,26 @@ research: ({ entityId }) =>
       numResults: cfg.maxResults,
     })
     const content = yield* Content
-    for (const h of hits)
-      yield* content.emitSignal({
+    const refs: Array<Ref> = []
+    for (const h of hits) {
+      const { signalId } = yield* content.emitSignal({
+        _tag: 'signal',
         entityId,
         kind: 'web',
         url: h.url,
         title: h.title,
         publishedAt: h.date,
       })
+      refs.push(`event:${signalId}`) // cite the signal, not the URL (D4)
+    }
     const ai = yield* Ai
     const brief = yield* ai.complete('synthesize', toContextItems(hits))
     const judge = yield* Judgment
     yield* judge.suggest({
       entityId,
-      kind: 'note',
-      body: brief,
+      proposal: { kind: 'note', body: brief },
       rationale: 'Exa web research',
-      refs: hits.map((h) => h.url),
+      refs,
     })
   })
 // R = Config | Http | Read | Content | Ai | Judgment. No Facts, no Identity — this job never declared them.
@@ -249,13 +252,31 @@ fixes what the job is handed and what it hands back. The set is closed and
 semver-frozen with the SDK; a new trigger is a minor.
 
 ```ts
-action:   (input: { entityId }) → Effect<void, JobError, R>          // manifest actions[] — the "Enrich" button
-            cost?: (input: { entityIds, fields? }) → { credits: number }   // D53, pure, action jobs only
+action:   run | { run, cost? }                                        // manifest actions[] — the "Enrich" button
+            run:  (input: { entityId }) → Effect<void, JobError, R>
+            cost: (input: { entityIds, fields? }) → { credits: number }   // D53, pure, action jobs only
 schedule: (input: { cursor: string | null }) → Effect<{ nextCursor: string | null }, JobError, R>   // Gmail, Calendar
 event:    (input: { event: DomainEvent }) → Effect<void, JobError, R>  // on: ['entity.created'] — enrich-on-create
-webhook:  { verify(req) → boolean; handle(payload) → Effect<void, JobError, R> }   // call recorders; §11 ingress
-file:     (input: { stream, filename, mime }) → Effect<void, JobError, R>          // an importer: CSV, WhatsApp export
+webhook:  (input: { payload, receivedAt }) → Effect<void, JobError, R>  // call recorders; §11 ingress
+file:     (input: { stream: ReadableStream<Uint8Array>, filename, mime }) → Effect<void, JobError, R>   // an importer
 ```
+
+The types are `packages/sdk/src/contract.ts` (sdk-4a), one file: `JobError`
+is `JobRetryable | JobRateLimited | JobPermanent`, the worker's three
+`runJob` outcomes under the same tags; `DomainEvent` is closed over
+`DOMAIN_EVENTS` (`entity.created` in v1 — the manifest's `on` validates
+against it); `PORT_NAMES` is the §4 table minus Clock (Effect ships one) and
+is what `uses` validates against.
+
+**A webhook job has no `verify` (checkpoint review, 2026-10-01).** Plugin
+code runs only in the worker, after web has already answered the provider's
+request, so a plugin-side check could gate nothing; running it in web would
+break "web never executes plugin code". Signature checking is
+manifest-declared (`ingress.signature`) and done by core in web (sdk-23)
+before the payload is stored; the job is handed the stored payload like any
+other. If a provider ever needs a plugin-side check, it arrives as an
+optional field — a minor; shipping `verify` now and removing it later would
+have been a major.
 
 **A job calls ports; it does not return claims (D52).** Each write port
 calls its lane at once and returns what the lane decided —
@@ -271,6 +292,19 @@ the order the job's code runs in, and each lane keeps its own idempotency
 (`resolveEntity` on identity keys, `Facts.fill` inside the row lock,
 interactions on `message_id`). An importer (the `file` trigger) still speaks
 claims, never a grid (D39) — it speaks them through Identity/Facts/Content.
+
+The claims (sdk-4a): `IdentityClaim { kind: company | person, keys:
+{ domain?, email?, linkedin?, cin? }, name? }` and `AliasClaim`;
+`FactClaim { entityId, values, receiptId? }` — `receiptId` is evidence (it
+becomes the attribute events' `refs`), not provenance; `ReceiptClaim
+{ entityId, raw, creditsUsed? }`; the three Content claims tagged by `_tag`
+— `document { body: { stream } | { bytes }, filename, mime, kind?,
+fileAgainst, url? }`, `interaction { kind, occurredAt, entityIds (≥1),
+subject?, messageId?, threadId?, body? }`, `signal { entityId, kind,
+title?, url?, publishedAt?, payload? }`; `JudgmentClaim { entityId,
+proposal: { kind: 'note', body } | { kind: 'attribute', slug, value },
+rationale, refs }`, where a ref is the shipped grammar (D4) and a URL is
+not one — cite the signal it was emitted as.
 
 **Cost (D53).** An `action` job may declare `cost`, a pure function of the
 input returning `{ credits }` in the provider's own unit. The host drops
@@ -293,6 +327,37 @@ manifest. It never decides filing — core's `resolveItem` (storage design,
 CONTEXT "Storage sources") maps folders to entities; the plugin is a bytes
 pipe with hints (`source_path`, folder names). Its body is owned by the
 storage area (project 20).
+
+### 5.1 As built (2026-10-01, SPA-200/201/202/203/204)
+
+What the Live ports do beyond the table above, recorded here so the next
+reader does not re-derive it from the tests:
+
+- **`Content.emitSignal`** also writes one `signal.emitted` activity row with
+  the integration in `meta`; it is how the record timeline shows the signal
+  at all ("`<plugin>` reported a signal"). `Content.logInteraction` is the
+  mailbox's own writer (`writes/interactions/write.ts`): one row per
+  `message_id` through the unique index, a new row each call without one; a
+  plugin-written body is born **`private`** (D30) until a syncer decides per
+  connection, and the claim carries no visibility field.
+- **`Facts.fill`** decides "blank" under the entity row lock (`fillBlanks`
+  in `setValuesInTx`): a slug held by anyone other than this integration —
+  a person, another integration, the system, or a value with no
+  `attribute_event` at all — is a conflict. A conflict is returned to the
+  job **and** raised as one open suggestion in the fill's own transaction,
+  rationale "`<slug>: <plugin> says <proposed>; the record holds
+<existing>`", refs = the receipt. `receiptId` must name a receipt this
+  integration stored, or the fill is `JobPermanent`.
+- **`Judgment.suggest`** and the raised conflicts are deduped by migration
+  0057's partial unique index on open `attribute_patch` rows proposed by an
+  integration, keyed on (entity, slugs, values) and **not** on
+  `proposed_by_id`: two plugins proposing the same value on one record share
+  one open row, and an identical MCP re-proposal returns the existing row.
+- **`Content.fileDocument`** is `intakeDocumentProgram` with source
+  `integration` + the bound row and actor `{ integrationId }`; the
+  `document.filed` activity row carries `actorType`/`integrationId` so the
+  timeline names the plugin. A merged-away `fileAgainst` id files on the
+  survivor.
 
 ## 6. `definePlugin()` and the testing kit
 
@@ -388,9 +453,15 @@ optional `DROP SCHEMA`.
 ## 9. Registry, signing, install from the running deployment
 
 ```
-registry.json  [{ id, version, sdk, kind, name, description, requires,
-                  tarball: url, sha256, sig, minCore? }]
+registry.json  [{ id, version, sdk, name, description, requires?,
+                  tarball: url, sha256, sig, keyId, minCore? }]     // no kind (D51)
 ```
+
+The format is `registryEntrySchema` in `@spaces/sdk/pack` (sdk-21a), which
+also packs: `<id>-<version>.tgz` (gzip'd ustar of manifest.json, bundle.mjs,
+migrations/) + `.sha256` + `.sig`. `verifyPlugin` is
+`@spaces/core/plugins/verify`; CONTEXT.md "Plugin architecture" records the
+key id format, the key directory and the tar choice.
 
 v0: tarballs on GitHub Releases, index committed in-repo and copied into
 the image (offline installs see the shipped list; live refresh when
@@ -440,7 +511,7 @@ image                      core web + worker + loader + registry.json snapshot. 
 ./data/blobs               existing
 ./data/secret.key          existing
 ./data/plugins/<id>/<ver>/ bundle.mjs · manifest.json · migrations/     (+ current symlink)
-./data/plugins/lock.json   { core: '1.4.0', plugins: { apollo: '1.2.0' } }
+./data/plugins/lock.json   { core: '1.4.0', plugins: { apollo: { version: '1.2.0', sha256: '<bundle.mjs>' } } }
 postgres public.*          core
 postgres plugin_<id>.*     plugin, own journal
 integration                enabled rows
@@ -469,6 +540,17 @@ contract 5) stays true.
   `NOTIFY` crosses processes via Postgres. Same flow.
 - Three sources of truth, reconciled at boot: DB row = intent (enabled),
   disk = code present, `lock.json` = pinned versions for reproducibility.
+- **Pinned by sdk-11 (2026-10-01).** A lock entry carries the sha256 of the
+  `bundle.mjs` it pinned beside the version (`@spaces/core/plugins/lock`);
+  until the installer writes one, an absent file or entry loads the plugin
+  **unpinned** (said in its verdict line) and an entry that disagrees with
+  the bytes degrades it. The loader (`apps/worker/src/plugins/loader.ts`)
+  writes the validated manifest to `integration.manifest`, which web renders
+  from; `core.*` rows (the mailbox) are first-party and never reconciled;
+  a bundle's bare `effect` / `zod` / `@spaces/sdk` imports resolve to the
+  worker's own copies through a `node:module` resolve hook, which is why the
+  worker bundle leaves `@spaces/sdk` external and the image carries it in
+  `/app/node_modules`. `/api/health` lists `degradedPlugins`.
 
 ## 11. Workers and jobs
 
@@ -581,7 +663,8 @@ Layered; most value never touches a provider.
 5. **Loader + jobs.** Fixture plugins in `plugins/_fixtures/`: `echo`,
    `throws` (breaker), `old-sdk` (degraded), `needs-key`. Boot the loader on
    a temp dir; assert `integration.status`, registered queues, Layer
-   privilege (a `poller` calling `Facts` → "service not found"). pg-boss on
+   privilege (a job calling `Facts` without `uses: ['Facts']` → "service not
+   found"). pg-boss on
    the test DB for enqueue → run → status stream.
 6. **Real sandboxes, nightly, opt-in.** Dedicated Google Cloud project + Box
    developer account, secrets in CI, conformance for real; failures open an
