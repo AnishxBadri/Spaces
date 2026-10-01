@@ -60,7 +60,16 @@ pnpm worker                                       # the worker alone (apps/worke
   graph's read half (`writes/read/*`, SPA-198: MCP's `get_record` program,
   `entitySearchRows`, and the lexical fused search statement with
   `canReadNoteSql` — apps/web re-exports all three and keeps only the
-  semantic lane) and the boot composition (`writes/boot.ts` with
+  semantic lane), the write lanes the ports and apps/web share — the
+  integration interaction writer (`writes/interactions/write.ts`, SPA-200:
+  row, body note, edges, dedupe by `message_id`; the mailbox and
+  `Content.logInteraction` both call it), document birth, intake and
+  prepare (`writes/documents/*`, SPA-201: the extraction enqueue is the
+  `Enqueue` service, which apps/web provides as `webEnqueue` from
+  `lib/enqueue-live.ts`), and `proposeProgram` (`writes/suggestions/
+propose.ts`, SPA-204, with migration 0057's partial unique index making an
+  identical open integration proposal a database no-op; the accept path
+  stays in apps/web) — and the boot composition (`writes/boot.ts` with
   `writes/seeds/taxonomy.ts`, SPA-177; `apps/web/src/db/boot.ts` is the
   process shell that runs it) — and is the only place in core a `drizzle-orm` import or a
   `db` value import passes. The pure half also holds the context assembler's
