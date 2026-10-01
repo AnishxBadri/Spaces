@@ -50,7 +50,13 @@ pnpm worker                                       # the worker alone (apps/worke
   SPA-178; `./writes/storage/local`'s token helpers are public on purpose for
   the blob route), the live plugin ports (`writes/ports/*`, SPA-197 on:
   Layer constructors over the bound `integration` row — Config, Secrets,
-  Log, and Http with its per-process throttle; Read since SPA-198), the
+  Log, and Http with its per-process throttle; Read since SPA-198;
+  Identity and Receipts since SPA-199, whose provenance — `source_ref`,
+  `enrichment_record.integration_id`, `signal.source_class`/`source_ref`
+  (migration 0056) — comes from the row, never the plugin, and whose
+  handed-back work goes through core's `Enqueue` service
+  (`@spaces/core/queue/enqueue`; the worker's Live is
+  `apps/worker/src/plugins/enqueue.ts`, on `createSender`)), the
   graph's read half (`writes/read/*`, SPA-198: MCP's `get_record` program,
   `entitySearchRows`, and the lexical fused search statement with
   `canReadNoteSql` — apps/web re-exports all three and keeps only the

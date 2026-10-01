@@ -393,6 +393,13 @@
       "when": 1790807552171,
       "tag": "0055_integration_manifest",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1790834834084,
+      "tag": "0056_plugin_provenance",
+      "breakpoints": true
     }
   ]
 }

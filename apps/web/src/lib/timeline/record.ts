@@ -12,6 +12,7 @@ import {
   link,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
+import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { resolveRefsProgram } from '#/lib/context/names'
 import type { ResolvedRef } from '#/lib/context/names'
@@ -73,6 +74,7 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           id: activity.id,
           verb: activity.verb,
           actorId: activity.actorId,
+          meta: activity.meta,
           at: activity.at,
         })
         .from(activity)
@@ -197,7 +199,14 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           type: 'macro' as const,
           id: m.id,
           verb: m.verb,
-          actorName: m.actorId ? (userNames.get(m.actorId) ?? null) : null,
+          // A plugin's port writes its activity with no user (sdk-7a): the
+          // integration it ran as is in `meta.integrationId`, and the row
+          // reads as that plugin's manifest id, never as a person.
+          actorName: m.actorId
+            ? (userNames.get(m.actorId) ?? null)
+            : (capabilityOf.get(
+                jsonString(jsonRecord(m.meta).integrationId) ?? '',
+              ) ?? null),
           at: m.at.toISOString(),
         })),
       ...bursts.map((b, i) => ({
