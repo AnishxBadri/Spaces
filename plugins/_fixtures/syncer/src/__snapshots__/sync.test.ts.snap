@@ -1,0 +1,149 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the syncer sync job, on the test Layers > resolves participants, logs each message, and returns the next cursor 1`] = `
+[
+  {
+    "input": {
+      "headers": {
+        "accept": "application/json",
+      },
+      "method": "GET",
+      "url": "https://mail.example/v1/messages",
+    },
+    "method": "request",
+    "output": {
+      "body": "{"messages":[{"id":"<CAF7x1@mail.northwind-robotics.example>","threadId":"thread-northwind-intro","subject":"Intro: Northwind Robotics","date":"2026-09-29T09:12:00Z","from":{"email":"priya@northwind-robotics.example","name":"Priya Rao"},"to":[{"email":"anish@fund.example","name":"Anish"}],"snippet":"Hi Anish — following up on the demo."},{"id":"<CAF7x2@mail.northwind-robotics.example>","threadId":"thread-northwind-intro","subject":"Re: Intro: Northwind Robotics","date":"2026-09-29T11:40:00Z","from":{"email":"anish@fund.example","name":"Anish"},"to":[{"email":"Priya@Northwind-Robotics.example"},{"email":"cto@northwind-robotics.example","name":"Dev Shah"}]}],"nextCursor":"page-2"}",
+      "headers": {},
+      "status": 200,
+    },
+    "port": "Http",
+  },
+  {
+    "input": {
+      "keys": {
+        "email": "priya@northwind-robotics.example",
+      },
+      "kind": "person",
+      "name": "Priya Rao",
+    },
+    "method": "resolve",
+    "output": {
+      "entityId": "entity-1",
+      "outcome": "created",
+    },
+    "port": "Identity",
+  },
+  {
+    "input": {
+      "keys": {
+        "email": "anish@fund.example",
+      },
+      "kind": "person",
+      "name": "Anish",
+    },
+    "method": "resolve",
+    "output": {
+      "entityId": "entity-2",
+      "outcome": "created",
+    },
+    "port": "Identity",
+  },
+  {
+    "input": {
+      "_tag": "interaction",
+      "body": "Hi Anish — following up on the demo.",
+      "entityIds": [
+        "entity-1",
+        "entity-2",
+      ],
+      "kind": "email",
+      "messageId": "<CAF7x1@mail.northwind-robotics.example>",
+      "occurredAt": "2026-09-29T09:12:00Z",
+      "subject": "Intro: Northwind Robotics",
+      "threadId": "thread-northwind-intro",
+    },
+    "method": "logInteraction",
+    "output": {
+      "interactionId": "interaction-1",
+    },
+    "port": "Content",
+  },
+  {
+    "input": {
+      "keys": {
+        "email": "anish@fund.example",
+      },
+      "kind": "person",
+      "name": "Anish",
+    },
+    "method": "resolve",
+    "output": {
+      "entityId": "entity-2",
+      "outcome": "attached",
+    },
+    "port": "Identity",
+  },
+  {
+    "input": {
+      "keys": {
+        "email": "Priya@Northwind-Robotics.example",
+      },
+      "kind": "person",
+    },
+    "method": "resolve",
+    "output": {
+      "entityId": "entity-1",
+      "outcome": "attached",
+    },
+    "port": "Identity",
+  },
+  {
+    "input": {
+      "keys": {
+        "email": "cto@northwind-robotics.example",
+      },
+      "kind": "person",
+      "name": "Dev Shah",
+    },
+    "method": "resolve",
+    "output": {
+      "entityId": "entity-3",
+      "outcome": "created",
+    },
+    "port": "Identity",
+  },
+  {
+    "input": {
+      "_tag": "interaction",
+      "entityIds": [
+        "entity-2",
+        "entity-1",
+        "entity-3",
+      ],
+      "kind": "email",
+      "messageId": "<CAF7x2@mail.northwind-robotics.example>",
+      "occurredAt": "2026-09-29T11:40:00Z",
+      "subject": "Re: Intro: Northwind Robotics",
+      "threadId": "thread-northwind-intro",
+    },
+    "method": "logInteraction",
+    "output": {
+      "interactionId": "interaction-2",
+    },
+    "port": "Content",
+  },
+  {
+    "input": {
+      "fields": {
+        "cursor": null,
+        "logged": 2,
+        "nextCursor": "page-2",
+      },
+      "message": "synced",
+    },
+    "method": "info",
+    "output": undefined,
+    "port": "Log",
+  },
+]
+`;

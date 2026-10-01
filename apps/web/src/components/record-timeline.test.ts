@@ -25,6 +25,8 @@ const PRODUCED = [
   'space.created',
   'term.created',
   'mandate.created',
+  // packages/core/src/writes/ports/content.ts (sdk-7b)
+  'signal.emitted',
   // the record, note and document verbs pinned before
   'record.created',
   'company.created',

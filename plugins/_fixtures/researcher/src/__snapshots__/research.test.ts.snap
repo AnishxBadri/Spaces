@@ -1,0 +1,111 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the researcher research job, on the test Layers > reads, searches, and emits one signal per hit 1`] = `
+[
+  {
+    "input": {
+      "id": "entity-0",
+    },
+    "method": "entity",
+    "output": {
+      "id": "entity-0",
+      "keys": {
+        "cin": [],
+        "domain": [],
+        "email": [],
+        "linkedin": [],
+      },
+      "kind": "company",
+      "name": "Northwind Robotics",
+      "values": {},
+    },
+    "port": "Read",
+  },
+  {
+    "input": {
+      "body": {
+        "numResults": 5,
+        "query": "Northwind Robotics",
+      },
+      "headers": {
+        "accept": "application/json",
+      },
+      "method": "POST",
+      "url": "https://search.example/v1/search",
+    },
+    "method": "request",
+    "output": {
+      "body": "{"requestId":"req_7a1c","results":[{"url":"https://news.example/2026/09/northwind-seed","title":"Northwind Robotics raises a $4M seed","publishedDate":"2026-09-28T07:30:00Z","score":0.91,"author":"A. Reporter"},{"url":"https://blog.example/warehouse-robots","title":"Who is teaching warehouse robots new SKUs?","score":0.64},{"url":"https://jobs.example/northwind/ml-engineer"}]}",
+      "headers": {},
+      "status": 200,
+    },
+    "port": "Http",
+  },
+  {
+    "input": {
+      "_tag": "signal",
+      "entityId": "entity-0",
+      "kind": "web",
+      "payload": {
+        "author": "A. Reporter",
+        "score": 0.91,
+      },
+      "publishedAt": "2026-09-28T07:30:00Z",
+      "title": "Northwind Robotics raises a $4M seed",
+      "url": "https://news.example/2026/09/northwind-seed",
+    },
+    "method": "emitSignal",
+    "output": {
+      "signalId": "signal-1",
+    },
+    "port": "Content",
+  },
+  {
+    "input": {
+      "_tag": "signal",
+      "entityId": "entity-0",
+      "kind": "web",
+      "payload": {
+        "score": 0.64,
+      },
+      "title": "Who is teaching warehouse robots new SKUs?",
+      "url": "https://blog.example/warehouse-robots",
+    },
+    "method": "emitSignal",
+    "output": {
+      "signalId": "signal-2",
+    },
+    "port": "Content",
+  },
+  {
+    "input": {
+      "_tag": "signal",
+      "entityId": "entity-0",
+      "kind": "web",
+      "payload": {},
+      "url": "https://jobs.example/northwind/ml-engineer",
+    },
+    "method": "emitSignal",
+    "output": {
+      "signalId": "signal-3",
+    },
+    "port": "Content",
+  },
+  {
+    "input": {
+      "fields": {
+        "entityId": "entity-0",
+        "refs": [
+          "event:signal-1",
+          "event:signal-2",
+          "event:signal-3",
+        ],
+      },
+      "message": "researched",
+    },
+    "method": "info",
+    "output": undefined,
+    "port": "Log",
+  },
+]
+`;

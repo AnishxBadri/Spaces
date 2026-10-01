@@ -1,0 +1,28 @@
+{
+  "messages": [
+    {
+      "id": "<CAF7x1@mail.northwind-robotics.example>",
+      "threadId": "thread-northwind-intro",
+      "subject": "Intro: Northwind Robotics",
+      "date": "2026-09-29T09:12:00Z",
+      "from": {
+        "email": "priya@northwind-robotics.example",
+        "name": "Priya Rao"
+      },
+      "to": [{ "email": "anish@fund.example", "name": "Anish" }],
+      "snippet": "Hi Anish — following up on the demo."
+    },
+    {
+      "id": "<CAF7x2@mail.northwind-robotics.example>",
+      "threadId": "thread-northwind-intro",
+      "subject": "Re: Intro: Northwind Robotics",
+      "date": "2026-09-29T11:40:00Z",
+      "from": { "email": "anish@fund.example", "name": "Anish" },
+      "to": [
+        { "email": "Priya@Northwind-Robotics.example" },
+        { "email": "cto@northwind-robotics.example", "name": "Dev Shah" }
+      ]
+    }
+  ],
+  "nextCursor": "page-2"
+}
