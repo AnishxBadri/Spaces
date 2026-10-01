@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { SDK_VERSION } from './version.ts'
@@ -29,4 +30,23 @@ describe('@spaces/sdk package.json', () => {
   it('carries SDK_VERSION as its version', () => {
     expect(pkg.version).toBe(SDK_VERSION)
   })
+})
+
+describe('the runtimes a plugin shares with the host', () => {
+  // A plugin's bare `effect` and `zod` resolve to the host's copies (sdk-11),
+  // and the sdk's own manifestSchema and configOf run on the sdk's copies —
+  // so the two must be one install, or a plugin's settings schema is a
+  // foreign zod to the sdk that parses it. pnpm resolved the sdk to a newer
+  // zod than the rest of the workspace once (fixed in the lockfile); this
+  // compares the resolved files, read from disk, with core's — no import.
+  const from = (dir: string) =>
+    createRequire(new URL(`../../${dir}/package.json`, import.meta.url))
+  it.each(['effect', 'zod'])(
+    'resolves %s to the same install as core',
+    (pkgName) => {
+      expect(realpathSync(from('sdk').resolve(pkgName))).toBe(
+        realpathSync(from('core').resolve(pkgName)),
+      )
+    },
+  )
 })
