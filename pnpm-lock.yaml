@@ -249,6 +249,9 @@ importers:
       '@spaces/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@spaces/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       '@tailwindcss/typography':
         specifier: ^0.5.16
         version: 0.5.20(tailwindcss@4.3.3)

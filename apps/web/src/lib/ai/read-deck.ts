@@ -25,8 +25,11 @@ import { jsonValue } from '@spaces/core/json'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
 import { storage } from '@spaces/core/writes/storage'
-import { captureObjectById, captureReadTask } from './capture-read'
-import type { CaptureObject } from './capture-read'
+import {
+  captureObjectById,
+  captureReadTask,
+} from '@spaces/core/writes/ai/capture-read'
+import type { CaptureObject } from '@spaces/core/writes/ai/capture-read'
 import { completeMessage } from './complete'
 import type { CompleteFailure } from './complete'
 import { cachedExtractProgram } from './extraction-cache'
@@ -86,8 +89,9 @@ import type {
  * against that object's registry — person for a profile, company for a
  * company page — through the same `cachedExtractProgram` call, the same
  * validator and the same `proposeProgram`, and what it proposes is anchored
- * on the captured document itself (`./capture-read.ts`), since a capture
- * usually names somebody we hold no record for. Read as a person, the schema
+ * on the captured document itself
+ * (`@spaces/core/writes/ai/capture-read`), since a capture usually names
+ * somebody we hold no record for. Read as a person, the schema
  * gains one field, `_subject` — a person reference, so its answer is the
  * same identity claim a deck's `founders` yields — and the page's subject
  * becomes one `identity` suggestion ahead of one `attribute_patch`. Every

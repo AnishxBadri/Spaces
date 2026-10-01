@@ -1,47 +1,72 @@
-import { Effect, Schema } from 'effect'
+import { Effect } from 'effect'
 import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { activity, document, entity, link, suggestion } from '@spaces/db/schema'
-import type { suggestionKind } from '@spaces/db/schema'
 import { jsonRecord } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
-import { proposalRefs, toPatch, validateProposal } from '@spaces/core/ai/schema'
-import type { ProposalIssue } from '@spaces/core/ai/schema'
-import { identityPayloadSchema } from '@spaces/core/ai/identity'
-import { documentKindPayloadSchema } from '@spaces/core/ai/document-kind'
-import { spaceTagPayloadSchema } from '@spaces/core/ai/space-tag'
-import { toObjectKind } from '@spaces/core/attributes/registry'
-import type { AttributeDef } from '@spaces/core/attributes/registry'
-import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
+import { toPatch, validateProposal } from '@spaces/core/ai/schema'
 import {
-  AttributeValidationError,
   EntityNotFound,
-  getRegistryByObjectId,
   setValuesInTx,
 } from '@spaces/core/writes/attributes/values'
-import type {
-  Actor,
-  SetValuesResult,
-  Tx,
-} from '@spaces/core/writes/attributes/values'
+import type { SetValuesResult, Tx } from '@spaces/core/writes/attributes/values'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import type { ResolveResult } from '@spaces/core/writes/entities/resolve'
 import { canonicalId } from '@spaces/core/writes/entities/sweep'
-import { notePayloadSchema } from '@spaces/core/ai/note'
+import {
+  SuggestionInvalid,
+  SuggestionNotFound,
+  SuggestionNotOpen,
+  UnsupportedSuggestionKind,
+  asFailure,
+  documentKindOf,
+  identityOf,
+  invalid,
+  noteOf,
+  patchAnchor,
+  registryFor,
+  spaceTagOf,
+} from '@spaces/core/writes/suggestions/propose'
+import type {
+  Suggestion,
+  SuggestionFailure,
+  SuggestionKind,
+} from '@spaces/core/writes/suggestions/propose'
+import type { CaptureObject } from '@spaces/core/writes/ai/capture-read'
 import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
 import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'
-import { captureObjectOfRun } from './capture-read'
-import type { CaptureObject } from './capture-read'
+
+// The propose half moved into core (SPA-204): every name it exported is
+// re-exported here unchanged, so the AI lanes, MCP, capture and their tests
+// import it from where they always did.
+export {
+  SuggestionInvalid,
+  SuggestionNotFound,
+  SuggestionNotOpen,
+  SuggestionWriteFailed,
+  UnsupportedSuggestionKind,
+  proposeProgram,
+  registryFor,
+} from '@spaces/core/writes/suggestions/propose'
+export type {
+  ProposeInput,
+  Reader,
+  Suggestion,
+  SuggestionFailure,
+  SuggestionKind,
+} from '@spaces/core/writes/suggestions/propose'
 
 /**
  * The AI layer's one mutating verb (docs/spec-ai-substrate.md §3, §10).
  *
  * `proposeProgram` writes a `suggestion` row and nothing else — a model, an
  * agent or a prompt injection in a deck can at worst put noise in a queue.
- * `acceptProgram` is the only way a suggestion becomes a value, and it goes
- * through the one write path (`setValuesInTx`) with the **accepter** as
- * actor, `source = 'suggestion'`, and the row's id and refs as the receipt
- * on every `attribute_event`. `rejectProgram` closes a row and writes nothing
+ * It lives in `@spaces/core/writes/suggestions/propose` since SPA-204, where
+ * the plugin ports reach it, and is re-exported above. `acceptProgram` is
+ * the only way a suggestion becomes a value, and it goes through the one
+ * write path (`setValuesInTx`) with the **accepter** as actor,
+ * `source = 'suggestion'`, and the row's id and refs as the receipt on
+ * every `attribute_event`. `rejectProgram` closes a row and writes nothing
  * else.
  *
  * Accept locks the row, writes the value and flips the status in **one**
@@ -61,7 +86,7 @@ import type { CaptureObject } from './capture-read'
  *
  * **A captured page is an anchor too (SPA-134).** A capture names somebody
  * we usually hold no record for, so its read is anchored on the captured
- * document's own entity (`lib/ai/capture-read.ts`). Two things differ
+ * document's own entity (`@spaces/core/writes/ai/capture-read`). Two things differ
  * there, and nothing else: a patch on a document is held to the registry of
  * the object its run read the page against (`patchAnchor`), and lands on the
  * one record of that object the page is filed on; an identity on a document
@@ -69,61 +94,11 @@ import type { CaptureObject } from './capture-read'
  * them `contact_at` it — which is what then gives the patch its record.
  */
 
-export type SuggestionKind = (typeof suggestionKind.enumValues)[number]
-
 /** Only a person accepts or rejects: the decision is what `decided_by` names. */
 export type Decider = { type: 'user'; id: string }
 
 /** Read wider than `Decider` on purpose: the runtime half of that claim. */
 const isPerson = (actor: { type: string }): boolean => actor.type === 'user'
-
-export class SuggestionNotFound extends Schema.TaggedError<SuggestionNotFound>()(
-  'SuggestionNotFound',
-  { id: Schema.String },
-) {}
-
-/** Refused: already accepted or rejected — including by a racing accept. */
-export class SuggestionNotOpen extends Schema.TaggedError<SuggestionNotOpen>()(
-  'SuggestionNotOpen',
-  { id: Schema.String, status: Schema.String },
-) {}
-
-/**
- * Refused: this kind has no accept path yet. `attribute_patch` and
- * `identity` do.
- */
-export class UnsupportedSuggestionKind extends Schema.TaggedError<UnsupportedSuggestionKind>()(
-  'UnsupportedSuggestionKind',
-  { id: Schema.String, kind: Schema.String },
-) {}
-
-/**
- * The payload does not hold against the record's registry — at propose, or
- * at accept after the registry moved. `message` is the validator's own
- * `slug: detail` lines, joined, so it reads on its own in a toast.
- */
-export class SuggestionInvalid extends Schema.TaggedError<SuggestionInvalid>()(
-  'SuggestionInvalid',
-  {
-    message: Schema.String,
-    issues: Schema.Array(
-      Schema.Struct({ slug: Schema.String, message: Schema.String }),
-    ),
-  },
-) {}
-
-export class SuggestionWriteFailed extends Schema.TaggedError<SuggestionWriteFailed>()(
-  'SuggestionWriteFailed',
-  { cause: Schema.Defect() },
-) {}
-
-export type SuggestionFailure =
-  | SuggestionNotFound
-  | SuggestionNotOpen
-  | UnsupportedSuggestionKind
-  | SuggestionInvalid
-  | EntityNotFound
-  | SuggestionWriteFailed
 
 const KIND_LABEL: Record<SuggestionKind, string> = {
   attribute_patch: 'field change',
@@ -151,72 +126,6 @@ export function suggestionMessage(failure: unknown): string {
     return `A suggested ${isKind(failure.kind) ? KIND_LABEL[failure.kind] : failure.kind} cannot be accepted yet`
   if (failure instanceof EntityNotFound) return failure.message
   return 'Could not apply this suggestion'
-}
-
-const invalid = (issues: ReadonlyArray<ProposalIssue>) =>
-  new SuggestionInvalid({
-    message: issues.map((i) => i.message).join('; '),
-    issues: issues.map((i) => ({ slug: i.slug, message: i.message })),
-  })
-
-export type Reader = Tx | typeof db
-
-/**
- * The live registry of the object this record belongs to. Exported for the
- * deck reader (SPA-90), which compiles the same registry into the schema it
- * hands the model — so the schema and the validator here never disagree.
- */
-export async function registryFor(
-  reader: Reader,
-  entityId: string,
-): Promise<Array<AttributeDef>> {
-  const ent = (
-    await reader
-      .select({ kind: entity.kind, objectId: entity.objectId })
-      .from(entity)
-      .where(eq(entity.id, entityId))
-  ).at(0)
-  if (!ent) throw new EntityNotFound({ entityId, message: 'Record not found' })
-  if (ent.objectId !== null) return getRegistryByObjectId(ent.objectId)
-  const core = toObjectKind(ent.kind)
-  if (core === null)
-    throw new EntityNotFound({
-      entityId,
-      message: `No attribute registry for kind ${ent.kind}`,
-    })
-  return getRegistryByObjectId(await objectIdForKindAsync(core))
-}
-
-/**
- * What a patch on this entity is held to, and — for a captured page — the
- * object it was read against (SPA-134). A record is its own anchor and its
- * own registry. A document holds a patch only when a capture read wrote it:
- * its run names the object, and that object's live registry is the one the
- * model was handed, so propose and accept validate against what was read.
- */
-async function patchAnchor(
-  reader: Reader,
-  entityId: string,
-  runId: string | null,
-): Promise<{
-  registry: Array<AttributeDef>
-  page: CaptureObject | null
-}> {
-  const ent = (
-    await reader
-      .select({ kind: entity.kind })
-      .from(entity)
-      .where(eq(entity.id, entityId))
-  ).at(0)
-  if (ent?.kind !== 'document')
-    return { registry: await registryFor(reader, entityId), page: null }
-  const page = await captureObjectOfRun(reader, runId)
-  if (page === null)
-    throw new EntityNotFound({
-      entityId,
-      message: 'A document takes a field change only from a captured page read',
-    })
-  return { registry: await getRegistryByObjectId(page.id), page }
 }
 
 /**
@@ -270,85 +179,6 @@ async function pageTarget(
     ])
   return only.id
 }
-
-/** Known refusals pass through; anything else is a write failure. */
-const asFailure = (cause: unknown): SuggestionFailure =>
-  cause instanceof SuggestionNotFound ||
-  cause instanceof SuggestionNotOpen ||
-  cause instanceof UnsupportedSuggestionKind ||
-  cause instanceof SuggestionInvalid ||
-  cause instanceof EntityNotFound
-    ? cause
-    : cause instanceof AttributeValidationError
-      ? invalid([{ slug: cause.slug, message: cause.message }])
-      : new SuggestionWriteFailed({ cause })
-
-// ---------- propose ----------
-
-export type ProposeInput = {
-  entityId: string
-  kind: SuggestionKind
-  /** `attribute_patch`: the `Proposal` envelope `{[slug]: {value, refs, confidence}}` */
-  payload: Json
-  rationale?: string
-  /** defaults to the union of the payload's per-field refs for a patch */
-  refs?: Array<string>
-  runId?: string
-  proposedBy: Actor
-}
-
-export type Suggestion = typeof suggestion.$inferSelect
-
-export const proposeProgram = Effect.fn('proposeProgram')(function* (
-  input: ProposeInput,
-): Effect.fn.Return<Suggestion, SuggestionFailure> {
-  return yield* Effect.tryPromise({
-    try: async () => {
-      let refs = input.refs ?? []
-      // A patch is held to the registry now, so the queue never shows a
-      // proposal that could not have been accepted when it was made.
-      if (input.kind === 'attribute_patch') {
-        const { registry } = await patchAnchor(
-          db,
-          input.entityId,
-          input.runId ?? null,
-        )
-        const checked = validateProposal(registry, input.payload)
-        if (!checked.ok) throw invalid(checked.issues)
-        refs = input.refs ?? proposalRefs(checked.proposal)
-      }
-      // An identity is held to its shape now for the same reason: the card
-      // draws it field by field, and the accept path resolves from it.
-      if (input.kind === 'identity') identityOf(input.payload)
-      // A document kind likewise (SPA-62): never `other`, never off-enum.
-      if (input.kind === 'document_kind') documentKindOf(input.payload)
-      // A note (SPA-66) likewise: the card draws its title and body, and
-      // the accept path renders the body into the note it writes.
-      if (input.kind === 'note') noteOf(input.payload)
-      // A space tag likewise (SPA-103): a space id and the path it was read as.
-      if (input.kind === 'space_tag') spaceTagOf(input.payload)
-      const row = (
-        await db
-          .insert(suggestion)
-          .values({
-            entityId: input.entityId,
-            kind: input.kind,
-            payload: input.payload,
-            rationale: input.rationale ?? null,
-            refs,
-            runId: input.runId ?? null,
-            proposedByType: input.proposedBy.type,
-            proposedById:
-              input.proposedBy.type === 'system' ? null : input.proposedBy.id,
-          })
-          .returning()
-      ).at(0)
-      if (!row) throw new Error('suggestion insert returned no row')
-      return row
-    },
-    catch: asFailure,
-  })
-})
 
 // ---------- decide ----------
 
@@ -421,18 +251,6 @@ export type Accepted =
       /** False when the record was already in the space: its row stands. */
       tagged: boolean
     }
-
-/** An identity payload, decoded — or the validator's refusal, by field. */
-function identityOf(payload: Json) {
-  const parsed = identityPayloadSchema.safeParse(payload)
-  if (parsed.success) return parsed.data
-  throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'identity'
-      return { slug, message: `${slug}: ${i.message}` }
-    }),
-  )
-}
 
 /**
  * Accept an identity (SPA-105, spec §11): the person a document named walks
@@ -641,18 +459,6 @@ async function fileIntoReference(
   return slug
 }
 
-/** A document-kind payload, decoded — or the validator's refusal. */
-function documentKindOf(payload: Json) {
-  const parsed = documentKindPayloadSchema.safeParse(payload)
-  if (parsed.success) return parsed.data
-  throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'document_kind'
-      return { slug, message: `${slug}: ${i.message}` }
-    }),
-  )
-}
-
 /**
  * Accept a classification (SPA-62, spec §11's first row): the document's
  * `kind` is set to the proposed one and one `document.reclassified`
@@ -698,18 +504,6 @@ async function acceptDocumentKindInTx(
 
 // ---------- note (SPA-66) ----------
 
-/** A note payload, decoded — or the validator's refusal, by field. */
-function noteOf(payload: Json) {
-  const parsed = notePayloadSchema.safeParse(payload)
-  if (parsed.success) return parsed.data
-  throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'note'
-      return { slug, message: `${slug}: ${i.message}` }
-    }),
-  )
-}
-
 /**
  * Accept a note (SPA-66, spec §11 "Summarize"): the drafted body becomes a
  * real note — `bodyJson` and `bodyMd` both — with the accepter as author,
@@ -753,18 +547,6 @@ async function acceptNoteInTx(
 }
 
 // ---------- space tag (SPA-103) ----------
-
-/** A space-tag payload, decoded — or the validator's refusal. */
-function spaceTagOf(payload: Json) {
-  const parsed = spaceTagPayloadSchema.safeParse(payload)
-  if (parsed.success) return parsed.data
-  throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'space_tag'
-      return { slug, message: `${slug}: ${i.message}` }
-    }),
-  )
-}
 
 /**
  * Accept a space tag (SPA-103): the record is tagged into the proposed

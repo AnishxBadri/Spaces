@@ -18,9 +18,11 @@ import type { Tx } from '@spaces/core/writes/attributes/values'
  * — the shape a column run names itself by (`columnRunTask`), and what
  * Settings → Usage lists it as. Every suggestion the read writes carries
  * that run (`suggestion.run_id`), so the object a document-anchored patch is
- * held to is one read away for the three places that need it: `propose.ts`
- * (validate at propose and at accept), and `lib/inbox/queue.ts` (draw the
- * fields). No column, no migration: the slug is the object's key, and an
+ * held to is one read away for the three places that need it:
+ * `writes/suggestions/propose.ts` (validate at propose, and at accept in
+ * apps/web's `lib/ai/propose.ts`), and apps/web's `lib/inbox/queue.ts`
+ * (draw the fields). Moved here from apps/web by SPA-204 with the propose
+ * writer that reads it. No column, no migration: the slug is the object's key, and an
  * object's slug is minted once and never renamed.
  */
 

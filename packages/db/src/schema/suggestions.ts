@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
 import { actorType } from './actors'
@@ -22,7 +23,10 @@ import type { Json } from '../json'
  * one-write-paths, with the accepter as actor and this row as provenance
  * (`attribute_event.source = 'suggestion'`, `attribute_event.suggestion_id`).
  *
- * `apps/web/src/lib/ai/propose.ts` is the only module that writes this table.
+ * `packages/core/src/writes/suggestions/propose.ts` is the only module that
+ * inserts into this table (SPA-204 moved it out of apps/web so the plugin
+ * ports reach it); the accept path that closes a row stays in
+ * `apps/web/src/lib/ai/propose.ts`.
  */
 
 /**
@@ -79,12 +83,16 @@ export const suggestion = pgTable(
     runId: uuid('run_id').references(() => aiRun.id),
     proposedByType: actorType('proposed_by_type').notNull(),
     /**
-     * A user id when `proposed_by_type = 'user'`, the `integration` row's
-     * id (`schema/integrations.ts`) when `'integration'`, null for
-     * `'system'`. A plain column with no FK, named after
-     * `attribute_event.actor_id`: one column holds either id, so neither FK
-     * fits it, and the proposer is provenance the write path never trusts —
-     * the accepter is who `attribute_event` records.
+     * Who proposed it, by `proposed_by_type`: a user id for `'user'`; null
+     * for `'system'`; for `'integration'`, **one of two ids** — the
+     * `integration` row's (`schema/integrations.ts`) when a plugin's
+     * `Judgment` or `Facts` port wrote it, or the `api_token` row's when an
+     * MCP client did (`apps/web/src/lib/mcp/tools-propose.ts`; /inbox tells
+     * them apart by joining `api_token` on it, `lib/inbox/queue.ts`). A
+     * plain text column with no FK, named after `attribute_event.actor_id`:
+     * it holds ids from three tables, so no FK fits it, and the proposer is
+     * provenance the write path never trusts — the accepter is who
+     * `attribute_event` records.
      */
     proposedById: text('proposed_by_id'),
     status: suggestionStatus('status').notNull().default('open'),
@@ -97,6 +105,30 @@ export const suggestion = pgTable(
   (t) => [
     index('suggestion_entity_status_idx').on(t.entityId, t.status),
     index('suggestion_run_idx').on(t.runId),
+    /**
+     * One open proposal per (record, slugs, values) from an integration
+     * (SPA-204): a plugin re-run that raises the same `Facts.fill` conflict
+     * or `Judgment.suggest`s the same value again is a no-op insert
+     * (`ON CONFLICT DO NOTHING`, `writes/suggestions/propose.ts`), not a
+     * read-then-write race. Keyed on the payload's slugs and an md5 of its
+     * proposed values — never its per-field refs or confidence, which a
+     * re-run changes (each run cites its own receipt). jsonb is stored
+     * canonically, so the two jsonpath arrays come out in one order for one
+     * payload. Partial: `attribute_patch` only (a note has no slug), open
+     * only (a decided row never blocks a fresh proposal), and
+     * `'integration'` only — the AI lanes, whose rows are `'user'` or
+     * `'system'`, keep writing what they wrote before. Every function here
+     * is IMMUTABLE, which an index expression requires.
+     */
+    uniqueIndex('suggestion_open_integration_unique')
+      .on(
+        t.entityId,
+        sql`jsonb_path_query_array(${t.payload}, '$.keyvalue().key')`,
+        sql`md5(jsonb_path_query_array(${t.payload}, '$.*.value')::text)`,
+      )
+      .where(
+        sql`${t.status} = 'open' AND ${t.kind} = 'attribute_patch' AND ${t.proposedByType} = 'integration'`,
+      ),
     // Decided ⇔ someone decided it, when. An open row carries neither.
     check(
       'suggestion_decision_invariant',
