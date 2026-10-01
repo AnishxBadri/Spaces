@@ -328,6 +328,37 @@ CONTEXT "Storage sources") maps folders to entities; the plugin is a bytes
 pipe with hints (`source_path`, folder names). Its body is owned by the
 storage area (project 20).
 
+### 5.1 As built (2026-10-01, SPA-200/201/202/203/204)
+
+What the Live ports do beyond the table above, recorded here so the next
+reader does not re-derive it from the tests:
+
+- **`Content.emitSignal`** also writes one `signal.emitted` activity row with
+  the integration in `meta`; it is how the record timeline shows the signal
+  at all ("`<plugin>` reported a signal"). `Content.logInteraction` is the
+  mailbox's own writer (`writes/interactions/write.ts`): one row per
+  `message_id` through the unique index, a new row each call without one; a
+  plugin-written body is born **`private`** (D30) until a syncer decides per
+  connection, and the claim carries no visibility field.
+- **`Facts.fill`** decides "blank" under the entity row lock (`fillBlanks`
+  in `setValuesInTx`): a slug held by anyone other than this integration —
+  a person, another integration, the system, or a value with no
+  `attribute_event` at all — is a conflict. A conflict is returned to the
+  job **and** raised as one open suggestion in the fill's own transaction,
+  rationale "`<slug>: <plugin> says <proposed>; the record holds
+<existing>`", refs = the receipt. `receiptId` must name a receipt this
+  integration stored, or the fill is `JobPermanent`.
+- **`Judgment.suggest`** and the raised conflicts are deduped by migration
+  0057's partial unique index on open `attribute_patch` rows proposed by an
+  integration, keyed on (entity, slugs, values) and **not** on
+  `proposed_by_id`: two plugins proposing the same value on one record share
+  one open row, and an identical MCP re-proposal returns the existing row.
+- **`Content.fileDocument`** is `intakeDocumentProgram` with source
+  `integration` + the bound row and actor `{ integrationId }`; the
+  `document.filed` activity row carries `actorType`/`integrationId` so the
+  timeline names the plugin. A merged-away `fileAgainst` id files on the
+  survivor.
+
 ## 6. `definePlugin()` and the testing kit
 
 The one export a bundle has:
