@@ -19,6 +19,9 @@ export const manifest = defineManifest({
   jobs: {
     sync: {
       trigger: 'schedule',
+      // Every 15 minutes: a schedule job must carry its cron (manifestSchema),
+      // and the build's manifest plugin refuses the bundle without it.
+      schedule: '*/15 * * * *',
       uses: ['Http', 'Identity', 'Content', 'Log'],
     },
   },
