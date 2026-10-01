@@ -48,7 +48,9 @@ pnpm worker                                       # the worker alone (apps/worke
   provenance), the view store, `chunk-sources` (SPA-174/175), the BYOK
   vault (`writes/vault/*`, SPA-176), the blob backend (`writes/storage/*`,
   SPA-178; `./writes/storage/local`'s token helpers are public on purpose for
-  the blob route) and the boot composition (`writes/boot.ts` with
+  the blob route), the live plugin ports (`writes/ports/*`, SPA-197 on:
+  Layer constructors over the bound `integration` row — Config, Secrets,
+  Log, and Http with its per-process throttle) and the boot composition (`writes/boot.ts` with
   `writes/seeds/taxonomy.ts`, SPA-177; `apps/web/src/db/boot.ts` is the
   process shell that runs it) — and is the only place in core a `drizzle-orm` import or a
   `db` value import passes. The pure half also holds the context assembler's
