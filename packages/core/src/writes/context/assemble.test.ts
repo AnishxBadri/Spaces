@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
+import type { SimilarCandidate } from '../../context/similar-lane'
 
 const ASOF = '2026-09-10T00:00:00Z'
 
@@ -8,15 +9,19 @@ const ASOF = '2026-09-10T00:00:00Z'
  * the walk can reach — attributes, alias, history, memo, shared note, a
  * teammate's private note, a deck with chunks, a space with a memo, a task,
  * an interaction — assembles it as two users, and snapshots the shape.
+ *
+ * In core since SPA-182: the judgment-memory lane is the `SimilarLane`
+ * service, and these tests provide a stub of it — the empty lane for the
+ * walk, a lane that hands back a private note for the leak invariant.
  */
 describe('assembleProgram', () => {
   const tag = randomUUID().slice(0, 8)
   const ids: Record<string, string> = {}
 
   it('assembles the record for two users, deterministically', async () => {
-    const { resolveEntity } =
-      await import('@spaces/core/writes/entities/resolve')
+    const { resolveEntity } = await import('../entities/resolve')
     const { assembleProgram } = await import('./assemble')
+    const { SimilarLaneEmpty } = await import('../../context/similar-lane')
     const { Effect } = await import('effect')
     const { db } = await import('@spaces/db')
     const {
@@ -225,7 +230,7 @@ describe('assembleProgram', () => {
         assembleProgram(
           { entityId: co.entityId },
           { user: { id: userId }, asOf: ASOF, budgetChars: 8000, taskText },
-        ),
+        ).pipe(Effect.provide(SimilarLaneEmpty)),
       )
     const mine = await run(me.id)
     const refs = mine.items.map((x) => x.ref)
@@ -296,5 +301,107 @@ describe('assembleProgram', () => {
         score: x.score == null ? null : Number(x.score.toFixed(4)),
       }))
     expect(shape).toMatchSnapshot()
+  })
+
+  it('takes asOf as an input: the same data at two clocks ranks by the clock it was handed', async () => {
+    const { assembleProgram } = await import('./assemble')
+    const { SimilarLaneEmpty } = await import('../../context/similar-lane')
+    const { Effect } = await import('effect')
+    const { db } = await import('@spaces/db')
+    const { entity, link, note } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+
+    const [me] = await db.select({ id: user.id }).from(user).limit(1)
+    const [co] = await db
+      .insert(entity)
+      .values({ kind: 'company', canonicalName: `AsOfCo ${tag}` })
+      .returning({ id: entity.id })
+    const [n] = await db
+      .insert(entity)
+      .values({ kind: 'note', canonicalName: `AsOf note ${tag}` })
+      .returning({ id: entity.id })
+    await db.insert(note).values({
+      entityId: n.id,
+      title: `AsOf note ${tag}`,
+      bodyMd: 'Dated once, read at two clocks.',
+      kind: 'note',
+      authorId: me.id,
+      visibility: 'shared',
+      updatedAt: new Date('2026-09-01T00:00:00Z'),
+    })
+    await db.insert(link).values({
+      fromEntityId: n.id,
+      toEntityId: co.id,
+      relation: 'mentions',
+      source: 'manual',
+    })
+
+    const at = (asOf: string) =>
+      Effect.runPromise(
+        assembleProgram(
+          { entityId: co.id },
+          { user: { id: me.id }, asOf, budgetChars: 8000 },
+        ).pipe(Effect.provide(SimilarLaneEmpty)),
+      )
+    const scoreAt = async (asOf: string) =>
+      (await at(asOf)).items.find((x) => x.ref === `note:${n.id}`)?.score
+    const near = await scoreAt('2026-09-02T00:00:00Z')
+    const far = await scoreAt('2027-09-02T00:00:00Z')
+    expect(near).toBeTypeOf('number')
+    expect(far).toBeTypeOf('number')
+    // Recency decays against the clock it was handed, not the wall clock.
+    expect(Number(near)).toBeGreaterThan(Number(far))
+    // And the same clock is the same answer.
+    expect(await at('2026-09-02T00:00:00Z')).toEqual(
+      await at('2026-09-02T00:00:00Z'),
+    )
+  })
+
+  it('refuses with ContextLeak when a lane hands back a note canRead would refuse', async () => {
+    const { assembleProgram } = await import('./assemble')
+    const { SimilarLane } = await import('../../context/similar-lane')
+    const { ref } = await import('../../context/ref')
+    const { Effect, Exit, Layer } = await import('effect')
+    const { db } = await import('@spaces/db')
+    const { entity } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+
+    const [me] = await db.select({ id: user.id }).from(user).limit(1)
+    const [co] = await db
+      .insert(entity)
+      .values({ kind: 'company', canonicalName: `LeakCo ${tag}` })
+      .returning({ id: entity.id })
+
+    // A lane that lost its canRead filter: a teammate's private note.
+    const privateId = randomUUID()
+    const lost: SimilarCandidate = {
+      ref: ref.note(privateId),
+      kind: 'note',
+      text: 'Similar judgment — note on Elsewhere: not yours',
+      entityIds: [privateId],
+      at: null,
+      hop: 'similar',
+      similarity: 0.9,
+      noteRow: {
+        entityId: privateId,
+        visibility: 'private',
+        authorId: `someone-else-${tag}`,
+      },
+    }
+    const leaky = Layer.succeed(
+      SimilarLane,
+      SimilarLane.of({
+        candidates: () => Effect.succeed([lost]),
+        pinned: () => Effect.succeed(true),
+      }),
+    )
+    const exit = await Effect.runPromiseExit(
+      assembleProgram(
+        { entityId: co.id },
+        { user: { id: me.id }, asOf: ASOF, budgetChars: 8000, similar: true },
+      ).pipe(Effect.provide(leaky)),
+    )
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect(JSON.stringify(exit)).toContain('ContextLeak')
   })
 })

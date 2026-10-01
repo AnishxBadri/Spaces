@@ -19,9 +19,9 @@ describe('recordContextProgram', () => {
     const { entity, link, note } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
     const { eq } = await import('drizzle-orm')
-    const { resolveEntity } =
-      await import('@spaces/core/writes/entities/resolve')
+    const { resolveEntity } = await import('../entities/resolve')
     const { recordContextProgram } = await import('./record')
+    const { SimilarLaneEmpty } = await import('../../context/similar-lane')
 
     const [me] = await db.select({ id: user.id }).from(user).limit(1)
     const [teammate] = await db
@@ -80,7 +80,7 @@ describe('recordContextProgram', () => {
           user: { id: userId },
           asOf: ASOF,
           budgetChars: 8000,
-        }),
+        }).pipe(Effect.provide(SimilarLaneEmpty)),
       )
 
     const mine = await run(me.id)
@@ -115,6 +115,7 @@ describe('recordContextProgram', () => {
     const { entity } = await import('@spaces/db/schema')
     const { user } = await import('@spaces/db/schema/auth')
     const { recordContextProgram } = await import('./record')
+    const { SimilarLaneEmpty } = await import('../../context/similar-lane')
 
     const [me] = await db.select({ id: user.id }).from(user).limit(1)
     const [bare] = await db
@@ -128,7 +129,7 @@ describe('recordContextProgram', () => {
         user: { id: me.id },
         asOf: ASOF,
         budgetChars: 8000,
-      }),
+      }).pipe(Effect.provide(SimilarLaneEmpty)),
     )
     expect(out.items).toEqual([])
   })
@@ -138,6 +139,7 @@ describe('recordContextProgram', () => {
     const { db } = await import('@spaces/db')
     const { user } = await import('@spaces/db/schema/auth')
     const { recordContextProgram } = await import('./record')
+    const { SimilarLaneEmpty } = await import('../../context/similar-lane')
     const [me] = await db.select({ id: user.id }).from(user).limit(1)
 
     const exit = await Effect.runPromiseExit(
@@ -146,7 +148,7 @@ describe('recordContextProgram', () => {
         user: { id: me.id },
         asOf: ASOF,
         budgetChars: 8000,
-      }),
+      }).pipe(Effect.provide(SimilarLaneEmpty)),
     )
     expect(Exit.isFailure(exit)).toBe(true)
     expect(JSON.stringify(exit)).toContain('ContextEntityNotFound')

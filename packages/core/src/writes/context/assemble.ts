@@ -27,24 +27,20 @@ import {
   round,
 } from '@spaces/db/schema/portfolio'
 import { task, taskEntity } from '@spaces/db/schema/tasks'
-import type { AttributeDef } from '@spaces/core/attributes/registry'
-import { fmtMoney } from '@spaces/core/portfolio/format'
-import { canRead } from '#/lib/server/shared'
+import type { AttributeDef } from '../../attributes/registry'
+import { fmtMoney } from '../../portfolio/format'
+import { canRead } from '../../read-policy'
 import {
   ContextEntityNotFound,
   ContextLeak,
   ContextQueryFailed,
-} from '@spaces/core/context/errors'
-import { rank } from '@spaces/core/context/rank'
-import type { Candidate, RankResult } from '@spaces/core/context/rank'
-import { ref } from '@spaces/core/context/ref'
-import { SIMILAR_TOP_N, similarCandidatesProgram } from './similar'
-import {
-  renderAttribute,
-  renderEvent,
-  truncate,
-} from '@spaces/core/context/render'
-import type { ContextEdge } from '@spaces/core/context/types'
+} from '../../context/errors'
+import { rank } from '../../context/rank'
+import type { Candidate, RankResult } from '../../context/rank'
+import { ref } from '../../context/ref'
+import { SIMILAR_TOP_N, SimilarLane } from '../../context/similar-lane'
+import { renderAttribute, renderEvent, truncate } from '../../context/render'
+import type { ContextEdge } from '../../context/types'
 
 /**
  * The assembler, fetch half (docs/spec-ai-substrate.md §1; Effect-first per
@@ -58,6 +54,11 @@ import type { ContextEdge } from '@spaces/core/context/types'
  *
  * Deterministic on (data, asOf, user). No Date.now(), and every fetch is
  * ordered so the ranker's first-wins dedupe sees a stable input.
+ *
+ * In core since SPA-182. The one lane it cannot run itself — judgment
+ * memory, which reads the embedding pin and pgvector — is the `SimilarLane`
+ * service (`../../context/similar-lane.ts`, D58): the program declares it,
+ * and the caller provides apps/web's live Layer or a test's stub.
  */
 
 export { ContextEntityNotFound, ContextLeak, ContextQueryFailed }
@@ -80,8 +81,9 @@ export type AssembleOptions = {
   /**
    * The judgment-memory mode (SPA-139, spec §1): add the `similar` lane —
    * the nearest close_reasons and terminal-stage notes of *other* records
-   * (`similar.ts`). Off unless asked for, so a default assembly sends the
-   * same statements and returns the same items it always did.
+   * (the `SimilarLane` service; apps/web's `lib/ai/similar.ts`). Off
+   * unless asked for, so a default assembly sends the same statements and
+   * returns the same items it always did.
    */
   similar?: boolean | undefined
 }
@@ -115,7 +117,8 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
   opts: AssembleOptions,
 ): Effect.fn.Return<
   AssembleResult,
-  ContextQueryFailed | ContextEntityNotFound | ContextLeak
+  ContextQueryFailed | ContextEntityNotFound | ContextLeak,
+  SimilarLane
 > {
   const userId = opts.user.id
   const readable = or(eq(note.visibility, 'shared'), eq(note.authorId, userId))
@@ -741,8 +744,9 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
         ? [seedId, ...otherIds.filter((id) => others.get(id)?.kind === 'deal')]
         : [seedId]
     const present = new Set(candidates.map((c) => c.ref))
+    const lane = yield* SimilarLane
     let taken = 0
-    for (const { noteRow, ...c } of yield* similarCandidatesProgram({
+    for (const { noteRow, ...c } of yield* lane.candidates({
       userId,
       anchorIds,
     })) {

@@ -14,8 +14,8 @@ import {
 import { activity } from '@spaces/db/schema/activity'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
-import { resolveRefsProgram } from '#/lib/context/names'
-import type { ResolvedRef } from '#/lib/context/names'
+import { resolveRefsProgram } from '@spaces/core/writes/context/names'
+import type { ResolvedRef } from '@spaces/core/writes/context/names'
 
 /**
  * Merged timeline: macro activity + attribute_event bursts. Bursts group

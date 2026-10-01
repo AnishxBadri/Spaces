@@ -14,11 +14,12 @@ import {
 import { user } from '@spaces/db/schema/auth'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
-import { assembleProgram } from './assemble'
-import type { AssembleResult } from './assemble'
-import { resolveRefsProgram } from './names'
+import { assembleProgram } from '@spaces/core/writes/context/assemble'
+import type { AssembleResult } from '@spaces/core/writes/context/assemble'
+import { resolveRefsProgram } from '@spaces/core/writes/context/names'
+import { SIMILAR_TOP_N } from '@spaces/core/context/similar-lane'
 import { ref } from '@spaces/core/context/ref'
-import { SIMILAR_MAX_DISTANCE, SIMILAR_TOP_N } from './similar'
+import { SIMILAR_MAX_DISTANCE, SimilarLaneLive } from './similar'
 
 /**
  * The judgment-memory lane (SPA-139). Chunks are written by hand with chosen
@@ -163,7 +164,7 @@ const assemble = (
         budgetChars: opts.budgetChars ?? 8000,
         ...(opts.similar === undefined ? {} : { similar: opts.similar }),
       },
-    ),
+    ).pipe(Effect.provide(SimilarLaneLive)),
   )
 
 const similarRefs = (r: AssembleResult) =>

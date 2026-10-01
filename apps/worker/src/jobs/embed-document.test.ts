@@ -20,7 +20,8 @@ import type {
 } from '@spaces/db/schema/workspace'
 import { QUEUES } from '@spaces/core/queue/names'
 import { FIXTURE_ACTOR } from '../../vitest.seed'
-import { recordContextProgram } from '#web/lib/context/record'
+import { recordContextProgram } from '@spaces/core/writes/context/record'
+import { SimilarLaneEmpty } from '@spaces/core/context/similar-lane'
 import { EMBED_BATCH } from '#web/lib/ai/embed-document'
 import { PIN_DIMS } from '#web/lib/ai/providers/embed/ids'
 import { storeCredential } from '@spaces/core/writes/vault'
@@ -179,7 +180,7 @@ describe('document.embed with no pin', () => {
         user: { id: FIXTURE_ACTOR.id },
         asOf: '2026-09-23T00:00:00Z',
         budgetChars: 20_000,
-      }),
+      }).pipe(Effect.provide(SimilarLaneEmpty)),
     )
     const fifth = context.items.find((i) => i.ref === `doc:${id}#4`)
     expect(fifth).toMatchObject({

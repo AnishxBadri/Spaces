@@ -17,7 +17,8 @@ import type {
 import { identityPayloadOf } from '@spaces/core/ai/identity'
 import { QUEUES } from '@spaces/core/queue/names'
 import { getRegistryByObjectId } from '@spaces/core/writes/attributes/values'
-import { recordContextProgram } from '#/lib/context/record'
+import { recordContextProgram } from '@spaces/core/writes/context/record'
+import { SimilarLaneLive } from './similar'
 import { ref } from '@spaces/core/context/ref'
 import type { ContextItem } from '@spaces/core/context/types'
 import { jsonValue } from '@spaces/core/json'
@@ -518,6 +519,7 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
             asOf,
             budgetChars: READ_DECK_CONTEXT_CHARS,
           }).pipe(
+            Effect.provide(SimilarLaneLive),
             Effect.mapError((cause) => new ReadDeckQueryFailed({ cause })),
           )
     const items: Array<ContextItem> = [

@@ -4,7 +4,7 @@ import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
 import { Switch } from '#/components/ui/switch'
 import { formatSince } from '@spaces/core/format'
 import type { ContextKind } from '@spaces/core/context/types'
-import type { RecordContextItem } from '#/lib/context/record'
+import type { RecordContextItem } from '@spaces/core/writes/context/record'
 import { getRecordContext } from '#/lib/server-fns'
 
 /**
@@ -86,7 +86,7 @@ export function RecordContext({ entityId }: { entityId: string }) {
       {open ? (
         <li>
           {/* No pin, no switch: the lane has no vector space to look in and
-              never falls back to words (lib/context/similar.ts), so a switch
+              never falls back to words (lib/ai/similar.ts), so a switch
               that could only ever return nothing is not offered. */}
           {query.data?.similarAvailable === true ? (
             <div className="flex h-row items-center border-b border-rule">

@@ -9,6 +9,10 @@ import { describe, expect, it, vi } from 'vitest'
  * for every entity-bearing kind; a re-chunk keeps `doc:<id>#<idx>` on its
  * document; a deleted target resolves `missing` and nothing throws; the cost
  * is one query per ref kind, not per ref; and `cite.ts` is the only renderer.
+ * That the two consumers in apps/web — /inbox and the record timeline —
+ * read a missing target without failing is
+ * `apps/web/src/lib/inbox/missing-refs.test.ts` (split out when this file
+ * moved into core, SPA-182).
  */
 
 async function deps() {
@@ -18,7 +22,7 @@ async function deps() {
   const schema = await import('@spaces/db/schema')
   const { user } = await import('@spaces/db/schema/auth')
   const { resolveRefsProgram, MISSING_LABEL } = await import('./names')
-  const { ref } = await import('@spaces/core/context/ref')
+  const { ref } = await import('../../context/ref')
   const me = (await db.select({ id: user.id }).from(user).limit(1)).at(0)
   if (!me) throw new Error('the test seed has no user')
   const resolve = (refs: ReadonlyArray<string>) =>
@@ -256,76 +260,6 @@ describe('resolveRefs — deleted targets', () => {
       },
     ])
   })
-
-  it('reaches /inbox and the record timeline as missing — neither consumer fails', async () => {
-    const d = await deps()
-    const { resolveEntity } =
-      await import('@spaces/core/writes/entities/resolve')
-    const { proposeProgram, acceptProgram } = await import('#/lib/ai/propose')
-    const { listInboxProgram } = await import('#/lib/inbox/queue')
-    const { recordTimelineProgram } = await import('#/lib/timeline/record')
-
-    const company = (
-      await resolveEntity({
-        kind: 'company',
-        name: 'Cited Robotics',
-        keys: { domain: 'cited-robotics.example' },
-        source: { class: 'manual' },
-      })
-    ).entityId
-    const source = await d.newEntity('company', 'Soon Gone')
-    const cited = [d.ref.attr(source, 'location'), d.ref.note(source)]
-
-    const open = await d.Effect.runPromise(
-      proposeProgram({
-        entityId: company,
-        kind: 'attribute_patch',
-        payload: {
-          founded_year: { value: 2019, refs: cited, confidence: 0.8 },
-        },
-        rationale: 'read it off a record that will be deleted',
-        proposedBy: { type: 'system' },
-      }),
-    )
-    const accepted = await d.Effect.runPromise(
-      proposeProgram({
-        entityId: company,
-        kind: 'attribute_patch',
-        payload: {
-          location: { value: 'Berlin', refs: cited, confidence: 0.8 },
-        },
-        rationale: 'accepted, so its refs reach attribute_event',
-        proposedBy: { type: 'system' },
-      }),
-    )
-    await d.Effect.runPromise(
-      acceptProgram(accepted.id, { type: 'user', id: d.me.id }),
-    )
-    await d.db.delete(d.schema.entity).where(d.eq(d.schema.entity.id, source))
-
-    const missing = cited.map((r) => ({
-      ref: r,
-      entityId: null,
-      label: d.MISSING_LABEL,
-      missing: true,
-    }))
-
-    const rows = await d.Effect.runPromise(listInboxProgram())
-    const card = rows.find((r) => r.kind === 'suggestion' && r.id === company)
-    if (card?.kind !== 'suggestion') throw new Error('no suggestion card')
-    expect(card.suggestions.find((s) => s.id === open.id)?.citations).toEqual(
-      missing,
-    )
-
-    const timeline = await d.Effect.runPromise(recordTimelineProgram(company))
-    const burst = timeline.find(
-      (i) => i.type === 'attrs' && i.source === 'suggestion',
-    )
-    if (burst?.type !== 'attrs') throw new Error('no suggestion burst')
-    expect(burst.changes).toEqual([
-      { slug: 'location', to: 'Berlin', citations: missing },
-    ])
-  })
 })
 
 describe('resolveRefs — cost', () => {
@@ -359,8 +293,9 @@ describe('resolveRefs — cost', () => {
 
 describe('cite.ts is the one renderer', () => {
   it('is called only from names.ts, and no other file in src formats a ref', () => {
-    // Both source trees: `cite.ts` is @spaces/core's since SPA-179 (the pure
-    // half of lib/context moved), `names.ts` is still this app's.
+    // Both source trees: `cite.ts` is @spaces/core's pure half since SPA-179,
+    // `names.ts` its db-coupled half since SPA-182, and apps/web is where a
+    // second renderer would most likely grow.
     const root = join(import.meta.dirname, '..', '..', '..', '..', '..')
     const files: Array<string> = []
     const walk = (dir: string) => {
@@ -375,14 +310,14 @@ describe('cite.ts is the one renderer', () => {
     walk(join(root, 'packages/core/src'))
     const rel = (f: string) => relative(root, f)
     const citeTs = 'packages/core/src/context/cite.ts'
-    const namesTs = 'apps/web/src/lib/context/names.ts'
+    const namesTs = 'packages/core/src/writes/context/names.ts'
 
     // Whoever calls `cite(` renders a ref; only the resolver may.
     const callers = files
       .filter((f) => /\bcite\(/.test(readFileSync(f, 'utf8')))
       .map(rel)
       .sort()
-    expect(callers).toEqual([namesTs, citeTs])
+    expect(callers).toEqual([citeTs, namesTs])
 
     // Nobody else builds a `CiteLookup` or re-derives a label from a parse:
     // the words "· chunk" and the mandate / history fallbacks live in cite.ts.
@@ -397,7 +332,7 @@ describe('cite.ts is the one renderer', () => {
       })
       .map(rel)
       .sort()
-    expect(renderers).toEqual([namesTs, citeTs])
+    expect(renderers).toEqual([citeTs, namesTs])
 
     // And cite.ts stays pure: the grammar and a type are all it imports.
     const imports = [

@@ -16,8 +16,8 @@ import type {
   suggestionKind,
   suggestionStatus,
 } from '@spaces/db/schema'
-import { resolveRefsProgram } from '#/lib/context/names'
-import type { ResolvedRef } from '#/lib/context/names'
+import { resolveRefsProgram } from '@spaces/core/writes/context/names'
+import type { ResolvedRef } from '@spaces/core/writes/context/names'
 import { effectFn } from '#/lib/server/effect'
 import { requireUser } from '#/lib/server/shared'
 import type { AiLane } from './lanes'
@@ -28,7 +28,7 @@ import { suggestionOfOutputRef } from './run'
  * written since the first Test call (ai-4a); this is its surface, listed by
  * run — task, record, who, when, status, tokens, what the run proposed — and,
  * opened, each step's tool, model, tokens and `input_refs → output_ref`, the
- * refs resolved to names by `resolveRefsProgram` (`lib/context/names.ts`,
+ * refs resolved to names by `resolveRefsProgram` (`@spaces/core/writes/context/names`,
  * which renders through `cite.ts`). Calls no run owns — the settings Test
  * call — are listed apart, under "Calls outside a run".
  *

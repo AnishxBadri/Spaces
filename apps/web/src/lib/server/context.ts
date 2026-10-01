@@ -20,9 +20,9 @@ export const getRecordContext = createServerFn()
     }),
   )
   .handler(async ({ data }) => {
-    // The body is `getRecordContextHandler` (lib/context/record-handler.ts),
+    // The body is `getRecordContextHandler` (lib/ai/record-context-handler.ts),
     // shared word for word with the MCP `get_context` tool's test (SPA-23).
     const { getRecordContextHandler } =
-      await import('../context/record-handler')
+      await import('../ai/record-context-handler')
     return getRecordContextHandler(data)
   })

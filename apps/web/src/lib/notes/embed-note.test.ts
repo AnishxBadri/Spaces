@@ -19,7 +19,8 @@ import { embedDocumentProgram } from '#/lib/ai/embed-document'
 import { pinEmbeddingProgram } from '#/lib/ai/embedding-pin'
 import { saveEmbeddingKeyProgram } from '#/lib/ai/providers/embed/settings'
 import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
-import { assembleProgram } from '#/lib/context/assemble'
+import { assembleProgram } from '@spaces/core/writes/context/assemble'
+import { SimilarLaneLive } from '#/lib/ai/similar'
 import { searchAllProgram } from '#/lib/search/query'
 import { clearQueryEmbeddingCache } from '#/lib/search/query-embedding'
 import { canRead } from '@spaces/core/read-policy'
@@ -378,7 +379,7 @@ describe('the assembler over chunked notes', () => {
             budgetChars: 20_000,
             taskText: 'founders not ready chillers',
           },
-        ),
+        ).pipe(Effect.provide(SimilarLaneLive)),
       )
 
     const mine = await assemble(FIXTURE_ACTOR.id)

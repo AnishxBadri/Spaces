@@ -65,8 +65,11 @@ pnpm worker                                       # the worker alone (apps/worke
   process shell that runs it) — and is the only place in core a `drizzle-orm` import or a
   `db` value import passes. The pure half also holds the context assembler's
   ranker, ref grammar and renderer (`context/*`) and `canRead`
-  (`read-policy.ts`, SPA-179; the db-coupled assembler is still
-  `apps/web/src/lib/context/`). Neither half imports React, and only
+  (`read-policy.ts`, SPA-179) and the `SimilarLane` service tag
+  (`context/similar-lane.ts`, SPA-182/D58); the db-coupled assembler
+  (`assemble`, `names`, `record`) is `writes/context/*` and declares that
+  service, whose one live Layer is `apps/web/src/lib/ai/similar.ts` beside
+  the embedding pin it reads. Neither half imports React, and only
   `writes/vault/` (MASTER_KEY, DATA_DIR) and `writes/storage/`
   (STORAGE_DRIVER, S3_*) read `process.env` — which is why
   `enqueueSourceEmbed` stayed in

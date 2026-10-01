@@ -2,16 +2,13 @@ import { Effect } from 'effect'
 import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { note } from '@spaces/db/schema'
-import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
-import { canRead } from '@spaces/core/read-policy'
-import {
-  ContextEntityNotFound,
-  ContextQueryFailed,
-} from '@spaces/core/context/errors'
+import { canRead } from '../../read-policy'
+import { ContextEntityNotFound, ContextQueryFailed } from '../../context/errors'
+import type { ContextLeak } from '../../context/errors'
+import { SimilarLane } from '../../context/similar-lane'
+import type { ContextKind } from '../../context/types'
 import { assembleProgram } from './assemble'
-import type { ContextLeak } from './assemble'
 import { resolveRefsProgram } from './names'
-import type { ContextKind } from '@spaces/core/context/types'
 
 /**
  * The record page's Context section, as one program: assemble the record for
@@ -19,8 +16,9 @@ import type { ContextKind } from '@spaces/core/context/types'
  * clock and the budget are arguments — `getRecordContext` stamps them at the
  * server-fn boundary — so this stays as deterministic as the assembler is.
  *
- * It lives outside `lib/server/` so a test can run it without a request
- * (CLAUDE.md, SPA-155).
+ * In core since SPA-182, beside the assembler. Like it, it declares the
+ * `SimilarLane` service rather than importing the embedding substrate: the
+ * pin read that decides `similarAvailable` is the lane's `pinned()`.
  */
 
 export type RecordContextItem = {
@@ -70,7 +68,8 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
     input: RecordContextInput,
   ): Effect.fn.Return<
     RecordContext,
-    ContextQueryFailed | ContextEntityNotFound | ContextLeak
+    ContextQueryFailed | ContextEntityNotFound | ContextLeak,
+    SimilarLane
   > {
     // A private note is its author's: asked for as the seed by anyone else,
     // it does not exist — not even its title leaves as the seed's name. The
@@ -101,15 +100,16 @@ export const recordContextProgram = Effect.fn('recordContextProgram')(
     )
     // A pin that cannot be read only hides the toggle; the mode itself,
     // asked for, still fails loudly through the assembler.
-    const pin = yield* readEmbeddingPinProgram().pipe(
-      Effect.orElseSucceed(() => null),
-    )
+    const lane = yield* SimilarLane
+    const similarAvailable = yield* lane
+      .pinned()
+      .pipe(Effect.orElseSucceed(() => false))
     const resolved = yield* resolveRefsProgram(result.items.map((i) => i.ref))
     const asOfMs = Date.parse(input.asOf)
     return {
       seed: result.seed,
       usedChars: result.usedChars,
-      similarAvailable: pin !== null,
+      similarAvailable,
       items: result.items.map((i, n) => {
         const atMs = i.at === null ? Number.NaN : Date.parse(i.at)
         return {

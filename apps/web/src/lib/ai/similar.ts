@@ -1,12 +1,16 @@
-import { Effect } from 'effect'
+import { Effect, Layer } from 'effect'
 import { sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { readEmbeddingPinProgram } from '#/lib/ai/embedding-pin'
-import { canReadNoteSql } from '#/lib/search/query'
+import { canReadNoteSql } from '@spaces/core/writes/read/search'
 import { ContextQueryFailed } from '@spaces/core/context/errors'
-import type { Candidate } from '@spaces/core/context/rank'
 import { ref } from '@spaces/core/context/ref'
 import { truncate } from '@spaces/core/context/render'
+import { SimilarLane } from '@spaces/core/context/similar-lane'
+import type {
+  SimilarCandidate,
+  SimilarInput,
+} from '@spaces/core/context/similar-lane'
 
 /**
  * The judgment-memory lane (SPA-139; docs/spec-ai-substrate.md §1 — "rank
@@ -49,32 +53,26 @@ import { truncate } from '@spaces/core/context/render'
  */
 
 /**
- * How far sideways is far enough. Both are **first guesses to tune on real
- * data** (the hitl half of SPA-139): five items is a paragraph of precedent,
- * not a report, and cosine distance 0.35 is "clearly about the same kind of
- * thing" for the 768-wide models the pin allows — loose enough that a
+ * How far sideways is far enough. A **first guess to tune on real data**
+ * (the hitl half of SPA-139), like its sibling `SIMILAR_TOP_N` (five items,
+ * a paragraph of precedent — the assembler's cut, so it lives with the
+ * service tag in core): cosine distance 0.35 is "clearly about the same kind
+ * of thing" for the 768-wide models the pin allows — loose enough that a
  * reworded pass reason still lands, tight enough that an unrelated deal's
  * does not. The budget slice (`SIMILAR_SHARE`, `rank.ts`) bounds the lane's
  * cost; these bound its reach, which the slice cannot.
  */
-export const SIMILAR_TOP_N = 5
 export const SIMILAR_MAX_DISTANCE = 0.35
 
 /**
  * Chunks the index hands back before the record filters apply. Several
  * chunks of one note collapse into one item, and the stage and anchor
- * filters drop more, so this sits well above {@link SIMILAR_TOP_N}.
+ * filters drop more, so this sits well above `SIMILAR_TOP_N`.
  */
 const INNER_LIMIT = 100
 
 /** How long a similar note's chunk may run in the item's text. */
 const CHUNK_TEXT_MAX = 1200
-
-export type SimilarInput = {
-  userId: string
-  /** The seed and, for a company, the deals linked to it. */
-  anchorIds: ReadonlyArray<string>
-}
 
 type SimilarRow = {
   entity_id: string
@@ -88,11 +86,6 @@ type SimilarRow = {
   note_visibility: string | null
   note_author_id: string | null
   note_updated_at: string | null
-}
-
-export type SimilarCandidate = Candidate & {
-  /** The note row behind a note item, for the assembler's output invariant. */
-  noteRow: { entityId: string; visibility: string; authorId: string } | null
 }
 
 const query = <T>(run: () => Promise<T>) =>
@@ -325,4 +318,21 @@ export const similarCandidatesProgram = Effect.fn('similarCandidatesProgram')(
       .sort(byDistance)
       .map(toCandidate)
   },
+)
+
+/**
+ * The judgment-memory lane as the assembler's `SimilarLane` service: the
+ * neighbours above, and the pin read `recordContextProgram` offers the mode
+ * on. The one live Layer; every app caller of the assembler provides it.
+ */
+export const SimilarLaneLive: Layer.Layer<SimilarLane> = Layer.succeed(
+  SimilarLane,
+  SimilarLane.of({
+    candidates: similarCandidatesProgram,
+    pinned: () =>
+      readEmbeddingPinProgram().pipe(
+        Effect.map((pin) => pin !== null),
+        Effect.mapError((e) => new ContextQueryFailed({ cause: e })),
+      ),
+  }),
 )

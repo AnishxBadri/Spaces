@@ -179,7 +179,9 @@ describe('deal.referred_by — backlinks', () => {
     const { resolveEntity } =
       await import('@spaces/core/writes/entities/resolve')
     const { setValues } = await import('@spaces/core/writes/attributes/values')
-    const { assembleProgram } = await import('#/lib/context/assemble')
+    const { assembleProgram } =
+      await import('@spaces/core/writes/context/assemble')
+    const { SimilarLaneLive } = await import('#/lib/ai/similar')
     const { Effect } = await import('effect')
     const { db } = await import('@spaces/db')
     const { entity, link } = await import('@spaces/db/schema')
@@ -239,7 +241,7 @@ describe('deal.referred_by — backlinks', () => {
       assembleProgram(
         { entityId: person.entityId },
         { user: { id: actor.id }, asOf: ASOF, budgetChars: 8000 },
-      ),
+      ).pipe(Effect.provide(SimilarLaneLive)),
     )
     expect(assembled.items.map((i) => i.ref)).toContain(
       `attr:${dealEnt.id}:referred_by`,
