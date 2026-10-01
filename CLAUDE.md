@@ -50,7 +50,11 @@ pnpm worker                                       # the worker alone (apps/worke
   SPA-178; `./writes/storage/local`'s token helpers are public on purpose for
   the blob route), the live plugin ports (`writes/ports/*`, SPA-197 on:
   Layer constructors over the bound `integration` row — Config, Secrets,
-  Log, and Http with its per-process throttle) and the boot composition (`writes/boot.ts` with
+  Log, and Http with its per-process throttle; Read since SPA-198), the
+  graph's read half (`writes/read/*`, SPA-198: MCP's `get_record` program,
+  `entitySearchRows`, and the lexical fused search statement with
+  `canReadNoteSql` — apps/web re-exports all three and keeps only the
+  semantic lane) and the boot composition (`writes/boot.ts` with
   `writes/seeds/taxonomy.ts`, SPA-177; `apps/web/src/db/boot.ts` is the
   process shell that runs it) — and is the only place in core a `drizzle-orm` import or a
   `db` value import passes. The pure half also holds the context assembler's

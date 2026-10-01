@@ -27,7 +27,8 @@
     "./timeline/*": "./src/timeline/*.ts",
     "./ai/*": "./src/ai/*.ts",
     "./import/*": "./src/import/*.ts",
-    "./plugins/*": "./src/plugins/*.ts"
+    "./plugins/*": "./src/plugins/*.ts",
+    "./search/*": "./src/search/*.ts"
   },
   "scripts": {
     "test": "vitest run",

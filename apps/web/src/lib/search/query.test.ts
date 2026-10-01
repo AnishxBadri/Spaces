@@ -408,6 +408,24 @@ describe('searchAllProgram', () => {
   })
 })
 
+/**
+ * The statement's source, as these source-reading assertions mean it: since
+ * SPA-198 the four lexical lanes and the fusion live in core
+ * (`@spaces/core/writes/read/search`, which the plugin SDK's Read.search
+ * runs) and the semantic lane in this directory's `query.ts`, which hands
+ * its fragment to core's builder. Read in that order — the fragment's CTEs
+ * come first in the emitted statement — they are the one statement.
+ */
+const statementSource = () =>
+  readFileSync(new URL('./query.ts', import.meta.url), 'utf8') +
+  readFileSync(
+    new URL(
+      '../../../../../packages/core/src/writes/read/search.ts',
+      import.meta.url,
+    ),
+    'utf8',
+  )
+
 describe('the task lane (SPA-55)', () => {
   it('returns a task alongside a company of the same name, each marked with its row kind', async () => {
     const { newEntity, newTask, search } = await deps()
@@ -552,7 +570,7 @@ describe('the task lane (SPA-55)', () => {
   it('spells k = 60 once, limits each of the five lanes to 40 and the answer to 20', () => {
     // Read from source: the per-lane limit is invisible behind the final 20,
     // and "one k" is a claim about the statement, not about any one answer.
-    const source = readFileSync(new URL('./query.ts', import.meta.url), 'utf8')
+    const source = statementSource()
     expect(source.match(/\b60 \+/g)).toHaveLength(1)
     expect(source.match(/limit 40\b/g)).toHaveLength(5)
     expect(source.match(/limit 20\b/g)).toHaveLength(1)
@@ -603,7 +621,7 @@ describe('terms are findable (SPA-75)', () => {
     // The semantic lane (SPA-129) and the query vector it reads are the
     // only CTEs outside the four-lane statement, spelled in their own
     // fragment; the union below gains exactly its one arm.
-    const source = readFileSync(new URL('./query.ts', import.meta.url), 'utf8')
+    const source = statementSource()
     expect(source.match(/^\s+\w+ as \($/gm)?.map((s) => s.trim())).toEqual([
       'qv as (',
       'sem_hits as (',
