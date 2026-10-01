@@ -139,9 +139,10 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 // by that spelling would hide the crossing), and a relative climb into
 // apps/web is banned so every crossing is greppable as `#web/`. The fence
 // narrows as lib/ moves into core; the day the list below is empty, the
-// alias and this paragraph go.
+// alias and this paragraph go. SPA-201 (sdk-8a) took documents/{birth,
+// intake, prepare} off it: they are `@spaces/core/writes/documents/*` now.
 //
-// The crossing list (2026-09-29, `grep -rho "'#web/[^']*'" apps/worker/src`),
+// The crossing list (2026-10-01, `grep -rho "'#web/[^']*'" apps/worker/src`),
 // shipping code first:
 //   lib/ai/{attribute-run, classify-document, column-run, complete,
 //     embed-backfill, embed-document, embed-source, key-terms, read-deck,
@@ -154,8 +155,8 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 //   lib/ai/{embed-chunks, embedding-pin, propose, route, providers/embed/ids,
 //     providers/embed/settings}
 //   lib/arrival/{fixtures, settings}
-//   lib/documents/{birth, clip, intake, prepare, read-deck-gate, shelf,
-//     space-sources} · lib/import/{mapping, plan} · lib/inbox/queue
+//   lib/documents/{clip, read-deck-gate, shelf, space-sources}
+//     · lib/import/{mapping, plan} · lib/inbox/queue
 //   lib/rpc/{api, versions} · lib/search/{query, query-embedding}
 //   lib/server/shared · lib/tokens/store
 //   test/{fake-imap, fake-ollama, minimal-pdf, queue-stub, reseed}

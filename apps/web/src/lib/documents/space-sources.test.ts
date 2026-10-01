@@ -49,7 +49,9 @@ async function fileIntoSpace(
   sha: string,
 ): Promise<string> {
   const { Effect } = await import('effect')
-  const { birthDocumentProgram } = await import('./birth')
+  const { birthDocumentProgram } =
+    await import('@spaces/core/writes/documents/birth')
+  const { webEnqueue } = await import('#/lib/enqueue-live')
   const { id } = await Effect.runPromise(
     birthDocumentProgram({
       blobSha: sha,
@@ -62,7 +64,7 @@ async function fileIntoSpace(
       provenance: {},
       fileAgainst: [{ kind: 'space', entityId: spaceId }],
       actor: { userId: await actorId() },
-    }),
+    }).pipe(Effect.provide(webEnqueue)),
   )
   return id
 }
@@ -103,7 +105,9 @@ async function fileAgainstRecord(
   sha: string,
 ): Promise<string> {
   const { Effect } = await import('effect')
-  const { birthDocumentProgram } = await import('./birth')
+  const { birthDocumentProgram } =
+    await import('@spaces/core/writes/documents/birth')
+  const { webEnqueue } = await import('#/lib/enqueue-live')
   const { id } = await Effect.runPromise(
     birthDocumentProgram({
       blobSha: sha,
@@ -116,7 +120,7 @@ async function fileAgainstRecord(
       provenance: {},
       fileAgainst: [{ kind: 'record', entityId }],
       actor: { userId: await actorId() },
-    }),
+    }).pipe(Effect.provide(webEnqueue)),
   )
   return id
 }
@@ -213,7 +217,9 @@ describe('spaceSourcesProgram', () => {
     const { db } = await import('@spaces/db')
     const { company, entity } = await import('@spaces/db/schema')
     const { Effect } = await import('effect')
-    const { birthDocumentProgram } = await import('./birth')
+    const { birthDocumentProgram } =
+      await import('@spaces/core/writes/documents/birth')
+    const { webEnqueue } = await import('#/lib/enqueue-live')
     const tag = randomUUID().slice(0, 8)
 
     const spaceId = await aSpace(tag)
@@ -235,7 +241,7 @@ describe('spaceSourcesProgram', () => {
         provenance: {},
         fileAgainst: [{ kind: 'record', entityId: ent.id }],
         actor: { userId: await actorId() },
-      }),
+      }).pipe(Effect.provide(webEnqueue)),
     )
 
     // `link(tagged_in)` is the record's edge and never a space's: a lane

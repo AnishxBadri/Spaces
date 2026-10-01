@@ -1,8 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Effect, Layer } from 'effect'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { Enqueue } from '../../queue/enqueue'
 import type { DocumentBirthInput } from './birth'
 
 /**
@@ -15,17 +17,34 @@ import type { DocumentBirthInput } from './birth'
  * dedupe rule, the activity line and the enqueue drift apart, and the grep
  * catches it before a reviewer has to.
  *
- * The queue is stubbed through `#/test/queue-stub`, as in every document
- * fixture file. Here it is also the assertion: whether extraction is enqueued
+ * The queue is core's `Enqueue` service, provided by a recording Layer.
+ * Here it is also the assertion: whether extraction is enqueued
  * is part of this slice — enqueueing a blobless row spends a worker attempt
  * to write 'unsupported', and never enqueueing a blob-bearing one leaves it
  * 'pending' forever — and there is no other seam to read it through, since
  * `enqueue` swallows its own failures and answers `null` either way.
+ *
+ * Moved from apps/web with the program (SPA-201, sdk-8a).
  */
-vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
+/**
+ * The queue, as core's `Enqueue` service (SPA-201): birth no longer imports a
+ * sender, it asks for one, so the test provides a recording one rather than
+ * mocking a module. `enqueue` never fails by contract, so what was sent is
+ * the only way to observe the decision at all.
+ */
+const enqueued = new Array<{ name: string; data: Record<string, unknown> }>()
+const RecordingEnqueue = Layer.succeed(
+  Enqueue,
+  Enqueue.of({
+    enqueue: (name, data) =>
+      Effect.sync(() => {
+        enqueued.push({ name, data })
+        return `job-${enqueued.length}`
+      }),
+  }),
+)
 
-beforeEach(async () => {
-  const { enqueued } = await import('#/test/queue-stub')
+beforeEach(() => {
   enqueued.length = 0
 })
 
@@ -48,9 +67,25 @@ async function aCompany(tag: string): Promise<string> {
   return ent.id
 }
 
+/** A root space, written the way core's other fixtures write one. */
 async function aSpace(tag: string): Promise<string> {
-  const { createSpaceRow } = await import('#/lib/server/shared')
-  return createSpaceRow(`Hydrogen ${tag}`, null, await actorId())
+  const { db } = await import('@spaces/db')
+  const { entity, space } = await import('@spaces/db/schema')
+  const [ent] = await db
+    .insert(entity)
+    .values({
+      kind: 'space',
+      canonicalName: `Hydrogen ${tag}`,
+      sourceClass: 'manual',
+      createdBy: await actorId(),
+    })
+    .returning({ id: entity.id })
+  await db.insert(space).values({
+    entityId: ent.id,
+    slug: `hydrogen_${tag}`,
+    path: `hydrogen_${tag}`,
+  })
+  return ent.id
 }
 
 /** A digest, which is all birth ever sees of a file. */
@@ -62,7 +97,6 @@ function aSha(tag: string): string {
 async function birth(
   over: Partial<DocumentBirthInput> & { filename?: string },
 ): Promise<{ id: string; deduped: boolean }> {
-  const { Effect } = await import('effect')
   const { birthDocumentProgram } = await import('./birth')
   return Effect.runPromise(
     birthDocumentProgram({
@@ -77,7 +111,7 @@ async function birth(
       fileAgainst: [],
       actor: { userId: await actorId() },
       ...over,
-    }),
+    }).pipe(Effect.provide(RecordingEnqueue)),
   )
 }
 
@@ -331,14 +365,13 @@ describe('birthDocumentProgram', () => {
     const { db } = await import('@spaces/db')
     const { document } = await import('@spaces/db/schema')
     const { eq } = await import('drizzle-orm')
-    const { QUEUES } = await import('@spaces/core/queue/names')
+    const { QUEUES } = await import('../../queue/names')
     const tag = randomUUID().slice(0, 8)
 
     const stored = await birth({
       blobSha: aSha(tag),
       filename: `deck-${tag}.pdf`,
     })
-    const { enqueued } = await import('#/test/queue-stub')
     expect(enqueued).toEqual([
       { name: QUEUES.extractDocument, data: { documentId: stored.id } },
     ])
@@ -379,7 +412,6 @@ describe('birthDocumentProgram', () => {
     const companyId = await aCompany(tag)
     const target = { kind: 'record', entityId: companyId } as const
 
-    const { enqueued } = await import('#/test/queue-stub')
     await birth({
       blobSha: sha,
       filename: `deck-${tag}.pdf`,
@@ -428,19 +460,35 @@ describe('birthDocumentProgram', () => {
 })
 
 /**
- * §3.1's promise, mechanically. `grep -rn 'insert(document)' src` outside
- * tests and seeds must be **one** line, and it must be birth's.
+ * §3.1's promise, mechanically. `insert(document)` outside tests and seeds
+ * must be **one** line, and it must be birth's — across the whole workspace
+ * since SPA-201 moved birth out of apps/web, so a second writer in any
+ * package (apps/web, the worker, core, a plugin) fails here by name.
  */
 describe('one writer', () => {
   it('has exactly one insert(document) outside tests and seeds', () => {
-    const src = resolve(fileURLToPath(new URL('.', import.meta.url)), '../..')
-    const writers = readdirSync(src, { recursive: true, encoding: 'utf8' })
-      .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
-      .filter((f) => !f.startsWith('lib/seeds/'))
+    const root = resolve(
+      fileURLToPath(new URL('.', import.meta.url)),
+      '../../../../..',
+    )
+    const trees = ['apps', 'packages', 'plugins', 'plugins/_fixtures'].flatMap(
+      (parent) =>
+        readdirSync(join(root, parent), { withFileTypes: true })
+          .filter((d) => d.isDirectory() && d.name !== '_fixtures')
+          .map((d) => `${parent}/${d.name}/src`)
+          .filter((tree) => existsSync(join(root, tree))),
+    )
+    const writers = trees
+      .flatMap((tree) =>
+        readdirSync(join(root, tree), { recursive: true, encoding: 'utf8' })
+          .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
+          .map((f) => `${tree}/${f}`),
+      )
+      .filter((f) => !f.startsWith('apps/web/src/lib/seeds/'))
       .filter((f) =>
-        readFileSync(join(src, f), 'utf8').includes('insert(document)'),
+        readFileSync(join(root, f), 'utf8').includes('insert(document)'),
       )
       .sort()
-    expect(writers).toEqual(['lib/documents/birth.ts'])
+    expect(writers).toEqual(['packages/core/src/writes/documents/birth.ts'])
   })
 })

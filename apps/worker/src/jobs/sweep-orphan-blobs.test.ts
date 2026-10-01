@@ -3,6 +3,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
+import { Enqueue } from '@spaces/core/queue/enqueue'
+import { enqueue as stubSend } from '#web/test/queue-stub'
 
 /**
  * The orphan-blob sweep (SPA-54) — the half of blob GC that runs from the
@@ -29,6 +31,10 @@ import { describe, expect, it, vi } from 'vitest'
  * the whole file drives the job.
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
+
+// Birth's extraction enqueue is core's `Enqueue` service since SPA-201;
+// here it records into the same stub the mocked `#web/lib/queue` does.
+const stubEnqueue = Enqueue.fromSender({ enqueue: stubSend })
 
 async function actorId(): Promise<string> {
   const { db } = await import('@spaces/db')
@@ -60,7 +66,7 @@ async function prepareAndPut(
 ): Promise<{ sha: string; alreadyStored: boolean }> {
   const { Effect } = await import('effect')
   const { prepareBlobUploadProgram } =
-    await import('#web/lib/documents/prepare')
+    await import('@spaces/core/writes/documents/prepare')
   const { storage } = await import('@spaces/core/writes/storage')
   const { sha, bytes } = shaOf(tag)
   const out = await Effect.runPromise(
@@ -104,7 +110,8 @@ async function sweep(graceMs?: number) {
 
 async function fileIt(sha: string, tag: string, entityId: string) {
   const { Effect } = await import('effect')
-  const { birthDocumentProgram } = await import('#web/lib/documents/birth')
+  const { birthDocumentProgram } =
+    await import('@spaces/core/writes/documents/birth')
   return Effect.runPromise(
     birthDocumentProgram({
       blobSha: sha,
@@ -117,7 +124,7 @@ async function fileIt(sha: string, tag: string, entityId: string) {
       provenance: {},
       fileAgainst: [{ kind: 'record', entityId }],
       actor: { userId: await actorId() },
-    }),
+    }).pipe(Effect.provide(stubEnqueue)),
   )
 }
 
@@ -262,7 +269,7 @@ describe('the alreadyStored short circuit', () => {
     // alone. A row here would put a known deck's bytes on the sweep's list.
     const { Effect } = await import('effect')
     const { prepareBlobUploadProgram } =
-      await import('#web/lib/documents/prepare')
+      await import('@spaces/core/writes/documents/prepare')
     const out = await Effect.runPromise(
       prepareBlobUploadProgram({
         sha,

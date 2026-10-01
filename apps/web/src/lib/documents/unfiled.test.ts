@@ -77,7 +77,9 @@ type Birth = {
 
 async function birth(input: Birth): Promise<string> {
   const { Effect } = await import('effect')
-  const { birthDocumentProgram } = await import('#/lib/documents/birth')
+  const { birthDocumentProgram } =
+    await import('@spaces/core/writes/documents/birth')
+  const { webEnqueue } = await import('#/lib/enqueue-live')
   const { id } = await Effect.runPromise(
     birthDocumentProgram({
       blobSha: input.blobSha,
@@ -97,7 +99,7 @@ async function birth(input: Birth): Promise<string> {
         input.sourceClass === 'integration'
           ? { integrationId: input.sourceRef ?? '' }
           : { userId: await actorId() },
-    }),
+    }).pipe(Effect.provide(webEnqueue)),
   )
   return id
 }

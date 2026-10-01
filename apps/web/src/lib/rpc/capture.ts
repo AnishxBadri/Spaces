@@ -7,9 +7,10 @@ import { MAX_CAPTURE_BYTES, formatBytes } from '@spaces/core/documents'
 import {
   documentIntakeMessage,
   intakeDocumentProgram,
-} from '#/lib/documents/intake'
-import type { DocumentIntakeFailure } from '#/lib/documents/intake'
-import { DocumentBirthRejected } from '#/lib/documents/birth'
+} from '@spaces/core/writes/documents/intake'
+import type { DocumentIntakeFailure } from '@spaces/core/writes/documents/intake'
+import { DocumentBirthRejected } from '@spaces/core/writes/documents/birth'
+import { webEnqueue } from '#/lib/enqueue-live'
 import { enqueueCaptureReadProgram } from '#/lib/ai/read-deck'
 import type { CaptureReadQueued } from '#/lib/ai/read-deck'
 import { resolveEntityRefProgram } from '#/lib/mcp/tools'
@@ -28,7 +29,7 @@ import { ACCEPTED_CAPTURE_SCHEMA_VERSIONS } from './versions'
  * `./records.ts` holds the read half.
  *
  * **This module writes no bytes and no rows of its own.** The text goes
- * through `intakeDocumentProgram` (`lib/documents/intake.ts`) — stream → sha
+ * through `intakeDocumentProgram` (`writes/documents/intake.ts` in core) — stream → sha
  * → blob → `birthDocumentProgram` → `tagged_in` edge → enqueue extract — the
  * same server lane forwarded attachments file through
  * (`lib/arrival/attachment-filing.ts`), and birth is the one writer of
@@ -289,7 +290,7 @@ export const captureProgram = Effect.fn('captureProgram')(function* (
     provenance: {},
     fileAgainst,
     actor: { userId: actor.id },
-  }).pipe(Effect.mapError(intakeFailure))
+  }).pipe(Effect.provide(webEnqueue), Effect.mapError(intakeFailure))
 
   const extraction =
     object === null

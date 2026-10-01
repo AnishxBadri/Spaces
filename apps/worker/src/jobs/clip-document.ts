@@ -51,7 +51,7 @@ import type { JobDef } from '../run-job'
  *
  * **It is the second `storage().put(` in the app, and deliberately not
  * `intakeDocumentProgram`.** The server byte lane
- * (`lib/documents/intake.ts`) ends in `birthDocumentProgram`: it *births a
+ * (core's `writes/documents/intake.ts`) ends in `birthDocumentProgram`: it *births a
  * row*. Here the row already exists — `clipUrlProgram` wrote it, named it,
  * filed it and enqueued this job before a packet left the box — so reusing
  * intake would mean a second document for the same clip and an orphaned

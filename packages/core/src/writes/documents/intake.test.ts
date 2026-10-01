@@ -1,14 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
-import { Effect } from 'effect'
+import { Effect, Layer } from 'effect'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MAX_UPLOAD_BYTES } from '@spaces/core/documents'
-import { minimalPdf } from '#/test/minimal-pdf'
+import { MAX_UPLOAD_BYTES } from '../../documents'
+import { Enqueue } from '../../queue/enqueue'
 import type { DocumentIntakeInput } from './intake'
 
 /**
@@ -22,20 +22,46 @@ import type { DocumentIntakeInput } from './intake'
  * deck must not become 250 MB of RSS. Hence the temp-directory sweep, the
  * `storage().put` spy, and the RSS bound on a generated 200 MB arrival.
  *
- * The queue is stubbed through `#/test/queue-stub` as in every document
- * fixture file; here it is also how the hand-off to extraction is read, since
- * `enqueue` swallows its own failures and answers `null` either way. The
+ * The queue is core's `Enqueue` service, provided by a recording Layer; it
+ * is how the hand-off to extraction is read, since `enqueue` never fails and
+ * answers `null` for a job it could not send. The
  * worker is not running, so the extract job's own program is then driven
  * directly against the arrived row — `extractDocument.run` under its real
  * `ExtractionStore` layer, exactly what `runJob` would hand it, with no
  * change to `extract-document`.
  */
-vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
+/**
+ * The queue, as core's `Enqueue` service (SPA-201): birth no longer imports a
+ * sender, it asks for one, so the test provides a recording one rather than
+ * mocking a module. `enqueue` never fails by contract, so what was sent is
+ * the only way to observe the decision at all.
+ */
+const enqueued = new Array<{ name: string; data: Record<string, unknown> }>()
+const RecordingEnqueue = Layer.succeed(
+  Enqueue,
+  Enqueue.of({
+    enqueue: (name, data) =>
+      Effect.sync(() => {
+        enqueued.push({ name, data })
+        return `job-${enqueued.length}`
+      }),
+  }),
+)
 
-beforeEach(async () => {
-  const { enqueued } = await import('#/test/queue-stub')
+beforeEach(() => {
   enqueued.length = 0
 })
+
+/**
+ * Bytes that look like a PDF to anyone sniffing the header. Intake never
+ * parses what it stores — it measures and hashes — so the phrase only has to
+ * make each test's bytes, and so its digest, its own. (apps/web's
+ * `minimalPdf` builds a parseable one, for the extraction half of this
+ * arrival, which runs in `apps/worker`.)
+ */
+function pdfLike(phrase: string): Buffer {
+  return Buffer.from(`%PDF-1.4\n% ${phrase}\n%%EOF\n`, 'utf8')
+}
 
 async function actorId(): Promise<string> {
   const { db } = await import('@spaces/db')
@@ -87,7 +113,7 @@ async function intake(
       fileAgainst: [],
       actor: { userId: await actorId() },
       ...over,
-    }),
+    }).pipe(Effect.provide(RecordingEnqueue)),
   )
 }
 
@@ -135,11 +161,11 @@ describe('intakeDocumentProgram', () => {
   it('arrives a PDF from a Readable: blob, row, tagged_in edge, queued to extract', async () => {
     const tag = randomUUID().slice(0, 8)
     const phrase = `Ohmium electrolyser stack ${tag}`
-    const bytes = minimalPdf(phrase)
+    const bytes = pdfLike(phrase)
     const sha = shaOf(bytes)
     const companyId = await aCompany(tag)
     const integrationId = await anIntegration(tag)
-    const { storage } = await import('@spaces/core/writes/storage')
+    const { storage } = await import('../storage')
 
     const { id, deduped } = await intake({
       stream: Readable.from([bytes]),
@@ -177,8 +203,7 @@ describe('intakeDocumentProgram', () => {
     // that reaches extraction_status 'done' off these exact bytes, is
     // `apps/worker/src/jobs/extract-document.arrival.test.ts`, on the
     // worker's side of the line where the import is legal.
-    const { QUEUES } = await import('@spaces/core/queue/names')
-    const { enqueued } = await import('#/test/queue-stub')
+    const { QUEUES } = await import('../../queue/names')
     expect(enqueued).toEqual([
       { name: QUEUES.extractDocument, data: { documentId: id } },
     ])
@@ -188,10 +213,10 @@ describe('intakeDocumentProgram', () => {
 
   it('skips the put when the digest is already stored, and still births', async () => {
     const tag = randomUUID().slice(0, 8)
-    const bytes = minimalPdf(`Already here ${tag}`)
+    const bytes = pdfLike(`Already here ${tag}`)
     const sha = shaOf(bytes)
     const companyId = await aCompany(tag)
-    const { storage } = await import('@spaces/core/writes/storage')
+    const { storage } = await import('../storage')
 
     // The same bytes, already arrived from another provider.
     await storage().put(sha, bytes, { mime: 'application/pdf' })
@@ -216,7 +241,7 @@ describe('intakeDocumentProgram', () => {
 
   it('destroys a source past MAX_UPLOAD_BYTES that declared no size, storing nothing', async () => {
     const tag = randomUUID().slice(0, 8)
-    const { storage } = await import('@spaces/core/writes/storage')
+    const { storage } = await import('../storage')
     const { documentIntakeMessage } = await import('./intake')
     const put = vi.spyOn(storage(), 'put')
 
@@ -270,7 +295,7 @@ describe('intakeDocumentProgram', () => {
 
   it('arrives a generated 200 MB fixture with peak RSS growth under 96 MB', async () => {
     const tag = randomUUID().slice(0, 8)
-    const { storage } = await import('@spaces/core/writes/storage')
+    const { storage } = await import('../storage')
 
     // 64 KiB × 3200 = 200 MiB, generated a chunk at a time. Never a Buffer of
     // the whole thing: that is the failure mode this bound exists to catch.
@@ -328,19 +353,29 @@ describe('intakeDocumentProgram', () => {
  * actually arrive through.
  */
 describe('one writer of bytes, per lane', () => {
-  const src = resolve(fileURLToPath(new URL('.', import.meta.url)), '../..')
-  // Both source trees (SPA-181): intake is apps/web's lane, the clip job's
-  // PDF branch is apps/worker's. Paths are repo-relative.
-  const root = resolve(src, '../../..')
-  const trees = ['apps/web/src', 'apps/worker/src']
+  // Re-rooted at the workspace (SPA-201): intake and birth moved into
+  // packages/core, so a grep over apps/web alone would now watch nothing. Every
+  // workspace package's `src/` — the globs `pnpm-workspace.yaml` lists — is
+  // read, and paths are repo-relative. Seeds are fixtures, not a lane.
+  const root = resolve(
+    fileURLToPath(new URL('.', import.meta.url)),
+    '../../../../..',
+  )
+  const trees = ['apps', 'packages', 'plugins', 'plugins/_fixtures'].flatMap(
+    (parent) =>
+      readdirSync(join(root, parent), { withFileTypes: true })
+        .filter((d) => d.isDirectory() && d.name !== '_fixtures')
+        .map((d) => `${parent}/${d.name}/src`)
+        .filter((tree) => existsSync(join(root, tree))),
+  )
 
   function sourcesContaining(needle: string): Array<string> {
     return trees
       .flatMap((tree) =>
         readdirSync(join(root, tree), { recursive: true, encoding: 'utf8' })
           .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
-          .filter((f) => !f.startsWith('lib/seeds/'))
-          .map((f) => join(tree, f)),
+          .map((f) => `${tree}/${f}`)
+          .filter((f) => !f.startsWith('apps/web/src/lib/seeds/')),
       )
       .filter((f) => readFileSync(join(root, f), 'utf8').includes(needle))
       .sort()
@@ -359,8 +394,8 @@ describe('one writer of bytes, per lane', () => {
    */
   it('has exactly two storage().put( outside tests and seeds', () => {
     expect(sourcesContaining('storage().put(')).toEqual([
-      'apps/web/src/lib/documents/intake.ts',
       'apps/worker/src/jobs/clip-document.ts',
+      'packages/core/src/writes/documents/intake.ts',
     ])
   })
 
@@ -371,24 +406,35 @@ describe('one writer of bytes, per lane', () => {
   })
 
   it('has each lane naming the other', () => {
-    expect(
-      readFileSync(join(src, 'lib/documents/intake.ts'), 'utf8'),
-    ).toContain('putContentAddressed')
-    // The local driver lives in @spaces/core since SPA-178; the lane it
-    // names is still this app's.
+    const lane = 'packages/core/src/writes/documents/intake.ts'
+    expect(readFileSync(join(root, lane), 'utf8')).toContain(
+      'putContentAddressed',
+    )
+    // The local driver and the server lane both live in @spaces/core now
+    // (SPA-178, SPA-201); the driver still names the lane.
     expect(
       readFileSync(
-        join(src, '../../../packages/core/src/writes/storage/local.ts'),
+        join(root, 'packages/core/src/writes/storage/local.ts'),
         'utf8',
       ),
-    ).toContain('lib/documents/intake.ts')
+    ).toContain('writes/documents/intake.ts')
     // And the clip's own branch, both ways: why it does not reuse intake,
     // and — in intake — why intake does not serve it.
-    expect(
-      readFileSync(join(src, 'lib/documents/intake.ts'), 'utf8'),
-    ).toContain('clip-document.ts')
+    expect(readFileSync(join(root, lane), 'utf8')).toContain('clip-document.ts')
     expect(
       readFileSync(join(root, 'apps/worker/src/jobs/clip-document.ts'), 'utf8'),
-    ).toContain('lib/documents/intake.ts')
+    ).toContain('writes/documents/intake.ts')
+  })
+
+  /**
+   * And one writer of a `document` row, over the same trees: birth's
+   * `insert(document)` — asserted in `birth.test.ts` too, beside the writer,
+   * and here with the other storage-6a1/6a2 greps so the three cannot be
+   * re-rooted apart.
+   */
+  it('has exactly one insert(document) outside tests and seeds', () => {
+    expect(sourcesContaining('insert(document)')).toEqual([
+      'packages/core/src/writes/documents/birth.ts',
+    ])
   })
 })

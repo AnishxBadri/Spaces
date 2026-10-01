@@ -1,9 +1,16 @@
 import { Effect, Schema } from 'effect'
 import { QUEUES } from '@spaces/core/queue/names'
+import {
+  DocumentBirthRejected,
+  birthDocumentProgram,
+} from '@spaces/core/writes/documents/birth'
+import { webEnqueue } from '#/lib/enqueue-live'
 import { enqueue } from '#/lib/queue'
-import { DocumentBirthRejected, birthDocumentProgram } from './birth'
 import { urlRefusal } from './fetch-guard'
-import type { DocumentActor, DocumentBirthFailure } from './birth'
+import type {
+  DocumentActor,
+  DocumentBirthFailure,
+} from '@spaces/core/writes/documents/birth'
 import type { DocumentFilingTarget } from '#/lib/server/shared'
 
 /**
@@ -38,7 +45,7 @@ import type { DocumentFilingTarget } from '#/lib/server/shared'
  * clip's own address already has a column of its own.
  *
  * It lives in `lib/documents/` and not `lib/server/` for the reason
- * `birth.ts` does — the server-fns barrel ships `lib/server/*` to the
+ * birth (now `@spaces/core/writes/documents/birth`) did — the server-fns barrel ships `lib/server/*` to the
  * browser, and `clip.test.ts` drives this without a request.
  */
 
@@ -119,7 +126,7 @@ export const clipUrlProgram = Effect.fn('clipUrlProgram')(function* (
     provenance: {},
     fileAgainst: input.fileAgainst,
     actor: input.actor,
-  })
+  }).pipe(Effect.provide(webEnqueue))
 
   // Outside any transaction and after the row, exactly as birth enqueues
   // extraction: a queue that is down must not undo a perfectly good row. With

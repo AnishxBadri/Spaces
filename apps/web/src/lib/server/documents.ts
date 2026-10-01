@@ -13,6 +13,7 @@ import {
   documentProvenance,
   requireUser,
 } from './shared'
+import type { DocumentBirthInput } from '@spaces/core/writes/documents/birth'
 
 /**
  * Upload is two calls around a direct-to-storage PUT, because a 200MB deck
@@ -47,11 +48,12 @@ export const prepareDocumentUpload = createServerFn({ method: 'POST' })
     const u = await requireUser()
     // The decision — already stored, and whether to write the `pending_blob`
     // row the orphan sweep reads (SPA-54) — is `prepareBlobUploadProgram` in
-    // `#/lib/documents/prepare`, reached by a **dynamic** import inside the
-    // handler so Effect and drizzle stay out of the client bundle, exactly as
-    // `finalizeDocumentUpload` below reaches birth.
+    // `@spaces/core/writes/documents/prepare` (SPA-201), reached by a
+    // **dynamic** import inside the handler so Effect and drizzle stay out of
+    // the client bundle, exactly as `finalizeDocumentUpload` below reaches
+    // birth.
     const { prepareBlobUploadProgram, prepareBlobUploadMessage } =
-      await import('../documents/prepare')
+      await import('@spaces/core/writes/documents/prepare')
     const { effectFn } = await import('./effect')
     try {
       return await effectFn(prepareBlobUploadProgram)({
@@ -97,12 +99,18 @@ export const finalizeDocumentUpload = createServerFn({ method: 'POST' })
     // drizzle stay out of the client bundle: this file is re-exported to the
     // browser by the server-fns barrel and only handler bodies are stripped
     // (CLAUDE.md → Traps). `lib/server/objects.ts` reaches `effectFn` the
-    // same way, and `lib/documents/birth.ts` is never in the barrel.
+    // same way, and birth (in `@spaces/core/writes/documents` since SPA-201)
+    // is never in the barrel. Its extraction enqueue is core's `Enqueue`
+    // service, provided here from the web sender.
     const { birthDocumentProgram, documentBirthMessage } =
-      await import('../documents/birth')
+      await import('@spaces/core/writes/documents/birth')
+    const { webEnqueue } = await import('../enqueue-live')
+    const { Effect } = await import('effect')
     const { effectFn } = await import('./effect')
     try {
-      return await effectFn(birthDocumentProgram)({
+      return await effectFn((input: DocumentBirthInput) =>
+        birthDocumentProgram(input).pipe(Effect.provide(webEnqueue)),
+      )({
         blobSha: data.sha,
         filename: data.filename,
         mime: data.mime ?? null,

@@ -48,8 +48,9 @@ vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
  * The upload ceiling, lowered for this file (SPA-115): "refused mid-stream"
  * is a claim about the intake meter, and 250 MB of base64 through the fake
  * IMAP server would test the fixture, not the meter. Every module reading the
- * constant — `lib/documents/intake.ts` among them — sees this value; nothing
- * in the intake itself changes.
+ * constant — core's `writes/documents/intake.ts` among them, whose relative
+ * `../../documents` resolves to the same mocked file — sees this value;
+ * nothing in the intake itself changes.
  */
 vi.mock('@spaces/core/documents', async (importOriginal) => ({
   ...(await importOriginal<object>()),

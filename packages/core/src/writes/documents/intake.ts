@@ -6,15 +6,16 @@ import { join } from 'node:path'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { Effect, Schema } from 'effect'
-import { MAX_UPLOAD_BYTES, formatBytes } from '@spaces/core/documents'
 import { db } from '@spaces/db'
 import { pendingBlob } from '@spaces/db/schema'
-import { storage } from '@spaces/core/writes/storage'
+import { MAX_UPLOAD_BYTES, formatBytes } from '../../documents'
+import { storage } from '../storage'
 import { birthDocumentProgram, documentBirthMessage } from './birth'
 import type { Readable } from 'node:stream'
-import type { DocumentKind } from '@spaces/core/documents'
 import type { SourceClass } from '@spaces/db/schema'
-import type { DocumentFilingTarget } from '#/lib/server/shared'
+import type { DocumentKind } from '../../documents'
+import type { DocumentFilingTarget } from '../../documents/filing'
+import type { Enqueue } from '../../queue/enqueue'
 import type {
   DocumentActor,
   DocumentBirthFailure,
@@ -30,17 +31,17 @@ import type {
  * which is the point of the cluster.
  *
  * **The URL clip's PDF response is the one arrival this lane does not
- * serve** (docsurf-10b, `worker/jobs/clip-document.ts`). This program ends
+ * serve** (docsurf-10b, `apps/worker/src/jobs/clip-document.ts`). This program ends
  * in birth, and a clip's row already exists — `clipUrlProgram` wrote it
  * before the fetch — so routing it here would mint a second document and
  * orphan the first. It hashes and `put`s the bytes itself, which is why
  * `intake.test.ts` asserts *two* `storage().put(` sites and not one.
  *
- * **The other lane is `lib/documents/upload.ts`,** and browser uploads must
- * keep using it: the page hashes with WebCrypto and PUTs straight at storage
- * through a presigned URL, which is what keeps a 200 MB deck out of Node
- * (CONTEXT.md → Storage). The presigned PUT lands at
- * `routes/api/blob/$key.ts`, which re-hashes through
+ * **The other lane is apps/web's `lib/documents/upload.ts`,** and browser
+ * uploads must keep using it: the page hashes with WebCrypto and PUTs
+ * straight at storage through a presigned URL, which is what keeps a 200 MB
+ * deck out of Node (CONTEXT.md → Storage). The presigned PUT lands at
+ * apps/web's `routes/api/blob/$key.ts`, which re-hashes through
  * `LocalStorage.putContentAddressed` because there the key is a *client's
  * claim*. Here the digest is something we measured ourselves, so the port's
  * plain `put` is the right call and `putContentAddressed` stays local-only —
@@ -63,10 +64,12 @@ import type {
  *   all — so the meter is the guard that counts, and passing the limit
  *   destroys the source mid-transfer and leaves no blob behind.
  *
- * It lives in `lib/documents/` and not in `lib/server/` for birth's reason: a
- * plain export from a module the server-fns barrel re-exports ships to the
- * browser (CLAUDE.md → Traps, SPA-155), and a test has to call this without a
- * request. It is never re-exported from `src/lib/server-fns.ts`.
+ * It lives in core's db-coupled half since SPA-201 (sdk-8a), with birth:
+ * the worker files through it (a plugin's `Content.fileDocument`, sdk-8) and
+ * reaches it through `@spaces/core`, never a `#web/*` crossing. It imports
+ * nothing from apps/web; the extraction enqueue at the end of birth is
+ * core's `Enqueue` service, which the caller provides. Never re-exported
+ * from apps/web's `src/lib/server-fns.ts` (CLAUDE.md → Traps, SPA-155).
  */
 
 export type DocumentIntakeInput = {
@@ -249,7 +252,11 @@ const storeBlob = Effect.fn('documentIntake.storeBlob')(function* (
 const storeAndBirth = Effect.fn('documentIntake.storeAndBirth')(function* (
   dir: string,
   input: DocumentIntakeInput,
-): Effect.fn.Return<{ id: string; deduped: boolean }, DocumentIntakeFailure> {
+): Effect.fn.Return<
+  { id: string; deduped: boolean },
+  DocumentIntakeFailure,
+  Enqueue
+> {
   const { sha, sizeBytes } = yield* storeBlob(
     dir,
     input.stream,
@@ -319,7 +326,11 @@ export const putBlobProgram = Effect.fn('putBlobProgram')(function* (
 export const intakeDocumentProgram = Effect.fn('intakeDocumentProgram')(
   function* (
     input: DocumentIntakeInput,
-  ): Effect.fn.Return<{ id: string; deduped: boolean }, DocumentIntakeFailure> {
+  ): Effect.fn.Return<
+    { id: string; deduped: boolean },
+    DocumentIntakeFailure,
+    Enqueue
+  > {
     // A provider that declares an over-limit size is refused before a byte is
     // read. This is the cheap half of the guard, not the guard: most of the
     // callers this lane exists for declare nothing.

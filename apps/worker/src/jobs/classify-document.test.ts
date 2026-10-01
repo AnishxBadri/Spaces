@@ -15,8 +15,8 @@ import { DOCUMENT_KINDS, guessDocumentKind } from '@spaces/core/documents'
 import type { DocumentKind } from '@spaces/core/documents'
 import { QUEUES } from '@spaces/core/queue/names'
 import { FIXTURE_ACTOR } from '../../vitest.seed'
-import { enqueued } from '#web/test/queue-stub'
-import { birthDocumentProgram } from '#web/lib/documents/birth'
+import { enqueue as stubSend, enqueued } from '#web/test/queue-stub'
+import { birthDocumentProgram } from '@spaces/core/writes/documents/birth'
 import { onDocumentExtracted } from '#web/lib/documents/on-extracted'
 import { offersReadDeck } from '#web/lib/documents/read-deck-gate'
 import { storeCredential } from '@spaces/core/writes/vault'
@@ -28,8 +28,13 @@ import { acceptProgram, rejectProgram } from '#web/lib/ai/propose'
 import { setAiRouteProgram } from '#web/lib/ai/route'
 import { JobPermanent } from '../run-job'
 import { runClassifyDocument } from './classify-document'
+import { Enqueue } from '@spaces/core/queue/enqueue'
 
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
+
+// Birth's extraction enqueue is core's `Enqueue` service since SPA-201;
+// here it records into the same stub the mocked `#web/lib/queue` does.
+const stubEnqueue = Enqueue.fromSender({ enqueue: stubSend })
 
 /**
  * SPA-62, the lane, from extraction's tail to the inbox decision. It sits
@@ -107,7 +112,7 @@ async function upload(filename: string, kind?: DocumentKind): Promise<string> {
       provenance: {},
       fileAgainst: [],
       actor: { userId: USER },
-    }),
+    }).pipe(Effect.provide(stubEnqueue)),
   )
   // Exempt from the one-writer rule: the state an extraction leaves.
   await db

@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { db } from '@spaces/db'
 import { pendingBlob } from '@spaces/db/schema'
-import { storage } from '@spaces/core/writes/storage'
+import { storage } from '../storage'
 
 /**
  * **The first half of an upload** — the call that hands out a URL, and the
@@ -14,14 +14,15 @@ import { storage } from '@spaces/core/writes/storage'
  * tab there leaves bytes no `document` row will ever name — so this is also
  * where the `pending_blob` row is written.
  *
- * It lives in `lib/documents/` and **not** in `lib/server/`, the arrangement
- * `birth.ts` and `shelf.ts` already use: the server-fns barrel re-exports
- * `lib/server/*` wholesale to the browser and a plain export there ships with
- * it (CLAUDE.md → Traps, SPA-155), while the two rules below — a pending row
- * for a blob we do not hold, and no pending row for one we do — need a test
- * that can call them without a request. `prepareDocumentUpload` is then
- * `requireUser()` plus this and nothing else, exactly as
- * `finalizeDocumentUpload` is `requireUser()` plus `birthDocumentProgram`.
+ * It lives in core's db-coupled half since SPA-201 (sdk-8a), beside
+ * `birth.ts` and `intake.ts`, and never in apps/web's `lib/server/`: the
+ * server-fns barrel re-exports `lib/server/*` wholesale to the browser and a
+ * plain export there ships with it (CLAUDE.md → Traps, SPA-155), while the
+ * two rules below — a pending row for a blob we do not hold, and no pending
+ * row for one we do — need a test that can call them without a request.
+ * `prepareDocumentUpload` is then `requireUser()` plus this and nothing else,
+ * exactly as `finalizeDocumentUpload` is `requireUser()` plus
+ * `birthDocumentProgram`.
  */
 
 export type PrepareBlobUploadInput = {

@@ -9,12 +9,12 @@ import {
   pendingBlob,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
-import { QUEUES } from '@spaces/core/queue/names'
-import { enqueue } from '#/lib/queue'
-import { documentFilingRefusal } from '#/lib/server/shared'
-import type { DocumentKind } from '@spaces/core/documents'
+import { documentFilingRefusal } from '../../documents/filing'
+import { Enqueue } from '../../queue/enqueue'
+import { QUEUES } from '../../queue/names'
+import type { DocumentKind } from '../../documents'
+import type { DocumentFilingTarget } from '../../documents/filing'
 import type { SourceClass } from '@spaces/db/schema'
-import type { DocumentFilingTarget } from '#/lib/server/shared'
 
 /**
  * **The birth of a document** — the one server path §3.1 promises all nine
@@ -42,18 +42,20 @@ import type { DocumentFilingTarget } from '#/lib/server/shared'
  *   call a person does.
  *
  * **This is not a byte path.** Birth never reads or writes bytes. The browser
- * lane PUT them before it is called (`lib/documents/upload.ts`); the server
- * lane hashes and stores them before it is called. What arrives here is a
+ * lane PUT them before it is called (apps/web's `lib/documents/upload.ts`);
+ * the server lane (`intake.ts`, beside this) hashes and stores them before it
+ * is called. What arrives here is a
  * digest, or nothing.
  *
- * It lives in `lib/documents/` and **not** in `lib/server/`: the server-fns
- * barrel re-exports `lib/server/*` wholesale to the client and a plain export
- * there ships to the browser (CLAUDE.md → Traps, SPA-155), while a test has
- * to be able to call this without a request. `lib/documents/refile.ts` and
- * `lib/documents/space-sources.ts` are the same arrangement. It is never
- * re-exported from `src/lib/server-fns.ts`; the server fn reaches it through
- * a dynamic import inside the handler, the way `lib/server/objects.ts`
- * reaches `effectFn`.
+ * It lives in core's db-coupled half since SPA-201 (sdk-8a), beside intake:
+ * a plugin files through the SDK from the worker, and the worker reaches it
+ * through `@spaces/core` rather than a `#web/*` crossing. It imports nothing
+ * from apps/web. The one thing it used to borrow from there — the post-commit
+ * extraction enqueue — goes through core's `Enqueue` **service**, which each
+ * process provides from its own sender (apps/web's `webEnqueue` in
+ * `lib/enqueue-live.ts`, the worker's `workerEnqueue`). The server fn still
+ * reaches it through a dynamic import inside the handler, so neither Effect
+ * nor drizzle enters the client bundle (CLAUDE.md → Traps, SPA-155).
  */
 
 /**
@@ -333,7 +335,11 @@ async function clearPendingBlob(
 export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
   function* (
     input: DocumentBirthInput,
-  ): Effect.fn.Return<{ id: string; deduped: boolean }, DocumentBirthFailure> {
+  ): Effect.fn.Return<
+    { id: string; deduped: boolean },
+    DocumentBirthFailure,
+    Enqueue
+  > {
     const targets = input.fileAgainst
     yield* checkTargets(targets)
 
@@ -421,14 +427,18 @@ export const birthDocumentProgram = Effect.fn('birthDocumentProgram')(
 
     // Outside the transaction: a queue that is down must not roll back a
     // perfectly good upload. The row stays 'pending' and can be re-queued.
+    // `Enqueue` never fails — an unsent job answers `null` — so the commit
+    // above is the whole of what this program promises.
     //
     // Skipped for a blobless document, because `extract-document` refuses a
     // null `blob_sha` as 'unsupported' — enqueueing one would spend a worker
     // attempt to write a failure, and never enqueueing leaves it 'pending'
     // forever. A caller that files bytes it does not store sets the row's own
     // `extraction_status` instead.
-    if (input.blobSha !== null)
-      yield* query(() => enqueue(QUEUES.extractDocument, { documentId: id }))
+    if (input.blobSha !== null) {
+      const queue = yield* Enqueue
+      yield* queue.enqueue(QUEUES.extractDocument, { documentId: id })
+    }
 
     return { id, deduped: false }
   },

@@ -6,6 +6,8 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { minimalPdf } from '#web/test/minimal-pdf'
 import { JobContext } from '../run-job'
 import { ExtractionStore, extractDocument } from './extract-document'
+import { Enqueue } from '@spaces/core/queue/enqueue'
+import { enqueue as stubSend } from '#web/test/queue-stub'
 
 /**
  * SPA-34's document half: extraction of a deck that mentions a glossary term
@@ -17,6 +19,10 @@ import { ExtractionStore, extractDocument } from './extract-document'
  * the same reason that file does: nothing under `lib/` may import it.
  */
 vi.mock('#web/lib/queue', () => import('#web/test/queue-stub'))
+
+// Birth's extraction enqueue is core's `Enqueue` service since SPA-201;
+// here it records into the same stub the mocked `#web/lib/queue` does.
+const stubEnqueue = Enqueue.fromSender({ enqueue: stubSend })
 
 beforeEach(async () => {
   const { enqueued } = await import('#web/test/queue-stub')
@@ -95,7 +101,8 @@ describe('document extraction links the glossary terms the deck mentions', () =>
     // Mentioned in the deck, but scoped to a space the deck is not filed in.
     await makeTerm('IND', bio)
 
-    const { intakeDocumentProgram } = await import('#web/lib/documents/intake')
+    const { intakeDocumentProgram } =
+      await import('@spaces/core/writes/documents/intake')
     const { id } = await Effect.runPromise(
       intakeDocumentProgram({
         stream: Readable.from([
@@ -110,7 +117,7 @@ describe('document extraction links the glossary terms the deck mentions', () =>
         provenance: {},
         fileAgainst: [{ kind: 'space', entityId: dataCentres }],
         actor: { userId: await actorId() },
-      }),
+      }).pipe(Effect.provide(stubEnqueue)),
     )
 
     await extract(id, `${tag}-1`)
