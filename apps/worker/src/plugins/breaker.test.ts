@@ -207,8 +207,22 @@ const send = async (queue: string, data: object) => {
 }
 
 /** Sends one job and waits for pg-boss to settle it. */
-const run = async (queue: string, data: object) =>
-  settled(queue, await send(queue, data))
+/**
+ * pg-boss settles the job before `runJob` closes its `job_run` row, and the
+ * breaker's charge commits with that close — so wait for the row too.
+ */
+const run = async (queue: string, data: object) => {
+  const state = await settled(queue, await send(queue, data))
+  await waitFor(
+    () =>
+      db
+        .select({ id: jobRun.id })
+        .from(jobRun)
+        .where(and(eq(jobRun.queue, queue), eq(jobRun.status, 'running'))),
+    (rows) => rows.length === 0,
+  )
+  return state
+}
 
 /** A job sent now that nobody works stays `created`. */
 const unworked = async (queue: string, data: object) => {
