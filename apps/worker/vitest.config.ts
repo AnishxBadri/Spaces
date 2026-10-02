@@ -51,11 +51,13 @@ export default defineConfig({
     // imports with vite's resolver, where the hook never runs; and it would
     // inline the sdk's dist/ (a workspace link, not node_modules), giving the
     // test a second copy of the tags the hook resolves plugins to. Both are
-    // handed to node, so the test sees exactly what the worker does.
+    // handed to node, so the test sees exactly what the worker does. A bundle
+    // is `<plugins>/<id>/<version or current>/bundle.mjs`: the loader imports
+    // the real path of `current`, which is a version directory.
     server: {
       deps: {
         external: [
-          /[\\/]plugins[\\/][^\\/]+[\\/]current[\\/]/,
+          /[\\/]plugins[\\/][^\\/]+[\\/][^\\/]+[\\/]bundle\.mjs/,
           /[\\/]packages[\\/]sdk[\\/]dist[\\/]/,
         ],
       },

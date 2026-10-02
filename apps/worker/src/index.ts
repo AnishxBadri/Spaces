@@ -1,4 +1,4 @@
-import { Effect, Layer } from 'effect'
+import { Effect, Fiber, Layer } from 'effect'
 import { PgBoss } from 'pg-boss'
 import type { Job } from 'pg-boss'
 import { requireEnv } from '#web/lib/server/env'
@@ -6,7 +6,8 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { startHeartbeat, workerIdentity } from './heartbeat'
 import { workerEnqueue } from './plugins/enqueue'
 import { makePluginHost } from './plugins/host'
-import { reconcilePlugins } from './plugins/loader'
+import { listenPluginChanged } from './plugins/listen'
+import { makePluginReloader } from './plugins/reload'
 import { pgBossHost, runJob } from './run-job'
 import { ExtractionStore, extractDocument } from './jobs/extract-document'
 import { clipDocument } from './jobs/clip-document'
@@ -66,31 +67,15 @@ async function main() {
   // Layer per job and a `plugin.<id>.<job>` queue per job, schedules
   // reconciled (`makePluginHost`). It never stops the boot — a plugin never
   // crashes the box — so even a database error here is logged and the
-  // worker goes on.
+  // worker goes on. After boot, `plugin_changed` reloads through the same
+  // reloader (`listenPluginChanged` below).
   const plugins = makePluginHost({
     enqueue: workerEnqueue(requireEnv('DATABASE_URL')),
     queues: { boss, host },
   })
-  await Effect.runPromise(
-    reconcilePlugins().pipe(
-      Effect.tap(({ verdicts }) =>
-        Effect.sync(() => {
-          for (const verdict of verdicts) console.log(verdict.line)
-        }),
-      ),
-      Effect.flatMap(({ loaded }) => plugins.wire(loaded)),
-      Effect.tap((verdicts) =>
-        Effect.sync(() => {
-          for (const verdict of verdicts) console.log(verdict.line)
-        }),
-      ),
-      Effect.catchCause((cause) =>
-        Effect.sync(() =>
-          console.error('[plugins] reconciliation failed', cause),
-        ),
-      ),
-    ),
-  )
+  const reloader = makePluginReloader({ host: plugins })
+  reloader.request(null)
+  await Effect.runPromise(reloader.settled())
 
   const stub = (label: string) => async (jobs: Array<Job>) => {
     for (const job of jobs) console.log(`[worker] ${label} (stub)`, job.id)
@@ -433,8 +418,22 @@ async function main() {
     `[worker] heartbeat: role '${identity.role}' instance '${identity.instance}' pid ${String(identity.pid)}`,
   )
 
+  // Enable, disable and upgrade without a restart: each notification reloads
+  // one plugin, and every (re)connect reconciles them all.
+  const listener = Effect.runFork(
+    listenPluginChanged({
+      connectionString: requireEnv('DATABASE_URL'),
+      onChange: reloader.request,
+      onListening: () => reloader.request(null),
+    }),
+  )
+
   const shutdown = async () => {
     console.log('[worker] shutting down')
+    await Effect.runPromise(Fiber.interrupt(listener))
+    await Effect.runPromise(
+      reloader.settled().pipe(Effect.timeoutOption(15_000)),
+    )
     // Stop beating, but leave the row: staleness is the signal, so a graceful
     // stop still tells the operator when this worker last beat.
     heartbeat.stop()

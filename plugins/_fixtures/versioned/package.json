@@ -1,0 +1,28 @@
+{
+  "//": "An upgrade fixture, not a product: two versions of one plugin built side by side into dist/0.1.0/ and dist/0.2.0/, each with a stamp job that logs its own version through Log. apps/worker's reload test swaps `current` from one to the other and asserts the second bundle ran, not a module node cached from the first.",
+  "name": "@spaces/plugin-versioned",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build && vite build --config vite.v2.config.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "zod": "^4.3.6"
+  }
+}

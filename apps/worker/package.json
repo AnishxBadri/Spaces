@@ -32,6 +32,7 @@
     "mailparser": "^3.9.28",
     "ollama-ai-provider-v2": "^4.0.1",
     "pdf-lib": "^1.17.1",
+    "pg": "^8.16.3",
     "pg-boss": "^12.26.3",
     "zod": "^4.3.6"
   },
@@ -45,7 +46,9 @@
     "@spaces/plugin-syncer": "workspace:*",
     "@spaces/plugin-tampered": "workspace:*",
     "@spaces/plugin-throws": "workspace:*",
+    "@spaces/plugin-versioned": "workspace:*",
     "@types/node": "^22.10.2",
+    "@types/pg": "^8.15.6",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.20.0",
     "tsx": "^4.23.1",

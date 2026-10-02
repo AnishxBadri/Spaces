@@ -1,6 +1,7 @@
 import {
   Cause,
   Context,
+  Deferred,
   Effect,
   Exit,
   Fiber,
@@ -64,6 +65,8 @@ import type { PluginQueue, PluginQueuesOptions } from './queues'
  * - A tripped breaker releases its plugin from a detached fiber, never from
  *   the job that tripped it: `offWork` waits out that job, so it cannot wait
  *   inside it. The row says `disabled`; `release` never degrades it.
+ * - Not safe to call concurrently: after boot, `makePluginReloader`
+ *   serializes every `wire` and `releasePlugin`.
  */
 
 /** What a job is handed, by its trigger. */
@@ -91,15 +94,28 @@ export type HostVerdict = {
   readonly line: string
 }
 
+export type WireOptions = {
+  /** `loaded` is this plugin's rows only: wired plugins with another id are left alone. */
+  readonly only?: string
+}
+
 export type PluginHost = {
-  /** Wire every loaded plugin not yet wired; release every wired one no longer loaded. */
+  /**
+   * Wire every loaded plugin not yet wired; release every wired one no longer
+   * loaded or whose fingerprint changed (a new bundle or a rebound row).
+   */
   readonly wire: (
     loaded: ReadonlyArray<LoadedPlugin>,
+    options?: WireOptions,
   ) => Effect.Effect<ReadonlyArray<HostVerdict>, Cause.UnknownError>
   /** Unregister its queues, run `onDisable`, then close every job scope of this integration. */
   readonly release: (
     integrationId: string,
   ) => Effect.Effect<HostVerdict | null, Cause.UnknownError>
+  /** `release` every wired integration of one plugin id. */
+  readonly releasePlugin: (
+    pluginId: string,
+  ) => Effect.Effect<ReadonlyArray<HostVerdict>, Cause.UnknownError>
   /** Release every plugin, then close the shared sender. */
   readonly releaseAll: () => Effect.Effect<void, Cause.UnknownError>
   /**
@@ -131,6 +147,7 @@ type WiredJob = {
 
 type Wired = {
   readonly id: string
+  readonly fingerprint: string
   readonly jobs: ReadonlyMap<string, WiredJob>
   /** The queues registered for it; empty when the host has no `queues`. */
   readonly queues: ReadonlyArray<PluginQueue>
@@ -322,6 +339,7 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     // Wired before its queues register: a job fetched at once finds it.
     wired.set(plugin.integrationId, {
       id: plugin.manifest.id,
+      fingerprint: plugin.fingerprint,
       jobs,
       queues: plans,
       ...(plugin.onDisable === undefined
@@ -367,12 +385,37 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
   })
 
   /** `breaker`: the breaker tripped it, so its row stays `disabled` whatever `onDisable` does. */
+  /** Releases in flight: a second release of one integration waits out the first. */
+  const releasing = new Map<string, Deferred.Deferred<void>>()
+
   const releaseBy = Effect.fn('PluginHost.release')(function* (
     integrationId: string,
     by: 'operator' | 'breaker',
   ) {
+    const inFlight = releasing.get(integrationId)
+    if (inFlight !== undefined) {
+      yield* Deferred.await(inFlight)
+      return null
+    }
     const plugin = wired.get(integrationId)
     if (plugin === undefined) return null
+    const done = yield* Deferred.make<void>()
+    releasing.set(integrationId, done)
+    return yield* releaseWired(integrationId, plugin, by).pipe(
+      Effect.ensuring(
+        Effect.suspend(() => {
+          releasing.delete(integrationId)
+          return Deferred.succeed(done, undefined)
+        }),
+      ),
+    )
+  })
+
+  const releaseWired = Effect.fn('PluginHost.releaseWired')(function* (
+    integrationId: string,
+    plugin: Wired,
+    by: 'operator' | 'breaker',
+  ) {
     // Stopped first, waiting out a job in flight, so none starts after the
     // ports it runs on are closed.
     if (options.queues !== undefined) {
@@ -442,14 +485,30 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     fiber.addObserver(() => trips.delete(fiber))
   }
 
-  const wire = Effect.fn('PluginHost.wire')(function* (
-    loaded: ReadonlyArray<LoadedPlugin>,
+  const releasePlugin = Effect.fn('PluginHost.releasePlugin')(function* (
+    pluginId: string,
   ) {
     yield* awaitTrips
     const verdicts: Array<HostVerdict> = []
-    const keep = new Set(loaded.map((p) => p.integrationId))
-    for (const integrationId of [...wired.keys()]) {
-      if (keep.has(integrationId)) continue
+    for (const [integrationId, plugin] of [...wired.entries()]) {
+      if (plugin.id !== pluginId) continue
+      const released = yield* release(integrationId)
+      if (released !== null) verdicts.push(released)
+    }
+    return verdicts
+  })
+
+  const wire = Effect.fn('PluginHost.wire')(function* (
+    loaded: ReadonlyArray<LoadedPlugin>,
+    wireOptions: WireOptions = {},
+  ) {
+    yield* awaitTrips
+    const verdicts: Array<HostVerdict> = []
+    const keep = new Map(loaded.map((p) => [p.integrationId, p.fingerprint]))
+    for (const [integrationId, plugin] of [...wired.entries()]) {
+      if (wireOptions.only !== undefined && plugin.id !== wireOptions.only)
+        continue
+      if (keep.get(integrationId) === plugin.fingerprint) continue
       const released = yield* release(integrationId)
       if (released !== null) verdicts.push(released)
     }
@@ -547,5 +606,13 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
       : [...job.context.mapUnsafe.keys()].map(portOfKey).sort()
   }
 
-  return { wire, release, releaseAll, shutdown, invoke, granted }
+  return {
+    wire,
+    release,
+    releasePlugin,
+    releaseAll,
+    shutdown,
+    invoke,
+    granted,
+  }
 }

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { pathToFileURL } from 'node:url'
@@ -36,6 +36,8 @@ import { resolvePluginImportsToHost } from './host-resolve'
  *   stops the box. Idempotent: a row is written only when something changes.
  * - A tripped row (`enabled`, status `disabled`) is left exactly as it is and
  *   not loaded: only a reset of the row clears the breaker, never a boot.
+ * - Runs on boot and on `plugin_changed` (`makePluginReloader`), for every
+ *   row or for one plugin's (`only`).
  */
 
 /** How much of a thrown message `last_error` keeps. */
@@ -70,6 +72,8 @@ export type LoadedPlugin = {
   readonly jobs: { readonly [name: string]: unknown }
   readonly onEnable?: LoadedHook
   readonly onDisable?: LoadedHook
+  /** The bundle imported and the row bound; a wired plugin whose fingerprint changed is reloaded. */
+  readonly fingerprint: string
 }
 
 export type Reconciled = {
@@ -80,6 +84,8 @@ export type Reconciled = {
 export type ReconcileOptions = {
   /** Defaults to `<dataDir()>/plugins`. */
   readonly pluginsRoot?: string
+  /** One plugin's rows (its `capabilityId`) instead of every enabled row. */
+  readonly only?: string
 }
 
 export const pluginsRootDir = (): string => path.join(dataDir(), 'plugins')
@@ -114,6 +120,15 @@ const pluginExport = z.object({
 
 type Row = typeof integration.$inferSelect
 
+/** The real path, or the path as given when it does not resolve (a missing file is reported later). */
+const realpathOr = (p: string): string => {
+  try {
+    return realpathSync(p)
+  } catch {
+    return p
+  }
+}
+
 /** lock.json, or why it cannot be read. Absent is not an error: unpinned. */
 const readLock = (pluginsRoot: string): Lock | Degraded => {
   const file = path.join(pluginsRoot, LOCK_FILE)
@@ -130,6 +145,7 @@ const readLock = (pluginsRoot: string): Lock | Degraded => {
 }
 
 type Checked = {
+  readonly bundleUrl: string
   readonly manifest: Manifest
   readonly stored: IntegrationManifest
   readonly settings: z.ZodType
@@ -152,14 +168,19 @@ const check = (
 ) =>
   Effect.gen(function* () {
     const id = row.capabilityId
-    const dir = path.join(pluginsRoot, id, 'current')
+    // `current` resolved once: every file is read from one version directory,
+    // and the import URL names it (see step 4).
+    const current = path.join(pluginsRoot, id, 'current')
+    const dir = realpathOr(current)
     const manifestFile = path.join(dir, 'manifest.json')
     const bundleFile = path.join(dir, 'bundle.mjs')
 
     // 2. locate
     for (const file of [manifestFile, bundleFile]) {
       if (!existsSync(file)) {
-        return yield* new Degraded({ reason: `plugin file missing: ${file}` })
+        return yield* new Degraded({
+          reason: `plugin file missing: ${path.join(current, path.basename(file))}`,
+        })
       }
     }
 
@@ -210,7 +231,8 @@ const check = (
         }),
     })
     const entry = Object.hasOwn(lock.plugins, id) ? lock.plugins[id] : undefined
-    if (entry !== undefined && entry.sha256 !== bundleSha256(bytes)) {
+    const sha256 = bundleSha256(bytes)
+    if (entry !== undefined && entry.sha256 !== sha256) {
       return yield* new Degraded({
         reason: 'bundle sha does not match lock.json',
       })
@@ -224,10 +246,13 @@ const check = (
       return yield* new Degraded({ reason: 'missing connection' })
     }
 
-    // 4. import
+    // 4. import — `import()` caches by URL for the life of the process, so the
+    // URL is the version directory's real path plus the bytes' sha: a swapped
+    // `current` or rewritten bundle is a new module, never the cached one.
     resolvePluginImportsToHost(pluginsRoot)
+    const bundleUrl = `${pathToFileURL(bundleFile).href}?sha256=${sha256}`
     const mod: unknown = yield* Effect.tryPromise({
-      try: () => import(/* @vite-ignore */ pathToFileURL(bundleFile).href),
+      try: () => import(/* @vite-ignore */ bundleUrl),
       catch: (error) =>
         new Degraded({
           reason: truncate(`bundle.mjs failed to import: ${messageOf(error)}`),
@@ -249,6 +274,7 @@ const check = (
     }
 
     return {
+      bundleUrl,
       manifest,
       stored,
       settings: exported.data.default.manifest.settings,
@@ -299,6 +325,9 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
         and(
           eq(integration.enabled, true),
           notLike(integration.capabilityId, 'core.%'),
+          options.only === undefined
+            ? undefined
+            : eq(integration.capabilityId, options.only),
         ),
       )
       .orderBy(integration.capabilityId, integration.createdAt),
@@ -330,14 +359,20 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
         lastError: null,
         manifest: ok.stored,
       })
+      const bound: BoundIntegration = {
+        id: row.id,
+        capabilityId: row.capabilityId,
+        config: row.config,
+        credentialId: row.credentialId,
+      }
       loaded.push({
         integrationId: row.id,
-        row: {
-          id: row.id,
-          capabilityId: row.capabilityId,
-          config: row.config,
-          credentialId: row.credentialId,
-        },
+        row: bound,
+        fingerprint: JSON.stringify({
+          bundle: ok.bundleUrl,
+          row: bound,
+          connectionId: row.connectionId,
+        }),
         manifest: ok.manifest,
         settings: ok.settings,
         jobs: ok.jobs,
