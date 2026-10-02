@@ -7,8 +7,6 @@ packages/db/drizzle/
 apps/web/src/routeTree.gen.ts
 # vitest writes it byte for byte; the test compares it byte for byte
 apps/web/src/lib/rpc/__snapshots__/
-.cta.json
-.impeccable/
 
 # vendored skills — third-party prose, not ours to reformat
 .claude/skills/
