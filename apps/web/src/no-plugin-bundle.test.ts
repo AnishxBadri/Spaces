@@ -26,10 +26,13 @@ const walk = (dir: string, keep: (file: string) => boolean): Array<string> =>
 const SPECIFIER =
   /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|^\s*import\s+)['"]([^'"]+)['"]/gm
 
-/** A specifier that reaches plugin code or the worker that hosts it. */
+/**
+ * A specifier that reaches plugin code or the worker that hosts it. Core's
+ * own `plugins/` modules (lock, verify, credit) are the host's, not a plugin's.
+ */
 const isPluginSpecifier = (spec: string): boolean =>
   spec.startsWith('@spaces/plugin-') ||
-  /(^|\/)plugins\//.test(spec) ||
+  (/(^|\/)plugins\//.test(spec) && !spec.startsWith('@spaces/core/plugins/')) ||
   spec.includes('apps/worker') ||
   spec.startsWith('@spaces/worker')
 
