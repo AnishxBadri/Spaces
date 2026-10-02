@@ -52,6 +52,7 @@ import { Route as AppSpacesSpaceIdRouteImport } from './routes/_app/spaces_.$spa
 import { Route as AppTermsTermIdRouteImport } from './routes/_app/terms.$termId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
+import { Route as ApiJobStatusEntityIdRouteImport } from './routes/api/job-status/$entityId'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
 import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings/objects_.$objectSlug'
@@ -270,6 +271,11 @@ const ApiBlobKeyRoute = ApiBlobKeyRouteImport.update({
   path: '/api/blob/$key',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiJobStatusEntityIdRoute = ApiJobStatusEntityIdRouteImport.update({
+  id: '/api/job-status/$entityId',
+  path: '/api/job-status/$entityId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
   id: '/api/v1/$',
   path: '/api/v1/$',
@@ -329,6 +335,7 @@ export interface FileRoutesByFullPath {
   '/terms/$termId': typeof AppTermsTermIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/api/job-status/$entityId': typeof ApiJobStatusEntityIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
@@ -375,6 +382,7 @@ export interface FileRoutesByTo {
   '/terms/$termId': typeof AppTermsTermIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/api/job-status/$entityId': typeof ApiJobStatusEntityIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/settings': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
@@ -424,6 +432,7 @@ export interface FileRoutesById {
   '/_app/terms/$termId': typeof AppTermsTermIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/blob/$key': typeof ApiBlobKeyRoute
+  '/api/job-status/$entityId': typeof ApiJobStatusEntityIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
@@ -473,6 +482,7 @@ export interface FileRouteTypes {
     | '/terms/$termId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/api/job-status/$entityId'
     | '/api/v1/$'
     | '/settings/'
     | '/o/$objectSlug/$recordId'
@@ -519,6 +529,7 @@ export interface FileRouteTypes {
     | '/terms/$termId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/api/job-status/$entityId'
     | '/api/v1/$'
     | '/settings'
     | '/o/$objectSlug/$recordId'
@@ -567,6 +578,7 @@ export interface FileRouteTypes {
     | '/_app/terms/$termId'
     | '/api/auth/$'
     | '/api/blob/$key'
+    | '/api/job-status/$entityId'
     | '/api/v1/$'
     | '/_app/settings/'
     | '/_app/o_/$objectSlug/$recordId'
@@ -583,6 +595,7 @@ export interface RootRouteChildren {
   ApiMcpRoute: typeof ApiMcpRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBlobKeyRoute: typeof ApiBlobKeyRoute
+  ApiJobStatusEntityIdRoute: typeof ApiJobStatusEntityIdRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
 }
 
@@ -889,6 +902,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBlobKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/job-status/$entityId': {
+      id: '/api/job-status/$entityId'
+      path: '/api/job-status/$entityId'
+      fullPath: '/api/job-status/$entityId'
+      preLoaderRoute: typeof ApiJobStatusEntityIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/$': {
       id: '/api/v1/$'
       path: '/api/v1/$'
@@ -1013,6 +1033,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMcpRoute: ApiMcpRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBlobKeyRoute: ApiBlobKeyRoute,
+  ApiJobStatusEntityIdRoute: ApiJobStatusEntityIdRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
 }
 export const routeTree = rootRouteImport

@@ -7,6 +7,12 @@ import { db } from '@spaces/db'
 import { integration, jobRun } from '@spaces/db/schema'
 import { JobPermanent, JobRateLimited, JobRetryable } from '@spaces/sdk'
 import type { JobRunStatus } from '@spaces/db/schema/jobs'
+import {
+  JOB_STATUS_CHANNEL,
+  announcesJobStatus,
+  encodeJobStatus,
+} from '@spaces/core/queue/job-status'
+import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 
 /**
  * The one wrapper every job goes through (spec-plugin-sdk §11; CONTEXT.md
@@ -402,34 +408,75 @@ export const LEDGER_STATUS: Record<JobOutcomeKind, JobRunStatus> = {
   defect: 'failed',
 }
 
+/** `pg_notify` inside `tx`, so it is delivered only if `tx` commits. */
+async function announce(tx: JobTx, event: JobStatusEvent): Promise<void> {
+  if (!announcesJobStatus(event.queue)) return
+  await tx.execute(
+    sql`select pg_notify(${JOB_STATUS_CHANNEL}, ${encodeJobStatus(event)})`,
+  )
+}
+
+/**
+ * Opens and closes the row; a plugin queue's row is also announced on
+ * `job_status` from the same transaction. (D64)
+ */
 const postgresLedger: JobRunLedger = {
-  begin: async (row) =>
-    (
-      await db
-        .insert(jobRun)
-        .values({
-          queue: row.queue,
-          attempt: row.attempt,
-          entityId: row.entityId,
-          integrationId: row.integrationId,
-          startedAt: row.startedAt,
-          status: 'running',
+  begin: (row) =>
+    db.transaction(async (tx) => {
+      const opened = (
+        await tx
+          .insert(jobRun)
+          .values({
+            queue: row.queue,
+            attempt: row.attempt,
+            entityId: row.entityId,
+            integrationId: row.integrationId,
+            startedAt: row.startedAt,
+            status: 'running',
+          })
+          .returning({ id: jobRun.id })
+      ).at(0)
+      if (opened === undefined) return null
+      await announce(tx, {
+        jobRunId: opened.id,
+        queue: row.queue,
+        integrationId: row.integrationId,
+        entityId: row.entityId,
+        status: 'running',
+        startedAt: row.startedAt.toISOString(),
+        summary: null,
+        error: null,
+      })
+      return opened.id
+    }),
+  end: (id, row, close, charge) =>
+    db.transaction(async (tx) => {
+      const closed = (
+        await tx.update(jobRun).set(row).where(eq(jobRun.id, id)).returning({
+          queue: jobRun.queue,
+          integrationId: jobRun.integrationId,
+          entityId: jobRun.entityId,
+          startedAt: jobRun.startedAt,
         })
-        .returning({ id: jobRun.id })
-    ).at(0)?.id ?? null,
-  end: async (id, row, close, charge) => {
-    if (close === null && charge === null) {
-      await db.update(jobRun).set(row).where(eq(jobRun.id, id))
-      return false
-    }
-    return db.transaction(async (tx) => {
-      await tx.update(jobRun).set(row).where(eq(jobRun.id, id))
+      ).at(0)
       if (close !== null) await close(tx)
-      return charge === null
-        ? false
-        : chargeBreaker(tx, charge, row.error ?? row.status)
-    })
-  },
+      const tripped =
+        charge === null
+          ? false
+          : await chargeBreaker(tx, charge, row.error ?? row.status)
+      if (closed !== undefined)
+        await announce(tx, {
+          jobRunId: id,
+          queue: closed.queue,
+          integrationId: closed.integrationId,
+          entityId: closed.entityId,
+          status: row.status,
+          startedAt: closed.startedAt.toISOString(),
+          summary: row.summary,
+          error: row.error,
+        })
+      return tripped
+    }),
 }
 
 function messageOf(err: unknown): string {

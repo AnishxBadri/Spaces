@@ -157,7 +157,7 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 //   lib/arrival/{fixtures, settings}
 //   lib/documents/{clip, read-deck-gate, shelf, space-sources}
 //     · lib/import/{mapping, plan} · lib/inbox/queue
-//     · lib/integrations/status
+//     · lib/integrations/{job-status, status}
 //   lib/rpc/{api, versions} · lib/search/{query, query-embedding}
 //   lib/server/shared · lib/tokens/store
 //   test/{fake-imap, fake-ollama, minimal-pdf, queue-stub, reseed}

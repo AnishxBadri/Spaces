@@ -113,6 +113,44 @@ const writeBundle = (
   )
 }
 
+/** A bundle of action jobs written by hand: each job's declaration and body. */
+const writeJobs = (
+  root: string,
+  id: string,
+  jobs: Record<string, { declared: Record<string, unknown>; body: string }>,
+) => {
+  const dir = path.join(root, id, 'current')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(
+    path.join(dir, 'manifest.json'),
+    JSON.stringify({
+      manifestVersion: 1,
+      id,
+      version: '0.1.0',
+      sdk: '^1.0',
+      name: id,
+      description: 'A queue registration test bundle.',
+      settings: {},
+      jobs: Object.fromEntries(
+        Object.entries(jobs).map(([name, job]) => [name, job.declared]),
+      ),
+    }),
+  )
+  writeFileSync(
+    path.join(dir, 'bundle.mjs'),
+    [
+      "import { Effect } from 'effect'",
+      "import { z } from 'zod'",
+      'export default {',
+      `  manifest: { id: '${id}', settings: z.object({}) },`,
+      '  jobs: {',
+      ...Object.entries(jobs).map(([name, job]) => `    ${name}: ${job.body},`),
+      '  },',
+      '}',
+    ].join('\n'),
+  )
+}
+
 const row = async (capabilityId: string) => {
   const inserted = (
     await db
@@ -330,6 +368,75 @@ describe('every declared job is a queue', () => {
     expect(['500ms', '60s', '5m', '1h'].map(durationMs)).toEqual([
       500, 60_000, 300_000, 3_600_000,
     ])
+  })
+})
+
+describe('an interactive job', () => {
+  it('is interrupted at its manifest timeout and closes its job_run row failed', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const companyId = await seedCompany()
+    const root = newPluginsRoot()
+    writeJobs(root, 'stuck', {
+      hang: {
+        declared: {
+          trigger: 'action',
+          uses: ['Log'],
+          timeout: '1s',
+          retry: 0,
+          interactive: true,
+        },
+        body: '() => Effect.never',
+      },
+    })
+    const stuck = await row('stuck')
+    await boot(root)
+    const queue = 'plugin.stuck.hang.interactive'
+    expect(await boss.getQueue(queue)).toMatchObject({
+      expireInSeconds: 1 + 60,
+    })
+
+    const id = await send(queue, { entityId: companyId })
+    expect(await settled(queue, id)).toBe('failed')
+    const runs = await waitFor(
+      () => runsOf(queue, stuck.id),
+      (rows) => rows.length > 0 && rows.every((r) => r.status !== 'running'),
+    )
+    expect(runs.map((r) => r.status)).toEqual(['failed'])
+    expect(runs.at(0)?.error).toContain('exceeded its 1s timeout')
+    vi.restoreAllMocks()
+  })
+
+  it('runs while a batch job of the same plugin holds every slot of its own queue', async () => {
+    const companyId = await seedCompany()
+    const root = newPluginsRoot()
+    writeJobs(root, 'busy', {
+      slow: {
+        declared: { trigger: 'action', uses: ['Log'], timeout: '10s' },
+        body: "() => Effect.sleep('3 seconds')",
+      },
+      ping: {
+        declared: { trigger: 'action', uses: ['Log'], interactive: true },
+        body: '() => Effect.void',
+      },
+    })
+    await row('busy')
+    await boot(root)
+
+    const first = await send('plugin.busy.slow', { entityId: companyId })
+    const second = await send('plugin.busy.slow', { entityId: companyId })
+    await waitFor(
+      () => stateOf('plugin.busy.slow', first),
+      (state) => state === 'active',
+    )
+    const ping = await send('plugin.busy.ping.interactive', {
+      entityId: companyId,
+    })
+    expect(await settled('plugin.busy.ping.interactive', ping)).toBe(
+      'completed',
+    )
+    // The batch queue is still saturated: its first job running, its next waiting.
+    expect(await stateOf('plugin.busy.slow', first)).toBe('active')
+    expect(await stateOf('plugin.busy.slow', second)).toBe('created')
   })
 })
 

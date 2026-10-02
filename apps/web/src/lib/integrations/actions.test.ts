@@ -137,6 +137,7 @@ describe('recordActionsProgram', () => {
         pluginName: 'Apollo',
         actionId: 'enrich-company',
         label: 'Enrich',
+        queue: 'plugin.apollo.enrichCompany',
       },
     ])
     expect((await actionsOn('person')).map((a) => a.actionId)).toEqual([

@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
+import type { RecordAction } from '#/lib/server-fns'
 import { PluginActions } from './plugin-actions.tsx'
 
 /**
@@ -9,12 +10,13 @@ import { PluginActions } from './plugin-actions.tsx'
  * runnable plugin declares one on this kind. (D63)
  */
 
-const enrich = {
+const enrich: RecordAction = {
   integrationId: 'f1f0b6f2-7c1e-4f0a-9d2a-000000000001',
   pluginId: 'apollo',
   pluginName: 'Apollo',
   actionId: 'enrich-company',
   label: 'Enrich',
+  queue: 'plugin.apollo.enrichCompany',
 }
 
 describe('PluginActions', () => {

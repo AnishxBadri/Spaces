@@ -29,6 +29,8 @@ export type RecordAction = {
   readonly pluginName: string
   readonly actionId: string
   readonly label: string
+  /** The queue its job runs on, which its status rows name. */
+  readonly queue: PluginQueueName
 }
 
 export class PluginActionRefused extends Schema.TaggedError<PluginActionRefused>()(
@@ -108,6 +110,7 @@ export const recordActionsProgram = Effect.fn('recordActionsProgram')(
           pluginName: a.pluginName,
           actionId: a.actionId,
           label: a.label,
+          queue: a.queue,
         })),
     )
   },
