@@ -1,0 +1,20 @@
+{
+  "person": {
+    "id": "64c1d2e3f4a5b60001a2b3d9",
+    "first_name": null,
+    "last_name": null,
+    "name": null,
+    "linkedin_url": null,
+    "title": null,
+    "email_status": "verified",
+    "photo_url": null,
+    "twitter_url": null,
+    "headline": null,
+    "email": "info@northwind-robotics.example",
+    "organization_id": "64b7f0c2a1e3d900015a2b3c",
+    "employment_history": [],
+    "state": null,
+    "city": null,
+    "country": null
+  }
+}

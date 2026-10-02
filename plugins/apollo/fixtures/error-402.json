@@ -1,0 +1,4 @@
+{
+  "error": "You have insufficient credits to perform this action. Please purchase more credits or upgrade your plan.",
+  "error_code": "INSUFFICIENT_CREDITS"
+}

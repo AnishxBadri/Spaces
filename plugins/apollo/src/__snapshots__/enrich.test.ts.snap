@@ -1,0 +1,326 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`enrichCompany > stores the receipt, adds the aliases, then fills the mapped values citing it 1`] = `
+[
+  {
+    "call": "Read.entity",
+    "input": {
+      "id": "entity-0",
+    },
+    "output": {
+      "id": "entity-0",
+      "keys": {
+        "cin": [],
+        "domain": [
+          "northwind-robotics.example",
+        ],
+        "email": [],
+        "linkedin": [],
+      },
+      "kind": "company",
+      "name": "Northwind",
+      "values": {},
+    },
+  },
+  {
+    "call": "Secrets.get",
+    "input": {},
+    "output": "<redacted>",
+  },
+  {
+    "call": "Http.request",
+    "input": {
+      "headers": {
+        "accept": "application/json",
+        "cache-control": "no-cache",
+        "content-type": "application/json",
+        "x-api-key": "test-apollo-key",
+      },
+      "method": "POST",
+      "url": "https://api.apollo.io/api/v1/organizations/enrich?domain=northwind-robotics.example",
+    },
+  },
+  {
+    "call": "Receipts.store",
+    "input": {
+      "creditsUsed": 1,
+      "entityId": "entity-0",
+      "raw": {
+        "organization": {
+          "alexa_ranking": null,
+          "angellist_url": null,
+          "annual_revenue": null,
+          "annual_revenue_printed": null,
+          "blog_url": null,
+          "city": "Pune",
+          "country": "India",
+          "crunchbase_url": null,
+          "departmental_head_count": {
+            "engineering": 41,
+            "sales": 6,
+          },
+          "estimated_num_employees": 84,
+          "facebook_url": null,
+          "founded_year": 2019,
+          "id": "64b7f0c2a1e3d900015a2b3c",
+          "industries": [
+            "machinery",
+          ],
+          "industry": "machinery",
+          "industry_tag_id": "5567cd4773696439dd350000",
+          "keywords": [
+            "robotics",
+            "warehouse automation",
+            "computer vision",
+          ],
+          "languages": [],
+          "latest_funding_round_date": "2024-03-01T00:00:00.000+00:00",
+          "latest_funding_stage": "Series A",
+          "linkedin_uid": "81234567",
+          "linkedin_url": "http://www.linkedin.com/company/northwind-robotics",
+          "logo_url": null,
+          "name": "Northwind Robotics",
+          "phone": null,
+          "postal_code": null,
+          "primary_domain": "northwind-robotics.example",
+          "primary_phone": {},
+          "publicly_traded_exchange": null,
+          "publicly_traded_symbol": null,
+          "raw_address": "Baner, Pune, Maharashtra, India",
+          "retail_location_count": 0,
+          "secondary_industries": [],
+          "seo_description": "Warehouse picking robots.",
+          "short_description": "Warehouse picking robots that learn a new SKU from one demonstration.",
+          "snippets_loaded": true,
+          "state": "Maharashtra",
+          "street_address": "",
+          "technology_names": [
+            "Amazon Web Services",
+            "Google Analytics",
+          ],
+          "total_funding": 6500000,
+          "total_funding_printed": "6.5M",
+          "twitter_url": "https://twitter.com/northwindbots",
+          "website_url": "http://www.northwind-robotics.example",
+        },
+      },
+    },
+    "output": {
+      "receiptId": "receipt-1",
+    },
+  },
+  {
+    "call": "Identity.addAlias",
+    "input": {
+      "entityId": "entity-0",
+      "keys": {
+        "domain": "northwind-robotics.example",
+        "linkedin": "http://www.linkedin.com/company/northwind-robotics",
+      },
+    },
+    "output": {
+      "keys": [
+        {
+          "key": "domain",
+          "outcome": "already_own",
+        },
+        {
+          "key": "linkedin",
+          "outcome": "added",
+        },
+      ],
+    },
+  },
+  {
+    "call": "Facts.fill",
+    "input": {
+      "entityId": "entity-0",
+      "receiptId": "receipt-1",
+      "values": {
+        "description": "Warehouse picking robots that learn a new SKU from one demonstration.",
+        "founded_year": 2019,
+        "linkedin": "http://www.linkedin.com/company/northwind-robotics",
+        "location": "Pune, India",
+      },
+    },
+    "output": {
+      "conflicts": [],
+    },
+  },
+  {
+    "call": "Log.info",
+    "input": {
+      "fields": {
+        "aliases": [
+          "domain:already_own",
+          "linkedin:added",
+        ],
+        "conflicts": [],
+        "endpoint": "organizations/enrich",
+        "entityId": "entity-0",
+        "receiptId": "receipt-1",
+      },
+      "message": "enriched",
+    },
+    "output": undefined,
+  },
+]
+`;
+
+exports[`enrichPerson > matches by email and adds the email and LinkedIn before filling 1`] = `
+[
+  {
+    "call": "Read.entity",
+    "input": {
+      "id": "entity-0",
+    },
+    "output": {
+      "id": "entity-0",
+      "keys": {
+        "cin": [],
+        "domain": [],
+        "email": [
+          "meera@northwind-robotics.example",
+        ],
+        "linkedin": [],
+      },
+      "kind": "person",
+      "name": "Meera Kulkarni",
+      "values": {},
+    },
+  },
+  {
+    "call": "Secrets.get",
+    "input": {},
+    "output": "<redacted>",
+  },
+  {
+    "call": "Http.request",
+    "input": {
+      "headers": {
+        "accept": "application/json",
+        "cache-control": "no-cache",
+        "content-type": "application/json",
+        "x-api-key": "test-apollo-key",
+      },
+      "method": "POST",
+      "url": "https://api.apollo.io/api/v1/people/match?email=meera%40northwind-robotics.example",
+    },
+  },
+  {
+    "call": "Receipts.store",
+    "input": {
+      "creditsUsed": 1,
+      "entityId": "entity-0",
+      "raw": {
+        "person": {
+          "city": "Pune",
+          "country": "India",
+          "departments": [
+            "master_engineering_technical",
+          ],
+          "email": "meera@northwind-robotics.example",
+          "email_status": "verified",
+          "employment_history": [
+            {
+              "current": true,
+              "end_date": null,
+              "organization_id": "64b7f0c2a1e3d900015a2b3c",
+              "organization_name": "Northwind Robotics",
+              "start_date": "2019-01-01",
+              "title": "Co-founder & CTO",
+            },
+          ],
+          "extrapolated_email_confidence": null,
+          "facebook_url": null,
+          "first_name": "Meera",
+          "functions": [
+            "engineering",
+          ],
+          "github_url": null,
+          "headline": "Co-founder & CTO at Northwind Robotics",
+          "id": "64c1d2e3f4a5b60001a2b3c4",
+          "last_name": "Kulkarni",
+          "linkedin_url": "http://www.linkedin.com/in/meera-kulkarni-robots",
+          "name": "Meera Kulkarni",
+          "organization": {
+            "founded_year": 2019,
+            "id": "64b7f0c2a1e3d900015a2b3c",
+            "linkedin_url": "http://www.linkedin.com/company/northwind-robotics",
+            "name": "Northwind Robotics",
+            "primary_domain": "northwind-robotics.example",
+            "website_url": "http://www.northwind-robotics.example",
+          },
+          "organization_id": "64b7f0c2a1e3d900015a2b3c",
+          "photo_url": null,
+          "seniority": "c_suite",
+          "state": "Maharashtra",
+          "subdepartments": [
+            "engineering_technical",
+          ],
+          "title": "Co-founder & CTO",
+          "twitter_url": "https://twitter.com/meerak",
+        },
+      },
+    },
+    "output": {
+      "receiptId": "receipt-1",
+    },
+  },
+  {
+    "call": "Identity.addAlias",
+    "input": {
+      "entityId": "entity-0",
+      "keys": {
+        "email": "meera@northwind-robotics.example",
+        "linkedin": "http://www.linkedin.com/in/meera-kulkarni-robots",
+      },
+    },
+    "output": {
+      "keys": [
+        {
+          "key": "email",
+          "outcome": "already_own",
+        },
+        {
+          "key": "linkedin",
+          "outcome": "added",
+        },
+      ],
+    },
+  },
+  {
+    "call": "Facts.fill",
+    "input": {
+      "entityId": "entity-0",
+      "receiptId": "receipt-1",
+      "values": {
+        "job_title": "Co-founder & CTO",
+        "linkedin": "http://www.linkedin.com/in/meera-kulkarni-robots",
+        "location": "Pune, India",
+        "twitter": "https://twitter.com/meerak",
+      },
+    },
+    "output": {
+      "conflicts": [],
+    },
+  },
+  {
+    "call": "Log.info",
+    "input": {
+      "fields": {
+        "aliases": [
+          "email:already_own",
+          "linkedin:added",
+        ],
+        "conflicts": [],
+        "endpoint": "people/match",
+        "entityId": "entity-0",
+        "receiptId": "receipt-1",
+      },
+      "message": "enriched",
+    },
+    "output": undefined,
+  },
+]
+`;

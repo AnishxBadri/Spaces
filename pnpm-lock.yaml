@@ -11,9 +11,18 @@ importers:
       '@spaces/config':
         specifier: workspace:*
         version: link:packages/config
+      '@spaces/core':
+        specifier: workspace:*
+        version: link:packages/core
+      '@spaces/db':
+        specifier: workspace:*
+        version: link:packages/db
       '@types/node':
         specifier: ^22.10.2
         version: 22.20.1
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
       eslint:
         specifier: ^9.20.0
         version: 9.39.5(jiti@2.7.0)
@@ -23,6 +32,9 @@ importers:
       prettier:
         specifier: ^3.8.1
         version: 3.9.6
+      tsx:
+        specifier: ^4.23.1
+        version: 4.23.1
       turbo:
         specifier: 2.11.2
         version: 2.11.2
@@ -782,6 +794,37 @@ importers:
       vite:
         specifier: ^8.1.5
         version: 8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.1)
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
+
+  plugins/apollo:
+    dependencies:
+      '@spaces/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      '@spaces/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
+      eslint:
+        specifier: ^9.20.0
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+      vite:
+        specifier: ^8.1.5
+        version: 8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.1)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@22.20.1)(vite@8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.1))
       zod:
         specifier: ^4.3.6
         version: 4.4.3

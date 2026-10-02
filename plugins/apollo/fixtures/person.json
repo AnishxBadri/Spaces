@@ -1,0 +1,44 @@
+{
+  "person": {
+    "id": "64c1d2e3f4a5b60001a2b3c4",
+    "first_name": "Meera",
+    "last_name": "Kulkarni",
+    "name": "Meera Kulkarni",
+    "linkedin_url": "http://www.linkedin.com/in/meera-kulkarni-robots",
+    "title": "Co-founder & CTO",
+    "email_status": "verified",
+    "photo_url": null,
+    "twitter_url": "https://twitter.com/meerak",
+    "github_url": null,
+    "facebook_url": null,
+    "extrapolated_email_confidence": null,
+    "headline": "Co-founder & CTO at Northwind Robotics",
+    "email": "meera@northwind-robotics.example",
+    "organization_id": "64b7f0c2a1e3d900015a2b3c",
+    "employment_history": [
+      {
+        "current": true,
+        "end_date": null,
+        "organization_id": "64b7f0c2a1e3d900015a2b3c",
+        "organization_name": "Northwind Robotics",
+        "start_date": "2019-01-01",
+        "title": "Co-founder & CTO"
+      }
+    ],
+    "state": "Maharashtra",
+    "city": "Pune",
+    "country": "India",
+    "organization": {
+      "id": "64b7f0c2a1e3d900015a2b3c",
+      "name": "Northwind Robotics",
+      "website_url": "http://www.northwind-robotics.example",
+      "linkedin_url": "http://www.linkedin.com/company/northwind-robotics",
+      "primary_domain": "northwind-robotics.example",
+      "founded_year": 2019
+    },
+    "departments": ["master_engineering_technical"],
+    "subdepartments": ["engineering_technical"],
+    "seniority": "c_suite",
+    "functions": ["engineering"]
+  }
+}

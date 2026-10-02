@@ -1,0 +1,31 @@
+{
+  "//": "Apollo enrichment: two `action` jobs, Enrich on a company (organizations/enrich) and on a person (people/match). Depends on @spaces/sdk only; effect and zod are peers the host provides, so the bundle leaves them as bare imports. The key is the workspace `enrichment` credential the Secrets port hands the job.",
+  "name": "@spaces/plugin-apollo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "pack:plugin": "spaces-plugin-pack .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
+    "zod": "^4.3.6"
+  }
+}
