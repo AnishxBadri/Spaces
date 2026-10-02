@@ -12,6 +12,11 @@ import type { Tx } from '@spaces/core/writes/attributes/values'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import type { EmbedSource } from '@spaces/core/writes/ai/chunk-sources'
 import { birthHolding } from '#/lib/portfolio/holding'
+import { webEnqueue } from '#/lib/enqueue-live'
+import {
+  dispatchDomainEvent,
+  entityCreated,
+} from '@spaces/core/writes/events/dispatch'
 
 /**
  * **Deal birth** (SPA-169) — the one program a deal is born through. It was
@@ -167,8 +172,9 @@ export async function birthDealInTx(
 
 /**
  * The program. Without `tx` it opens its own transaction and, once that
- * commits, queues the embeddable values it set; with one, it runs inside the
- * caller's and leaves that step to whoever commits it.
+ * commits, queues the embeddable values it set and dispatches the birth's
+ * `entity.created` (none for an `import` birth, D65); with one, it runs
+ * inside the caller's and leaves those steps to whoever commits it.
  */
 export const birthDealProgram = Effect.fn('birthDealProgram')(function* (
   input: BirthDealInput,
@@ -188,8 +194,12 @@ export const birthDealProgram = Effect.fn('birthDealProgram')(function* (
         ? cause
         : new DealBirthFailed({ cause }),
   })
-  if (!tx)
+  if (!tx) {
     for (const source of out.reembed)
       yield* Effect.promise(() => enqueueSourceEmbed(source))
+    yield* dispatchDomainEvent(
+      entityCreated(out.id, 'deal', input.source),
+    ).pipe(Effect.provide(webEnqueue))
+  }
   return { id: out.id, holdingId: out.holdingId }
 })

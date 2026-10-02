@@ -5,10 +5,12 @@ import { mailbox } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { registrableDomain } from '@spaces/core/entities/normalize'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { dispatchDomainEvent } from '@spaces/core/writes/events/dispatch'
 import type {
   ResolveResult,
   ResolveSource,
 } from '@spaces/core/writes/entities/resolve'
+import { webEnqueue } from '#/lib/enqueue-live'
 import { isFreeEmailDomain } from './free-email-domains'
 import type { ArrivalMessage } from './message'
 import { decideParticipants } from './participants'
@@ -137,6 +139,9 @@ export const participantRecordsProgram = Effect.fn('participantRecords')(
         )
       }
     }
+    // Each birth has committed by now; an attach emits nothing. (D65)
+    for (const r of results)
+      yield* dispatchDomainEvent(r.emit).pipe(Effect.provide(webEnqueue))
     return {
       entityIds: [...new Set(results.map((r) => r.entityId))],
       created: results.filter((r) => r.action === 'created').length,

@@ -51,7 +51,15 @@ describe('the apollo manifest.json', () => {
       credential: { kind: 'enrichment', scope: 'workspace' },
     })
     expect(parsed.http).toEqual({ rateLimit: { rpm: 50 } })
-    expect(Object.keys(parsed.jobs)).toEqual(['enrichCompany', 'enrichPerson'])
+    expect(Object.keys(parsed.jobs)).toEqual([
+      'enrichCompany',
+      'enrichPerson',
+      'onCompanyCreated',
+    ])
+    expect(parsed.jobs.onCompanyCreated).toMatchObject({
+      trigger: 'event',
+      on: ['entity.created'],
+    })
     expect(parsed.actions?.map((a) => [a.on, a.job])).toEqual([
       ['company', 'enrichCompany'],
       ['person', 'enrichPerson'],
@@ -59,10 +67,11 @@ describe('the apollo manifest.json', () => {
     expect(parsed.settings).toEqual(settingsJsonSchema(manifest.settings))
   })
 
-  it('defaults the cache to 90 days and carries a daily credit cap', () => {
+  it('defaults the cache to 90 days, carries a daily credit cap and leaves autoEnrich off', () => {
     expect(z.parse(manifest.settings, {})).toEqual({
       cacheDays: 90,
       dailyCreditCap: 100,
+      autoEnrich: false,
     })
   })
 

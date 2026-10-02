@@ -19,6 +19,7 @@ import {
 import { jsonString } from '@spaces/core/json'
 import { requireUser } from './shared'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
+import { emitDomainEvent } from '#/lib/events/emit'
 import { pagedListInput, pageOptions } from '#/lib/views/page-input'
 import type { SetValuesResult } from '@spaces/core/writes/attributes/values'
 
@@ -71,7 +72,7 @@ export const createCompany = createServerFn({ method: 'POST' })
   .validator(createCompanyInput)
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { reembed, ...result } = await resolveEntity({
+    const { reembed, emit, ...result } = await resolveEntity({
       kind: 'company',
       ...(data.name ? { name: data.name } : {}),
       ...(data.domain ? { keys: { domain: data.domain } } : {}),
@@ -82,6 +83,8 @@ export const createCompany = createServerFn({ method: 'POST' })
     // The birth's embeddable values, queued once the resolve has returned —
     // core hands them back rather than reaching the queue (SPA-174/175).
     for (const s of reembed) await enqueueSourceEmbed(s)
+    // A manual birth's `entity.created`; null on an attach. (D65)
+    await emitDomainEvent(emit)
 
     if (result.action === 'created') {
       await db.insert(activity).values({

@@ -241,6 +241,63 @@ describe('enrichPerson', () => {
   })
 })
 
+describe('onCompanyCreated', () => {
+  const created = (kind: 'company' | 'person' | 'deal') =>
+    jobs
+      .onCompanyCreated({
+        event: {
+          name: 'entity.created',
+          entityId: 'entity-0',
+          kind,
+          occurredAt: '2026-10-02T12:00:00Z',
+        },
+      })
+      .pipe(Effect.provide(ports.layer))
+  let ports = testPorts({ secret: TEST_KEY })
+
+  it('enriches a new company with a domain exactly as the action does', async () => {
+    ports = portsFor(company, ORG_URL, { body: fixture('organization.json') })
+    expect((await Effect.runPromiseExit(created('company')))._tag).toBe(
+      'Success',
+    )
+    expect(ports.calls.map((c) => `${c.port}.${c.method}`)).toEqual([
+      'Read.entity',
+      'Secrets.get',
+      'Http.request',
+      'Receipts.store',
+      'Identity.addAlias',
+      'Facts.fill',
+      'Log.info',
+    ])
+    expect(ports.receipts.calls[0]?.input).toMatchObject({ creditsUsed: 1 })
+  })
+
+  it('declines a company with no domain without a key, a call or a credit', async () => {
+    ports = testPorts({
+      secret: TEST_KEY,
+      entities: [readEntity({ id: 'entity-0', name: 'No domain' })],
+    })
+    expect((await Effect.runPromiseExit(created('company')))._tag).toBe(
+      'Success',
+    )
+    expect(ports.calls.map((c) => `${c.port}.${c.method}`)).toEqual([
+      'Read.entity',
+      'Log.info',
+    ])
+    expect(ports.http.calls).toEqual([])
+    expect(ports.receipts.calls).toEqual([])
+  })
+
+  it.each(['person', 'deal'] as const)(
+    'declines a new %s before reading anything',
+    async (kind) => {
+      ports = testPorts({ secret: TEST_KEY, entities: [person] })
+      expect((await Effect.runPromiseExit(created(kind)))._tag).toBe('Success')
+      expect(ports.calls).toEqual([])
+    },
+  )
+})
+
 describe('cost', () => {
   it('is one credit per record, from the input alone', () => {
     for (const { cost } of [jobs.enrichCompany, jobs.enrichPerson]) {

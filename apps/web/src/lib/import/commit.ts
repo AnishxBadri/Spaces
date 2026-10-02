@@ -47,6 +47,7 @@ import {
 } from '@spaces/core/writes/attributes/object-registry'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { birthDealProgram } from '#/lib/deals/birth'
+import { emitDomainEvent } from '#/lib/events/emit'
 import { recordPath } from '#/lib/record-path'
 import { mappingObjectOf } from './mapping'
 import { commitLedgerProgram, loadLedgerReceiptProgram } from './ledger-commit'
@@ -313,7 +314,7 @@ async function makeSecondary(
       valuesSource: 'import',
       batchId: ctx.batchId,
     })
-    const after = [reembedAll(out.reembed)]
+    const after = [reembedAll(out.reembed), () => emitDomainEvent(out.emit)]
     if (out.sweepName !== null)
       after.push(resolveSweep(out.entityId, out.sweepName))
     return { id: out.entityId, after }
@@ -445,7 +446,7 @@ async function writeRow(
       valuesSource: 'import',
       batchId: ctx.batchId,
     })
-    after.push(reembedAll(out.reembed))
+    after.push(reembedAll(out.reembed), () => emitDomainEvent(out.emit))
     if (out.sweepName !== null)
       after.push(resolveSweep(out.entityId, out.sweepName))
     if (out.action === 'attached') {

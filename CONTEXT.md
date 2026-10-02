@@ -382,7 +382,11 @@ plain Node process whose handlers become Effect programs run by one
 retry / fail / circuit-breaker). Every plugin invocation is a job: manual
 (declared `actions`), scheduled (`manifest.jobs[].schedule`), or
 event-triggered (`on: ['entity.created']` — Attio's enrich-on-create is
-this implicit trigger, not a different architecture). Interactive jobs get a
+this implicit trigger, not a different architecture). `entity.created` is
+emitted after the birth commits by `resolveEntity` and `createDeal`, never
+on an attach or for a `seed`/`import` birth, and dispatched to the runnable
+subscribers whose `autoEnrich` is on through each process's `Enqueue` (D65,
+`dispatchDomainEvent`). Interactive jobs get a
 priority queue and `LISTEN/NOTIFY → SSE` status; a narrow read-only `query`
 kind may use request/reply over pg-boss with a hard budget; webhook ingress
 verifies a manifest-declared signature in web, stores the raw payload,

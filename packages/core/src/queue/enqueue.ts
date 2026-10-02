@@ -1,6 +1,6 @@
 import { Context, Effect, Layer } from 'effect'
 import type { EnqueueOptions, Sender } from './sender'
-import type { QueueName } from './names'
+import type { EnqueueTarget } from './names'
 
 /**
  * The queue seam as an Effect service (sdk-7a, decided at publish): a
@@ -18,7 +18,7 @@ export class Enqueue extends Context.Service<
   Enqueue,
   {
     readonly enqueue: (
-      queue: QueueName,
+      queue: EnqueueTarget,
       data: Record<string, unknown>,
       options?: EnqueueOptions,
     ) => Effect.Effect<string | null>

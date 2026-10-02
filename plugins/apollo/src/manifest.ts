@@ -8,6 +8,9 @@ import { defineManifest } from '@spaces/sdk'
  *   `uses`, and the job reads the key from it for the `X-Api-Key` header.
  * - `cacheDays` and `dailyCreditCap` are the host's to enforce (D53); the
  *   jobs never read them.
+ * - `autoEnrich` is the dispatcher's switch for `onCompanyCreated`: off, a
+ *   new company enqueues nothing. Never in bulk — seed and import births
+ *   emit no event. (D65)
  */
 export const manifest = defineManifest({
   manifestVersion: 1,
@@ -21,6 +24,7 @@ export const manifest = defineManifest({
   settings: z.object({
     cacheDays: z.int().min(0).max(3650).default(90),
     dailyCreditCap: z.int().min(0).default(100),
+    autoEnrich: z.boolean().default(false),
   }),
   jobs: {
     enrichCompany: {
@@ -29,6 +33,11 @@ export const manifest = defineManifest({
     },
     enrichPerson: {
       trigger: 'action',
+      uses: ['Read', 'Secrets', 'Http', 'Identity', 'Receipts', 'Facts', 'Log'],
+    },
+    onCompanyCreated: {
+      trigger: 'event',
+      on: ['entity.created'],
       uses: ['Read', 'Secrets', 'Http', 'Identity', 'Receipts', 'Facts', 'Log'],
     },
   },

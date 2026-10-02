@@ -17,6 +17,7 @@ import type {
   ActionInput,
   CostInput,
   EntityId,
+  EventInput,
   JsonValue,
   ReadEntity,
   RecordKind,
@@ -145,6 +146,18 @@ const cost = ({ entityIds }: CostInput) => ({
   credits: entityIds.length * CREDITS_PER_MATCH,
 })
 
+/** One company, by the domain it was read with: the call, then the claims. */
+const enrichByDomain = Effect.fn('apollo.enrichByDomain')(function* (
+  entityId: EntityId,
+  domain: string,
+) {
+  const raw = yield* callApollo('organizations/enrich', { domain })
+  const claims = yield* mapped('organizations/enrich', () =>
+    organizationEnrichment(entityId, raw),
+  )
+  yield* record('organizations/enrich', claims)
+})
+
 /** The jobs as written; `definePlugin` checks each `R` against its `uses`. */
 export const jobs = {
   enrichCompany: {
@@ -158,14 +171,30 @@ export const jobs = {
           reason: `${company.name} has no domain to enrich from`,
         })
       }
-      const raw = yield* callApollo('organizations/enrich', { domain })
-      const claims = yield* mapped('organizations/enrich', () =>
-        organizationEnrichment(entityId, raw),
-      )
-      yield* record('organizations/enrich', claims)
+      yield* enrichByDomain(entityId, domain)
     }),
     cost,
   },
+  /**
+   * Enrich-on-create. Anything but a company with a domain is declined
+   * before the key is read or Apollo is called, so it spends no credit —
+   * and declining is a success, not a failure: nothing was asked of it.
+   */
+  onCompanyCreated: Effect.fn('apollo.onCompanyCreated')(function* ({
+    event,
+  }: EventInput) {
+    if (event.kind !== 'company') return
+    const company = yield* (yield* Read).entity(event.entityId)
+    const domain =
+      company?.kind === 'company' ? first(company.keys.domain) : undefined
+    if (domain === undefined) {
+      yield* (yield* Log).info('declined: no domain', {
+        entityId: event.entityId,
+      })
+      return
+    }
+    yield* enrichByDomain(event.entityId, domain)
+  }),
   enrichPerson: {
     run: Effect.fn('apollo.enrichPerson')(function* ({
       entityId,

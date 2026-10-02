@@ -7,6 +7,7 @@ import { Identity, JobPermanent, JobRetryable } from '@spaces/sdk'
 import type { AliasClaim, AliasResult, IdentityClaim } from '@spaces/sdk'
 import type { Enqueue } from '../../queue/enqueue'
 import { enqueueEmbeds } from '../ai/enqueue-embed'
+import { dispatchDomainEvent } from '../events/dispatch'
 import {
   RESOLVE_NEEDS_NAME_OR_KEY,
   addIdentityAlias,
@@ -35,8 +36,8 @@ import type { BoundIntegration } from './binding'
  *
  * A birth writes one `activity` row (`<kind>.created`) with no `actor_id`
  * and the integration named in `meta`, which the record timeline reads; its
- * embeddable values (`reembed`) go out through core's `Enqueue` service,
- * which the process running the port provides.
+ * embeddable values (`reembed`) and its `entity.created` go out through
+ * core's `Enqueue` service, which the process running the port provides.
  */
 
 /** What an integration-written activity row carries in `meta`. */
@@ -107,6 +108,7 @@ export const IdentityLive = (
             })
           }
           yield* claimAll(result.entityId, claim)
+          yield* dispatchDomainEvent(result.emit)
           return { entityId: result.entityId, outcome: result.action }
         }).pipe(Effect.provide(context))
 

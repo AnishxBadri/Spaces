@@ -16,6 +16,7 @@ import { ledgerVoidLine, missingRates } from '@spaces/core/import/ledger-commit'
 import { resolveEntityInTx } from '@spaces/core/writes/entities/resolve'
 import { sweepNameSimilarity } from '@spaces/core/writes/entities/sweep'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
+import { emitDomainEvent } from '#/lib/events/emit'
 import { baseCurrency, loadFxRates } from '#/lib/portfolio/detail'
 import {
   HoldingNotFound,
@@ -192,6 +193,7 @@ async function companyOf(
     async () => {
       for (const s of reembed) await enqueueSourceEmbed(s)
     },
+    () => emitDomainEvent(out.emit),
   ]
   const sweep = out.sweepName
   if (sweep !== null)

@@ -11,6 +11,8 @@ import type { SourceClass } from '@spaces/db/schema'
 import type { CoreIdentityKey } from '../../attributes/registry'
 import type { Actor, EventSource } from '../attributes/values'
 import type { EmbedSource } from '../ai/chunk-sources'
+import { entityCreated } from '../events/dispatch'
+import type { DomainEvent } from '@spaces/sdk'
 import { canonicalId, suggestDuplicate, sweepNameSimilarity } from './sweep'
 import {
   domainHost,
@@ -112,6 +114,12 @@ export type ResolveResult = {
    * not, so it is handed back (SPA-174/175).
    */
   reembed: Array<EmbedSource>
+  /**
+   * The `entity.created` this birth emits, for the caller to dispatch once
+   * the birth has committed (`dispatchDomainEvent`). Null on an attach and
+   * for a `seed` or `import` birth. (D65)
+   */
+  emit: DomainEvent | null
 }
 
 /**
@@ -313,6 +321,7 @@ export async function resolveEntity(
       action: 'attached',
       matchedOn: match.key.kind,
       reembed: [],
+      emit: null,
     }
   }
 
@@ -351,7 +360,12 @@ export async function resolveEntity(
     )
   }
 
-  return { entityId: created.id, action: 'created', reembed }
+  return {
+    entityId: created.id,
+    action: 'created',
+    reembed,
+    emit: entityCreated(created.id, input.kind, input.source.class),
+  }
 }
 
 /**
@@ -460,6 +474,7 @@ export async function resolveEntityInTx(
       matchedOn: match.key.kind,
       sweepName: null,
       reembed: [],
+      emit: null,
     }
   }
   const canonicalName = name ?? keys[0].valueNorm
@@ -495,6 +510,7 @@ export async function resolveEntityInTx(
     action: 'created',
     sweepName: name ? normalizeName(name) : null,
     reembed,
+    emit: entityCreated(created.id, input.kind, input.source.class),
   }
 }
 

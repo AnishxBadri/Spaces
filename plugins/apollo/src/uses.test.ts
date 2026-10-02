@@ -21,13 +21,16 @@ type Services<T> =
   T extends Effect.Effect<unknown, unknown, infer R> ? R : never
 
 describe('the ports each job needs', () => {
-  it('are exactly the seven its uses grants', () => {
+  it('are exactly the seven each job uses grants', () => {
     type Granted = Read | Secrets | Http | Identity | Receipts | Facts | Log
     expectTypeOf<
       Services<ReturnType<typeof jobs.enrichCompany.run>>
     >().toEqualTypeOf<Granted>()
     expectTypeOf<
       Services<ReturnType<typeof jobs.enrichPerson.run>>
+    >().toEqualTypeOf<Granted>()
+    expectTypeOf<
+      Services<ReturnType<typeof jobs.onCompanyCreated>>
     >().toEqualTypeOf<Granted>()
   })
 
@@ -40,6 +43,7 @@ describe('the ports each job needs', () => {
           uses: ['Read', 'Http', 'Identity', 'Receipts', 'Facts', 'Log'],
         },
         enrichPerson: manifest.jobs.enrichPerson,
+        onCompanyCreated: manifest.jobs.onCompanyCreated,
       },
     })
     // @ts-expect-error — enrichCompany yields Secrets, which these uses do not grant
