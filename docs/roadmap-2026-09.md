@@ -212,33 +212,33 @@ A Layer per (integration, job), queues by kind, the breaker, hot reload, then Ap
 
 **▸ A Layer per job, and queues by kind** — The privilege boundary is built and released per (integration, job): an over-reaching job fails with service-not-found while the database stays clean and the worker stays up. Queues register, schedule and unregister without a restart.
 
-| slice     |     |     | title                                                                       | blocked by                                                |
-| --------- | --- | --- | --------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `sdk-12a` | afk | M   | A Layer per (integration, job) — the privilege boundary, built and released | `sdk-11`, `sdk-6a`, `sdk-6b`, `sdk-7a`, `sdk-7b`, `sdk-9` |
-| `sdk-12b` | afk | M   | Queues by kind — register, schedule, unregister without restarting          | `sdk-12a`, `sdk-1`                                        |
+| slice     |     |     | title                                                                          | blocked by |
+| --------- | --- | --- | ------------------------------------------------------------------------------ | ---------- |
+| `sdk-12a` | afk | M   | A Layer per (integration, job) — the privilege boundary, built and released    | —          |
+| `sdk-12b` | afk | M   | Queues per job (migration) — register, schedule, unregister without restarting | `sdk-12a`  |
 
 **▸ Failures disable the plugin, never the worker** — Five failures fill job_run, flip the integration to disabled with a reason and put one line on Today while extraction keeps working in the same worker. Enable, disable and upgrade happen over NOTIFY with no restart, and the exit-75 escape hatch is reconciled with the either-process-dies contract.
 
-| slice     |      |     | title                                                                    | blocked by            |
-| --------- | ---- | --- | ------------------------------------------------------------------------ | --------------------- |
-| `sdk-13`  | afk  | M   | Plugin breaker — five failures disable the integration, never the worker | `sdk-12b`, `clean-2b` |
-| `sdk-14a` | afk  | M   | NOTIFY plugin_changed — enable, disable and upgrade without a restart    | `sdk-12b`             |
-| `sdk-14b` | hitl | S   | Exit-75 reload — the escape hatch that argues with contract 2            | `sdk-14a`             |
+| slice     |     |     | title                                                                    | blocked by |
+| --------- | --- | --- | ------------------------------------------------------------------------ | ---------- |
+| `sdk-13`  | afk | M   | Plugin breaker — five failures disable the integration, never the worker | `sdk-12b`  |
+| `sdk-14a` | afk | M   | NOTIFY plugin_changed — enable, disable and upgrade without a restart    | `sdk-12b`  |
+| `sdk-14b` | —   | —   | Dropped (D62) — exit-75 reload is not built                              | —          |
 
 **▸ Apollo enriches a company** — Paste a key, see the Enrich action appear on records rendered from the row's manifest, click it and watch blanks fill with Apollo as actor and the raw payload in an enrichment_record — credit-capped, 90-day cached, refusals visible on Today. This is the plugin arc's undeclared L and should be split at the provider-client seam before it is grabbed.
 
-| slice    |      |     | title                                                                  | blocked by         |
-| -------- | ---- | --- | ---------------------------------------------------------------------- | ------------------ |
-| `sdk-15` | afk  | M   | Apollo's mapping — provider JSON becomes claims, with no database      | `sdk-5`, `sdk-4b`  |
-| `sdk-16` | afk  | M   | Credit safety — daily cap, 90-day cache, refusals that are visible     | `sdk-15`, `sdk-13` |
-| `sdk-17` | hitl | M   | Manifest actions — the Enrich button, rendered from the row's manifest | `sdk-15`, `sdk-11` |
+| slice    |     |     | title                                                              | blocked by         |
+| -------- | --- | --- | ------------------------------------------------------------------ | ------------------ |
+| `sdk-15` | afk | M   | plugins/apollo — the provider mapping, tested with no database     | —                  |
+| `sdk-16` | afk | M   | Credit safety — daily cap, 90-day cache, refusals that are visible | `sdk-13`, `sdk-15` |
+| `sdk-17` | afk | M   | Manifest actions — the Enrich button, in the record head (D63)     | `sdk-12b`          |
 
 **▸ Under a second, and on creation** — LISTEN/NOTIFY to SSE so the cell goes pending then resolves with no refresh, survives a mid-run reload, and settles into failure rather than spinning when the worker dies. New companies with a domain enrich themselves on creation, with the emitter's home decided.
 
-| slice    |      |     | title                                                                   | blocked by                    |
-| -------- | ---- | --- | ----------------------------------------------------------------------- | ----------------------------- |
-| `sdk-18` | hitl | M   | Interactive status — LISTEN/NOTIFY to SSE, so 'later' is under a second | `sdk-17`, `sdk-13`, `sdk-14a` |
-| `sdk-19` | hitl | M   | Event triggers — enrich-on-create, and where the emitter lives          | `sdk-12b`, `sdk-15`           |
+| slice    |     |     | title                                                                     | blocked by                    |
+| -------- | --- | --- | ------------------------------------------------------------------------- | ----------------------------- |
+| `sdk-18` | afk | M   | Interactive status — one LISTEN client, SSE to the record (D64)           | `sdk-13`, `sdk-14a`, `sdk-17` |
+| `sdk-19` | afk | M   | Event triggers — enrich-on-create from resolveEntity and createDeal (D65) | `sdk-12b`, `sdk-15`           |
 
 ### 19. Install from the app, no redeploy
 
