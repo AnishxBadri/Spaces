@@ -12,7 +12,7 @@ import {
   JobPermanent,
   JobRetryable,
 } from '@spaces/sdk'
-import type { JobDeclaration, JobError, Manifest } from '@spaces/sdk'
+import type { CostHook, JobDeclaration, JobError, Manifest } from '@spaces/sdk'
 import { runJob } from '../run-job'
 import type {
   JobBreaker,
@@ -23,6 +23,8 @@ import type {
   JobRunLedger,
   JobTx,
 } from '../run-job'
+import { costOf, creditDefaults, guardAction } from './credit'
+import type { CreditPolicy } from './credit'
 import type { JobInput, JobOutput } from './host'
 import { messageOf } from './loader'
 
@@ -63,6 +65,10 @@ export type PluginQueue = {
   readonly queue: PluginQueueName
   readonly job: string
   readonly declared: JobDeclaration
+  /** An action job's `cost` hook; null when it has none or is not one. */
+  readonly cost: CostHook | null
+  /** The manifest's defaults for the credit guard's two settings. */
+  readonly credit: CreditPolicy
 }
 
 /** Runs a wired job: the host's `invoke`. */
@@ -113,13 +119,27 @@ export const durationMs = (text: string): number => {
   return Number(amount) * unitMs(unit)
 }
 
-/** The queues a manifest declares, one per job. */
-export const pluginQueues = (manifest: Manifest): ReadonlyArray<PluginQueue> =>
-  Object.entries(manifest.jobs).map(([job, declared]) => ({
+/**
+ * The queues a manifest declares, one per job. `jobs` is the bundle's job
+ * exports, where an action job's `cost` hook lives; without them every job
+ * is guarded as one with no `cost` hook.
+ */
+export const pluginQueues = (
+  manifest: Manifest,
+  jobs: { readonly [name: string]: unknown } = {},
+): ReadonlyArray<PluginQueue> => {
+  const credit = creditDefaults(manifest)
+  return Object.entries(manifest.jobs).map(([job, declared]) => ({
     queue: pluginQueueName(manifest.id, job, declared.interactive === true),
     job,
     declared,
+    cost:
+      declared.trigger === 'action' && Object.hasOwn(jobs, job)
+        ? costOf(jobs[job])
+        : null,
+    credit,
   }))
+}
 
 /** The cron a queue is scheduled at, or null when its job has none. */
 const cronOf = (plan: PluginQueue): string | null =>
@@ -270,8 +290,17 @@ const workPlan = (
         {
           ...common(plan),
           schema: actionData,
+          // The credit guard runs first, so a skip makes no provider call.
           run: (data) =>
-            invoke(integrationId, plan.job, data).pipe(Effect.asVoid),
+            guardAction({
+              integrationId,
+              entityId: data.entityId,
+              defaults: plan.credit,
+              cost: plan.cost,
+            }).pipe(
+              Effect.andThen(invoke(integrationId, plan.job, data)),
+              Effect.asVoid,
+            ),
           refs: (data) => ({ integrationId, entityId: data.entityId }),
         },
         concurrency,

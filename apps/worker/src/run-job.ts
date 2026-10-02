@@ -1,4 +1,4 @@
-import { Cause, Context, Duration, Effect, Exit, Option } from 'effect'
+import { Cause, Context, Data, Duration, Effect, Exit, Option } from 'effect'
 import type { Layer } from 'effect'
 import { and, count, eq, gt, ne, notLike, or, isNull, sql } from 'drizzle-orm'
 import type { JobWithMetadata, PgBoss } from 'pg-boss'
@@ -45,13 +45,27 @@ import type { JobRunStatus } from '@spaces/db/schema/jobs'
  */
 export { JobPermanent, JobRateLimited, JobRetryable }
 
-export type JobFailure = JobRetryable | JobRateLimited | JobPermanent
+/**
+ * The job deliberately did no work: a cache hit or a credit-cap refusal the
+ * plugin host decides before an action job runs (D53).
+ * - Completed in pg-boss, never retried; the `job_run` row closes `skipped`
+ *   with `reason` in `summary`, and the breaker is not charged.
+ * - The host's, not the SDK's: a plugin cannot skip itself — `invoke` maps
+ *   any error that is not an SDK class to `JobPermanent`.
+ */
+export class JobSkipped extends Data.TaggedError('JobSkipped')<{
+  readonly reason: string
+}> {}
+
+export type JobFailure =
+  JobRetryable | JobRateLimited | JobPermanent | JobSkipped
 
 export type JobOutcomeKind =
   | 'completed'
   | 'retryable'
   | 'rate-limited'
   | 'permanent'
+  | 'skipped'
   | 'invalid-data'
   | 'defect'
 
@@ -351,15 +365,20 @@ async function chargeBreaker(
   return tripped.length > 0
 }
 
-/** Only a failure the plugin owns is charged: never a throttle or a lost host. */
+/**
+ * Only a failure the plugin owns is charged: never a throttle, a skip or a
+ * lost host.
+ */
 const chargeable = (settled: JobOutcome | null): boolean =>
   settled !== null &&
   settled.kind !== 'completed' &&
-  settled.kind !== 'rate-limited'
+  settled.kind !== 'rate-limited' &&
+  settled.kind !== 'skipped'
 
 /**
- * The wrapper's typed outcome → the ledger's status. Explicit rather than
- * derived, because three of these are judgement calls:
+ * The wrapper's typed outcome → the ledger's status, and the only mapping to
+ * `skipped`. Explicit rather than derived, because three of these are
+ * judgement calls:
  *
  *  - `retryable` is `failed`. The attempt failed; that pg-boss will hand the
  *    job out again is the *next* attempt's row, not this one's.
@@ -368,16 +387,17 @@ const chargeable = (settled: JobOutcome | null): boolean =>
  *    work, and the `invalid-data:` tag in `error` is what tells them apart.
  *  - `rate-limited` is `failed` too, tagged `rate-limited:`. The work did not
  *    happen, so calling it `succeeded` would inflate every success count on
- *    the Integrations page. It is not `skipped`: that word is reserved for
- *    sdk-16's cache hits and cap refusals, and nothing in this slice writes
- *    it. What makes a throttle different — it is re-sent rather than retried,
- *    so it never burns the retry budget — lives in pg-boss, not here.
+ *    the Integrations page. It is not `skipped`, which is the host's cache
+ *    hits and cap refusals (`JobSkipped`). What makes a throttle different —
+ *    it is re-sent rather than retried, so it never burns the retry budget —
+ *    lives in pg-boss, not here.
  */
-const LEDGER_STATUS: Record<JobOutcomeKind, JobRunStatus> = {
+export const LEDGER_STATUS: Record<JobOutcomeKind, JobRunStatus> = {
   completed: 'succeeded',
   retryable: 'failed',
   'rate-limited': 'failed',
   permanent: 'failed',
+  skipped: 'skipped',
   'invalid-data': 'failed',
   defect: 'failed',
 }
@@ -465,7 +485,7 @@ async function endRun(
     finishedAt,
     durationMs: finishedAt.getTime() - startedAt.getTime(),
     error: ledgerError(settled, hostError),
-    summary: settled?.kind === 'completed' ? summary : null,
+    summary: ledgerSummary(settled, summary),
   }
   let tripped = false
   try {
@@ -533,8 +553,21 @@ function ledgerError(
 ): string | null {
   if (settled === null)
     return `host-unavailable: ${messageOf(hostError)}`.slice(0, 1000)
-  if (settled.kind === 'completed') return null
+  if (settled.kind === 'completed' || settled.kind === 'skipped') return null
   return `${settled.kind}: ${settled.reason}`.slice(0, 1000)
+}
+
+/**
+ * A completed attempt's own line, or a skip's reason: a skip is not an
+ * error, and `summary` is what the attempt did — here, why it did nothing.
+ */
+function ledgerSummary(
+  settled: JobOutcome | null,
+  summary: string | null,
+): string | null {
+  if (settled?.kind === 'completed') return summary
+  if (settled?.kind === 'skipped') return settled.reason.slice(0, 1000)
+  return null
 }
 
 /**
@@ -795,6 +828,13 @@ async function resolveFailure(
         outcome('rate-limited', failure.reason),
       )
       await host.send(queue, job.data, startAfter, { singletonKey: key })
+      return
+    }
+    case 'JobSkipped': {
+      console.log(
+        `[worker] ${queue} ${job.id}: skipped, 0 credits — ${failure.reason}`,
+      )
+      await host.complete(queue, job.id, outcome('skipped', failure.reason))
       return
     }
     case 'JobPermanent': {

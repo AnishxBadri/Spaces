@@ -8,9 +8,18 @@ import {
   JobPermanent,
   JobRateLimited,
   JobRetryable,
+  JobSkipped,
+  LEDGER_STATUS,
   runJob,
 } from './run-job'
-import type { JobDef, JobHost, JobOutcome, JobRunLedger } from './run-job'
+import type {
+  BreakerCharge,
+  JobDef,
+  JobHost,
+  JobOutcome,
+  JobRunEnd,
+  JobRunLedger,
+} from './run-job'
 
 /**
  * The wrapper's own tests. No Postgres: `runJob` settles through a JobHost,
@@ -406,5 +415,71 @@ describe('runJob — a host that itself fails', () => {
     await expect(handler([fakeJob('h', { n: 1 })])).resolves.toBeUndefined()
     expect(errors.join('\n')).toContain('could not resolve the job')
     expect(warnings).toEqual([])
+  })
+})
+
+describe('runJob — a skipped job', () => {
+  it('completes the job, closes the row skipped with the reason as its summary, and charges no breaker', async () => {
+    const { host, calls } = fakeHost()
+    const closed: Array<{ row: JobRunEnd; charge: BreakerCharge | null }> = []
+    const ledger: JobRunLedger = {
+      begin: async () => 'run-1',
+      end: async (_id, row, _close, charge) => {
+        closed.push({ row, charge })
+        return false
+      },
+    }
+    const logged = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const handler = runJob(
+      def(() =>
+        Effect.fail(
+          new JobSkipped({ reason: 'cached (enriched 12 days ago)' }),
+        ),
+      ),
+      {
+        host,
+        layer: nothing,
+        ledger,
+        breaker: {
+          integrationId: 'integration-1',
+          group: 'plugin.test.',
+          onTrip: () => undefined,
+        },
+      },
+    )
+
+    await handler([fakeJob('s', { n: 1 })])
+
+    expect(calls).toEqual([
+      {
+        call: 'complete',
+        queue: 'test.queue',
+        jobId: 's',
+        output: {
+          kind: 'skipped',
+          queue: 'test.queue',
+          attempt: 1,
+          reason: 'cached (enriched 12 days ago)',
+        },
+      },
+    ])
+    expect(closed).toHaveLength(1)
+    expect(closed.at(0)?.row).toMatchObject({
+      status: 'skipped',
+      summary: 'cached (enriched 12 days ago)',
+      error: null,
+    })
+    expect(closed.at(0)?.charge).toBeNull()
+    expect(String(logged.mock.calls.at(0)?.at(0))).toContain(
+      'skipped, 0 credits — cached (enriched 12 days ago)',
+    )
+  })
+
+  it('is the only outcome the ledger records as skipped', () => {
+    expect(
+      Object.entries(LEDGER_STATUS)
+        .filter(([, status]) => status === 'skipped')
+        .map(([kind]) => kind),
+    ).toEqual(['skipped'])
   })
 })

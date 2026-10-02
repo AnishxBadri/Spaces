@@ -317,7 +317,9 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
       })
     }
     const plans =
-      options.queues === undefined ? [] : pluginQueues(plugin.manifest)
+      options.queues === undefined
+        ? []
+        : pluginQueues(plugin.manifest, plugin.jobs)
     const taken = plans.find((plan) => {
       const owner = owners.get(plan.queue)
       return owner !== undefined && owner !== plugin.integrationId

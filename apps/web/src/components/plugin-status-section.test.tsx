@@ -57,3 +57,32 @@ describe('PluginStatusSection', () => {
     expect(renderToStaticMarkup(<PluginStatusSection stopped={[]} />)).toBe('')
   })
 })
+
+describe('PluginStatusSection, a plugin at its credit cap', () => {
+  const capped = {
+    integrationId: 'f1f0b6f2-7c1e-4f0a-9d2a-000000000005',
+    pluginId: 'apollo',
+    state: 'capped' as const,
+    reason: 'daily credit cap (2) reached',
+    refused: 3,
+  }
+
+  it('renders one line naming the cap and today’s refusals', () => {
+    const html = renderToStaticMarkup(
+      <PluginStatusSection stopped={[capped]} />,
+    )
+    expect(html.match(/<li/g)).toHaveLength(1)
+    expect(html).toContain('1 · at their credit cap')
+    expect(html).toContain('apollo')
+    expect(html).toContain('daily credit cap (2) reached')
+    expect(html).toContain('3 refused today')
+  })
+
+  it('counts a capped line beside stopped ones', () => {
+    const html = renderToStaticMarkup(
+      <PluginStatusSection stopped={[...stopped, capped]} />,
+    )
+    expect(html.match(/<li/g)).toHaveLength(5)
+    expect(html).toContain('5 · not running or capped')
+  })
+})
