@@ -319,3 +319,25 @@ _Carried by_ `graph-1` (`docs/roadmap-backlog.md`, Unplaced), a `migration` slic
 _Rejected:_ keeping "Inbox" (reads as email); "Suggestions" (leaves out duplicates, which are not suggestions from the AI); "Queue" (says how it works, not what you do there).
 
 _Carried by_ `review-1` (`docs/roadmap-backlog.md`, Unplaced). Wait for in-flight `apps/web` route work to land first: the route tree is regenerated.
+
+---
+
+## Addenda — 2026-10-02 (project 18's publish)
+
+_Four decisions taken by the owner while publishing project 18 (plugins run unattended, Apollo enriches), against the code project 17 shipped. They settle the four slices that were `hitl`; all four are now `afk`._
+
+### D62-drop-exit-75
+
+**Does the worker get an exit-75 "reload, not crash" escape hatch?** Answered: **no.** In-process reload over `NOTIFY plugin_changed` (`sdk-14a`) plus an ordinary restart is the answer; hostability contract 2 (a worker death kills the container) stays exactly as written, and spec §7's exit-75 fallback is struck. Rejected: a supervise loop in `ROLE=worker` and an exception in the `ROLE=all` watchdog — a change to a locked contract for a case v1's first-party signed plugins do not need. Carried by `sdk-14b`, dropped.
+
+### D63-manifest-action-placement
+
+**Where does a plugin's manifest action appear, and what happens when the plugin is unhealthy?** Answered: in the **record head's action area**, beside the record's own actions, for every action whose `on` matches the record's kind; **absent** when the plugin is degraded, disabled or breaker-tripped, with Review and the Today line saying why. Rejected: a separate plugin panel (a second place to look), and a present-but-disabled control explaining itself (a broken control on every record). Carried by `sdk-17`.
+
+### D64-web-listen-client
+
+**May web hold a long-lived pg connection to stream job status?** Answered: **yes, one.** A single shared LISTEN client in web fans `job_status` notifications out over SSE to record pages; `runJob`'s ledger emits them, so no trigger and no migration. Pending and failed reuse the existing ledger cell states. State on reopen or reconnect comes from `job_run`, never from a missed notification. Rejected: polling (the latency the spec promised away), and a client per subscriber. Carried by `sdk-18`.
+
+### D65-domain-event-emitter
+
+**Where is `entity.created` emitted?** Answered: from **`resolveEntity`** (company and person births) **and `createDeal`** (deal births), after the birth commits, never on an attach; **skipped for `seed` and `import` births**. The dispatcher enqueues through each process's `Enqueue` service. `autoEnrich` is a per-integration toggle, **off by default**. Rejected: a `domain_event` outbox (new schema for one trigger), pg NOTIFY (neither durable nor transactional), and an emitter only in web's write paths (misses worker-born entities). Carried by `sdk-19`.

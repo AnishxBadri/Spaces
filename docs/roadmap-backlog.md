@@ -963,82 +963,96 @@ The last write lane. Judgment.suggest lands a claim in the review inbox rather t
 
 ## 18. Plugins run unattended, Apollo enriches
 
-_Extensibility · 10 slices_
+_Extensibility · 9 slices (sdk-14b dropped, D62) · reconciled 2026-10-02 against D51–D58 and the code project 17 shipped (PR #4); owner calls D62–D65_
 
-A Layer per (integration, job), queues by kind, the breaker, hot reload, then Apollo end to end with credit safety, manifest actions, live status and event triggers.
+A Layer per (integration, job) built from the job's `uses`, queues per job, the breaker, hot reload, then Apollo end to end with credit safety, manifest actions, live status and event triggers.
 
-### ▸ A Layer per job, and queues by kind
+**Order:** `sdk-12a` ∥ `sdk-15` → `sdk-12b` (migration) → `sdk-13` ∥ `sdk-14a` ∥ `sdk-17` ∥ `sdk-19` → `sdk-16` → `sdk-18`. `sdk-12b` is the only migration-labelled slice, and it shares the one migration lane with every other migration slice in flight.
 
-_The privilege boundary is built and released per (integration, job): an over-reaching job fails with service-not-found while the database stays clean and the worker stays up. Queues register, schedule and unregister without a restart._
+**What project 17 already built, so no slice here rebuilds it:** the manifest with per-job `trigger` and `uses` (no kind, D51), trigger-shaped job types and the `cost` hook (D53) in `packages/sdk/src/contract.ts`, `definePlugin` with `onEnable`/`onDisable`, the testing kit's recording Layers (`@spaces/sdk/testing`), the loader's steps 1–4 and 8 (`apps/worker/src/plugins/loader.ts`, `reconcilePlugins`, which returns `loaded` plugins with their job functions but registers nothing), every live port except `Ai` and `PluginDb` (`packages/core/src/writes/ports/*`: Identity, Facts, Content, Judgment, Receipts, Read, Secrets, Config, Http, Log, plus `AmbientPortsLive`), the worker's `Enqueue` (`apps/worker/src/plugins/enqueue.ts`), `job_run` with `integration_id` and a reserved `skipped` status, `runJob`'s `refs → integrationId`, `integration.error_count`/`last_error`/`status`, and `enrichment_record.integration_id` + `credits_used` (D57). Jobs call ports; there are no returned claims and no router (D52).
+
+**Not in this project, and not blockers:** `Ai` live (`backfill-11`), `PluginDb` and plugin migrations (`sdk-24a`), the Integrations page and settings/key form (`sdk-20a`/`sdk-20b`, project 19). Until `sdk-20b`, an operator keys Apollo with the dev script `sdk-15` adds under `scripts/`.
+
+### ▸ A Layer per job, and a queue per job
+
+_The privilege boundary is built and released per (integration, job): a job that reaches for a port it did not declare fails with service-not-found while the database stays clean and the worker stays up. Queues register, schedule and unregister without a restart._
 
 #### `sdk-12a` · afk · M — A Layer per (integration, job) — the privilege boundary, built and released
 
-**Blocked by:** `sdk-11`, `sdk-6a`, `sdk-6b`, `sdk-7a`, `sdk-7b`, `sdk-9`
+**Blocked by:** none (sdk-11, sdk-6a, sdk-6b, sdk-7a, sdk-7b, sdk-9 shipped in project 17)
 
 **What to build**
 
-The half of loader step six that is actually interesting: for each loaded plugin, build a scoped Layer per (integration, job) from the kind-to-ports table exported by the SDK, bound to that row's config, credential and id; cache it; and release it cleanly. The Layer is the boundary — a bundle that lies in its types gets a runtime service-not-found because the host never handed the service over, and the job fails without writing anything. This slice is demoable without pg-boss: an exported invoke(integrationId, jobName, data) runs a job through its Layer directly, which is also what the queue registration in sdk-12b wraps. definePlugin's onEnable and onDisable hooks are called here, on transition into and out of enabled, with a failing hook degrading the plugin rather than crashing the worker. Split from registration because a Layer with nothing provided and a queue name with no Layer are each undemoable, but Layer construction alone is not.
+Loader step six (spec §7). For each plugin `reconcilePlugins` returns in `loaded`, build one scoped Layer per (integration, job) holding exactly the ports that job's manifest `uses` names (D51), bound to the row: the ambient four through `AmbientPortsLive(row, { settings, rpm })`, the lane ports through their `*Live(row)` constructors, and the worker's `Enqueue` (`workerEnqueue`) where Identity and Content hand work back. There is no kind and no port table: `uses` is the grant. Cache the Layer per (integration, job) and release its scope on disable.
+
+Two ports have no live implementation yet, `Ai` (`backfill-11`) and `PluginDb` (`sdk-24a`). A plugin whose job declares either is marked `degraded` by the loader with the port named ("job research uses Ai, which this host does not provide yet"), never half-wired.
+
+Export `invoke(integrationId, jobName, input)`, which runs a loaded job through its Layer directly with the trigger's input shape (`ActionInput`, `ScheduleInput`, …); it is the demo seam and what `sdk-12b` wraps. An action job written as `{ run, cost }` (D53) is invoked through `run`. Call `onEnable` on the transition into enabled and `onDisable` on release; a hook that fails degrades that plugin with the message in `last_error` and leaves the others running.
 
 **Acceptance criteria**
 
-- [ ] An enricher fixture invoked through the loader has Identity, Facts, Receipts, Http, Secrets, Config, Read and Log available and nothing else; a poller fixture that yields Facts fails with service-not-found mapped to permanent failure, and the database shows no write from that run
-- [ ] Layers are cached per (integration, job): two invocations of the same job build one Layer, asserted by a construction counter
-- [ ] The kind-to-ports table used at runtime is the one exported from the SDK — one table, asserted by the same test that checks it against the spec
-- [ ] onEnable runs once when a plugin transitions to enabled and onDisable when it is released; a hook that throws degrades that plugin with the message in last_error and leaves the others running
-- [ ] Releasing a plugin releases the Layer scope so any open Http client or pg handle closes, asserted by a finalizer counter
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+- [ ] The echo fixture's `enrich` job, invoked through `invoke`, has exactly Read, Http, Identity, Receipts, Facts and Log; an `overreach` fixture whose built bundle yields `Facts` from a job that declares only `Log` fails with service-not-found mapped to `JobPermanent`, and the database shows no write from that run
+- [ ] Layers are cached per (integration, job): two invocations of one job build one Layer, asserted by a construction counter
+- [ ] A plugin whose job declares `Ai` or `PluginDb` is `degraded` with the port named in `last_error`, and no Layer is built for it
+- [ ] `onEnable` runs once on the transition to enabled and `onDisable` on release; a throwing hook degrades that plugin with its message in `last_error` and the others keep running
+- [ ] Releasing a plugin closes its Layer scope (Http client, any pg handle), asserted by a finalizer counter
+- [ ] Full gate pass: typecheck, test, lint, prettier; full `turbo run build` (fixtures under `plugins/` are built by it)
 
-**Demo** — With the echo and poller fixtures enabled, call the loader's invoke seam for plugin echo's job and watch it write its claim through the ports; invoke the poller's deliberately over-reaching job and watch it fail with service-not-found while the database stays clean and the worker stays up.
+**Demo** — With the echo and overreach fixtures enabled (rows inserted by SQL), call `invoke` for echo's `enrich` job and watch the identity, receipt and fact land through the ports; invoke the overreaching job and watch it fail with service-not-found while the database stays clean and the worker stays up.
 
-**Spec** — docs/spec-plugin-sdk.md §7 step 6; docs/spec-plugin-sdk.md §4 (ports granted per integration and job)
+**Spec** — docs/spec-plugin-sdk.md §7 step 6; §4 (ports granted per integration and job, D51)
 
-#### `sdk-12b` · afk · M — Queues by kind — register, schedule, unregister without restarting
+#### `sdk-12b` · afk · M · migration — Queues per job — register, schedule, unregister without restarting
 
-**Blocked by:** `sdk-1`, `sdk-12a`
+**Blocked by:** `sdk-12a`
 
 **What to build**
 
-Loader step seven: for every declared job, createQueue and boss.work('plugin.<id>.<job>', runJob(...)) using the Layer sdk-12a built; boss.schedule those with a cron and timezone; and make disable the exact reverse — unregister, release the scope, forget the module. The manifest's concurrency and timeout become the work options, and interactive jobs get their own queue name so sdk-18 can give them a separate batch size later. Web's enqueue() is typed against the QUEUES const today, so its signature widens to accept a plugin queue name shaped plugin.${string}.${string}; no other web change. Schedules must be reconciled, not appended: a job that drops its schedule on upgrade has to be unscheduled, or the old cron keeps firing against a job that no longer exists.
+Loader step seven. For every declared job: `createQueue` and `boss.work('plugin.<id>.<job>', runJob(def, { host, layer }))` with the Layer `sdk-12a` built, a `JobDef` whose `schema` is the trigger's input shape and whose `refs` returns `{ integrationId, entityId }` (an action's `entityId`) so `job_run` is attributed through the existing write point. A `schedule` job is `boss.schedule`d at its manifest cron; its `ScheduleInput.cursor` lives in a new `integration.cursors` jsonb column keyed by job name (null until the first run) and is advanced from the returned `nextCursor` in the transaction that closes the run. Nothing in the spec gives the cursor a home today; this column is that home, and it is why this slice is `migration`-labelled (`pnpm db:generate --name integration_cursors`, SQL hand-inspected). The column references no entity, so no `ENTITY_REFS` entry. The manifest's `concurrency`, `timeout` and `retry` become the work and queue options; an `interactive: true` job gets its own queue name (`plugin.<id>.<job>.interactive`) so `sdk-18` can tune it later. Disable is the exact reverse: unregister, unschedule, release the scope, forget the module. Schedules are reconciled, not appended: a job that drops its schedule on upgrade is unscheduled.
+
+`event`, `webhook` and `file` jobs are registered as queues here but nothing enqueues them yet: `sdk-19` adds the event dispatcher, `sdk-23` (project 19) the ingress, and `file` keeps the path the importer fixture already proves.
+
+Web's `enqueue()` (`apps/web/src/lib/queue.ts`) is typed against `QueueName`; widen it to also accept `` `plugin.${string}.${string}` `` without weakening the core type. No other web change.
 
 **Acceptance criteria**
 
-- [ ] Every declared job is createQueue'd and registered as plugin.<id>.<job> through runJob with the manifest's concurrency and timeout; enqueuing one runs it end to end
-- [ ] A job declaring a schedule is registered with boss.schedule at the manifest's cron and timezone; removing the schedule from the manifest and reloading unschedules it, asserted by reading pg-boss's schedule table
-- [ ] Releasing a plugin unregisters its queues; a subsequently enqueued job for it stays queued rather than erroring, and re-enabling drains it
-- [ ] enqueue() accepts plugin queue names without weakening the core QueueName type — a typo'd core queue name still fails typecheck
-- [ ] A manifest declaring interactive: true registers that job on its own queue name, with the behaviour of that queue left to sdk-18
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+- [ ] Every declared job is `createQueue`'d and registered as `plugin.<id>.<job>` through `runJob` with the manifest's concurrency, timeout and retry; enqueuing echo's `echo` runs it end to end and leaves a `job_run` row carrying `integration_id`
+- [ ] The syncer fixture's `sync` job is scheduled at its cron; its returned `nextCursor` is stored in `integration.cursors.sync` and is what the next run receives, including after a worker restart; removing the schedule from the manifest and reconciling unschedules it, asserted against pg-boss's schedule table
+- [ ] Releasing a plugin unregisters its queues; a job enqueued for it afterwards stays queued rather than erroring, and re-enabling drains it
+- [ ] `enqueue()` accepts plugin queue names, and a misspelt core queue name still fails typecheck
+- [ ] An `interactive: true` job is registered on its own queue name
+- [ ] Full gate pass: typecheck, test, lint, prettier; full `turbo run build`
 
-**Demo** — With the echo fixture enabled, enqueue plugin.echo.run from a psql-side send or the dev app and watch the worker run it; disable the row and reload, enqueue again, and watch the job sit queued while the extraction queue keeps working.
+**Demo** — With the echo fixture enabled, enqueue `plugin.echo.echo` from the dev app or a psql-side send and watch the worker run it; disable the row and reconcile, enqueue again, and watch the job sit queued while the extraction queue keeps working.
 
-**Spec** — docs/spec-plugin-sdk.md §7 step 7; docs/spec-plugin-sdk.md §11 (queue names encode ownership)
+**Spec** — docs/spec-plugin-sdk.md §7 step 7; §11 (queue names encode ownership); §5 (trigger shapes)
 
 ### ▸ Failures disable the plugin, never the worker
 
-_Five failures fill job_run, flip the integration to disabled with a reason and put one line on Today while extraction keeps working in the same worker. Enable, disable and upgrade happen over NOTIFY with no restart, and the exit-75 escape hatch is reconciled with the either-process-dies contract._
+_Five failures fill job_run, set the integration aside with a reason and put one line on Today while extraction keeps working in the same worker. Enable, disable and upgrade happen over NOTIFY with no restart, and a restart stays an ordinary restart (D62)._
 
 #### `sdk-13` · afk · M — Plugin breaker — five failures disable the integration, never the worker
 
-**Blocked by:** `clean-2b`, `sdk-12b`
+**Blocked by:** `sdk-12b` (clean-2b shipped)
 
 **What to build**
 
-The plugin half of failure handling, with the table it used to create now owned by clean-2b. Two things land here. First, attribution: the Layer sdk-12a builds knows which integration a job belongs to, so runJob's existing `job_run` insert learns to stamp `integration_id` for plugin queues and leave it null for core ones — a widened call at the one write point, not a second insert site. Second, the breaker: a permanently failed plugin job increments `integration.error_count` and stamps `last_error` in the same transaction that closes the job_run row, and N failures inside an hour — grouped on the queue name's `plugin.<id>` segment — set the integration to disabled with the reason and unregister its queues. Breaker-disabled and operator-disabled must stay distinguishable, so the breaker sets `status` disabled with a reason while leaving `enabled` true: re-enabling is a reset, not a reinstall, which is exactly the distinction sdk-20a renders. Contract 2 means the worker process survives all of it. Today's line reuses the existing LedgerSection and LedgerRow, so there is no new visual language.
+Attribution is already in place: `runJob` writes `job_run.integration_id` from the `refs` `sdk-12b` supplies, through its one write point. This slice is the breaker. A plugin job that ends `failed` increments `integration.error_count` and stamps `last_error` with the typed failure tag, in the same transaction that closes the `job_run` row (the ledger's `end`, not a second insert site). Five failures inside an hour, counted from `job_run` grouped on the queue name's `plugin.<id>` segment, set `integration.status = 'disabled'` with the reason in `last_error` and unregister that plugin's queues, while `integration.enabled` stays `true`: breaker-tripped and operator-disabled stay distinguishable, and re-enabling is a reset, not a reinstall (what `sdk-20a` renders). `reconcilePlugins` must leave a tripped row alone (enabled, status disabled) instead of marking it `enabled` again at the next boot; only a reset clears it. Contract 2 means the worker survives all of it. Today's line reuses `LedgerSection` and `LedgerRow`.
 
 **Acceptance criteria**
 
-- [ ] A job registered from a plugin Layer writes `job_run.integration_id`; a core job leaves it null — and clean-2b's single-writer test stays green, because no new insert site is added
-- [ ] A permanently failed plugin job increments `integration.error_count` and stamps `last_error` with the typed failure tag, in the same transaction that closes the job_run row
-- [ ] Five failures of the throws fixture inside an hour set `integration.status` to disabled with reason '5 failures in an hour' while `integration.enabled` stays true, unregister its queues, and leave the worker process running and the extraction queue working
-- [ ] The breaker groups on the queue name's `plugin.<id>` segment: two plugins failing in the same hour disable independently
-- [ ] Unregistering from inside a failing job's own handler does not deadlock or drop the in-flight batch, asserted by a test that trips the breaker on the fifth job of a batch
-- [ ] Successes reset the failure window: four failures, then a success, then one failure does not trip the breaker
-- [ ] Today shows one line per tripped plugin using the existing LedgerSection and LedgerRow, and it clears when the integration is reset (a SQL update at this point; the button lands with sdk-20a); gate 5 passes on the touched tsx
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+- [ ] A failed plugin job increments `error_count` and stamps `last_error` in the transaction that closes its `job_run` row; `job-run-one-writer.test.ts` stays green because no insert site is added
+- [ ] Five failures of a `throws` fixture inside an hour set `status = 'disabled'` with reason '5 failures in an hour', leave `enabled = true`, unregister its queues, and leave the worker running and extraction working
+- [ ] A worker restart does not re-enable a tripped plugin: `reconcilePlugins` skips it, asserted by test
+- [ ] Two plugins failing in the same hour trip independently (grouped on `plugin.<id>`)
+- [ ] Tripping on the fifth job of a batch neither deadlocks nor drops the in-flight batch
+- [ ] Four failures, a success, then one failure does not trip the breaker
+- [ ] Today shows one line per tripped plugin and clears when the row is reset (by SQL here; the button lands with `sdk-20a`); `pnpm lint` (gate 5) passes on the touched tsx
+- [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — Enqueue the throws fixture five times: job_run fills with failures attributed to the integration, the integration flips to disabled with a reason, one line appears on Today, and the extraction queue keeps working in the same worker. Reset error_count by SQL and the line clears.
+**Demo** — Enqueue the throws fixture five times: `job_run` fills with failures attributed to the integration, the row flips to disabled with a reason, one line appears on Today, and extraction keeps working in the same worker. Restart the worker: it stays disabled. Reset by SQL and the line clears.
 
-**Spec** — docs/spec-plugin-sdk.md §11 (isolation, breaker, queue-name grouping); CONTEXT.md — Hostability decisions (contract 2); clean-2b (job_run and its single writer)
+**Spec** — docs/spec-plugin-sdk.md §11 (isolation, breaker, queue-name grouping); CONTEXT.md — Hostability decisions (contract 2)
 
 #### `sdk-14a` · afk · M — NOTIFY plugin_changed — enable, disable and upgrade without a restart
 
@@ -1046,66 +1060,55 @@ The plugin half of failure handling, with the table it used to create now owned 
 
 **What to build**
 
-There is no LISTEN client and no NOTIFY anywhere in the codebase; this adds the first. The worker holds a dedicated pg connection listening on plugin_changed; a notification carrying a plugin id re-runs the loader for that one id — release the old scope, unregister its queues, forget the module, then reconcile from disk and the row. Forgetting an ESM module is the sharp edge: import() caches by URL, so a version swap must import the new version's path (which the version-directory layout gives us) and the reload must assert the new bundle actually ran rather than the cached one. The connection reconnects with backoff and reconciles everything on reconnect, because a missed notification must not leave the worker's view stale. The exit-75 fallback is deliberately not here — it changes the supervision contract and is sdk-14b.
+There is no LISTEN client and no NOTIFY anywhere in the codebase; this adds the first. The worker holds a dedicated pg connection listening on `plugin_changed`; a notification carrying a plugin id re-runs the loader for that one id: release the old scope, unregister its queues, forget the module, then reconcile from disk and the row. Forgetting an ESM module is the sharp edge: `import()` caches by URL, so a version swap must import the new version's path (the version-directory layout gives one) and the reload must prove the new bundle ran. The connection reconnects with backoff and reconciles everything on reconnect, because a missed notification must not leave the worker's view stale. There is no exit-75 fallback (D62): if in-process reload ever fails, the remedy is an ordinary restart.
 
 **Acceptance criteria**
 
-- [ ] With the worker running, flipping a fixture row to enabled and calling pg_notify('plugin_changed','echo') registers its queues within a second and an immediately enqueued job runs, with no restart
-- [ ] Disabling by the same route unregisters queues and releases the Layer scope; an already-running job finishes rather than being killed mid-write
-- [ ] Swapping current to a new version directory and notifying runs the new bundle, asserted by a fixture whose two versions return different claims — the ESM cache does not serve the old module
-- [ ] Killing the LISTEN connection with pg_terminate_backend reconnects within the backoff window and performs a full reconciliation rather than a resume, asserted by changing a row while the connection is down
-- [ ] Reload is reentrant: two notifications for the same id arriving together produce one reconciliation, not two competing ones
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+- [ ] With the worker running, setting a fixture row enabled and calling `pg_notify('plugin_changed','echo')` registers its queues within a second, and a job enqueued immediately runs, with no restart
+- [ ] Disabling by the same route unregisters queues and releases the Layer scope; a job already running finishes rather than being killed mid-write
+- [ ] Swapping `current` to a new version directory and notifying runs the new bundle, asserted by a fixture whose two versions write different values through `Log` (or a port) — the ESM cache does not serve the old module
+- [ ] Terminating the LISTEN backend reconnects within the backoff window and performs a full reconciliation, asserted by changing a row while the connection is down
+- [ ] Two notifications for the same id arriving together produce one reconciliation
+- [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — Two terminals — worker in one, psql in the other. Update the row and NOTIFY: the worker log shows unregister, reload, register, and an enqueued job runs immediately. Then terminate the listener's backend and watch it reconnect and reconcile.
+**Demo** — Worker in one terminal, psql in the other. Update the row and NOTIFY: the worker log shows unregister, reload, register, and an enqueued job runs at once. Terminate the listener's backend and watch it reconnect and reconcile.
 
-**Spec** — docs/spec-plugin-sdk.md §7 (runs on boot and on NOTIFY plugin_changed); docs/spec-plugin-sdk.md §10 (split roles, NOTIFY crosses processes)
+**Spec** — docs/spec-plugin-sdk.md §7 (runs on boot and on NOTIFY plugin_changed); §10 (split roles; NOTIFY crosses processes)
 
-#### `sdk-14b` · hitl · S — Exit-75 reload — the escape hatch that argues with contract 2
+#### `sdk-14b` · Dropped (D62) — Exit-75 reload
 
-**Blocked by:** `sdk-14a`
-
-**What to build**
-
-The spec's documented fallback when in-process reload proves unsafe is worker exit code 75, which the entrypoint treats as reload rather than crash. That directly contradicts what docker/entrypoint.sh implements and comments today: ROLE=worker execs the worker (so the shell is gone and cannot interpret its exit code at all), and ROLE=all deliberately kills the container when the worker exits, which is hostability contract 2 written down as a supervision rule. Implementing exit-75 means replacing exec with a supervise loop in ROLE=worker and carving an exception into the ROLE=all watchdog — a change to a locked contract, which is why a human decides rather than an agent. The alternative on the table is to not build it and let sdk-14a's in-process reload stand alone, with restart the operator's remedy. Small either way; the argument is the work.
-
-**Acceptance criteria**
-
-- [ ] A decision is recorded in CONTEXT.md under Hostability decisions: either contract 2 gains a named exception for exit 75, or exit-75 is dropped and the spec's fallback is struck
-- [ ] If built: ROLE=worker supervises rather than execs, restarting the worker on exit 75 and exiting the container on any other non-zero code; ROLE=all restarts only the worker on 75 and still kills the container on every other worker exit
-- [ ] If built: a test or scripted check drives both roles with a worker that exits 75 and one that exits 1, asserting reload versus container exit
-- [ ] If built: the restart loop is bounded — repeated exit 75 within a short window stops rather than spinning, with the reason logged
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
-
-**Demo** — With the split-role compose overlay up, send the worker a signal that makes it exit 75: the container stays up and the worker comes back with plugins reloaded. Make it exit 1: the container stops, exactly as contract 2 says.
-
-**Spec** — docs/spec-plugin-sdk.md §7 (exit 75 fallback); CONTEXT.md — Hostability decisions (contract 2); docker/entrypoint.sh
+Not built. In-process reload (`sdk-14a`) plus an ordinary restart is the answer; hostability contract 2 stays as it is, and spec §7's exit-75 fallback is struck. Nothing depends on it.
 
 ### ▸ Apollo enriches a company
 
-_Paste a key, see the Enrich action appear on records rendered from the row's manifest, click it and watch blanks fill with Apollo as actor and the raw payload in an enrichment_record — credit-capped, 90-day cached, refusals visible on Today. This is the plugin arc's undeclared L and should be split at the provider-client seam before it is grabbed._
+_Key Apollo with the dev script (until `sdk-20b`), see the Enrich action on records rendered from the row's manifest, click it and watch blanks fill with Apollo as actor and the raw payload in an `enrichment_record` — credit-capped, 90-day cached, refusals visible on Today._
 
-#### `sdk-15` · afk · M — Apollo's mapping — provider JSON becomes claims, with no database
+#### `sdk-15` · afk · M — plugins/apollo — the provider mapping, tested with no database
 
-**Blocked by:** `sdk-4b`, `sdk-5`
+**Blocked by:** none (sdk-4b, sdk-5 shipped; the echo fixture's `enrich` job is the shape to copy)
 
 **What to build**
 
-plugins/apollo as a real bundle: a manifest declaring requires.credential { kind: 'enrichment', scope: 'workspace' }, the settings the operator fills, its http config, and the enricher's three methods — enrichCompany, enrichPerson, estimateCost — written against the SDK's port tags and nothing else. The job reads the entity's domain through Read, calls organizations/enrich and people/match through Http with X-Api-Key from Secrets (the header-driven self-throttle belongs to HttpLive and is declared here as manifest.http, never a second rate limiter), maps provider JSON into identity and fact claims, and stores the raw response through Receipts. Role emails are rejected using the normalizers the SDK exports, not a second copy of the list. Apollo's own error text rides on the typed failure instead of being swallowed, and a 402 or 403 from a paid-plan-only endpoint is permanent rather than retried. All of it is provable with the testing kit's recording Layers against committed fixtures derived from Apollo's documented response shapes with secrets scrubbed — no database, no network, no integration row, and nothing from the live-port arc.
+`plugins/apollo` (`@spaces/plugin-apollo`) as a real bundle: a manifest declaring `requires.credential { kind: 'enrichment', scope: 'workspace' }`, its settings (including `cacheDays` default 90 and `dailyCreditCap`, which `sdk-16` enforces), `http.rateLimit`, and two `action` jobs, `enrichCompany` and `enrichPerson`, each `uses: ['Read', 'Http', 'Identity', 'Receipts', 'Facts', 'Log']`, each written as `{ run, cost }` (D53: `cost` is pure, `{ credits }` per entity in Apollo's unit, from the input alone). Actions: Enrich on `company` and on `person`.
+
+The job calls ports in order (D52): `Read.entity` for the domain or email; `Http` to `organizations/enrich` or `people/match` with `X-Api-Key` from `Secrets` (HttpLive's header-driven throttle is the rate limiter, not a second one); `Receipts.store` with the raw response and `creditsUsed`; `Identity.addAlias`/`resolve` for keys Apollo returns; `Facts.fill` for the mapped attributes, citing the receipt. A pure `map.ts` turns provider JSON into those port arguments. Role emails are rejected with `@spaces/sdk/identity`'s `isRoleEmail`, not a local list. Apollo's own error text rides the typed failure; a 402 or 403 from a paid-plan-only endpoint is `JobPermanent`, not retried. Provable with the testing kit's recording Layers against committed fixtures derived from Apollo's documented responses, secrets scrubbed: no database, no network, no integration row.
+
+Keying, until the settings form (`sdk-20b`, project 19): a small dev script under `scripts/` reads the Apollo key from an env var (`APOLLO_API_KEY`), stores it as a workspace `enrichment` credential through core's `storeCredential` (encrypted by the vault, never raw SQL), and inserts or updates the `apollo` `integration` row pointing at it, enabled. Idempotent: a second run updates the key and leaves one row. The root `tsconfig.json` already covers `scripts/**/*.ts`, so it typechecks under `typecheck:root`; it must resolve `@spaces/core` from where it runs.
 
 **Acceptance criteria**
 
-- [ ] plugins/apollo builds to bundle.mjs plus manifest.json and imports @spaces/sdk only — a core or db import fails lint
-- [ ] against the committed fixtures, enriching by domain produces one identity claim carrying the domain, fact claims for the mapped attributes, and one receipt; the claim snapshot is committed
-- [ ] a person match returning only a role email (info@, careers@) emits no identity claim for that person, using the SDK's isRoleEmail rather than a local list
-- [ ] a 402 or 403 fixture fails the job permanently — not retried — carrying Apollo's own message on the typed failure, asserted through the testing kit's recorder
-- [ ] estimateCost(n) returns credits from the manifest's declared pricing without touching Http, and each job's R type names no port the enricher kind is not granted
-- [ ] DATABASE_URL= pnpm vitest run plugins/apollo is green with Postgres stopped and the network off; the committed fixtures carry no key material
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+- [ ] `plugins/apollo` builds to `bundle.mjs` + `manifest.json` and imports `@spaces/sdk`, `effect` and `zod` only — a core or db import fails lint
+- [ ] Against the fixtures, enriching a company by domain records one `Receipts.store`, the identity alias calls and one `Facts.fill` with the mapped attributes, in that order; the recorder's call log is snapshotted
+- [ ] A person match returning only a role email records no identity call for that email
+- [ ] A 402 or 403 fixture fails `JobPermanent` carrying Apollo's own message
+- [ ] `cost` returns credits from the input without touching Http; each job's `R` is bounded by its `uses` (typecheck)
+- [ ] The package's vitest suite is green with Postgres stopped and the network off; the fixtures carry no key material
+- [ ] The dev script, run with `APOLLO_API_KEY` set, leaves exactly one enabled `apollo` integration row with an encrypted workspace `enrichment` credential; a second run with a new key updates both and adds no row; with the variable unset it exits non-zero naming it
+- [ ] Full gate pass: typecheck, test, lint, prettier; full `turbo run build`
 
-**Demo** — DATABASE_URL= pnpm vitest run plugins/apollo with the network off: the committed Apollo fixtures produce a snapshotted claim set — one identity claim with the domain, the mapped fact claims, one receipt — the role-email fixture produces no identity claim, and the 402 fixture fails permanently carrying Apollo's own sentence.
+**Demo** — Run the package's tests with the network off: the Apollo fixtures produce a snapshotted call log (receipt, aliases, fill), the role-email fixture produces no identity call, and the 402 fixture fails permanently with Apollo's sentence. Then run the dev script with a key and see the `apollo` row and its credential in the dev database.
 
-**Spec** — docs/spec-plugin-sdk.md §5; docs/spec-plugin-sdk.md §4 — kind → ports; docs/spec-plugin-sdk.md §13 step 1; CONTEXT.md — Enrichment (Apollo endpoints, headers, error text)
+**Spec** — docs/spec-plugin-sdk.md §5 (triggers, port calls, D52/D53); §13 step 1; CONTEXT.md — Enrichment (Apollo endpoints, headers, error text)
 
 #### `sdk-16` · afk · M — Credit safety — daily cap, 90-day cache, refusals that are visible
 
@@ -1113,92 +1116,106 @@ plugins/apollo as a real bundle: a manifest declaring requires.credential { kind
 
 **What to build**
 
-CONTEXT is blunt that the first issue anyone files is someone torching credits on four thousand companies. The draft left where the guards live as an open question; it is settled here, because the SDK's public surface must not move for it. Both guards are core-side, enforced at the same place privilege is — in the enricher wrapper the loader builds — so a plugin cannot bypass them and Receipts keeps its single store() method. The cache reads the entity's most recent enrichment_record for this integration; the cap sums enrichment_record.credits_used for this integration since UTC midnight, which is why it survives a worker restart. A refusal is a first-class visible outcome: job_run closes with a skipped or refused status and a reason, never a silent success. cacheDays and dailyCreditCap are ordinary manifest settings so no surface special-cases Apollo.
+D53 settles where the guards live: in the host, around an `action` job, so a plugin cannot bypass them and `Receipts` keeps one `store()`. Before the job runs, in the wrapper `sdk-12b` registers:
+
+1. **Cache:** if the entity's most recent `enrichment_record` for this integration (`integration_id`) is younger than `cacheDays`, skip — no provider call.
+2. **Cap:** ask the job's `cost` hook for the estimate; if today's spend plus the estimate exceeds `dailyCreditCap`, refuse before any API call. A job with no `cost` hook is still refused once today's spend has reached the cap.
+3. **Spend** is only ever `sum(enrichment_record.credits_used)` for this integration since UTC midnight, so it survives a restart.
+
+A skip or refusal closes `job_run` with status `skipped` (already in the enum; no migration) and a reason, never a silent success: `runJob` gains a `skipped` outcome kind mapped to that status. `cacheDays` and `dailyCreditCap` are read from `integration.config` by those names and declared in the plugin's settings schema, so the Integrations page renders them without special-casing Apollo.
 
 **Acceptance criteria**
 
-- [ ] Enriching an entity whose most recent enrichment_record for this integration is younger than the configured cacheDays makes no provider call and closes job_run with the skipped status and reason 'cached (enriched 12 days ago)'
-- [ ] With dailyCreditCap set to 2, the third enrich job of the day fails with a typed CreditCapExceeded, makes no provider call, and surfaces one line on Today; gate 5 passes on the touched tsx
-- [ ] The credit count is per integration per UTC day and derived from enrichment_record rows, asserted by a test that restarts the guard mid-day and gets the same count
-- [ ] Both guards live in the enricher wrapper, not in the plugin: a fixture plugin calling Http directly for the same entity still trips the cap, asserted by test
-- [ ] cacheDays and dailyCreditCap are declared in the manifest settings schema so the Integrations page renders them without special-casing Apollo
-- [ ] The job_run status values this needs are agreed with the clean area rather than added ad hoc; the migration adding them (if any) is hand-inspected
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+- [ ] Enriching an entity whose latest receipt for this integration is younger than `cacheDays` makes no provider call and closes `job_run` as `skipped` with reason 'cached (enriched 12 days ago)'
+- [ ] With `dailyCreditCap = 2` and a `cost` of 1, the third job of the day is refused before any Http call, closes `skipped` with the cap named, and shows one line on Today; gate 5 passes on the touched tsx
+- [ ] Spend is per integration per UTC day from `enrichment_record`, asserted by restarting the guard mid-day and reading the same total
+- [ ] The guards live in the host: a fixture job with no `cost` hook is still refused once the day's receipts reach the cap
+- [ ] `runJob`'s new `skipped` outcome is the only writer of `job_run.status = 'skipped'`
+- [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — Enrich a company twice in a row: the second run logs 'cached, 0 credits' and job_run shows skipped. Set dailyCreditCap to 2 and enqueue three: the third fails with the cap named and Today shows it.
+**Demo** — Enrich a company twice: the second run logs 'cached, 0 credits' and `job_run` shows skipped. Set `dailyCreditCap` to 2 and enqueue three: the third is refused with the cap named and Today shows it.
 
-**Spec** — CONTEXT.md — Enrichment (credit safety); docs/spec-plugin-sdk.md §4 (Receipts); docs/spec-plugin-sdk.md §11 (job_run)
+**Spec** — D53; CONTEXT.md — Enrichment (credit safety); docs/spec-plugin-sdk.md §4 (Receipts), §11 (job_run)
 
-#### `sdk-17` · hitl · M — Manifest actions — the Enrich button, rendered from the row's manifest
+#### `sdk-17` · afk · M — Manifest actions — the Enrich button, in the record head (D63)
 
-**Blocked by:** `sdk-11`, `sdk-15`
+**Blocked by:** `sdk-12b` (sdk-11 shipped: the loader already writes `integration.manifest`). `sdk-15` is needed for the Apollo demo only; echo's declared actions demo it earlier.
 
 **What to build**
 
-Web renders actions from integration.manifest, the jsonb the loader wrote on reconcile, and never loads a bundle or reads /data: for enabled integrations it puts the declared actions on the record pages whose object matches the action's on field and enqueues plugin.<id>.<job> with the entity id through a server fn. This is the first plugin-driven UI in the product and needs a human against DESIGN.md — where an action sits on a record page, what it looks like while it is nothing but a queued job, and how an action for a degraded plugin reads (absent, or present and explaining itself). Gate 5 applies: Instrument vocabulary only. Permissions follow the existing shape — any member can fire an action, only admins reach settings and keys, which requireAdmin already enforces.
+Web renders actions from `integration.manifest`, decoded with `manifestSchema`, and never loads a bundle or reads `/data`. For each enabled integration whose `status` is `enabled`, every declared action whose `on` (`company` · `person` · `deal`) matches the record's kind is a control in the **record head's action area** (D63), beside the record's own actions, using the existing record-head control styling. Firing it enqueues `plugin.<id>.<job>` with `{ entityId }` through a server fn and returns at once. A plugin that is degraded, disabled or breaker-tripped shows **no** action; Review and the Today line say why (the plugin and its `last_error`), so the record head never carries a broken control. Instrument vocabulary only (gate 5). Any member may fire an action (`requireUser`); settings and keys stay admin (`requireAdmin`).
 
 **Acceptance criteria**
 
-- [ ] With Apollo enabled and keyed, a company record shows its declared Enrich action; with Apollo disabled or degraded the action is absent; the web build contains no import of plugins/* and no read of the plugins directory, asserted by a build-output grep test
-- [ ] Clicking enqueues plugin.apollo.enrich with the entity id and returns immediately; a job_run row appears
-- [ ] An action declared on: 'person' does not appear on company or deal records
-- [ ] A non-admin member can fire the action and cannot reach Settings; requireAdmin covers the settings path and requireUser the action path
-- [ ] No new route file is added (the action is a component plus a server fn); if one is, pnpm generate-routes is run and routeTree.gen.ts is committed
-- [ ] Gate 5 passes on the new tsx: no v1 tokens, Instrument vocabulary only
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+- [ ] With Apollo (or echo) enabled, a company record's head shows its declared action in the action area; degraded, disabled or tripped, it shows none; the web build contains no import of `plugins/*` and no read of the plugins directory, asserted by a build-output grep test
+- [ ] A degraded or tripped plugin with declared actions appears on Today (and in Review) with its reason, so the missing action is explained somewhere the user looks
+- [ ] Clicking enqueues `plugin.<id>.<job>` with the entity id and returns at once; a `job_run` row appears
+- [ ] An action declared `on: 'person'` does not appear on company or deal records
+- [ ] A non-admin member can fire the action and cannot reach Settings
+- [ ] No new route file (a component plus a server fn); if one is added, `pnpm generate-routes` runs and `routeTree.gen.ts` is committed
+- [ ] Gate 5 passes on the new tsx
+- [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — Open a company record with Apollo enabled: the Enrich action is there, and firing it produces a job_run row and, seconds later, filled blanks. Disable Apollo and reload: the action is gone, with no code change.
+**Demo** — Open a company record with Apollo enabled: Enrich sits in the record head, and firing it produces a `job_run` row and, seconds later, filled blanks. Mark Apollo degraded and reload: the action is gone and Today says why, with no code change.
 
-**Spec** — docs/spec-plugin-sdk.md §3 (actions); docs/spec-plugin-sdk.md §11 (manual trigger); DESIGN.md
+**Spec** — D63; docs/spec-plugin-sdk.md §3 (actions), §11 (manual trigger); docs/design-contract.md
 
 ### ▸ Under a second, and on creation
 
-_LISTEN/NOTIFY to SSE so the cell goes pending then resolves with no refresh, survives a mid-run reload, and settles into failure rather than spinning when the worker dies. New companies with a domain enrich themselves on creation, with the emitter's home decided._
+_LISTEN/NOTIFY to SSE so the cell goes pending then resolves with no refresh, survives a mid-run reload, and settles into failure rather than spinning when the worker dies. New companies with a domain enrich themselves on creation when the operator turns it on._
 
-#### `sdk-18` · hitl · M — Interactive status — LISTEN/NOTIFY to SSE, so 'later' is under a second
+#### `sdk-18` · afk · M — Interactive status — one LISTEN client, SSE to the record (D64)
 
 **Blocked by:** `sdk-13`, `sdk-14a`, `sdk-17`
 
 **What to build**
 
-The cost of every plugin result being a job is that nothing renders inline in a request; the mitigation the spec names is an eager job plus a status stream. Jobs declaring interactive: true get a low batch size and a short timeout on the queue sdk-12b already gave them; job_run transitions emit a NOTIFY, and a server-sent-events route relays them to the record page, so the cell reads 'Enriching…' and then the outcome without polling. This puts a second long-lived pg client in the product, this time in the web process — worth stating, because it is the first thing web holds open. New interaction pattern and new UI, so a human reviews: what pending looks like in a ledger cell, what a failure reads as, and how a reconnect avoids a flash. Reopening the page must recover state from job_run, not from a stream that already fired.
+Jobs declaring `interactive: true` get batch size 1 and the manifest's short timeout on the queue `sdk-12b` gave them. `runJob`'s ledger emits `pg_notify('job_status', …)` when it opens and closes a plugin job's `job_run` row (in the writer, so no trigger and no migration). Web holds **one shared LISTEN client** (D64) that fans each notification out to the SSE subscribers of an `apps/web/src/routes/api/` stream; it is the first long-lived pg client in the web process, created lazily, released on shutdown, and its module comment says so. The record page subscribes for its entity, so the cell reads pending and then the outcome with no polling. Pending and failed **reuse the existing ledger cell states** (D64): no new visual vocabulary. Reopening the page, or reconnecting a dropped stream, recovers state from `job_run`, never from a notification that already fired.
 
 **Acceptance criteria**
 
-- [ ] A new route file under src/routes/api/ serves the stream; pnpm generate-routes is run and routeTree.gen.ts is committed
-- [ ] A job declaring interactive: true runs on its own queue with batchSize 1 and the manifest's short timeout; batch jobs never starve it
-- [ ] Firing Enrich shows a pending state in under 200ms locally and flips to the outcome when the job closes, with no polling request in the network tab
-- [ ] Closing and reopening the record while the job runs shows the same pending state, read from job_run
-- [ ] A dropped SSE connection reconnects and resyncs from job_run rather than showing a stale pending forever, and the stream carries nothing the viewer could not read (canRead as the viewing user, never as the integration)
-- [ ] The web-side LISTEN client is one connection shared by all subscribers, released on process shutdown, and its existence is documented in the module comment
-- [ ] Gate 5 passes on the new tsx; pending and failed states use existing Instrument components
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+- [ ] A new route under `apps/web/src/routes/api/` serves the stream; `pnpm generate-routes` runs and `routeTree.gen.ts` is committed
+- [ ] An `interactive: true` job runs on its own queue with batch size 1 and its short timeout; batch jobs never starve it
+- [ ] Firing Enrich shows the pending ledger state in under 200 ms locally and flips to the outcome when the job closes, with no polling request
+- [ ] Closing and reopening the record mid-run shows the same pending state, read from `job_run`
+- [ ] A dropped SSE connection reconnects and resyncs from `job_run`; the stream carries nothing the viewer could not read (`canRead` as the viewing user, never as the integration)
+- [ ] Web holds exactly one LISTEN connection however many subscribers there are, asserted by test, and releases it on shutdown
+- [ ] Pending and failed use the existing ledger cell states; gate 5 passes
+- [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — Click Enrich on a company and watch the cell go pending then resolve with no page refresh; mid-run, reload the page and see the pending state restored; kill the worker mid-run and watch the cell settle into the failure state rather than spinning forever.
+**Demo** — Click Enrich and watch the cell go pending then resolve with no refresh; reload mid-run and see pending restored; kill the worker mid-run and watch the cell settle into the failed state instead of spinning.
 
-**Spec** — docs/spec-plugin-sdk.md §11 (interactive jobs, SSE); DESIGN.md — Micro-interactions
+**Spec** — D64; docs/spec-plugin-sdk.md §11 (interactive jobs, SSE)
 
-#### `sdk-19` · hitl · M — Event triggers — enrich-on-create, and where the emitter lives
+#### `sdk-19` · afk · M — Event triggers — enrich-on-create from resolveEntity and createDeal (D65)
 
 **Blocked by:** `sdk-12b`, `sdk-15`
 
 **What to build**
 
-The third trigger, and the whole workflow engine this product will ever have: a manifest job declaring on: ['entity.created'] runs when core emits that event. No domain-event emitter exists today, and the choice of shape is exactly what makes this human work: an in-process emitter in the web write path misses entities born in the worker (an importer plugin's own Identity.resolve) and in seeds; a domain_event outbox is durable and orderable but is new schema; pg NOTIFY is neither durable nor transactional. The leading candidate is emitting inside resolveEntity — the choke point both processes already share, which is the repo's own doctrine for exactly this problem — but it makes every seeded and imported entity a trigger, which may be wrong. Decide, then build only the narrow emission the trigger needs, not a general bus, with a per-integration config toggle because bulk auto-enrichment is never a default.
+The contract half shipped in project 17: an `event` job declares `on: ['entity.created']` and receives `EventInput { event: DomainEvent }` (`DOMAIN_EVENTS` is closed at `entity.created`, kinds company · person · deal). This slice builds the emitter and the dispatcher, as D65 decided:
+
+- **Emitted from `resolveEntity`** (company and person births, `packages/core/src/writes/entities/resolve.ts`, both `resolveEntity` and `resolveEntityInTx`) **and `createDeal`** (deal births, `apps/web/src/lib/server/deals.ts`), after the birth commits, never on an attach.
+- **Skipped for seed and import births** (`source_class` `seed` or `import`), so seeding or a CSV never fans out into enrichment.
+- **No outbox, no NOTIFY bus, no migration:** the dispatcher maps the event to `plugin.<id>.<job>` enqueues through the `Enqueue` service each process already has (`webEnqueue` in web, `workerEnqueue` in the worker), for enabled, non-degraded, non-tripped subscribers.
+- **`autoEnrich` is off by default:** a per-integration config toggle the dispatcher reads; off means no enqueue.
+
+Apollo gains an `event` job (`onCompanyCreated`, `on: ['entity.created']`) that declines an entity with no domain without spending a credit. CONTEXT.md's Plugin architecture block points at D65.
 
 **Acceptance criteria**
 
-- [ ] The emitter's shape is decided and recorded in CONTEXT.md under Plugin architecture, naming what it does for entities born in the worker, in seeds and in imports
-- [ ] Creating a company with a domain emits entity.created once and enqueues plugin.apollo.enrich within a second; creating one without a domain emits the event and Apollo's job declines it as unenrichable rather than burning a credit
-- [ ] Setting autoEnrich off in the integration config stops the enqueue while the event still fires, so other subscribers are unaffected
-- [ ] An event with no subscribers enqueues nothing and costs one map lookup, asserted by the absence of any job_run row
-- [ ] Merging two entities does not emit entity.created for the survivor — a test pins this, since the merge executor rewrites rows
-- [ ] A subscriber whose plugin is degraded or disabled is skipped without raising an error into the write path that emitted the event
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+- [ ] With `autoEnrich` on, creating a company with a domain emits `entity.created` once and enqueues Apollo's event job within a second; one without a domain is declined without a credit spent
+- [ ] `autoEnrich` absent or off enqueues nothing
+- [ ] A seeded or imported company emits no event; an attach (resolve finds an existing record) emits no event
+- [ ] A deal created through `createDeal` emits `entity.created` with kind `deal`
+- [ ] An event with no subscribers enqueues nothing (no `job_run` row)
+- [ ] Merging two entities emits no `entity.created` for the survivor
+- [ ] A degraded, disabled or tripped subscriber is skipped without raising into the write path that emitted the event
+- [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — Create a company with a domain in the dev app and watch the record fill itself within a second or two; toggle autoEnrich off in the integration config and create another — nothing enqueues. Seed a company and observe whatever the recorded decision says should happen.
+**Demo** — Turn `autoEnrich` on and create a company with a domain in the dev app: the record fills itself within a second or two. Turn it off and create another: nothing enqueues. Seed a company: no event.
 
-**Spec** — docs/spec-plugin-sdk.md §11 (event trigger); CONTEXT.md — Enrichment (never auto-enrich in bulk)
+**Spec** — D65; docs/spec-plugin-sdk.md §5 (event trigger), §11; CONTEXT.md — Enrichment (never auto-enrich in bulk)
 
 ---
 

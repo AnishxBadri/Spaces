@@ -412,8 +412,8 @@ Grafana's discovery → bootstrap → validation → initialization, same beats.
 Any failed step → `degraded` with the reason, jobs skipped, **boot
 continues**. A plugin never crashes the box. Disable / upgrade = reverse:
 unregister queues, release the Layer scope, forget the module. Hot reload
-is in-process (Effect scopes release cleanly); fallback is worker exit code
-75, which the entrypoint treats as reload, not crash.
+is in-process (Effect scopes release cleanly); if it ever fails, the remedy
+is an ordinary restart — there is no exit-75 fallback (D62).
 
 What the loader is not: not a package manager (the installer, §9, moves
 bytes); not a sandbox (trust comes from signing); never in web.
@@ -566,23 +566,24 @@ Core jobs and plugin jobs use the same wrapper; only the Layer differs.
 Queue names encode ownership: `core.<domain>.<verb>` vs
 `plugin.<id>.<job>` — also what the breaker groups on.
 
-**Every plugin invocation is a job.** Three triggers, all landing in
-pg-boss:
+**Every plugin invocation is a job.** Every trigger lands in pg-boss; D51
+names five (`action` · `schedule` · `event` · `webhook` · `file`, §5). The
+three a user or core starts:
 
 | trigger  | example                                                                                                                                                                         |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| manual   | `actions[]` → "Enrich" button → `enqueue('plugin.apollo.enrich', { entityId })`                                                                                                 |
+| action   | `actions[]` → "Enrich" button → `enqueue('plugin.apollo.enrich', { entityId })`                                                                                                 |
 | schedule | `manifest.jobs[].schedule` → `boss.schedule`                                                                                                                                    |
-| event    | `on: ['entity.created']` — core write paths emit domain events; a dispatcher maps them to jobs. Attio's enrich-on-create is this implicit trigger, not a different architecture |
+| event    | `on: ['entity.created']` — `resolveEntity` and `createDeal` emit it (D65); a dispatcher maps it to jobs. Attio's enrich-on-create is this trigger, not a different architecture |
 
 This is the whole "workflow engine" we will ever have: declarative in
 manifests, never a UI (the tasks decision already rejected a builder).
 
 - **Interactive jobs** (`interactive: true`): own priority queue, low batch,
   short timeout. Status via `LISTEN/NOTIFY job_status → SSE` to the record
-  page; the cell shows "Enriching… → Apollo says X, accept?". No polling.
-- **`query` kind (narrow, read-only, budgeted)**: request/reply over
-  pg-boss — web sends, awaits NOTIFY with the reply, 3s budget. For "search
+  page, through one shared LISTEN client in web (D64); the cell shows "Enriching… → Apollo says X, accept?". No polling.
+- **`query` (deferred; not one of D51's five triggers — adding it is a
+  minor)**: narrow, read-only, budgeted request/reply over pg-boss — web sends, awaits NOTIFY with the reply, 3s budget. For "search
   Exa inside a picker". Works unchanged in split-role deployments; a
   worker localhost HTTP would not.
 - **Ingress**: web verifies the manifest-declared signature (generic HMAC,

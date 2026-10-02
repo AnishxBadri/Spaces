@@ -1679,21 +1679,9 @@ silently garbage** — search degrades quietly rather than erroring. This bites 
 
 ### Enrichment
 
-```ts
-interface Enricher {
-  id: 'apollo' | 'pdl' | 'crunchbase' | 'hunter'
-  enrichCompany(input: { domain?; name? }): Promise<EnrichResult>
-  enrichPerson(input: {
-    email?
-    linkedin?
-    name?
-    domain?
-  }): Promise<EnrichResult>
-  estimateCost(n: number): { credits: number }
-}
-```
+An enricher is a plugin, not an interface of its own: an `action` job (the Enrich button) with an optional `cost` hook, and optionally an `event` job on `entity.created`, calling ports — `Read`, `Http`, `Receipts`, `Identity`, `Facts` — rather than returning results for a router (D51 triggers, D52 ports, D53 cost hook; `docs/spec-plugin-sdk.md` §5). Apollo is `plugins/apollo` (`sdk-15`).
 
-Ship Apollo first; the interface makes PDL/Crunchbase/Harmonic/Exa community PRs.
+Ship Apollo first; the port contract makes PDL/Crunchbase/Harmonic/Exa community PRs.
 
 Apollo notes: `POST /api/v1/organizations/enrich` (by domain), `POST /api/v1/people/match`.
 Use bulk variants — cheaper per record. Auth header `X-Api-Key`. Rate limits are per-minute/hour/day
@@ -1707,8 +1695,8 @@ paid-plan-only; surface Apollo's real error text, don't swallow it.
 - Per-day credit cap in settings, enforced in worker.
 - Hard cache: skip re-enrich within N days (default 90).
 
-**Provenance:** store raw response, project into fields, track source per field
-(`manual` | `apollo` | `gmail`). **Never overwrite a manually-edited field** — show
+**Provenance:** store raw response (`Receipts`), project into fields, track who wrote each field
+(actor `integration` with `source_ref` → the integration row, never a vendor name; D1, D57). **Never overwrite a manually-edited field** — show
 "Apollo says X, you have Y — accept?" Multi-provider disagreement is normal; last-write-wins corrupts.
 
 ## Storage
