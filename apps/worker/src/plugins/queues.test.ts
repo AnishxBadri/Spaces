@@ -212,6 +212,20 @@ const settled = (queue: string, id: string) =>
     (state) => state === 'completed' || state === 'failed',
   )
 
+/**
+ * pg-boss marks the job completed before `runJob` closes its `job_run` row
+ * (and, for a schedule job, writes the cursor in that same transaction), so
+ * a cursor read right after `settled` can be one commit early.
+ */
+const cursorsSettled = (
+  integrationId: string,
+  changedFrom: Awaited<ReturnType<typeof cursorsOf>>,
+) =>
+  waitFor(
+    () => cursorsOf(integrationId),
+    (cursors) => JSON.stringify(cursors) !== JSON.stringify(changedFrom),
+  )
+
 const send = async (queue: string, data: object) => {
   const id = await boss.send(queue, data)
   if (id === null) throw new Error(`${queue} refused the job`)
@@ -336,7 +350,7 @@ describe('a schedule job', () => {
     const tick = await send('plugin.syncer.sync', {})
     expect(await settled('plugin.syncer.sync', tick)).toBe('completed')
     expect(fetched).toEqual([MESSAGES_URL])
-    expect(await cursorsOf(syncer.id)).toEqual({ sync: 'page-2' })
+    expect(await cursorsSettled(syncer.id, null)).toEqual({ sync: 'page-2' })
     const run = (await runsOf('plugin.syncer.sync', syncer.id)).at(0)
     expect(run).toMatchObject({
       integrationId: syncer.id,
@@ -350,11 +364,15 @@ describe('a schedule job', () => {
     const next = await send('plugin.syncer.sync', {})
     expect(await settled('plugin.syncer.sync', next)).toBe('completed')
     expect(fetched).toEqual([MESSAGES_URL, `${MESSAGES_URL}?cursor=page-2`])
-    expect(await cursorsOf(syncer.id)).toEqual({ sync: 'page-3' })
+    expect(await cursorsSettled(syncer.id, { sync: 'page-2' })).toEqual({
+      sync: 'page-3',
+    })
 
     const last = await send('plugin.syncer.sync', {})
     expect(await settled('plugin.syncer.sync', last)).toBe('completed')
-    expect(await cursorsOf(syncer.id)).toEqual({ sync: null })
+    expect(await cursorsSettled(syncer.id, { sync: 'page-3' })).toEqual({
+      sync: null,
+    })
   })
 
   it('a failed run leaves the cursor where it was', async () => {
@@ -375,8 +393,11 @@ describe('a schedule job', () => {
       ),
     ).toBe('retry')
     expect(fetched).toEqual([`${MESSAGES_URL}?cursor=${UNAVAILABLE}`])
+    const runs = await waitFor(
+      () => runsOf('plugin.syncer.sync', syncer.id),
+      (rows) => rows.length > 0 && rows.every((r) => r.status !== 'running'),
+    )
     expect(await cursorsOf(syncer.id)).toEqual({ sync: UNAVAILABLE })
-    const runs = await runsOf('plugin.syncer.sync', syncer.id)
     expect(runs.map((r) => r.status)).toEqual(['failed'])
     expect(runs.at(0)?.error).toContain('retryable:')
   })
