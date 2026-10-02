@@ -61,7 +61,7 @@ export function Segmented<T extends string>({
           disabled={disabled}
           onClick={() => onChange(o.id)}
           className={cn(
-            'focus-ring-inset flex h-full items-center gap-2 font-medium transition-colors duration-150 ease-out-quart disabled:opacity-60',
+            'focus-ring-inset flex h-full shrink-0 items-center gap-2 font-medium whitespace-nowrap transition-colors duration-150 ease-out-quart disabled:opacity-60',
             sm ? 'px-3 text-label' : 'px-2.5 text-ui',
             i > 0 && 'border-l border-hairline',
             value === o.id

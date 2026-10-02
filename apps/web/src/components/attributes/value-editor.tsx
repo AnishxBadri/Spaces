@@ -21,8 +21,18 @@ import type { AttributeOptions } from '@spaces/core/attributes/registry'
 /**
  * Typed attribute editors — ONE implementation shared by table cells,
  * record rails, and create modals. `variant` only changes chrome:
- * 'cell' is borderless-until-hover; 'field' looks like a form input.
+ * - 'cell': inset in a table cell, no rule.
+ * - 'field': a record's property row — reads as a value, the rule on hover.
+ * - 'form': inside a form beside `Input`s — the rule at rest, flush left.
  */
+
+type Variant = 'cell' | 'field' | 'form'
+
+/** The picker/input box for the two non-cell variants. */
+const boxChrome = (variant: Variant) =>
+  variant === 'form'
+    ? 'focus-ring h-8 rounded-md border border-rule bg-paper px-2.5 transition-colors'
+    : 'focus-ring h-8 rounded-md border border-transparent px-2 transition-colors hover:border-rule'
 
 export type RegistryEntry = {
   id?: string
@@ -47,7 +57,7 @@ type Props = {
   def: RegistryEntry
   value: unknown
   onSave: (value: unknown) => void
-  variant: 'cell' | 'field'
+  variant: Variant
   autoFocus?: boolean | undefined
   /** display names for record/actor reference ids */
   refNames?: RefNames | undefined
@@ -132,6 +142,17 @@ export function ValueEditor({
         />
       )
     case 'status':
+      // A form sets the stage a record is born at — no move, so no reason.
+      if (variant === 'form')
+        return (
+          <OptionPicker
+            def={def}
+            value={value}
+            onSave={onSave}
+            variant={variant}
+            multi={false}
+          />
+        )
       // Never edited in a cell: the stage log needs a reason, so M opens
       // Move stage on the record. Here it only reads.
       return (
@@ -188,6 +209,7 @@ export function ValueEditor({
           className={cn(
             'flex items-center gap-2',
             variant === 'field' && 'h-8 px-2',
+            variant === 'form' && 'h-8',
           )}
           role="radiogroup"
           aria-label={def.name}
@@ -370,10 +392,9 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
       className={cn(
         'w-full min-w-0 bg-transparent text-ui',
         (def.type === 'number' || def.type === 'currency') && 'numeric',
-        variant === 'field'
-          ? // At rest it reads as a value; the rule appears on hover, the
-            // reticle on focus. ↵ commits, esc reverts.
-            'focus-ring h-8 rounded-md border border-transparent px-2 transition-colors hover:border-rule focus:border-rule'
+        variant !== 'cell'
+          ? // ↵ commits, esc reverts; the reticle on focus.
+            cn(boxChrome(variant), 'focus:border-rule')
           : // Inset inside a cell: an offset ring would be clipped by the
             // table's scroll container and overlap the neighbouring column.
             'focus-ring-inset h-full rounded-md px-1',
@@ -432,8 +453,8 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
         aria-label={def.name}
         className={cn(
           'group/pick flex min-w-0 items-center gap-1 text-left',
-          variant === 'field'
-            ? 'focus-ring h-8 w-full rounded-md border border-transparent px-2 transition-colors hover:border-rule data-[state=open]:border-rule'
+          variant !== 'cell'
+            ? cn(boxChrome(variant), 'w-full data-[state=open]:border-rule')
             : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
@@ -511,8 +532,8 @@ function ActorPicker({ def, value, onSave, variant, refNames }: Props) {
         aria-label={def.name}
         className={cn(
           'group/pick flex min-w-0 items-center gap-1 text-left',
-          variant === 'field'
-            ? 'focus-ring h-8 w-full rounded-md border border-transparent px-2 transition-colors hover:border-rule data-[state=open]:border-rule'
+          variant !== 'cell'
+            ? cn(boxChrome(variant), 'w-full data-[state=open]:border-rule')
             : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
@@ -574,8 +595,8 @@ function OptionPicker({
         aria-label={def.name}
         className={cn(
           'group/pick flex min-w-0 items-center gap-1 text-left',
-          variant === 'field'
-            ? 'focus-ring h-8 w-full rounded-md border border-transparent px-2 transition-colors hover:border-rule data-[state=open]:border-rule'
+          variant !== 'cell'
+            ? cn(boxChrome(variant), 'w-full data-[state=open]:border-rule')
             : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >

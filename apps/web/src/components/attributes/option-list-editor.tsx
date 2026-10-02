@@ -48,12 +48,30 @@ export type OptionDraft = {
 }
 
 let seq = 0
-export const newDraft = (index: number, group?: OptionGroup): OptionDraft => ({
+export const newDraft = (
+  index: number,
+  group?: OptionGroup,
+  taken: ReadonlyArray<string> = [],
+): OptionDraft => ({
   key: `new-${++seq}`,
   label: '',
   ...(group ? { group } : {}),
-  color: nextBadgeColor(index, group),
+  color: nextBadgeColor(index, group, taken),
 })
+
+/** New rows for `labels`, each in a hue no sibling (or earlier new row) wears. */
+const newRows = (
+  drafts: Array<OptionDraft>,
+  labels: Array<string>,
+  group?: OptionGroup,
+): Array<OptionDraft> => {
+  const taken = drafts.filter((d) => !d.archived).map((d) => d.color)
+  return labels.map((label, k) => {
+    const row = { ...newDraft(drafts.length + k, group, taken), label }
+    taken.push(row.color)
+    return row
+  })
+}
 
 function move<T>(list: Array<T>, from: number, to: number): Array<T> {
   if (to < 0 || to >= list.length || from === to) return list
@@ -94,10 +112,7 @@ export function OptionListEditor({
     onChange(drafts.map((d, j) => (j === i ? { ...d, ...patch } : d)))
 
   const insertAfter = (i: number, labels: Array<string> = ['']) => {
-    const rows = labels.map((label, k) => ({
-      ...newDraft(drafts.length + k, isStatus ? 'active' : undefined),
-      label,
-    }))
+    const rows = newRows(drafts, labels, isStatus ? 'active' : undefined)
     const next = [...drafts]
     next.splice(i + 1, 0, ...rows)
     onChange(next)
@@ -109,10 +124,7 @@ export function OptionListEditor({
    *  the rest become rows after it. */
   const pasteInto = (i: number, parts: Array<string>) => {
     const [first = '', ...rest] = parts
-    const rows = rest.map((label, k) => ({
-      ...newDraft(drafts.length + k, isStatus ? 'active' : undefined),
-      label,
-    }))
+    const rows = newRows(drafts, rest, isStatus ? 'active' : undefined)
     const next = drafts.map((d, j) =>
       j === i ? { ...d, label: (d.label + first).trim() } : d,
     )

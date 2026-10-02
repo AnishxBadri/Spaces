@@ -72,10 +72,26 @@ const GROUP_SEED: Partial<Record<string, BadgeColor>> = {
   closed: 'slate',
 }
 
-/** The colour a newly created option should be stored with. */
-export function nextBadgeColor(index: number, group?: string): BadgeColor {
+/**
+ * The colour a newly created option should be stored with.
+ * - Never one a sibling already wears while the palette has a free hue.
+ * - The group seed first, then the palette from `index` onward.
+ * - All twelve taken: falls back to the seed, else the positional hue.
+ */
+export function nextBadgeColor(
+  index: number,
+  group?: string,
+  taken: ReadonlyArray<string> = [],
+): BadgeColor {
   const seeded = group ? GROUP_SEED[group] : undefined
-  return seeded ?? BADGE_COLORS[index % BADGE_COLORS.length]
+  const positional = BADGE_COLORS[index % BADGE_COLORS.length]
+  const order = [
+    ...(seeded ? [seeded] : []),
+    ...BADGE_COLORS.map(
+      (_, k) => BADGE_COLORS[(index + k) % BADGE_COLORS.length],
+    ),
+  ]
+  return order.find((c) => !taken.includes(c)) ?? seeded ?? positional
 }
 
 /** Inline style for a badge in the given colour. */

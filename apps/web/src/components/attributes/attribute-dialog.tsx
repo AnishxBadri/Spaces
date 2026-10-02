@@ -138,10 +138,10 @@ const TYPE_GLYPHS: Record<string, string> = {
   select: '◫',
   multi_select: '◫◫',
   status: '→',
-  url: '@',
+  url: '↗',
   email: '@',
-  phone: '@',
-  domain: '@',
+  phone: '+',
+  domain: '//',
   rating: '■□',
   record_reference: '⇢',
   actor_reference: '◉',
@@ -257,8 +257,10 @@ export function AttributeDialog(props: Props) {
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
       {/* Two panes on one sheet (Overlays · Flows): the type list left with
-          its › search, the form right, a 44px head and a 52px bone foot. */}
-      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-[41.25rem]">
+          its › search, the form right, a 44px head and a 52px bone foot.
+          One height for every type — the type list's — so switching type
+          never resizes the sheet; a longer form scrolls in its pane. */}
+      <DialogContent className="flex h-[33.25rem] max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-[41.25rem]">
         {/* Remount per open so a cancelled draft never leaks into the next. */}
         {open ? (
           <AttributeForm
@@ -710,19 +712,19 @@ function AttributeForm({
             <ValueEditor
               def={previewDef}
               value={dflt}
-              variant="field"
+              variant="form"
               onSave={setDflt}
             />
           ) : null}
         </div>
       )
-    // select / multi / status / rating / checkbox / record_reference share
-    // the record's own editor, so the default looks exactly like the value.
+    // select / multi / status / rating / record_reference share the
+    // record's own editor, so the default looks exactly like the value.
     return (
       <ValueEditor
         def={previewDef}
         value={dflt}
-        variant="field"
+        variant="form"
         onSave={setDflt}
       />
     )
@@ -795,35 +797,39 @@ function AttributeForm({
 
           {slot}
 
-          <div className="flex items-end gap-5">
-            <Field
-              label="Default"
-              htmlFor="attr-default"
-              optional
-              className="min-w-0 flex-1"
-            >
+          {type === 'checkbox' ? null : (
+            <Field label="Default" htmlFor="attr-default" optional>
               {defaultWidget}
             </Field>
-            {type !== 'checkbox' ? (
-              <div className="shrink-0">
-                <CheckRow
-                  id="attr-required"
-                  checked={required}
-                  onChange={setRequired}
-                  label="Required"
-                  hint="Once set, it can't be cleared"
-                />
-              </div>
-            ) : null}
-          </div>
+          )}
 
-          <CheckRow
-            id="attr-indexed"
-            checked={indexed}
-            onChange={setIndexed}
-            label="Filter and sort on this"
-            hint="Keeps a long list fast; costs a little on every write"
-          />
+          {/* The flags share one column so every box sits on one edge. */}
+          <div className="flex flex-col">
+            {type === 'checkbox' ? (
+              <CheckRow
+                id="attr-default"
+                checked={dflt === true}
+                onChange={(on) => setDflt(on ? true : null)}
+                label="Starts checked"
+                hint={`New ${plural.toLowerCase()} begin ticked`}
+              />
+            ) : (
+              <CheckRow
+                id="attr-required"
+                checked={required}
+                onChange={setRequired}
+                label="Required"
+                hint="Once set, it can't be cleared"
+              />
+            )}
+            <CheckRow
+              id="attr-indexed"
+              checked={indexed}
+              onChange={setIndexed}
+              label="Filter and sort on this"
+              hint="Keeps a long list fast; costs a little on every write"
+            />
+          </div>
 
           {error ? (
             <p
@@ -901,10 +907,15 @@ function TypePane({
   fixed: boolean
   onPick: (id: AttributeType) => void
 }) {
+  // cmdk's cursor follows the pointer and stays where it left; snap it back
+  // to the chosen type so only one row reads as highlighted.
+  const [cursor, setCursor] = useState<string>(value)
+  useEffect(() => setCursor(value), [value])
   return (
     <CommandPrimitive
       label="Type"
-      value={value}
+      value={cursor}
+      onValueChange={setCursor}
       className="flex w-59 shrink-0 flex-col border-r border-rule"
     >
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-rule px-3">
@@ -918,7 +929,10 @@ function TypePane({
           className="h-full min-w-0 flex-1 bg-transparent text-ui outline-none placeholder:text-graphite disabled:text-graphite"
         />
       </div>
-      <CommandPrimitive.List className="min-h-0 flex-1 overflow-y-auto p-1">
+      <CommandPrimitive.List
+        onPointerLeave={() => setCursor(value)}
+        className="min-h-0 flex-1 overflow-y-auto p-1"
+      >
         <CommandEmpty>No type matches.</CommandEmpty>
         {TYPES.map((t) => {
           const on = t.id === value
@@ -974,10 +988,12 @@ function Field({
 }) {
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <Label htmlFor={htmlFor}>
+      <Label htmlFor={htmlFor} className="items-baseline">
         {label}
         {optional ? (
-          <span className="ml-2 font-normal text-graphite">optional</span>
+          <span className="font-sans text-field tracking-normal text-graphite normal-case">
+            optional
+          </span>
         ) : null}
       </Label>
       {children}
@@ -1008,7 +1024,7 @@ function CheckRow({
         checked={checked}
         onCheckedChange={onChange}
         aria-label={label}
-        className="mt-0.5"
+        className="mt-[0.1875rem]"
       />
       <label
         htmlFor={id}
