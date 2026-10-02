@@ -104,7 +104,7 @@ function fakeStore(options: {
 
 const noLedger: JobRunLedger = {
   begin: async () => null,
-  end: async () => undefined,
+  end: async () => false,
 }
 
 const documentId = '11111111-1111-4111-8111-111111111111'

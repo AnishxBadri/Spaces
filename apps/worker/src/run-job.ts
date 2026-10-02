@@ -1,10 +1,10 @@
 import { Cause, Context, Duration, Effect, Exit, Option } from 'effect'
 import type { Layer } from 'effect'
-import { eq } from 'drizzle-orm'
+import { and, count, eq, gt, ne, notLike, or, isNull, sql } from 'drizzle-orm'
 import type { JobWithMetadata, PgBoss } from 'pg-boss'
 import type { z } from 'zod'
 import { db } from '@spaces/db'
-import { jobRun } from '@spaces/db/schema'
+import { integration, jobRun } from '@spaces/db/schema'
 import { JobPermanent, JobRateLimited, JobRetryable } from '@spaces/sdk'
 import type { JobRunStatus } from '@spaces/db/schema/jobs'
 
@@ -240,13 +240,122 @@ export interface JobRunEnd {
 export interface JobRunLedger {
   /** Opens the row in `running`; null means the ledger is unavailable. */
   readonly begin: (row: JobRunStart) => Promise<string | null>
-  /** `close`, when given, commits with the row or not at all. */
+  /**
+   * Closes the row. `close` and `charge`, when given, commit with it or not
+   * at all. Resolves true when this charge tripped the breaker.
+   */
   readonly end: (
     id: string,
     row: JobRunEnd,
-    close?: JobClose['close'],
-  ) => Promise<void>
+    close: JobClose['close'] | null,
+    charge: BreakerCharge | null,
+  ) => Promise<boolean>
 }
+
+// ---------------------------------------------------------------------------
+// The plugin breaker — charged in the transaction that closes the row
+// ---------------------------------------------------------------------------
+
+/** What a failed attempt on a plugin's queues is charged to. */
+export interface BreakerCharge {
+  readonly integrationId: string
+  /** The queue-name prefix failures are counted over: `plugin.<id>.`. */
+  readonly group: string
+}
+
+/**
+ * A plugin queue's breaker, handed to `runJob` by the plugin host.
+ * - `onTrip` runs once, after the tripping row commits. It must not wait on
+ *   the queue it is called from: `offWork` waits out the very job calling it.
+ */
+export interface JobBreaker extends BreakerCharge {
+  readonly onTrip: () => void
+}
+
+export const BREAKER_FAILURES = 5
+const BREAKER_WINDOW_SECONDS = 60 * 60
+export const BREAKER_REASON = `${BREAKER_FAILURES} failures in an hour`
+
+/**
+ * Charges one failed attempt: `error_count + 1` and `last_error`, then trips
+ * the integration to `disabled` (leaving `enabled` alone) on the fifth.
+ * - The count is failures on `group`'s queues in the trailing hour since the
+ *   group's last success: five in a row, and a success resets the streak.
+ * - `error_count` must have reached five too: a reset zeroes it, so the
+ *   failures that tripped the breaker never trip it again.
+ * - A throttle (`rate-limited:`) is not a failure and is never counted.
+ * - The first update takes the integration's row lock, so two attempts of
+ *   one plugin closing at once count one after the other.
+ * - A tripped row keeps its reason: later charges only add to the count.
+ */
+async function chargeBreaker(
+  tx: JobTx,
+  charge: BreakerCharge,
+  error: string,
+): Promise<boolean> {
+  const charged = (
+    await tx
+      .update(integration)
+      .set({
+        errorCount: sql`${integration.errorCount} + 1`,
+        lastError: sql`case when ${integration.status} = 'disabled' then ${integration.lastError} else ${error.slice(0, 500)} end`,
+      })
+      .where(eq(integration.id, charge.integrationId))
+      .returning({
+        status: integration.status,
+        enabled: integration.enabled,
+        errorCount: integration.errorCount,
+      })
+  ).at(0)
+  if (charged === undefined || charged.status === 'disabled') return false
+  if (!charged.enabled || charged.errorCount < BREAKER_FAILURES) return false
+
+  const inGroup = sql`starts_with(${jobRun.queue}, ${charge.group})`
+  const lastSuccess = tx
+    .select({ at: sql`max(${jobRun.finishedAt})` })
+    .from(jobRun)
+    .where(and(inGroup, eq(jobRun.status, 'succeeded')))
+  const failures =
+    (
+      await tx
+        .select({ n: count() })
+        .from(jobRun)
+        .where(
+          and(
+            inGroup,
+            eq(jobRun.status, 'failed'),
+            or(isNull(jobRun.error), notLike(jobRun.error, 'rate-limited:%')),
+            gt(
+              jobRun.finishedAt,
+              sql`now() - make_interval(secs => ${BREAKER_WINDOW_SECONDS})`,
+            ),
+            gt(
+              jobRun.finishedAt,
+              sql`coalesce((${lastSuccess}), '-infinity'::timestamptz)`,
+            ),
+          ),
+        )
+    ).at(0)?.n ?? 0
+  if (failures < BREAKER_FAILURES) return false
+
+  const tripped = await tx
+    .update(integration)
+    .set({ status: 'disabled', lastError: BREAKER_REASON })
+    .where(
+      and(
+        eq(integration.id, charge.integrationId),
+        ne(integration.status, 'disabled'),
+      ),
+    )
+    .returning({ id: integration.id })
+  return tripped.length > 0
+}
+
+/** Only a failure the plugin owns is charged: never a throttle or a lost host. */
+const chargeable = (settled: JobOutcome | null): boolean =>
+  settled !== null &&
+  settled.kind !== 'completed' &&
+  settled.kind !== 'rate-limited'
 
 /**
  * The wrapper's typed outcome → the ledger's status. Explicit rather than
@@ -288,14 +397,17 @@ const postgresLedger: JobRunLedger = {
         })
         .returning({ id: jobRun.id })
     ).at(0)?.id ?? null,
-  end: async (id, row, close) => {
-    if (close === undefined) {
+  end: async (id, row, close, charge) => {
+    if (close === null && charge === null) {
       await db.update(jobRun).set(row).where(eq(jobRun.id, id))
-      return
+      return false
     }
-    await db.transaction(async (tx) => {
+    return db.transaction(async (tx) => {
       await tx.update(jobRun).set(row).where(eq(jobRun.id, id))
-      await close(tx)
+      if (close !== null) await close(tx)
+      return charge === null
+        ? false
+        : chargeBreaker(tx, charge, row.error ?? row.status)
     })
   },
 }
@@ -332,9 +444,14 @@ async function endRun(
   hostError: unknown,
   summary: string | null,
   close: JobClose['close'] | null,
+  breaker: JobBreaker | null,
 ): Promise<void> {
   // Only a completed attempt closes with its write.
   const commit = settled?.kind === 'completed' ? close : null
+  const charge: BreakerCharge | null =
+    breaker !== null && chargeable(settled)
+      ? { integrationId: breaker.integrationId, group: breaker.group }
+      : null
   if (runId === null) {
     if (commit !== null) await closeWithoutRow(commit)
     return
@@ -350,28 +467,41 @@ async function endRun(
     error: ledgerError(settled, hostError),
     summary: settled?.kind === 'completed' ? summary : null,
   }
+  let tripped = false
   try {
-    await (commit === null
-      ? ledger.end(runId, row)
-      : ledger.end(runId, row, commit))
-    return
+    tripped = await ledger.end(runId, row, commit, charge)
   } catch (err) {
     console.error(
       `[worker] could not close job_run ${runId} — ${messageOf(err)}`,
     )
-    if (commit === null) return
-    // The close's own write failed and took the row's update with it: close
-    // the row without it, so it does not sit in `running`.
+    if (commit === null && charge === null) return
+    // The close's or the charge's write failed and took the row's update
+    // with it: close the row without it, so it does not sit in `running`.
     try {
-      await ledger.end(runId, {
-        ...row,
-        error: `close-failed: ${messageOf(err)}`.slice(0, 1000),
-      })
+      await ledger.end(
+        runId,
+        commit === null
+          ? row
+          : {
+              ...row,
+              error: `close-failed: ${messageOf(err)}`.slice(0, 1000),
+            },
+        null,
+        null,
+      )
     } catch (again) {
       console.error(
         `[worker] could not close job_run ${runId} — ${messageOf(again)}`,
       )
     }
+  }
+  if (!tripped || breaker === null) return
+  try {
+    breaker.onTrip()
+  } catch (err) {
+    console.error(
+      `[worker] ${breaker.group}: the breaker tripped and its handler threw — ${messageOf(err)}`,
+    )
   }
 }
 
@@ -449,6 +579,8 @@ export interface RunJobOptions<TServices> {
   readonly layer: Layer.Layer<TServices>
   /** Defaults to the Postgres ledger; tests hand it a recorder instead. */
   readonly ledger?: JobRunLedger
+  /** A plugin queue's breaker; a core queue has none. */
+  readonly breaker?: JobBreaker
 }
 
 /** The pg-boss batch handler for a JobDef. Its promise never rejects. */
@@ -584,6 +716,7 @@ async function settle<TData, TServices>(
       hostError,
       summary,
       close,
+      options.breaker ?? null,
     )
   }
 }

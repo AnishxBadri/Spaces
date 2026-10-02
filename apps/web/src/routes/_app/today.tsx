@@ -9,6 +9,7 @@ import {
   ReferenceBar,
 } from '#/components/ledger-section'
 import { KeyHint, PageHeader, ReadoutStrip } from '#/components/page-header'
+import { PluginStatusSection } from '#/components/plugin-status-section'
 import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -22,6 +23,7 @@ import {
   listHoldings,
   listRegistry,
   listTasks,
+  listTrippedPlugins,
   setTaskDone,
 } from '#/lib/server-fns'
 import { useBornRows } from '#/lib/born-rows'
@@ -46,6 +48,7 @@ export const Route = createFileRoute('/_app/today')({
       dealRegistry,
       inbox,
       unfiled,
+      tripped,
     ] = await Promise.all([
       listTasks(),
       listHoldings(),
@@ -59,6 +62,7 @@ export const Route = createFileRoute('/_app/today')({
       // Likewise: one number, from the same predicate the shelf filters
       // with, so the cell and `/documents?filed=unfiled` cannot disagree.
       countUnfiledDocuments(),
+      listTrippedPlugins(),
     ])
     return {
       tasks,
@@ -69,6 +73,7 @@ export const Route = createFileRoute('/_app/today')({
       dealRegistry,
       inboxCount: inbox.open,
       unfiledCount: unfiled,
+      tripped,
     }
   },
   component: TodayPage,
@@ -179,6 +184,7 @@ function TodayPage() {
     dealRegistry,
     inboxCount,
     unfiledCount,
+    tripped,
   } = Route.useLoaderData()
   const today = localToday()
   // The spine's composer row reports what it made; nothing the loader
@@ -231,7 +237,8 @@ function TodayPage() {
     dueTasks.length === 0 &&
     staleHoldings.length === 0 &&
     idleDeals.length === 0 &&
-    missingRates === 0
+    missingRates === 0 &&
+    tripped.length === 0
 
   const needsYou =
     dueTasks.length +
@@ -241,7 +248,8 @@ function TodayPage() {
     inboxCount +
     // Bytes that arrived with no target are the one thing on this page that
     // is lost rather than late — they belong in the headline (SPA-124).
-    unfiledCount
+    unfiledCount +
+    tripped.length
 
   const weekday = WEEKDAY[new Date(`${today}T00:00:00Z`).getUTCDay()]
 
@@ -336,6 +344,8 @@ function TodayPage() {
               </p>
             </div>
           ) : null}
+
+          <PluginStatusSection tripped={tripped} />
 
           {dueTasks.length > 0 ? (
             <LedgerSection

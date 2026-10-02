@@ -26,7 +26,7 @@ import type { JobDef, JobHost, JobOutcome, JobRunLedger } from './run-job'
 
 const noLedger: JobRunLedger = {
   begin: async () => null,
-  end: async () => undefined,
+  end: async () => false,
 }
 
 type Settlement =

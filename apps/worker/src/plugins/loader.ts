@@ -34,6 +34,8 @@ import { resolvePluginImportsToHost } from './host-resolve'
  *   reads `/data` and never runs plugin code.
  * - Every failure degrades one plugin and the loop moves on; a plugin never
  *   stops the box. Idempotent: a row is written only when something changes.
+ * - A tripped row (`enabled`, status `disabled`) is left exactly as it is and
+ *   not loaded: only a reset of the row clears the breaker, never a boot.
  */
 
 /** How much of a thrown message `last_error` keeps. */
@@ -48,7 +50,7 @@ class Degraded extends Data.TaggedError('Degraded')<{
 export type Verdict = {
   readonly integrationId: string
   readonly id: string
-  readonly status: 'enabled' | 'degraded'
+  readonly status: 'enabled' | 'degraded' | 'disabled'
   readonly reason: string | null
   /** True when lock.json pins the bundle; null when the check was not reached. */
   readonly pinned: boolean | null
@@ -306,6 +308,17 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
   const verdicts: Array<Verdict> = []
   const loaded: Array<LoadedPlugin> = []
   for (const row of rows) {
+    if (row.status === 'disabled') {
+      verdicts.push({
+        integrationId: row.id,
+        id: row.capabilityId,
+        status: 'disabled',
+        reason: row.lastError,
+        pinned: null,
+        line: `[plugins] ${row.capabilityId}: disabled — ${row.lastError ?? 'tripped'}; reset the row to re-enable it`,
+      })
+      continue
+    }
     let stored: IntegrationManifest | null = null
     const outcome = yield* check(row, pluginsRoot, lock, (m) => {
       stored = m

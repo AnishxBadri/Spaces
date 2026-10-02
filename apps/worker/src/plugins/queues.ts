@@ -15,6 +15,7 @@ import {
 import type { JobDeclaration, JobError, Manifest } from '@spaces/sdk'
 import { runJob } from '../run-job'
 import type {
+  JobBreaker,
   JobClose,
   JobDef,
   JobHost,
@@ -73,6 +74,10 @@ export type Invoke = (
 
 /** The prefix every plugin queue and schedule carries. */
 export const PLUGIN_QUEUE_PREFIX = 'plugin.'
+
+/** One plugin's queues, as the breaker groups them: `plugin.<id>.`. */
+export const breakerGroup = (pluginId: string): string =>
+  `${PLUGIN_QUEUE_PREFIX}${pluginId}.`
 
 /** pg-boss's own default, stated so an upgrade that drops `retry` resets it. */
 const DEFAULT_RETRY_LIMIT = 2
@@ -225,6 +230,7 @@ const work = <TData>(
   options: PluginQueuesOptions,
   def: JobDef<TData>,
   concurrency: number,
+  breaker: JobBreaker,
 ): Promise<string> =>
   options.boss.work(
     def.name,
@@ -239,6 +245,7 @@ const work = <TData>(
     runJob(def, {
       host: options.host,
       layer: Layer.empty,
+      breaker,
       ...(options.ledger === undefined ? {} : { ledger: options.ledger }),
     }),
   )
@@ -252,6 +259,7 @@ const workPlan = (
   integrationId: string,
   plan: PluginQueue,
   invoke: Invoke,
+  breaker: JobBreaker,
 ): Promise<string> => {
   const concurrency = plan.declared.concurrency ?? 1
   const integrationRef = { integrationId }
@@ -267,6 +275,7 @@ const workPlan = (
           refs: (data) => ({ integrationId, entityId: data.entityId }),
         },
         concurrency,
+        breaker,
       )
     case 'schedule':
       return work(
@@ -293,6 +302,7 @@ const workPlan = (
           refs: () => integrationRef,
         },
         concurrency,
+        breaker,
       )
     case 'event':
       return work(
@@ -305,6 +315,7 @@ const workPlan = (
           refs: (data) => ({ integrationId, entityId: data.event.entityId }),
         },
         concurrency,
+        breaker,
       )
     case 'webhook':
       return work(
@@ -317,6 +328,7 @@ const workPlan = (
           refs: () => integrationRef,
         },
         concurrency,
+        breaker,
       )
     case 'file':
       // A file job is handed a stream in-process; a queued job has no way
@@ -335,6 +347,7 @@ const workPlan = (
           refs: () => integrationRef,
         },
         concurrency,
+        breaker,
       )
   }
 }
@@ -347,12 +360,14 @@ const workPlan = (
  * Creates each queue (its policy is fixed at create, so `updateQueue` carries
  * retry and expiry to one an earlier boot made), works it, and schedules a
  * schedule job. A schedule queue is `singleton`: two runs never share a cursor.
+ * Every queue runs under `breaker`, whose failures count across them all.
  */
 export const registerQueues = Effect.fn('registerQueues')(function* (
   options: PluginQueuesOptions,
   integrationId: string,
   plans: ReadonlyArray<PluginQueue>,
   invoke: Invoke,
+  breaker: JobBreaker,
 ) {
   const { boss } = options
   for (const plan of plans) {
@@ -368,7 +383,7 @@ export const registerQueues = Effect.fn('registerQueues')(function* (
     )
     yield* Effect.tryPromise(() => boss.updateQueue(plan.queue, queue))
     yield* Effect.tryPromise(() =>
-      workPlan(options, integrationId, plan, invoke),
+      workPlan(options, integrationId, plan, invoke, breaker),
     )
     if (cron !== null) {
       yield* Effect.tryPromise(() =>

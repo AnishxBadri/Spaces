@@ -1,4 +1,13 @@
-import { Cause, Context, Effect, Exit, Layer, Predicate, Scope } from 'effect'
+import {
+  Cause,
+  Context,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Predicate,
+  Scope,
+} from 'effect'
 import type { Layer as LayerType } from 'effect'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
@@ -24,10 +33,13 @@ import type {
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import type { FetchLike } from '@spaces/core/writes/ports/http'
 import type { LogSink } from '@spaces/core/writes/ports/log'
+import { BREAKER_REASON } from '../run-job'
+import type { JobBreaker } from '../run-job'
 import { grantLayer } from './grant'
 import { messageOf, truncate } from './loader'
 import type { LoadedHook, LoadedPlugin } from './loader'
 import {
+  breakerGroup,
   pluginQueues,
   reconcileSchedules,
   registerQueues,
@@ -49,6 +61,9 @@ import type { PluginQueue, PluginQueuesOptions } from './queues'
  *   released. A failing hook degrades that plugin and no other.
  * - One `Enqueue` serves every job, built in the host's own scope: closing a
  *   job's scope closes its ports and never the shared sender.
+ * - A tripped breaker releases its plugin from a detached fiber, never from
+ *   the job that tripped it: `offWork` waits out that job, so it cannot wait
+ *   inside it. The row says `disabled`; `release` never degrades it.
  */
 
 /** What a job is handed, by its trigger. */
@@ -71,7 +86,7 @@ export type PluginHostOptions = {
 export type HostVerdict = {
   readonly integrationId: string
   readonly id: string
-  readonly status: 'enabled' | 'degraded' | 'released'
+  readonly status: 'enabled' | 'degraded' | 'released' | 'disabled'
   readonly reason: string | null
   readonly line: string
 }
@@ -315,11 +330,17 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     })
     if (options.queues !== undefined) {
       const queues = options.queues
+      const breaker: JobBreaker = {
+        integrationId: plugin.integrationId,
+        group: breakerGroup(plugin.manifest.id),
+        onTrip: () => tripLater(plugin.integrationId),
+      }
       const registered = yield* registerQueues(
         queues,
         plugin.integrationId,
         plans,
         invoke,
+        breaker,
       ).pipe(Effect.exit)
       if (Exit.isFailure(registered)) {
         yield* unregisterQueues(queues, plans).pipe(
@@ -345,8 +366,10 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     return verdict
   })
 
-  const release = Effect.fn('PluginHost.release')(function* (
+  /** `breaker`: the breaker tripped it, so its row stays `disabled` whatever `onDisable` does. */
+  const releaseBy = Effect.fn('PluginHost.release')(function* (
     integrationId: string,
+    by: 'operator' | 'breaker',
   ) {
     const plugin = wired.get(integrationId)
     if (plugin === undefined) return null
@@ -362,6 +385,18 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     const failed =
       plugin.onDisable === undefined ? null : yield* runHook(plugin.onDisable)
     yield* closeAll(plugin.jobs.values())
+    if (by === 'breaker') {
+      if (failed !== null)
+        console.error(`[plugins] ${plugin.id}: onDisable failed: ${failed}`)
+      const verdict: HostVerdict = {
+        integrationId,
+        id: plugin.id,
+        status: 'disabled',
+        reason: BREAKER_REASON,
+        line: `[plugins] ${plugin.id}: disabled — ${BREAKER_REASON}; its queues are unregistered until the row is reset`,
+      }
+      return verdict
+    }
     if (failed !== null) {
       const reason = `onDisable failed: ${failed}`
       yield* degrade(integrationId, reason)
@@ -384,9 +419,33 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     return verdict
   })
 
+  const release = (integrationId: string) =>
+    releaseBy(integrationId, 'operator')
+
+  /** Breaker releases in flight; everything that releases waits them out first. */
+  const trips = new Set<Fiber.Fiber<void>>()
+  const awaitTrips = Effect.suspend(() =>
+    Effect.forEach([...trips], Fiber.await, { discard: true }),
+  )
+  const tripLater = (integrationId: string): void => {
+    const fiber = Effect.runFork(
+      releaseBy(integrationId, 'breaker').pipe(
+        Effect.flatMap((verdict) =>
+          Effect.sync(() => {
+            if (verdict !== null) console.log(verdict.line)
+          }),
+        ),
+        Effect.catchCause(logFailure(`${integrationId}: breaker release`)),
+      ),
+    )
+    trips.add(fiber)
+    fiber.addObserver(() => trips.delete(fiber))
+  }
+
   const wire = Effect.fn('PluginHost.wire')(function* (
     loaded: ReadonlyArray<LoadedPlugin>,
   ) {
+    yield* awaitTrips
     const verdicts: Array<HostVerdict> = []
     const keep = new Set(loaded.map((p) => p.integrationId))
     for (const integrationId of [...wired.keys()]) {
@@ -410,11 +469,13 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
   })
 
   const releaseAll = Effect.fn('PluginHost.releaseAll')(function* () {
+    yield* awaitTrips
     for (const integrationId of [...wired.keys()]) yield* release(integrationId)
     yield* closeShared
   })
 
   const shutdown = Effect.fn('PluginHost.shutdown')(function* () {
+    yield* awaitTrips
     const plugins = [...wired.values()]
     wired.clear()
     owners.clear()

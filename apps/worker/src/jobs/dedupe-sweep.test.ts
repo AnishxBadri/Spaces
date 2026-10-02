@@ -390,7 +390,7 @@ describe('dedupeSweep JobDef', () => {
     }
     const ledger: JobRunLedger = {
       begin: async () => null,
-      end: async () => undefined,
+      end: async () => false,
     }
 
     const me = await actorId()
