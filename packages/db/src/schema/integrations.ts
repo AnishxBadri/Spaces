@@ -53,6 +53,15 @@ export type IntegrationConfig = { [k: string]: Json }
  */
 export type IntegrationManifest = { [k: string]: Json }
 
+/**
+ * Each schedule job's resume point, keyed by job name: the `nextCursor` its
+ * last successful run handed back, which the next run is given as `cursor`.
+ * - Null until the first run of any schedule job; a job with no key yet
+ *   starts from null.
+ * - Advanced only in the transaction that closes the run's `job_run` row.
+ */
+export type IntegrationCursors = { [job: string]: string | null }
+
 export const integration = pgTable('integration', {
   id: uuid('id').primaryKey().defaultRandom(),
   /** `manifest.id` — the capability this row installs. */
@@ -68,6 +77,7 @@ export const integration = pgTable('integration', {
   status: integrationStatus('status').notNull().default('installing'),
   config: jsonb('config').$type<IntegrationConfig>().notNull().default({}),
   manifest: jsonb('manifest').$type<IntegrationManifest>(),
+  cursors: jsonb('cursors').$type<IntegrationCursors>(),
   /** BYOK key (an Apollo token); null for a plugin that needs none. */
   credentialId: uuid('credential_id').references(() => credential.id),
   /** OAuth grant (a Gmail mailbox); null for a plugin that needs none. */

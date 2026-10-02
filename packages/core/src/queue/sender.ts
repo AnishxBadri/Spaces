@@ -1,6 +1,6 @@
 import { PgBoss } from 'pg-boss'
 import type { ConstructorOptions } from 'pg-boss'
-import type { QueueName } from './names'
+import type { EnqueueTarget, QueueName } from './names'
 
 /**
  * The sending half of the web→worker seam. A sender only ever *sends*: it
@@ -93,7 +93,7 @@ export type Sender = {
    * extraction_status='pending' and can be re-queued.
    */
   enqueue: (
-    queue: QueueName,
+    queue: EnqueueTarget,
     data: Record<string, unknown>,
     options?: EnqueueOptions,
   ) => Promise<string | null>

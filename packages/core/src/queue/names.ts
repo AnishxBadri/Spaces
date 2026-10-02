@@ -146,3 +146,21 @@ export const QUEUES = {
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
+
+/**
+ * A plugin job's queue: `plugin.<id>.<job>`, with `.interactive` appended
+ * for an `interactive: true` job. Not a member of `QueueName`, so a misspelt
+ * core name still fails typecheck at every `QueueName` site.
+ */
+export type PluginQueueName = `plugin.${string}.${string}`
+
+/** What a sender may enqueue onto: a core queue or a plugin's. */
+export type EnqueueTarget = QueueName | PluginQueueName
+
+/** The queue the worker registers for a plugin job. */
+export const pluginQueueName = (
+  pluginId: string,
+  job: string,
+  interactive: boolean,
+): PluginQueueName =>
+  `plugin.${pluginId}.${job}${interactive ? '.interactive' : ''}`

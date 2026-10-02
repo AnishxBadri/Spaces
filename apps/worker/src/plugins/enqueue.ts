@@ -10,7 +10,8 @@ import type { QueueClientFactory } from '@spaces/core/queue/sender'
  * never reaches web's `#web/lib/queue` (the test pins it).
  *
  * - Scoped: the sender's pg-boss pool is opened on the first send and closed
- *   when the scope that built this Layer closes — a job Layer's, on release.
+ *   when the scope that built this Layer closes. `makePluginHost` builds it
+ *   once in its own scope, so every job shares one pool.
  */
 export const workerEnqueue = (
   connectionString: string,

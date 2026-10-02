@@ -27,17 +27,28 @@ import type { LogSink } from '@spaces/core/writes/ports/log'
 import { grantLayer } from './grant'
 import { messageOf, truncate } from './loader'
 import type { LoadedHook, LoadedPlugin } from './loader'
+import {
+  pluginQueues,
+  reconcileSchedules,
+  registerQueues,
+  scheduledQueues,
+  unregisterQueues,
+} from './queues'
+import type { PluginQueue, PluginQueuesOptions } from './queues'
 
 /**
- * The plugin host: loader step six. For each loaded plugin it builds one
- * scoped Layer per (integration, job) from that job's `uses` (D51), caches
- * it, runs jobs through it (`invoke`), and closes the scopes on release.
+ * The plugin host: loader steps six and seven. For each loaded plugin it
+ * builds one scoped Layer per (integration, job) from that job's `uses`
+ * (D51), caches it, runs jobs through it (`invoke`), registers each job's
+ * queue (`registerQueues`), and undoes all of it on release.
  *
  * - The Layer is the privilege boundary: a job that reaches for a port it
  *   did not declare dies with "Service not found", which `invoke` maps to
  *   `JobPermanent`.
  * - `onEnable` runs once when a plugin is wired, `onDisable` when it is
  *   released. A failing hook degrades that plugin and no other.
+ * - One `Enqueue` serves every job, built in the host's own scope: closing a
+ *   job's scope closes its ports and never the shared sender.
  */
 
 /** What a job is handed, by its trigger. */
@@ -48,8 +59,10 @@ export type JobInput =
 export type JobOutput = ScheduleOutput | void
 
 export type PluginHostOptions = {
-  /** Built inside each job's scope, so its pool closes when the job's Layer is released. */
+  /** Built once, on the first job that hands work back; closed by `releaseAll` or `shutdown`. */
   readonly enqueue: LayerType.Layer<Enqueue>
+  /** pg-boss and the wrapper's seams; without it no queue is registered. */
+  readonly queues?: PluginQueuesOptions
   readonly fetch?: FetchLike
   readonly sink?: LogSink
 }
@@ -68,11 +81,17 @@ export type PluginHost = {
   readonly wire: (
     loaded: ReadonlyArray<LoadedPlugin>,
   ) => Effect.Effect<ReadonlyArray<HostVerdict>, Cause.UnknownError>
-  /** Run `onDisable`, then close every job scope of this integration. */
+  /** Unregister its queues, run `onDisable`, then close every job scope of this integration. */
   readonly release: (
     integrationId: string,
   ) => Effect.Effect<HostVerdict | null, Cause.UnknownError>
+  /** Release every plugin, then close the shared sender. */
   readonly releaseAll: () => Effect.Effect<void, Cause.UnknownError>
+  /**
+   * Process exit, after `boss.stop`: close every job scope and the shared
+   * sender. No hook runs and nothing is unscheduled — the rows are still on.
+   */
+  readonly shutdown: () => Effect.Effect<void>
   /** Run a wired job on its cached Layer with its trigger's input. */
   readonly invoke: (
     integrationId: string,
@@ -98,6 +117,8 @@ type WiredJob = {
 type Wired = {
   readonly id: string
   readonly jobs: ReadonlyMap<string, WiredJob>
+  /** The queues registered for it; empty when the host has no `queues`. */
+  readonly queues: ReadonlyArray<PluginQueue>
   readonly onDisable?: LoadedHook
 }
 
@@ -178,6 +199,35 @@ const closeAll = (jobs: Iterable<WiredJob>) =>
 
 export const makePluginHost = (options: PluginHostOptions): PluginHost => {
   const wired = new Map<string, Wired>()
+  /** Queue name → the integration whose jobs it runs. */
+  const owners = new Map<string, string>()
+
+  let shared: {
+    readonly scope: Scope.Closeable
+    readonly context: Context.Context<Enqueue>
+  } | null = null
+  /** The host's one sender, built on first use and reused by every job. */
+  const sharedEnqueue: LayerType.Layer<Enqueue> = Layer.effectContext(
+    Effect.suspend(() => {
+      if (shared !== null) return Effect.succeed(shared.context)
+      return Effect.gen(function* () {
+        const scope = yield* Scope.make()
+        const context = yield* Layer.buildWithScope(options.enqueue, scope)
+        shared = { scope, context }
+        return context
+      })
+    }),
+  )
+  const closeShared = Effect.suspend(() => {
+    const open = shared
+    shared = null
+    return open === null ? Effect.void : Scope.close(open.scope, Exit.void)
+  })
+
+  const logFailure = (what: string) => (cause: Cause.Cause<unknown>) =>
+    Effect.sync(() => {
+      console.error(`[plugins] ${what}: ${describeCause(cause)}`)
+    })
 
   const degraded = (plugin: LoadedPlugin, reason: string) =>
     Effect.gen(function* () {
@@ -209,7 +259,7 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
       const built = yield* Layer.buildWithScope(
         grantLayer(plugin.row, declared.uses, {
           settings: plugin.settings,
-          enqueue: options.enqueue,
+          enqueue: sharedEnqueue,
           ...(plugin.manifest.http?.rateLimit === undefined
             ? {}
             : { rpm: plugin.manifest.http.rateLimit.rpm }),
@@ -234,6 +284,19 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
         ),
       })
     }
+    const plans =
+      options.queues === undefined ? [] : pluginQueues(plugin.manifest)
+    const taken = plans.find((plan) => {
+      const owner = owners.get(plan.queue)
+      return owner !== undefined && owner !== plugin.integrationId
+    })
+    if (taken !== undefined) {
+      yield* closeAll(jobs.values())
+      return yield* degraded(
+        plugin,
+        `queue ${taken.queue} is already registered by integration ${owners.get(taken.queue) ?? ''}`,
+      )
+    }
     if (plugin.onEnable !== undefined) {
       const failed = yield* runHook(plugin.onEnable)
       if (failed !== null) {
@@ -241,13 +304,37 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
         return yield* degraded(plugin, `onEnable failed: ${failed}`)
       }
     }
+    // Wired before its queues register: a job fetched at once finds it.
     wired.set(plugin.integrationId, {
       id: plugin.manifest.id,
       jobs,
+      queues: plans,
       ...(plugin.onDisable === undefined
         ? {}
         : { onDisable: plugin.onDisable }),
     })
+    if (options.queues !== undefined) {
+      const queues = options.queues
+      const registered = yield* registerQueues(
+        queues,
+        plugin.integrationId,
+        plans,
+        invoke,
+      ).pipe(Effect.exit)
+      if (Exit.isFailure(registered)) {
+        yield* unregisterQueues(queues, plans).pipe(
+          Effect.catchCause(logFailure(`${plugin.manifest.id}: unregister`)),
+        )
+        wired.delete(plugin.integrationId)
+        if (plugin.onDisable !== undefined) yield* runHook(plugin.onDisable)
+        yield* closeAll(jobs.values())
+        return yield* degraded(
+          plugin,
+          `could not register its queues: ${describeCause(registered.cause)}`,
+        )
+      }
+      for (const plan of plans) owners.set(plan.queue, plugin.integrationId)
+    }
     const verdict: HostVerdict = {
       integrationId: plugin.integrationId,
       id: plugin.manifest.id,
@@ -263,6 +350,14 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
   ) {
     const plugin = wired.get(integrationId)
     if (plugin === undefined) return null
+    // Stopped first, waiting out a job in flight, so none starts after the
+    // ports it runs on are closed.
+    if (options.queues !== undefined) {
+      yield* unregisterQueues(options.queues, plugin.queues).pipe(
+        Effect.catchCause(logFailure(`${plugin.id}: unregister`)),
+      )
+    }
+    for (const plan of plugin.queues) owners.delete(plan.queue)
     wired.delete(integrationId)
     const failed =
       plugin.onDisable === undefined ? null : yield* runHook(plugin.onDisable)
@@ -303,11 +398,28 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
       if (wired.has(plugin.integrationId)) continue
       verdicts.push(yield* wireOne(plugin))
     }
+    if (options.queues !== undefined) {
+      const scheduled = new Set(
+        [...wired.values()].flatMap((plugin) => scheduledQueues(plugin.queues)),
+      )
+      yield* reconcileSchedules(options.queues, scheduled).pipe(
+        Effect.catchCause(logFailure('schedule reconciliation')),
+      )
+    }
     return verdicts
   })
 
   const releaseAll = Effect.fn('PluginHost.releaseAll')(function* () {
     for (const integrationId of [...wired.keys()]) yield* release(integrationId)
+    yield* closeShared
+  })
+
+  const shutdown = Effect.fn('PluginHost.shutdown')(function* () {
+    const plugins = [...wired.values()]
+    wired.clear()
+    owners.clear()
+    for (const plugin of plugins) yield* closeAll(plugin.jobs.values())
+    yield* closeShared
   })
 
   const invoke = (
@@ -374,5 +486,5 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
       : [...job.context.mapUnsafe.keys()].map(portOfKey).sort()
   }
 
-  return { wire, release, releaseAll, invoke, granted }
+  return { wire, release, releaseAll, shutdown, invoke, granted }
 }

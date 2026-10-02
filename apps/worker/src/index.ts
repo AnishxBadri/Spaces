@@ -59,13 +59,17 @@ async function main() {
   await boss.start()
   console.log('[worker] pg-boss started')
 
+  const host = pgBossHost(boss)
+
   // Boot reconciliation: every enabled plugin row is checked against its
   // files and marked enabled or degraded, then each loaded plugin gets a
-  // Layer per job (`makePluginHost`). It never stops the boot — a plugin
-  // never crashes the box — so even a database error here is logged and the
-  // worker goes on. No plugin queue is registered yet.
+  // Layer per job and a `plugin.<id>.<job>` queue per job, schedules
+  // reconciled (`makePluginHost`). It never stops the boot — a plugin never
+  // crashes the box — so even a database error here is logged and the
+  // worker goes on.
   const plugins = makePluginHost({
     enqueue: workerEnqueue(requireEnv('DATABASE_URL')),
+    queues: { boss, host },
   })
   await Effect.runPromise(
     reconcilePlugins().pipe(
@@ -87,8 +91,6 @@ async function main() {
       ),
     ),
   )
-
-  const host = pgBossHost(boss)
 
   const stub = (label: string) => async (jobs: Array<Job>) => {
     for (const job of jobs) console.log(`[worker] ${label} (stub)`, job.id)
@@ -437,6 +439,7 @@ async function main() {
     // stop still tells the operator when this worker last beat.
     heartbeat.stop()
     await boss.stop({ graceful: true, timeout: 15000 })
+    await Effect.runPromise(plugins.shutdown())
     process.exit(0)
   }
   process.on('SIGTERM', () => void shutdown())

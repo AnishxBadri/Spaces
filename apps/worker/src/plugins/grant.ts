@@ -52,7 +52,7 @@ export type GrantOptions = {
   readonly settings: z.ZodType
   /** `manifest.http.rateLimit.rpm`. */
   readonly rpm?: number
-  /** Built inside the job's scope, so its pool closes on release. */
+  /** The host's shared sender; building it opens nothing the job's scope owns. */
   readonly enqueue: Layer.Layer<Enqueue>
   readonly fetch?: FetchLike
   readonly sink?: LogSink

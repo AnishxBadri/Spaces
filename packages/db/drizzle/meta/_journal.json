@@ -407,6 +407,13 @@
       "when": 1790850128156,
       "tag": "0057_open_suggestion_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1790962730019,
+      "tag": "0058_integration_cursors",
+      "breakpoints": true
     }
   ]
 }

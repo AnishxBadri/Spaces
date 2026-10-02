@@ -157,6 +157,109 @@ describe('runJob — the job_run ledger', () => {
   })
 })
 
+describe('runJob — a JobClose commits with the row that closes the run', () => {
+  const setup = async () => {
+    const { JobRetryable, runJob } = await import('./run-job')
+    const { db } = await import('@spaces/db')
+    const { integration, jobRun } = await import('@spaces/db/schema')
+    const { eq } = await import('drizzle-orm')
+    const row = (
+      await db
+        .insert(integration)
+        .values({ capabilityId: 'closer', version: '0.1.0' })
+        .returning()
+    ).at(0)
+    if (!row) throw new Error('no integration row')
+    const cursors = async () =>
+      (
+        await db
+          .select({ cursors: integration.cursors })
+          .from(integration)
+          .where(eq(integration.id, row.id))
+      ).at(0)?.cursors
+    const runs = (queue: string) =>
+      db.select().from(jobRun).where(eq(jobRun.queue, queue))
+    return { JobRetryable, runJob, integration, eq, row, cursors, runs }
+  }
+
+  it('writes the close on success, and not on a failed attempt', async () => {
+    const t = await setup()
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const queue = `test.close-${randomUUID().slice(0, 8)}`
+    const succeed = advancing(t, queue, { fail: false })
+    const fail = advancing(t, queue, { fail: true })
+
+    await fail([fakeJob(queue, {}, { count: 0, limit: 2 })])
+    expect(await t.cursors()).toBeNull()
+    await succeed([fakeJob(queue, {}, { count: 0, limit: 2 })])
+    expect(await t.cursors()).toEqual({ sync: 'next' })
+    expect((await t.runs(queue)).map((r) => [r.status, r.summary])).toEqual(
+      expect.arrayContaining([
+        ['failed', null],
+        ['succeeded', 'advanced'],
+      ]),
+    )
+    vi.restoreAllMocks()
+  })
+
+  it('a close that throws still closes the row, tagged, and commits nothing', async () => {
+    const t = await setup()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const queue = `test.close-${randomUUID().slice(0, 8)}`
+    const handler = t.runJob(
+      {
+        name: queue,
+        schema: z.object({}),
+        run: () =>
+          Effect.succeed({
+            summary: 'advanced',
+            close: async (tx) => {
+              await tx
+                .update(t.integration)
+                .set({ cursors: { sync: 'next' } })
+                .where(t.eq(t.integration.id, t.row.id))
+              throw new Error('the second statement failed')
+            },
+          }),
+      },
+      { host: silentHost(), layer: Layer.empty },
+    )
+    await handler([fakeJob(queue, {}, { count: 0, limit: 2 })])
+    expect(await t.cursors()).toBeNull()
+    expect((await t.runs(queue)).map((r) => [r.status, r.error])).toEqual([
+      ['succeeded', 'close-failed: the second statement failed'],
+    ])
+    vi.restoreAllMocks()
+  })
+
+  /** A handler whose success advances `cursors.sync`, or that fails retryably. */
+  function advancing(
+    t: Awaited<ReturnType<typeof setup>>,
+    queue: string,
+    options: { readonly fail: boolean },
+  ) {
+    return t.runJob(
+      {
+        name: queue,
+        schema: z.object({}),
+        run: () =>
+          options.fail
+            ? Effect.fail(new t.JobRetryable({ reason: 'not yet' }))
+            : Effect.succeed({
+                summary: 'advanced',
+                close: async (tx) => {
+                  await tx
+                    .update(t.integration)
+                    .set({ cursors: { sync: 'next' } })
+                    .where(t.eq(t.integration.id, t.row.id))
+                },
+              }),
+      },
+      { host: silentHost(), layer: Layer.empty },
+    )
+  }
+})
+
 describe('extractDocument — the row the wrapper writes for it', () => {
   it('records the extract queue, the document entity, and a status matching the row', async () => {
     const run = await extraction({ corrupt: false })

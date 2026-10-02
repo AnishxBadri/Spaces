@@ -245,7 +245,7 @@ describe('a Layer per (integration, job)', () => {
       location: 'Pune, India',
     })
     expect(logged.join('\n')).toContain('[plugin:echo] enriched')
-    // Identity and Facts were built over the job's own Enqueue.
+    // Identity and Facts were built over the host's one Enqueue.
     expect(enqueue.built).toBe(1)
   })
 
@@ -287,7 +287,7 @@ describe('a Layer per (integration, job)', () => {
     install(root, 'echo')
     const echo = await row('echo')
     const { host, enqueue } = await boot(root)
-    // One job of echo's two hands work back, so one Enqueue was built.
+    // One Enqueue for the host, built when the first job needing it was wired.
     expect(enqueue.built).toBe(1)
 
     for (let i = 0; i < 2; i++) {
@@ -300,7 +300,7 @@ describe('a Layer per (integration, job)', () => {
     expect(enqueue.released).toBe(0)
   })
 
-  it('releasing a plugin closes its job scopes', async () => {
+  it('releasing a plugin closes its job scopes, and releaseAll the shared sender', async () => {
     const companyId = await seedCompany()
     const root = newPluginsRoot()
     install(root, 'echo')
@@ -312,13 +312,37 @@ describe('a Layer per (integration, job)', () => {
 
     const released = await Effect.runPromise(host.release(echo.id))
     expect(released?.status).toBe('released')
-    expect(enqueue.released).toBe(enqueue.built)
-    expect(enqueue.released).toBe(1)
+    // The job scopes held only ports; the sender is the host's.
+    expect(enqueue.released).toBe(0)
     expect(host.granted(echo.id, 'enrich')).toBeNull()
     const after = await Effect.runPromiseExit(
       host.invoke(echo.id, 'enrich', { entityId: companyId }),
     )
     expect(Exit.isFailure(after)).toBe(true)
+
+    await Effect.runPromise(host.releaseAll())
+    expect(enqueue.built).toBe(1)
+    expect(enqueue.released).toBe(1)
+  })
+
+  it('every job of every plugin shares one Enqueue, and a re-wire reuses it', async () => {
+    const root = newPluginsRoot()
+    install(root, 'echo')
+    writeBundle(root, 'second', { uses: ['Identity', 'Log'] })
+    const echo = await row('echo')
+    await row('second')
+    const { host, enqueue, reconciled } = await boot(root)
+    expect(host.granted(echo.id, 'enrich')).not.toBeNull()
+    expect(enqueue.built).toBe(1)
+
+    await Effect.runPromise(host.release(echo.id))
+    await Effect.runPromise(host.wire(reconciled.loaded))
+    expect(host.granted(echo.id, 'enrich')).not.toBeNull()
+    expect(enqueue).toMatchObject({ built: 1, released: 0 })
+
+    await Effect.runPromise(host.shutdown())
+    expect(host.granted(echo.id, 'enrich')).toBeNull()
+    expect(enqueue).toMatchObject({ built: 1, released: 1 })
   })
 
   it('a row disabled and reconciled again is released', async () => {
@@ -337,7 +361,8 @@ describe('a Layer per (integration, job)', () => {
     expect(verdicts.map((v) => [v.id, v.status])).toEqual([
       ['echo', 'released'],
     ])
-    expect(enqueue.released).toBe(1)
+    expect(host.granted(echo.id, 'enrich')).toBeNull()
+    expect(enqueue.released).toBe(0)
   })
 })
 

@@ -1,6 +1,6 @@
 import { createSender } from '@spaces/core/queue/sender'
 import { requireEnv } from './server/env'
-import type { QueueName } from '@spaces/core/queue/names'
+import type { EnqueueTarget, QueueName } from '@spaces/core/queue/names'
 import type {
   EnqueueOptions,
   QueuedJob,
@@ -23,7 +23,7 @@ export type { EnqueueOptions, QueuedJob }
 
 let sender: Sender | null = null
 
-function senderOrNull(queue: QueueName): Sender | null {
+function senderOrNull(queue: EnqueueTarget): Sender | null {
   try {
     sender ??= createSender({ connectionString: requireEnv('DATABASE_URL') })
     return sender
@@ -37,8 +37,9 @@ function senderOrNull(queue: QueueName): Sender | null {
   }
 }
 
+/** Onto a core queue, or a plugin job's `plugin.<id>.<job>`. */
 export async function enqueue(
-  queue: QueueName,
+  queue: EnqueueTarget,
   data: Record<string, unknown>,
   options?: EnqueueOptions,
 ): Promise<string | null> {

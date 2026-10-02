@@ -397,6 +397,9 @@ importers:
       '@spaces/plugin-overreach':
         specifier: workspace:*
         version: link:../../plugins/_fixtures/overreach
+      '@spaces/plugin-syncer':
+        specifier: workspace:*
+        version: link:../../plugins/_fixtures/syncer
       '@spaces/plugin-tampered':
         specifier: workspace:*
         version: link:../../plugins/_fixtures/tampered

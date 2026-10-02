@@ -112,12 +112,29 @@ export interface JobRunRefs {
  */
 export type JobSummary = string
 
+/** The transaction a `JobClose` writes in. */
+export type JobTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+/**
+ * A success that also writes in the transaction closing its `job_run` row —
+ * a schedule job's cursor. `close` runs only for a completed attempt; if it
+ * throws, the row still closes, tagged `close-failed:`, and nothing it wrote
+ * commits.
+ */
+export interface JobClose {
+  readonly summary: JobSummary | null
+  readonly close: (tx: JobTx) => Promise<void>
+}
+
+/** What a successful attempt hands back to the wrapper. */
+export type JobResult = JobSummary | JobClose | void
+
 export interface JobDef<TData, TServices = never> {
   readonly name: string
   readonly schema: z.ZodType<TData>
   readonly run: (
     data: TData,
-  ) => Effect.Effect<JobSummary | void, JobFailure, TServices | JobContext>
+  ) => Effect.Effect<JobResult, JobFailure, TServices | JobContext>
   readonly retry?: JobRetryPolicy
   readonly timeout?: Duration.Input
   readonly concurrency?: number
@@ -223,7 +240,12 @@ export interface JobRunEnd {
 export interface JobRunLedger {
   /** Opens the row in `running`; null means the ledger is unavailable. */
   readonly begin: (row: JobRunStart) => Promise<string | null>
-  readonly end: (id: string, row: JobRunEnd) => Promise<void>
+  /** `close`, when given, commits with the row or not at all. */
+  readonly end: (
+    id: string,
+    row: JobRunEnd,
+    close?: JobClose['close'],
+  ) => Promise<void>
 }
 
 /**
@@ -266,8 +288,15 @@ const postgresLedger: JobRunLedger = {
         })
         .returning({ id: jobRun.id })
     ).at(0)?.id ?? null,
-  end: async (id, row) => {
-    await db.update(jobRun).set(row).where(eq(jobRun.id, id))
+  end: async (id, row, close) => {
+    if (close === undefined) {
+      await db.update(jobRun).set(row).where(eq(jobRun.id, id))
+      return
+    }
+    await db.transaction(async (tx) => {
+      await tx.update(jobRun).set(row).where(eq(jobRun.id, id))
+      await close(tx)
+    })
   },
 }
 
@@ -302,26 +331,61 @@ async function endRun(
   settled: JobOutcome | null,
   hostError: unknown,
   summary: string | null,
+  close: JobClose['close'] | null,
 ): Promise<void> {
-  if (runId === null) return
+  // Only a completed attempt closes with its write.
+  const commit = settled?.kind === 'completed' ? close : null
+  if (runId === null) {
+    if (commit !== null) await closeWithoutRow(commit)
+    return
+  }
   const finishedAt = new Date()
+  const row: JobRunEnd = {
+    // No settlement means the host itself failed below; the attempt did
+    // happen, and leaving the row in `running` would make it look like a
+    // worker that died.
+    status: settled === null ? 'failed' : LEDGER_STATUS[settled.kind],
+    finishedAt,
+    durationMs: finishedAt.getTime() - startedAt.getTime(),
+    error: ledgerError(settled, hostError),
+    summary: settled?.kind === 'completed' ? summary : null,
+  }
   try {
-    await ledger.end(runId, {
-      // No settlement means the host itself failed below; the attempt did
-      // happen, and leaving the row in `running` would make it look like a
-      // worker that died.
-      status: settled === null ? 'failed' : LEDGER_STATUS[settled.kind],
-      finishedAt,
-      durationMs: finishedAt.getTime() - startedAt.getTime(),
-      error: ledgerError(settled, hostError),
-      summary: settled?.kind === 'completed' ? summary : null,
-    })
+    await (commit === null
+      ? ledger.end(runId, row)
+      : ledger.end(runId, row, commit))
+    return
   } catch (err) {
     console.error(
       `[worker] could not close job_run ${runId} — ${messageOf(err)}`,
     )
+    if (commit === null) return
+    // The close's own write failed and took the row's update with it: close
+    // the row without it, so it does not sit in `running`.
+    try {
+      await ledger.end(runId, {
+        ...row,
+        error: `close-failed: ${messageOf(err)}`.slice(0, 1000),
+      })
+    } catch (again) {
+      console.error(
+        `[worker] could not close job_run ${runId} — ${messageOf(again)}`,
+      )
+    }
   }
 }
+
+/** A completed attempt whose ledger row never opened still commits its write. */
+async function closeWithoutRow(close: JobClose['close']): Promise<void> {
+  try {
+    await db.transaction(close)
+  } catch (err) {
+    console.error(`[worker] a job's closing write failed — ${messageOf(err)}`)
+  }
+}
+
+const isJobClose = (result: JobResult): result is JobClose =>
+  typeof result === 'object'
 
 /**
  * The wrapper's typed tag, then its reason. This is not the operator-facing
@@ -436,6 +500,7 @@ async function settle<TData, TServices>(
   })
   let hostError: unknown = null
   let summary: string | null = null
+  let close: JobClose['close'] | null = null
 
   try {
     if (!parsed.success) {
@@ -464,7 +529,13 @@ async function settle<TData, TServices>(
     )
 
     if (Exit.isSuccess(exit)) {
-      summary = typeof exit.value === 'string' ? exit.value : null
+      const result = exit.value
+      if (isJobClose(result)) {
+        summary = result.summary
+        close = result.close
+      } else {
+        summary = typeof result === 'string' ? result : null
+      }
       await host.complete(queue, job.id, outcome('completed', summary ?? 'ok'))
       return
     }
@@ -505,7 +576,15 @@ async function settle<TData, TServices>(
       err,
     )
   } finally {
-    await endRun(ledger, runId, startedAt, recorded.outcome, hostError, summary)
+    await endRun(
+      ledger,
+      runId,
+      startedAt,
+      recorded.outcome,
+      hostError,
+      summary,
+      close,
+    )
   }
 }
 
@@ -528,8 +607,8 @@ function refsOf<TData, TServices>(
 
 function withTimeout<TData, TServices>(
   def: JobDef<TData, TServices>,
-  effect: Effect.Effect<JobSummary | void, JobFailure, TServices>,
-): Effect.Effect<JobSummary | void, JobFailure, TServices> {
+  effect: Effect.Effect<JobResult, JobFailure, TServices>,
+): Effect.Effect<JobResult, JobFailure, TServices> {
   const duration = def.timeout
   if (duration === undefined) return effect
   return Effect.timeoutOrElse(effect, {
