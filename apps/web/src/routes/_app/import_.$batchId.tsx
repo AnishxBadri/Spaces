@@ -72,8 +72,7 @@ import { landingRows } from '@spaces/core/import/plan'
  * planned batch step 3 — so a reload resumes exactly where the operator
  * was. `?show=` is the ledger's filter: a `loaderDeps` key, since it
  * changes which rows the server sends. The escaping `_` keeps the
- * page outside `/import`'s component, as `settings_.objects.$objectSlug`
- * stays outside the settings shell.
+ * page outside `/import`'s component.
  */
 const importSearch = z.object({
   show: z

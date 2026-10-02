@@ -241,17 +241,20 @@ under `apps/web/src/routes/_app/settings/` plus one row in `SETTINGS_SECTIONS`
 another section's file, and never a page of its own outside the shell: the eleven
 pending sections (Providers, Routing, Usage, Integrations, the manifest form, install,
 OAuth, Connections, Binding health, and the two embeddings slices) all take this one
-answer. The row carries the path, the label, the `group` it joins — `workspace`,
-`objects`, `capital`, the same three the chassis uses — and `admin`. The group is also
+answer. The row carries the path, the label, the `group` it joins — `general` (the
+workspace and its people), `data` (printed `Data & AI`: AI keys and runs, and the doors
+data comes in and out by), then `objects` and `capital` as the chassis has them — and
+`admin`. The group is also
 the eyebrow the section prints, so `SETTINGS · CAPITAL` cannot name a place the nav does
 not have; `admin: true` draws the row graphite for a member with `admin` in the right
 lane rather than a link into a page that refuses, and changes no guard. Below `md` the
 nav is the same rows as a horizontal strip above the content. `/settings` redirects to
 the first row. `settings-nav.test.ts` holds the grammar the way `nav-grammar.test.ts`
 holds the chassis'. The shell's loader carries what the nav's right lane counts; a
-section that needs anything else loads it in its own child route's loader. A page that is _about_
-one record rather than a section of settings stays outside the shell — that is why
-`settings_.objects.$objectSlug.tsx` keeps its escaping `_`.
+section that needs anything else loads it in its own child route's loader. A page that
+drills into one row of a section — one object's attributes — stays inside the shell with
+its section's row lit, and takes the `SettingsSection` head
+(`settings/objects_.$objectSlug.tsx`; its `_` escapes only the index's component).
 
 **A record** — the term page, a provider, a connection. → **`RecordHeader`**,
 `apps/web/src/components/record/record-parts.tsx:21`, used as

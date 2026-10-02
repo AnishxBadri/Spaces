@@ -30,7 +30,7 @@ function ArrivalRoute() {
     <SettingsSection
       title="Arrival"
       blurb="An address you forward or BCC mail to."
-      crumb="Workspace"
+      crumb="Data & AI"
     >
       <SettingsRow
         label="Admins only"

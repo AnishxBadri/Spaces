@@ -45,7 +45,7 @@ function EmbeddingsRoute() {
     <SettingsSection
       title="Embeddings"
       blurb="Which model turns text into vectors for search."
-      crumb="Workspace"
+      crumb="Data & AI"
     >
       <SettingsRow
         label="Admins only"

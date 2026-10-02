@@ -67,7 +67,7 @@ function UsageRoute() {
     <SettingsSection
       title="AI usage"
       blurb="Every AI action as a run: what it read, which models it called, what it cost and what it proposed."
-      crumb="Workspace"
+      crumb="Data & AI"
     >
       <div className="flex flex-col pt-5">
         <div className="flex items-baseline gap-3 pb-2">

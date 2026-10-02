@@ -52,7 +52,7 @@ function WorkspaceSection({
   }
 
   return (
-    <SettingsSection title="Workspace" crumb="Workspace">
+    <SettingsSection title="Workspace" crumb="General">
       <SettingsRow
         label="Name"
         hint={

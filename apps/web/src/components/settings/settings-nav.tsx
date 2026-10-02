@@ -12,18 +12,25 @@ import { cn } from '#/lib/utils'
  * install — and each of them is one row plus one file under
  * `routes/_app/settings/`, no other edit.
  *
- * The groups mirror the chassis: `workspace` (the deployment and who is in
- * it), `objects` (what it records), `capital` (what it prices). The group is
- * also the eyebrow the section prints — `SETTINGS · WORKSPACE` — so a section
- * cannot name a place the nav does not have.
+ * The groups:
+ * - `general`: the workspace and who is in it.
+ * - `data`: AI keys and runs, and the doors data comes in and out by.
+ * - `objects`, `capital`: what it records and what it prices, as the chassis.
+ * The group is also the eyebrow the section prints — `SETTINGS · GENERAL` —
+ * so a section cannot name a place the nav does not have.
  *
  * `settings-nav.test.ts` fails naming both sections when two rows claim one
- * path, on a group that is not one of the three, and on a row that breaks the
+ * path, on a group that is not one of the four, and on a row that breaks the
  * group order — so the grammar is checked, not negotiated.
  */
 
-/** The three groups of the settings shell, in the order the nav draws them. */
-export const SETTINGS_GROUP_IDS = ['workspace', 'objects', 'capital'] as const
+/** The four groups of the settings shell, in the order the nav draws them. */
+export const SETTINGS_GROUP_IDS = [
+  'general',
+  'data',
+  'objects',
+  'capital',
+] as const
 export type SettingsGroupId = (typeof SETTINGS_GROUP_IDS)[number]
 
 /**
@@ -31,12 +38,13 @@ export type SettingsGroupId = (typeof SETTINGS_GROUP_IDS)[number]
  * the section's eyebrow (`SETTINGS · CAPITAL`). One name, printed twice.
  */
 export const SETTINGS_CRUMBS = {
-  workspace: 'Workspace',
+  general: 'General',
+  data: 'Data & AI',
   objects: 'Objects',
   capital: 'Capital',
 } as const satisfies Record<SettingsGroupId, string>
 
-/** The three crumbs a section may print, and nothing else. */
+/** The crumbs a section may print, and nothing else. */
 export type SettingsCrumb = (typeof SETTINGS_CRUMBS)[SettingsGroupId]
 
 export type SettingsSectionRow = {
@@ -58,19 +66,19 @@ export const SETTINGS_SECTIONS = [
   {
     to: '/settings/workspace',
     label: 'Workspace',
-    group: 'workspace',
+    group: 'general',
     admin: false,
   },
   {
     to: '/settings/members',
     label: 'Members',
-    group: 'workspace',
+    group: 'general',
     admin: false,
   },
   {
     to: '/settings/templates',
     label: 'Templates',
-    group: 'workspace',
+    group: 'general',
     admin: false,
   },
   {
@@ -78,7 +86,7 @@ export const SETTINGS_SECTIONS = [
     // row locks for a member and the route's server fns refuse one.
     to: '/settings/ai',
     label: 'AI providers',
-    group: 'workspace',
+    group: 'data',
     admin: true,
   },
   {
@@ -86,7 +94,7 @@ export const SETTINGS_SECTIONS = [
     // provider keys.
     to: '/settings/embeddings',
     label: 'Embeddings',
-    group: 'workspace',
+    group: 'data',
     admin: true,
   },
   {
@@ -94,7 +102,7 @@ export const SETTINGS_SECTIONS = [
     // to, and a page that writes nothing — not admin-only.
     to: '/settings/usage',
     label: 'AI usage',
-    group: 'workspace',
+    group: 'data',
     admin: false,
   },
   {
@@ -102,7 +110,7 @@ export const SETTINGS_SECTIONS = [
     // owner's, so every member manages their own — not admin-only.
     to: '/settings/tokens',
     label: 'API tokens',
-    group: 'workspace',
+    group: 'data',
     admin: false,
   },
   {
@@ -110,7 +118,7 @@ export const SETTINGS_SECTIONS = [
     // password the workspace polls. Admin-only, like every vault secret.
     to: '/settings/arrival',
     label: 'Arrival',
-    group: 'workspace',
+    group: 'data',
     admin: true,
   },
   { to: '/settings/objects', label: 'Objects', group: 'objects', admin: false },
@@ -127,7 +135,8 @@ export const FIRST_SETTINGS_SECTION = SETTINGS_SECTIONS[0]
 
 /** The groups, derived by filter — a row may be inserted anywhere in its own run. */
 export const SETTINGS_GROUPS = {
-  workspace: SETTINGS_SECTIONS.filter((s) => s.group === 'workspace'),
+  general: SETTINGS_SECTIONS.filter((s) => s.group === 'general'),
+  data: SETTINGS_SECTIONS.filter((s) => s.group === 'data'),
   objects: SETTINGS_SECTIONS.filter((s) => s.group === 'objects'),
   capital: SETTINGS_SECTIONS.filter((s) => s.group === 'capital'),
 } satisfies Record<SettingsGroupId, readonly SettingsSectionRow[]>

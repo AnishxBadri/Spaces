@@ -96,7 +96,7 @@ function TokensRoute() {
     <SettingsSection
       title="API tokens"
       blurb="Tokens that let your own assistant read Spaces as you, over MCP, for the scopes you tick."
-      crumb="Workspace"
+      crumb="Data & AI"
     >
       <form onSubmit={create} className="flex flex-col">
         <SettingsRow

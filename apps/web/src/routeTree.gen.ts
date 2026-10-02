@@ -54,7 +54,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
-import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings_.objects.$objectSlug'
+import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings/objects_.$objectSlug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -282,9 +282,9 @@ const AppOObjectSlugRecordIdRoute = AppOObjectSlugRecordIdRouteImport.update({
 } as any)
 const AppSettingsObjectsObjectSlugRoute =
   AppSettingsObjectsObjectSlugRouteImport.update({
-    id: '/settings_/objects/$objectSlug',
-    path: '/settings/objects/$objectSlug',
-    getParentRoute: () => AppRoute,
+    id: '/objects_/$objectSlug',
+    path: '/objects/$objectSlug',
+    getParentRoute: () => AppSettingsRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -427,7 +427,7 @@ export interface FileRoutesById {
   '/api/v1/$': typeof ApiV1SplatRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
-  '/_app/settings_/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
+  '/_app/settings/objects_/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -570,7 +570,7 @@ export interface FileRouteTypes {
     | '/api/v1/$'
     | '/_app/settings/'
     | '/_app/o_/$objectSlug/$recordId'
-    | '/_app/settings_/objects/$objectSlug'
+    | '/_app/settings/objects_/$objectSlug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -903,12 +903,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOObjectSlugRecordIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/settings_/objects/$objectSlug': {
-      id: '/_app/settings_/objects/$objectSlug'
-      path: '/settings/objects/$objectSlug'
+    '/_app/settings/objects_/$objectSlug': {
+      id: '/_app/settings/objects_/$objectSlug'
+      path: '/objects/$objectSlug'
       fullPath: '/settings/objects/$objectSlug'
       preLoaderRoute: typeof AppSettingsObjectsObjectSlugRouteImport
-      parentRoute: typeof AppRoute
+      parentRoute: typeof AppSettingsRoute
     }
   }
 }
@@ -925,6 +925,7 @@ interface AppSettingsRouteChildren {
   AppSettingsUsageRoute: typeof AppSettingsUsageRoute
   AppSettingsWorkspaceRoute: typeof AppSettingsWorkspaceRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppSettingsObjectsObjectSlugRoute: typeof AppSettingsObjectsObjectSlugRoute
 }
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
@@ -939,6 +940,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsUsageRoute: AppSettingsUsageRoute,
   AppSettingsWorkspaceRoute: AppSettingsWorkspaceRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppSettingsObjectsObjectSlugRoute: AppSettingsObjectsObjectSlugRoute,
 }
 
 const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
@@ -970,7 +972,6 @@ interface AppRouteChildren {
   AppSpacesSpaceIdRoute: typeof AppSpacesSpaceIdRoute
   AppTermsTermIdRoute: typeof AppTermsTermIdRoute
   AppOObjectSlugRecordIdRoute: typeof AppOObjectSlugRecordIdRoute
-  AppSettingsObjectsObjectSlugRoute: typeof AppSettingsObjectsObjectSlugRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -998,7 +999,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppSpacesSpaceIdRoute: AppSpacesSpaceIdRoute,
   AppTermsTermIdRoute: AppTermsTermIdRoute,
   AppOObjectSlugRecordIdRoute: AppOObjectSlugRecordIdRoute,
-  AppSettingsObjectsObjectSlugRoute: AppSettingsObjectsObjectSlugRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

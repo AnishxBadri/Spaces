@@ -47,7 +47,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
     <SettingsSection
       title="Templates"
       blurb="Saved patterns for notes, records, and space breakdowns."
-      crumb="Workspace"
+      crumb="General"
     >
       {templates.length === 0 ? (
         <p className="border-b border-rule py-3 text-label text-graphite">

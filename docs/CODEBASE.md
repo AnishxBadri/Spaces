@@ -64,7 +64,7 @@ with the worker handling anything CPU-bound asynchronously.
 - `_app/`: one file per surface — `today` (attention landing), `spaces` +
   `spaces_.$spaceId`, `companies`, `people`, `deals` (table/board toggle),
   `portfolio` + `portfolio_.$holdingId`, `notes`, `tasks`, `mandate`,
-  `inbox` (`dedupe` redirects to it), `settings` + `settings_.objects.$objectSlug`. Custom objects
+  `inbox` (`dedupe` redirects to it), `settings` (with `settings/objects_.$objectSlug` inside the shell). Custom objects
   share two generic routes — `o.$objectSlug` (the table) and
   `o_.$objectSlug.$recordId` (the record). The `x_.$xId` convention =
   detail page.

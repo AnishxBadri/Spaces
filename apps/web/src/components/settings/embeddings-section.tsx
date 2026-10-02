@@ -201,7 +201,7 @@ export function EmbeddingsSection({
     <SettingsSection
       title="Embeddings"
       blurb="Which model turns text into vectors for search. Search reads only the pinned model's vectors."
-      crumb="Workspace"
+      crumb="Data & AI"
     >
       <div className="flex flex-col pt-5">
         <div className="flex items-baseline gap-3 border-b border-hairline pb-2">

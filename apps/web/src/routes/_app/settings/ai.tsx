@@ -104,7 +104,7 @@ function ProvidersSection({
       <SettingsSection
         title="AI providers"
         blurb="Which model providers this workspace calls, with whose key."
-        crumb="Workspace"
+        crumb="Data & AI"
       >
         <SettingsRow
           label="Admins only"
@@ -118,7 +118,7 @@ function ProvidersSection({
     <SettingsSection
       title="AI providers"
       blurb="Which model providers this workspace calls, with whose key."
-      crumb="Workspace"
+      crumb="Data & AI"
     >
       <div className="flex flex-col pt-5">
         <div className="flex items-baseline gap-3 pb-2">
@@ -411,7 +411,7 @@ function RoutingSection({
     <SettingsSection
       title="Routing"
       blurb="Which provider and model each lane calls, at each sensitivity."
-      crumb="Workspace"
+      crumb="Data & AI"
     >
       <div className="flex flex-col pt-5">
         <div className="flex items-baseline gap-3 pb-2">
@@ -620,7 +620,7 @@ function CapsSection({ caps, usage }: { caps: CapsView; usage: UsageToday }) {
     <SettingsSection
       title="Caps"
       blurb="How many tokens the workspace may spend on AI, counted from every call's usage."
-      crumb="Workspace"
+      crumb="Data & AI"
     >
       <form onSubmit={save} className="flex flex-col pt-5">
         <div className="flex items-baseline gap-3 border-b border-hairline pb-2">

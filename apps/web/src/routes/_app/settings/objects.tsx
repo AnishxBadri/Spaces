@@ -16,10 +16,8 @@ import { objectIcon } from '#/lib/object-icons'
 const shell = getRouteApi('/_app/settings')
 
 /**
- * The object registry index. One object's attributes page
- * (`/settings/objects/$objectSlug`) deliberately escapes this shell — it is
- * a record page for one object, not a settings section — and comes back
- * here by its crumb.
+ * The object registry index. Each row links to that object's attributes
+ * page, which sits in the same shell with this row still lit.
  */
 export const Route = createFileRoute('/_app/settings/objects')({
   component: ObjectsRoute,

@@ -119,7 +119,7 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
     <SettingsSection
       title="Arrival"
       blurb="An address you forward or BCC mail to. Threads land on the people and companies they match."
-      crumb="Workspace"
+      crumb="Data & AI"
     >
       <div className="flex flex-col pt-5">
         <div className="flex items-baseline gap-3 border-b border-hairline pb-2">

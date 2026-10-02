@@ -42,10 +42,15 @@ describe('the settings nav grammar', () => {
     }
   })
 
-  it('puts every row in one of the three known groups', () => {
-    expect(SETTINGS_GROUP_IDS).toEqual(['workspace', 'objects', 'capital'])
+  it('puts every row in one of the four known groups', () => {
+    expect(SETTINGS_GROUP_IDS).toEqual([
+      'general',
+      'data',
+      'objects',
+      'capital',
+    ])
     expect(Object.keys(SETTINGS_GROUPS)).toEqual([...SETTINGS_GROUP_IDS])
-    // Every group also prints a crumb — a fourth id would print nothing.
+    // Every group also prints a crumb — an id without one would print nothing.
     expect(Object.keys(SETTINGS_CRUMBS)).toEqual([...SETTINGS_GROUP_IDS])
     const strays = SETTINGS_SECTIONS.filter(
       (row) => !SETTINGS_GROUP_IDS.some((id) => id === row.group),
@@ -53,7 +58,7 @@ describe('the settings nav grammar', () => {
     expect(strays.map((row) => `${row.label} — ${row.group}`)).toEqual([])
   })
 
-  it('keeps the groups contiguous and in the order workspace → objects → capital', () => {
+  it('keeps the groups contiguous and in the order general → data → objects → capital', () => {
     // The groups are derived by filter, so a row filed out of its run would
     // still render — just under a rule that no longer means anything. Hold
     // the order and the derivation renders the array as written.
@@ -77,7 +82,8 @@ describe('the settings nav grammar', () => {
       expect(positions).toEqual([...positions].sort((a, b) => a - b))
     }
     expect([
-      ...SETTINGS_GROUPS.workspace,
+      ...SETTINGS_GROUPS.general,
+      ...SETTINGS_GROUPS.data,
       ...SETTINGS_GROUPS.objects,
       ...SETTINGS_GROUPS.capital,
     ]).toEqual([...SETTINGS_SECTIONS])

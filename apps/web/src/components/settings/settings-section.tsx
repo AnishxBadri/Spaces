@@ -38,7 +38,7 @@ export function SettingsSection({
   title: string
   /** One sentence, what the section decides. Omit when the title says it. */
   blurb?: ReactNode
-  /** The section's group, printed caps in the eyebrow as `SETTINGS · WORKSPACE`. */
+  /** The section's group, printed caps in the eyebrow as `SETTINGS · GENERAL`. */
   crumb: SettingsCrumb
   action?: ReactNode
   children: ReactNode
