@@ -10,40 +10,30 @@ import { integration } from '@spaces/db/schema'
 import type { IntegrationManifest } from '@spaces/db/schema/integrations'
 import { LOCK_FILE, bundleSha256, lockSchema } from '@spaces/core/plugins/lock'
 import type { Lock } from '@spaces/core/plugins/lock'
+import type { BoundIntegration } from '@spaces/core/writes/ports/binding'
 import { dataDir } from '@spaces/core/writes/vault/key'
 import { SDK_VERSION, manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
+import { unprovidedPort } from './grant'
 import { resolvePluginImportsToHost } from './host-resolve'
 
 /**
- * Loader part one (sdk-11; docs/spec-plugin-sdk.md §7 steps 1–4 and 8, §10
- * "boot reconciliation"): the half of the loader that decides whether a
- * plugin may run at all. Every worker boot, before any queue registers:
+ * Boot reconciliation: decides whether each plugin may run at all, before
+ * any queue registers. Steps 1–4 and 8 of the loader; step 6 is
+ * `makePluginHost`.
  *
- *   1. discover  enabled `integration` rows — never a `core.*` row, which
- *                is a first-party channel (the mailbox), not a plugin
- *   2. locate    `<plugins>/<id>/current/{manifest.json,bundle.mjs}`
- *   3. validate  manifest.json parses under the SDK's `manifestSchema` and
- *                names the row's capability; `manifest.sdk` is satisfied
- *                by this host; the bundle's sha256 matches its lock.json
- *                entry (no entry → loads, recorded unpinned); what the
- *                manifest `requires` is on the row
- *   4. import    `bundle.mjs`, its three bare imports resolved to the
- *                host's copies (`./host-resolve.ts`)
- *   8. mark      `integration.status` enabled | degraded, the reason in
- *                `last_error`, and the parsed manifest in
- *                `integration.manifest` — which web renders from, so web
- *                never reads `/data` and never runs plugin code
- *
- * Steps 5–7 (plugin migrations, the per-job Layer, queues) are sdk-12a/12b;
- * nothing is registered here. Every failure is one plugin `degraded` with a
- * reason, and the loop moves on — a plugin never stops the box. Rows are the
- * intent (§10's three sources of truth): files with no row are ignored, and
- * a row with no files is degraded naming the path it expected.
- *
- * Idempotent: a row is written only when its status, reason or manifest
- * would change, so a second boot against the same files and rows writes
- * nothing.
+ * - Discovers enabled `integration` rows, never a `core.*` row (a
+ *   first-party channel, not a plugin). Rows are the intent: files with no
+ *   row are ignored, a row with no files is degraded naming the path.
+ * - Validates the manifest, the sdk range, the bundle sha against lock.json
+ *   (no entry loads unpinned), what `requires` asks of the row, and that
+ *   every port a job declares is one this host provides (`UNPROVIDED_PORTS`).
+ * - Imports `bundle.mjs` with its bare imports resolved to the host's copies.
+ * - Marks `integration.status` with the reason in `last_error` and the
+ *   manifest in `integration.manifest`, which web renders from — web never
+ *   reads `/data` and never runs plugin code.
+ * - Every failure degrades one plugin and the loop moves on; a plugin never
+ *   stops the box. Idempotent: a row is written only when something changes.
  */
 
 /** How much of a thrown message `last_error` keeps. */
@@ -65,11 +55,19 @@ export type Verdict = {
   readonly line: string
 }
 
-/** A plugin that passed every step: what sdk-12b wires and registers. */
+/** A lifecycle hook as the bundle exported it; the host checks what it returns. */
+export type LoadedHook = () => unknown
+
+/** A plugin that passed every step: what `makePluginHost` wires. */
 export type LoadedPlugin = {
   readonly integrationId: string
+  readonly row: BoundIntegration
   readonly manifest: Manifest
+  /** The bundle's `manifest.settings`, which ConfigLive validates the row against. */
+  readonly settings: z.ZodType
   readonly jobs: { readonly [name: string]: unknown }
+  readonly onEnable?: LoadedHook
+  readonly onDisable?: LoadedHook
 }
 
 export type Reconciled = {
@@ -84,20 +82,31 @@ export type ReconcileOptions = {
 
 export const pluginsRootDir = (): string => path.join(dataDir(), 'plugins')
 
-const truncate = (text: string): string =>
+export const truncate = (text: string): string =>
   text.length > REASON_MAX ? `${text.slice(0, REASON_MAX - 1)}…` : text
 
-const messageOf = (error: unknown): string =>
+export const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
 /** The stored manifest is JSON — `integration.manifest`'s column type. */
 const jsonRecord = z.record(z.string(), z.json())
 
-/** What a bundle's default export must look like to be loaded at all. */
+const hook = z.custom<LoadedHook>((value) => typeof value === 'function')
+
+/**
+ * What a bundle's default export must look like to be loaded at all. The
+ * bundle's `zod` is the host's (`resolvePluginImportsToHost`), so its
+ * settings schema is a ZodType here.
+ */
 const pluginExport = z.object({
   default: z.object({
-    manifest: z.object({ id: z.string() }),
+    manifest: z.object({
+      id: z.string(),
+      settings: z.custom<z.ZodType>((value) => value instanceof z.ZodType),
+    }),
     jobs: z.record(z.string(), z.unknown()),
+    onEnable: hook.optional(),
+    onDisable: hook.optional(),
   }),
 })
 
@@ -121,7 +130,10 @@ const readLock = (pluginsRoot: string): Lock | Degraded => {
 type Checked = {
   readonly manifest: Manifest
   readonly stored: IntegrationManifest
+  readonly settings: z.ZodType
   readonly jobs: { readonly [name: string]: unknown }
+  readonly onEnable?: LoadedHook
+  readonly onDisable?: LoadedHook
   readonly pinned: boolean
 }
 
@@ -178,6 +190,14 @@ const check = (
     const sdk = satisfiesSdk(manifest.sdk, SDK_VERSION)
     if (!sdk.ok) return yield* new Degraded({ reason: sdk.reason })
 
+    // 3. validate — every port a job declares is one this host provides
+    const unprovided = unprovidedPort(manifest)
+    if (unprovided !== null) {
+      return yield* new Degraded({
+        reason: `job ${unprovided.job} uses ${unprovided.port}, which this host does not provide yet`,
+      })
+    }
+
     // 3. validate — the bundle against lock.json
     if (lock instanceof Degraded) return yield* lock
     const bytes = yield* Effect.try({
@@ -215,10 +235,10 @@ const check = (
     if (!exported.success) {
       return yield* new Degraded({
         reason:
-          'bundle.mjs has no definePlugin(…) default export with manifest and jobs',
+          'bundle.mjs has no definePlugin(…) default export with manifest, settings and jobs',
       })
     }
-    const jobs = exported.data.default.jobs
+    const { jobs, onEnable, onDisable } = exported.data.default
     const declared = Object.keys(manifest.jobs).sort()
     if (!isDeepStrictEqual(Object.keys(jobs).sort(), declared)) {
       return yield* new Degraded({
@@ -229,7 +249,10 @@ const check = (
     return {
       manifest,
       stored,
+      settings: exported.data.default.manifest.settings,
       jobs,
+      ...(onEnable === undefined ? {} : { onEnable }),
+      ...(onDisable === undefined ? {} : { onDisable }),
       pinned: entry !== undefined,
     } satisfies Checked
   })
@@ -296,8 +319,17 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
       })
       loaded.push({
         integrationId: row.id,
+        row: {
+          id: row.id,
+          capabilityId: row.capabilityId,
+          config: row.config,
+          credentialId: row.credentialId,
+        },
         manifest: ok.manifest,
+        settings: ok.settings,
         jobs: ok.jobs,
+        ...(ok.onEnable === undefined ? {} : { onEnable: ok.onEnable }),
+        ...(ok.onDisable === undefined ? {} : { onDisable: ok.onDisable }),
       })
       verdicts.push({
         integrationId: row.id,

@@ -1,23 +1,29 @@
-import type { Layer } from 'effect'
+import { Effect, Layer } from 'effect'
 import { Enqueue } from '@spaces/core/queue/enqueue'
 import { createSender } from '@spaces/core/queue/sender'
 import type { QueueClientFactory } from '@spaces/core/queue/sender'
 
 /**
- * The worker's `Enqueue` (sdk-7a): what a plugin port's handed-back work —
- * `Identity.resolve`'s `reembed`, sdk-8a's extraction — is sent through when
- * the port runs here. Built from core's `createSender` on the connection
- * string the worker already boots pg-boss with, so the port path never
- * reaches web's `#web/lib/queue` (`plugins/` imports none; the test pins
- * it). The loader's per-job Layer (sdk-12b) provides it to the ports.
+ * The worker's `Enqueue`: what a plugin port's handed-back work —
+ * `Identity.resolve`'s `reembed`, the extraction enqueue — is sent through
+ * when the port runs here. Built on core's `createSender`, so the port path
+ * never reaches web's `#web/lib/queue` (the test pins it).
+ *
+ * - Scoped: the sender's pg-boss pool is opened on the first send and closed
+ *   when the scope that built this Layer closes — a job Layer's, on release.
  */
 export const workerEnqueue = (
   connectionString: string,
   client?: QueueClientFactory,
 ): Layer.Layer<Enqueue> =>
-  Enqueue.fromSender(
-    createSender({
-      connectionString,
-      ...(client === undefined ? {} : { client }),
-    }),
+  Layer.unwrap(
+    Effect.acquireRelease(
+      Effect.sync(() =>
+        createSender({
+          connectionString,
+          ...(client === undefined ? {} : { client }),
+        }),
+      ),
+      (sender) => Effect.promise(() => sender.close()),
+    ).pipe(Effect.map((sender) => Enqueue.fromSender(sender))),
   )

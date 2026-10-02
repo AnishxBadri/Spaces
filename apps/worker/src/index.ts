@@ -4,6 +4,8 @@ import type { Job } from 'pg-boss'
 import { requireEnv } from '#web/lib/server/env'
 import { QUEUES } from '@spaces/core/queue/names'
 import { startHeartbeat, workerIdentity } from './heartbeat'
+import { workerEnqueue } from './plugins/enqueue'
+import { makePluginHost } from './plugins/host'
 import { reconcilePlugins } from './plugins/loader'
 import { pgBossHost, runJob } from './run-job'
 import { ExtractionStore, extractDocument } from './jobs/extract-document'
@@ -57,14 +59,23 @@ async function main() {
   await boss.start()
   console.log('[worker] pg-boss started')
 
-  // Boot reconciliation (sdk-11, spec §10): every enabled plugin row is
-  // checked against its files and marked enabled or degraded before any
-  // queue registers. It never stops the boot — a plugin never crashes the
-  // box — so even a database error here is logged and the worker goes on.
-  // No plugin queue is registered yet (sdk-12b).
+  // Boot reconciliation: every enabled plugin row is checked against its
+  // files and marked enabled or degraded, then each loaded plugin gets a
+  // Layer per job (`makePluginHost`). It never stops the boot — a plugin
+  // never crashes the box — so even a database error here is logged and the
+  // worker goes on. No plugin queue is registered yet.
+  const plugins = makePluginHost({
+    enqueue: workerEnqueue(requireEnv('DATABASE_URL')),
+  })
   await Effect.runPromise(
     reconcilePlugins().pipe(
       Effect.tap(({ verdicts }) =>
+        Effect.sync(() => {
+          for (const verdict of verdicts) console.log(verdict.line)
+        }),
+      ),
+      Effect.flatMap(({ loaded }) => plugins.wire(loaded)),
+      Effect.tap((verdicts) =>
         Effect.sync(() => {
           for (const verdict of verdicts) console.log(verdict.line)
         }),

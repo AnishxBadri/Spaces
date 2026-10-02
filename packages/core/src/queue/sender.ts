@@ -72,6 +72,8 @@ export interface QueueClient {
     name: string,
     options: { key: string },
   ) => Promise<Array<QueuedJob>>
+  /** Closes the pool pg-boss opened for this client. */
+  stop: () => Promise<unknown>
 }
 
 export type QueueClientFactory = (options: ConstructorOptions) => QueueClient
@@ -100,6 +102,12 @@ export type Sender = {
    * the queue is unreachable — the same non-fatal answer `enqueue` gives.
    */
   jobsByKey: (queue: QueueName, key: string) => Promise<Array<QueuedJob> | null>
+  /**
+   * Stops the client if one was started, closing its pool; the next enqueue
+   * connects again. Never rejects. A process-lifetime sender never calls it;
+   * a scoped one (`workerEnqueue`) does when its scope closes.
+   */
+  close: () => Promise<void>
 }
 
 export function createSender(config: SenderConfig): Sender {
@@ -144,6 +152,16 @@ export function createSender(config: SenderConfig): Sender {
       } catch (err) {
         console.error(`[queue] could not read ${queue}`, err)
         return null
+      }
+    },
+    async close() {
+      const pending = started
+      started = null
+      if (pending === null) return
+      try {
+        await (await pending).stop()
+      } catch (err) {
+        console.error('[queue] could not stop the sender', err)
       }
     },
   }

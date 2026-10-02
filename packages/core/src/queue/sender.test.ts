@@ -51,6 +51,7 @@ function recorder(): {
           return Promise.resolve('job-1')
         },
         findJobs: () => Promise.resolve([]),
+        stop: () => Promise.resolve(undefined),
       }
     },
   }
@@ -128,6 +129,29 @@ describe('the queue sender', () => {
     ])
   })
 
+  it('close stops a started client once, and is a no-op before any send', async () => {
+    let stops = 0
+    const sender = createSender({
+      connectionString: CLOSED_PORT,
+      client: () => ({
+        on: () => undefined,
+        start: () => Promise.resolve(undefined),
+        send: () => Promise.resolve('job-3'),
+        findJobs: () => Promise.resolve([]),
+        stop: () => {
+          stops += 1
+          return Promise.resolve(undefined)
+        },
+      }),
+    })
+    await sender.close()
+    expect(stops).toBe(0)
+    await sender.enqueue(QUEUES.extractDocument, {})
+    await sender.close()
+    await sender.close()
+    expect(stops).toBe(1)
+  })
+
   it('does not cache a failed connection', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     let attempts = 0
@@ -143,6 +167,7 @@ describe('the queue sender', () => {
         },
         send: () => Promise.resolve('job-2'),
         findJobs: () => Promise.resolve([]),
+        stop: () => Promise.resolve(undefined),
       }),
     })
 

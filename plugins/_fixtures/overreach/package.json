@@ -1,0 +1,28 @@
+{
+  "//": "A loader fixture, not a product: its one job declares only Log and its bundle reaches for Facts anyway, through a context read the type system cannot see. apps/worker's plugin host test proves the undeclared port is service-not-found, mapped to JobPermanent, with nothing written.",
+  "name": "@spaces/plugin-overreach",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "zod": "^4.3.6"
+  }
+}

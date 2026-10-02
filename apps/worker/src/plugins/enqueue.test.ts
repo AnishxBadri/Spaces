@@ -11,6 +11,7 @@ describe('the worker’s Enqueue', () => {
   it('sends through core’s sender, built on the connection string it is given', async () => {
     const sends: Array<[string, Record<string, unknown>, unknown]> = []
     const built: Array<unknown> = []
+    let stops = 0
     const client = (options: unknown): QueueClient => {
       built.push(options)
       return {
@@ -21,6 +22,10 @@ describe('the worker’s Enqueue', () => {
           return Promise.resolve('job-1')
         },
         findJobs: () => Promise.resolve([]),
+        stop: () => {
+          stops += 1
+          return Promise.resolve(undefined)
+        },
       }
     }
     const id = await Effect.runPromise(
@@ -37,6 +42,8 @@ describe('the worker’s Enqueue', () => {
       ),
     )
     expect(id).toBe('job-1')
+    // The scope `Effect.provide` opened has closed, and the pool with it.
+    expect(stops).toBe(1)
     expect(sends).toEqual([
       [QUEUES.embedSource, { entityId: 'e-1' }, { singletonKey: 'k' }],
     ])
