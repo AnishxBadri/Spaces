@@ -271,3 +271,51 @@ _Amended 2026-10-01 (checkpoint review):_ a `webhook` job carries no plugin `ver
 ### D58-assembler-similar-lane
 
 **What seam lets the context assembler into core (SPA-182)?** Answered: a narrow `SimilarLane` `Context.Service` in `packages/core/src/context/` — similar candidates for a scope plus the pin read `record.ts` needs. `assemble.ts`, `names.ts` and `record.ts` move to core; `similar.ts` stays in apps/web as the live Layer; tests get a stub Layer; `canRead` comes from `@spaces/core/read-policy`. Blocked by `sdk-5` (the house pattern) and `sdk-6b` (which owns moving `canReadNoteSql`). Rejected: a wide `ContextAssembler` service, and moving the embedding-pin substrate into core. It is also the shape the spec's later `Read.context(id)` takes. Carried by `SPA-182`, which joins project 17.
+
+---
+
+## Addenda — 2026-10-02
+
+### D59-supersedes-writers
+
+**Who writes a `supersedes` link, and what does the user see?** Today the relation exists, the context assembler follows it and the note-delete dialog labels it, but nothing writes one. Answered: **the user never picks a relation; a verb does, and the machine only suggests.**
+
+- **Nothing is deleted.** `supersedes` is a link between two rows. Both files, rows and chunks stay; the older one is still readable and searchable, ranked lower.
+- **The verb is "Newer version of…"**, never a bare "Replaces", which reads as delete. The older item shows "Replaced by → …", dimmed.
+- **Three writers, newer → older:**
+  1. **Manual.** "Newer version of…" in a document's menu; "Save as new version" on a note makes a new note that supersedes the old one.
+  2. **At upload.** Uploading a document to a record that already holds one of the same `document_kind` offers the pick. Optional.
+  3. **Suggested at intake.** A document of the same kind filed against the same record proposes the link in the suggestions inbox; accept writes it, a dismissal persists. Needs a new `suggestion_kind` value, so this writer carries a migration.
+- **Never written automatically.** A wrong `supersedes` hides true facts from the AI, which is worse than a missing one — the same deterministic-acts, probabilistic-suggests rule as entity resolution.
+- **The ranker demotes the superseded item.** Today `supersedes` is only a traversal edge (`DEFAULT_WEIGHTS.edge`, 0.5), while `halfLifeDays.doc_chunk: null` already assumes "a deck is true until superseded".
+
+_Rejected:_ a relation picker (exposes internal vocabulary); auto-writing at intake; replacing the file in place (loses history — corrections are appends, as in the ledger).
+
+_Build order:_ demotion + manual action → upload picker → intake suggestion. _Carried by_ no slice yet; add to the backlog when the documents area is next open.
+
+### D60-person-companies-attribute
+
+**Is "this person is at that company" a link or an attribute?** Today it is `link(contact_at)`, written by hand in `lib/server/people.ts` (create, and the link/unlink server fn) and read by the people list and the company page. It predates the attribute engine and was never folded into it. Answered: **an attribute.** People get a system attribute `companies` — `record_reference`, `targetKind: 'company'`, `multi: true` — and `contact_at` is retired.
+
+- **One write path.** The value goes through `setValues`, which writes `link(references, attr_slug: 'companies')`, the same mechanism as `deals.company` and `deals.people`. Backlinks, the context walk and merge keep working with no new rule.
+- **What it buys:** history in `attribute_event` ("moved from Kalpana to Vayu"), value-level provenance, a column/filter/sort in views, CSV import through the attribute path, and an end to the people list showing one company when a person has several.
+- **Multi from the start.** Angels, advisors and co-investors sit at several companies, and flipping `multi` later rewrites every stored value from a uuid to an array.
+- **Backfill.** A migration turns each `contact_at` link into a `companies` value through `setValues`, then nothing writes `contact_at`. Whether the enum value is dropped is the slice's call.
+- **`founders` stays.** It is a role, not "works at"; the two may later be checked against each other, not merged.
+- **Ranking moves.** `references` weighs 1 against `contact_at`'s 0.5 in `DEFAULT_WEIGHTS.edge`, so a person's company counts more in AI context. Check it in the slice.
+
+_Rejected:_ keeping `contact_at` as a link (no history, no views, no provenance, and a second way to say a fact `founders` also says); a single `company` attribute (shape migration the first time someone has two).
+
+_Carried by_ `graph-1` (`docs/roadmap-backlog.md`, Unplaced), a `migration` slice, so it runs alone on the migration lane.
+
+### D61-review-not-inbox
+
+**What is the review queue called?** `/inbox` holds two lanes, AI suggestions and duplicate candidates (`InboxLane`), and no email. "Inbox" reads as mail, and once Gmail and the forwarding lane land beside it the name will be wrong in the most confusing way. Answered: **"Review", at `/review`.**
+
+- **What the user sees changes:** the nav item, the page heading, Today's "Review inbox" tile, and every toast, title and hint that says "inbox" ("proposed · review in the inbox", "waiting in the inbox").
+- **The route moves:** `/review` is the page; `/inbox` and `/dedupe` both answer a permanent 301 to it, the pattern `/dedupe` already set. `review` joins `RESERVED` in the object registry beside `inbox` and `dedupe`, which stay reserved.
+- **Internal names stay:** `lib/inbox/`, `components/inbox/`, `InboxLane` and test names are not renamed here. Renaming them is a separate chore with nothing a user sees.
+
+_Rejected:_ keeping "Inbox" (reads as email); "Suggestions" (leaves out duplicates, which are not suggestions from the AI); "Queue" (says how it works, not what you do there).
+
+_Carried by_ `review-1` (`docs/roadmap-backlog.md`, Unplaced). Wait for in-flight `apps/web` route work to land first: the route tree is regenerated.

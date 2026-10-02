@@ -307,6 +307,29 @@ errors, 62% of them in test files and `apps/web/src/lib/seeds/dev.ts`, where man
 from gate 4. Revisit when project 2's test-database slices rewrite the tests
 anyway. Don't re-litigate it from the flag list.
 
+## Comments (decided 2026-10-02)
+
+A comment is for the next reader of the code, not a record of how it was
+designed. Short and formatted:
+
+- **First line says what it is.** Bullets for rules and invariants.
+- **Keep:** non-obvious _why_, invariants, warnings ("never inside a
+  transaction", "never add to the journal"). Keep warnings word for word.
+- **Rejected alternatives:** one line plus a decision id, at most
+  (`// Not access control — canRead decides visibility. (Dnn)`). The full
+  reasoning lives in `CONTEXT.md`, `docs/decisions-*.md` or `docs/adr/`.
+- **Leave out:** SPA ids, dates, "grilled", slice or milestone names, plan
+  state ("until mono-9a"), history of what used to be there. Those belong
+  in the commit message.
+- **Name symbols, not file paths.** A path goes stale when a module moves; a
+  symbol is found by search.
+- **Aim for 5 lines or fewer.** Longer means it belongs in a doc.
+
+Bring a comment to this style when you change the code under it. Rewriting
+comments in code you are not otherwise changing is a sweep, done one package
+at a time, and the sweep must not drop an invariant. No lint rule can check
+this; the reviewer does.
+
 ## After specific change kinds
 
 - Routes changed → `pnpm generate-routes` (turbo task `generate-routes`, whose

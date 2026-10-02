@@ -2097,6 +2097,8 @@ The failure surfaces §5.5 promises, which today have nowhere to appear. Setting
 
 #### `storage-18` · afk · M — The sensitivity stamp — one writer, raised in the transaction, lowered by a job
 
+_Amended 2026-10-02: the half that needs no storage binding (raising on a record or space flag and on filing, lowering by a job) moved to `sensitivity-1` in Unplaced. What remains here is the binding input._
+
 **Blocked by:** `ai-10b`, `ai-12a`, `ai-26`, `storage-8b`
 
 **What to build**
@@ -2397,3 +2399,100 @@ L, and it cannot split: the redaction layer cannot merge before the sync that ma
 **Spec** — CONTEXT.md — Email / calendar ingestion (forward-only, BYO GCP client, Google verification avoidable); CONTEXT.md — Privacy default (metadata shared, bodies restricted, per-connection exclude list, settings toggle); docs/survey-twenty-email-sync.md §5 (visibility enforced at read time) and §7.3, §7.5; docs/spec-plugin-sdk.md §14 build order step 5 (Calendar, then Gmail forward-only); docs/ARCHITECTURE.md §12
 
 ---
+
+## Unplaced — slices added after the plan
+
+_Not part of the 98 and not in any project's order. Each carries the decision it implements; schedule it when its area is next open._
+
+#### `graph-1` · afk · M · migration — A person's companies become an attribute (D60)
+
+**Blocked by:** none. **Label:** `migration` — runs alone on the migration lane.
+
+**What to build**
+
+"This person is at that company" is `link(contact_at)` today, written by hand outside the attribute engine: `createPerson` and `setPersonCompany` in `apps/web/src/lib/server/people.ts` insert and delete the link, `listPeople` / `listPeopleTable` / `getPerson` and the company page (`apps/web/src/lib/server/companies.ts`) read it, and the demo and dev seeds write it directly. It has no history, no provenance, no view column, no import mapping, and `listPeople` keys a `Map` by person, so a person at two companies shows one.
+
+Per D60, add a system attribute to `SYSTEM_ATTRIBUTES.person` in `packages/core/src/attributes/registry.ts`: slug `companies`, name "Companies", type `record_reference`, options `{ targetKind: 'company', multi: true }`. Every writer goes through `setValues`, which syncs `link(references, attr_slug: 'companies')` like `deals.people`. A hand-written data migration converts existing data: each person's `contact_at` targets become the `companies` array in `entity.values`, and the link rows are rewritten in place to `relation = 'references'`, `attr_slug = 'companies'` (no unique-index collision is possible — no such rows exist yet). Its journal `when` is the clock at write time. The `contact_at` enum value stays (Postgres cannot drop one cheaply); nothing writes it afterwards.
+
+Readers switch to the attribute: the people list and table read `values.companies`, the company page reads `references` links with `attr_slug = 'companies'`, and the person record shows the attribute in its rail like any other. `founders` is untouched.
+
+**Acceptance criteria**
+
+- [ ] `companies` is seeded on the people object (insert-if-absent), `record_reference`, `targetKind: 'company'`, `multi: true`
+- [ ] `createPerson` with a company and `setPersonCompany` write through `setValues`; each change leaves an `attribute_event` and a `references` link with `attr_slug = 'companies'`
+- [ ] The migration converts every `contact_at` link: the person's `values.companies` holds exactly its former targets, and no `contact_at` row remains
+- [ ] A test asserts no code path inserts `relation: 'contact_at'` (seeds included)
+- [ ] A person at two companies shows both in the people list and on both company pages
+- [ ] People can be filtered and sorted by Companies in a saved view, and an import maps a Company column onto it
+- [ ] Merging two companies repoints `companies` values and links on every person (the existing `links` merge section covers it — asserted, not assumed)
+- [ ] The context assembler reaches a person's companies through `references` at weight 1; the slice records whether that ranking change is wanted
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — On a dev database with `contact_at` links, run the migration: every person's Companies column is filled, the company pages list the same people as before, and adding a second company to a person shows on both companies and in the person's history.
+
+#### `review-1` · afk · S — The review queue is "Review", at /review (D61)
+
+**Blocked by:** none, but land it after any open `apps/web` route work, since it regenerates `routeTree.gen.ts`.
+
+**What to build**
+
+Rename the page at `routes/_app/inbox.tsx` to `routes/_app/review.tsx` (route `/review`). `/inbox` becomes a redirect route shaped like `routes/_app/dedupe.tsx` today (301, `replace: true`), and `dedupe.tsx` points at `/review` directly so nothing chains two redirects. Add `review` to `RESERVED` in `packages/core/src/writes/attributes/object-registry.ts`; keep `inbox` and `dedupe` there. Change every link to `/inbox` (`components/attributes/ai-cell.tsx`, `components/record/waiting-rail.tsx`, `routes/_app/companies.tsx`, the page's own links, Today's tile) and every user-facing string that says "inbox" to "Review" or "review". Run `pnpm generate-routes`. Internal module and type names (`lib/inbox/`, `components/inbox/`, `InboxLane`) stay.
+
+**Acceptance criteria**
+
+- [ ] `/review` renders both lanes, suggestions and duplicate candidates, exactly as `/inbox` did
+- [ ] `/inbox` and `/dedupe` each answer one 301 to `/review`, with no redirect chain
+- [ ] No user-facing string says "inbox" (a grep over `apps/web/src` string literals and JSX text, excluding the arrival lane's IMAP `INBOX` folder, finds none)
+- [ ] Creating an object whose slug would be `review` is refused, as `inbox` is
+- [ ] `apps/e2e` specs that visit `/inbox` are updated, or pass through the redirect
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Press ✦ on an AI attribute cell: the toast says the proposal is waiting in Review, the cell's pointer opens `/review`, and an old `/inbox` bookmark lands on the same page.
+
+#### `vault-1` · afk · S · migration — One workspace credential per provider, enforced by the database
+
+**Blocked by:** none. **Label:** `migration` — runs alone on the migration lane.
+
+**What to build**
+
+`credential_user_unique` is `(scope, provider, user_id)`, and a workspace row has `user_id = null`. Postgres treats nulls as distinct, so the index never stops two workspace rows for one provider. The write path (`storeCredential` in `packages/core/src/writes/vault/index.ts`) covers the ordinary case with `select … for update` then insert, but `for update` locks nothing when no row exists yet: two first-time saves of one provider at the same moment both insert, and the reader's `limit 1` then picks either key.
+
+Replace the index with the same columns declared `nulls not distinct` (Postgres 15+; the supported image is 17), so one index covers user and workspace rows alike. Before creating it, the migration collapses any duplicates already present: per `(scope, provider, user_id)`, keep the most recently created row, repoint `mailbox.credential_id`, `integration.credential_id` and `ai_run.credential_id` at it, then delete the rest. With the index in place, both branches of the write path become one `insert … on conflict (scope, provider, user_id) do update`, and the `for update` read goes.
+
+**Acceptance criteria**
+
+- [ ] Migration generated with `pnpm db:generate --name credential_unique_nulls`, SQL hand-inspected; the duplicate collapse runs before `create unique index`
+- [ ] On a database seeded with two workspace rows for one provider, the migration leaves one row, and every `mailbox`, `integration` and `ai_run` row that pointed at the other now points at it
+- [ ] Inserting a second workspace credential for a provider raises a unique violation
+- [ ] Two concurrent first-time saves of one workspace provider leave exactly one row (a test that races two transactions)
+- [ ] User-scoped credentials behave as before: one per `(scope, provider, user)`, upserted on save
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Save an OpenAI key twice from two tabs at once: one row in `credential`, and the key in use is the last one saved.
+
+#### `sensitivity-1` · afk · M — A record turning sensitive re-stamps its chunks at once
+
+**Blocked by:** none. Carved out of `storage-18`: this is its half that does not need storage bindings.
+
+**What to build**
+
+`chunk.sensitive` is a cached copy of the sensitivity resolver, written only by `stampSensitivity(entityId)` (`apps/web/src/lib/ai/stamp-sensitivity.ts`), and today only the embed job calls it. So a record flagged sensitive after it was embedded, a document filed into a sensitive space, or a space flagged sensitive leaves its chunks stamped `false`. Calls that send bytes out (`complete()`, `embed()`) resolve live and are unaffected; the stale column matters to the embed backfill's pass today and to retrieval's SQL filter once that lands.
+
+Apply `storage-18`'s asymmetry without the binding input: **raising is synchronous, lowering is a job.**
+
+- **Raise, in the same transaction as the change:** `setEntitySensitiveProgram` setting a record's flag stamps that record's chunks; on a space, it stamps every entity filed in the space or any descendant space (`entity_space` joined through `space.path`), as one set-based update. Filing into a space (every `entity_space` insert: `lib/spaces/tag.ts`, `lib/notes/create.ts`, `lib/documents/refile.ts`, `packages/core/src/writes/documents/birth.ts`) stamps the filed entity when the space resolves sensitive.
+- **Lower, by a job:** clearing a flag or unfiling (`lib/documents/refile.ts`, `lib/server/companies.ts`) enqueues one `sensitivity.restamp` job per affected entity, keyed by entity id. The job calls `stampSensitivity`, which resolves live, so an entity still sensitive through another input stays stamped.
+- `stampSensitivity` stays the only writer of the column. The set-based raise is a second function in the same module, named in the column comment.
+
+Out of scope: storage bindings (stay in `storage-18`), and the workspace default, which has no writer yet. When one lands it raises every chunk synchronously and lowers through the same job.
+
+**Acceptance criteria**
+
+- [ ] Flagging an embedded document sensitive sets every one of its chunks `sensitive = true` before the request returns
+- [ ] Flagging a space sensitive stamps the chunks of every entity filed in it and in its descendant spaces, in one transaction
+- [ ] Filing an embedded document into a sensitive space stamps its chunks in the filing's transaction
+- [ ] Clearing the flag or unfiling enqueues the restamp job; after it runs, chunks are `false` only if no other input keeps the entity sensitive (a test files one document in two sensitive spaces, unfiles one, and asserts it stays `true`)
+- [ ] No code outside `stamp-sensitivity.ts` sets `chunk.sensitive` (a test asserts it, seeds included)
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Embed a deck, then flag its company's space sensitive: `select sensitive from chunk` for the deck turns `true` immediately. Unflag it: after the job runs, it turns back to `false`.
