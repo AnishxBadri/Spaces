@@ -35,6 +35,7 @@ import { RecordLedger } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
+import { PluginActions } from '#/components/record/plugin-actions'
 import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -47,6 +48,7 @@ import {
   createNote,
   getDeal,
   getRecordTimeline,
+  listRecordActions,
   listRecordDocuments,
   getEntitySensitivity,
   listRecordNotes,
@@ -56,30 +58,56 @@ import {
 
 export const Route = createFileRoute('/_app/deals_/$dealId')({
   loader: async ({ params }) => {
-    const [deal, registry, timeline, documents, notes, waiting, sensitivity] =
-      await Promise.all([
-        getDeal({ data: { id: params.dealId } }),
-        listRegistry({ data: { kind: 'deal' } }),
-        getRecordTimeline({ data: { entityId: params.dealId } }),
-        listRecordDocuments({ data: { entityId: params.dealId } }),
-        listRecordNotes({ data: { entityId: params.dealId } }),
-        countOpenSuggestions({ data: { entityId: params.dealId } }),
-        getEntitySensitivity({ data: { entityId: params.dealId } }),
-      ])
+    const [
+      deal,
+      registry,
+      timeline,
+      documents,
+      notes,
+      waiting,
+      sensitivity,
+      pluginActions,
+    ] = await Promise.all([
+      getDeal({ data: { id: params.dealId } }),
+      listRegistry({ data: { kind: 'deal' } }),
+      getRecordTimeline({ data: { entityId: params.dealId } }),
+      listRecordDocuments({ data: { entityId: params.dealId } }),
+      listRecordNotes({ data: { entityId: params.dealId } }),
+      countOpenSuggestions({ data: { entityId: params.dealId } }),
+      getEntitySensitivity({ data: { entityId: params.dealId } }),
+      listRecordActions({ data: { kind: 'deal' } }),
+    ])
     if (deal.mergedIntoId) {
       throw redirect({
         to: '/deals/$dealId',
         params: { dealId: deal.mergedIntoId },
       })
     }
-    return { deal, registry, timeline, documents, notes, waiting, sensitivity }
+    return {
+      deal,
+      registry,
+      timeline,
+      documents,
+      notes,
+      waiting,
+      sensitivity,
+      pluginActions,
+    }
   },
   component: DealRecordPage,
 })
 
 function DealRecordPage() {
-  const { deal, registry, timeline, documents, notes, waiting, sensitivity } =
-    Route.useLoaderData()
+  const {
+    deal,
+    registry,
+    timeline,
+    documents,
+    notes,
+    waiting,
+    sensitivity,
+    pluginActions,
+  } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [moveOpen, setMoveOpen] = useState(false)
@@ -203,6 +231,7 @@ function DealRecordPage() {
           <>
             <SensitiveToggle entityId={deal.id} state={sensitivity} />
             <SummarizeRecordButton recordId={deal.id} />
+            <PluginActions entityId={deal.id} actions={pluginActions} />
             <LogInteractionDialog
               seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
               hotkey="l"

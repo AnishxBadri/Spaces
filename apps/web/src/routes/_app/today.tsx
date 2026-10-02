@@ -23,7 +23,7 @@ import {
   listHoldings,
   listRegistry,
   listTasks,
-  listTrippedPlugins,
+  listStoppedPlugins,
   setTaskDone,
 } from '#/lib/server-fns'
 import { useBornRows } from '#/lib/born-rows'
@@ -48,7 +48,7 @@ export const Route = createFileRoute('/_app/today')({
       dealRegistry,
       inbox,
       unfiled,
-      tripped,
+      stoppedPlugins,
     ] = await Promise.all([
       listTasks(),
       listHoldings(),
@@ -62,7 +62,7 @@ export const Route = createFileRoute('/_app/today')({
       // Likewise: one number, from the same predicate the shelf filters
       // with, so the cell and `/documents?filed=unfiled` cannot disagree.
       countUnfiledDocuments(),
-      listTrippedPlugins(),
+      listStoppedPlugins(),
     ])
     return {
       tasks,
@@ -73,7 +73,7 @@ export const Route = createFileRoute('/_app/today')({
       dealRegistry,
       inboxCount: inbox.open,
       unfiledCount: unfiled,
-      tripped,
+      stoppedPlugins,
     }
   },
   component: TodayPage,
@@ -184,7 +184,7 @@ function TodayPage() {
     dealRegistry,
     inboxCount,
     unfiledCount,
-    tripped,
+    stoppedPlugins,
   } = Route.useLoaderData()
   const today = localToday()
   // The spine's composer row reports what it made; nothing the loader
@@ -238,7 +238,7 @@ function TodayPage() {
     staleHoldings.length === 0 &&
     idleDeals.length === 0 &&
     missingRates === 0 &&
-    tripped.length === 0
+    stoppedPlugins.length === 0
 
   const needsYou =
     dueTasks.length +
@@ -249,7 +249,7 @@ function TodayPage() {
     // Bytes that arrived with no target are the one thing on this page that
     // is lost rather than late — they belong in the headline (SPA-124).
     unfiledCount +
-    tripped.length
+    stoppedPlugins.length
 
   const weekday = WEEKDAY[new Date(`${today}T00:00:00Z`).getUTCDay()]
 
@@ -345,7 +345,7 @@ function TodayPage() {
             </div>
           ) : null}
 
-          <PluginStatusSection tripped={tripped} />
+          <PluginStatusSection stopped={stoppedPlugins} />
 
           {dueTasks.length > 0 ? (
             <LedgerSection

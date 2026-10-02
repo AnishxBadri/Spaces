@@ -35,6 +35,7 @@ import { RecordContext } from '#/components/record-context'
 import { RecordLedger } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
+import { PluginActions } from '#/components/record/plugin-actions'
 import { recordPath } from '#/lib/record-path'
 import {
   addPersonContact,
@@ -44,6 +45,7 @@ import {
   getPerson,
   getRecordTimeline,
   listCompanies,
+  listRecordActions,
   listRecordDocuments,
   listRecordNotes,
   listRegistry,
@@ -66,6 +68,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       notes,
       waiting,
       sensitivity,
+      pluginActions,
     ] = await Promise.all([
       getPerson({ data: { id: params.personId } }),
       listCompanies(),
@@ -76,6 +79,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       listRecordNotes({ data: { entityId: params.personId } }),
       countOpenSuggestions({ data: { entityId: params.personId } }),
       getEntitySensitivity({ data: { entityId: params.personId } }),
+      listRecordActions({ data: { kind: 'person' } }),
     ])
     if (personData.mergedIntoId) {
       throw redirect({
@@ -93,6 +97,7 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       notes,
       waiting,
       sensitivity,
+      pluginActions,
     }
   },
   component: PersonRecordPage,
@@ -109,6 +114,7 @@ function PersonRecordPage() {
     notes,
     waiting,
     sensitivity,
+    pluginActions,
   } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
@@ -155,6 +161,7 @@ function PersonRecordPage() {
           <>
             <SensitiveToggle entityId={person.id} state={sensitivity} />
             <SummarizeRecordButton recordId={person.id} />
+            <PluginActions entityId={person.id} actions={pluginActions} />
             <LogInteractionDialog
               seed={{ id: person.id, name: person.name, kind: 'person' }}
               hotkey="l"

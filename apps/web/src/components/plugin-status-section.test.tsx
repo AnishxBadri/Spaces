@@ -4,36 +4,56 @@ import { describe, expect, it } from 'vitest'
 import { PluginStatusSection } from './plugin-status-section.tsx'
 
 /**
- * One Today line per tripped plugin, naming it and its reason; no section at
- * all once every row is reset. Rendered the way the app's server render does.
+ * One line per stopped plugin on Today and Review, naming it, how it stopped
+ * and why; no section at all once every row is reset. Rendered the way the
+ * app's server render does.
  */
 
-const tripped = [
+const stopped = [
   {
     integrationId: 'f1f0b6f2-7c1e-4f0a-9d2a-000000000001',
     pluginId: 'flaky',
+    state: 'tripped' as const,
     lastError: '5 failures in an hour',
   },
   {
     integrationId: 'f1f0b6f2-7c1e-4f0a-9d2a-000000000002',
     pluginId: 'throws',
+    state: 'tripped' as const,
+    lastError: null,
+  },
+  {
+    integrationId: 'f1f0b6f2-7c1e-4f0a-9d2a-000000000003',
+    pluginId: 'apollo',
+    state: 'degraded' as const,
+    lastError: 'sdk ^0.1 does not include 1.0.0',
+  },
+  {
+    integrationId: 'f1f0b6f2-7c1e-4f0a-9d2a-000000000004',
+    pluginId: 'needs-key',
+    state: 'degraded' as const,
     lastError: null,
   },
 ]
 
 describe('PluginStatusSection', () => {
-  it('renders one line per tripped plugin with its id and last error', () => {
-    const html = renderToStaticMarkup(<PluginStatusSection tripped={tripped} />)
-    expect(html.match(/<li/g)).toHaveLength(2)
+  it('renders one line per stopped plugin with its id, state and reason', () => {
+    const html = renderToStaticMarkup(<PluginStatusSection stopped={stopped} />)
+    expect(html.match(/<li/g)).toHaveLength(4)
     expect(html).toContain('Plugins')
-    expect(html).toContain('2 · disabled')
+    expect(html).toContain('4 · not running')
     expect(html).toContain('flaky')
     expect(html).toContain('5 failures in an hour')
     expect(html).toContain('throws')
     expect(html).toContain('stopped by the breaker')
+    expect(html).toContain('apollo')
+    expect(html).toContain('sdk ^0.1 does not include 1.0.0')
+    expect(html).toContain('the worker could not load it')
+    expect(html.match(/>off</g)).toHaveLength(2)
+    expect(html.match(/>degraded</g)).toHaveLength(2)
   })
 
-  it('renders nothing when no plugin is tripped', () => {
-    expect(renderToStaticMarkup(<PluginStatusSection tripped={[]} />)).toBe('')
+  it('renders nothing when every plugin runs', () => {
+    expect(renderToStaticMarkup(<PluginStatusSection stopped={[]} />)).toBe('')
   })
 })

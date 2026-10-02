@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 /**
- * Today's tripped-plugin lines read the `integration` row as the worker's
- * breaker leaves it: enabled, status `disabled`. Against this worker's test
- * database, truncated before the file was imported.
+ * Today's and Review's plugin lines read the `integration` row as the worker
+ * leaves it: enabled, with status `disabled` (the breaker) or `degraded` (the
+ * loader). Against this worker's test database, truncated before the file
+ * was imported.
  */
 
 async function world() {
@@ -11,7 +12,7 @@ async function world() {
   const { db } = await import('@spaces/db')
   const { integration } = await import('@spaces/db/schema')
   const { eq } = await import('drizzle-orm')
-  const { trippedPluginsProgram } = await import('./status')
+  const { stoppedPluginsProgram } = await import('./status')
 
   const row = async (values: {
     capabilityId: string
@@ -28,17 +29,17 @@ async function world() {
     if (!inserted) throw new Error('no integration row')
     return inserted.id
   }
-  const tripped = () => Effect.runPromise(trippedPluginsProgram())
+  const stopped = () => Effect.runPromise(stoppedPluginsProgram())
   const reset = (id: string) =>
     db
       .update(integration)
       .set({ status: 'enabled', errorCount: 0, lastError: null })
       .where(eq(integration.id, id))
-  return { row, tripped, reset }
+  return { row, stopped, reset }
 }
 
-describe('trippedPluginsProgram', () => {
-  it('lists every breaker-tripped plugin and nothing else, and a reset clears it', async () => {
+describe('stoppedPluginsProgram', () => {
+  it('lists every tripped and degraded plugin and nothing else, and a reset clears it', async () => {
     const w = await world()
     const throws = await w.row({
       capabilityId: 'throws',
@@ -52,7 +53,14 @@ describe('trippedPluginsProgram', () => {
       status: 'disabled',
       lastError: '5 failures in an hour',
     })
-    // An operator's off switch, a degraded load, a running plugin, a channel.
+    const oldSdk = await w.row({
+      capabilityId: 'old-sdk',
+      enabled: true,
+      status: 'degraded',
+      lastError: 'sdk ^0.1 does not include 1.0.0',
+    })
+    // An operator's off switch, a switched-off degraded row, a running
+    // plugin, a channel.
     await w.row({
       capabilityId: 'apollo',
       enabled: false,
@@ -60,10 +68,10 @@ describe('trippedPluginsProgram', () => {
       lastError: null,
     })
     await w.row({
-      capabilityId: 'old-sdk',
-      enabled: true,
+      capabilityId: 'needs-key',
+      enabled: false,
       status: 'degraded',
-      lastError: 'sdk ^0.1 does not include 1.0.0',
+      lastError: 'no credential',
     })
     await w.row({
       capabilityId: 'echo',
@@ -78,22 +86,31 @@ describe('trippedPluginsProgram', () => {
       lastError: 'not a plugin',
     })
 
-    expect(await w.tripped()).toEqual([
+    expect(await w.stopped()).toEqual([
       {
         integrationId: flaky,
         pluginId: 'flaky',
+        state: 'tripped',
         lastError: '5 failures in an hour',
+      },
+      {
+        integrationId: oldSdk,
+        pluginId: 'old-sdk',
+        state: 'degraded',
+        lastError: 'sdk ^0.1 does not include 1.0.0',
       },
       {
         integrationId: throws,
         pluginId: 'throws',
+        state: 'tripped',
         lastError: '5 failures in an hour',
       },
     ])
 
     await w.reset(throws)
-    expect((await w.tripped()).map((p) => p.pluginId)).toEqual(['flaky'])
+    await w.reset(oldSdk)
+    expect((await w.stopped()).map((p) => p.pluginId)).toEqual(['flaky'])
     await w.reset(flaky)
-    expect(await w.tripped()).toEqual([])
+    expect(await w.stopped()).toEqual([])
   })
 })

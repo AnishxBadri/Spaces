@@ -7,10 +7,12 @@ import { EmptyState } from '#/components/empty-state'
 import { SuggestionCard } from '#/components/inbox/suggestion-card'
 import { ColumnRunGroup } from '#/components/inbox/column-run-group'
 import { PageHeader } from '#/components/page-header'
+import { PluginStatusSection } from '#/components/plugin-status-section'
 import { Button } from '#/components/ui/button'
 import {
   dismissDuplicate,
   listInbox,
+  listStoppedPlugins,
   mergeDuplicate,
   runDedupeSweep,
 } from '#/lib/server-fns'
@@ -48,7 +50,13 @@ const inboxSearch = z.object({
 export const Route = createFileRoute('/_app/inbox')({
   validateSearch: inboxSearch,
   loaderDeps: ({ search }) => ({ record: search.record ?? null }),
-  loader: ({ deps }) => listInbox({ data: { record: deps.record } }),
+  loader: async ({ deps }) => {
+    const [inbox, stoppedPlugins] = await Promise.all([
+      listInbox({ data: { record: deps.record } }),
+      listStoppedPlugins(),
+    ])
+    return { ...inbox, stoppedPlugins }
+  },
   component: InboxPage,
 })
 
@@ -172,7 +180,7 @@ const LANE_PARAM: Record<'all' | 'suggestions' | 'duplicates', Lane> = {
 }
 
 function InboxPage() {
-  const { rows, scope } = Route.useLoaderData()
+  const { rows, scope, stoppedPlugins } = Route.useLoaderData()
   const search = Route.useSearch()
   const [lane, setLane] = useState<Lane>(
     search.lane ? LANE_PARAM[search.lane] : 'all',
@@ -235,6 +243,13 @@ function InboxPage() {
           </>
         }
       />
+
+      {/* Why a record head is missing a plugin's action (D63). */}
+      {stoppedPlugins.length > 0 ? (
+        <div className="max-w-220 px-8 pt-6">
+          <PluginStatusSection stopped={stoppedPlugins} />
+        </div>
+      ) : null}
 
       {rows.length === 0 ? (
         <EmptyState
