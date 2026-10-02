@@ -29,8 +29,14 @@ const apiRoutes = (): Array<string> => {
 const underPrefix = (path: string) =>
   path === API_PREFIX || path.startsWith(`${API_PREFIX}/`)
 
-/** Raw by design, and mounted today. */
-const RAW = ['/api/auth/$', '/api/blob/$key', '/api/health', '/api/mcp']
+/** Raw by design, and mounted today. The job-status stream is SSE (D64). */
+const RAW = [
+  '/api/auth/$',
+  '/api/blob/$key',
+  '/api/health',
+  '/api/job-status/$entityId',
+  '/api/mcp',
+]
 
 /** Raw by design, mounted by the ingress slice (sdk-23) when it lands. */
 const RAW_TO_COME = ['/api/webhooks/$provider']
