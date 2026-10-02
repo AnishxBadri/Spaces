@@ -13,21 +13,19 @@ import { entity } from './entities'
 import { tsvector } from './helpers'
 
 /**
- * Tasks (CONTEXT.md 15b, 2026-08-07): the resurrection machinery for
- * Parked deals plus diligence chores. A plain table, deliberately not an
- * entity kind — tasks need no backlinks or mentions payload. They are
- * searchable all the same: Cmd-K fuses them in as their own lane over
- * `tsv` (SPA-55), a search lane rather than a kind.
- * due_date is nullable: a dateless task is legal, forced deadlines create
- * fake urgency.
+ * Tasks: the resurrection machinery for Parked deals, plus diligence chores.
+ * - A plain table, deliberately not an entity kind — no backlinks or
+ *   mentions. Cmd-K searches them as their own lane over `tsv`.
+ * - due_date is nullable: a dateless task is legal, forced deadlines create
+ *   fake urgency.
  */
 export const task = pgTable(
   'task',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     content: text('content').notNull(),
-    // Generated column (migration 0046) — derived from content by Postgres,
-    // never written by the app. Cmd-K's task lane reads it.
+    // Generated column — derived from content by Postgres, never written by
+    // the app. Cmd-K's task lane reads it.
     tsv: tsvector('tsv'),
     dueDate: date('due_date'),
     assigneeId: text('assignee_id')

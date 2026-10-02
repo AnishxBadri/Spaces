@@ -5,20 +5,14 @@ import { entity, entityAlias } from './schema/entities.ts'
 import { integration } from './schema/integrations.ts'
 
 /**
- * The enum collapse, asserted where it happened — in Postgres (SPA-118).
- *
- * Two claims the TypeScript schema cannot make on its own. First that the
- * migration ran the conversion rather than dropping and re-adding columns:
- * the type exists with eight values and the two vendor-named types are
- * *gone* from `pg_type`, which is the part a `DROP COLUMN` would have left
- * standing. Second that the biconditional is real, and a biconditional has
- * two ways to break — an implication would let a `seed` row carry an
- * integration id, a provenance lie the dedupe card renders as fact.
- *
- * Both halves, both tables, asserted by *constraint name* for the reason
- * `actor-invariant.test.ts` gives: drizzle's `Failed query: …` message names
- * the SQL and not the constraint, so asserting on the message would pass for
- * a not-null violation or a typo in the fixture.
+ * `source_class` in Postgres — two claims the TypeScript schema cannot make:
+ * - The type has eight values and the vendor-named `entity_source` /
+ *   `alias_source` types are *gone* from `pg_type`.
+ * - The source_ref biconditional is real in both directions: an implication
+ *   would let a `seed` row carry an integration id, a provenance lie the
+ *   dedupe card renders as fact.
+ * Asserted by *constraint name*: drizzle's `Failed query: …` message names
+ * the SQL, not the constraint, so it would pass for any rejection.
  */
 function constraintOf(err: unknown): string | null {
   let cur: unknown = err

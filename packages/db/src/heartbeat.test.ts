@@ -57,9 +57,8 @@ describe('classifyBeat', () => {
   })
 })
 
-// This package's own test database (SPA-143), emptied before this file was
-// imported (SPA-145) — no afterAll, because the row this writes is gone
-// before the next file runs whether or not anyone remembers to delete it.
+// This package's own test database, emptied before this file runs — no
+// afterAll, because the row this writes is gone before the next file runs.
 describe('beat (database)', () => {
   const role = `test-${randomUUID()}`
 

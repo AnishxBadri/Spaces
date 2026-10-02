@@ -18,14 +18,11 @@ import { credential } from './vault'
 import type { Json } from '../json'
 
 /**
- * The provider contract's two tables (docs/spec-ai-substrate.md §4, §9).
- * Features never name a model — they name a **lane** — and `ai_route` is the
- * settings table that turns lane × sensitivity into a provider and a model.
- * `ai_usage` is the per-call ledger the operator reads for cost.
- *
- * `apps/web/src/lib/ai/route.ts` reads `ai_route`;
- * `apps/web/src/lib/ai/complete.ts` is the only writer of `ai_usage`.
- * `ai_run` (below) is the run log the calls roll up into.
+ * The AI provider contract's tables (spec-ai-substrate §4, §9).
+ * - Features never name a model, only a lane; `ai_route` turns lane ×
+ *   sensitivity into a provider and a model (`aiRouteProgram` reads it).
+ * - `ai_usage` is the per-call cost ledger; `completeProgram` is its only writer.
+ * - `ai_run` is the run log the calls roll up into.
  */
 
 /** What a feature asks for. `vision` is an LLM with image input (spec §9). */
@@ -41,8 +38,8 @@ export type AiLane = (typeof aiLane.enumValues)[number]
 
 /**
  * The second routing axis. `sensitive` forces the local provider or refuses —
- * it never falls back to cloud. Resolved elsewhere (record → filed spaces →
- * storage binding → workspace default, ai-26); a route only keys on it.
+ * it never falls back to cloud. `resolveSensitivity` decides it (record →
+ * filed spaces → storage binding → workspace default); a route only keys on it.
  */
 export const aiSensitivity = pgEnum('ai_sensitivity', ['normal', 'sensitive'])
 export type AiSensitivity = (typeof aiSensitivity.enumValues)[number]
@@ -54,9 +51,9 @@ export const aiRoute = pgTable(
     lane: aiLane('lane').notNull(),
     sensitivity: aiSensitivity('sensitivity').notNull(),
     /**
-     * A provider id (`apps/web/src/lib/ai/providers/ids.ts`). Text rather
-     * than an enum: the provider list grows by adapter, in app code, and the
-     * id is validated where it is written and again where it is read.
+     * A provider id (`LLM_PROVIDERS`). Text rather than an enum: the provider
+     * list grows by adapter, in app code, and the id is validated where it is
+     * written and again where it is read.
      */
     provider: text('provider').notNull(),
     /** The provider's own model id, e.g. `claude-haiku-4-5`. */
@@ -74,10 +71,10 @@ export const aiRoute = pgTable(
 // ---------- the run log ----------
 
 /**
- * `running` is the birth state, as `job_run`'s is: the row exists before the
- * outcome does, so a run whose process died is left `running` and the Usage
- * page shows it so — nothing sweeps it to `failed`, because nothing knows it
- * failed.
+ * A run's status. `running` is the birth state, as `job_run`'s is.
+ * - The row exists before the outcome does, so a run whose process died is
+ *   left `running` and the Usage page shows it so.
+ * - Nothing sweeps it to `failed`, because nothing knows it failed.
  */
 export const aiRunStatus = pgEnum('ai_run_status', [
   'running',
@@ -91,9 +88,8 @@ export type AiRunStatus = (typeof aiRunStatus.enumValues)[number]
  * in for it. Snake-cased because it is stored JSON, read back as written.
  *
  * - `tool` is the lane the step ran on (`extract`, `synthesize`, …).
- * - `input_refs` are the ContextItem refs the call was shown
- *   (`docs/spec-ai-substrate.md` §1) — resolved to names through
- *   `apps/web/src/lib/context/cite.ts` on the Usage page.
+ * - `input_refs` are the ContextItem refs the call was shown — resolved to
+ *   names through `cite` on the Usage page.
  * - `output_ref` is what the step produced: `suggestion:<id>` for a step that
  *   proposed (the first suggestion it wrote; the run's suggestions are every
  *   `suggestion.run_id` row), a context ref for one that wrote a document's
@@ -118,36 +114,14 @@ export type AiRunStep = {
 }
 
 /**
- * **The run log** (SPA-100; `docs/spec-ai-substrate.md` §6, §14 step 10): one
- * row per logical AI action — "Read deck", "Summarize", "Read deck and
- * summarize" — with its ordered steps, so a multi-step action is auditable
- * and every suggestion it produced cites it (`suggestion.run_id`), as every
- * call it made does (`ai_usage.run_id`).
- *
- * **Two tables, not one — reconciling the two specs** (owner, 2026-09-27).
- * spec-ai-substrate §6 specifies `run(id, task, steps jsonb, credential_id,
- * tokens, status)`; spec-plugin-sdk §11 says `job_run` is "one table, three
- * consumers", the third being "later the AI run log". They describe
- * different grains. `job_run` (`schema/jobs.ts`) is the worker's attempt
- * ledger — queue, attempt, retry — with one writer, `runJob`. A run is one
- * logical action of 1..n ordered steps, each step 0..1 worker attempts, and
- * a request-path call (the settings Test call) has no job at all. Widening
- * `job_run` with steps would repeat the steps on every retried attempt, and
- * would still leave the request path with nowhere to write. So plugin-sdk
- * §11's third consumer is read as the **Usage surface**, which joins both
- * tables; `job_run` stays one table with its one writer, and this is a
- * second. It follows that `ai_usage.job_run_id` stays nullable — as its own
- * comment argues — and `ai_usage.run_id` beside it is nullable for the same
- * reason: the Test call is outside any run.
- *
- * `started_by` is the typed actor pair `suggestion.proposed_by` uses (one
- * column holding a user or an integration id, so no FK). `tokens_in` /
- * `tokens_out` are the steps' sum, rolled up as each step lands.
- * `credential_id` is the key the first model-calling step resolved; null
- * when every step was a cache answer or an injected test model.
- *
- * `apps/web/src/lib/ai/run.ts` is the only writer: `openRun`, `addStep`,
- * `closeRun`, each one row write.
+ * The run log (spec-ai-substrate §6): one row per logical AI action ("Read
+ * deck and summarize") with its ordered steps.
+ * - Every suggestion it produced cites it (`suggestion.run_id`), as every call
+ *   it made does (`ai_usage.run_id`).
+ * - A second table, not a widening of `job_run`: a step is 0..1 worker
+ *   attempts, and a request-path call has no job at all.
+ * - The only writers are `openRunProgram`, `addStepProgram`,
+ * `closeRunProgram`, each one row write.
  */
 export const aiRun = pgTable(
   'ai_run',
@@ -157,15 +131,24 @@ export const aiRun = pgTable(
     task: text('task').notNull(),
     /** The record the action was about; null once that record is deleted. */
     entityId: uuid('entity_id').references(() => entity.id),
+    /**
+     * The typed actor pair `suggestion.proposed_by` uses: one column holding a
+     * user or an integration id, so no FK.
+     */
     startedByType: actorType('started_by_type').notNull(),
     startedById: text('started_by_id'),
     steps: jsonb('steps')
       .$type<ReadonlyArray<AiRunStep>>()
       .notNull()
       .default(sql`'[]'::jsonb`),
+    /**
+     * The key the first model-calling step resolved; null when every step was
+     * a cache answer or an injected test model.
+     */
     credentialId: uuid('credential_id').references(() => credential.id, {
       onDelete: 'set null',
     }),
+    /** The steps' sum, rolled up as each step lands. */
     tokensIn: integer('tokens_in'),
     tokensOut: integer('tokens_out'),
     status: aiRunStatus('status').notNull().default('running'),
@@ -196,17 +179,15 @@ export const aiUsage = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     /**
-     * The attempt that made this call, when a queued job made it. Will
-     * reference clean's `job_run` table (`job_run.id`, `schema/jobs.ts`, the
-     * attempt ledger); a plain uuid until a job makes a call, and nullable
-     * because a call made from a request — the settings Test call — has no
-     * job run.
+     * The `job_run` attempt that made this call, when a queued job made it; a
+     * plain uuid, no FK. Nullable: a call made from a request — the settings
+     * Test call — has no job run.
      */
     jobRunId: uuid('job_run_id'),
     /**
-     * The run this call was a step of (`ai_run` above). Nullable for the
-     * `job_run_id` reason: a call outside any run — the settings Test call —
-     * is listed on the Usage page under "Calls outside a run".
+     * The `ai_run` this call was a step of. Nullable: a call outside any run —
+     * the settings Test call — is listed on the Usage page under "Calls
+     * outside a run".
      */
     runId: uuid('run_id').references(() => aiRun.id),
     lane: aiLane('lane').notNull(),
@@ -235,38 +216,41 @@ export const aiUsage = pgTable(
 )
 
 /**
- * **The extraction cache** (SPA-74; docs/spec-storage-sources.md §9, the
- * derived-layer stack): what one extract-lane call answered for one blob,
- * one compiled schema and one model, so asking again is free.
- *
- * Keyed by the **blob**, never the document: the same deck filed twice is
- * two `document` rows over one sha, and both read one row here. Keyed by
- * `model_id` (`<provider>:<model>` as the lane routed it), so re-routing the
- * lane re-asks instead of serving another model's answer. And keyed by
- * `schema_key`, a digest of the compiled registry schema
- * (`schemaFor`, `@spaces/core/ai/schema`), so an attribute added to the
- * object misses rather than replaying a shape that no longer validates.
- *
- * `patch` is the model's structured output as it came back; the caller
- * validates it against the live registry on every read, hit or miss. The
- * reading document's own citations are stored with its id replaced by a
- * placeholder, so a second document over the same blob cites itself.
- *
- * It is a cache and nothing more: truncating it costs provider calls, never
- * behaviour. Rows go with their blob — `reclaimBlobIfOrphaned`
- * (`apps/web/src/lib/documents/blob-refs.ts`) drops them when the last
- * document row on the sha is gone. `blob_sha` is a digest, not an entity
- * reference, so there is no `ENTITY_REFS` entry.
- *
- * `apps/web/src/lib/ai/extraction-cache.ts` is the only reader and writer
- * besides that reclaim.
+ * The extraction cache (spec-storage-sources §9): what one extract-lane call
+ * answered for one blob, one compiled schema and one model, so asking again
+ * is free.
+ * - A cache and nothing more: truncating it costs provider calls, never
+ *   behaviour.
+ * - Rows go with their blob: `reclaimBlobIfOrphaned` drops them when the last
+ *   document row on the sha is gone.
+ * - `cachedExtractProgram` is the only reader and writer besides that reclaim.
  */
 export const extractionCache = pgTable(
   'extraction_cache',
   {
+    /**
+     * Keyed by the blob, never the document: the same deck filed twice is two
+     * `document` rows over one sha, and both read one row here. A digest, not
+     * an entity reference, so there is no `ENTITY_REFS` entry.
+     */
     blobSha: text('blob_sha').notNull(),
+    /**
+     * A digest of the compiled registry schema (`schemaFor`), so an attribute
+     * added to the object misses rather than replaying a shape that no longer
+     * validates.
+     */
     schemaKey: text('schema_key').notNull(),
+    /**
+     * `<provider>:<model>` as the lane routed it, so re-routing the lane
+     * re-asks instead of serving another model's answer.
+     */
     modelId: text('model_id').notNull(),
+    /**
+     * The model's structured output as it came back; the caller validates it
+     * against the live registry on every read, hit or miss. The reading
+     * document's own citations are stored with its id replaced by a
+     * placeholder, so a second document over the same blob cites itself.
+     */
     patch: jsonb('patch').$type<Json>().notNull(),
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   },

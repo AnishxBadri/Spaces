@@ -1,25 +1,14 @@
 import { integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 /**
- * One row per worker role, upserted on boot and every 15s
- * (spec-plugin-sdk §10; CONTEXT.md hostability contract 4). `/api/health`
- * answers "is the database up"; this row is what lets it also answer "is the
- * background worker running", which is the failure that otherwise looks
- * healthy while extraction silently never runs.
+ * One row per worker role, upserted on boot and every 15s, so `/api/health`
+ * can answer "is the background worker running" (CONTEXT.md, hostability
+ * contract 4).
  *
- * The key is `role`, not `instance`. One worker per role is what self-host
- * runs, so a role key makes idempotence across restarts structural rather
- * than dependent on a stable container name — restart the worker three times
- * and there is still exactly one row. When multiple instances per role ever
- * matter the key widens to (role, instance) without changing the reader's
- * question.
- *
- * `instance` and `pid` are stored for the operator reading the table, never
- * served: `/api/health` is unauthenticated, so the response carries only a
- * status and an age.
- *
- * Nothing here references an entity, so there is no ENTITY_REFS entry —
- * `entity-refs.test.ts` staying green is the proof.
+ * - Keyed on `role`, not `instance`: restarts leave exactly one row whatever
+ *   the container is named.
+ * - `instance` and `pid` are for the operator reading the table, never
+ *   served: `/api/health` is unauthenticated, so it carries only status + age.
  */
 export const workerHeartbeat = pgTable('worker_heartbeat', {
   role: text('role').primaryKey(),

@@ -14,12 +14,11 @@ import { visibility } from './kinds'
 import { objectDef } from './objects'
 
 /**
- * The payload types of this table's four jsonb columns. They are declared
- * here, at the columns that claim them, rather than in the filter module that
- * evaluates them (`apps/web/src/lib/views/filter.ts`, which re-exports every
- * name below): packages/db imports nothing internal, and a column's type has
- * one home (SPA-142). The evaluator, the op menu and the editor stay in the
- * app — they are readers of this shape, not the shape.
+ * The payload types of this table's four jsonb columns, declared at the
+ * columns that claim them: packages/db imports nothing internal, and a
+ * column's type has one home. The filter module (`matchesConditions`)
+ * re-exports every name; the evaluator, op menu and editor are readers of
+ * this shape, not the shape.
  */
 
 export type ConditionOp =
@@ -44,7 +43,7 @@ export type ViewExtra = Record<string, string | number | boolean | null>
 export type ViewColumns = Record<string, boolean>
 
 /**
- * Which list a view is saved against (D2, decided 2026-09-23). `object` is a
+ * Which list a view is saved against (D2). `object` is a
  * row of the object registry — `object_id` names it. `document` is
  * /documents, a research kind with no object row and no attribute registry,
  * so it carries no `object_id` at all. A third value is a migration to this
@@ -57,7 +56,7 @@ export type ViewSurface = (typeof viewSurface.enumValues)[number]
 
 /**
  * A view is a saved way of looking at one list (CONTEXT.md "Lists —
- * deferred", 2026-09-07): filter conditions, which columns show, one sort,
+ * deferred"): filter conditions, which columns show, one sort,
  * and any surface-specific extra (the deals stage chips). It holds no
  * values — anything worth saying about a record is an attribute on the
  * record. `surface` says which list; on the `object` surface `object_id`
@@ -72,7 +71,7 @@ export const view = pgTable(
     // Null exactly when the surface is not `object` — the check below.
     objectId: uuid('object_id').references(() => objectDef.id),
     name: text('name').notNull(),
-    // Array<{ slug, op, value? }> — see src/lib/views/filter.ts
+    // Array<{ slug, op, value? }> — see `Condition`
     filter: jsonb('filter').$type<Array<Condition>>().notNull().default([]),
     // { id, desc } | null — TanStack's single sort
     sort: jsonb('sort').$type<ViewSort>(),

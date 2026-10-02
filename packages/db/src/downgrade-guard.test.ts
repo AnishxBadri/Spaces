@@ -9,9 +9,8 @@ import { MIGRATIONS_FOLDER } from './migrate'
  * this package's real `drizzle/` folder. Neither needs a database.
  *
  * The end-to-end half — an image booted against a truncated journal, refusing
- * before either seed runs — lives in `apps/web/src/db/boot.test.ts`, because
- * what it proves is the *ordering of the boot composition*, and the
- * composition is the app's (SPA-142). This package has no seeds to run.
+ * before either seed runs — is the app's boot test: it proves the boot
+ * composition's ordering, and this package has no seeds to run.
  */
 
 describe('checkDowngrade (pure)', () => {
@@ -86,9 +85,7 @@ describe('readImageJournal', () => {
   /**
    * The cwd trap, as a test. `MIGRATIONS_FOLDER` is resolved from
    * `import.meta.url`, so it is absolute and reading it does not depend on
-   * where the process was started — which is the property that let the
-   * folder move from apps/web to packages/db without the journal moving with
-   * the caller (SPA-142).
+   * where the process was started.
    */
   it('resolves the migrations folder absolutely, not against cwd', () => {
     expect(path.isAbsolute(MIGRATIONS_FOLDER)).toBe(true)

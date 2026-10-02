@@ -19,28 +19,20 @@ import type { Json } from '../json'
  * Workspace-scoped keys. The index signature keeps the column honest about
  * the rest rather than pretending the set is closed.
  *
- * `sensitivity_default` (SPA-61) is the floor `resolveSensitivity` ORs every
- * record's own, space and binding inputs over; absent reads as `'normal'`.
- *
- * `ai_caps` (SPA-73) is the workspace's AI token cap — `daily_tokens` per
- * UTC day and `per_run_tokens` per call, each absent for no cap on that
- * axis; the key absent is no cap at all. `@spaces/core/ai/caps` is the
- * predicate that reads it.
- *
- * `embedding` (SPA-51) is the workspace's embedding pin — the provider and
- * model every vector is made with, the width they all have, and when it was
- * set; the key absent is no embedding model, and search is lexical only.
- * `apps/web/src/lib/ai/embedding-pin.ts` writes it; since SPA-136 it moves
- * to another model of the same width (the backfill re-embeds) and refuses a
- * change of width — that re-pin (ALTER COLUMN TYPE, index rebuild, full
- * re-embed) is not built.
- *
- * `embedding.sensitive` (SPA-83, D11) is the sensitive slot: a second,
- * local provider stored beside the pin, at the pin's width, that
- * `embed(texts, {sensitivity: 'sensitive'})` routes to when the pin is a
- * cloud provider. Absent, a sensitive embed is refused and the record is
- * left unembedded. It lives inside `embedding` so it goes where the pin goes
- * — a pin swap merges into the object rather than replacing it.
+ * - `sensitivity_default`: the floor `resolveSensitivity` ORs every record's
+ *   own, space and binding inputs over; absent reads as `'normal'`.
+ * - `ai_caps`: `daily_tokens` per UTC day and `per_run_tokens` per call, each
+ *   absent for no cap on that axis; the key absent is no cap at all. Read by
+ *   `capsFromSettings`.
+ * - `embedding`: the pin — provider, model, the width every vector has, and
+ *   when it was set; absent means no embedding model and lexical-only search.
+ *   `pinEmbeddingProgram` moves it to another model of the same width (the
+ *   backfill re-embeds) and refuses a change of width — that re-pin (ALTER
+ *   COLUMN TYPE, index rebuild, full re-embed) is not built.
+ * - `embedding.sensitive` (D11): a second, local provider at the pin's width
+ *   that a sensitive embed routes to when the pin is a cloud provider. Absent,
+ *   a sensitive embed is refused and the record is left unembedded. It lives
+ *   inside `embedding` so a pin swap merges into the object, not replaces it.
  */
 export type AiCapsSetting = {
   daily_tokens?: number
@@ -74,17 +66,12 @@ export type WorkspaceSettings = {
 /**
  * The workspace singleton — one deployment, one workspace, one row.
  *
- * This is an anchor for identity (sidebar name), the mandate, and
- * credential(scope: 'workspace'), which otherwise reference a ghost.
- *
- * The old hard rule — "NOT a tenancy boundary; no other table ever grows a
- * workspace_id FK" (CONTEXT.md, 2026-08) — was RESCINDED 2026-08-15 by the
- * owner's multi-workspace reversal: one install holds N workspaces (books)
- * and the user account is the only global object. This singleton is the
- * current build state, not the target shape; the CHECK and the magic id = 1
- * go away when multi-workspace lands (no deployments exist, no upgrade path
- * is owed). The CHECK
- * constraint makes the singleton structural rather than remembered.
+ * - Anchors identity (sidebar name), the mandate, and
+ *   credential(scope: 'workspace'), which otherwise reference a ghost.
+ * - The CHECK constraint makes the singleton structural rather than
+ *   remembered.
+ * - Not the target shape: one install holds N workspaces, and the CHECK and
+ *   magic id = 1 go away then (CONTEXT.md, "Single user first, team ready").
  */
 export const workspace = pgTable(
   'workspace',
@@ -108,12 +95,11 @@ export const workspace = pgTable(
 export const mandateStatus = pgEnum('mandate_status', ['active', 'archived'])
 
 /**
- * The mandate — the fund's prescriptive strategy (CONTEXT.md, 2026-08).
- * Prose lives in a real note (search, mentions, future AI screening all come
- * free); the few typed columns are the objective measures. Deliberately NOT
- * the attribute engine: one row, a registry buys nothing. `stages` holds
- * option ids from the company funding_stage vocabulary. One active mandate
- * per workspace — archived rows are prior vintages.
+ * The mandate — the fund's prescriptive strategy (CONTEXT.md, "Mandate").
+ * - Prose lives in a real note; the few typed columns are the objective
+ *   measures. Not the attribute engine: one row, a registry buys nothing.
+ * - `stages` holds option ids from the company funding_stage vocabulary.
+ * - One active mandate per workspace — archived rows are prior vintages.
  */
 export const mandate = pgTable(
   'mandate',

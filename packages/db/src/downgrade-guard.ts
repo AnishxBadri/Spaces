@@ -6,19 +6,12 @@ import { z } from 'zod'
 /**
  * Downgrade guard — an image refuses a database from the future.
  *
- * Drizzle's `migrate()` applies only the journal entries the database has not
- * seen. A database carrying migrations this image does not know about is not
- * an error to drizzle: it applies nothing, and old code starts against a new
- * schema. So `migrate.ts` asks this module first.
- *
- * Contract 5 (CONTEXT.md, hostability): "Backup is both-or-neither, and
- * rollback is restore. Never run an older image against a newer schema."
- * There is deliberately no override — an escape hatch would exist only to let
- * someone do the exact thing this guard is for.
- *
- * Matching rows to entries: `drizzle.__drizzle_migrations` stores `hash` and
- * `created_at` only, never the tag. `created_at` is the journal's `when`, so
- * that is the join key; the hash is drizzle's own sha256 of the .sql file.
+ * - Drizzle's `migrate()` treats unknown applied migrations as nothing to do,
+ *   so old code would start against a new schema; `runMigrations` asks this first.
+ * - Contract 5 (CONTEXT.md, hostability): "Never run an older image against
+ *   a newer schema." There is deliberately no override.
+ * - `drizzle.__drizzle_migrations` stores `hash` and `created_at` (the
+ *   journal's `when`), never the tag, so `when` is the join key.
  */
 
 export type JournalEntry = { tag: string; when: number; hash: string }
@@ -42,11 +35,11 @@ const journalSchema = z.object({
 })
 
 /**
- * The image's journal, tag included. The hashes come from drizzle's own
- * `readMigrationFiles` rather than a copy of its sha256 call, so the guard
- * and the migrator can never disagree about what a migration hashes to; the
- * journal supplies the tag, which `readMigrationFiles` drops. Both walk
- * `journal.entries` in order, so index i lines up.
+ * The image's journal, tag included.
+ * - Hashes come from drizzle's own `readMigrationFiles`, so the guard and the
+ *   migrator can never disagree about what a migration hashes to.
+ * - The journal supplies the tag `readMigrationFiles` drops; both walk
+ *   `journal.entries` in order, so index i lines up.
  */
 export function readImageJournal(
   migrationsFolder: string,
@@ -157,7 +150,7 @@ export function checkDowngrade(args: {
 }
 
 /**
- * The call `migrate.ts` makes: read both sides, decide. A fresh database (no
+ * The call `runMigrations` makes: read both sides, decide. A fresh database (no
  * migrations table) is always ok.
  */
 export async function inspectDowngrade(

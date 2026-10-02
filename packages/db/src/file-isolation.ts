@@ -10,12 +10,8 @@ import {
 import { user } from './schema/auth.ts'
 
 /**
- * The two halves of the per-file isolation regression test (SPA-145) —
- * `file-isolation-a.test.ts` and `file-isolation-b.test.ts` — are identical
- * apart from their tag, so the body lives here once.
- *
- * Like `test-db.ts` this is harness, not product: nothing that ships imports
- * it.
+ * The shared body of the two per-file isolation tests, which differ only by
+ * tag. Harness, not product: nothing that ships imports it.
  */
 
 export type PublicSchemaCounts = {
@@ -27,11 +23,9 @@ export type PublicSchemaCounts = {
 }
 
 /**
- * What the probe asserts about the database it was handed: the four tables a
- * probe writes are empty, and the drizzle journal is not. The journal is the
- * point of the last number — the truncate names tables in `public` only, and
- * `__drizzle_migrations` lives in the `drizzle` schema, so a truncate that
- * had grown teeth would show up here as a migration count of zero.
+ * Row counts for the four tables a probe writes, plus the drizzle journal.
+ * The journal lives outside `public`, so a truncate that reached past
+ * `public` shows up here as a migration count of zero.
  */
 export async function readPublicSchemaCounts(): Promise<PublicSchemaCounts> {
   const rows = await db.execute<{
@@ -60,10 +54,9 @@ export async function readPublicSchemaCounts(): Promise<PublicSchemaCounts> {
 }
 
 /**
- * One attribute, one view and one duplicate_candidate — the three rows
- * `cleanupTestEntities` could not reach, since none of them carries a name
- * for a regex to match. Left behind deliberately: the other half of the pair
- * is what proves they do not survive to the next file.
+ * One attribute, one view, one duplicate_candidate and their parents: rows
+ * with no name a cleanup could match. Left behind deliberately: the other
+ * half of the pair proves they do not survive to the next file.
  */
 export async function writeIsolationProbe(tag: string): Promise<void> {
   const [object] = await db

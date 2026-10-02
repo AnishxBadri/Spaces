@@ -16,25 +16,15 @@ import { integration } from './integrations'
 import { credential } from './vault'
 
 /**
- * The forwarding mailbox (SPA-56, arrival-1; decisions D30, D31, D49). An
- * address the fund forwards or BCCs mail to, owned by the operator and polled
- * over IMAP with an app password — no OAuth consent screen, no loader, no
- * registry, which is why this lane is core and not a plugin. Admin-only, one
- * row in practice; nothing here references `entity`, so it has no
- * `ENTITY_REFS` entry.
- *
- * `integration_id` is the provenance half. D1 made `source_ref` always name an
- * `integration` row, FK-enforced, so the core channel owns one such row
- * (`capability_id = 'core.mailbox'`) and every interaction, note and job run
- * this lane writes points at it.
- *
- * `last_uid` / `last_uid_validity` are the IMAP cursor. A UID is only
- * meaningful under the UIDVALIDITY it was read with: when the server changes
- * it (a folder recreated, a migrated mail store) every UID the cursor holds
- * names a different message or none, so the poll restarts from UID 1 and
- * leans on `interaction_message_id_unique` to skip what it already wrote.
- * Both are `bigint` because a UID is an unsigned 32-bit number and a Postgres
- * `integer` stops at 2^31.
+ * The forwarding mailbox: an operator-owned address polled over IMAP with an
+ * app password — core, not a plugin. Admin-only, one row in practice.
+ * (D30, D31, D49)
+ * - `integration_id`: the core channel's integration row
+ *   (`core.mailbox`), which every interaction, note and job run of this lane
+ *   names. (D1)
+ * - `last_uid` / `last_uid_validity`: the IMAP cursor. A UID means nothing
+ *   under another UIDVALIDITY, so a change restarts from UID 1, leaning on
+ *   `interaction_message_id_unique`. `bigint`: a UID is unsigned 32-bit.
  */
 
 /**

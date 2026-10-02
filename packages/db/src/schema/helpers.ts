@@ -2,7 +2,7 @@ import { customType } from 'drizzle-orm/pg-core'
 
 /**
  * Postgres types drizzle-orm doesn't ship natively.
- * Extensions (pg_trgm, ltree, unaccent, vector) are created in migration 0000.
+ * Extensions (pg_trgm, ltree, unaccent, vector) are created by the first migration.
  */
 
 export const tsvector = customType<{ data: string }>({

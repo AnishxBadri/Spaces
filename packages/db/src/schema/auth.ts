@@ -1,12 +1,12 @@
 import { boolean, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 /**
- * Better Auth tables (core + admin plugin). Shape matches what
- * `@better-auth/cli generate` emits for the drizzle adapter — verify with
- * `pnpm dlx @better-auth/cli generate` after auth config changes.
- *
- * This is the app-session store. Gmail/Calendar OAuth grants live in
- * account_connection (vault.ts) and are never conflated with these.
+ * Better Auth tables (core + admin plugin) — the app-session store.
+ * - Shape matches what `@better-auth/cli generate` emits for the drizzle
+ *   adapter — verify with `pnpm dlx @better-auth/cli generate` after auth
+ *   config changes.
+ * - Gmail/Calendar OAuth grants live in `accountConnection` and are never
+ *   conflated with these.
  */
 
 export const user = pgTable('user', {

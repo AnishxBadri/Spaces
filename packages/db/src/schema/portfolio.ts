@@ -17,26 +17,14 @@ import { entity } from './entities'
 import { user } from './auth'
 
 /**
- * The financial engine (CONTEXT.md phase 15, 2026-08). Everything is an
- * append-only dated event; every aggregate — ownership, MOIC, XIRR, NAV —
- * is derived at read, never stored. "As on <date>" views are filters over
- * these tables. Money stays in its original currency forever; conversion
- * is a read-time lookup against fx_rate (workspace.settings.base_currency).
- *
- * **A correction is an append (D12, SPA-150).** There is still no edit and no
- * delete path. `investment`, `mark` and `distribution` each carry a nullable
- * self-referencing `reverses_id`: a void appends an exact-negative event
- * citing the original, dated as the original was dated, and the partial
- * unique index on `reverses_id` makes a second void a database error rather
- * than a race. `batch_id` is the handle a bulk void grabs — nullable uuid,
- * deliberately no FK, because the table that owns a batch does not exist yet
- * (import-9 and ai-22 stamp it; a later migration adds the FK).
- *
- * `fx_rate` is excluded on purpose: it is a lookup, not a summed event. It
- * carries a `rate_to_base > 0` CHECK that a negated row would violate, and
- * `setFxRate` already upserts on (currency, date) — correcting a rate
- * recomputes every derived number, so there is nothing for a reversal to
- * undo.
+ * The financial engine (CONTEXT.md, "Build record", Portfolio layer).
+ * - Every row is an append-only dated event; every aggregate (ownership,
+ *   MOIC, XIRR, NAV) is derived at read, never stored.
+ * - Money stays in its original currency; conversion is a read-time fx_rate
+ *   lookup against the workspace base currency.
+ * - A correction is an append: no edit and no delete path. A void is an
+ *   exact-negative event citing the original via `reverses_id`, dated as the
+ *   original was. `fx_rate` has no reversal — it is a lookup. (D12)
  */
 
 /**
@@ -63,10 +51,10 @@ export const holding = pgTable(
 
 /**
  * A financing event in a company — ours or not (rounds we passed on still
- * shape dilution). `kind` is free text sharing the funding-stage vocabulary,
- * not an enum: enum-narrowing needs hand-written data deletes (0010 lesson).
- * shares_outstanding is the FULLY DILUTED count post-round; with
- * price_per_share it powers the ownership ledger.
+ * shape dilution).
+ * - `kind` is free text sharing the funding-stage vocabulary, not an enum:
+ *   narrowing an enum needs hand-written data deletes.
+ * - shares_outstanding is the FULLY DILUTED count post-round.
  */
 export const round = pgTable(
   'round',
@@ -116,9 +104,9 @@ export const roundCoInvestor = pgTable(
 )
 
 /**
- * Instrument subtypes carry ownership semantics (CONTEXT.md, 2026-08):
- * post-money SAFEs lock implied % at signing (amount ÷ cap); pre-money
- * SAFEs and CCDs are cost-basis-only until conversion — a % is never faked.
+ * Instrument subtypes carry ownership semantics: post-money SAFEs lock
+ * implied % at signing (amount ÷ cap); pre-money SAFEs and CCDs are
+ * cost-basis-only until conversion — a % is never faked.
  */
 export const instrument = pgEnum('instrument', [
   'priced',
@@ -252,10 +240,11 @@ export const distribution = pgTable(
 )
 
 /**
- * Sparse manual rates to the workspace base currency (2026-08-06 decision).
- * Lookup is latest rate ≤ event date; a missing rate is surfaced, never
- * silently 1.0. Cash flows convert at transaction-date rates, marks at
- * current/as-of rates — FX gain/loss lands inside base-currency performance.
+ * Sparse manual rates to the workspace base currency.
+ * - Lookup is latest rate ≤ event date; a missing rate is surfaced, never
+ *   silently 1.0.
+ * - Cash flows convert at transaction-date rates, marks at current/as-of
+ *   rates — FX gain/loss lands inside base-currency performance.
  */
 export const fxRate = pgTable(
   'fx_rate',

@@ -4,53 +4,21 @@ import { attribute } from './schema/attributes.ts'
 
 /**
  * Per-attribute expression indexes over `entity.values`, reconciled from the
- * registry (SPA-93 — CONTEXT.md, _Open questions_, `values jsonb` indexing
- * strategy, closed here).
- *
- * The recorded answer was "an expression index per attribute, minted at
- * attribute creation behind a filterable/sortable flag, not a GIN over the
- * universe" — a GIN on `values` would index every key of every row to serve
- * the two or three fields anybody actually sorts a twenty-thousand-row
- * object by, and would still not order anything.
- *
- * **Why this is DDL from application code and not a drizzle migration.**
- * The set of indexes is a function of user data — which attributes a fund
- * flagged — not of the schema, so there is no migration that could contain
- * it: it changes when somebody ticks a checkbox. That is also why it is a
- * *reconciler* rather than a create-and-drop pair bolted to the write path.
- * `CREATE INDEX CONCURRENTLY` cannot run inside a transaction, so the mint
- * happens after the attribute write commits, which means it can be
- * interrupted between the two; a diff that runs again at every boot heals
- * that by construction, the same shape `seedSystemAttributes()` already
- * uses. A failed mint is logged and returned, never thrown: the attribute
- * is perfectly usable without its index — the list is just as slow as it
- * was before the tick — and the next boot tries again.
- *
- * **Why the index leads with `object_id`.** Every read of this table is
- * scoped to one object and passes that id as a *parameter*
- * (`lib/views/records.ts`). A partial index `where object_id = '<literal>'`
- * would be unusable by a generic plan, and Postgres will not prove a
- * parameter equals a literal. A composite whose first column is `object_id`
- * needs no proof: `object_id = $1` is an ordinary equality on the leading
- * key, which both restricts the scan and collapses the index's pathkeys
- * onto the second column — that collapse is what lets the paged query's
- * `order by <sort key>` be answered by the index instead of by sorting the
- * object. `value-indexes.test.ts` asserts the plan rather than trusting it.
- *
- * **What the second column is.** Exactly the expression the compiled sort
- * key emits (`compileSortKey` in `apps/web/src/lib/views/sql.ts`):
- * `spaces_json_text(values -> '<slug>')` for every type but the three
- * numeric ones, which get `spaces_json_number(...)` because a number sorted
- * as text is not sorted. Those two functions are migration 0041's, and they
- * exist *because* of this file — the coercions used to be inline CASEs, and
- * Postgres refuses a subquery in an index expression, so nothing could be
- * indexed until they moved into the database.
- *
- * `isNumericType` is passed in rather than copied: it lives in
- * `@spaces/core/views/filter` beside the browser evaluator that has to
- * branch the same way, and that module says in so many words that a second
- * copy of the set is a divergence a property test can only report after the
- * fact. packages/db imports nothing internal, so the caller hands it over.
+ * flagged attributes. Not a GIN over `values`. (CONTEXT.md, _Open questions_,
+ * `values jsonb` indexing strategy)
+ * - DDL from application code, never the drizzle journal: the set is a
+ *   function of user data.
+ * - `CREATE INDEX CONCURRENTLY` cannot run inside a transaction, so the mint
+ *   runs after the attribute write commits; the boot-time diff heals one
+ *   interrupted between the two. A failed mint is logged, never thrown.
+ * - Composite `(object_id, <expr>)`, not partial on a literal object id:
+ *   reads pass the object id as a bind parameter.
+ * - `<expr>` must be exactly what `compileSortKey` emits, or the index sits
+ *   unused: `spaces_json_number` for numeric types (a number sorted as text
+ *   is not sorted), `spaces_json_text` for the rest. Both are SQL functions
+ *   because Postgres refuses a subquery in an index expression.
+ * - `isNumericType` is passed in, not copied: this package imports nothing
+ *   internal, and a second copy of the set would drift from the evaluator.
  */
 
 /** Every index this module owns starts with it, and nothing else may. */
@@ -101,9 +69,8 @@ export type ValueIndexOutcome = {
 
 export type ReconcileOptions = {
   /**
-   * `isNumericType` from `@spaces/core/views/filter` — which attribute types
-   * the sort key compiles numerically. See the note above on why this is an
-   * argument.
+   * Core's `isNumericType`: which attribute types the sort key compiles
+   * numerically. See the module note on why this is an argument.
    */
   isNumericType: (type: string) => boolean
   /**
@@ -153,10 +120,8 @@ export async function reconcileValueIndexes(
   const run =
     options.execute ?? ((statement: string) => db.execute(sql.raw(statement)))
 
-  // Flagged and live. Either flag mints the one index: a reader who can
-  // filter on a field sorts by it next, and the two capabilities want the
-  // same btree. The columns stay apart for the reconciler's own sake and
-  // for whatever later UI separates them.
+  // Flagged and live. Either flag mints the one index: filtering and
+  // sorting want the same btree.
   const wanted = await db.execute<{ id: string; slug: string; type: string }>(
     sql`select ${attribute.id} as id, ${attribute.slug} as slug, ${attribute.type}::text as type
         from ${attribute}

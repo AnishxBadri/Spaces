@@ -9,10 +9,9 @@ import {
 import { user } from './auth'
 
 /**
- * The two keys a custom object may declare as identity (spec §9, CONTEXT.md
- * "Two-tier object model", 2026-09-19). `email` and `cin` are core doctrine —
- * the free-mail and role-prefix rules are about people and companies and mean
- * nothing on a bag — so they are refused rather than listed here.
+ * The two keys a custom object may declare as identity (CONTEXT.md "Two-tier
+ * object model"). `email` and `cin` are refused: their free-mail and
+ * role-prefix rules are about people and companies and mean nothing on a bag.
  */
 export type IdentityKey = 'domain' | 'linkedin'
 
@@ -34,11 +33,10 @@ export const objectDef = pgTable(
     plural: text('plural').notNull(),
     icon: text('icon'),
     /**
-     * Opt-in identity (spec §9). Declaring a key materializes its backing
-     * attribute in the same transaction — slug `domain` type `domain`, slug
-     * `linkedin` type `url`, carrying `options.identityKey` so the write path
-     * finds it without guessing. Empty for every core object: their identity
-     * is core-owned and lives in `entity_alias`, not here.
+     * Opt-in identity. Declaring a key materializes its backing attribute in
+     * the same transaction (slug `domain` type `domain`, slug `linkedin` type
+     * `url`), carrying `options.identityKey` so the write path finds it.
+     * Empty for every core object: their identity lives in `entity_alias`.
      */
     identityKeys: text('identity_keys')
       .array()

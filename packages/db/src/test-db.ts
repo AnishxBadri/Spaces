@@ -5,35 +5,14 @@ import { runMigrations } from './migrate.ts'
 import type { SqlQuery } from './downgrade-guard.ts'
 
 /**
- * The test database — derived, created, migrated (SPA-143), and since
- * SPA-145 one per vitest worker, truncated between files.
- *
- * Until this module existed the suite ran against whatever `DATABASE_URL`
- * named, which in every developer checkout is the *dev* database the running
- * app is showing: ten files opened a connection and wrote entities,
- * attributes, links and activity into it. This gives the suite its own
- * database on the same server — same Postgres, second database, so
- * `docker-compose.dev.yml` is untouched.
- *
- * `spaces_test` is the reference database: global setup creates it, migrates
- * it and (in apps/web) seeds it, and it is the one `pnpm db:migrate:run`
- * should be pointed at to check that a suite run left the journal alone. The
- * *workers* never touch it. Each gets a sibling — `spaces_test_web1`,
- * `spaces_test_db1`, … — because isolation is per file: a worker truncates
- * every table in `public` before each of its files, and a truncate in one
- * worker's database must not be able to reach another worker's file
- * mid-test. `drizzle.__drizzle_migrations` and the `pgboss` schema are out of
- * reach of that truncate by construction: it only ever names tables in
- * `public`.
- *
- * Nothing here ever drops a database. The only DDL it issues is
- * `create database` and `truncate`, and it refuses outright when the database
- * it derived is the one `DATABASE_URL` names. Dropping `spaces_test*` is a
- * human typing `dropdb` — after which the next run recreates it.
- *
- * This module is the harness, not the product: it is imported by the two
- * `vitest.config.ts` files, the two global setups and the two per-file setups,
- * and by nothing that ships.
+ * The test harness: derives, creates and migrates the suite's own databases on
+ * the dev Postgres, one per vitest worker, truncated between files.
+ * - `spaces_test` is the reference database; workers never write to it. Each
+ *   worker owns a sibling (`spaces_test_web1`, `spaces_test_db1`, …) so one
+ *   worker's truncate cannot reach another worker's file mid-test.
+ * - Nothing here ever drops a database. The only DDL is `create database` and
+ *   `truncate`, and it refuses when the derived database is `DATABASE_URL`'s.
+ * - Harness, not product: imported by vitest configs and setups only.
  */
 
 /** `.env.local` at the workspace root, resolved from this file, never cwd. */
@@ -42,12 +21,10 @@ const ENV_FILES = ['.env.local', '.env'].map((name) =>
 )
 
 /**
- * One advisory-lock key for the whole harness. `turbo run test` runs
- * `@spaces/web` and `@spaces/db` in parallel and both call
- * `prepareTestDatabase`, so "create if absent" and "apply the journal" are
- * both races without it: two `create database` statements for one name, or
- * two migrators applying the same migration. The number is arbitrary and
- * only has to be the same in both processes.
+ * One advisory-lock key for the whole harness.
+ * - turbo runs every package's `test` at once, so "create if absent", "apply
+ *   the journal" and seeding all race without it.
+ * - The number is arbitrary; it only has to be the same in every process.
  */
 const HARNESS_LOCK = 143_000_143
 
@@ -63,9 +40,8 @@ export type TestDatabaseReady = {
 }
 
 /**
- * The workspace `.env.local`, as a plain object — the same load both vitest
- * configs already did, in one place now because the global setups need it
- * too (vitest's `test.env` reaches the workers, not the setup file).
+ * The workspace `.env.local`, as a plain object, for configs and global
+ * setups alike (vitest's `test.env` reaches the workers, not the setup file).
  */
 export function loadWorkspaceEnv(): Record<string, string> {
   const out: Record<string, string> = {}
@@ -138,28 +114,19 @@ export function resolveTestDatabaseUrl(
 }
 
 /**
- * How many vitest workers `@spaces/web` runs, and therefore how many worker
- * databases its global setup builds. It lives here rather than in the config
- * because the name and the count are one decision: `vitest.config.ts` passes
- * it as `maxWorkers`, the global setup loops to it, and the per-file setup
- * indexes into the result with `VITEST_POOL_ID`, which vitest documents as
- * `1…maxWorkers`.
- *
- * Four, measured on an 8-core box: `@spaces/web` runs in 9.4s at two workers,
- * 5.3s at four and 6.0s at six — past four the workers contend for one
- * Postgres and each one is another database to create, migrate and keep.
- * Change it here and nowhere else: the global setup builds exactly this many
- * databases, and a run given more workers than this from the command line is
- * refused by the per-file setup rather than quietly putting two workers on
- * one database.
+ * How many vitest workers a multi-worker suite runs, and so how many worker
+ * databases its global setup builds (the config's `maxWorkers`; the per-file
+ * setup indexes by `VITEST_POOL_ID`, `1…maxWorkers`).
+ * - Change it here and nowhere else. A run given more workers is refused by
+ *   the per-file setup rather than putting two workers on one database.
+ * - Four was measured fastest; past it the workers contend for one Postgres.
  */
 export const TEST_WORKERS = 4
 
 /**
- * The database one worker of one suite owns — `spaces_test` plus the suite's
- * name and the worker's pool id, so `@spaces/web`'s worker 2 is
- * `spaces_test_web2` and never collides with `@spaces/db`'s `spaces_test_db1`
- * while turbo runs the two `test` tasks in parallel.
+ * The database one worker of one suite owns: the base name plus suite name
+ * plus pool id (`spaces_test_web2`), so suites turbo runs in parallel never
+ * share one.
  */
 export function workerDatabaseUrl(
   baseUrl: string,
@@ -185,18 +152,10 @@ export function currentPoolId(env: Record<string, string | undefined>): number {
 /**
  * Empty every table in `public`, which is the whole of what a test file may
  * have written, and nothing else.
- *
- * The exclusions are structural rather than a deny-list: the drizzle journal
- * is `drizzle.__drizzle_migrations` and pg-boss keeps its state in the
- * `pgboss` schema (`apps/web/src/lib/queue.ts` names it), so restricting the
- * statement to `schemaname = 'public'` cannot reach either. That is why this
- * reads `pg_tables` instead of taking a list: a table added by a migration
- * next month is truncated without anyone remembering to add it, which is the
- * failure mode of the eleven-table hand-written cleanup this replaced.
- *
- * One statement for all of them — `truncate a, b, c` does not care about
- * foreign keys between the tables it names, and `cascade` covers anything
- * left. `restart identity` matters for the two serial columns.
+ * - Structural, not a list: `drizzle.__drizzle_migrations` and the `pgboss`
+ *   schema are outside `public`, and a new table is covered unasked.
+ * - One statement: `truncate a, b, c` ignores FKs among the tables it names,
+ *   `cascade` covers the rest, `restart identity` resets the serial columns.
  */
 export async function truncatePublicTables(query: SqlQuery): Promise<number> {
   const found = await query(
@@ -209,17 +168,14 @@ export async function truncatePublicTables(query: SqlQuery): Promise<number> {
 }
 
 /**
- * Connect, or fail naming the server. This is the whole point of doing it in
- * a global setup: with Postgres down the old suite threw ECONNREFUSED ten
- * times, once per DB-coupled file, and said nothing about which database it
- * had failed to reach.
+ * The reason a connect failed, for an error that names the server once
+ * instead of every file throwing a bare ECONNREFUSED.
  */
 function describeCause(cause: unknown): string {
   if (cause instanceof Error) {
     if (cause.message !== '') return cause.message
-    // Node's happy-eyeballs AggregateError is the one that matters here — a
-    // refused connection arrives with an empty message and the reason on
-    // `code`, which is how "cannot reach Postgres at … — ." got shipped once.
+    // Node's happy-eyeballs AggregateError arrives with an empty message and
+    // the reason on `code`.
     if ('code' in cause) return String(cause.code)
   }
   return String(cause)
@@ -270,17 +226,12 @@ async function ensureDatabase(url: string): Promise<boolean> {
 }
 
 /**
- * Derive, create if absent, migrate, seed — and point `process.env.DATABASE_URL`
- * at the result before returning, because `@spaces/db`'s `db` builds its pool
- * from that variable at *import* time. A caller that seeds must therefore
- * `await import` its seeds after this resolves, not at the top of its file —
- * or, better, pass `seed`, which runs inside the harness lock (SPA-181
- * review): the reference database is seeded by three global setups now
- * (apps/web, apps/worker, packages/core), turbo runs their `test` tasks in
- * parallel, and two insert-if-absent seeders released from the lock at the
- * same moment both saw "absent" and both inserted the system attributes. A
- * seed run before the lock is released finds the rows the previous seeder
- * left and inserts nothing.
+ * Derive, create if absent, migrate, seed, and point `process.env.DATABASE_URL`
+ * at the result before returning.
+ * - `db` builds its pool from that variable at *import* time, so a caller that
+ *   seeds must `await import` its seeds after this resolves, or pass `seed`.
+ * - Pass `seed` when several setups seed one database: it runs inside the
+ *   harness lock, so two insert-if-absent seeders cannot both see "absent".
  */
 export async function prepareTestDatabase(
   env: Record<string, string | undefined>,
@@ -298,11 +249,9 @@ export async function prepareTestDatabase(
 }
 
 /**
- * The same create-and-migrate for a database whose name the caller already
- * holds — the worker databases, which a global setup builds by looping
- * `workerDatabaseUrl` over `TEST_WORKERS`. They are siblings of the url
- * `resolveTestDatabaseUrl` derived, so the "is this the app's database"
- * guard has already run on the name they were derived from.
+ * The same create-and-migrate for a database the caller already named: the
+ * worker databases from `workerDatabaseUrl`. No "is this the app's database"
+ * guard here; it ran on the `resolveTestDatabaseUrl` name they derive from.
  */
 export async function prepareDatabase(
   url: string,

@@ -18,9 +18,8 @@ import { note } from './kinds'
 import type { Json } from '../json'
 
 /**
- * Interaction graph. Gmail sync is post-MVP (forward-only when it lands),
- * but the tables exist from migration one — relationship intelligence is a
- * live query over interaction_entity weighted by recency + frequency.
+ * Interaction graph. Relationship intelligence is a live query over
+ * interaction_entity weighted by recency + frequency.
  */
 
 export const interactionKind = pgEnum('interaction_kind', [
@@ -36,14 +35,9 @@ export const interaction = pgTable(
     kind: interactionKind('kind').notNull(),
     /**
      * Which lane produced the interaction — as a class, and the vendor as a
-     * row (SPA-137, migration 0030). `interaction_source` named five of them
-     * in the type itself (`email_sync`, `forwarding`, `calendar`, `recorder`,
-     * `whatsapp`), which is the shape a third-party plugin cannot migrate:
-     * a Fireflies plugin would have had to ALTER a shared enum to say it
-     * wrote a row. A Calendar meeting and a WhatsApp export are still
-     * different evidence with different trust — the difference is now
-     * `source_ref`, which names the installed integration rather than the
-     * product category.
+     * row: `source_ref` names the installed integration, not a product
+     * category. Not a vendor-named enum, which a plugin would have to ALTER to
+     * say it wrote a row. (CONTEXT.md "Interactions and enrichment")
      */
     sourceClass: sourceClass('source_class').notNull().default('manual'),
     /** The integration that wrote the row; null for every other class. */
@@ -54,19 +48,11 @@ export const interaction = pgTable(
     threadId: text('thread_id'),
     subject: text('subject'),
     /**
-     * The interaction's write-up, as a real note row (CONTEXT.md →
-     * "Interactions and enrichment", decided 2026-09-14; built SPA-123).
-     * `interaction` never had a body column, so this is the whole of the
-     * unification: the structured event keeps kind / occurred_at / attendees
-     * and the prose lives in `note`, where one editor, one mention system and
-     * one search index already are.
-     *
-     * **Nullable, and lazily filled.** A call logged in twenty seconds with
-     * nothing written should not manufacture an empty note row — the plain
-     * "Log meeting" path leaves this null, and "Log and write up" is what
-     * sets it. The `interaction_note_unique` index below stops two
-     * interactions claiming one body; being partial by nature of a unique
-     * index over NULLs, it says nothing about the many bodyless rows.
+     * The interaction's write-up, as a real note row; the structured event
+     * stays here. (CONTEXT.md "Interactions and enrichment")
+     * - Nullable, and lazily filled: a call logged with nothing written must
+     *   not manufacture an empty note row. "Log and write up" sets it.
+     * - `interaction_note_unique` stops two interactions claiming one body.
      */
     noteId: uuid('note_id').references(() => note.entityId),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
@@ -124,11 +110,10 @@ export const signal = pgTable(
       .notNull()
       .defaultNow(),
     /**
-     * Who wrote the signal (D57, sdk-7a): the same pair `entity` and
-     * `entity_alias` carry. `source` stays as the display text; these two
-     * are the provenance a plugin cannot forge — `Content.emitSignal`
-     * (sdk-7b) writes the bound integration's id from the port, never from
-     * the plugin. Rows from before the column are `manual`.
+     * Who wrote the signal (D57): the same pair `entity` and `entity_alias`
+     * carry. `source` stays as the display text; these two are the provenance
+     * a plugin cannot forge — `Content.emitSignal` writes the bound
+     * integration's id from the port, never from the plugin.
      */
     sourceClass: sourceClass('source_class').notNull().default('manual'),
     sourceRef: uuid('source_ref').references(() => integration.id),
@@ -161,9 +146,9 @@ export const enrichmentRecord = pgTable(
     raw: jsonb('raw').$type<Json>().notNull(),
     creditsUsed: integer('credits_used'),
     /**
-     * The integration whose call this is (D57, sdk-7a), written by
-     * `Receipts.store` from the bound row. Nullable only for rows from
-     * before the column; the port always sets it.
+     * The integration whose call this is (D57), written by `Receipts.store`
+     * from the bound row. Nullable only for legacy rows; the port always
+     * sets it.
      */
     integrationId: uuid('integration_id').references(() => integration.id),
     fetchedAt: timestamp('fetched_at', { withTimezone: true })

@@ -11,32 +11,22 @@ import { entity } from './entities'
 import { integration } from './integrations'
 
 /**
- * The attempt ledger (`docs/spec-plugin-sdk.md` §11). One row per pg-boss
- * attempt, written by `runJob` and by nothing else: extraction, every plugin
- * job the SDK registers, the storage list job and the ingest job all inherit
- * the row rather than each instrumenting itself. The wrapper is the only
- * place that knows when an attempt started, which attempt it was, and how it
- * ended, so it is the only place that can write this honestly — a handler
- * that logged its own run would miss the two cases that matter most, a defect
- * and a job whose data never parsed.
+ * The attempt ledger (docs/spec-plugin-sdk.md §11): one row per pg-boss
+ * attempt, answering "did the work run, when, and how did it end".
  *
- * Both refs are nullable because both are genuinely absent half the time: a
- * core job has no integration, and a sweep has no entity.
- *
- * There is deliberately **no `tokens` column**. Spec §11's sketch carries one;
- * it is overridden here. An attempt that is retried would double-count its
- * tokens against a job whose row is per-attempt, and the ledger has no way to
- * tell a re-charged call from a replayed one. Token accounting belongs to
- * `ai_usage` (the per-call ledger) with ai-25a's `ai_run` as its rollup; this
- * table answers "did the work run, when, and how did it end".
+ * - Written by `runJob` and by nothing else — only the wrapper knows when an
+ *   attempt started, which attempt it was and how it ended; a handler logging
+ *   its own run would miss a defect and a job whose data never parsed.
+ * - Both refs are nullable: a core job has no integration, a sweep no entity.
+ * - Deliberately **no `tokens` column**; token accounting is `ai_usage` with
+ *   `ai_run` as its rollup.
  */
 
 /**
- * `running` is the birth state — the row exists before the outcome does, so an
- * attempt that dies with the worker is visible as a run that never finished.
- * `skipped` is pinned here rather than added later: sdk-16's cache hits and
- * cap refusals need the word, and an enum value is a migration. Nothing in
- * this slice writes it.
+ * - `running` is the birth state — the row exists before the outcome does, so
+ *   an attempt that dies with the worker is visible as a run that never finished.
+ * - `skipped` is for cache hits and cap refusals, declared up front because
+ *   an enum value is a migration.
  */
 export const jobRunStatus = pgEnum('job_run_status', [
   'running',
@@ -68,16 +58,15 @@ export const jobRun = pgTable(
     durationMs: integer('duration_ms'),
     /**
      * The wrapper's typed outcome tag, then its reason — `permanent: No
-     * stored file to extract text from`. Not a replacement for the operator
-     * text a tenant writes on its own row (`document.extraction_error`): this
-     * column is a per-attempt classification on a prunable ledger, and that
-     * one is the current state of the document, which outlives every run.
+     * stored file to extract text from`. A per-attempt classification on a
+     * prunable ledger; not a replacement for a tenant's own current-state text
+     * (`document.extraction_error`), which outlives every run.
      */
     error: text('error'),
     /**
      * What a successful attempt did, in the one line its handler returned —
-     * `fetched 3 · written 1 · duplicate 1 · refused 1 (auto-submitted 1)`
-     * (SPA-56). Null for a handler that returns nothing, and for every failed
+     * `fetched 3 · written 1 · duplicate 1 · refused 1 (auto-submitted 1)`.
+     * Null for a handler that returns nothing, and for every failed
      * attempt, whose account is `error`. Still written only by `runJob`.
      */
     summary: text('summary'),

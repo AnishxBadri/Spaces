@@ -24,16 +24,15 @@ import type { Json } from '../json'
 
 /**
  * The payload of `attribute.options`, declared at the column that claims it
- * and re-exported by the registry that validates against it
- * (`apps/web/src/lib/attributes/registry.ts` — SPA-142). Only the shapes
- * moved: the type menu, the validators, the seeded SYSTEM_ATTRIBUTES and the
- * badge palette are behaviour and stayed in the app.
+ * and re-exported by the attribute registry that validates against it. Only
+ * the shapes live here: the type menu, the validators, `SYSTEM_ATTRIBUTES`
+ * and the badge palette are behaviour and live with the registry.
  */
 
 /** The three core object kinds; `entity.kind` is the wider vocabulary. */
 export type ObjectKind = 'company' | 'person' | 'deal'
 
-/** The badge colour vocabulary — `apps/web/src/lib/attributes/colors.ts`. */
+/** The badge colour vocabulary; `BADGE_COLORS` is the list. */
 export type BadgeColor =
   | 'slate'
   | 'blue'
@@ -60,15 +59,14 @@ export type SelectOption = {
 }
 
 /**
- * AI attribute config (SPA-72, docs/spec-ai-substrate.md §13). **The spec's
- * `attribute.config.ai` and this `attribute.options.ai` are the same thing**:
- * there is no `config` column — the per-type blob is `attribute.options`
- * jsonb, so the spec's name for it is this key. Config on the existing
- * types, never a new type: the fifteen-type menu stays frozen, and a custom
- * object's attribute carries it exactly as a core one does. The mode × type
- * matrix and the mode → lane map live in `@spaces/core/ai/attribute-ai`;
- * `updateAttributeProgram` refuses a mode the type cannot hold and writes
- * `lane` from the mode, so the stored lane is never a second opinion.
+ * AI attribute config (spec-ai-substrate §13) — the spec's
+ * `attribute.config.ai` is this `attribute.options.ai`; there is no `config`
+ * column.
+ * - Config on the existing types, never a new type: the fifteen-type menu
+ *   stays frozen, and a custom object's attribute carries it as a core one does.
+ * - `AI_MODE_TYPES` and `AI_MODE_LANE` are the mode × type matrix and mode →
+ *   lane map; `updateAttributeProgram` refuses a mode the type cannot hold and
+ *   writes `lane` from the mode, so the stored lane is never a second opinion.
  */
 export type AiAttributeMode = 'classify' | 'summarize' | 'prompt' | 'research'
 export type AiAttributeConfig = {
@@ -108,7 +106,7 @@ export type AttributeOptions = {
    * (`validateDefault`), resolved at record birth (`resolveDefault`).
    */
   default?: Json
-  /** AI attribute config (SPA-72) — the spec's `attribute.config.ai`; see `AiAttributeConfig`. */
+  /** AI attribute config — the spec's `attribute.config.ai`; see `AiAttributeConfig`. */
   ai?: AiAttributeConfig
 }
 
@@ -147,8 +145,8 @@ export const attribute = pgTable(
       .references(() => objectDef.id),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
-    // Optional, human-facing. The expansion path (spec §8) later feeds it to
-    // the AI extract lane as prompt context; today it's help text.
+    // Optional, human-facing help text; `schemaFor` also hands it to the AI
+    // extract lane as the property's description (spec §8).
     description: text('description'),
     type: attributeType('type').notNull(),
     /**
@@ -159,22 +157,12 @@ export const attribute = pgTable(
      */
     options: jsonb('options').$type<AttributeOptions>().notNull().default({}),
     /**
-     * Engine properties, not per-type config (SPA-93). `options` is the bag
-     * `buildOptions` polices — every key in it means something to exactly one
-     * attribute type, and nothing reads it in SQL. These two are the
-     * opposite: they mean the same thing for all fifteen types, and
-     * `reconcileValueIndexes()` reads them in a `select` to decide which
-     * `attr_idx_<id>` expression indexes must exist. A jsonb key would make
-     * that diff a `options ->> 'filterable' = 'true'` string comparison over
-     * a column with no constraint behind it, and would let a typo create an
-     * attribute that is silently unindexed. Real booleans, not-null, default
-     * false: off is the shape of a new attribute, and the reconciler's read
-     * is a column scan the planner understands.
-     *
-     * They are set together by one dialog control today — a user does not
-     * distinguish "filter on this" from "sort on this" — and stay two
-     * columns because the reconciler and any later per-capability UI want
-     * them apart.
+     * Engine properties, not `options` keys: they mean the same thing for all
+     * fifteen types, and `reconcileValueIndexes()` reads them in a `select` to
+     * decide which `attr_idx_<id>` indexes must exist. (D36; CONTEXT.md "Open
+     * questions", values jsonb indexing)
+     * - One dialog control sets both; they stay two columns because the
+     *   reconciler and any later per-capability UI want them apart.
      */
     filterable: boolean('filterable').notNull().default(false),
     sortable: boolean('sortable').notNull().default(false),
@@ -192,7 +180,7 @@ export const attribute = pgTable(
 )
 
 /**
- * `actor_type` lives in `./actors` (SPA-46) so `suggestion` can use it
+ * `actor_type` lives in `./actors` so `suggestion` can use it
  * without importing this module back: `attribute_event.suggestion_id`
  * references `suggestion`, and a two-way import between the two schema files
  * would hand one of them an uninitialised enum at module evaluation.
@@ -242,27 +230,21 @@ export const attributeEvent = pgTable(
      */
     actorRef: uuid('actor_ref').references(() => integration.id),
     source: attributeEventSource('source').notNull().default('direct'),
-    // The accepted suggestion this value came from (SPA-46). `set null` on
+    // The accepted suggestion this value came from. `set null` on
     // delete: a suggestion row only dies with its entity (ENTITY_REFS
     // `suggestion.entity` cascades), and the event must never be what makes
     // that delete order-sensitive.
     suggestionId: uuid('suggestion_id').references(() => suggestion.id, {
       onDelete: 'set null',
     }),
-    // Citation refs — spec-ai-substrate `ContextItem.ref` ids, or an
-    // enrichment_record id. Array of strings; null when there's no receipt.
-    // jsonb here, `text[]` on `suggestion.refs`: this column predates the
-    // suggestion table and is written by every door (enrichment ids, merge,
-    // import), so its shape is a JSON payload decoded at the column; the
-    // suggestion's refs are one flat list of ContextItem ids that the review
-    // queue filters on (`= ANY(refs)`), which is what a native array is for.
-    // Accept copies one into the other unchanged.
+    // Citation refs — `ContextItem.ref` ids, or an enrichment_record id; null
+    // when there's no receipt. jsonb here, `text[]` on `suggestion.refs`,
+    // which the review queue filters with `= ANY(refs)`. Accept copies one
+    // into the other unchanged.
     refs: jsonb('refs').$type<Array<string>>(),
-    // The import batch whose commit wrote this value (SPA-169), so every
-    // imported cell — and every default its birth fired — is findable by the
-    // batch that brought it. Not `refs`: those are citations a reader follows
-    // to a source, a flat list of mixed kinds with no index; this is one
-    // typed foreign key a "what did this import write?" query filters on.
+    // The import batch whose commit wrote this value, so every imported cell —
+    // and every default its birth fired — is findable by its batch. A typed
+    // FK, not a `refs` entry: refs are citations a reader follows.
     // `set null` on delete: the receipt outlives the staging rows.
     batchId: uuid('batch_id').references(() => importBatch.id, {
       onDelete: 'set null',
@@ -277,10 +259,9 @@ export const attributeEvent = pgTable(
       .on(t.batchId)
       .where(sql`${t.batchId} is not null`),
     // actor_type = 'user' ⇔ actor_id set, and actor_type = 'integration' ⇔
-    // actor_ref set (spec §4 invariant, both halves). Biconditionals, not
-    // implications: a `system` row carrying an integration id would be a
-    // provenance lie in the other direction, and an integration write that
-    // cannot say *which* integration is the hole this column closes.
+    // actor_ref set (spec §4; D1). Biconditionals, not implications: a
+    // `system` row carrying an integration id is a provenance lie, and an
+    // integration write that cannot say *which* integration is a hole.
     check(
       'attribute_event_actor_invariant',
       sql`(${t.actorType} = 'user') = (${t.actorId} IS NOT NULL) AND (${t.actorType} = 'integration') = (${t.actorRef} IS NOT NULL)`,

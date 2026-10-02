@@ -7,29 +7,14 @@ import { accountConnection } from './schema/vault.ts'
 import { user } from './schema/auth.ts'
 
 /**
- * `document_connection_external_unique`, asserted in Postgres (SPA-78,
- * `docs/spec-storage-sources.md` §11 delta 1).
- *
- * The index is the reason the five columns ship together rather than with the
- * first storage-source plugin, so it is worth more than a line in a snapshot.
- * Two claims the TypeScript schema cannot make:
- *
- * 1. One document per (connection, provider file). §6's loop prevention ("our
- *    own export seen by the poll → `external_id` match → no-op") and §8's
- *    cursor-expiry full re-list are both `on conflict` on that pair, and
- *    without the index neither is idempotent — a re-list would double every
- *    row in the bound subtree.
- * 2. It is **partial**. Every document in the workspace today carries both
- *    columns null, and a plain unique index over a nullable pair would still
- *    be honoured for the non-null rows but is trivially satisfied by nulls —
- *    the failure mode worth pinning is the opposite one, an index predicate
- *    typo'd into something that catches the null rows and admits exactly one
- *    hand-uploaded file per workspace.
- *
- * Asserted by constraint *name*, for the reason `source-class.test.ts` gives:
- * drizzle's `Failed query: …` message names the SQL and not the constraint, so
- * matching on the message would pass for a not-null violation or a typo in the
- * fixture.
+ * `document_connection_external_unique`, asserted in Postgres.
+ * - One document per (connection, provider file): write-through loop
+ *   prevention and the full re-list are `on conflict` on that pair, and
+ *   without it a re-list doubles every row (storage-sources spec §6, §8).
+ * - Partial: a predicate that caught the null rows would admit one
+ *   hand-uploaded file per workspace.
+ * - Asserted by constraint name: drizzle's message names the SQL, so matching
+ *   it would pass on a not-null violation or a fixture typo.
  */
 function constraintOf(err: unknown): string | null {
   let cur: unknown = err

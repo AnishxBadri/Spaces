@@ -11,7 +11,6 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
-// (values column) — attribute registry lives in ./attributes
 import { sql } from 'drizzle-orm'
 import { user } from './auth'
 import { integration } from './integrations'
@@ -19,10 +18,9 @@ import { objectDef } from './objects'
 import type { Json } from '../json'
 
 /**
- * Attribute values (system + custom), keyed by attribute slug. The registry
- * (attribute table) defines each slug's shape; validation happens at write
- * (src/lib/attributes/values.ts), so the column claims only what the
- * serializer guarantees.
+ * Attribute values (system + custom), keyed by attribute slug.
+ * The attribute registry defines each slug's shape and the attribute write
+ * path validates, so the column claims only what the serializer guarantees.
  */
 export type EntityValues = { [slug: string]: Json }
 
@@ -61,20 +59,13 @@ export const entityKind = pgEnum('entity_kind', [
 ])
 
 /**
- * Provenance, as a class and never as a vendor (CONTEXT.md "Plugin
- * architecture" → Schema deltas; `docs/spec-plugin-sdk.md` §8). The four
- * vendor-named enums baked `gmail`/`apollo`/`clip` into shared types, which
- * is precisely what a third-party plugin cannot migrate safely — so the
- * vendor moves out of the type and into a row: `source_class = 'integration'`
- * plus `source_ref → integration.id`.
- *
- * Eight values, each a different kind of writer, not a different product:
- * `manual` a human in the app (the browser extension's clip included — it is
- * first-party, and a clip is a person clicking a button) · `integration` an
- * installed plugin, named by `source_ref` · `ai` the substrate's own lanes ·
- * `import` a CSV or a backfill · `seed` starter taxonomy and dev data ·
- * `merge` a row the merge executor moved · `extracted` pulled out of a
- * document's text · `inherited` carried down from a parent record.
+ * Provenance as a kind of writer, never a vendor: a plugin is `integration`
+ * plus `source_ref`. (CONTEXT.md "Plugin architecture", D1)
+ * - `manual` a human in the app, the extension's clip included ·
+ *   `integration` an installed plugin · `ai` the substrate's own lanes
+ * - `import` a CSV or backfill · `seed` starter taxonomy, dev data ·
+ *   `merge` moved by the merge executor
+ * - `extracted` from a document's text · `inherited` from a parent record
  */
 export const sourceClass = pgEnum('source_class', [
   'manual',
@@ -111,17 +102,11 @@ export const entity = pgTable(
     sourceRef: uuid('source_ref').references(() => integration.id),
     createdBy: text('created_by').references(() => user.id),
     /**
-     * The record's own sensitivity flag (SPA-61, spec-ai-substrate §9) — one
-     * of the three authored inputs `resolveSensitivity`
-     * (`apps/web/src/lib/ai/sensitivity.ts`) ORs together, and the only one
-     * a record carries. One column covers a space, a company, a deal, a
-     * document and a custom record alike, because a space is an entity.
-     *
-     * An egress flag, never access control: it says where this record's bytes
-     * may travel (a sensitive call goes to a local model or nowhere), never
-     * who may read the row — `canRead` stays the only thing that hides one.
-     * Inheritance from a filed space is resolved at read and never written
-     * here. No `ENTITY_REFS` entry: the column references nothing.
+     * The record's own sensitivity flag, one of the inputs
+     * `resolveSensitivity` ORs. A space is an entity, so it carries one too.
+     * - An egress flag, never access control: a sensitive call goes to a
+     *   local model or nowhere. `canRead` stays the only thing that hides a row.
+     * - Inheritance from a filed space is resolved at read, never written here.
      */
     sensitive: boolean('sensitive').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -131,18 +116,16 @@ export const entity = pgTable(
   (t) => [
     index('entity_kind_idx').on(t.kind),
     // The scope column of everything object-shaped: the nightly dedupe
-    // sweep's self-join (`worker/jobs/dedupe-sweep.ts`), the merge guard's
-    // same-object refusal, `objectHasRecords`, and every `/o/<slug>` list.
-    // Added by SPA-81, which is the slice that gave it a set-based reader.
+    // sweep's self-join, the merge guard's same-object refusal,
+    // `objectHasRecords`, and every `/o/<slug>` list.
     index('entity_object_idx').on(t.objectId),
     index('entity_merged_into_idx')
       .on(t.mergedIntoId)
       .where(sql`${t.mergedIntoId} is not null`),
-    // A biconditional, the same shape as `attribute_event_actor_invariant`
-    // and for the same reason: an implication would let a `seed` row carry
-    // an integration id (a provenance lie the dedupe card would render as
-    // fact) or let a plugin write a row that cannot say which plugin wrote
-    // it. Both directions are the point.
+    // A biconditional, like `attribute_event_actor_invariant`: one direction
+    // alone would let a `seed` row carry an integration id, or a plugin write
+    // a row that cannot say which plugin wrote it. Both directions are the
+    // point. (D1)
     check(
       'entity_source_ref_invariant',
       sql`(${t.sourceClass} = 'integration') = (${t.sourceRef} IS NOT NULL)`,
@@ -159,11 +142,9 @@ export const aliasKind = pgEnum('alias_kind', [
 ])
 
 /**
- * The keys that identify a person or a company — the alias kinds that carry
- * `is_identity`, which is every kind but `name`. Derived from the enum rather
- * than spelled again, so the repo has one notion of what identifies a record
- * (SPA-165): `CORE_IDENTITY_KEYS` in `@spaces/core/attributes/registry` is
- * the runtime list, typed against this.
+ * The keys that identify a person or a company: every alias kind but `name`.
+ * Derived from the enum so there is one notion of identity;
+ * `CORE_IDENTITY_KEYS` is the runtime list, typed against this.
  */
 export type CoreIdentityKey = Exclude<
   (typeof aliasKind.enumValues)[number],
@@ -200,10 +181,9 @@ export const entityAlias = pgTable(
       .on(t.kind, t.valueNorm)
       .where(sql`${t.isIdentity}`),
     index('alias_entity_idx').on(t.entityId),
-    // trgm GIN index on value_norm for fuzzy name matching lives in
-    // migration 0000 (drizzle-kit can't express operator classes).
-    // Aliases carry the pair too, not just the entity: identity is what a
-    // plugin actually writes, and an unattributed alias is the one row that
+    // The trgm GIN index on value_norm (fuzzy name matching) lives in the
+    // first migration: drizzle-kit can't express operator classes.
+    // Aliases carry the provenance pair too: an unattributed identity alias
     // could silently weld two companies together.
     check(
       'entity_alias_source_ref_invariant',

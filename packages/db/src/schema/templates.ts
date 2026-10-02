@@ -15,12 +15,12 @@ import type { Json } from '../json'
 export const templateKind = pgEnum('template_kind', ['note', 'space', 'record'])
 
 /**
- * Templates — one mechanism, three kinds (CONTEXT.md, 2026-08).
- * Standardized *capture*, never automation. Config, not entities: no
- * mentions, no search hits, no graph rows. User-created and
- * workspace-shared; we ship none — a shipped template pre-empts vocabulary.
- * Instantiation is copy, not reference: editing a template never rewrites
- * what it stamped.
+ * Templates — one mechanism, three kinds (CONTEXT.md "Templates").
+ * - Standardized *capture*, never automation. Config, not entities: no
+ *   mentions, no search hits, no graph rows.
+ * - User-created, workspace-shared; we ship none — a shipped template
+ *   pre-empts vocabulary.
+ * - Instantiation is copy: editing a template never rewrites what it stamped.
  *
  * `body` by kind:
  *  - note   — a BlockNote document (mentions stripped to plain text at save;
@@ -37,13 +37,9 @@ export const template = pgTable('template', {
   /** Only when kind = record. */
   objectKind: text('object_kind'),
   /**
-   * Only when kind = note — the genre the template stamps (SPA-131).
-   * CONTEXT.md freezes note kinds at three on the grounds that "IC memo" and
-   * "post-mortem" are *templates that set title/structure/kind*; without this
-   * column a template set two of the three and an IC-memo template stamped a
-   * plain note. Nullable on purpose and never backfilled: a template saved
-   * before this column has nothing to say about kind, and stamps the note
-   * default.
+   * Only when kind = note — the note kind the template stamps; genres are
+   * templates that set title/structure/kind (CONTEXT.md "The note model").
+   * Nullable, never backfilled: null stamps the note default.
    */
   noteKind: noteKind('note_kind'),
   name: text('name').notNull(),

@@ -28,26 +28,21 @@ import {
 
 /**
  * The one list of columns that point at an entity (CONTEXT.md "One registry
- * of entity-referencing tables", 2026-09-07).
+ * of entity-referencing tables").
  *
- * The graph is one `link` table in the story but a dozen edge columns in the
- * schema. Three consumers must iterate every one of them: the merge executor
- * (repoint loser → winner), the context assembler ("everything about this
- * record"), and the delete executor (`apps/web/src/lib/entities/delete.ts`,
- * SPA-77). All three have the same failure mode — a new column ships and one
- * of them silently misses it. So all three read this array, and
- * `entity-refs.test.ts` diffs it against drizzle's foreign-key metadata: a
- * column that references `entity.id` (or a side table's entity_id) without an
- * entry here fails CI.
- *
- * Membership rule: every FK column whose target is `entity.id` or a side
- * table's primary key, except a side table's own single-column PK (that row
- * *is* the entity, not a reference to one). Composite-PK edge columns such
- * as entity_space.entity_id are references and belong here.
- *
- * Each entry answers all three consumers explicitly. `context: null` is a
- * decision, not an omission — it means "this column is never AI-visible" —
- * and `del` is the same kind of declaration for deletion.
+ * - Three consumers iterate every entry: the merge executor (repoint loser →
+ *   winner), the context assembler ("everything about this record") and
+ *   `deleteEntityProgram`. A column missing here is one they silently miss.
+ * - The ENTITY_REFS test diffs this against drizzle's foreign-key metadata: a
+ *   column that references `entity.id` (or a side table's entity_id) without
+ *   an entry here fails CI.
+ * - Membership: every FK column whose target is `entity.id` or a side table's
+ *   primary key, except a side table's own single-column PK (that row *is*
+ *   the entity). Composite-PK edge columns such as entity_space.entity_id are
+ *   references and belong here.
+ * - Each entry answers all three consumers explicitly. `context: null` is a
+ *   decision, not an omission — it means "this column is never AI-visible" —
+ *   and `del` is the same kind of declaration for deletion.
  */
 
 // ---------- merge ----------
@@ -60,7 +55,7 @@ export type MergeStrategy =
    * when the winner already has the pair — drop the loser's row then.
    */
   | { kind: 'repoint-or-drop'; uniqueWith: ReadonlyArray<PgColumn> }
-  /** Hand-written section in merge.ts; named so the two stay findable. */
+  /** Hand-written section in `mergeEntities`; named so the two stay findable. */
   | { kind: 'custom'; handler: string }
   /** Never repointed; `why` is the invariant that makes that safe. */
   | { kind: 'none'; why: string }
@@ -68,14 +63,13 @@ export type MergeStrategy =
 // ---------- delete ----------
 
 /**
- * What the delete executor (`apps/web/src/lib/entities/delete.ts`) does with
- * the rows on this column when the entity they point at is deleted. Four
- * answers, and every entry gives one: a column with no `del` is a row the
- * executor would walk past and leave dangling — or trip over as a foreign-key
- * violation, which is how `deleteDocument` and `deleteTerm` used to fail.
+ * What `deleteEntityProgram` does with the rows on this column when the
+ * entity they point at is deleted.
  *
- * `block` is not a fallback for "undecided": its `reason` is what the caller
- * is told, so it reads as a sentence about the data, not about the code.
+ * - Every entry gives one: a column with no `del` is a row the executor would
+ *   walk past and leave dangling, or trip over as a foreign-key violation.
+ * - `block` is not a fallback for "undecided": its `reason` is what the caller
+ *   is told, so it reads as a sentence about the data, not about the code.
  */
 export type DeleteStrategy =
   /** Delete the dependent row — it is only about the entity. */
@@ -86,35 +80,29 @@ export type DeleteStrategy =
   | { kind: 'orphan'; why: string }
   /**
    * Nothing to do: no row can point here when the entity dies, and `why` is
-   * the invariant that makes that true. No entry claims this today — it is
-   * declared so a column that is genuinely unreachable can say so instead of
-   * pretending to cascade.
+   * the invariant that makes that true. Lets a genuinely unreachable column
+   * say so instead of pretending to cascade.
    */
   | { kind: 'none'; why: string }
 
 // ---------- context ----------
 
 /**
- * The two halves of the context contract that ENTITY_REFS itself speaks
- * (docs/spec-ai-substrate.md §1). They are declared here, and re-exported by
- * `apps/web/src/lib/context/types.ts` which keeps the rest — `ContextEdge`,
- * `ContextItem` — because the `context` field of every entry below is typed
- * against them and packages/db imports nothing internal (SPA-142). Both
- * halves land in core together at mono-9a; until then this is where the
- * vocabulary is written down.
+ * The two parts of the context contract (docs/spec-ai-substrate.md §1) that
+ * ENTITY_REFS itself speaks. Declared here because every entry's `context` is
+ * typed against them and packages/db imports nothing internal; core's context
+ * types re-export them beside `ContextEdge` and `ContextItem`.
  */
 
 /**
- * ContextItem kinds. The spec's seven plus `interaction` and `task`: both
- * are citation targets and neither is an entity (decided 2026-09-09).
+ * ContextItem kinds: the spec's seven plus `interaction` and `task`, which
+ * are citation targets and not entities.
  *
- * No kind for the note and attribute chunk sources `chunk` gained in SPA-102
- * (decided there). A chunk is the *retrieval* grain, not the citation grain:
- * a note chunk renders as `note` (ref `note:<id>`), a close_reason chunk as
- * `attribute` (the attribute's ref), because the semantic lane only ranks
- * which note or value surfaces. Neither renders as `doc_chunk` — that kind
- * means a `doc:<id>#<idx>` ref, and the ranker's per-document cap
- * (`rank.ts`, `docOfRef`) reads it so.
+ * - A chunk is the retrieval grain, not the citation grain: a note chunk
+ *   renders as `note` (ref `note:<id>`), a close_reason chunk as `attribute`
+ *   (the attribute's ref).
+ * - `doc_chunk` means a `doc:<id>#<idx>` ref only; the ranker's per-document
+ *   cap (`docOfRef`) reads it so.
  */
 export type ContextKind =
   | 'attribute'
@@ -151,9 +139,8 @@ export type EntityRef = {
   context: ContextRole | null
 }
 
-// `entity.sensitive` (SPA-61) has no entry and needs none: it is a boolean
-// on the entity row itself and references nothing, so there is nothing to
-// repoint on merge and no edge for the context assembler to walk.
+// `entity.sensitive` has no entry and needs none: a boolean on the entity row
+// that references nothing.
 export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
   // --- identity ----------------------------------------------------------
   {
@@ -348,26 +335,20 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
 
   // --- research kinds (one step removed via a side-table PK) -------------
   {
-    // Was `document_chunk.document` (merge `none`) until SPA-102 widened the
-    // table: a chunk now points at a document, a note, or the record whose
-    // attribute was chunked (a deal's `close_reason`). Notes and documents
-    // are not mergeable but records are, so the rows must follow the record.
-    // `custom` since SPA-132 started writing attribute chunks: the unique
-    // index is on (entity_id, source_kind, source_key, idx), so a winner
-    // already holding chunks of the same source would collide with a plain
-    // repoint. The section in merge.ts takes the values rule — the winner
-    // keeps its value, the loser only fills a gap — per source: a source the
-    // winner already has chunks for drops the loser's; any other source's
-    // chunks move, matching the value the merge filled in with them.
+    // A chunk points at a document, a note, or the record whose attribute was
+    // chunked (a deal's `close_reason`). Records are mergeable, so rows follow.
+    // - `custom`: the unique index on (entity_id, source_kind, source_key, idx)
+    //   would collide on a plain repoint.
+    // - The values rule (winner keeps, loser fills a gap), per source: a source
+    //   the winner already has chunks for drops the loser's; any other moves.
     key: 'chunk.entity',
     table: chunk,
     column: chunk.entityId,
     merge: { kind: 'custom', handler: 'chunks' },
     del: { kind: 'cascade' },
     // One kind per column: a document's chunks are `doc_chunk` items one hop
-    // out (record → filed document → chunk), the only source written today.
-    // Note and attribute chunks render as their source's own kind (`note`,
-    // `attribute`) — see ContextKind above.
+    // out (record → filed document → chunk). Note and attribute chunks render
+    // as their source's own kind — see ContextKind.
     context: { role: 'item', kind: 'doc_chunk', hop: 1 },
   },
   {

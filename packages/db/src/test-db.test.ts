@@ -2,11 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { resolveTestDatabaseUrl } from './test-db.ts'
 
 /**
- * The derivation, and the two refusals (SPA-143). Pure — no database, no
- * environment — which is the reason `resolveTestDatabaseUrl` takes its env as
- * an argument instead of reading `process.env`: the rule that decides which
- * database the whole suite writes to should be provable without running the
- * suite.
+ * The test-database derivation and its two refusals. Pure: that is why
+ * `resolveTestDatabaseUrl` takes env as an argument, so the rule deciding
+ * which database the suite writes to is provable without a database.
  */
 
 const DEV = 'postgresql://spaces:spaces@localhost:5432/spaces'

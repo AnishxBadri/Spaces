@@ -94,9 +94,9 @@ describe('ENTITY_REFS', () => {
 
   it('makes every entry declare what delete does with it', () => {
     // A `del` the type system never saw — a hand-written entry, a merge from
-    // a branch that predates SPA-77 — reaches the delete executor as
-    // `undefined` and falls through its switch, leaving the rows dangling.
-    // Named keys, because the point is to say which entry to go and fix.
+    // an older branch — reaches the delete executor as `undefined` and falls
+    // through its switch, leaving the rows dangling. Named keys, because the
+    // point is to say which entry to go and fix.
     const undeclared = ENTITY_REFS.filter((r) => {
       const del: unknown = r.del
       return (

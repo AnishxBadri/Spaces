@@ -7,23 +7,19 @@ import { integration } from './schema/integrations.ts'
 import { attributeEvent } from './schema/attributes.ts'
 
 /**
- * The typed actor's invariant, asserted where it lives — in Postgres (SPA-70).
+ * The typed actor's invariant, asserted where it lives — in Postgres.
  *
  * `attribute_event`'s check is a pair of biconditionals, and a biconditional
- * has two ways to break. An implication would let a `system` row carry an
- * integration id, which is a provenance lie the timeline would render as
- * fact; so each half is tested in both directions, by expecting the insert
- * to throw. A test that only asserted the happy path would pass against no
- * constraint at all.
+ * has two ways to break: an implication would let a `system` row carry an
+ * integration id, a provenance lie the timeline would render as fact. So each
+ * half is tested in both directions, by expecting the insert to throw.
  */
 /**
- * Which constraint Postgres refused on. drizzle wraps the driver error in a
- * `Failed query: …` message that names the SQL and not the constraint, so
- * asserting on the message would pass for any rejection at all — including a
- * not-null violation or a typo in the fixture. The name lives on `constraint`
- * somewhere down the `cause` chain; this walks to it, and returns null when
- * the call did not throw, so a missing constraint reads as `null` rather than
- * as a quietly passing test.
+ * Which constraint Postgres refused on, walked from the `cause` chain.
+ * - drizzle's `Failed query: …` message names the SQL, not the constraint, so
+ *   asserting on it would pass for any rejection (a not-null, a fixture typo).
+ * - Returns null when the call did not throw, so a missing constraint reads
+ *   as `null` rather than as a quietly passing test.
  */
 function constraintOf(err: unknown): string | null {
   let cur: unknown = err
@@ -75,7 +71,7 @@ describe('attribute_event actor invariant', () => {
     ids.integration = i[0].id
   })
 
-  /** The column defaults the acceptance criterion names, read back from PG. */
+  /** The integration column defaults, read back from PG. */
   it('gives an integration row installing / 0 / false by default', async () => {
     const rows = await db.select().from(integration)
     const row = rows.find((r) => r.id === ids.integration)

@@ -6,19 +6,15 @@ import { objectDef } from './schema/objects.ts'
 import { reconcileValueIndexes, valueIndexName } from './value-indexes.ts'
 
 /**
- * The reconciler's contract (SPA-93): the set of `attr_idx_*` indexes on
- * `entity` is a pure function of the flagged, unarchived attributes, and
- * running it again changes nothing.
- *
- * It is DDL issued by application code, which is a departure from "schema
- * changed → db:generate" — so the properties that make that safe are the
- * ones under test here: idempotence, orphan removal, and a failed mint that
- * leaves the attribute perfectly usable and is retried on the next run.
- * `apps/web/src/lib/views/value-index-plan.test.ts` is the other half — it
- * asserts the planner actually uses what this mints.
+ * The reconciler's contract: the `attr_idx_*` indexes on `entity` are a pure
+ * function of the flagged, unarchived attributes.
+ * - Under test: idempotence, orphan removal, and a failed mint that leaves the
+ *   attribute usable and is retried on the next run.
+ * - The planner half (the paged query really uses the index) is web's
+ *   `value-index-plan` test.
  */
 
-/** The three types `@spaces/core/views/filter` compiles numerically. */
+/** The three types core's `isNumericType` compiles numerically. */
 const isNumericType = (type: string) =>
   type === 'number' || type === 'currency' || type === 'rating'
 
@@ -39,10 +35,8 @@ async function indexesOnEntity(): Promise<Map<string, string>> {
 }
 
 /**
- * The suite's isolation is per *file* (SPA-145), and a truncate does not
- * drop an index — so each test starts from an empty registry and an empty
- * `attr_idx_` namespace explicitly, or the reconciler would be diffing
- * against the previous test's leftovers.
+ * Resets per test, not per file, and drops the indexes a truncate leaves
+ * behind, or the reconciler would diff against the last test's leftovers.
  */
 async function emptyRegistry(): Promise<void> {
   for (const name of (await indexesOnEntity()).keys())

@@ -4,7 +4,7 @@ import {
   writeIsolationProbe,
 } from './file-isolation.ts'
 
-/** The other half of the pair — see `file-isolation-a.test.ts`. */
+/** The other half of the pair; see `file isolation (a)`. */
 describe('file isolation (b)', () => {
   it('starts on an empty public schema, with the journal untouched', async () => {
     expect(await readPublicSchemaCounts()).toEqual({

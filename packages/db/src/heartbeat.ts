@@ -3,21 +3,15 @@ import { db } from './index.ts'
 import { workerHeartbeat } from './schema/worker.ts'
 
 /**
- * The worker heartbeat, from both ends (SPA-57; spec-plugin-sdk §10;
- * CONTEXT.md hostability contract 4).
+ * The worker heartbeat, from both ends (CONTEXT.md, hostability contract 4).
  *
- * The worker writes through `beat()`; two readers ask the same question of
- * the same row — the unauthenticated `/api/health` route and the
- * `ROLE=worker` container's own health command (`apps/worker/src/health.ts`),
- * which has no HTTP server to ask. They share this module so the threshold
- * has exactly one definition: `classifyBeat` takes it as an argument and
- * both callers pass `STALE_AFTER`, so a second literal threshold cannot
- * appear without deleting the parameter.
- *
- * Every function here returns a value on every path, including "Postgres is
- * down". That is load-bearing for the route: a worker-only outage must never
- * fail a healthy web container's HEALTHCHECK, and a database outage must not
- * turn the heartbeat read into a throw on the way to reporting it.
+ * - The worker writes through `beat()`; `/api/health` and the `ROLE=worker`
+ *   container's health command read the same row. Both pass `STALE_AFTER` to
+ *   `classifyBeat`, so the threshold has exactly one definition.
+ * - Every function here returns a value on every path, including "Postgres is
+ *   down": a worker-only outage must never fail a healthy web container's
+ *   HEALTHCHECK, and a database outage must not turn the heartbeat read into a
+ *   throw on the way to reporting it.
  */
 
 /**

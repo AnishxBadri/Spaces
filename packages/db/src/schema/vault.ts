@@ -26,18 +26,13 @@ const bytea = customType<{ data: Buffer }>({
 
 export const credentialScope = pgEnum('credential_scope', ['workspace', 'user'])
 /**
- * What class of secret a row holds. Seven values, three of which nothing writes
- * yet — they exist because the slices that need them were specified against a
- * three-value enum and would each have had to widen it (SPA-112):
- *
+ * What class of secret a row holds.
  * - `embedding` — embedding providers are not chat models: the pinned
- *   dimension makes them non-interchangeable (`docs/spec-ai-substrate.md` §9).
+ *   dimension makes them non-interchangeable (spec-ai-substrate §9).
  * - `oauth_client` — an OAuth app's client id/secret per provider, registered
- *   once by the operator (`docs/spec-plugin-sdk.md` §12, slice `storage-1`).
- * - `webhook` — a webhook signing secret per integration (slice `sdk-23`).
- * - `mailbox` — the forwarding mailbox's IMAP app password (SPA-56), the
- *   seventh value. Added by that slice's own migration: SPA-112 stopped at
- *   six, and a mailbox password is none of them.
+ *   once by the operator (spec-plugin-sdk §12).
+ * - `webhook` — a webhook signing secret per integration.
+ * - `mailbox` — the forwarding mailbox's IMAP app password.
  *
  * Widening is free for stored ciphertext: the AAD is `scope:provider`, so
  * `kind` is not an encryption input and no existing row is re-encrypted.
@@ -81,9 +76,9 @@ export const credential = pgTable(
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
   },
   (t) => [
-    // One credential per (scope, provider) per user; workspace rows have
-    // null user_id and Postgres treats nulls as distinct, so workspace
-    // uniqueness is (scope, provider) via the partial index below.
+    // One credential per (scope, provider) per user. Workspace rows have
+    // null user_id and Postgres treats nulls as distinct, so this index does
+    // not make them unique — and no other index does.
     uniqueIndex('credential_user_unique').on(t.scope, t.provider, t.userId),
   ],
 )
@@ -91,7 +86,7 @@ export const credential = pgTable(
 /**
  * OAuth grants for data ingestion (Gmail/Calendar) — NEVER conflated with
  * auth sessions. "Login with Google" ≠ "sync my Gmail": different scopes,
- * consent, lifetime. Post-MVP, table exists from migration one.
+ * consent, lifetime.
  */
 export const connectionStatus = pgEnum('connection_status', [
   'active',

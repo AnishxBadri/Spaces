@@ -13,22 +13,14 @@ import { accountConnection, credential } from './vault'
 import type { Json } from '../json'
 
 /**
- * The installed-integration row (`docs/spec-plugin-sdk.md` §8, CONTEXT.md
- * "Plugin architecture"). Capability = code: what a plugin _can_ do, named by
- * its manifest id and listed in the registry. Integration = row: what this
- * host actually did with it. Nothing about the plugin's code lives here — the
- * bytes are in `/data/plugins`, the manifest is the contract — so the row is
- * exactly the host's side of the install: which capability, at which version,
- * turned on or not, with which vault material, and how it has been behaving.
- *
- * Two consumers point at this row and must agree: `source_ref` (the enum
- * collapse, still ahead) and `attribute_event.actor_ref` (here, now). Both
- * name the integration, not the capability, so two integrations sharing one
- * Google grant stay distinguishable and "which integration wrote this" has a
- * single enforceable answer.
- *
- * No FK from here into any `plugin_<id>` schema, ever: a plugin may depend on
- * core, core never depends on a plugin (spec §8).
+ * The installed-integration row (CONTEXT.md "Plugin architecture").
+ * Capability = code (a manifest id); integration = this row, the host's side
+ * of the install: version, on/off, vault material, health. The bytes live in
+ * `/data/plugins`.
+ * - `source_ref` and `attribute_event.actor_ref` must agree: both name the
+ *   integration, not the capability, so two sharing one grant stay distinct.
+ * - No FK from here into any `plugin_<id>` schema, ever: a plugin may depend
+ *   on core, core never depends on a plugin.
  */
 
 /**
@@ -51,17 +43,13 @@ export const integrationStatus = pgEnum('integration_status', [
 export type IntegrationConfig = { [k: string]: Json }
 
 /**
- * The plugin's validated `manifest.json`, as the loader last parsed it
- * (sdk-11). Web renders actions, settings and ingress from this column and
- * never reads `/data/plugins` — which is what keeps "web never executes
- * plugin code" true when web and the worker are separate containers.
- *
- * Typed as JSON here, not as the SDK's `Manifest`: packages/db imports
- * nothing internal (the eslint db zone). The loader writes only what
- * `manifestSchema` accepted, and a reader that needs the fields decodes it
- * with `manifestSchema` again — the one decode the principle asks for. Null
- * until the loader has validated the plugin once, and always null for a
- * first-party `core.*` row, which has no manifest.
+ * The plugin's validated `manifest.json`, as the loader last parsed it.
+ * - Web renders from this column and never reads `/data/plugins` — what keeps
+ *   "web never executes plugin code" true across separate containers.
+ * - JSON, not the SDK's `Manifest`: this package imports nothing internal.
+ *   The loader writes only what `manifestSchema` accepted; readers decode
+ *   with `manifestSchema` again.
+ * - Null until first validated; always null for a first-party `core.*` row.
  */
 export type IntegrationManifest = { [k: string]: Json }
 

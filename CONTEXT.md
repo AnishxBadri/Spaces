@@ -391,6 +391,22 @@ and trip a breaker that disables the plugin, never the worker (contract 2).
 A `job_run` table (queue, integration, entity, status, timings, error)
 serves the status stream, the Integrations page, and later the AI run log.
 
+- **`job_run` has no `tokens` column**, overriding spec-plugin-sdk §11's
+  sketch. A retried attempt would double-count its tokens against a ledger
+  that is per-attempt, with no way to tell a re-charged call from a
+  replayed one. Token accounting is `ai_usage` (per call), rolled up by
+  `ai_run`.
+- **The AI run log is a second table, `ai_run`, not a widening of
+  `job_run`** (owner, 2026-09-27). `job_run` is the worker's attempt ledger
+  with one writer, `runJob`; a run is one logical action of 1..n ordered
+  steps, each step 0..1 worker attempts, and a request-path call (the
+  settings Test call) has no job at all. Widening `job_run` with steps would
+  repeat them on every retried attempt and still leave the request path
+  nowhere to write. So "later the AI run log" above reads as the Usage
+  surface, which joins both tables; `ai_usage.job_run_id` and
+  `ai_usage.run_id` are both nullable because the Test call is outside any
+  job and any run.
+
 **Schema deltas this implies, before the first plugin (Apollo) lands:**
 `integration(id, capability_id, version, enabled, status, config jsonb,
 credential_id?, connection_id?, error_count, created_by)`; collapse the four
@@ -413,6 +429,16 @@ migration 0029).** Two things were settled to get it in, and both generalise:
   attributed to the integration that owns the binding, and "whose account" is
   one hop away through `integration.connection_id`.
   `docs/spec-storage-sources.md` §3.1 is corrected to match.
+- **Why the vendor leaves the type.** The four vendor-named enums baked
+  `gmail`/`apollo`/`clip` into shared types, which is exactly what a
+  third-party plugin cannot migrate — a Fireflies plugin would have had to
+  `ALTER` a shared enum to say it wrote a row. The vendor moves into a row.
+- **Biconditional, not implication, in both directions.** An implication
+  would let a `seed` row carry an integration id (a provenance lie the
+  dedupe card would render as fact) or let a plugin write a row that cannot
+  say which plugin wrote it. Aliases carry the pair too: identity is what a
+  plugin actually writes, and an unattributed alias is the one row that
+  could weld two companies together.
 - **First-party channels are not integrations.** Existing `clip` rows
   backfilled to `manual`: the browser extension is ours, and a clip is a
   person clicking a button. Core does not seed a synthetic `integration` row
@@ -814,6 +840,13 @@ and explicitly sample data. An empty spaces page teaches; a fake ontology mislea
 Users fork and extend freely; custom nodes sit alongside seeded ones with no second-class
 treatment.
 
+**Slugs are unique per parent, not globally.** At three or four levels the
+same label recurs legitimately across branches (_Cooling_ under _Data
+centers_ and under _Energy storage_), and a global constraint renamed the
+second one `cooling_2` — in a tree the investor reads. `path` stays globally
+unique by construction, so nothing is lost; roots get a partial index, since
+a NULL `parent_id` defeats a plain unique constraint.
+
 ### Glossary
 
 Scoped to a space — "stage" means different things in aerospace and bio. Terms auto-link in any
@@ -1100,6 +1133,21 @@ analytics fall out free. `activity` carries macro verbs only (created, merged, t
 note-created) — no "updated" noise rows. **Condensing is read-time display:** group
 events by actor + record within a ~10-minute burst → "changed 8 attributes", expandable
 to the attr/value table. No write-side session tracking.
+
+- **Typed actor without a polymorphic pair.** Attio's typed-actor idea,
+  minus its `(type, id)` pair: `actor_id` stays a real user FK and
+  `actor_ref` a real integration FK, each set iff its type (D1). A
+  sync-created value is `integration`, traceable to whoever connected it
+  through the integration's own config.
+- **`refs` is jsonb here and `text[]` on `suggestion.refs`.** This column
+  predates the suggestion table and is written by every door (enrichment
+  ids, merge, import), so its shape is a JSON payload decoded at the column;
+  the suggestion's refs are one flat list of ContextItem ids the review
+  queue filters with `= ANY(refs)`, which is what a native array is for.
+- **`batch_id` is a typed FK, not a `refs` entry.** Refs are citations a
+  reader follows to a source — a flat list of mixed kinds with no index;
+  "what did this import write?" is a query that filters on one indexed
+  column.
 
 ### Lists — deferred
 
@@ -1408,7 +1456,10 @@ article · other`) — with code consumers
   kind was a naming collision. `document.origin` collapses into
   `source_class + source_ref` with the other vendor enums; rows gain
   `source_path`, `external_id`, `external_url`, `external_status`,
-  `connection_id`.
+  `connection_id`. They shipped together, ahead of the first storage-source
+  plugin, because of `document_connection_external_unique`: write-through
+  loop prevention and the cursor-expiry re-list are both `on conflict` on
+  `(connection_id, external_id)`, and neither is idempotent without it.
 - **Storage source ≠ blob backend; they coexist by role.** Drive/Box are
   the fund's archive and collaboration surface and an arrival channel; our
   blob + derived layers (extracted text, chunks, vectors, page images,
@@ -1524,12 +1575,24 @@ Two token stores, never conflated:
    anyone who can reach the port. Print a one-time setup token to container logs and require it
    at `/setup` — survives someone exposing the port before reading docs.
 
+### API tokens
+
+The MCP server and the `/api/v1` door authenticate against one store,
+`api_token`: per-user bearer tokens, hashed, revoked rather than deleted.
+Decided by the owner 2026-09-27 — no OAuth, and not better-auth's `mcp` or
+`bearer` plugin. Per-user because `canRead` is per user: a teammate's
+assistant sees what that teammate sees. A table because the required-env
+set is frozen at `DATABASE_URL` and `APP_URL` (hostability contract 6), so
+no external identity provider may appear. `scopes` governs the door only;
+tokens minted before scopes existed carry `'{}'` and still open MCP.
+
 ## BYOK — one framework, all providers
 
 One encrypted vault, LLMs are just one provider class:
 
 ```
-credential(id, scope: workspace|user, provider, kind: llm|enrichment|search,
+credential(id, scope: workspace|user, provider,
+           kind: llm|embedding|enrichment|search|oauth_client|webhook|mailbox,
            secret_enc, meta jsonb, created_by, last_used_at, status)
 ```
 
@@ -1602,6 +1665,17 @@ silently garbage** — search degrades quietly rather than erroring. This bites 
   in the **worker** — how web gets a vector from it is D50, open, answered
   in that slice before it is built. LM Studio is out of scope until asked
   for: it is a desktop app, and Ollama covers the server case.
+- **`chunk` carries no space path.** spec-ai-substrate §9 (and
+  spec-storage-sources) list the space ltree path among what a chunk
+  carries, but a document can be filed in many spaces and one ltree column
+  cannot hold that, so space filtering joins `entity_space` (and
+  `space.path`) at query time. Denormalizing the path set onto the chunk is
+  an optimization to take only if EXPLAIN on the semantic CTE demands it.
+- **A chunk is the retrieval grain, not the citation grain.** Note and
+  attribute chunks get no ContextItem kind of their own: a note chunk
+  renders as `note`, a `close_reason` chunk as `attribute`, because the
+  semantic lane only ranks which note or value surfaces. `doc_chunk` means a
+  `doc:<id>#<idx>` ref only, which the ranker's per-document cap reads.
 
 ### Enrichment
 
@@ -1724,6 +1798,29 @@ two `document` rows. Dedupe free, immutable, cache-forever.
 - Scanned/image PDF -> **BYOK vision model**. No Tesseract container. Key absent -> "text not extractable".
 
 Documents hang off entities, not folders. Folders are the thing being replaced.
+
+### Orphan blobs — an intent row, not a store listing
+
+Upload is two calls around a direct-to-storage PUT: `prepareDocumentUpload`
+hands out a URL, the browser PUTs the bytes, and only then does
+`finalizeDocumentUpload` write the `document` row. A tab closed between the
+PUT and the finalize leaves bytes no row will ever name, and the only other
+GC runs from the opposite direction (a document row being deleted). Every
+later entry point (drop-into-note, URL clip, Drive sync, the server intake)
+reopens the same window, so the reclaim is built once: `pending_blob` is
+written at prepare, deleted by `birthDocumentProgram`, and the sweep
+reclaims what is older than the grace period and named by no `document`.
+
+**An intent row, not a store listing.** Asking the store what it holds was
+rejected for three reasons: it would add `list()` to the frozen `Storage`
+interface; an S3 `LIST` is a paginated scan of the whole bucket, a nightly
+cost proportional to everything ever uploaded rather than to what is
+pending; and a prefix walk cannot tell an orphan from an arrival still in
+flight, because a key carries no notion of when it was promised. A row
+written at prepare time knows exactly that. `pending_blob.size_bytes` is
+`bigint` because `MAX_UPLOAD_BYTES` is the app's cap and the column should
+not impose a 2GB one (`document.size_bytes` is `integer` and predates the
+question).
 
 ## Integration readiness (noted 2026-08)
 
@@ -2119,10 +2216,18 @@ unless-stopped` heals it.
    (`docker-compose.tls.yml` + Caddyfile) so HTTPS is copy-paste.
 4. **`/api/health` checks the DB**, not just the process — otherwise the compose
    healthcheck gates nothing. Later: worker heartbeat row so `ROLE=worker` containers
-   get a real check too.
+   get a real check too. **Built:** `worker_heartbeat` is keyed on `role`, not
+   `instance` — one worker per role is what self-host runs, so a role key makes
+   restart idempotence structural rather than dependent on a stable container name;
+   the key widens to `(role, instance)` if several instances per role ever matter.
+   `/api/health` and the worker container's own health command (which has no HTTP
+   server to ask) share `classifyBeat`, which takes the threshold as an argument, so
+   a second literal threshold cannot appear without deleting the parameter.
 5. **Backup is both-or-neither, and rollback is restore.** `pg_dump` + `tar ./data`
    together — content-addressed blobs are worthless without the DB and vice versa.
    Upgrade = backup → pull → up. Never run an older image against a newer schema.
+   The downgrade guard enforces this and has no override, deliberately: an escape
+   hatch would exist only to let someone do the exact thing the guard is for.
 6. **The required-env set is frozen at `{DATABASE_URL, APP_URL}` — permanently.** Every
    future feature ships with a working default or is optional. This rule is what keeps
    "compose up works first try" true five features from now.
@@ -2530,7 +2635,7 @@ trigger that revives it.
 
 Standing debt:
 
-- ~~**Test-db harness.**~~ **Closed 2026-09-19 (SPA-143, SPA-145)** — the suite owns `spaces_test*`, one database per vitest worker, truncated per file. See CLAUDE.md, _Dev environment_.
+- ~~**Test-db harness.**~~ **Closed 2026-09-19 (SPA-143, SPA-145)** — the suite owns `spaces_test*`, one database per vitest worker, truncated per file. See CLAUDE.md, _Dev environment_. `TEST_WORKERS = 4` was measured on an 8-core box: `@spaces/web` ran in 9.4s at two workers, 5.3s at four and 6.0s at six — past four the workers contend for one Postgres, and each is another database to create, migrate and keep.
 - ~~**`./data` ownership landmine.**~~ **Closed: fixed structurally by ship-2 (the
   entrypoint repairs `/data` as root, then drops to 1000), documented by SPA-188
   (`docs/install.md`, _Ownership_ — the `chown` line appears only for a container pinned
@@ -2598,8 +2703,11 @@ CSV, virtualization + keyboard-grid, kanban, drawer-over-table, Overview/Highlig
   model section.~~ **Answered, and shipped 2026-09-23 (SPA-93).** The
   2026-09-13 re-examination said: when pagination lands, a per-attribute
   expression index created at attribute creation behind a
-  `filterable`/`sortable` flag, not a GIN over the universe. That is what
-  shipped, with three things the sketch did not have.
+  `filterable`/`sortable` flag, not a GIN over the universe — a GIN on
+  `values` would index every key of every row to serve the two or three
+  fields anybody sorts a twenty-thousand-row object by, and would still not
+  order anything. That is what shipped, with three things the sketch did not
+  have.
   - **The flags are real columns**, `attribute.filterable` and
     `attribute.sortable`, boolean not-null default false — not keys in
     `attribute.options`. `options` is the per-type bag `buildOptions`
@@ -2608,16 +2716,34 @@ CSV, virtualization + keyboard-grid, kanban, drawer-over-table, Overview/Highlig
     are read in a `select` by the reconciler. One dialog control, "Filter and
     sort on this", sets both: a reader does not distinguish filtering a list
     from sorting it, and both want the same btree. Only `deal.stage` is
-    flagged at seed.
+    flagged at seed. A jsonb key would make the reconciler's diff an
+    `options ->> 'filterable' = 'true'` string comparison over a column with
+    no constraint behind it, and a typo would create an attribute that is
+    silently unindexed; real booleans, not-null, default false, are a column
+    scan the planner understands. They stay two columns, though one control
+    sets both, for the reconciler's own sake and any later UI that separates
+    them.
   - **The index is composite, `(object_id, <expression>)`, not partial on a
     literal object id**, because every list read passes the object id as a
-    bind parameter — and it is `spaces_json_text|number(values -> '<slug>')`,
+    bind parameter. A partial index `where object_id = '<literal>'` is
+    unusable by a generic plan, since Postgres will not prove a parameter
+    equals a literal; a composite leading with `object_id` needs no proof —
+    `object_id = $1` is an equality on the leading key, which restricts the
+    scan and collapses the index's pathkeys onto the second column, and that
+    collapse is what lets the paged `order by` be answered by the index. The
+    second column is `spaces_json_text|number(values -> '<slug>')`,
     not `(values->>'slug')`, because that is what `compileSortKey` emits.
     Getting that expression wrong raises nothing: the index simply sits
     unused. So it is asserted, not assumed —
     `apps/web/src/lib/views/value-index-plan.test.ts` EXPLAINs the paged
     query and requires an index scan on `attr_idx_…`, under a forced generic
-    plan as well as a custom one.
+    plan as well as a custom one. The two coercions became IMMUTABLE SQL
+    functions (migration 0041) because of this: they were inline CASEs, and
+    Postgres refuses a subquery in an index expression. `isNumericType` is
+    passed to the reconciler rather than copied into packages/db, which
+    imports nothing internal; it lives beside the browser evaluator that
+    branches the same way, and a second copy of the set is a divergence a
+    property test could only report after the fact.
   - **It buys the sort, not the filter.** `compileConditions` wraps every
     condition in `coalesce(…, false)` so SQL's third truth value cannot leak,
     and the planner cannot match an index key through a `CoalesceExpr`. The

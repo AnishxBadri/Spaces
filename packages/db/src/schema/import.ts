@@ -20,17 +20,11 @@ import type { attributeType } from './attributes'
 import type { distributionKind, instrument, markBasis } from './portfolio'
 
 /**
- * **Staged import** (SPA-164, import-2; CONTEXT.md phase 15 item 9 — one
- * wizard: upload → map → preview → dry run → commit). A spreadsheet becomes a
- * batch and one row per data row, and nothing reaches the graph: no entity,
- * no document, no edge. The later steps read these rows, write `plan` and
- * `verdict`, and only the commit step stamps `entity_id`.
- *
- * The payload is a **blob, not a document**: `blob_sha` is the content
- * address the bytes were stored under, with no `document` row behind it, so
- * a portfolio spreadsheet is never extracted, chunked or embedded. There is
- * no `blob` table to reference — storage is keyed by the digest itself — so
- * the column is plain text, as `document.blob_sha` is.
+ * Staged import: a spreadsheet becomes a batch plus one row per data row.
+ * - Nothing reaches the graph before commit — no entity, document or edge —
+ *   and only the commit stamps `entity_id`.
+ * - The payload is a blob, not a document, so it is never extracted, chunked
+ *   or embedded. `blob_sha` is plain text: storage is keyed by the digest.
  */
 
 /**
@@ -44,7 +38,7 @@ export type ImportMode = (typeof importMode.enumValues)[number]
 
 /**
  * Where the batch is in the wizard. `planned` once every row carries its
- * plan (SPA-167); a mapping change returns it to `staged`.
+ * plan; a mapping change returns it to `staged`.
  */
 export const importBatchStatus = pgEnum('import_batch_status', [
   'staged',
@@ -56,23 +50,15 @@ export const importBatchStatus = pgEnum('import_batch_status', [
 export type ImportBatchStatus = (typeof importBatchStatus.enumValues)[number]
 
 /**
- * The payload of `import_batch.mapping` (SPA-165, import-3), declared at the
- * column that stores it and re-exported by `@spaces/core/import/mapping`,
- * which owns the behaviour — packages/db imports nothing internal, and the
- * column owns the shape of what it stores (SPA-142).
- *
- * One target per source column, by column index:
- *
- * - `name` — the record's name (exactly one column).
- * - `attribute` — a live attribute of the target object. `dateOrder` is the
- *   column's declared reading of a slashed date, never sniffed.
- *   `createMissing` (SPA-168, `record_reference` columns only, default off)
- *   plans a record of the referenced object for a cell that names none.
- * - `identity` — one of the object's identity keys.
- * - `ignore` — the column is not imported.
- * - `new` — an attribute the operator is defining from this column and has
- *   not yet confirmed; confirming creates it and the column becomes an
- *   `attribute` target. `options` are the labels a select will be born with.
+ * `import_batch.mapping`: one target per source column, by index. Core's
+ * import mapping owns the behaviour.
+ * - `name` — the record's name (exactly one column). `identity` — one of the
+ *   object's identity keys. `ignore` — not imported.
+ * - `attribute` — a live attribute. `dateOrder` is declared, never sniffed;
+ *   `createMissing` (`record_reference` only, default off) plans a record of
+ *   the referenced object for a cell that names none.
+ * - `new` — an attribute not yet confirmed; confirming creates it and the
+ *   column becomes an `attribute` target. `options` seed a select.
  */
 export type ImportDateOrder = 'dmy' | 'mdy'
 
@@ -100,7 +86,7 @@ export type ColumnTarget =
 export type Mapping = Array<ColumnTarget>
 
 // ---------------------------------------------------------------------------
-// Ledger mode (SPA-170, import-8)
+// Ledger mode
 // ---------------------------------------------------------------------------
 
 export type LedgerInstrument = (typeof instrument.enumValues)[number]
@@ -144,19 +130,14 @@ export type LedgerField =
 export type LedgerInstrumentResolution = LedgerInstrument | 'per_row'
 
 /**
- * A ledger column's target. The decisions the plan needs ride on the column
- * they are about, as `dateOrder` does in records mode, so planning the batch
- * twice reads the same stored answer and a column moved elsewhere starts its
- * decisions over (its values are other values):
- *
- * - `dateOrder` — on every date field.
- * - `createMissing` — on `company`: a company the matcher does not find is
- *   planned as a create.
- * - `instrumentMap` — on `instrument`: source value (its `instrumentKey`) →
- *   resolution. `instrumentByRow` — row number → instrument, for the values
- *   resolved `per_row`.
- * - `currency` — on `amount`: the currency of a row that names none.
- * - `marksAsOf` — on `markValue`: the date of a mark whose row has none.
+ * A ledger column's target. Decisions ride on the column they are about, so
+ * a re-plan reads the same answer and a moved column starts over.
+ * - `dateOrder` on every date field. `createMissing` on `company`: an
+ *   unmatched company is planned as a create.
+ * - `instrumentMap` on `instrument`: `instrumentKey` → resolution;
+ *   `instrumentByRow` holds the values resolved `per_row`.
+ * - `currency` on `amount`, `marksAsOf` on `markValue`: the value for a row
+ *   that names none.
  */
 export type LedgerTarget = {
   target: 'ledger'
@@ -170,22 +151,15 @@ export type LedgerTarget = {
 }
 
 /**
- * The payload of `import_row.plan` (SPA-167, import-5): what the preview step
- * decided to do with one row, stored so the commit replays it rather than
- * recomputing an answer that could disagree with the report. Declared at the
- * column and re-exported by `@spaces/core/import/plan`, which owns the rules.
- *
- * - `attach` — an identity key matched a live record (`entityId`,
- *   `matchedOn`); the row's values land on it.
- * - `create` — no match; `creator` births the record.
- * - `collide` — the row shares an identity key with another row of this file
- *   under a different name, and waits on a `decision` (`collidesWith` names
- *   the other rows). Its `entityId` / `matchedOn` are kept, so a decision
- *   restores the row to what the resolver said.
- * - `merged` — the row folds into row `mergedInto`: same key and same name,
- *   or the losing side of a decided collision. Counted once, on that row.
- * - `skip` — a decided collision's `skip-both`.
- * - `no-land` — the row cannot be written as it stands; `errors` say why.
+ * A row's verdict, stored in `import_row.plan` so the commit replays the
+ * preview rather than recomputing an answer that could disagree with it.
+ * - `attach` matched a live record · `create` no match · `skip` a decided
+ *   collision's `skip-both`.
+ * - `collide` shares a key with another row under another name and waits on
+ *   a `decision`; keeps `entityId`/`matchedOn` so a decision can restore them.
+ * - `merged` folds into `mergedInto` (same key and name, or a collision's
+ *   loser), counted once there.
+ * - `no-land` cannot be written as it stands; `errors` say why.
  */
 export type ImportVerdict =
   'attach' | 'create' | 'collide' | 'merged' | 'skip' | 'no-land'
@@ -207,7 +181,7 @@ export type ImportCellIssue = { column: number; raw: string; reason: string }
 export type ImportCellValue = string | number | boolean | Array<string>
 
 /**
- * A reference cell the plan settled (SPA-168): the record it found, the
+ * A reference cell the plan settled: the record it found, the
  * member it found, or the record a secondary create will make — `key` names
  * that create across the batch (one per referenced object and name), and the
  * create itself rides on one row's `alsoCreates`.
@@ -272,20 +246,18 @@ export type RecordRowPlan = {
   mergedInto?: number
   collidesWith?: Array<number>
   decision?: CollisionDecision
-  /** Reference cells that resolved, or plan a create (SPA-168). */
+  /** Reference cells that resolved, or plan a create. */
   references?: Array<ImportReference>
-  /** Records of referenced objects this row creates first (SPA-168). */
+  /** Records of referenced objects this row creates first. */
   alsoCreates?: Array<ImportAlsoCreate>
   /**
-   * What the commit's creator actually did (SPA-169), stored only when it
-   * differs from `verdict` — a record born between the preview and the
-   * commit turns a planned create into an attach. The plan is intent; this
-   * is what happened.
+   * What the commit's creator actually did, stored only when it differs from
+   * `verdict` (a record born after the preview turns a create into an attach).
    */
   committedAs?: 'attach' | 'create'
-  /** The records this row's `alsoCreates` became, by create key (SPA-169). */
+  /** The records this row's `alsoCreates` became, by create key. */
   alsoCreated?: Record<string, string>
-  /** Why the commit wrote nothing for a row that was never going to (SPA-169). */
+  /** Why the commit wrote nothing for a row that was never going to. */
   skipReason?: string
 }
 
@@ -343,13 +315,14 @@ export type LedgerNeed = 'instrument' | 'marksAsOf' | 'currency' | 'dateOrder'
 export type LedgerEventKind = 'round' | 'investment' | 'mark' | 'distribution'
 
 /**
- * What the commit did with a ledger row (SPA-171), written onto its plan in
- * the row's own transaction. A row holding it is passed over by every later
- * run, so a committed batch re-run appends nothing. The ids are the rows the
- * events are — appended by this commit, or an existing live row with the
- * same natural key, named in `reused`. `roundId` is set on the row that
- * carries the round: a round has no `batch_id` (D12), so this is how the
- * receipt names it.
+ * What the commit did with a ledger row, written onto its plan in the row's
+ * own transaction.
+ * - A row holding it is passed over by every later run: a re-run appends
+ *   nothing.
+ * - Ids are events this commit appended, or existing live rows with the same
+ *   natural key (named in `reused`).
+ * - `roundId` is how the receipt names the round: a round has no `batch_id`.
+ *   (D12)
  */
 export type LedgerCommitted = {
   holdingId: string
@@ -372,12 +345,12 @@ export type LedgerPlan = {
   events: LedgerEvents | null
   /** Decisions whose absence stops the row. */
   needs: Array<LedgerNeed>
-  /** Set by the commit once the row's events landed (SPA-171). */
+  /** Set by the commit once the row's events landed. */
   committed?: LedgerCommitted
 }
 
 /**
- * A ledger row's plan (SPA-170): the records plan's frame — the verdict says
+ * A ledger row's plan: the records plan's frame — the verdict says
  * what happened to the company (`attach` found, `create` planned, `no-land`
  * errors), `references` names it, `alsoCreates` carries its create — plus
  * the row's dated events.

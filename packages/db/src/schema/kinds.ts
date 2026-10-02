@@ -32,9 +32,8 @@ export type NoteBody = Array<Json>
  */
 
 // ---------- company / person ----------
-// Attribute values live in entity.values (unified storage, CONTEXT.md).
-// Side tables persist as kind markers and future homes for non-attribute
-// structure; they carry no attribute columns.
+// Kind markers only: attribute values live in entity.values, so these carry
+// no attribute columns.
 
 export const company = pgTable('company', {
   entityId: uuid('entity_id')
@@ -58,17 +57,14 @@ export const space = pgTable(
       .references(() => entity.id),
     parentId: uuid('parent_id'),
     slug: text('slug').notNull(),
-    // Materialized path for ancestor/descendant queries (ltree GiST index
-    // in migration 0000).
+    // Materialized path for ancestor/descendant queries (ltree GiST index).
     path: ltree('path').notNull(),
     isSeeded: boolean('is_seeded').notNull().default(false),
   },
-  // Slugs are unique per parent, not globally: at 3–4 levels the same label
-  // recurs legitimately across branches (Cooling under Data centers and under
-  // Energy storage), and a global constraint renamed the second one to
-  // `cooling_2` — in a tree the investor reads. `path` stays globally unique
-  // by construction, so nothing is lost. Roots are disambiguated by a partial
-  // index, since NULL parent_id defeats a plain unique constraint.
+  // Slugs are unique per parent, not globally — one label recurs across
+  // branches. `path` stays globally unique by construction.
+  // - Roots get their own partial index: NULL parent_id defeats a plain
+  //   unique constraint.
   (t) => [
     uniqueIndex('space_slug_per_parent_unique')
       .on(t.parentId, t.slug)
@@ -116,11 +112,12 @@ export const noteKind = pgEnum('note_kind', ['note', 'memo', 'scratch'])
 export const visibility = pgEnum('visibility', ['shared', 'private'])
 
 /**
- * body_json (BlockNote document) is authoritative — BlockNote's markdown
- * export is lossy, so md can't round-trip. body_md is derived on save and
- * feeds search/embeddings/export ([[Label|entity:uuid]] for mentions).
- * Attachment to other entities goes through `link`. Default visibility is
- * shared — private-by-default keeps partner #2 in Apple Notes.
+ * A note. `body_json` (BlockNote) is authoritative; BlockNote's markdown
+ * export is lossy, so md can't round-trip.
+ * - `body_md` is derived on save; it feeds search/embeddings/export
+ *   (`[[Label|entity:uuid]]` for mentions). Attachment goes through `link`.
+ * - Visibility defaults to shared (CONTEXT.md "Single user first, team
+ *   ready").
  */
 export const note = pgTable('note', {
   entityId: uuid('entity_id')
@@ -130,8 +127,8 @@ export const note = pgTable('note', {
   bodyJson: jsonb('body_json').$type<NoteBody>(),
   bodyMd: text('body_md').notNull().default(''),
   kind: noteKind('kind').notNull().default('note'),
-  // Generated column (migration 0009) — derived from title + body_md by
-  // Postgres, never written by the app. Title is weighted above body.
+  // Generated column — derived from title + body_md by Postgres, never
+  // written by the app. Title is weighted above body.
   tsv: tsvector('tsv'),
   authorId: text('author_id')
     .notNull()
@@ -145,11 +142,8 @@ export const note = pgTable('note', {
 // ---------- document (uploads, decks, and clipped URLs — sources ARE documents) ----------
 
 /**
- * Six, not seven: `memo` was dropped 2026-09-20 (SPA-25,
- * spec-storage-sources §11 delta 3). It collided with `note_kind = 'memo'`
- * while meaning something else — an exported memo PDF is a document that is
- * `derived_from` a note, a provenance edge, not a genre of file. Existing
- * rows were mapped to `other` by migration 0037.
+ * A document's genre. No `memo`: an exported memo PDF is `derived_from` a
+ * note, a provenance edge, not a genre (CONTEXT.md, "Sources are documents").
  */
 export const documentKind = pgEnum('document_kind', [
   'deck',
@@ -161,10 +155,9 @@ export const documentKind = pgEnum('document_kind', [
 ])
 
 /**
- * Extraction is a worker job, so the row exists before its text does. The
- * UI needs to tell "still working" from "this format has no text we can
- * reach" (scanned PDFs, images — a BYOK vision model is the upgrade path)
- * from "we tried and it broke".
+ * Text-extraction state. Extraction is a worker job, so the row exists before
+ * its text does; the UI tells "still working" from "no text we can reach"
+ * (scanned PDFs, images) from "we tried and it broke".
  */
 export const extractionStatus = pgEnum('extraction_status', [
   'pending',
@@ -174,12 +167,11 @@ export const extractionStatus = pgEnum('extraction_status', [
 ])
 
 /**
- * What the provider's copy is doing, for a document that came from one
- * (`docs/spec-storage-sources.md` §8). `linked` is the live mapping; `gone`
- * is the file deleted on their side — we keep ours and the row says so,
- * because a copy-in archive that deletes when Drive deletes is not an
- * archive. Null for every document nobody linked, which is all of them
- * until the first storage-source plugin lands.
+ * What the provider's copy is doing (`docs/spec-storage-sources.md` §8).
+ * - `linked`: the live mapping. `gone`: deleted on their side — we keep ours
+ *   and the row says so; an archive that deletes when Drive deletes is not
+ *   an archive.
+ * - Null for a document no storage source linked.
  */
 export const externalStatus = pgEnum('external_status', ['linked', 'gone'])
 
@@ -198,33 +190,26 @@ export const document = pgTable(
     sizeBytes: integer('size_bytes'),
     kind: documentKind('kind').notNull().default('other'),
     /**
-     * How the bytes arrived, as a class and never as a vendor (SPA-137,
-     * migration 0030). `document_origin` was `upload | gmail_attachment |
-     * url | clip`: one class, one vendor, and two first-party channels.
-     * `upload`, `url` and `clip` are all a person choosing a file or a page
-     * in a surface we ship — the extension is first-party (CONTEXT.md
-     * "Plugin architecture"), so all three are `manual`; a connector's
-     * attachment is `integration` plus the row that names it, which is what
-     * `docs/spec-storage-sources.md` §11.2 asks of drive/box/gmail.
+     * How the bytes arrived, as a class and never as a vendor.
+     * - Upload, URL and clip are a person in a surface we ship (the extension
+     *   is first-party, CONTEXT.md "Plugin architecture"), so all are `manual`.
+     * - A connector's attachment is `integration` plus `source_ref`.
      */
     sourceClass: sourceClass('source_class').notNull().default('manual'),
     /** The integration that filed the document; null for every other class. */
     sourceRef: uuid('source_ref').references(() => integration.id),
     /**
-     * Where the file sits in the provider's own tree, kept **verbatim**
-     * (spec §5.3) — "Data room / Legal", as the user would read it aloud.
-     * It is a label and a write-back address, never a key: retrieval scopes
-     * by `entity_space` and ltree, because the tree is a projection and the
-     * graph is the meaning.
+     * Where the file sits in the provider's tree, kept **verbatim**
+     * ("Data room / Legal"). A label and a write-back address, never a key:
+     * retrieval scopes by `entity_space` and ltree — the tree is a
+     * projection, the graph is the meaning.
      */
     sourcePath: text('source_path'),
     /**
-     * The provider's own id for the file, and the idempotency key of the
-     * whole sync: §6's write-through must not re-import the file it just
-     * exported, and §8's cursor-expiry full re-list must land on the rows it
-     * already made. Both are `on conflict (connection_id, external_id)`,
-     * which is why the partial unique index below ships with the column
-     * rather than with the first plugin.
+     * The provider's id for the file — the idempotency key of the whole sync.
+     * Write-through must not re-import what it just exported, and a
+     * cursor-expiry re-list must land on existing rows: both are
+     * `on conflict (connection_id, external_id)`.
      */
     externalId: text('external_id'),
     /** The provider's own link — "Open in source" on the row. */
@@ -233,7 +218,7 @@ export const document = pgTable(
     /**
      * Whose account the file came through. `account_connection.id` is a
      * plain uuid primary key and not an entity id, so this column takes **no**
-     * `ENTITY_REFS` entry — see the note in migration 0038.
+     * `ENTITY_REFS` entry.
      */
     connectionId: uuid('connection_id').references(() => accountConnection.id),
     extractedText: text('extracted_text'),
@@ -261,10 +246,9 @@ export const document = pgTable(
       'document_source_ref_invariant',
       sql`(${t.sourceClass} = 'integration') = (${t.sourceRef} IS NOT NULL)`,
     ),
-    // One document per (connection, provider file). Partial, because the
-    // pair is null on every hand-uploaded row and Postgres would otherwise
-    // let exactly one of them exist. This is what makes §6's loop prevention
-    // and §8's cursor-expiry re-list idempotent rather than duplicating.
+    // One document per (connection, provider file) — what makes sync loop
+    // prevention and the cursor-expiry re-list idempotent. Partial, because
+    // the pair is null on every hand-uploaded row.
     uniqueIndex('document_connection_external_unique')
       .on(t.connectionId, t.externalId)
       .where(
@@ -274,11 +258,9 @@ export const document = pgTable(
 )
 
 /**
- * What a chunk was cut from (docs/spec-ai-substrate.md §7: the semantic lane
- * extends from documents to notes and close_reasons). `close_reason` is a
- * deal *attribute* (slug `close_reason`, type text), not a column, so the
- * third kind is the general `attribute` with the slug in `source_key` rather
- * than a bespoke `close_reason` value.
+ * What a chunk was cut from. `attribute` carries the slug in `source_key` —
+ * `close_reason` is a deal attribute, not a column, so it gets no value of
+ * its own.
  */
 export const chunkSourceKind = pgEnum('chunk_source_kind', [
   'document',
@@ -287,30 +269,16 @@ export const chunkSourceKind = pgEnum('chunk_source_kind', [
 ])
 
 /**
- * The retrieval grain for every AI-visible text (SPA-102, generalized from
- * `document_chunk` before anything writes a vector). `entity_id` is the
- * entity the text belongs to — the document, the note, or the record whose
- * attribute was chunked (a deal for `close_reason`) — so it references
- * `entity.id` directly, and merge repoints it (see ENTITY_REFS `chunk.entity`).
- *
- * `source_key` names the part of that entity the text came from: the
- * attribute slug for `attribute`, and `''` for `document` / `note`, whose
- * whole body is the one source. Not null so the unique index below holds for
- * every row (a nullable key would let two `(doc, 'document', NULL, 0)` rows
- * coexist); the check keeps the empty key and the attribute kind honest.
- *
- * One embedding model per deployment (pgvector dimension is baked into the
- * column). embedding_model is recorded so a model change can enqueue a full
- * re-embed instead of silently corrupting search. 768 dims fits both
- * nomic-embed-text (Ollama path) and bge-base. The HNSW index on `embedding`
- * is hand-written SQL (migrations 0002, then 0045 for this table) because
- * drizzle-kit cannot express the operator class.
- *
- * No `space_path` column, although §9 lists the space ltree path among what a
- * chunk carries: a document can be filed in many spaces and one ltree column
- * cannot hold that, so space filtering joins `entity_space` (and `space.path`)
- * at query time. Denormalizing the path set onto the chunk is a later
- * optimization, to be taken only if EXPLAIN on the semantic CTE demands it.
+ * The retrieval grain for every AI-visible text.
+ * - `entity_id`: the document, note, or record whose attribute was chunked;
+ *   merge repoints it (ENTITY_REFS `chunk.entity`).
+ * - `source_key`: the attribute slug for `attribute`, `''` otherwise. Not
+ *   null, so the unique index holds for every row.
+ * - One embedding model per deployment (dimension baked into the column);
+ *   `embedding_model` lets a model change enqueue a full re-embed.
+ * - The HNSW index on `embedding` is hand-written SQL: drizzle-kit cannot
+ *   express the operator class.
+ * - No space path column: space filtering joins `entity_space` at query time.
  */
 export const chunk = pgTable(
   'chunk',
@@ -328,20 +296,15 @@ export const chunk = pgTable(
     /** 1-based page (PDF/PPTX) or sheet the chunk was cut from, when known. */
     page: integer('page'),
     /**
-     * A derived cache of the sensitivity resolver (ai-26), so retrieval can
-     * filter inside SQL "before scoring" (§9) without calling a resolver per
-     * row. Exactly one writer: `stampSensitivity(entityId)` in
-     * `apps/web/src/lib/ai/stamp-sensitivity.ts`, created by SPA-121 for the
-     * embed job (which inserts chunks at the default and stamps them in the
-     * same transaction) and the function storage-18 will call on binding and
-     * filing changes. No second author may appoint themselves; an insert
-     * leaves the default for it to correct. (Migration 0045's
-     * `COMMENT ON COLUMN` still names storage-18 as the home; the intent is
-     * unchanged — one writer — only its address moved, and the comment is
-     * corrected the next time a migration touches `chunk`.) The routing
-     * boundary never reads this column — it
-     * resolves live through `apps/web/src/lib/ai/sensitivity.ts`, because a
-     * stale cache at the point bytes leave the box is a leak.
+     * A derived cache of the sensitivity resolver, so retrieval filters in
+     * SQL before scoring.
+     * - Exactly one writer: `stampSensitivity` (the embed job calls it in the
+     *   transaction that inserts the chunks). No second author may appoint
+     *   themselves; an insert leaves the default for it to correct.
+     * - Binding and filing changes do not restamp, so the column can lag them.
+     * - The routing boundary never reads this column — it resolves live
+     *   (`resolveSensitivity`): a stale cache where bytes leave the box is a
+     *   leak.
      */
     sensitive: boolean('sensitive').notNull().default(false),
   },
