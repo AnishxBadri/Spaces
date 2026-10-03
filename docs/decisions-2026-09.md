@@ -341,3 +341,21 @@ _Four decisions taken by the owner while publishing project 18 (plugins run unat
 ### D65-domain-event-emitter
 
 **Where is `entity.created` emitted?** Answered: from **`resolveEntity`** (company and person births) **and `createDeal`** (deal births), after the birth commits, never on an attach; **skipped for `seed` and `import` births**. The dispatcher enqueues through each process's `Enqueue` service. `autoEnrich` is a per-integration toggle, **off by default**. Rejected: a `domain_event` outbox (new schema for one trigger), pg NOTIFY (neither durable nor transactional), and an emitter only in web's write paths (misses worker-born entities). Carried by `sdk-19`.
+
+## Addenda — 2026-10-03
+
+### D66-linked-storage-behaviour
+
+**How do linked storage files and folders behave on a record?** Settled against Attio's Files tab, keeping `docs/spec-storage-sources.md`'s copy-in model underneath. Answered:
+
+- **No folders the user creates.** §3.4 holds: kind, filed-against and space do what a folder would, and one file sits in several places. A linked folder shows **its own Drive tree, read-only**, grouped under the folder name, from each document's source path.
+- **Native Google files open in Google.** Clicking a Doc, Sheet or Slides file opens it in Google; every other format opens in the in-app preview. "Open in Drive" is in every linked file's menu.
+- **Native files default to `retain: text`.** Google is the source of truth, so we keep the text, chunks and pointer, refreshed by the change poll, and no exported bytes. PDFs, decks, images and office files keep `full`.
+- **App delete never touches the provider.** The action is "Remove from record". Deleting in Drive is not offered.
+- **Unlink deletes the copies that came only through the binding**, after a confirmation that gives the counts: row, blob when no other row shares the sha, chunks and embeddings. A file also filed elsewhere stays and loses only this filing. Drive is untouched, so re-linking restores. A file deleted _in Drive_ still keeps ours as `external_status: gone`; only an unlink the user chose removes copies.
+- **One connection per Google product.** `account_connection` is keyed by `(user, provider, product, external_email)`: Drive, Calendar and Gmail each have their own consent, token, status and Disconnect, so disconnecting one never revokes another. One OAuth client per fund is shared. Incremental scopes grow only within a product.
+- **Menus:** local file — Rename · Download · Change kind · Remove. Linked folder — Rename · Upload file (writes to Drive) · Unlink. File in a linked folder — Rename (renames in Drive) · Download · Open in Drive · Remove from record.
+
+_Rejected:_ user-created folders (a second organising scheme that cannot hold a file in two places); reference-only linking (no text for search or AI, dies with the token); deleting in Drive from the app (a founder's data room or a partner's folder is not ours to delete); one shared Google grant (disconnecting Gmail would revoke Drive).
+
+_Carried by_ the storage slices when project 20 is reconciled: `storage-2b` and `storage-3b` (per-product connections), `storage-7` and `storage-8a`/`8b` (tree display, unlink), `storage-12` (native default), and spec §3.3, §6, §7, §12. _Follow-ups noted, not decided:_ a per-document chunk cap (a 250 MB text-heavy file embeds every chunk today), and a "source deleted" state for citations whose document is gone (refs are strings, so a delete leaves them dangling).
