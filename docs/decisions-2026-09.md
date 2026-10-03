@@ -383,3 +383,29 @@ _Carried by_ the storage slices when project 20 is reconciled: `storage-2b` and 
 _Rejected:_ SMTP with an app password (weaker threading; Google is retiring app passwords); syncing drafts to Gmail (needs `gmail.compose` and two-way reconciliation); parsing first names from `canonical_name`; HTML in the note body (a second rendering of the one text body); summaries as proposals (buries Review); new relationship, interaction or location attribute types (the menu of fifteen holds).
 
 _Carried by_ `arrival-10` and slices to be written when Gmail is reconciled. D66's Gmail scope line is amended to add `gmail.send`.
+
+### D68-meetings
+
+**How do calendar meetings and call recorders fit the graph?** A meeting is an interaction (`kind: meeting`), an activity on the records it touches, with no page of its own. Answered:
+
+- **Events change; the row follows.** `interaction` gains a per-kind `meta` jsonb (D67's email `headers` becomes its email shape). For a meeting: `ends_at`, `status` (scheduled, cancelled), conference link, organizer, recurring instance id, each participant's RSVP. Calendar sync updates the row in place, keyed by iCalUID. A cancelled meeting is marked, never deleted, so notes on it survive.
+- **RSVP is shown, never edited.** Calendar stays `calendar.events.readonly` (D66); "Open in Google" changes it.
+- **Linked records** are `interaction_entity` edges: participants by the participants module, plus manual edges (D49's pin). A link never invites anyone.
+- **Notes.** The write-up stays one canonical body (`interaction.note_id`, D30). A prep note is an ordinary note filed against the meeting's records.
+- **Today gains a Meetings section** with day navigation, external meetings only (internal ones are not stored). The meeting dialog shows time and link, participants with RSVP, linked records, the write-up, artifacts, pending suggestions and **Prep**: the assembler over the linked records through the synthesize lane, shown on demand and ephemeral, with "Save as note". Not a Review proposal.
+- **Recorders are plugins, one per provider.** Spaces never records, transcribes, joins calls or asks for consent.
+  - Each plugin declares a `webhook` or `schedule` job and calls ports. It passes match keys to `Content.logInteraction` (calendar event id or iCalUID, else start time plus participant emails); **the interaction writer decides**: attach to the calendar meeting, or create a `call` only when nothing matches. One meeting, one row.
+  - Speakers go through the participants module.
+  - A transcript is a document: copied, chunked, embedded.
+  - A recording is kept as a link, never copied (large, no text layer, the provider is the archive).
+  - A provider summary is a note suggestion; accepting makes it the write-up (`arrival-7`).
+  - User-authored notes (a per-integration "these notes are mine" switch, e.g. Granola) fill the write-up only when it is empty; otherwise they are a suggestion. AI summaries never take this path.
+  - Action items are task suggestions, which needs a new `suggestion_kind` (a migration).
+  - The raw payload goes to `Receipts`.
+  - Google Meet's recordings and Gemini notes arrive through the Drive plugin and match the same way.
+- **One meeting, many artifacts.** D67's email–document join table carries a `role`: attachment, transcript, recording link. It replaces `interaction.document_id` before `arrival-6` builds on it.
+- **Privacy follows D67:** a recorder's transcript and notes are private to the person whose tool made them; that a recording exists, and its length, are visible. The sensitivity gate applies to every AI call over them.
+
+_Rejected:_ a meeting entity or page (an activity, not a thing); editing RSVPs or events from Spaces (calendar write scope); copying recordings; a second interaction per recorder (the calendar meeting the user sees is the one row); auto-moving deal stages on a first meeting (later, and only as a suggestion).
+
+_Carried by_ `arrival-5` (calendar), `arrival-6`/`arrival-7` (recorder, rewritten as one contract for every provider) and a Today slice, when that area is reconciled.
