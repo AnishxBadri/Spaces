@@ -354,9 +354,32 @@ _Four decisions taken by the owner while publishing project 18 (plugins run unat
 - **App delete never touches the provider.** The action is "Remove from record". Deleting in Drive is not offered.
 - **Unlink deletes the copies that came only through the binding**, after a confirmation that gives the counts: row, blob when no other row shares the sha, chunks and embeddings. A file also filed elsewhere stays and loses only this filing. Drive is untouched, so re-linking restores. A file deleted _in Drive_ still keeps ours as `external_status: gone`; only an unlink the user chose removes copies.
 - **One connection per Google product.** `account_connection` is keyed by `(user, provider, product, external_email)`: Drive, Calendar and Gmail each have their own consent, token, status and Disconnect, so disconnecting one never revokes another. One OAuth client per fund is shared. Incremental scopes grow only within a product.
-- **Least-privilege scopes, named:** Drive asks `drive.file` (files picked in Google's picker) and adds `drive.readonly` only when a whole folder is bound; never full `drive`. Calendar asks `calendar.events.readonly`; never edit. Gmail asks `gmail.readonly`; never `mail.google.com` (it includes permanent delete) and never send, since there is no compose. A product's consent screen never lists another product's scopes.
+- **Least-privilege scopes, named:** Drive asks `drive.file` (files picked in Google's picker) and adds `drive.readonly` only when a whole folder is bound; never full `drive`. Calendar asks `calendar.events.readonly`; never edit. Gmail asks `gmail.readonly` plus `gmail.send` (D67); never `mail.google.com` (it includes permanent delete), `gmail.compose` or `gmail.modify`. A product's consent screen never lists another product's scopes.
 - **Menus:** local file — Rename · Download · Change kind · Remove. Linked folder — Rename · Upload file (writes to Drive) · Unlink. File in a linked folder — Rename (renames in Drive) · Download · Open in Drive · Remove from record.
 
 _Rejected:_ user-created folders (a second organising scheme that cannot hold a file in two places); reference-only linking (no text for search or AI, dies with the token); deleting in Drive from the app (a founder's data room or a partner's folder is not ours to delete); one shared Google grant (disconnecting Gmail would revoke Drive).
 
 _Carried by_ the storage slices when project 20 is reconciled: `storage-2b` and `storage-3b` (per-product connections), `storage-7` and `storage-8a`/`8b` (tree display, unlink), `storage-12` (native default), and spec §3.3, §6, §7, §12. _Follow-ups noted, not decided:_ a per-document chunk cap (a 250 MB text-heavy file embeds every chunk today), and a "source deleted" state for citations whose document is gone (refs are strings, so a delete leaves them dangling).
+
+### D67-email
+
+**How is email viewed, shared, tracked and composed?** Settled against Attio's email surfaces; it answers what `arrival-10` left open. Answered:
+
+- **Store the email, not only its text.** `interaction` gains `headers` jsonb (from, to, cc, date); the raw MIME is kept as a content-addressed blob; the viewer renders its HTML sanitized in a sandboxed iframe, so scripts and tracking pixels never run. The body note stays the searchable, AI-readable text.
+- **Attachments are documents** linked to their email by a join table (`interaction.document_id` stays one-to-one for transcripts), opened in the Files preview dialog. The list filters on "has attachments".
+- **List rows** show subject, participants, a one-line summary, attachment count, category labels, "via <mailbox owner>" and date. The Interactions section filters by kind. `?modal=email&id=` deep-links an email.
+- **Summary and labels are derived display text**, cached per email by the summarize and classify lanes under the sensitivity gate, rebuildable like embeddings. Never a proposal, never an attribute value.
+- **Privacy, three layers.** Synced mail's bodies and attachments are private to the mailbox owner by default; forwarded mail stays shared (D49). A per-record override ("my emails with Flent are visible to the workspace") and per-email grants to named users widen it. Subject, participants, date and mailbox owner are always visible. `canRead` enforces it as an extension of note visibility.
+- **Interaction stats.** A derived table per entity holds first, last and next interaction for email, calendar and any, each with its interaction id. The interaction writer updates it in the same transaction. Views sort and filter on it as read-only columns; it is not an attribute and not in `entity.values`. "Next" fills once calendar sync lands; connection strength builds on it later.
+- **Team** on a company is a computed panel over D60's `companies` references. Editing it writes the person's value.
+- **Drafts** are an `email_draft` row: author-private, local only (never synced to Gmail drafts), autosaved. Modes are new, reply, reply-all and forward, with `In-Reply-To`/`References` set. Trash deletes; Send sends.
+- **Sending** goes through the Gmail plugin with `gmail.send`, so replies thread and land in the user's Sent folder. A sent email is written as an outgoing interaction at once; when sync later sees it, Message-ID dedupes.
+- **Recipients** are searched over people and their email aliases; the chip picks which alias. A new address goes through the participants module at send (D34).
+- **Variables** become paths, one grammar shared with AI prompts: `{{name.first}}`, `{{company.name}}`, `{{last_interaction.when}}`. Review resolves them per recipient and flags blanks before sending.
+- **Templates** gain a fourth kind, `email`: `{subject, body, attachments}`, favouritable.
+- **Attribute shapes.** A person's name has first and last parts, and `canonical_name` is their join, kept in sync. `phone` validates as E.164 and takes `multi` as config. Location stays text. Email addresses are the identity aliases shown as one multi-value field.
+- **Deferred:** outbox and scheduled sends, mass sending, sequences, signatures.
+
+_Rejected:_ SMTP with an app password (weaker threading; Google is retiring app passwords); syncing drafts to Gmail (needs `gmail.compose` and two-way reconciliation); parsing first names from `canonical_name`; HTML in the note body (a second rendering of the one text body); summaries as proposals (buries Review); new relationship, interaction or location attribute types (the menu of fifteen holds).
+
+_Carried by_ `arrival-10` and slices to be written when Gmail is reconciled. D66's Gmail scope line is amended to add `gmail.send`.
