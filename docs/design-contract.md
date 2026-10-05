@@ -137,8 +137,10 @@ in the head and the `↵` on the Review card's primary.
 record title carries derived and cross-cutting numbers — a ratio, a window, a next run, a
 queue elsewhere — never the count a section head on the same page already prints. Cells
 are equal lanes on rules with the number in mono 22 above a sentence-case graphite label;
-a ratio prints as `1 / 2`. Providers are shown by their own mark at 14–16px, never a
-monogram; degraded is the same mark at reduced opacity.
+a ratio prints as `1 / 2`. A readout is a number or a date, never a word: a state
+(`needs a key`, `webhook`) belongs in the head's mono meta line, not in a cell. Providers
+are shown by their own mark at 14–16px, never a monogram; degraded is the same mark at
+reduced opacity.
 
 Instrument density is measured density: readouts, ledger rows, five numbers in a
 strip. It is never explanatory density. The drift to guard against is doctrine
@@ -302,8 +304,10 @@ its section's row lit, and takes the `SettingsSection` head
 **A record** — the term page, a provider, a connection. → **`RecordHeader`**,
 `apps/web/src/components/record/record-parts.tsx:21`, used as
 `apps/web/src/routes/_app/deals_.$dealId.tsx:178` uses it: caps mono breadcrumb, actions
-with key hints, mark + serif name + square badge, readout strip, then `RecordBody` as
-two columns: a 320px details column on bone left — the `PropertyGrid` as single
+with key hints — all outlined, a record head has no single affirmative to give pine to —
+mark + serif name + square badge, readout strip, then `RecordBody` as two columns: a
+320px details column on bone (bone, not bone-deep, even beside a bone nav; the 1px rule
+separates) left — the `PropertyGrid` as single
 label–value rows, then the relationship sections (Waiting, Team, Associated deals,
 Spaces, Tasks) — and the view right at full remaining width under a 44px bone tab head —
 Notes · Interactions · Files · History, each with its mono count, Notes by default, the
