@@ -409,3 +409,25 @@ _Carried by_ `arrival-10` and slices to be written when Gmail is reconciled. D66
 _Rejected:_ a meeting entity or page (an activity, not a thing); editing RSVPs or events from Spaces (calendar write scope); copying recordings; a second interaction per recorder (the calendar meeting the user sees is the one row); auto-moving deal stages on a first meeting (later, and only as a suggestion).
 
 _Carried by_ `arrival-5` (calendar), `arrival-6`/`arrival-7` (recorder, rewritten as one contract for every provider) and a Today slice, when that area is reconciled.
+
+### D69-custom-objects-and-relationships
+
+**How do relationships, attribute editing and custom objects behave?** Settled against Attio's object settings. Answered:
+
+- **Relationships have four cardinalities** (1:1, 1:N, N:1, N:N), set in one Relationship dialog that names both sides. A relationship is a **pair of `record_reference` attribute rows**, one per object, joined by `options.inverseOf`. Both are real attributes: rail, list column, filter, sort, template variable, AI context. Not a sixteenth type.
+- **The value is stored once, on the owning side;** the other side is derived.
+  - Owner: the "many" side for N:1 and 1:N, holding a single reference; the side it was created from for N:N and 1:1.
+  - The inverse reads the `references` links `setValues` already writes (`link_to_idx`); one resolver serves rail, views, variables and the assembler.
+  - A write from either side becomes `setValues` on the owning side: one event, one history.
+  - Cardinality is enforced in `setValues`: single vs multi on the owner, plus inverse uniqueness for 1:1.
+  - Merge, delete, import and the context walk follow from the links they already handle.
+- **Views learn inverse attributes:** `lib/views/sql.ts` compiles link-join and count expressions for filter and sort, with an index plan like `attr_idx_*`. This is the one new piece of work.
+- **Existing references become pairs:** D60's person `companies` (N:N, owned by the person) pairs with company **Team**; deal `company` (N:1) pairs with company **Associated deals**; deal `people` (N:N) pairs with person **Deals**.
+- **Edits widen only.** Single → multi and `select` → `multi_select` are allowed as a reshape that wraps stored values, logged as **one** event on the attribute, not one per record. Narrowing is refused. This replaces "decide `multi` up front".
+- **System attributes are never archivable**, only user-created ones. "Structure fixed, content free" is unchanged: options, colours, currency code and defaults stay editable. Clutter is a display concern: the rail shows filled and pinned attributes, empty ones collapse under "Show all". Amends `spec-attribute-engine.md` §3.
+- **Custom objects:** files and Drive bindings work as on core objects; every record keeps a `canonical_name`, so none is a bare id; archive, never delete; record templates as built. **Email on custom records is deferred**; when wanted, it derives through references as deals do (D49), plus a manual pin.
+- **Deferred:** per-object permissions (until a second partner), teams, requirements, rules, notifications.
+
+_Rejected:_ storing both sides of a relationship (every write, merge, delete and import keeps two rows agreeing — the drift `ENTITY_REFS` exists to prevent); a relationship attribute type; narrowing edits; archiving system attributes; deleting objects.
+
+_Carried by_ no slice yet: the relationship pair and inverse resolver, the views inverse compilation, and the widening reshape, written when the attribute engine is next open. `graph-1` (D60) becomes the first pair.
