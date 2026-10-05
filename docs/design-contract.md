@@ -171,8 +171,8 @@ architecture to a reviewer; the person at 8am needs the value.
   what the section is for. Subheads inside a section are not a way to explain it:
   when rows come in two lanes, the lane is a mark in the row's mono end lane
   (`mention · note · 09-21`), never a second caps head over an empty list. The
-  shipped precedent is `/portfolio/$holdingId`; the record page's Notes, Files and
-  Context sections were brought to it 2026-09-30.
+  shipped precedent is `/portfolio/$holdingId`; the record page's Notes and Files
+  sections were brought to it 2026-09-30.
 
 ---
 
@@ -306,11 +306,12 @@ with key hints, mark + serif name + square badge, readout strip, then `RecordBod
 two columns: a 320px details column on bone left — the `PropertyGrid` as single
 label–value rows, then the relationship sections (Waiting, Team, Associated deals,
 Spaces, Tasks) — and the view right at full remaining width under a 44px bone tab head —
-Notes · Interactions · Files · History · Context, each with its mono count, Notes by
-default, the last tab remembered, empty tabs grey with a zero (D74, 2026-10-06; the
-stacked sections and the right-hand rail of 2026-09-30 are superseded).
+Notes · Interactions · Files · History, each with its mono count, Notes by default, the
+last tab remembered, empty tabs grey with a zero (D74, 2026-10-06; the stacked
+sections and the right-hand rail of 2026-09-30 are superseded, and there is no
+Context tab — Ask's answer card carries a `Sources n ›` footer instead).
 
-**A ledger of a stream** — the Context readout, a run log, a feed.
+**A ledger of a stream** — Ask's sources footer, a run log, a feed.
 → **Today's spine**, `apps/web/src/routes/_app/today.tsx:320`. `LedgerSection` with a
 bone head band with the title, a mono count and one link right; 40px `LedgerRow`s on rules; a fixed
 `LedgerFigure` lane the row ends on; `ReferenceBar` wherever a median exists; the last
