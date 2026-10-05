@@ -431,3 +431,26 @@ _Carried by_ `arrival-5` (calendar), `arrival-6`/`arrival-7` (recorder, rewritte
 _Rejected:_ storing both sides of a relationship (every write, merge, delete and import keeps two rows agreeing — the drift `ENTITY_REFS` exists to prevent); a relationship attribute type; narrowing edits; archiving system attributes; deleting objects.
 
 _Carried by_ no slice yet: the relationship pair and inverse resolver, the views inverse compilation, and the widening reshape, written when the attribute engine is next open. `graph-1` (D60) becomes the first pair.
+
+### D70-find-and-ask
+
+**What does Cmd-K do, and where does a question about your own data get answered?** Answered: **Cmd-K finds and goes; Ask answers.** Split by the question, not the technique.
+
+- **Cmd-K is the finder.** Instant, deterministic, keyboard-first.
+  - Groups in order: **Jump to** (objects, saved views, settings pages) · **Actions** (verbs with their printed keys, contextual — on a record its own verbs first: Log interaction, Write email, Move stage) · **Records** (lexical + fuzzy only, so typing a name always puts that record first) · **Passages**.
+  - **Passages** is the existing semantic lane (SPA-129, second wave after typing pauses), kept only as a finder: places to go (a deck page, a note paragraph), never answers, never mixed into record ranking.
+  - Highlighting a result opens a preview pane: a record's readout strip and key fields; an object's views and counts. Nothing highlighted, the list runs full width.
+  - Foot: navigate · actions on this result · open · **Tab hands the typed query to Ask**.
+- **Ask is the agent.** The same palette after Tab (or ⌘J), plus a full thread view.
+  - It is a **second, in-process client of the MCP tool surface** — `search_records`, `get_record`, `get_context`, propose — so external agents and the in-app chat share one set of tools, permissions and rules (spec-ai-substrate §5–6).
+  - **New tools:** `query_records(object, conditions, sort, limit)` over the views compiler and D67's interaction stats, so filters and counts are computed, never generated; portfolio tools over the pure portfolio libraries, so money is computed too.
+  - **Answers cite** every claim (`doc:…#n`, `note:…`). "Save as note" promotes an answer, as Prep does (D68).
+  - **Action cards:** the agent proposes (create task, move stage, file into a space); applying one writes as the user. AI still only proposes.
+  - **Scoping:** `@space` or `@record` in the prompt narrows retrieval and context; a space's memos and filed companies are what make "what do we believe about this market" answerable.
+  - **Threads** are private to their author and are not entities: no mentions, no search hits.
+  - Inherited: `canRead` as the user, the sensitivity gate per call from what was retrieved (local model or refused), an `ai_run` per turn under the daily cap.
+- **Build order:** `query_records` first — it makes the MCP server useful for real questions before any chat UI exists — then threads, the Ask surface, action cards, scoping.
+
+_Rejected:_ semantic ranking inside Records (a name typed must win); Cmd-K answering questions (it finds); a separate tool set for the in-app chat (two rule sets); the agent writing directly; chat threads as entities.
+
+_Carried by_ no slice yet; `query_records` is the first, when the AI area is next open.
