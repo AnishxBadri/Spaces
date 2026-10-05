@@ -114,3 +114,7 @@ Drawn once on their own page and referenced from the Surfaces sheets, never redr
 ## Deliverable
 
 Part one: the inventory and mapping, approved, then the six pages. Part two: the ten Surfaces sheets, the Components and Patterns sheets they add, and an index on Surfaces with numbered owner questions and one line per sheet saying new / re-read-changed / re-read-unchanged. When the owner has reviewed it, the slice bodies for projects 23–26 are written citing sheets by number, and the projects go to Linear.
+
+## Status — 2026-10-06
+
+Part one done: six pages, 17 archived sheets with pointers, the v1 flows deleted. Part two done: Components › "Research · Ask · Watches" and "Readout strip · variants"; Patterns P8 amended, P9–P11 added; Surfaces K1 Cmd-K, A1 Ask, SP1 Space, R1 Review, T1 Today, I1 Integrations, C1 Connections, F1 Fathom, strips on O1–O4 and E8 converted to variant B with section counts dropped, `esc`/`↵`/dialog `⌘↵` hints stripped across the page, M1 archived as a second Today. The Surfaces index (00, at x −1520) lists every sheet with its status and five owner questions. Next: the owner reviews the canvas, then the slice bodies for projects 23–26 are written citing sheets, then the Linear upload.
