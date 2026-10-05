@@ -1,10 +1,32 @@
 # Design brief — the product at first ship
 
-_2026-10-06. For the design session that owns the Paper file `spaces` (id in `DESIGN.md`). One new page, **"Product at first ship"**, showing the main routes as they will look once projects 19–26 have shipped. The page is the reference every surface slice in projects 23–26 cites, so it is drawn before those slice bodies are written._
+_2026-10-06. For the session that works the Paper file `spaces` (id in `DESIGN.md`). Two jobs, in order: condense the file into six pages that mirror `docs/design-contract.md`, then draw the main routes as they will look once projects 19–26 have shipped, on the **Surfaces** page. Those sheets are the reference every surface slice in projects 23–26 cites, so they are drawn before those slice bodies are written._
 
-## What this page is for
+## Part one — the file mirrors the contract
 
-Projects 19–26 carry decisions D59–D73. Half of their surfaces exist on the canvas already (p-D-0 "Storage & Email", p-E-0 "Meetings · Relationships · Objects"); the other half — the finder, Ask, the space page, Review with space heads — has never been drawn. This page does two things at once:
+The file holds initial renders, proposals and approved sheets side by side. By project 26 most proposals are decisions, so the file is condensed into six pages. A slice cites one place; a reviewer checks it against one section of the contract.
+
+| Page            | Holds                                                                                                                                                                                                                                                                                | Contract section  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- |
+| **Foundations** | materials, type steps, voices, the Casing Rule, the Commentary Rule, the Separation Rule cards                                                                                                                                                                                       | §1 the vocabulary |
+| **Components**  | one sheet per primitive, each naming its code file: `RecordHeader`, `RecordBody` + `PropertyGrid`, `LedgerSection`/`LedgerRow`/`LedgerFigure`, `SettingsSection`/`SettingsRow`, card, chip and ref chip, dialog, confirm, composer row, picker — plus the new ones Part two produces | §2 the primitives |
+| **Patterns**    | the five shapes (shelf, queue, settings section, record, ledger of a stream) and the new ones Part two produces                                                                                                                                                                      | §3 precedent map  |
+| **Surfaces**    | every route as it is at first ship, one sheet per route, its states beside it                                                                                                                                                                                                        | the routes        |
+| **Landing**     | the marketing site, its own grammar                                                                                                                                                                                                                                                  | none              |
+| **Archive**     | every initial render and proposal, moved not deleted, captioned with the date and the sheet or decision that superseded it                                                                                                                                                           | none              |
+
+Rules for the condensation:
+
+- **A Surfaces sheet must be true by project 26 or shipped.** Anything that depends on an open question or a later project goes to Archive with a note: Harmonic's filter form, the two-axis routing grid, anything past 26.
+- **One sheet per route.** Where p-D-0 and p-E-0 drew a route twice, the one that survives the rule pass stays; the other is archived.
+- **Components carry the code pointer.** The sheet names the file. The repo stays the truth and the canvas stays the draft.
+- **Proposals that became decisions become captions.** The D number sits on the surviving sheet; the proposal page is archived.
+- **Archive is append-only.** Never delete; a superseded render is the record of why.
+- **Mapping before moving.** First an inventory: every page and sheet, with its proposed destination and, for Archive, what superseded it. The owner approves the mapping; then one pass of moving; then Part two on a clean file.
+
+## Part two — the Surfaces at first ship
+
+Projects 19–26 carry decisions D59–D73. Half of their surfaces exist on the canvas already (p-D-0 "Storage & Email", p-E-0 "Meetings · Relationships · Objects", both of which Part one folds into Surfaces); the other half — the finder, Ask, the space page, Review with space heads — has never been drawn. Part two does two things at once:
 
 1. **Draws the missing surfaces**, from the decisions named per sheet below.
 2. **Re-reads the existing sheets against The Separation Rule** (approved 2026-10-05, `DESIGN.md` §3–§5, `docs/design-contract.md`), so that one grammar runs through every route. Re-read means adjust in place where the rule is broken; it does not mean redraw.
@@ -24,7 +46,7 @@ Shipped surfaces are not redesigned beyond the rule. The product keeps its philo
 
 ## The sheets
 
-Ten sheets. "Re-read" sheets exist and get the rule pass plus the named additions; "new" sheets are drawn from scratch.
+Ten Surfaces sheets. "Re-read" sheets exist and get the rule pass plus the named additions; "new" sheets are drawn from scratch. Each new sheet also yields Components and Patterns sheets, listed at the end.
 
 ### 1. Today — re-read M1, add the attention row
 
@@ -66,7 +88,14 @@ Precedent: settings section (the FX ledger). Two sheets. **Integrations**: insta
 
 Precedent: p-D-0. Rule pass only. Confirm the read-only Drive tree under the folder name, native files opening in Google, `retain: text` shown as a value not a sentence, the unlink confirm with its counts. Decision: D66.
 
-## Out of scope for this page
+## What Part two adds to Components and Patterns
+
+Drawn once on their own page and referenced from the Surfaces sheets, never redrawn per surface.
+
+- **Components:** the watch row (engine mark, cadence or "manual", last run, live status cell, Run now); the action card (proposal, evidence refs, Apply, as Ask and Review both use it); the call strip (which tools a turn called, Spaces and plugin alike); the criteria field (in-place editable sentences under a title); the space head's path breadcrumb; the add-record and file-record cards as card variants.
+- **Patterns:** a queue grouped by head (Review under space heads; also the Interactions section filtered by kind); a palette with a preview pane (Cmd-K, Ask); a record with rail lanes that stream (the space page's Watching and What's moving, over D64).
+
+## Out of scope
 
 - Dark mode, new colours, new type steps.
 - Redesigning shipped routes beyond The Separation Rule.
@@ -76,4 +105,4 @@ Precedent: p-D-0. Rule pass only. Confirm the read-only Drive tree under the fol
 
 ## Deliverable
 
-The page, its index with numbered owner questions, and one line per sheet on the index saying new / re-read-changed / re-read-unchanged. When the owner has reviewed it, the slice bodies for projects 23–26 are written citing sheets by number, and the projects go to Linear.
+Part one: the inventory and mapping, approved, then the six pages. Part two: the ten Surfaces sheets, the Components and Patterns sheets they add, and an index on Surfaces with numbered owner questions and one line per sheet saying new / re-read-changed / re-read-unchanged. When the owner has reviewed it, the slice bodies for projects 23–26 are written citing sheets by number, and the projects go to Linear.
