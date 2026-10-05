@@ -302,11 +302,13 @@ its section's row lit, and takes the `SettingsSection` head
 **A record** — the term page, a provider, a connection. → **`RecordHeader`**,
 `apps/web/src/components/record/record-parts.tsx:21`, used as
 `apps/web/src/routes/_app/deals_.$dealId.tsx:178` uses it: caps mono breadcrumb, actions
-with key hints, mark + serif name + square badge, readout strip, then `RecordBody` with
-the `PropertyGrid` left over a 44px bone tab head — Notes · Interactions · Files ·
-History · Context, each with its mono count, Notes by default, the last tab remembered,
-empty tabs grey with a zero (D74, 2026-10-06; the stacked collapsed sections of
-2026-09-30 are superseded) — and the bone rail right across every tab.
+with key hints, mark + serif name + square badge, readout strip, then `RecordBody` as
+two columns: a 320px details column on bone left — the `PropertyGrid` as single
+label–value rows, then the relationship sections (Waiting, Team, Associated deals,
+Spaces, Tasks) — and the view right at full remaining width under a 44px bone tab head —
+Notes · Interactions · Files · History · Context, each with its mono count, Notes by
+default, the last tab remembered, empty tabs grey with a zero (D74, 2026-10-06; the
+stacked sections and the right-hand rail of 2026-09-30 are superseded).
 
 **A ledger of a stream** — the Context readout, a run log, a feed.
 → **Today's spine**, `apps/web/src/routes/_app/today.tsx:320`. `LedgerSection` with a

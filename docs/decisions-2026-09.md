@@ -513,12 +513,12 @@ _Carried by_ no slice yet; precedes D72's watches.
 
 **Does a record's body stack its sections, or tab them?** The 2026-09-30 declutter split the body into Notes, Interactions, History, Files and Context as stacked sections collapsed to bone heads, with empty sections hidden. Since then Interactions (D67, D68) and Files (D66) have each become whole views — a ledger with kind filters, a Drive tree — and stacking makes them fight for one scroll. Answered: **tabbed.**
 
-- **Body = property grid, then a 44px bone tab head, then one view.** Tabs in order: Notes · Interactions · Files · History · Context, each with its mono count. The rail stays on the right across every tab.
+- **Body = a details column left, the tabbed view right.** The details column, 320px on bone, holds the property grid as single label–value rows and then the relationship sections (Waiting, Team, Associated deals, Spaces, Tasks): one place for what the record is. The view right takes every remaining pixel: a 44px bone tab head — Notes · Interactions · Files · History · Context, each with its mono count — over one view: one place for what happened to it. The readout strip stays full width above both. (Amended the same day: the first draft kept the rail right of the tabs, which left the ledger 618px wide and two structures competing; owner, 2026-10-06.)
 - **Default is Notes**; the last tab used on that object is remembered per user, like table prefs.
 - **Each tab owns its room.** Interactions keeps its kind filters (All · Email · Meeting · Call) as a second row inside the tab; Files holds the local list and the bound Drive tree; History is the attribute and stage ledger; Context loads when opened and stops being "Show ›".
 - **Empty tabs stay visible and grey, count 0.** The empty-section rule becomes "grey what is empty", so the tab head remains the record's index.
 - **Deep links:** `?tab=files`; `?modal=email&id=` opens over the Interactions tab; `?modal=meeting&id=` likewise.
 
-_Rejected:_ stacked collapsed sections (the 09-30 answer, superseded now that two sections are products); an "Overview" tab that re-summarises (the readout strip and the rail already do); hiding empty tabs (loses the index).
+_Rejected:_ stacked collapsed sections (the 09-30 answer, superseded now that two sections are products); a rail right of the tabs (two structures side by side, the view starved of width); an "Overview" tab that re-summarises (the readout strip and the details column already do); hiding empty tabs (loses the index).
 
 _Carried by_ the record port slice beside SPA-214 for shipped routes, and the anatomy sheets O1–O4 on the canvas; E1 and S1 are the Interactions and Files tabs of the same record.
