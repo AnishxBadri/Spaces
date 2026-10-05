@@ -124,6 +124,12 @@ state word — it is data and stays. Foot notes under ledgers, subtitles under d
 titles that restate scope, and "what happens next" sentences in dialog feet all fail the
 test. The canvas is checked against it sheet by sheet; the reviewer checks the PR.
 
+**One close per dialog (2026-10-06).** A dialog closes from its foot: `Cancel` with its
+key printed (`esc`), beside the primary with its own (`⌘↵`). The head carries no
+standalone `esc` and no cross; `esc` and Cancel are one verb, printed once. An overlay
+with no foot verbs, such as the palette, prints `esc close` among its foot keys. Amends
+P8's "esc right" in the head.
+
 Instrument density is measured density: readouts, ledger rows, five numbers in a
 strip. It is never explanatory density. The drift to guard against is doctrine
 written as interface copy — a footer under every card, a clause after every count,
