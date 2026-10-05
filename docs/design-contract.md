@@ -116,6 +116,14 @@ The record table keeps its 36px rows and paper head.
 
 ### The Commentary Rule — data is dense, commentary is scarce
 
+**The invariant-line test (2026-10-06).** Before a line of mono or graphite text ships
+on a surface, ask whether it would read the same on every instance of that surface. If
+yes, it is documentation: delete it, and put what it said in a tooltip on the control it
+explained, or in the docs. If it varies — a count, a date, a provenance mark, a name, a
+state word — it is data and stays. Foot notes under ledgers, subtitles under dialog
+titles that restate scope, and "what happens next" sentences in dialog feet all fail the
+test. The canvas is checked against it sheet by sheet; the reviewer checks the PR.
+
 Instrument density is measured density: readouts, ledger rows, five numbers in a
 strip. It is never explanatory density. The drift to guard against is doctrine
 written as interface copy — a footer under every card, a clause after every count,
