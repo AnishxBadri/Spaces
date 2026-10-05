@@ -128,8 +128,10 @@ test. The canvas is checked against it sheet by sheet; the reviewer checks the P
 its foot: `Cancel`, unmarked, beside the primary with its key (`⌘↵`). The head carries
 no standalone `esc` and no cross. `esc` is not printed anywhere, in a foot key list
 either: it closes every dialog in every app, so it fails the invariant-line test. A
-printed key earns its place only when the binding is ours and not guessable — `⌘↵`,
-`L`, `G T`. Amends P8's "esc right" in the head.
+printed key earns its place only when the binding is ours and not guessable — `⌘↵` to
+submit from inside a text field, `L`, `G T`. `↵` on a primary button or on the
+highlighted row of a list is universal too, and is not printed. Amends P8's "esc right"
+in the head and the `↵` on the Review card's primary.
 
 Instrument density is measured density: readouts, ledger rows, five numbers in a
 strip. It is never explanatory density. The drift to guard against is doctrine
