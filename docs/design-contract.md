@@ -133,6 +133,13 @@ submit from inside a text field, `L`, `G T`. `↵` on a primary button or on the
 highlighted row of a list is universal too, and is not printed. Amends P8's "esc right"
 in the head and the `↵` on the Review card's primary.
 
+**A readout is never a section count (2026-10-06).** The readout strip under a page or
+record title carries derived and cross-cutting numbers — a ratio, a window, a next run, a
+queue elsewhere — never the count a section head on the same page already prints. Cells
+are equal lanes on rules with the number in mono 22 above a sentence-case graphite label;
+a ratio prints as `1 / 2`. Providers are shown by their own mark at 14–16px, never a
+monogram; degraded is the same mark at reduced opacity.
+
 Instrument density is measured density: readouts, ledger rows, five numbers in a
 strip. It is never explanatory density. The drift to guard against is doctrine
 written as interface copy — a footer under every card, a clause after every count,
