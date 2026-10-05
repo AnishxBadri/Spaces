@@ -468,3 +468,43 @@ _Carried by_ no slice yet; `query_records` is the first, when the AI area is nex
 _Rejected:_ memos only (the thesis without the map); the whole tree in every call (budget); peers across all spaces (noise — the leaf is the competitive set).
 
 _Carried by_ no slice yet; it lands with the assembler and `query_records` work in D70.
+
+## Addenda — 2026-10-06
+
+### D72-space-watches
+
+**How do research engines (Exa, Harmonic, later news and RSS) use a space, and how does a space use them?** A space is the unit a research plugin works on — a definition of what belongs (memo, criteria, terms, exemplar companies), a growing set of members, and monitoring over time — which is what an Exa webset is. So engines attach to spaces, not to records, and the space never knows which engine. Answered:
+
+- **Four integration roles**, each a way of using the existing ports, never a plugin kind (D51): **enrich** (facts through `Facts.fill`, conflicts to Review — Apollo), **monitor** (`schedule` or `watch` → signals; a time series is signals, never values), **discover** (new companies → add-record cards), **research** (web signals plus a cited brief through `Judgment` — Exa).
+- **A `watch` trigger**, sixth beside action, event, schedule and webhook. A watch job runs once per `space_watch` row with the space as its subject. The manifest declares a per-watch settings schema the same way it declares `settings`; the host renders the form. Exa's is criteria and a per-run cap; Harmonic's is structured filters.
+- **`space_watch` is host state:** space, integration, settings, cadence (**nullable — a watch with no cadence runs only on "Run now"**, and the button is present on scheduled watches too), a plugin-owned `state` jsonb cursor (the webset id, a saved-search id, a history id), last run and a run log. A watch is a saved research lens on a space; the clock is optional.
+- **`Spaces` port**, read-only, one call: the brief D71 already builds for the assembler — path, memo, criteria, terms, filed companies with key values, subspace tree with counts. Exa turns it into a webset query and criteria; Harmonic turns the exemplars into seeds. Same material, two engines.
+- **`Discover` port**, the hand-back: name, domain, aliases, evidence refs, an optional subspace hint. The host runs `previewResolve`: known and filed here → dropped; known elsewhere → a "also file X here?" card (`suggestion_kind: file_record`); unknown → an "add X?" card (`suggestion_kind: add_record`). Accept runs `resolveEntity`, files, and fires `entity.created` so a targeted auto-enrich follows. **Dismissals are permanent per (space, domain)** and are applied before a card is made. Review groups the cards under a space head, labelled "via <plugin>".
+- **Signals on members** go through the existing `Content` port and show in a "What's moving" lane on the space page; a Watching lane lists the watches with live status over D64's stream. Today counts the space's open cards.
+- **Space gains a `criteria` text**, one to three sentences, "what belongs here". The memo stays the thesis; criteria is the membership rule websets need literally and the classify lane needs to place a candidate in a leaf.
+- **Discovery fills the map; the pipeline is a separate act.** A card never creates a deal. Tracking, not evaluating.
+- **Ask (D70) mounts a plugin's MCP server** when the manifest declares `mcp: { url, auth }`, keyed from the vault, proxied through the Http throttle and the D53 credit cap, and unmounted for a turn whose context holds a sensitive space. Hits are web results, filed records are records; action cards are the only crossing, and "Save as watch" writes a `space_watch` from the turn, as "Save as note" promotes an answer. Enabling Exa lights the watch, the record action and the Ask tools from one integration row.
+- **Apollo gaps noted from the same thread:** a cleared value counts as user-held (fill-blanks refills a cleared field today — `setValuesInTx`, `lastWriters`, `ownedBy`); `Content` joins Apollo's `uses` for funding and hiring signals; relationships fill only when empty, else a card; a targeted auto-enrich scope (deal, space, meeting) replaces the on/off `autoEnrich`; credits are visible in the project 19 ledger.
+- **Rules.** No workflow builder. When wanted, a rule is one trigger → one action over domain events, which needs `stage.changed`, `filed` and `meeting.ended` beside `entity.created` (D65).
+- **Ordering.** Not first ship: it needs the Ai port's live layer (`backfill-11`), new schema, two ports and a trigger. First ship carries Exa as the record-level Research action (`backfill-12`) only; watches land in the ship after, once D73 has made spaces malleable, and Harmonic rides in then as one plugin with no host work.
+
+_Rejected:_ research as a record-level feature only (a webset is a set, and the set is the space); engines knowing the space table (one coupling, the watch row); a row-less one-shot "Research" action on a space beside the watch (two near-identical paths and two homes for Exa's settings); a feed poller in core (D33 closes: feeds are a watch plugin); cards creating deals; a separate tool set for Exa in Ask (D70's one-client rule).
+
+_Carried by_ no slice yet; written when project 23's research area is reconciled.
+
+### D73-spaces-are-malleable
+
+**Is the space tree a one-time taxonomy, or can it be reorganised?** Today only `createSpace` exists: no rename on the space head, no move, no archive, and the merge executor excludes spaces on purpose. The thesis since 2026-09-21 is that structure emerges from encounter and depth is earned, which is false for a tree that cannot be corrected, and D72's watches multiply spaces, so more of them will be wrong. Answered: **malleable, and before any watch ships.**
+
+- **Why it is cheap:** the ltree path is the only derived structure and every consumer computes from it at read time — ancestor visibility, sensitivity inheritance, the assembler's climb, glossary scope, watches and dismissals all join by id and then read the path. Filings in `entity_space` point at the space id, never the path.
+- **Rename:** `renameRecordProgram` wired to the space head. Slug and path are unchanged; the path is never shown.
+- **Move (reparent):** one UPDATE rewriting the subtree's paths and `parent_id`; one event; refused under its own descendant. Visibility, sensitivity and context follow at once.
+- **Archive:** hidden from the picker and the tree, filings kept, watches paused, cards stop. Never delete.
+- **Split** is not a primitive: create a child, then multi-select "move here" on the parent's companies, over tag and untag. Depth earned by hand.
+- **Merge two spaces: deferred** until two collide. It needs its own executor (reparent children into the winner, dedupe filings, repoint memos, terms, watches and dismissals through `ENTITY_REFS`, snapshot for unmerge). Archive the loser and refile by hand in the interim.
+- **Two invariants:** filings never change on their own — move and merge rewrite structure, and only split and merge touch filings, each on an explicit choice; watches and dismissals follow the space by id, so a rename or move mid-watch changes nothing and a merge unions them.
+- **Later:** a watch may propose a subspace as a Review card when candidates cluster; move and split are what make accepting it safe.
+
+_Rejected:_ a fixed taxonomy (rejected again); deleting spaces; merge now (no pain yet, medium cost); filings following a move anywhere but with their space.
+
+_Carried by_ no slice yet; precedes D72's watches.
