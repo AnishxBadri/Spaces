@@ -392,7 +392,7 @@ The write half of the port, write-through, the mirror root, live files proposing
 
 _Extensibility · 17 slices · amended 2026-10-06_
 
-The last unimplemented port goes live and every trigger the SDK froze gets a tenant: a researcher, a syncer, an ingress, and — replacing the feed poller — a watch. Placed after storage because each needs OAuth, the loader and the fakes. Amended for D68 (meetings), D72 (space watches) and D73 (spaces are malleable): `arrival-8`/`arrival-9` are struck, D33 is closed by D72 (a feed is a watch plugin), `arrival-5`–`arrival-7` are rewritten against D68 before dispatch, and the Apollo gaps D72 lists land here beside the auto-enrich scope they change. Bodies for the new slices are written after the canvas pass.
+The last unimplemented port goes live and every trigger the SDK froze gets a tenant: a researcher, a syncer, an ingress, and — replacing the feed poller — a watch. Placed after storage because each needs OAuth, the loader and the fakes. Amended for D68 (meetings), D72 (space watches) and D73 (spaces are malleable): `arrival-8`/`arrival-9` are struck, D33 is closed by D72 (a feed is a watch plugin), `arrival-5`–`arrival-7` are rewritten against D68 before dispatch, and the Apollo gaps D72 lists land here beside the auto-enrich scope they change. Bodies for every slice are in `docs/roadmap-backlog.md` (written 2026-10-06 after the canvas pass).
 
 **▸ The last unimplemented port** — The Ai port's live layer with the sensitivity gate and the spend ceiling enforced by core rather than trusted to the plugin, tokens attributed to the integration and not to a user; then Exa as the researcher kind's first tenant — five web signals on a record and a one-paragraph brief in /inbox citing the five URLs.
 
