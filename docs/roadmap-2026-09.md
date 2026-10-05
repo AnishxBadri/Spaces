@@ -2,13 +2,17 @@
 
 _2026-09-15, trimmed 2026-09-27. The order of all 23 projects and why, the milestones of the unshipped ones, the decisions still ahead, and the open audit findings. The reconciliation narrative, the shipped projects' milestones and the decisions carried by shipped slices are in this file's git history._
 
-**230 slices · 23 projects · 2 initiatives · 80 added · 3 deleted · 227 with written bodies, 3 still key-and-title only**
+**26 projects · 2 initiatives · projects 1–18 shipped · 19–23 sliced with bodies (`docs/roadmap-backlog.md`) · 23 amended and 24–26 added 2026-10-06 as key-and-title tables whose bodies are written after the canvas pass**
 
-**Status: projects 1–13 are published to Linear as SPA-16…SPA-150** (134 issues, 169 blocking relations, 44
-milestones, published 2026-09-16). The bodies for those live in Linear, which is their store of record; this file
-carries their structure. **Projects 14–23 are not published**, and their 98 slice bodies live in
-`docs/roadmap-backlog.md` — publish a project when you reach it, not before. All 48 open decisions are closed:
-`docs/decisions-2026-09.md`.
+**Status (2026-10-06): projects 1–18 are published to Linear** (1–13 as SPA-16…SPA-150 on 2026-09-16; 14–18 as
+SPA-156…SPA-213 across 2026-09-28 to 2026-10-02) and every one of them has shipped except one open slice of 14
+(`SPA-172`, the importer kind's tenant). The bodies for those live in Linear, which is their store of record; this
+file carries their structure. **Projects 19–26 are not published**, and their slice bodies live in
+`docs/roadmap-backlog.md`. The "publish when reached" rule is retired for them: the decisions they carry closed with
+D59–D73 (`docs/decisions-2026-09.md`), so the remaining projects are published together, after the canvas pass
+described in `docs/design-brief-first-ship.md` has fixed the surfaces and the slice bodies have been written against
+it. Archive projects 1–18 in Linear at the same upload: the free plan counts unarchived issues. All 73 decisions are
+closed.
 
 _Historical note from before publication:_ The 35 unresolved placeholder blockers from the first pass (`clean-integration-table`, `mono-test-db-harness`, `ai-suggestion-inbox` and friends) have been mapped to real keys, so every blocker in projects 1–13 exists before the slice that names it. Exactly one slice blocks the rest: `import-10` (P14) is blocked by `sdk-5` (P17) and `sdk-12a` (P18); defer it and projects 14–16 unlock too. The second audit's warning was against publishing projects 2, 5 and 6 _out of order_, not against publishing more than one. See §4 for the eleven collisions this pass introduced at the new seams, which a serial reader should close before the projects that contain them.
 
@@ -16,7 +20,7 @@ _Historical note from before publication:_ The 35 unresolved placeholder blocker
 
 ## 1. Projects
 
-Projects 1–12 have shipped (their slice bodies are the Linear issues). Project 13 is in Linear; 14–23 are in `docs/roadmap-backlog.md` and are published to Linear when reached.
+Projects 1–18 have shipped (their slice bodies are the Linear issues; `SPA-172` in 14 is the one slice still open). 19–26 are in `docs/roadmap-backlog.md`; 24–26 and the amended half of 23 are tables here until their bodies are written.
 
 **Shipped:**
 
@@ -32,6 +36,12 @@ Projects 1–12 have shipped (their slice bodies are the Linear issues). Project
 - **10.** AI substrate — it reads a deck
 - **11.** Everything Cmd-K can find
 - **12.** AI on every object, and the graph from outside
+- **13.** Doors that are not an upload — a mailbox, a link, and an API with a spec (structure kept below; `arrival-4` cancelled)
+- **14.** Import and export — a spreadsheet becomes the graph (`SPA-172` open)
+- **15.** packages/core and apps/worker
+- **16.** A published image anyone can run
+- **17.** The plugin SDK — claims without a database
+- **18.** Plugins run unattended, Apollo enriches
 
 ### 13. Doors that are not an upload — a mailbox, a link, and an API with a spec
 
@@ -378,11 +388,11 @@ The write half of the port, write-through, the mirror root, live files proposing
 | `storage-19a` | afk | M   | Box, read side — the same port, a second fake          | `storage-11`, `storage-4b`  |
 | `storage-19b` | afk | M   | Box, bound and writing — the port measured by the diff | `storage-19a`, `storage-14` |
 
-### 23. The researcher lane, syncers, recorders and feeds
+### 23. The researcher lane, syncers, recorders and watches
 
-_Extensibility · 8 slices_
+_Extensibility · 17 slices · amended 2026-10-06_
 
-The last unimplemented port goes live and every kind interface the SDK froze finally gets a tenant: a researcher, a syncer, an ingress, a poller. Placed last because each needs OAuth, the loader and the fakes — but every one of them is a channel CONTEXT names, and none of them may be dropped silently.
+The last unimplemented port goes live and every trigger the SDK froze gets a tenant: a researcher, a syncer, an ingress, and — replacing the feed poller — a watch. Placed after storage because each needs OAuth, the loader and the fakes. Amended for D68 (meetings), D72 (space watches) and D73 (spaces are malleable): `arrival-8`/`arrival-9` are struck, D33 is closed by D72 (a feed is a watch plugin), `arrival-5`–`arrival-7` are rewritten against D68 before dispatch, and the Apollo gaps D72 lists land here beside the auto-enrich scope they change. Bodies for the new slices are written after the canvas pass.
 
 **▸ The last unimplemented port** — The Ai port's live layer with the sensitivity gate and the spend ceiling enforced by core rather than trusted to the plugin, tokens attributed to the integration and not to a user; then Exa as the researcher kind's first tenant — five web signals on a record and a one-paragraph brief in /inbox citing the five URLs.
 
@@ -404,13 +414,124 @@ The last unimplemented port goes live and every kind interface the SDK froze fin
 | `arrival-6` | afk | M   | plugins/recorder — a webhook lands the transcript on the call                  | `arrival-2`, `sdk-23`, `sdk-8`, `notes-5` |
 | `arrival-7` | afk | S   | The recorder's summary is a suggestion — accept it and the call has a write-up | `arrival-6`, `ai-15`, `sdk-10`, `notes-6` |
 
-**▸ Feeds, and a mailbox that syncs itself** — A feed URL attached to a space or a record, polled on a cadence you can mute, items matched deterministically into signals with the unmatched kept visible because that is where the next company comes from. Then Gmail forward-only from the connect date, deduped against threads the forwarding lane already saw, with the privacy default decided, recorded and enforced at read time.
+**▸ One meeting, one row** — Before any recorder lands, the interaction row learns what D68 needs: a per-kind `meta` jsonb, the artifact join with a `role` that replaces `interaction.document_id`, the task `suggestion_kind`, and the writer's attach-or-create rule keyed on the calendar event. Then Today's Meetings section and Prep.
 
-| slice        |      |     | title                                                                            | blocked by                                                                  |
-| ------------ | ---- | --- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `arrival-8`  | hitl | M   | feed and feed_item — one URL, three scopes, a cadence you can mute               | `sdk-24b`, `docsurf-1b`                                                     |
-| `arrival-9`  | afk  | M   | Feed items match the graph — a signal on the record, the unmatched still visible | `arrival-8`                                                                 |
-| `arrival-10` | hitl | L   | plugins/gmail — forward-only sync, and the privacy default finally decided       | `arrival-2`, `arrival-3`, `arrival-5`, `sdk-25`, `storage-2b`, `storage-3a` |
+| slice           |     |     | title                                                                                             | blocked by                                 |
+| --------------- | --- | --- | ------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `interaction-1` | afk | M   | `interaction.meta`, the artifact join with `role`, the task suggestion kind — one migration (D68) | `arrival-2`, `notes-5` — label `migration` |
+| `interaction-2` | afk | M   | The writer attaches a recorder's payload to the calendar meeting, or births a `call` (D68)        | `interaction-1`, `arrival-5`               |
+| `arrival-11`    | afk | M   | Today's Meetings section with day navigation, the meeting dialog, and Prep on demand (D68)        | `interaction-2`, `ai-15`                   |
+
+**▸ A mailbox that syncs itself** — Gmail's sync half only; the surface is project 25.
+
+| slice        |      |     | title                                                                      | blocked by                                                                  |
+| ------------ | ---- | --- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `arrival-10` | hitl | L   | plugins/gmail — forward-only sync, and the privacy default finally decided | `arrival-2`, `arrival-3`, `arrival-5`, `sdk-25`, `storage-2b`, `storage-3a` |
+
+**▸ Spaces can be reshaped** — Rename a space from its head, move a subtree under another parent and watch visibility, sensitivity and context follow at once, archive one and keep its filings, carve a child and move companies into it — nothing filed moves on its own (D73). Precedes every watch.
+
+| slice      |     |     | title                                                                                          | blocked by |
+| ---------- | --- | --- | ---------------------------------------------------------------------------------------------- | ---------- |
+| `spaces-1` | afk | S   | Rename and archive from the space head — `renameRecordProgram` wired, archive hides and pauses | none       |
+| `spaces-2` | afk | M   | Move a space — one subtree path rewrite, refused under its own descendant, one event           | `spaces-1` |
+| `spaces-3` | afk | S   | Split by hand — create a child and multi-select "move here" over tag and untag                 | `spaces-2` |
+
+**▸ A space watches** — A space carries a criteria sentence; a watch row names an engine, a cadence or none, and a cursor; Run now fires the job and the Watching lane shows it live; candidates come back through `Discover` and land in Review as add-record and file-record cards under the space's head, dismissals permanent per space; signals on members fill "What's moving" (D72). Exa is the first tenant; Harmonic rides the same contract later.
+
+| slice      |     |     | title                                                                                                                                                   | blocked by                                 |
+| ---------- | --- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `watch-1`  | afk | M   | `space.criteria`, `space_watch`, the two suggestion kinds — one migration (D72)                                                                         | `spaces-2`, `review-1` — label `migration` |
+| `watch-2`  | afk | M   | The `watch` trigger and the `Spaces` port — a job runs per watch row with the D71 brief as its subject                                                  | `watch-1`, `sdk-12b`                       |
+| `watch-3`  | afk | M   | The `Discover` port — `previewResolve`, add-record and file-record cards, permanent dismissals                                                          | `watch-2`, `sdk-7b`                        |
+| `watch-4`  | afk | M   | Space page: criteria, the Watching lane with Run now and live status, "What's moving", Today's count                                                    | `watch-3`, `sdk-18`                        |
+| `watch-5`  | afk | M   | plugins/exa — the watch job: webset from the brief, cursor in `state`, candidates and signals                                                           | `watch-3`, `backfill-12`                   |
+| `enrich-1` | afk | M   | Apollo gaps — a cleared value is user-held, `Content` for signals, relationships fill only when empty, targeted auto-enrich scope replaces `autoEnrich` | `watch-3`, `graph-1`                       |
+
+### 24. Cmd-K finds, Ask answers
+
+_Spaces v1 · 8 slices · added 2026-10-06_
+
+The Attio-class chat layer, as D70 and D71 decided it: Cmd-K regrouped into a finder with a preview pane; Ask as a second, in-process client of the MCP tool surface, with `query_records` first so external agents gain from it before any chat UI exists; threads, citations, action cards, `@space` scoping over D71's position and peers, and a plugin's MCP server mounted when its manifest declares one (D72). Independent of 25; either may run first.
+
+**▸ Questions the graph can compute** — `query_records` over the views compiler and the interaction stats, with a descendant-inclusive `space` condition, and the portfolio tools over the pure libraries, so filters, counts and money are computed and never generated.
+
+| slice   |     |     | title                                                                                        | blocked by          |
+| ------- | --- | --- | -------------------------------------------------------------------------------------------- | ------------------- |
+| `ask-1` | afk | M   | `query_records` — conditions, sort, limit, the `space` condition with descendants (D70, D71) | `ai-23a`, `email-4` |
+| `ask-2` | afk | S   | Portfolio tools on the MCP surface — computed over `@spaces/core/portfolio`                  | `ask-1`             |
+
+**▸ Cmd-K finds and goes** — Jump to, Actions with printed keys and the record's own verbs first, Records lexical and fuzzy only, Passages as the second wave; a preview pane on highlight; Tab hands the query to Ask.
+
+| slice   |     |     | title                                                                                 | blocked by |
+| ------- | --- | --- | ------------------------------------------------------------------------------------- | ---------- |
+| `ask-3` | afk | M   | The finder regroup — four groups, contextual actions, semantic only as Passages (D70) | none       |
+| `ask-4` | afk | S   | The preview pane — a record's readout and key fields, an object's views and counts    | `ask-3`    |
+
+**▸ Ask answers** — The same palette after Tab, plus a thread view: every claim cited, "Save as note", action cards applied as the user, `@space` and `@record` scoping, the sensitivity gate per call, private threads.
+
+| slice   |     |     | title                                                                                                                | blocked by                |
+| ------- | --- | --- | -------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `ask-5` | afk | M   | Threads and the Ask surface — an in-process MCP client, citations, Save as note (D70)                                | `ask-1`, `ask-3`, `ai-15` |
+| `ask-6` | afk | M   | Action cards — propose create task, move stage, file into a space; applying writes as the user                       | `ask-5`                   |
+| `ask-7` | afk | M   | Scoping — `@space` and `@record`; the assembler's position, peers and space-as-seed (D71)                            | `ask-5`                   |
+| `ask-8` | afk | M   | A plugin's MCP server in Ask — manifest `mcp`, vault key, throttle and cap, sensitivity unmount, Save as watch (D72) | `ask-6`, `watch-4`        |
+
+### 25. Email — viewed, shared, tracked, composed
+
+_Spaces v1 · 9 slices · added 2026-10-06_
+
+D67's surface over `arrival-10`'s sync: the email stored rather than only its text, attachments as documents, the three privacy layers through `canRead`, interaction stats as read-only view columns, drafts, send through Gmail, variables and the `email` template kind. The canvas (p-D-0, E1–E8) is drawn; the slices cite it.
+
+**▸ The email itself** — Headers, the raw MIME as a blob, a sanitized HTML viewer in a sandboxed iframe, attachments through the artifact join, list rows with summary and labels as cached display text, deep links.
+
+| slice     |     |     | title                                                                                           | blocked by                                        |
+| --------- | --- | --- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `email-1` | afk | M   | `interaction.meta` email shape, the MIME blob, the viewer (D67)                                 | `arrival-10`, `interaction-1` — label `migration` |
+| `email-2` | afk | M   | Attachments are documents on the artifact join; the Files preview opens them; "has attachments" | `email-1`                                         |
+| `email-3` | afk | M   | List rows, kind filters, summary and labels cached under the sensitivity gate, `?modal=email`   | `email-2`, `ai-15`                                |
+
+**▸ Who may read it** — Synced mail private to its mailbox owner, forwarded mail shared, a per-record override and per-email grants; subject, participants, date and owner always visible; interaction stats maintained by the writer and read by views.
+
+| slice     |      |     | title                                                                                                                        | blocked by                          |
+| --------- | ---- | --- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `email-4` | afk  | M   | Interaction stats — first, last, next per entity and kind, written in the writer's transaction, read-only view columns (D67) | `interaction-1` — label `migration` |
+| `email-5` | hitl | M   | Privacy, three layers — owner default, record override, per-email grants, through `canRead`                                  | `email-1`, `arrival-10`             |
+
+**▸ Writing one** — Drafts author-private and local, four modes with threading headers, recipients over people and aliases, variables as paths shared with AI prompts, the `email` template kind, send through Gmail so replies thread and land in Sent.
+
+| slice     |     |     | title                                                                                                | blocked by                    |
+| --------- | --- | --- | ---------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `email-6` | afk | M   | `email_draft` — new, reply, reply-all, forward; recipients over aliases; autosave (D67)              | `email-1` — label `migration` |
+| `email-7` | afk | M   | Send through the Gmail plugin with `gmail.send`; the outgoing interaction at once; Message-ID dedupe | `email-6`, `arrival-10`       |
+| `email-8` | afk | M   | Variables as paths, resolved per recipient with blanks flagged; the `email` template kind            | `email-6`                     |
+| `email-9` | afk | S   | Name parts and `canonical_name` as their join; `phone` as E.164 with `multi` (D67)                   | `graph-1` — label `migration` |
+
+### 26. Relationships, and what a newer file supersedes
+
+_Spaces v1 · 7 slices · added 2026-10-06_
+
+The attribute engine's second pass (D69) and the one relation nothing writes (D59). A relationship is a pair of `record_reference` attributes stored once on the owning side with a derived inverse; views compile the inverse; edits widen and never narrow; system attributes are never archivable. Then `supersedes` written by verbs — demote, the upload picker, the intake suggestion — and never picked as a relation. `graph-1` (Unplaced) is the first pair and must land first.
+
+**▸ A relationship is a pair** — The Relationship dialog names both sides; the owner holds the value; one resolver serves rail, views, variables and the assembler.
+
+| slice   |     |     | title                                                                                                           | blocked by |
+| ------- | --- | --- | --------------------------------------------------------------------------------------------------------------- | ---------- |
+| `rel-1` | afk | M   | The pair — `options.inverseOf`, owner-side writes from either side, cardinality in `setValues` (D69)            | `graph-1`  |
+| `rel-2` | afk | M   | The inverse resolver — rail, variables, assembler read the `references` links                                   | `rel-1`    |
+| `rel-3` | afk | M   | Views learn inverse attributes — link-join and count expressions, an index plan like `attr_idx_*`               | `rel-2`    |
+| `rel-4` | afk | S   | Widening-only edits logged once; system attributes never archivable; Team, Associated deals, Deals become pairs | `rel-2`    |
+
+**▸ Nothing is deleted, something supersedes** — D59's build order.
+
+| slice   |     |     | title                                                                                              | blocked by                  |
+| ------- | --- | --- | -------------------------------------------------------------------------------------------------- | --------------------------- |
+| `doc-1` | afk | S   | Demote and the manual "supersedes" action write the link; both rows stay, older ranked lower (D59) | `docsurf-7`                 |
+| `doc-2` | afk | S   | The upload picker offers "replaces …" over the record's documents                                  | `doc-1`                     |
+| `doc-3` | afk | S   | Intake suggests the supersession when a newer version arrives — a new `suggestion_kind`            | `doc-1` — label `migration` |
+
+### Unplaced, published as "Corrections"
+
+`graph-1` (D60, migration), `review-1` (D61), `vault-1` (migration) and `sensitivity-1` have no order and no blockers; they are grabbable now and go to Linear as one project, "Corrections", in the same upload. `review-1` before `watch-1`, `graph-1` before `rel-1`, `enrich-1` and `email-9`.
 
 ---
 
@@ -569,7 +690,9 @@ CONTEXT calls feeds "the one capability with no vault dependency; dormant until 
 **Recommendation:** Option 1, carried by arrival-8, with spec-plugin-sdk §5's poller example changed from RSS to something that actually needs the port.  
 "Dormant until the first feed URL" is a core-capability sentence, and a capability whose default state is inert unless you install something is the kind of quiet disappointment that makes a self-hosted product feel unfinished.
 
-_Carried by_ `arrival-8`. _Blocks_ `the feed-scopes slice`.
+**Superseded 2026-10-06 by D72.** A feed is a watch plugin: `space_watch` holds the URL, scope and cadence, the `watch` trigger polls it, and items reach the graph through `Discover` and `Content` like any other engine's. `arrival-8` and `arrival-9` are struck; there is no core fetcher.
+
+_Was carried by_ `arrival-8`.
 
 ### D34-participants-and-interactions
 

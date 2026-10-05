@@ -1,4 +1,4 @@
-# Backlog bodies — projects 14 to 23
+# Backlog bodies — projects 14 to 26
 
 _The 98 slices that were **not** published to Linear. For projects 1–13 the Linear issues are the store of record and this file carries nothing; for 14–23 nothing else holds the substance, so it lives here._
 
@@ -2186,9 +2186,11 @@ The write half and the proof. plugins/box implements ensureFolder, putFile, move
 
 ---
 
-## 23. The researcher lane, syncers, recorders and feeds
+## 23. The researcher lane, syncers, recorders and watches
 
-_Extensibility · 8 slices_
+_Extensibility · 17 slices · amended 2026-10-06_
+
+_Amended 2026-10-06: `arrival-8` and `arrival-9` are struck (D33 superseded by D72 — a feed is a watch plugin). `arrival-5`–`arrival-7` are rewritten against D68 before dispatch. The new slices `interaction-1`/`2`, `arrival-11`, `spaces-1`–`3`, `watch-1`–`5` and `enrich-1`, and all of projects 24–26, are key-and-title tables in `docs/roadmap-2026-09.md` until their bodies are written after the canvas pass (`docs/design-brief-first-ship.md`)._
 
 The last unimplemented port goes live and every kind interface the SDK froze finally gets a tenant: a researcher, a syncer, an ingress, a poller. Placed last because each needs OAuth, the loader and the fakes — but every one of them is a channel CONTEXT names, and none of them may be dropped silently.
 
@@ -2332,7 +2334,7 @@ The one case ai-15 does not have is a note suggestion whose subject is an intera
 
 _A feed URL attached to a space or a record, polled on a cadence you can mute, items matched deterministically into signals with the unmatched kept visible because that is where the next company comes from. Then Gmail forward-only from the connect date, deduped against threads the forwarding lane already saw, with the privacy default decided, recorded and enforced at read time._
 
-#### `arrival-8` · hitl · M — feed and feed_item — one URL, three scopes, a cadence you can mute
+#### ~~`arrival-8` · hitl · M — feed and feed_item — one URL, three scopes, a cadence you can mute~~ **struck 2026-10-06 (D72 supersedes D33: a feed is a watch plugin)**
 
 **Blocked by:** `docsurf-1b`, `sdk-24b`
 
@@ -2359,7 +2361,7 @@ The product half of the feed capability, which sdk-24b does not build: it makes 
 
 **Spec** — CONTEXT.md — The integration map #12 (feed(url, scope, cadence, muted) + feed_item; three attach scopes); docs/spec-plugin-sdk.md §5 (poller kind) and §14 step 6; docs/spec-plugin-sdk.md §1 (plugins feed the graph; they never extend the product); src/db/entity-refs.ts (every entity-referencing column declares merge strategy and context role)
 
-#### `arrival-9` · afk · M — Feed items match the graph — a signal on the record, the unmatched still visible
+#### ~~`arrival-9` · afk · M — Feed items match the graph — a signal on the record, the unmatched still visible~~ **struck 2026-10-06 (D72; matching is `Discover` → `previewResolve`, unmatched items are the add-record cards)**
 
 **Blocked by:** `arrival-8`
 
@@ -2419,7 +2421,7 @@ L, and it cannot split: the redaction layer cannot merge before the sync that ma
 
 ## Unplaced — slices added after the plan
 
-_Not part of the 98 and not in any project's order. Each carries the decision it implements; schedule it when its area is next open._
+_Not part of the 98 and not in any project's order. Each carries the decision it implements. Published to Linear as one project, "Corrections", with the rest (2026-10-06): no blockers, grabbable now; `review-1` precedes `watch-1`, `graph-1` precedes `rel-1`, `enrich-1` and `email-9`._
 
 #### `graph-1` · afk · M · migration — A person's companies become an attribute (D60)
 
