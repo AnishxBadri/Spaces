@@ -239,8 +239,9 @@ comment saying why and a scoped disable; there are four.
 **The Casing Rule** (2026-09-15). Three tiers, and the tier is decided by who is
 speaking, never by how small the text is:
 
-- **CAPS** (`label-caps`) — structure the instrument labels: section heads, column
-  heads, tabs, field labels.
+- **CAPS** (`label-caps`) — structure the instrument labels: column heads, tabs,
+  field labels, readout labels. Section heads left this tier on 2026-10-05: a section is
+  titled in sentence case at the title step (see The Separation Rule, §5).
 - **Sentence case** — anything a person reads or clicks. Every control, every button,
   every chip, every menu item, every empty-state invitation. `Add task`, `Due date`,
   `Assign to`, `Keep open`, `+ Link record`.
@@ -263,8 +264,10 @@ Structure is 1px ink. Inner rules are 1px rule. Nothing blurs.
   Dialog · 3 (`shadow-[3px_3px_0_0_var(--hairline)]`). Toast · ink. Every lifted sheet is
   paper with a 1px ink edge and a hard offset shadow. No blur, ever.
 - **Spacing.** 4 8 12 16 24 32; the page gutter is 32.
-- **Heights.** Row 36 · control 32 · small 26 · badge 20 · nav row 30 · header row 48 ·
-  readout strip 56–64 · dialog head 44 · dialog foot 52.
+- **Heights.** Table row 36 · ledger row 40 · section head 44 · control 32 · small 26 ·
+  badge 20 · nav row 30 · header row 48 · readout strip 56–64 · dialog head 48 · dialog
+  foot 52. The record table keeps 36: it is a spreadsheet and density is its job; every
+  ledger (record sections, Today, settings ledgers) is 40.
 - **Radius.** 0 on chassis, cards, badges, dialogs, sheets. 2px on controls and inputs.
   No 4, 6, 8, 12. No pills. No circles — initials sit in ink squares.
 - **Texture.** Dither, 1-bit, Bayer 4×4 at 2px cells, pine or ink. See the Dither Rule.
@@ -484,6 +487,32 @@ load-bearing rules promoted here:
   name/value pair for a native input to contribute. The caller owns the label and the
   hit area around it.
 
+### The Separation Rule — sections and separation (2026-10-05)
+
+A page reads as stacked sections, and each section separates itself from its neighbours
+by at least two of three means: **material**, **space**, **ink weight**. Approved by the
+owner on 2026-10-05 after the storage and email drafts read as one flat plane. The
+shipped surfaces still draw the earlier caps heads and 36px ledger rows until the port
+slice lands; new surfaces are born on this grammar.
+
+- **Material.** A section head is a 44px band on bone — title, count, tabs, filters and
+  the head's one action live in it. A Drive folder band and a group band inside a
+  settings section are the same band. Dialog heads and feet are bone. Rows sit on paper.
+- **Scale.** The section title is the title step (15/22, sans 500, sentence case) with a
+  mono count beside it. A row's primary is body (14/20) in ink; at most one graphite
+  meta line under it. Column heads, tabs and field labels stay CAPS.
+- **One line, then a second when it is content.** A ledger row leads with one 40px
+  line; secondary facts go to fixed lanes. A second graphite line is right when it is
+  the row's description — an email's people and summary, a meeting's participants.
+- **Space.** 32–40px between sections and groups; nothing wider than a rule between
+  rows inside one.
+- **Ink weight.** A hairline opens a section, above its bone head; rules sit between
+  rows.
+- **Values on the surface, behaviour in tooltips.** The surface shows values and state.
+  A tooltip explains what a control does — opens in Google, writes to Drive, what a
+  switch shares — and never holds information the row should show. A consequence of a
+  destructive act lives on its confirm.
+
 ### Page header + readout strip (P1)
 
 `PageHeader`: serif title (or a sentence when the page has a state to report — "Seven
@@ -494,8 +523,8 @@ colour only when nonzero and bad.
 
 ### Ledger section + attention row (P2 · P3)
 
-`LedgerSection`: caps label + mono count left, one mono link right, hairline under the
-head, 36px rows on rules, the last row may be a composer (`+ Add a task…  T`). Notes
+`LedgerSection`: a bone head band on a hairline — sentence-case title at the title step
+and a mono count left, one link right — then 40px rows on rules, the last row may be a composer (`+ Add a task…  T`). Notes
 splits its ledger by ISO week (THIS WEEK · `W37`, then EARLIER); Spaces is one ledger of
 the market-map tree with `›` at a 24px indent per depth, ending on three fixed 80px
 mono lanes (COMPANIES · MEMOS · TERMS, caps heads in the section's link slot, ink when
@@ -601,14 +630,16 @@ share the parts.
   expand in place. Since 2026-09-30 it is two sections, not one list: **Interactions**
   (calls, emails, meetings — each with its `Write up` / `Open note`) under the composer
   row, and **History** (stage moves, edits, filings, the portfolio's verbs) folded past
-  six rows behind `+ N more`. A call and `tagged into a space` never again share a lane.
+  six rows behind `+ N more`. A call and `tagged into a space` never again share a lane. An
+  interaction row is two lines (2026-10-05): the subject with its badges, mailbox or
+  artifact marks and RSVP; then, in graphite, who took part and the ✦ summary.
 - **Notes** is one list: filed rows first, then the notes that merely mention the
   record, stamped `mention` in the mono end lane. Empty is `No notes.`; the way in is
   `note about this ›` in the head.
 - **Files** owns its head — `N files · size` and `upload` — and draws the dashed
   dropzone only while the list is empty or a drag is over it; once files exist the rows
   are the section and the whole of it is the target.
-- **The Composer Row.** Adding to a stream never starts from a corner button: a 36px
+- **The Composer Row.** Adding to a stream never starts from a corner button: a 40px
   row with a pine `+`, graphite hint text and the key that opens the real dialog
   (`+ Log a call, meeting, or note…  L`). The Tasks page grows it into the bone
   composer band (P6): paper input, square chips, create-more switch, `Add task ↵`.
@@ -623,15 +654,15 @@ Stage` box appears while dragging over a column.
 
 ### Overlays (P8)
 
-- **The attribute sheet:** 660px, two panes under the 44px head (`New attribute` ·
+- **The attribute sheet:** 660px, two panes under the 48px head (`New attribute` ·
   mono `on Companies · 19 → 20`): a 236px type pane on a rule with the pine `›` search
   and 26px rows (mono glyph lane, label, the chosen row on bone), the form right (name
   with its frozen mono slug beneath, description, the per-type slot, default and
   required on one line), the bone foot saying where it lands. In edit mode the pane
   stays, greyed — the type is the record of what this is.
-- **Dialogs:** paper sheet, 1px ink, 3px hard shadow, 0 radius. 44px head — serif
-  title 18/600, mono context beside it, `esc` in the right lane, hairline under. 20px
-  body. 52px bone foot — mono note left ("what will happen · counts"), buttons right,
+- **Dialogs:** paper sheet, 1px ink, 3px hard shadow, 0 radius. 48px head on bone —
+  serif title 18/600, mono context beside it, `esc` in the right lane, hairline under
+  (bone since 2026-10-05). 20px body on paper. 52px bone foot — mono note left ("what will happen · counts"), buttons right,
   the primary carrying ⌘↵. The first field takes the reticle on open. Wide (560px)
   for forms, 420–480 otherwise; the quick task has no title bar — the input is the
   title. A modal must be argued for.
@@ -645,8 +676,9 @@ Stage` box appears while dragging over a column.
   mono until touched; a 1-bit icon grid of 32px tiles, the chosen one ink; the derived
   slug shown frozen in a bone box (`/o/funds · /o/funds/<id>`); the foot says records are
   born with a required name and objects archive, never delete.
-- **Confirm:** 440px, no title bar — an 8px crimson square beside the serif question,
-  one sans sentence saying what happens and what does not, an optional rule-bordered
+- **Confirm:** 440px. The 8px crimson square and the serif question sit in a bone head
+  band (2026-10-05); under it on paper, one sans sentence saying what happens and what
+  does not, an optional rule-bordered
   ledger of what is affected (name left, mono meta right), then the bone foot: Keep
   takes focus, the destructive button carries ⌘↵. `useConfirm()` replaces
   `window.confirm` everywhere; a confirm exists to be read, never to be clicked through.
