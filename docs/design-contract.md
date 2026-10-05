@@ -303,7 +303,10 @@ its section's row lit, and takes the `SettingsSection` head
 `apps/web/src/components/record/record-parts.tsx:21`, used as
 `apps/web/src/routes/_app/deals_.$dealId.tsx:178` uses it: caps mono breadcrumb, actions
 with key hints, mark + serif name + square badge, readout strip, then `RecordBody` with
-the `PropertyGrid` and sections left and the bone rail right.
+the `PropertyGrid` left over a 44px bone tab head — Notes · Interactions · Files ·
+History · Context, each with its mono count, Notes by default, the last tab remembered,
+empty tabs grey with a zero (D74, 2026-10-06; the stacked collapsed sections of
+2026-09-30 are superseded) — and the bone rail right across every tab.
 
 **A ledger of a stream** — the Context readout, a run log, a feed.
 → **Today's spine**, `apps/web/src/routes/_app/today.tsx:320`. `LedgerSection` with a

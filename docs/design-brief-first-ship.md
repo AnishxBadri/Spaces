@@ -78,7 +78,7 @@ Precedent: queue (`/inbox`, renamed Review, D61). Shows the existing lanes (sugg
 
 ### 6. Company record — re-read O1
 
-Precedent: record. Add: the **Team** panel over D60's `companies` references (editing writes the person's value); the **relationship rail** entries as D69 draws them — the inverse side reads as a plain attribute, no visual difference from the owning side; **Enrich** and **Research** as manifest actions in the head's action area (D63), and the same head with both absent and a one-line "Apollo is disabled" in the readout; signals from a watch in the Interactions section with `via Exa`. Decisions: D60, D63, D69, D72.
+Precedent: record. The body is tabbed (D74): Notes · Interactions · Files · History · Context under a 44px bone tab head, the rail beside every tab; O1 shows the Interactions tab open. Add: the **Team** panel over D60's `companies` references (editing writes the person's value); the **relationship rail** entries as D69 draws them — the inverse side reads as a plain attribute, no visual difference from the owning side; **Enrich** and **Research** as manifest actions in the head's action area (D63), and the same head with both absent and a one-line "Apollo is disabled" in the readout; signals from a watch in the Interactions section with `via Exa`. Decisions: D60, D63, D69, D72.
 
 ### 7. Meeting dialog — re-read M2
 
