@@ -454,3 +454,17 @@ _Carried by_ no slice yet: the relationship pair and inverse resolver, the views
 _Rejected:_ semantic ranking inside Records (a name typed must win); Cmd-K answering questions (it finds); a separate tool set for the in-app chat (two rule sets); the agent writing directly; chat threads as entities.
 
 _Carried by_ no slice yet; `query_records` is the first, when the AI area is next open.
+
+### D71-space-structure-in-context
+
+**Does the AI see the shape of the market map, or only its memos?** Today the assembler climbs from a record's filed spaces up their ltree ancestors and pulls the memos filed there (hop 1 direct, hop 2 ancestors, `space` edge 0.8), plus space-scoped glossary terms. It never sees where the record sits, what sits beside it, or the tree itself. Answered: **give it position, peers and shape.**
+
+- **Position.** One context item per filed space naming its full path (`Filed in: Spacetech › Launch › Small-lift`), so answers can place a record without inferring it from memo prose.
+- **Peers.** A capped peer set: other companies filed in the same leaf space, ranked by stage and recency, each with its key values. The competitive set, for comparative answers.
+- **A space as the subject.** When the seed is a space (`@Hydrogen` in Ask, D70), the assembler returns its subspace tree with counts, its memos, its companies grouped by stage, and its terms — so a whole market can be summarised or its thin branches found.
+- **Structured queries over the tree.** `query_records` (D70) takes a `space` condition that includes descendants, matching ancestor visibility (2026-09-21).
+- Peers and tree are ranked and capped like every other candidate, so they compete for the context budget rather than flood it. `canRead` applies, and a sensitive space anywhere in a path keeps the call sensitive, as the resolver already does through ancestors.
+
+_Rejected:_ memos only (the thesis without the map); the whole tree in every call (budget); peers across all spaces (noise — the leaf is the competitive set).
+
+_Carried by_ no slice yet; it lands with the assembler and `query_records` work in D70.
