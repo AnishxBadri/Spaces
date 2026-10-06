@@ -69,3 +69,35 @@ describe('one entity_space insert for tagging', () => {
     ])
   })
 })
+
+describe('every filing change reaches chunk.sensitive', () => {
+  const DELETE = /\.delete\(\s*entitySpace\s*\)/
+  const modules = (pattern: RegExp) => [
+    ...walk(SRC)
+      .filter((f) => !/\.test\.tsx?$/.test(f) && !f.includes('/seeds/'))
+      .filter((f) => pattern.test(readFileSync(f, 'utf8'))),
+    ...walk(CORE)
+      .filter((f) => !/\.test\.tsx?$/.test(f) && !f.includes('/seeds/'))
+      .filter((f) => pattern.test(readFileSync(f, 'utf8'))),
+  ]
+
+  it('each module inserting into entity_space raises in the same transaction', () => {
+    const inserters = modules(INSERT)
+    expect(inserters).toHaveLength(4)
+    for (const f of inserters)
+      expect(readFileSync(f, 'utf8'), f).toContain('raiseSensitivity(tx')
+  })
+
+  it('each module deleting from entity_space enqueues the restamp', () => {
+    const deleters = modules(DELETE)
+    expect(deleters.map((f) => relative(SRC, f)).sort()).toEqual([
+      'lib/documents/refile.ts',
+      'lib/server/companies.ts',
+    ])
+    for (const f of deleters) {
+      const src = readFileSync(f, 'utf8')
+      expect(src, f).toContain('stampedSensitive(')
+      expect(src, f).toContain('enqueueRestamp(')
+    }
+  })
+})

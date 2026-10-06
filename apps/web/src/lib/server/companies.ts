@@ -288,13 +288,15 @@ export const tagIntoSpace = createServerFn({ method: 'POST' })
     const u = await requireUser()
     // The one entity_space insert (SPA-103), shared with the space_tag accept.
     const { insertSpaceTag } = await import('../spaces/tag')
-    await insertSpaceTag(db, {
-      entityId: data.entityId,
-      spaceId: data.spaceId,
-      source: 'manual',
-      confidence: null,
-      createdBy: u.id,
-    })
+    await db.transaction((tx) =>
+      insertSpaceTag(tx, {
+        entityId: data.entityId,
+        spaceId: data.spaceId,
+        source: 'manual',
+        confidence: null,
+        createdBy: u.id,
+      }),
+    )
     await db.insert(activity).values({
       actorId: u.id,
       verb: 'space.tagged',
@@ -310,6 +312,9 @@ export const untagFromSpace = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
+    const { stampedSensitive } =
+      await import('@spaces/core/writes/ai/stamp-sensitivity')
+    const { enqueueRestamp } = await import('../ai/enqueue-restamp')
     await db
       .delete(entitySpace)
       .where(
@@ -324,5 +329,7 @@ export const untagFromSpace = createServerFn({ method: 'POST' })
       subjectEntityId: data.entityId,
       objectEntityId: data.spaceId,
     })
+    // Lowering is a job: another space may still hold the record sensitive.
+    await enqueueRestamp(await stampedSensitive(db, { kind: 'filed', ...data }))
     return { ok: true }
   })

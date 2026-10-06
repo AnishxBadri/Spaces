@@ -17,6 +17,7 @@ import { readDeck } from './jobs/read-deck'
 import { summarize } from './jobs/summarize'
 import { embedDocument } from './jobs/embed-document'
 import { embedSource } from './jobs/embed-source'
+import { restampSensitivity } from './jobs/restamp-sensitivity'
 import { embedBackfill, embedBackfillRetry } from './jobs/embed-backfill'
 import { classifyDocument } from './jobs/classify-document'
 import { suggestSpaces } from './jobs/suggest-spaces'
@@ -106,6 +107,24 @@ async function main() {
     QUEUES.embedSource,
     { batchSize: 1, includeMetadata: true },
     runJob(embedSource, { host, layer: Layer.empty }),
+  )
+  // The lowering half of `chunk.sensitive`: `stately` with
+  // `singletonKey = entityId`, so a burst of unfilings is one queued job and
+  // a change made while one runs still gets a run after it. Created before
+  // the plain create loop below; a queue's policy is fixed at create.
+  await boss
+    .createQueue(QUEUES.restampSensitivity, { policy: 'stately' })
+    .catch(() => {})
+  if (restampSensitivity.retry)
+    await boss.updateQueue(QUEUES.restampSensitivity, {
+      retryLimit: restampSensitivity.retry.limit,
+      retryDelay: restampSensitivity.retry.delaySeconds,
+      retryBackoff: restampSensitivity.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.restampSensitivity,
+    { batchSize: 1, includeMetadata: true },
+    runJob(restampSensitivity, { host, layer: Layer.empty }),
   )
   // The corpus backfill (SPA-136): `exclusive` with one fixed singletonKey,
   // so one run is queued, active or paused for the AI cap at a time — and it

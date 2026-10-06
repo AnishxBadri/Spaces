@@ -10,6 +10,7 @@ import {
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { documentFilingRefusal } from '../../documents/filing'
+import { raiseSensitivity } from '../ai/stamp-sensitivity'
 import { Enqueue } from '../../queue/enqueue'
 import { QUEUES } from '../../queue/names'
 import type { DocumentKind } from '../../documents'
@@ -315,6 +316,12 @@ async function addEdges(
           createdBy: userId,
         })
         .onConflictDoNothing()
+      // A deduped document may already carry chunks; a fresh one has none.
+      await raiseSensitivity(tx, {
+        kind: 'filed',
+        entityId: documentId,
+        spaceId: target.entityId,
+      })
     }
   }
 }

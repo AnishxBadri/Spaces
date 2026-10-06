@@ -2,6 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import type { db } from '@spaces/db'
 import { entity, entitySpace, space } from '@spaces/db/schema'
 import type { tagSource } from '@spaces/db/schema'
+import { raiseSensitivity } from '@spaces/core/writes/ai/stamp-sensitivity'
 import type { Tx } from '@spaces/core/writes/attributes/values'
 
 /**
@@ -16,6 +17,9 @@ import type { Tx } from '@spaces/core/writes/attributes/values'
  * space keeps the row it has — its source, confidence and author — and the
  * answer is `false`. `tag.test.ts` greps that these two call sites reach
  * `entity_space` through here and nowhere else.
+ *
+ * A new tag raises the record's chunks to `sensitive` in the caller's
+ * transaction when the space, or one of its ancestors, is sensitive.
  *
  * It lives outside `lib/server/` so the accept path, which runs without a
  * request, can call it, and nothing here reaches the client bundle
@@ -34,10 +38,10 @@ export type TagIntoSpaceInput = {
 }
 
 export async function insertSpaceTag(
-  writer: Tx | typeof db,
+  tx: Tx,
   input: TagIntoSpaceInput,
 ): Promise<boolean> {
-  const inserted = await writer
+  const inserted = await tx
     .insert(entitySpace)
     .values({
       entityId: input.entityId,
@@ -48,7 +52,13 @@ export async function insertSpaceTag(
     })
     .onConflictDoNothing()
     .returning({ entityId: entitySpace.entityId })
-  return inserted.length > 0
+  if (inserted.length === 0) return false
+  await raiseSensitivity(tx, {
+    kind: 'filed',
+    entityId: input.entityId,
+    spaceId: input.spaceId,
+  })
+  return true
 }
 
 /**

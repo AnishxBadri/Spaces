@@ -10,7 +10,7 @@ import type {
   SensitivityEntityNotFound,
   SensitivityReadFailed,
 } from './sensitivity-for'
-import type { StampWriteFailed } from './stamp-sensitivity'
+import type { StampWriteFailed } from '@spaces/core/writes/ai/stamp-sensitivity'
 
 /**
  * A document's extracted text → its `chunk` rows (SPA-121, ai-10b;

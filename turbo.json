@@ -117,6 +117,19 @@
       "outputs": []
     },
 
+    // core's one-writer scans (chunk.sensitive, document birth) read apps/
+    // and plugins/, which are dependents, not dependencies, so turbo would
+    // not fold them into this hash on its own.
+    "@spaces/core#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/*/src/**",
+        "$TURBO_ROOT$/plugins/**/src/**"
+      ],
+      "outputs": []
+    },
+
     "typecheck": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$"],

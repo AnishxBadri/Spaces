@@ -4,6 +4,11 @@ import { db } from '@spaces/db'
 import { document, entity, entitySpace, link } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { QUEUES } from '@spaces/core/queue/names'
+import {
+  raiseSensitivity,
+  stampedSensitive,
+} from '@spaces/core/writes/ai/stamp-sensitivity'
+import { enqueueRestamp } from '#/lib/ai/enqueue-restamp'
 import { enqueue } from '#/lib/queue'
 import { documentFilingRefusal } from '#/lib/server/shared'
 import type { DocumentKind } from '@spaces/core/documents'
@@ -164,6 +169,12 @@ export const fileDocumentProgram = Effect.fn('fileDocumentProgram')(function* (
               .onConflictDoNothing()
               .returning({ id: entitySpace.entityId })
       if (added.length === 0) return { filed: false }
+      if (target.kind === 'space')
+        await raiseSensitivity(tx, {
+          kind: 'filed',
+          entityId: documentId,
+          spaceId: target.entityId,
+        })
 
       // Subject is the target, object is the document — the shape
       // `document.filed` already writes, so the record's timeline and the
@@ -202,7 +213,7 @@ export const unfileDocumentProgram = Effect.fn('unfileDocumentProgram')(
     yield* readDocument(input.documentId)
     const { documentId, target } = input
 
-    return yield* query(() =>
+    const outcome = yield* query(() =>
       db.transaction(async (tx) => {
         const removed =
           target.kind === 'record'
@@ -225,7 +236,7 @@ export const unfileDocumentProgram = Effect.fn('unfileDocumentProgram')(
                   ),
                 )
                 .returning({ id: entitySpace.entityId })
-        if (removed.length === 0) return { unfiled: false }
+        if (removed.length === 0) return { unfiled: false, lowered: [] }
 
         await tx.insert(activity).values({
           actorId: userId,
@@ -234,9 +245,22 @@ export const unfileDocumentProgram = Effect.fn('unfileDocumentProgram')(
           objectEntityId: documentId,
           meta: { action: 'unfiled', target: target.kind },
         })
-        return { unfiled: true }
+        const lowered =
+          target.kind === 'space'
+            ? await stampedSensitive(tx, {
+                kind: 'filed',
+                entityId: documentId,
+                spaceId: target.entityId,
+              })
+            : []
+        return { unfiled: true, lowered }
       }),
     )
+    // Lowering is a job, after the commit: another space may still hold the
+    // document sensitive, and only the live resolver can say.
+    if (outcome.lowered.length > 0)
+      yield* query(() => enqueueRestamp(outcome.lowered))
+    return { unfiled: outcome.unfiled }
   },
 )
 

@@ -298,10 +298,13 @@ export const chunk = pgTable(
     /**
      * A derived cache of the sensitivity resolver, so retrieval filters in
      * SQL before scoring.
-     * - Exactly one writer: `stampSensitivity` (the embed job calls it in the
-     *   transaction that inserts the chunks). No second author may appoint
-     *   themselves; an insert leaves the default for it to correct.
-     * - Binding and filing changes do not restamp, so the column can lag them.
+     * - One writing module, two functions: `stampSensitivity` (the embed job,
+     *   in the transaction that inserts the chunks, and the
+     *   `sensitivity.restamp` job that lowers) and `raiseSensitivity` (the
+     *   set-based raise, in the transaction that flags a record or files it
+     *   into a sensitive space). No second author may appoint themselves; an
+     *   insert leaves the default for them to correct.
+     * - Binding changes do not restamp yet, so the column can lag them.
      * - The routing boundary never reads this column — it resolves live
      *   (`resolveSensitivity`): a stale cache where bytes leave the box is a
      *   leak.

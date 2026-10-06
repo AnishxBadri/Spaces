@@ -10,8 +10,8 @@ import type {
   SensitivityEntityNotFound,
   SensitivityReadFailed,
 } from './sensitivity-for'
-import { stampSensitivity } from './stamp-sensitivity'
-import type { StampWriteFailed } from './stamp-sensitivity'
+import { stampSensitivity } from '@spaces/core/writes/ai/stamp-sensitivity'
+import type { StampWriteFailed } from '@spaces/core/writes/ai/stamp-sensitivity'
 
 /**
  * The replace-stamp-embed half every chunk source shares (SPA-121 wrote it

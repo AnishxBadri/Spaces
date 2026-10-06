@@ -37,6 +37,13 @@ export const QUEUES = {
    */
   embedBackfill: 'chunk.embed-backfill',
   /**
+   * The lowering half of `chunk.sensitive`: one entity's chunks restamped
+   * from the live resolver after a flag is cleared or a filing removed.
+   * Created `stately` and sent with `singletonKey = entityId`, so a burst of
+   * changes is one queued job that resolves when it runs.
+   */
+  restampSensitivity: 'sensitivity.restamp',
+  /**
    * A saved link → readability text on the same `document` row (SPA-117).
    * `document.` and not `clip.`, because the row it acts on is a document
    * like every other: no separate source table, one search box over decks

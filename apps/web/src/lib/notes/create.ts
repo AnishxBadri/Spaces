@@ -2,6 +2,7 @@ import type { NoteKind } from './ordering'
 import { Effect, Schema } from 'effect'
 import { db } from '@spaces/db'
 import { entity, entitySpace, link, note } from '@spaces/db/schema'
+import { raiseSensitivity } from '@spaces/core/writes/ai/stamp-sensitivity'
 import { activity } from '@spaces/db/schema/activity'
 import type { NoteBody } from '@spaces/db/schema/kinds'
 
@@ -145,6 +146,11 @@ export const createNoteProgram = Effect.fn('createNoteProgram')(function* (
                 createdBy: userId,
               })
               .onConflictDoNothing()
+            await raiseSensitivity(tx, {
+              kind: 'filed',
+              entityId: ent.id,
+              spaceId: about.entityId,
+            })
           } else {
             // The filing, first: the act the button names.
             await tx
