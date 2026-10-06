@@ -954,8 +954,8 @@ enum branch in any registry read. `description` landed 2026-09 (migration
 - **Hard exclusions, never attributes:** `kind`, `canonical_name`, `merged_into_id`.
   The opinionated core stays code-owned; attributes are display/filter/sort data.
 - **Identity is a unique attribute (D75, 2026-10-06; supersedes "identity is never an
-  attribute").** Person `emails`, company `domains` and company `cin` are multi-valued
-  system attributes carrying `options.identityKey`; `setValues` mirrors each value into an
+  attribute").** Person `emails` and company `domains` are multi-valued system
+  attributes carrying `options.identityKey`; `setValues` mirrors each value into an
   `is_identity` alias in the same transaction, and that alias table — its partial unique
   index — is what enforces one owner per key and what `resolveEntity` matches on.
 - **Type menu is fixed** (users define attributes, never types): text, number, currency,
@@ -1135,7 +1135,8 @@ enum branch in any registry read. `description` landed 2026-09 (migration
 
 - **Company:** description (text) · business_model (multi-select) · funding_stage (select:
   Pre-seed → Public/Bootstrapped) · location (text) · founded_year (number).
-  domains (domain, multi, identity) · cin (text, identity) · linkedin (url, plain) (D75).
+  domains (domain, multi, identity) · linkedin (url, plain) (D75). No CIN: Spaces is
+  country-agnostic, and a user who tracks it adds their own attribute.
 - **Person:** job_title (text) · description · location · twitter (url) ·
   phone (phone) · emails (email, multi, identity) · linkedin (url, plain) (D75).
 - **LinkedIn is a plain attribute (D75).** SPA-300 (migration 0063) briefly made it a
@@ -1364,8 +1365,9 @@ see "Lists — deferred").
 ### Entity resolution & merge
 
 **Doctrine: deterministic auto, probabilistic suggest.** Identity comes only from
-deterministic keys — domain, email, CIN (LinkedIn URL on people and companies is a plain
-attribute since D75; a custom object may still declare `linkedin` as its identity key). Exact key match auto-attaches. Fuzzy
+deterministic keys — domain and email (since D75 LinkedIn on people and companies is a
+plain attribute and CIN is not a core key; a custom object may still declare `domain` or
+`linkedin` as its identity key). Exact key match auto-attaches. Fuzzy
 name match **suggests, never merges** — no threshold is safe ("Stripe" payments vs "Stripe"
 design agency corrupts silently). Fuzzy feeds a dedupe inbox; a human clicks.
 
