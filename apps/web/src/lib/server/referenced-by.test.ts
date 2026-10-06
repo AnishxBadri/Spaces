@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The person page's "Referred deals" section (SPA-153). SPA-59 already
+ * The person page's referring-deals section (SPA-153). SPA-59 already
  * writes the edge — `deal.referred_by` syncs a
  * `link(relation:'references', attr_slug:'referred_by')` row — and
  * `apps/web/src/lib/attributes/referred-by.test.ts` pins that write. What
@@ -70,9 +70,10 @@ describe('the person page — referred deals', () => {
     const groups = groupReferencedBy(await referencedByRows(personId))
     expect(groups.length).toBe(1)
     const [group] = groups
-    // The heading is the attribute's display name ("Referred by") over the
-    // referring object's plural ("Deals") — not a literal in the page.
-    expect(group.label).toBe('Referred deals')
+    // The title is the referring object's plural, the via its attribute's
+    // display name — both data, not literals in the page.
+    expect(group.label).toBe('Deals')
+    expect(group.via).toBe('Referred by')
     expect(group.attrSlug).toBe('referred_by')
     expect(group.items.map((i) => i.name).sort()).toEqual(
       deals.map((d) => d.name).sort(),
@@ -156,9 +157,9 @@ describe('the person page — referred deals', () => {
     })
 
     const groups = groupReferencedBy(await referencedByRows(personId))
-    expect(groups.map((g) => g.label)).toEqual([
-      'Champion deals',
-      'Referred deals',
+    expect(groups.map((g) => [g.label, g.via])).toEqual([
+      ['Deals', 'Champion'],
+      ['Deals', 'Referred by'],
     ])
     expect(groups.map((g) => g.attrSlug).sort()).toEqual(
       [slug, 'referred_by'].sort(),

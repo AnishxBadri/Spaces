@@ -16,7 +16,6 @@ import { RailField } from '#/components/attributes/rail-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import { KeyHint } from '#/components/page-header'
 import {
-  DitherMark,
   InitialsMark,
   PropertyCell,
   PropertyGrid,
@@ -44,13 +43,11 @@ import {
   getEntitySensitivity,
   getPerson,
   getRecordTimeline,
-  listCompanies,
   listRecordActions,
   listRecordDocuments,
   listRecordNotes,
   listRegistry,
   listSpaces,
-  setPersonCompany,
   tagIntoSpace,
   untagFromSpace,
   updateRecord,
@@ -60,7 +57,6 @@ export const Route = createFileRoute('/_app/people_/$personId')({
   loader: async ({ params }) => {
     const [
       personData,
-      companies,
       spaces,
       registry,
       timeline,
@@ -71,7 +67,6 @@ export const Route = createFileRoute('/_app/people_/$personId')({
       pluginActions,
     ] = await Promise.all([
       getPerson({ data: { id: params.personId } }),
-      listCompanies(),
       listSpaces(),
       listRegistry({ data: { kind: 'person' } }),
       getRecordTimeline({ data: { entityId: params.personId } }),
@@ -89,7 +84,6 @@ export const Route = createFileRoute('/_app/people_/$personId')({
     }
     return {
       person: personData,
-      allCompanies: companies,
       allSpaces: spaces,
       registry,
       timeline,
@@ -106,7 +100,6 @@ export const Route = createFileRoute('/_app/people_/$personId')({
 function PersonRecordPage() {
   const {
     person,
-    allCompanies,
     allSpaces,
     registry,
     timeline,
@@ -119,9 +112,6 @@ function PersonRecordPage() {
   const router = useRouter()
   const navigate = useNavigate()
 
-  const unlinkedCompanies = allCompanies.filter(
-    (c) => !person.companies.some((pc) => pc.id === c.id),
-  )
   const untaggedSpaces = allSpaces.filter(
     (s) => !person.spaces.some((ps) => ps.id === s.id),
   )
@@ -187,26 +177,6 @@ function PersonRecordPage() {
             tone: jobTitle ? undefined : 'muted',
           },
           {
-            label: 'Companies',
-            value:
-              person.companies.length > 0 ? (
-                <Link
-                  to="/companies/$companyId"
-                  params={{ companyId: person.companies[0].id }}
-                  className="focus-ring hover:underline"
-                >
-                  {person.companies[0].name}
-                  {person.companies.length > 1
-                    ? ` +${person.companies.length - 1}`
-                    : ''}
-                </Link>
-              ) : (
-                '—'
-              ),
-            kind: 'text',
-            tone: person.companies.length > 0 ? undefined : 'muted',
-          },
-          {
             label: 'Location',
             value: location ?? '—',
             kind: 'text',
@@ -220,62 +190,6 @@ function PersonRecordPage() {
         rail={
           <>
             <WaitingRail entityId={person.id} counts={waiting} />
-            <RailSection label="Companies" meta={`${person.companies.length}`}>
-              {person.companies.map((c) => (
-                <RailItem key={c.id} className="group">
-                  <DitherMark size={22} />
-                  <Link
-                    to="/companies/$companyId"
-                    params={{ companyId: c.id }}
-                    className="focus-ring min-w-0 flex-1 truncate hover:underline"
-                  >
-                    {c.name}
-                  </Link>
-                  <button
-                    aria-label={`Unlink from ${c.name}`}
-                    onClick={async () => {
-                      await setPersonCompany({
-                        data: {
-                          personId: person.id,
-                          companyId: c.id,
-                          action: 'unlink',
-                        },
-                      })
-                      void router.invalidate()
-                    }}
-                    className="focus-ring hidden size-5 items-center justify-center text-graphite group-hover:flex hover:text-foreground focus-visible:flex"
-                  >
-                    <X className="size-3" strokeWidth={2} />
-                  </button>
-                </RailItem>
-              ))}
-              {unlinkedCompanies.length > 0 ? (
-                <Select
-                  aria-label="Link to company"
-                  value=""
-                  onChange={async (companyId) => {
-                    await setPersonCompany({
-                      data: {
-                        personId: person.id,
-                        companyId,
-                        action: 'link',
-                      },
-                    })
-                    void router.invalidate()
-                  }}
-                  items={unlinkedCompanies.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                  }))}
-                  width="content"
-                  placeholder="+ Link to company…"
-                  searchPlaceholder="Search companies…"
-                  emptyLabel="No company matches."
-                  className="mt-1 h-7 rounded-none bg-paper px-2 text-label text-graphite"
-                />
-              ) : null}
-            </RailSection>
-
             {/* Spaces (SPA-99). The same rail the company and custom-record
                 pages carry, on the same two server fns — and the writer the
                 space page's Contacts section had been missing: `entity_space`
@@ -398,9 +312,9 @@ function PersonRecordPage() {
             people lands here with no edit. No inbound refs, no heading. */}
         {person.referencedBy.map((group) => (
           <RecordSection
-            key={group.attrSlug}
+            key={`${group.label}:${group.attrSlug}`}
             label={group.label}
-            meta={`${group.items.length}`}
+            meta={`via ${group.via} · ${group.items.length}`}
           >
             <ol>
               {group.items.map((item) => {

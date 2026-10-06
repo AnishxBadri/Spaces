@@ -183,7 +183,10 @@ export async function referencedByRows(
 /** Inbound references under one attribute, ready to render as a section. */
 export type ReferencedByGroup = {
   attrSlug: string
+  /** The referring object's plural — the section title ("Deals"). */
   label: string
+  /** The attribute that made the link — the head's meta ("Referred by"). */
+  via: string
   items: Array<{
     id: string
     name: string
@@ -194,35 +197,34 @@ export type ReferencedByGroup = {
 }
 
 /**
- * A backlink group's heading, from data alone: the attribute's display name
- * carries the verb, the referring object's plural the noun. "Referred by"
- * on deals reads "Referred deals"; a later `champion` reads "Champion
- * deals" — no page edit, and no slug in the markup. The trailing "by" is
- * the only word of English in it; a link whose attribute has since been
- * deleted falls back to the slug.
+ * A backlink group's heading, from data alone: the referring object's plural
+ * is the title, the attribute's display name the `via`. No sentence is built
+ * from the two, so any attribute name reads right ("People", "Champion").
+ * A link whose attribute has since been deleted falls back to the slug.
  */
-function backlinkLabel(row: ReferencedByRow): string {
-  const verb = (row.attrName ?? row.attrSlug.replace(/_/g, ' '))
-    .replace(/\s+by$/i, '')
-    .trim()
-  const noun = (row.objectPlural ?? `${row.kind}s`).toLowerCase()
-  return verb ? `${verb} ${noun}` : noun
+function backlinkLabel(row: ReferencedByRow): { label: string; via: string } {
+  const plural = row.objectPlural ?? `${row.kind}s`
+  return {
+    label: plural.charAt(0).toUpperCase() + plural.slice(1),
+    via: row.attrName ?? row.attrSlug.replace(/_/g, ' '),
+  }
 }
 
 /**
- * Inbound references grouped by the attribute that made them, so a second
- * record-reference attribute pointing at the same record gets its own
- * heading for free. The grouping is `attr_slug`, never a hard-coded slug.
+ * Inbound references grouped by the object and attribute that made them, so
+ * a second record-reference attribute pointing at the same record gets its
+ * own section for free. Never a hard-coded slug.
  */
 export function groupReferencedBy(
   rows: Array<ReferencedByRow>,
 ): Array<ReferencedByGroup> {
   const groups = new Map<string, ReferencedByGroup>()
   for (const row of rows) {
-    const existing = groups.get(row.attrSlug)
+    const key = `${row.objectSlug ?? row.kind}:${row.attrSlug}`
+    const existing = groups.get(key)
     const group = existing ?? {
       attrSlug: row.attrSlug,
-      label: backlinkLabel(row),
+      ...backlinkLabel(row),
       items: [],
     }
     group.items.push({
@@ -232,9 +234,11 @@ export function groupReferencedBy(
       objectSlug: row.objectSlug,
       objectSingular: row.objectSingular,
     })
-    if (!existing) groups.set(row.attrSlug, group)
+    if (!existing) groups.set(key, group)
   }
-  return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label))
+  return [...groups.values()].sort(
+    (a, b) => a.label.localeCompare(b.label) || a.via.localeCompare(b.via),
+  )
 }
 
 /**
