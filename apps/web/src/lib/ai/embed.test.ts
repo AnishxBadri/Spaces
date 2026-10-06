@@ -33,6 +33,9 @@ import {
  * `/v1/embeddings` wire format.
  */
 
+// The settings view reads the local model's jobs from the queue.
+vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
+
 const USER = { type: 'user', id: FIXTURE_ACTOR.id } as const
 
 const opts = (over: Partial<EmbedOptions> = {}): EmbedOptions => ({

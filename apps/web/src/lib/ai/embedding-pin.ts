@@ -7,6 +7,10 @@ import type {
   EmbeddingSlotSetting,
 } from '@spaces/db/schema/workspace'
 import { readWorkspaceCredential } from '@spaces/core/writes/vault'
+import {
+  localModelPresentProgram,
+  localModelTestedGreenProgram,
+} from './local-model'
 import { readProviderMeta } from './providers/meta'
 import {
   EMBEDDING_PROVIDER_INFO,
@@ -193,6 +197,17 @@ const knownModel = Effect.fn('pinEmbedding.knownModel')(function* (
 const requireKey = Effect.fn('pinEmbedding.requireKey')(function* (
   target: EmbeddingTarget,
 ): Effect.fn.Return<void, PinRefused | EmbeddingPinReadFailed> {
+  // The in-process model's key is its files on disk. (D50)
+  if (EMBEDDING_PROVIDER_INFO[target.provider].inProcess) {
+    const present = yield* localModelPresentProgram(target.model).pipe(
+      Effect.mapError((e) => new EmbeddingPinReadFailed({ cause: e })),
+    )
+    if (!present)
+      return yield* new PinRefused({
+        message: missingCredentialMessage(target.provider, 'pinning'),
+      })
+    return
+  }
   const key = yield* Effect.tryPromise({
     try: () =>
       readWorkspaceCredential(embeddingCredentialProvider(target.provider)),
@@ -314,6 +329,16 @@ export class SlotRefused extends Schema.TaggedError<SlotRefused>()(
 const testedGreen = Effect.fn('sensitiveSlot.testedGreen')(function* (
   target: EmbeddingTarget,
 ): Effect.fn.Return<boolean | 'no-credential', EmbeddingPinReadFailed> {
+  // The in-process model's verdict is its newest Test job. (D50)
+  if (EMBEDDING_PROVIDER_INFO[target.provider].inProcess) {
+    const present = yield* localModelPresentProgram(target.model).pipe(
+      Effect.mapError((e) => new EmbeddingPinReadFailed({ cause: e })),
+    )
+    if (!present) return 'no-credential'
+    return yield* localModelTestedGreenProgram(target.model).pipe(
+      Effect.mapError((e) => new EmbeddingPinReadFailed({ cause: e })),
+    )
+  }
   const row = yield* Effect.tryPromise({
     try: () =>
       readWorkspaceCredential(embeddingCredentialProvider(target.provider)),

@@ -7,6 +7,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   unique,
@@ -255,4 +256,33 @@ export const extractionCache = pgTable(
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.blobSha, t.schemaKey, t.modelId] })],
+)
+
+/**
+ * One query embedding asked of the worker's local model: web writes the row
+ * and notifies its id, the worker writes the vector and notifies it back. (D50)
+ * - Transient: web deletes its own row on read or timeout, and the worker
+ *   prunes any row older than a minute. Nothing else reads it.
+ * - The vector lives here, never in a notification (8 KB payload cap).
+ * - `real[]`, not `vector(768)`: `embed()` asserts the width, and a re-pin
+ *   need not alter a table nothing searches.
+ */
+export const embedRequest = pgTable(
+  'embed_request',
+  {
+    /** Minted by web, so it can wait on the id before the row exists. */
+    id: uuid('id').primaryKey(),
+    /** The pinned local model the text is embedded with. */
+    model: text('model').notNull(),
+    text: text('text').notNull(),
+    /** Null until the worker answers. */
+    embedding: real('embedding').array(),
+    /** Why the worker could not answer; null on success. */
+    error: text('error'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    answeredAt: timestamp('answered_at', { withTimezone: true }),
+  },
+  (t) => [index('embed_request_created_idx').on(t.createdAt)],
 )

@@ -64,6 +64,7 @@ describe('the catalogue', () => {
       'google/text-embedding-004',
       'google/gemini-embedding-001',
       'ollama/nomic-embed-text',
+      'local/bge-base-en-v1.5',
     ])
     expect(PIN_DIMS).toBe(768)
   })
@@ -203,7 +204,7 @@ describe('Ollama (SPA-83)', () => {
     })
     expect(
       EMBEDDING_PROVIDERS.filter((p) => EMBEDDING_PROVIDER_INFO[p].local),
-    ).toEqual(['ollama'])
+    ).toEqual(['ollama', 'local'])
     expect(embeddingCredentialProvider('ollama')).toBe('ollama')
     expect(embeddingCredentialProvider('openai')).toBe('embed:openai')
   })

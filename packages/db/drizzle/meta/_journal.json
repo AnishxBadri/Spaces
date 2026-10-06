@@ -428,6 +428,13 @@
       "when": 1791269741136,
       "tag": "0060_credential_unique_nulls",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1791273464477,
+      "tag": "0061_embed_request",
+      "breakpoints": true
     }
   ]
 }

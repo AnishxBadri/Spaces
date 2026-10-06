@@ -6,6 +6,7 @@ import { aiCapsInput } from '../ai/caps-input'
 import {
   embeddingKeyInput,
   embeddingTargetInput,
+  localModelInput,
 } from '../ai/providers/embed/ids'
 
 /**
@@ -208,3 +209,25 @@ export const clearSensitiveSlot = createServerFn({ method: 'POST' }).handler(
     return clearSensitiveSlotHandler()
   },
 )
+
+/**
+ * Settings → Embeddings · the local model (D50): download its files into
+ * `<dataDir>/models`, or Test it, each as one keyed worker job the section
+ * then polls through `getEmbeddingSettings`. Admin-only; the bodies open
+ * with `requireAdmin()`.
+ */
+export const startLocalModelDownload = createServerFn({ method: 'POST' })
+  .validator(localModelInput)
+  .handler(async ({ data }) => {
+    const { startLocalModelDownloadHandler } =
+      await import('../ai/providers/embed/settings')
+    return startLocalModelDownloadHandler(data)
+  })
+
+export const startLocalModelTest = createServerFn({ method: 'POST' })
+  .validator(localModelInput)
+  .handler(async ({ data }) => {
+    const { startLocalModelTestHandler } =
+      await import('../ai/providers/embed/settings')
+    return startLocalModelTestHandler(data)
+  })

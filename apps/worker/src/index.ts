@@ -38,6 +38,16 @@ import {
   IMPORT_COMMIT_EXPIRE_SECONDS,
   importCommit,
 } from './jobs/import-commit'
+import {
+  MODEL_DOWNLOAD_EXPIRE_SECONDS,
+  modelDownload,
+  modelDownloadRetry,
+} from './jobs/model-download'
+import { modelTest } from './jobs/model-test'
+import { makeLocalModelHost } from './local-model/host'
+import { serveEmbedRequests } from './local-model/serve'
+import { transformersLoader } from './local-model/transformers'
+import { installLocalEmbedder } from '#web/lib/ai/providers/embed/local'
 
 /**
  * The worker process. Second process in the app container (or run locally
@@ -338,6 +348,35 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(importCommit, { host, layer: Layer.empty }),
   )
+  // The local embedding model (D50): one instance in this process, loaded
+  // by the first use and freed when idle. Every embed() here runs on it;
+  // web's requests arrive through `serveEmbedRequests` below. Both queues
+  // are `exclusive` on a per-model key, created before the plain loop.
+  const localModels = makeLocalModelHost({ load: transformersLoader })
+  installLocalEmbedder((model, texts) => localModels.embed(model, texts))
+  await boss
+    .createQueue(QUEUES.modelDownload, {
+      policy: 'exclusive',
+      expireInSeconds: MODEL_DOWNLOAD_EXPIRE_SECONDS,
+      heartbeatSeconds: 60,
+      retryLimit: modelDownloadRetry.limit,
+      retryDelay: modelDownloadRetry.delaySeconds,
+      retryBackoff: modelDownloadRetry.backoff,
+    })
+    .catch(() => {})
+  await boss.work(
+    QUEUES.modelDownload,
+    { batchSize: 1, includeMetadata: true },
+    runJob(modelDownload(localModels), { host, layer: Layer.empty }),
+  )
+  await boss
+    .createQueue(QUEUES.modelTest, { policy: 'exclusive', retryLimit: 0 })
+    .catch(() => {})
+  await boss.work(
+    QUEUES.modelTest,
+    { batchSize: 1, includeMetadata: true },
+    runJob(modelTest(localModels), { host, layer: Layer.empty }),
+  )
   for (const queue of Object.values(QUEUES)) {
     await boss.createQueue(queue).catch(() => {}) // idempotent across boots
   }
@@ -446,10 +485,18 @@ async function main() {
       onListening: () => reloader.request(null),
     }),
   )
+  // Web's query embeddings for a local pin (D50).
+  const embedListener = Effect.runFork(
+    serveEmbedRequests({
+      connectionString: requireEnv('DATABASE_URL'),
+      host: localModels,
+    }),
+  )
 
   const shutdown = async () => {
     console.log('[worker] shutting down')
     await Effect.runPromise(Fiber.interrupt(listener))
+    await Effect.runPromise(Fiber.interrupt(embedListener))
     await Effect.runPromise(
       reloader.settled().pipe(Effect.timeoutOption(15_000)),
     )
@@ -458,6 +505,7 @@ async function main() {
     heartbeat.stop()
     await boss.stop({ graceful: true, timeout: 15000 })
     await Effect.runPromise(plugins.shutdown())
+    await Effect.runPromise(localModels.dispose())
     process.exit(0)
   }
   process.on('SIGTERM', () => void shutdown())
