@@ -69,7 +69,19 @@ export function productScopes(provider: ProviderId, product: string): string[] {
   )
 }
 
-/** The start route a Connect control navigates to. */
-export function connectHref(provider: ProviderId, product: string): string {
-  return `/api/connections/${provider}/start?product=${encodeURIComponent(product)}`
+/**
+ * The start route a Connect control navigates to. With `scopes` (what
+ * `hasScopes` named missing) it grows the held connection; with `returnTo`
+ * the dance ends back on that path.
+ */
+export function connectHref(
+  provider: ProviderId,
+  product: string,
+  scopes: ReadonlyArray<string> = [],
+  returnTo: string | null = null,
+): string {
+  const query = new URLSearchParams({ product })
+  if (scopes.length > 0) query.set('scopes', scopes.join(','))
+  if (returnTo !== null) query.set('return', returnTo)
+  return `/api/connections/${provider}/start?${query.toString()}`
 }

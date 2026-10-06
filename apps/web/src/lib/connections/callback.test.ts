@@ -17,6 +17,7 @@ import { storeCredential } from '@spaces/core/writes/vault'
 import { startFakeIdp } from '@spaces/core/writes/connections/fake-idp'
 import type { FakeIdp } from '@spaces/core/writes/connections/fake-idp'
 import { decryptBundle } from '@spaces/core/writes/connections/bundle'
+import { hasScopes } from '@spaces/core/writes/connections/scopes'
 import {
   newVerifier,
   verifierCookie,
@@ -29,6 +30,7 @@ import {
 } from '@spaces/core/writes/connections/state'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { connectCallbackProgram, handleConnectCallback } from './callback'
+import { connectHref } from './products'
 import { handleConnectStart } from './start'
 import type { ProviderTable } from './start'
 
@@ -369,5 +371,97 @@ describe('refusals write no row', () => {
     const response = await callback('box', url.toString(), cookie)
     expect(response.status).toBe(400)
     expect(await rows()).toHaveLength(0)
+  })
+})
+
+/**
+ * Scope growth stays within a product (D66), so the added scope is Drive's
+ * own `drive.readonly` on top of `drive.file`, not Calendar's.
+ */
+describe('scope growth on a held connection', () => {
+  const owner = { userId: FIXTURE_ACTOR.id, provider: 'google' }
+  const lastAuthorize = () => idp.authorizeRequests.at(-1)
+
+  it('unions the added scope onto the one row with a fresh refresh token', async () => {
+    await dance('google', 'product=drive')
+    expect(lastAuthorize()?.get('include_granted_scopes')).toBeNull()
+    const first = (await rows())[0]
+
+    const { response } = await dance(
+      'google',
+      'product=drive&scopes=drive.readonly',
+    )
+    expect(response.status).toBe(302)
+    expect(lastAuthorize()?.get('include_granted_scopes')).toBe('true')
+    expect(lastAuthorize()?.get('scope')).toBe(
+      'https://www.googleapis.com/auth/drive.readonly',
+    )
+
+    const all = await rows()
+    expect(all).toHaveLength(1)
+    expect(all[0].id).toBe(first.id)
+    expect(all[0].scopes).toEqual([
+      'openid',
+      'email',
+      'drive.file',
+      'drive.readonly',
+    ])
+    const before = decryptBundle(first.tokensEnc, owner)
+    const after = decryptBundle(all[0].tokensEnc, owner)
+    expect(after.refreshToken).toMatch(/^fake-refresh-/)
+    expect(after.refreshToken).not.toBe(before.refreshToken)
+  })
+
+  it('answers hasScopes missing, then grows through connectHref back to the return path', async () => {
+    await dance('google', 'product=drive')
+    const { id } = (await rows())[0]
+    const wanted = ['drive.file', 'drive.readonly']
+    const check = await Effect.runPromise(hasScopes(id, wanted))
+    expect(check).toEqual({ _tag: 'missing', scopes: ['drive.readonly'] })
+    if (check._tag !== 'missing') throw new Error('expected missing')
+
+    const href = connectHref(
+      'google',
+      'drive',
+      check.scopes,
+      '/records/abc?tab=files',
+    )
+    const { response } = await dance(
+      'google',
+      new URL(href, APP).search.slice(1),
+    )
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe('/records/abc?tab=files')
+    expect(await Effect.runPromise(hasScopes(id, wanted))).toEqual({
+      _tag: 'granted',
+    })
+  })
+
+  it('stores what was granted when the user unticks the added scope', async () => {
+    await dance('google', 'product=drive')
+    idp.mode.withheldScopes = ['https://www.googleapis.com/auth/drive.readonly']
+    await dance('google', 'product=drive&scopes=drive.readonly')
+    const all = await rows()
+    expect(all).toHaveLength(1)
+    expect(all[0].scopes).toEqual(['openid', 'email', 'drive.file'])
+  })
+
+  it('never makes a second row for the same account on re-consent', async () => {
+    await dance('google', 'product=drive')
+    await db
+      .update(accountConnection)
+      .set({ status: 'revoked' })
+      .where(eq(accountConnection.product, 'drive'))
+    await dance('google', 'product=drive')
+    // A held row asks for the earlier grant whatever its status.
+    expect(lastAuthorize()?.get('include_granted_scopes')).toBe('true')
+    await dance('google', 'product=drive&scopes=drive.file,drive.readonly')
+    await dance('google', 'product=drive')
+    const all = await rows()
+    expect(all).toHaveLength(1)
+    expect(all[0]).toMatchObject({
+      status: 'active',
+      scopes: ['openid', 'email', 'drive.file', 'drive.readonly'],
+    })
   })
 })

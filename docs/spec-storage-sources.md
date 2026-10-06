@@ -131,6 +131,29 @@ for `socialProviders`). The two legs are core's, once, for every provider.
   - Then a 302 to the state's return path. The verifier cookie is cleared
     on every answer whose state is genuinely signed (`signedNonce`), refusal
     or success; a forged state names no cookie of ours.
+- **Scopes grow incrementally, within a product (D66).** A product's
+  connection is one row however many times its user consents; Drive asks
+  `drive.file` first and `drive.readonly` only when a folder is bound,
+  never a second account row.
+  - **Ask.** `hasScopes(connectionId, scopes)` (core,
+    `writes/connections/scopes`, no user, so the worker calls it too)
+    answers `granted`, or `missing` listing exactly the asked-for values not
+    on the row, or fails `ConnectionNotFound`. The caller sends the user to
+    `connectHref(provider, product, missing, returnTo)` — the start route
+    with `scopes` and `return` — and the dance ends back on `returnTo`.
+  - **Start.** When the session user already holds a row for (provider,
+    product) — any `external_email`, any status — the authorize URL also
+    carries `include_granted_scopes=true` (Google folds the earlier grant
+    into the new token; Box ignores the parameter). The `scope` param is
+    still exactly the values asked for.
+  - **Callback.** The upsert inserts, or on conflict locks the row and
+    writes `scopes` as the union of the stored set and what this grant
+    returned, in registry order — the union adds only what was granted, so
+    an unticked scope never lands. `tokens_enc` is the new bundle; when the
+    provider omitted `refresh_token` (a repeat consent can), the stored
+    refresh token is decrypted under the same AAD and carried into it.
+  - A `revoked` row's grant is gone at the provider: its scopes and refresh
+    token are not carried over, and the row holds this grant alone.
 - **Tests run against an in-repo fake IdP**, a node `http` server on an
   ephemeral loopback port (`startFakeIdp`, core `writes/connections/fake-idp`),
   not a container. Its `/authorize` records each query and answers 302 to

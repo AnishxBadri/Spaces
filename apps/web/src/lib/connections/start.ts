@@ -13,6 +13,7 @@ import {
   newVerifier,
   verifierCookie,
 } from '@spaces/core/writes/connections/pkce'
+import { holdsConnection } from '@spaces/core/writes/connections/scopes'
 import { newNonce, signState } from '@spaces/core/writes/connections/state'
 import { auth } from '#/lib/auth'
 import { effectFn } from '#/lib/server/effect'
@@ -152,6 +153,16 @@ export const connectStartProgram = Effect.fn('connectStart')(function* (
       message: `${entry.label} has no OAuth client yet. An admin adds it in Settings → Connections.`,
     })
 
+  const held = yield* holdsConnection({
+    userId: input.userId,
+    provider,
+    product: productId,
+  }).pipe(
+    Effect.mapError(
+      (e) => new ConnectFailed({ message: e.message, cause: e.cause }),
+    ),
+  )
+
   const redirect = redirectUri(input.origin, provider)
   const callbackPath = yield* Effect.try({
     try: () => new URL(redirect).pathname,
@@ -183,6 +194,8 @@ export const connectStartProgram = Effect.fn('connectStart')(function* (
     url.searchParams.set('access_type', 'offline')
     url.searchParams.set('prompt', 'consent')
   }
+  // Scope growth: the new token carries the earlier grant too. Box ignores it.
+  if (held) url.searchParams.set('include_granted_scopes', 'true')
 
   return {
     location: url.toString(),
