@@ -1,3 +1,4 @@
+import { formatDate } from '@spaces/core/format'
 import {
   createFileRoute,
   Link,
@@ -129,11 +130,6 @@ function PersonRecordPage() {
     }
   }
 
-  const jobTitle =
-    typeof person.values.job_title === 'string' ? person.values.job_title : null
-  const location =
-    typeof person.values.location === 'string' ? person.values.location : null
-
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
@@ -171,16 +167,9 @@ function PersonRecordPage() {
         name={person.name}
         readouts={[
           {
-            label: 'Title',
-            value: jobTitle ?? '—',
-            kind: 'text',
-            tone: jobTitle ? undefined : 'muted',
-          },
-          {
-            label: 'Location',
-            value: location ?? '—',
-            kind: 'text',
-            tone: location ? undefined : 'muted',
+            label: 'Last touched',
+            value: formatDate(person.lastTouched) || '—',
+            tone: person.lastTouched ? undefined : 'muted',
           },
           { label: 'Emails', value: `${person.emails.length}` },
         ]}
