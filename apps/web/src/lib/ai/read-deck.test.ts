@@ -10,6 +10,7 @@ import {
   chunk,
   document,
   entity,
+  entityAlias,
   link,
   suggestion,
 } from '@spaces/db/schema'
@@ -19,6 +20,7 @@ import { enqueued } from '#/test/queue-stub'
 import { jsonRecord } from '@spaces/core/json'
 import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { acceptProgram } from './propose'
 import {
   enqueueReadDeckProgram,
   readDeckMessage,
@@ -81,8 +83,11 @@ async function routeExtract() {
   )
 }
 
-/** A company, and a deck filed against it with three chunks. */
-async function deckOnCompany(opts: { chunks?: boolean } = {}) {
+/**
+ * A company, and a deck filed against it with three chunks — a fourth when
+ * `extra` is given.
+ */
+async function deckOnCompany(opts: { chunks?: boolean; extra?: string } = {}) {
   const tag = randomUUID().slice(0, 8)
   const company = await resolveEntity({
     kind: 'company',
@@ -110,6 +115,7 @@ async function deckOnCompany(opts: { chunks?: boolean } = {}) {
         'Deckco: liquid cooling for edge data centres.',
         'Business model: B2B, sold to operators.',
         'Raising a seed round. HQ Berlin.',
+        ...(opts.extra === undefined ? [] : [opts.extra]),
       ].map((text, idx) => ({
         entityId: docEnt.id,
         sourceKind: 'document' as const,
@@ -507,6 +513,96 @@ describe('readDeck', () => {
     )
     expect(model.doGenerateCalls).toHaveLength(0)
     expect(await suggestionsOn(companyId)).toHaveLength(0)
+  })
+})
+
+describe('a company LinkedIn read from a deck', () => {
+  // A plain `url` attribute (D75): the reader's schema carries it because the
+  // registry does, and it goes through the normal value path — never an alias.
+  const LINKEDIN = 'https://www.linkedin.com/company/acme'
+
+  it('proposes the LinkedIn URL the deck carries, and accepting writes a value and no alias', async () => {
+    await routeExtract()
+    const { companyId, documentId } = await deckOnCompany({
+      extra: 'Follow us: linkedin.com/company/acme',
+    })
+    const model = mockModel(() => ({
+      ...COMPANY_ANSWER(documentId),
+      linkedin: {
+        value: LINKEDIN,
+        refs: [`doc:${documentId}#3`],
+        confidence: 0.9,
+      },
+    }))
+
+    await Effect.runPromise(
+      readDeckProgram({ documentId, userId: USER, model }),
+    )
+    expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain(
+      'linkedin.com/company/acme',
+    )
+    expect(JSON.stringify(model.doGenerateCalls[0].responseFormat)).toContain(
+      '"linkedin"',
+    )
+
+    const rows = await suggestionsOn(companyId)
+    expect(rows).toHaveLength(1)
+    const row = rows[0]
+    expect(row.kind).toBe('attribute_patch')
+    expect(row.payload).toMatchObject({
+      linkedin: { value: LINKEDIN, refs: [`doc:${documentId}#3`] },
+    })
+    expect(row.rationale).toMatch(/5 fields proposed/)
+
+    const accepted = await Effect.runPromise(
+      acceptProgram(row.id, { type: 'user', id: USER }),
+    )
+    if (accepted.kind !== 'attribute_patch') throw new Error('not a patch')
+    expect(accepted.write.changed).toContain('linkedin')
+
+    const company = (
+      await db
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, companyId))
+    ).at(0)
+    expect(company?.values.linkedin).toBe(LINKEDIN)
+    const aliases = await db
+      .select({ kind: entityAlias.kind, value: entityAlias.value })
+      .from(entityAlias)
+      .where(eq(entityAlias.entityId, companyId))
+    expect(aliases.map((a) => a.kind)).not.toContain('linkedin')
+    expect(aliases.map((a) => a.value)).not.toContain(LINKEDIN)
+  })
+
+  it('drops a malformed LinkedIn URL at validation and keeps the rest of the read', async () => {
+    await routeExtract()
+    const { companyId, documentId } = await deckOnCompany({
+      extra: 'Follow us: linkedin company acme',
+    })
+    const model = mockModel(() => ({
+      ...COMPANY_ANSWER(documentId),
+      linkedin: {
+        value: 'linkedin company acme',
+        refs: [`doc:${documentId}#3`],
+        confidence: 0.4,
+      },
+    }))
+
+    const result = await Effect.runPromise(
+      readDeckProgram({ documentId, userId: USER, model }),
+    )
+    expect(result.suggestions).toHaveLength(1)
+    const row = (await suggestionsOn(companyId))[0]
+    expect(Object.keys(jsonRecord(row.payload)).sort()).toEqual([
+      'business_model',
+      'description',
+      'funding_stage',
+      'location',
+    ])
+    expect(row.rationale).toMatch(/1 proposed field was dropped at validation/)
+    // Refused by the url validator, not as an unknown slug.
+    expect(row.rationale).toMatch(/linkedin: Invalid URL/i)
   })
 })
 

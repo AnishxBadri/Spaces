@@ -111,6 +111,13 @@ describe('schemaFor', () => {
     expect(schemaFor(company, 'Company')).toMatchSnapshot()
   })
 
+  it('asks for a company LinkedIn as a plain URI, straight from the registry (D75)', () => {
+    expect(schemaFor(company).properties?.linkedin).toMatchObject({
+      title: 'LinkedIn',
+      properties: { value: { type: 'string', format: 'uri' } },
+    })
+  })
+
   it('wraps every property in {value, refs, confidence}', () => {
     const s = schemaFor(everyType)
     for (const prop of Object.values(s.properties ?? {})) {
