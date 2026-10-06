@@ -2,7 +2,10 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { IntegrationLedger } from '#/components/integrations/integration-ledger'
-import { RegistryPane } from '#/components/integrations/registry-pane'
+import {
+  RegistryPane,
+  UploadPlugin,
+} from '#/components/integrations/registry-pane'
 import {
   SettingsRow,
   SettingsSection,
@@ -15,13 +18,15 @@ import {
   resetIntegration,
   setIntegrationEnabled,
   updateIntegration,
+  uploadIntegration,
 } from '#/lib/server-fns'
 import type { InstallOutcome, IntegrationRow } from '#/lib/server-fns'
 
 /**
  * Settings → Integrations: the installed plugins as a ledger, each with its
  * switch, state and the one action its state calls for, then what the
- * registry offers, each with Install. Admin-only: the
+ * registry offers, each with Install; Upload in the head takes a tarball
+ * from disk for a box with no outbound HTTPS. Admin-only: the
  * loader asks for the rows only when the reader is an admin, since the
  * server fns refuse anyone else, and a member who types the URL reads a
  * sentence instead of an error.
@@ -38,6 +43,9 @@ export const Route = createFileRoute('/_app/settings/integrations')({
   },
   component: IntegrationsRoute,
 })
+
+/** What `pending` holds while an upload is in flight; never a row id or plugin id. */
+const UPLOAD = ':upload'
 
 function IntegrationsRoute() {
   const { rows, registry } = Route.useLoaderData()
@@ -80,6 +88,21 @@ function IntegrationsRoute() {
     }
   }
 
+  async function upload(files: ReadonlyArray<File>) {
+    setPending(UPLOAD)
+    try {
+      const form = new FormData()
+      for (const file of files) form.append('file', file)
+      const outcome = await uploadIntegration({ data: form })
+      toast(landed(outcome, 'installed'))
+      await router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not upload')
+    } finally {
+      setPending(null)
+    }
+  }
+
   if (rows === null)
     return (
       <SettingsSection title="Integrations" crumb="Data & AI">
@@ -91,7 +114,17 @@ function IntegrationsRoute() {
     )
 
   return (
-    <SettingsSection title="Integrations" crumb="Data & AI">
+    <SettingsSection
+      title="Integrations"
+      crumb="Data & AI"
+      action={
+        <UploadPlugin
+          pending={pending === UPLOAD}
+          disabled={pending !== null}
+          onUpload={(files) => void upload(files)}
+        />
+      }
+    >
       <IntegrationLedger
         rows={rows}
         actions={{

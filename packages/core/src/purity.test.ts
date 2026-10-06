@@ -48,11 +48,14 @@ const DB_COUPLED_DIRS: ReadonlyArray<string> = ['writes/']
  * and configures s3 from S3_* (SPA-178). Narrower than DB_COUPLED_DIRS on
  * purpose: the write paths beside them take a transaction or a connection
  * string and read nothing; an enqueue that would have needed DATABASE_URL
- * stayed in apps/web for exactly this reason.
+ * stayed in apps/web for exactly this reason. One file joins them: the
+ * first-boot conveniences, whose input is SPACES_PLUGINS and
+ * SPACES_CREDENTIAL_<ID>.
  */
 const ENV_READING_DIRS: ReadonlyArray<string> = [
   'writes/vault/',
   'writes/storage/',
+  'writes/plugins/first-boot.ts',
 ]
 
 type Source = { path: string; text: string }
@@ -165,7 +168,7 @@ describe('@spaces/core is pure outside src/writes/', () => {
     expect(offenders.map((s) => s.path)).toEqual([])
   })
 
-  it('reads no environment outside the vault and the blob backend', () => {
+  it('reads no environment outside the vault, the blob backend and first boot', () => {
     const offenders = sources.filter((s) => !mayReadEnv(s.path) && readsEnv(s))
     expect(offenders.map((s) => s.path)).toEqual([])
   })

@@ -205,12 +205,14 @@ or a redirect.
 Only two values are required. Everything else is optional and set from the
 app.
 
-| Variable         | Required | Purpose                                                                                                                                     |
-| ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`   | yes      | Postgres 17 with pgvector. The compose file provides one.                                                                                   |
-| `APP_URL`        | yes      | The origin the browser sees, e.g. `https://deals.example.com`.                                                                              |
-| `MASTER_KEY`     | no       | Encrypts stored credentials. Auto-generated to `/data/secret.key`.                                                                          |
-| `STORAGE_DRIVER` | no       | `local` (default) or `s3`, then `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`. |
+| Variable                 | Required | Purpose                                                                                                                                                                   |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | yes      | Postgres 17 with pgvector. The compose file provides one.                                                                                                                 |
+| `APP_URL`                | yes      | The origin the browser sees, e.g. `https://deals.example.com`.                                                                                                            |
+| `MASTER_KEY`             | no       | Encrypts stored credentials. Auto-generated to `/data/secret.key`.                                                                                                        |
+| `STORAGE_DRIVER`         | no       | `local` (default) or `s3`, then `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`.                               |
+| `SPACES_PLUGINS`         | no       | Plugins to install on first boot, e.g. `apollo,rss`, from the image's registry snapshot. A plugin already installed is skipped; removing the variable uninstalls nothing. |
+| `SPACES_CREDENTIAL_<ID>` | no       | Seeds a plugin's workspace key (`SPACES_CREDENTIAL_APOLLO`) once, when none is stored. A key changed in Settings wins from then on.                                       |
 
 `STORAGE_DRIVER=s3` with R2 or B2 is how ephemeral-disk platforms (Fly,
 Railway, Render) run it.

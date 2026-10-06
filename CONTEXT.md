@@ -356,7 +356,12 @@ exotic backends is deferred until asked for.
   Web moves bytes and writes rows; it never executes plugin code.
   `SPACES_PLUGINS=apollo,rss` is an optional first-boot convenience that
   runs the same installer; the required-env set stays `{DATABASE_URL,
-APP_URL}`.
+APP_URL}` (Hostability contract 6 has both conveniences as built). The
+  upload door takes the release's `.tgz` and the `<id>-<version>.json` entry
+  published beside it, so it is verified against the same sha256, signature
+  and key id a registry install is, and refused with the same `RefusalCode`;
+  a lone `.tgz` named `<id>-<version>.tgz` is verified as unsigned, refused
+  unless `.allow-unsigned` exists.
 - Boot reconciles every start: row present + files present + sdk satisfied
   → enabled; anything else → `degraded` with the reason, jobs skipped, boot
   continues. A plugin never crashes the box. `/api/health` lists degraded
@@ -2373,7 +2378,21 @@ unless-stopped` heals it.
    hatch would exist only to let someone do the exact thing the guard is for.
 6. **The required-env set is frozen at `{DATABASE_URL, APP_URL}` — permanently.** Every
    future feature ships with a working default or is optional. This rule is what keeps
-   "compose up works first try" true five features from now.
+   "compose up works first try" true five features from now. **Two optional plugin
+   conveniences sit outside it, and a box that sets neither is unaffected (asserted by
+   test: no row, no file, no log line).** `SPACES_PLUGINS=apollo,rss` installs, at boot,
+   each named plugin with no live row, from the bundled registry's newest satisfying
+   entry, through the same `installPlugin` the Integrations page calls; a live row is
+   skipped before any fetch, so the second boot changes nothing, and unsetting it
+   uninstalls nothing — the row is intent. `SPACES_CREDENTIAL_<ID>` (plugin id
+   upper-cased, `-` as `_`) seeds the workspace credential `provider = <id>`, in the row
+   shape the page writes, only when none exists; a key changed in Settings survives every
+   reboot. Env is an input to the vault, never the store. The seed records the first
+   admin as `created_by` (`credential.created_by` is not null), so on a fresh volume it
+   lands on the first boot after setup. Both run last in `boot()`, before web and worker
+   start; the installer's NOTIFY may reach no worker, which is fine — the worker
+   reconciles every row on its own boot. Never fatal: a plugin that cannot be installed
+   is one warning line.
 
 Backup — three artifacts, one cron line, ship as `scripts/backup.sh`:
 

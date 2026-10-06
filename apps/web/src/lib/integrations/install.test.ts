@@ -35,12 +35,14 @@ import { recordTimelineProgram } from '../timeline/record'
 import {
   availableProgram,
   installFromRegistryProgram,
+  installFromUploadProgram,
   installIntegrationHandler,
   listAvailableHandler,
   uninstallIntegrationHandler,
   uninstallIntegrationProgram,
   upgradeFromRegistryProgram,
   upgradeIntegrationHandler,
+  uploadIntegrationHandler,
 } from './install'
 import { integrationLedgerProgram } from './ledger'
 import type { RegistrySource } from './registry'
@@ -232,6 +234,109 @@ describe('install from the registry', () => {
   })
 })
 
+describe('install from an upload', () => {
+  /** The two files a release publishes, as the form hands them over. */
+  const uploadOf = (p: FixturePlugin) => ({
+    tarballName: `${p.entry.id}-${p.entry.version}.tgz`,
+    tarball: p.tarball,
+    entryText: JSON.stringify(p.entry),
+  })
+
+  it('installs the .tgz and its .json entry exactly as a registry install does', async () => {
+    const outcome = await run(
+      installFromUploadProgram(
+        FIXTURE_ACTOR.id,
+        uploadOf(echo('1.0.0')),
+        source,
+      ),
+    )
+    expect(outcome).toEqual({ name: 'Echo', version: '1.0.0', warning: null })
+    expect(readlinkSync(path.join(plugins(), 'echo', 'current'))).toBe('1.0.0')
+    expect(
+      JSON.parse(readFileSync(path.join(plugins(), 'lock.json'), 'utf8')),
+    ).toMatchObject({ plugins: { echo: { version: '1.0.0' } } })
+    expect(await rows()).toMatchObject([
+      {
+        version: '1.0.0',
+        enabled: true,
+        status: 'installing',
+        createdBy: FIXTURE_ACTOR.id,
+      },
+    ])
+    await heardSoon('echo')
+  })
+
+  const tampered = (p: FixturePlugin): FixturePlugin => {
+    const bytes = Uint8Array.from(p.tarball)
+    bytes[40] = (bytes.at(40) ?? 0) ^ 0xff
+    return { ...p, tarball: bytes }
+  }
+  const untrusted = () =>
+    fixturePlugin({ id: 'echo', version: '1.0.0', signer: fixtureSigner() })
+
+  it.each([
+    ['sha-mismatch', () => tampered(echo('1.0.0'))],
+    ['unknown-key', untrusted],
+  ])(
+    'refuses a %s upload with the reason the registry path gives, writing nothing',
+    async (code, make) => {
+      const plugin = make()
+      serve(plugin)
+      const viaRegistry = await failureOf(
+        installFromRegistryProgram(FIXTURE_ACTOR.id, 'echo', source),
+      )
+      const viaUpload = await failureOf(
+        installFromUploadProgram(FIXTURE_ACTOR.id, uploadOf(plugin), source),
+      )
+      expect(viaRegistry.message).toContain(`Refused (${code})`)
+      expect(viaUpload.message).toBe(viaRegistry.message)
+      expect(existsSync(plugins())).toBe(false)
+      expect(await rows()).toEqual([])
+      expect(heard).toEqual([])
+    },
+  )
+
+  it('takes a lone .tgz as unsigned, refused unless .allow-unsigned exists', async () => {
+    const lone = { ...uploadOf(echo('1.0.0')), entryText: null }
+    const refused = await failureOf(
+      installFromUploadProgram(FIXTURE_ACTOR.id, lone, source),
+    )
+    expect(refused.message).toContain('Refused (unsigned)')
+    expect(await rows()).toEqual([])
+
+    mkdirSync(plugins(), { recursive: true })
+    writeFileSync(path.join(plugins(), '.allow-unsigned'), '')
+    const outcome = await run(
+      installFromUploadProgram(FIXTURE_ACTOR.id, lone, source),
+    )
+    expect(outcome).toMatchObject({
+      version: '1.0.0',
+      warning: expect.stringContaining('unsigned'),
+    })
+  })
+
+  it('refuses an entry that is not a registry entry, and a tarball it cannot name', async () => {
+    const plugin = echo('1.0.0')
+    const bad = await failureOf(
+      installFromUploadProgram(
+        FIXTURE_ACTOR.id,
+        { ...uploadOf(plugin), entryText: '{"id":"echo"}' },
+        source,
+      ),
+    )
+    expect(bad.message).toContain('not the registry entry')
+    const unnamed = await failureOf(
+      installFromUploadProgram(
+        FIXTURE_ACTOR.id,
+        { tarballName: 'plugin.tgz', tarball: plugin.tarball, entryText: null },
+        source,
+      ),
+    )
+    expect(unnamed.message).toContain('<id>-<version>.tgz')
+    expect(await rows()).toEqual([])
+  })
+})
+
 describe('update', () => {
   it('shows the newer registry version, then moves to it keeping the old one back', async () => {
     serve(echo('1.0.0'))
@@ -320,6 +425,13 @@ describe('the handlers', () => {
     await expect(listAvailableHandler()).rejects.toThrow('Admins only')
     await expect(
       installIntegrationHandler({ pluginId: 'echo' }),
+    ).rejects.toThrow('Admins only')
+    const plugin = echo('1.0.0')
+    await expect(
+      uploadIntegrationHandler({
+        tarball: new File([Uint8Array.from(plugin.tarball)], 'echo-1.0.0.tgz'),
+        entry: null,
+      }),
     ).rejects.toThrow('Admins only')
     await expect(upgradeIntegrationHandler({ id })).rejects.toThrow(
       'Admins only',

@@ -8,7 +8,8 @@ import { logExternalOrigin } from '#/lib/server/external-origin'
  * `pnpm db:migrate:run`.
  *
  * The composition — migrate, then system attributes, then the starter
- * taxonomy, then the value-index reconcile, as one command — is
+ * taxonomy, then the value-index reconcile, then the optional
+ * `SPACES_PLUGINS` / `SPACES_CREDENTIAL_<ID>` install, as one command — is
  * `@spaces/core`'s `boot()` since SPA-177. What is left here is the process:
  * the two lines an operator reads at the top of `docker compose logs app`,
  * the argv a test hands over, and the exit code.

@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Install, upgrade and uninstall go through one installer routine, and each
- * entry point has one caller: the program behind its server fn. Checked over
+ * Install, upgrade and uninstall go through one installer routine. Install
+ * has exactly three callers — the registry install and the upload, each
+ * behind its server fn, and first boot's SPACES_PLUGINS; upgrade and
+ * uninstall one each, the program behind its server fn. Checked over
  * the source text of every shipping file in apps/ and packages/ (tests
  * excluded), so a second caller fails here naming its file.
  */
@@ -15,6 +17,7 @@ const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url))
 const INSTALLER = 'packages/core/src/writes/plugins/install.ts'
 const WEB = 'apps/web/src/lib/integrations/install.ts'
 const FNS = 'apps/web/src/lib/server/integrations.ts'
+const FIRST_BOOT = 'packages/core/src/writes/plugins/first-boot.ts'
 
 const sourceFiles = (dir: string): Array<string> => {
   const out: Array<string> = []
@@ -49,25 +52,45 @@ const callsOf = (name: string): Array<string> =>
     ),
   )
 
+/** The text of one exported program, up to the next export. */
+const programBody = (path: string, program: string): string => {
+  const text = files.find((f) => f.path === path)?.text ?? ''
+  const start = text.indexOf(`export const ${program} =`)
+  if (start === -1) return ''
+  const body = text.slice(start)
+  const next = body.indexOf('\nexport ', 1)
+  return next === -1 ? body : body.slice(0, next)
+}
+
 describe('the installer has one caller per entry point', () => {
   it('runInstaller is called by install, upgrade and uninstall and nothing else', () => {
     expect(callsOf('runInstaller')).toEqual([INSTALLER, INSTALLER, INSTALLER])
   })
 
+  /** Two doors in web — the registry and an upload — and one at boot, all one function. */
+  it('installPlugin is called by the registry install, the upload and first boot, and nothing else', () => {
+    expect(callsOf('installPlugin').sort()).toEqual([WEB, WEB, FIRST_BOOT])
+    for (const program of [
+      'installFromRegistryProgram',
+      'installFromUploadProgram',
+    ])
+      expect(programBody(WEB, program), program).toContain('installPlugin(')
+    expect(
+      files.find((f) => f.path === FIRST_BOOT)?.text.match(/installPlugin\(/g),
+    ).toHaveLength(1)
+  })
+
   it.each([
-    ['installPlugin', 'installFromRegistryProgram'],
     ['upgradePlugin', 'upgradeFromRegistryProgram'],
     ['uninstallPlugin', 'uninstallIntegrationProgram'],
   ])('%s is called once, by %s', (entry, program) => {
     expect(callsOf(entry)).toEqual([WEB])
-    const web = files.find((f) => f.path === WEB)?.text ?? ''
-    const body = web.slice(web.indexOf(`export const ${program} =`))
-    const next = body.indexOf('\nexport ', 1)
-    expect(body.slice(0, next)).toContain(`${entry}(`)
+    expect(programBody(WEB, program)).toContain(`${entry}(`)
   })
 
   it.each([
     ['installFromRegistryProgram', 'installIntegrationHandler'],
+    ['installFromUploadProgram', 'uploadIntegrationHandler'],
     ['upgradeFromRegistryProgram', 'upgradeIntegrationHandler'],
     ['uninstallIntegrationProgram', 'uninstallIntegrationHandler'],
   ])(

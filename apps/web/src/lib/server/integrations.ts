@@ -3,10 +3,10 @@ import { z } from 'zod'
 
 /**
  * Settings → Integrations: the installed plugins, one plugin's settings and
- * key, on/off and breaker reset, and the registry's Install, Update and
- * Uninstall. Admin only — every handler opens with
- * `requireAdmin()`; the bodies are imported inside the handlers so their
- * database code never reaches the client bundle.
+ * key, on/off and breaker reset, the registry's Install, Update and
+ * Uninstall, and Upload for a box with no outbound HTTPS. Admin only — every
+ * handler opens with `requireAdmin()`; the bodies are imported inside the
+ * handlers so their database code never reaches the client bundle.
  */
 
 export type {
@@ -112,6 +112,32 @@ export const installIntegration = createServerFn({ method: 'POST' })
     const { installIntegrationHandler } =
       await import('../integrations/install')
     return installIntegrationHandler(data)
+  })
+
+/**
+ * The upload's two files from the form: one `.tgz`, and at most one `.json`
+ * (the entry its release published). `FormData` is the transport TanStack
+ * Start reads natively for a POST.
+ */
+function readUploadForm(data: FormData): { tarball: File; entry: File | null } {
+  const files = data.getAll('file').filter((f) => f instanceof File)
+  const tarballs = files.filter((f) => f.name.endsWith('.tgz'))
+  const entries = files.filter((f) => f.name.endsWith('.json'))
+  if (tarballs.length !== 1 || entries.length > 1)
+    throw new Error('Choose one .tgz, and the .json entry published beside it')
+  if (tarballs.length + entries.length !== files.length)
+    throw new Error(
+      'A plugin upload is a .tgz and its .json entry, nothing else',
+    )
+  return { tarball: tarballs[0], entry: entries.at(0) ?? null }
+}
+
+/** Verifies and installs an uploaded tarball through the registry install's installer. */
+export const uploadIntegration = createServerFn({ method: 'POST' })
+  .validator((data: FormData) => readUploadForm(data))
+  .handler(async ({ data }) => {
+    const { uploadIntegrationHandler } = await import('../integrations/install')
+    return uploadIntegrationHandler(data)
   })
 
 /** Moves an installed plugin to the registry's newest version, keeping one back. */

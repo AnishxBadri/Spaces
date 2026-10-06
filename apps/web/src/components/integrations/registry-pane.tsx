@@ -1,7 +1,53 @@
+import { useRef } from 'react'
 import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import type { AvailablePlugin, RegistryView } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
+
+/**
+ * Upload a plugin: the page head's second door to the same installer, for a
+ * box with no outbound HTTPS. The operator picks the release's `.tgz` and
+ * the `.json` entry published beside it, together; a refusal is the same
+ * named reason a registry install gives.
+ */
+export function UploadPlugin({
+  pending,
+  disabled,
+  onUpload,
+}: {
+  /** An upload is in flight. */
+  pending: boolean
+  /** Any install is in flight; the upload waits on it. */
+  disabled: boolean
+  onUpload: (files: ReadonlyArray<File>) => void
+}) {
+  const input = useRef<HTMLInputElement>(null)
+  return (
+    <>
+      <Button
+        variant="outline"
+        disabled={disabled}
+        title="Choose the .tgz and the .json entry its release published"
+        onClick={() => input.current?.click()}
+      >
+        {pending ? 'Uploading' : 'Upload a plugin'}
+      </Button>
+      <input
+        ref={input}
+        type="file"
+        multiple
+        accept=".tgz,.json"
+        aria-label="Plugin tarball and its entry"
+        className="sr-only"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? [])
+          e.target.value = ''
+          if (files.length > 0) onUpload(files)
+        }}
+      />
+    </>
+  )
+}
 
 /**
  * In the registry: every plugin the image's signed registry offers that this

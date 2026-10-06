@@ -589,6 +589,23 @@ since removed"), deletes the files, the lock entry and the key, and drops
 `plugin_<id>` only when asked; a reinstall reuses the row. CONTEXT.md
 "Plugin architecture" has the decision.
 
+**As built (sdk-22).** Two more doors, no second code path: `installPlugin`
+has exactly three callers — the registry install, the upload and first
+boot (asserted by the same source scan). **Upload** (Settings →
+Integrations → Upload a plugin) takes the release's `<id>-<version>.tgz`
+and the `<id>-<version>.json` entry beside it, as a multipart server fn; the
+entry gives sha256, `sig` and `keyId`, so an upload verifies exactly as a
+registry install does and a refusal carries the same `RefusalCode`. A lone
+`.tgz` verifies as unsigned. The bytes go to the installer, never to blob
+storage. **`SPACES_PLUGINS`** and **`SPACES_CREDENTIAL_<ID>`** are
+`firstBootPlugins` (`@spaces/core/writes/plugins/first-boot`), the last step
+of `boot()`: each named plugin without a live row gets the snapshot's newest
+entry whose `sdk` range and `minCore` this box satisfies; the key is seeded
+only when the vault has none for that provider, bound to the row, as the
+page writes it. Tarballs are fetched by `fetchPluginTarball`
+(`@spaces/core/plugins/source`, `https:` or `file:`), the one fetcher the
+registry install and first boot share. CONTEXT.md Hostability contract 6 has the rules.
+
 ## 10. Hosting lifecycle
 
 ```

@@ -82,15 +82,24 @@ it was the first time.
 
 Everything else is optional and has a default:
 
-| variable             | default                     | what it does                                                                                                                                                 |
-| -------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `MASTER_KEY`         | generated on first boot     | the key every stored credential is encrypted with; see _What lives in ./data_                                                                                |
-| `STORAGE_DRIVER`     | `local`                     | `s3` puts blobs in a bucket instead of `./data` (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`) |
-| `BETTER_AUTH_SECRET` | derived from the master key | set it only if you want the session-signing secret rotated separately                                                                                        |
-| `ROLE`               | `all`                       | `web` or `worker` for the split-role overlay, below                                                                                                          |
+| variable                 | default                     | what it does                                                                                                                                                       |
+| ------------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MASTER_KEY`             | generated on first boot     | the key every stored credential is encrypted with; see _What lives in ./data_                                                                                      |
+| `STORAGE_DRIVER`         | `local`                     | `s3` puts blobs in a bucket instead of `./data` (`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`)       |
+| `BETTER_AUTH_SECRET`     | derived from the master key | set it only if you want the session-signing secret rotated separately                                                                                              |
+| `ROLE`                   | `all`                       | `web` or `worker` for the split-role overlay, below                                                                                                                |
+| `SPACES_PLUGINS`         | unset                       | plugins to install on first boot (`apollo,rss`) from the image's registry snapshot; one already installed is skipped, and removing the variable uninstalls nothing |
+| `SPACES_CREDENTIAL_<ID>` | unset                       | seeds a plugin's workspace key once, when none is stored (`SPACES_CREDENTIAL_APOLLO`); a key changed in Settings wins from then on                                 |
 
 AI providers, enrichment keys and everything a user can configure are set
-in the app under Settings, never in the environment.
+in the app under Settings, never in the environment. The two `SPACES_*`
+plugin variables are conveniences for a box brought up by script: each is
+read at boot as an input, never as the store, so a plugin it installed and
+a key it seeded are rows like any other from then on. A plugin key is
+seeded only once an admin exists, so on a fresh volume it lands on the
+first boot after setup. A box with no outbound HTTPS installs
+a plugin by uploading its `.tgz` and the `.json` entry its release
+published, under Settings → Integrations → Upload a plugin.
 
 ## 3. What lives in `./data`
 

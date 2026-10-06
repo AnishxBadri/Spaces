@@ -1,13 +1,15 @@
+import { Effect } from 'effect'
 import { runMigrations } from '@spaces/db/migrate'
 import type { MigrationOutcome } from '@spaces/db/migrate'
 import { reconcileAttributeIndexes } from './attributes/reconcile'
 import { seedSystemAttributes } from './attributes/seed'
+import { firstBootPlugins } from './plugins/first-boot'
 import { seedStarterTaxonomy } from './seeds/taxonomy'
 
 /**
  * The boot composition, and only the composition (SPA-177; the interim
  * apps/web entry mono-3 created is now the process shell around this): the
- * four things every boot does, in the one order that is safe, as one
+ * five things every boot does, in the one order that is safe, as one
  * function the container entrypoint and `pnpm db:migrate:run` both reach
  * through `apps/web/src/db/boot.ts`.
  *
@@ -29,6 +31,10 @@ import { seedStarterTaxonomy } from './seeds/taxonomy'
  *    fresh database, and it is the retry for every mint an earlier boot or
  *    an interrupted `CREATE INDEX CONCURRENTLY` left undone. Never fatal: an
  *    unindexed attribute is a slow list, not a broken one.
+ * 5. `SPACES_PLUGINS` / `SPACES_CREDENTIAL_<ID>` — optional; unset, nothing
+ *    happens. Last, because it writes rows against the migrated schema. The
+ *    installer's NOTIFY may reach no worker yet; the worker reconciles every
+ *    row on its own boot. Never fatal.
  *
  * `migrationsFolder` names a journal other than the package's own; nothing
  * in the boot path passes it — `boot.test.ts` does, to boot against
@@ -43,5 +49,6 @@ export async function boot(options?: {
   await seedSystemAttributes()
   await seedStarterTaxonomy()
   await reconcileAttributeIndexes()
+  await Effect.runPromise(firstBootPlugins())
   return outcome
 }

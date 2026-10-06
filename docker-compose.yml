@@ -24,6 +24,9 @@ services:
       # MASTER_KEY:
       # SMTP_URL:
       # STORAGE_DRIVER: local
+      # First-boot plugin install and key seed; see docs/install.md.
+      # SPACES_PLUGINS: apollo,rss
+      # SPACES_CREDENTIAL_APOLLO:
     volumes:
       # Blobs + auto-generated secret.key. BACK THIS UP together with pg_dump.
       - ./data:/data

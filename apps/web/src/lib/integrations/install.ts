@@ -1,5 +1,4 @@
-import { readFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 import { Effect } from 'effect'
 import { and, eq, isNull, notLike } from 'drizzle-orm'
 import { db } from '@spaces/db'
@@ -7,11 +6,17 @@ import { integration } from '@spaces/db/schema'
 import { loadPluginTrust } from '@spaces/core/plugins/trust'
 import { compareVersions, newestPerPlugin } from '@spaces/core/plugins/registry'
 import {
+  MAX_TARBALL_BYTES,
+  fetchPluginTarball,
+} from '@spaces/core/plugins/source'
+import type { EntryToVerify } from '@spaces/core/plugins/verify'
+import {
   installPlugin,
   uninstallPlugin,
   upgradePlugin,
 } from '@spaces/core/writes/plugins/install'
 import type { InstallerError } from '@spaces/core/writes/plugins/install'
+import { registryEntrySchema } from '@spaces/sdk/pack'
 import type { RegistryEntry } from '@spaces/sdk/pack'
 import { requireAdmin } from '#/lib/server/shared'
 import { IntegrationRefused, run } from './admin'
@@ -21,10 +26,12 @@ import type { RegistrySource } from './registry'
 
 /**
  * Settings → Integrations, the registry half: what the committed
- * `registry.json` offers, and Install / Update / Uninstall. Web fetches the
- * tarball and hands the bytes to core's installer; it never runs plugin code.
- * - Each installer entry point has exactly one caller, here, behind one
- *   server fn (asserted by `installer-callers.test.ts`).
+ * `registry.json` offers, and Install / Update / Uninstall / Upload. Web
+ * fetches the tarball (or takes an upload, for a box with no outbound
+ * HTTPS) and hands the bytes to core's installer; it never runs plugin code.
+ * - `installPlugin` is called by the registry install and the upload here,
+ *   and by first boot; upgrade and uninstall have one caller each (asserted
+ *   by `installer-callers.test.ts`).
  * - `RegistrySource` exists so tests point it at a registry and tarballs on
  *   disk; the server fns pass none.
  */
@@ -50,19 +57,6 @@ export type InstallOutcome = {
   readonly version: string | null
   /** `unsigned (allowed by .allow-unsigned)`, when that is how it verified. */
   readonly warning: string | null
-}
-
-/** 64 MiB: a plugin is a bundle and a few migrations. */
-const MAX_TARBALL_BYTES = 64 * 1024 * 1024
-
-const fetchTarball = async (url: string): Promise<Uint8Array> => {
-  if (url.startsWith('file:')) return readFile(fileURLToPath(url))
-  const res = await fetch(url, { signal: AbortSignal.timeout(60_000) })
-  if (!res.ok) throw new Error(`${url} answered ${res.status}`)
-  const bytes = new Uint8Array(await res.arrayBuffer())
-  if (bytes.length > MAX_TARBALL_BYTES)
-    throw new Error(`${url} is larger than a plugin can be`)
-  return bytes
 }
 
 const refused = (message: string) => new IntegrationRefused({ message })
@@ -125,6 +119,12 @@ const sentence = (error: InstallerError): IntegrationRefused =>
       : error.message,
   )
 
+const trustOf = (source: RegistrySource) =>
+  loadPluginTrust({
+    ...(source.keysDir === undefined ? {} : { keysDir: source.keysDir }),
+    ...(source.dataDir === undefined ? {} : { dataDir: source.dataDir }),
+  })
+
 /** The newest entry for one plugin, its bytes, and the trust to check them with. */
 const fetchNewest = Effect.fn('fetchNewest')(function* (
   pluginId: string,
@@ -137,16 +137,13 @@ const fetchNewest = Effect.fn('fetchNewest')(function* (
   if (entry === undefined)
     return yield* refused(`${pluginId} is not in the registry`)
   const tarball = yield* Effect.tryPromise({
-    try: () => (source.fetchTarball ?? fetchTarball)(entry.tarball),
+    try: () => (source.fetchTarball ?? fetchPluginTarball)(entry.tarball),
     catch: (cause) =>
       refused(
         `Could not fetch ${entry.name} ${entry.version}: ${cause instanceof Error ? cause.message : String(cause)}`,
       ),
   })
-  const trust = yield* loadPluginTrust({
-    ...(source.keysDir === undefined ? {} : { keysDir: source.keysDir }),
-    ...(source.dataDir === undefined ? {} : { dataDir: source.dataDir }),
-  })
+  const trust = yield* trustOf(source)
   return { entry, tarball, trust }
 })
 
@@ -177,6 +174,78 @@ export const installFromRegistryProgram = Effect.fn(
   ).pipe(Effect.mapError(sentence))
   return { name: entry.name, version: done.version, warning: done.warning }
 })
+
+/** A plugin uploaded from the operator's disk. */
+export type PluginUpload = {
+  /** The tarball's file name, `<id>-<version>.tgz` as the packer names it. */
+  readonly tarballName: string
+  readonly tarball: Uint8Array
+  /** The `<id>-<version>.json` entry its release published; null for an unsigned build. */
+  readonly entryText: string | null
+}
+
+const PACKED_NAME =
+  /^([a-z][a-z0-9]*(?:-[a-z0-9]+)*)-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\.tgz$/
+
+/**
+ * What an upload is verified against. With the release's entry: its sha256,
+ * signature and key id, exactly as the registry would give them. Without
+ * it: an unsigned entry named by the file, which verification refuses
+ * unless `.allow-unsigned` exists.
+ */
+const uploadedEntry = Effect.fn('uploadedEntry')(function* (
+  upload: PluginUpload,
+): Effect.fn.Return<
+  { readonly entry: EntryToVerify; readonly name: string },
+  IntegrationRefused
+> {
+  if (upload.entryText === null) {
+    const named = PACKED_NAME.exec(upload.tarballName)
+    if (named === null)
+      return yield* refused(
+        'Name the tarball <id>-<version>.tgz, as the packer does, or add its .json entry',
+      )
+    const [, id, version] = named
+    const sha256 = createHash('sha256').update(upload.tarball).digest('hex')
+    return {
+      name: id,
+      entry: { id, version, sha256, sig: null, keyId: null },
+    }
+  }
+  const text = upload.entryText
+  const parsed = registryEntrySchema.safeParse(
+    yield* Effect.try({
+      try: (): unknown => JSON.parse(text),
+      catch: () => refused('The .json beside the tarball is not JSON'),
+    }),
+  )
+  if (!parsed.success)
+    return yield* refused(
+      'The .json beside the tarball is not the registry entry its release published',
+    )
+  return { name: parsed.data.name, entry: parsed.data }
+})
+
+/** Install an uploaded tarball through the same installer as a registry install. */
+export const installFromUploadProgram = Effect.fn('installFromUploadProgram')(
+  function* (
+    actorId: string | null,
+    upload: PluginUpload,
+    source: RegistrySource = {},
+  ): Effect.fn.Return<InstallOutcome, IntegrationRefused> {
+    if (upload.tarball.length > MAX_TARBALL_BYTES)
+      return yield* refused(
+        `${upload.tarballName} is larger than a plugin can be`,
+      )
+    const { entry, name } = yield* uploadedEntry(upload)
+    const trust = yield* trustOf(source)
+    const done = yield* installPlugin(
+      { tarball: upload.tarball, entry, trust, actorId },
+      installerOptions(source),
+    ).pipe(Effect.mapError(sentence))
+    return { name, version: done.version, warning: done.warning }
+  },
+)
 
 /** Move an installed plugin to the registry's newest version. */
 export const upgradeFromRegistryProgram = Effect.fn(
@@ -226,6 +295,24 @@ export async function installIntegrationHandler(input: {
 }): Promise<InstallOutcome> {
   const actor = await requireAdmin()
   return run(installFromRegistryProgram(actor.id, input.pluginId))
+}
+
+export async function uploadIntegrationHandler(input: {
+  readonly tarball: File
+  readonly entry: File | null
+}): Promise<InstallOutcome> {
+  const actor = await requireAdmin()
+  // Refused before the bytes are copied, naming the file.
+  if (input.tarball.size > MAX_TARBALL_BYTES)
+    throw new Error(`${input.tarball.name} is larger than a plugin can be`)
+  const entry = input.entry
+  return run(
+    installFromUploadProgram(actor.id, {
+      tarballName: input.tarball.name,
+      tarball: new Uint8Array(await input.tarball.arrayBuffer()),
+      entryText: entry === null ? null : await entry.text(),
+    }),
+  )
 }
 
 export async function upgradeIntegrationHandler(input: {
