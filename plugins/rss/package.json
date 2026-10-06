@@ -1,0 +1,31 @@
+{
+  "//": "RSS 2.0 and Atom, the first poller and the first PluginDb tenant: one `schedule` job fetches the feed its row's settings name, keeps what it has seen in plugin_rss.feed_item, and emits each new item as a signal on the record the settings name. One integration row is one feed. Depends on @spaces/sdk only; effect and zod are peers the host provides, and migrations/ ships beside the bundle.",
+  "name": "@spaces/plugin-rss",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "pack:plugin": "spaces-plugin-pack .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
+    "zod": "^4.3.6"
+  }
+}

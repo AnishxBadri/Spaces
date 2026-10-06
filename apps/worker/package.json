@@ -44,6 +44,7 @@
     "@spaces/plugin-needs-key": "workspace:*",
     "@spaces/plugin-old-sdk": "workspace:*",
     "@spaces/plugin-overreach": "workspace:*",
+    "@spaces/plugin-rss": "workspace:*",
     "@spaces/plugin-syncer": "workspace:*",
     "@spaces/plugin-tabled": "workspace:*",
     "@spaces/plugin-tampered": "workspace:*",

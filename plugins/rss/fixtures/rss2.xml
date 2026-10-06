@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Northwind Robotics — Newsroom</title>
+    <link>https://northwind-robotics.example/news</link>
+    <atom:link href="https://northwind-robotics.example/news/feed.xml" rel="self" type="application/rss+xml" />
+    <description>Announcements from Northwind Robotics</description>
+    <language>en</language>
+    <item>
+      <title>Northwind closes its Series B</title>
+      <link>https://northwind-robotics.example/news/series-b</link>
+      <guid isPermaLink="false">northwind-news-0004</guid>
+      <pubDate>Mon, 05 Oct 2026 09:00:00 GMT</pubDate>
+      <description>&lt;p&gt;Northwind raised &lt;b&gt;$40M&lt;/b&gt; led by Example Ventures &amp;amp; friends.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title><![CDATA[Hiring: 3 field engineers for the R&D lab]]></title>
+      <link>https://northwind-robotics.example/news/hiring-field-engineers</link>
+      <guid isPermaLink="false">northwind-news-0003</guid>
+      <pubDate>Thu, 24 Sep 2026 14:30:00 +0000</pubDate>
+      <description><![CDATA[<p>We are growing the <em>field</em> team.</p>]]></description>
+    </item>
+    <item>
+      <title>Pilot with a regional grocer &#8212; phase two</title>
+      <link>https://northwind-robotics.example/news/grocer-pilot</link>
+      <guid>https://northwind-robotics.example/news/grocer-pilot</guid>
+      <dc:date>2026-09-10T08:00:00Z</dc:date>
+      <description>Phase two covers twelve stores.</description>
+    </item>
+    <item>
+      <title>Northwind at RoboConf 2026</title>
+      <link>https://northwind-robotics.example/news/roboconf</link>
+      <guid isPermaLink="false">northwind-news-0001</guid>
+      <pubDate>Tue, 01 Sep 2026 10:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
