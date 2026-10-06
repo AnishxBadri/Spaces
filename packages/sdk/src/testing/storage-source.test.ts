@@ -1,17 +1,36 @@
 import { Effect, Exit } from 'effect'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+  vi,
+} from 'vitest'
+import { AuthExpired } from '../storage-source.ts'
 import type { StorageSource } from '../storage-source.ts'
 import {
   DOCX_MIME,
+  FAKE_DRIVE_CHAOS_FIXTURE,
   FAKE_DRIVE_CREDENTIALS,
   FAKE_DRIVE_FIXTURE,
+  FAKE_DRIVE_SCAN,
   FAKE_DRIVE_SEED,
   GOOGLE_DOC_MIME,
+  LARGE_FILE_MEMORY_BOUND,
+  fakeDriveLargeChunks,
   makeFakeDrive,
+  makeSha256,
   sha256Hex,
+  storageSourceChaos,
   storageSourceConformance,
 } from './index.ts'
-import type { FakeDriveSeedItem, StorageSourceSubject } from './index.ts'
+import type {
+  FakeDriveSeedItem,
+  StorageSourceChaosSubject,
+  StorageSourceSubject,
+} from './index.ts'
 
 beforeAll(() => {
   vi.stubGlobal('fetch', () => {
@@ -37,6 +56,32 @@ describe('storage-source conformance — the fake Drive', () => {
   it.each(storageSourceConformance(fakeDrive))('$name', ({ run }) =>
     Effect.runPromise(run),
   )
+})
+
+const chaosDrive: StorageSourceChaosSubject = {
+  make: () => {
+    const drive = makeFakeDrive({ largeFiles: [FAKE_DRIVE_SCAN] })
+    return { source: drive.source, chaos: drive.chaos }
+  },
+  fixture: FAKE_DRIVE_CHAOS_FIXTURE,
+  secrets,
+  memory: () => process.memoryUsage.rss(),
+}
+
+/** The large-file case streams 200 MB through a pure-JS SHA-256; the rest are quick. */
+const CHAOS_TIMEOUT_MS = 120_000
+
+describe('storage-source chaos — the fake Drive', () => {
+  it.each(storageSourceChaos(chaosDrive))(
+    '$name',
+    ({ run }) => Effect.runPromise(run),
+    CHAOS_TIMEOUT_MS,
+  )
+
+  it('cannot be handed a subject without a chaos handle', () => {
+    expectTypeOf<StorageSourceSubject>().not.toExtend<StorageSourceChaosSubject>()
+    expectTypeOf<StorageSourceChaosSubject>().not.toExtend<StorageSourceSubject>()
+  })
 })
 
 const failureOf = <TValue, TError>(exit: Exit.Exit<TValue, TError>) => {
@@ -124,7 +169,231 @@ describe('the suite fails loudly rather than skipping', () => {
   })
 })
 
+/** The one chaos case whose name starts `prefix`, run: its failure message, or null. */
+const chaosOutcome = async (
+  subject: StorageSourceChaosSubject,
+  prefix: string,
+) => {
+  const found = storageSourceChaos(subject).filter((c) =>
+    c.name.startsWith(prefix),
+  )
+  expect(found).toHaveLength(1)
+  const exit = await Effect.runPromiseExit(found[0].run)
+  return Exit.isSuccess(exit) ? null : failureOf(exit)
+}
+
+/** The fake Drive with the scan, one source method or toggle replaced. */
+const chaosWith = (
+  change: (
+    drive: ReturnType<typeof makeFakeDrive>,
+  ) => Partial<ReturnType<StorageSourceChaosSubject['make']>>,
+): StorageSourceChaosSubject => ({
+  ...chaosDrive,
+  make: () => {
+    const drive = makeFakeDrive({ largeFiles: [FAKE_DRIVE_SCAN] })
+    return { source: drive.source, chaos: drive.chaos, ...change(drive) }
+  },
+})
+
+describe('the chaos cases fail when the bad day does not show', () => {
+  it('fails the RateLimited case, naming it, when the rate-limit toggle is off', async () => {
+    const failure = await chaosOutcome(
+      chaosWith((drive) => ({
+        chaos: { ...drive.chaos, rateLimit: () => {} },
+      })),
+      'a 429 with Retry-After: 1',
+    )
+    expect(failure).toMatchObject({ _tag: 'ConformanceFailure' })
+    expect(String(failure)).toContain(
+      'getFolder(dataroom) after a seeded 429 with Retry-After: 1 succeeded, expected RateLimited',
+    )
+  })
+
+  it('fails the RateLimited case when the hint is lost', async () => {
+    const failure = await chaosOutcome(
+      chaosWith((drive) => ({
+        chaos: {
+          ...drive.chaos,
+          rateLimit: (calls) => drive.rateLimit(calls, 5000),
+        },
+      })),
+      'a 429 with Retry-After: 1',
+    )
+    expect(String(failure)).toContain(
+      'carried retryAfterMs 5000, not the 1000 that Retry-After: 1 gave',
+    )
+  })
+
+  it('fails the vanished-file case when getFile throws instead of failing NotFound', async () => {
+    const failure = await chaosOutcome(
+      chaosWith((drive) => ({
+        source: {
+          ...drive.source,
+          getFile: (id) =>
+            Effect.catchTag(drive.source.getFile(id), 'NotFound', () =>
+              Effect.promise(() => Promise.reject(new Error('404 from Drive'))),
+            ),
+        },
+      })),
+      'a file deleted between list and get',
+    )
+    expect(String(failure)).toContain(
+      'getFile(deck) deleted after it was listed died (Error: 404 from Drive) — a throw, not a typed failure, expected NotFound',
+    )
+  })
+
+  it('fails the batch case when one missing file sinks the rest', async () => {
+    const failure = await chaosOutcome(
+      chaosWith((drive) => {
+        let sunk = false
+        return {
+          source: {
+            ...drive.source,
+            getFile: (id) =>
+              Effect.suspend(() =>
+                sunk
+                  ? Effect.fail(new AuthExpired({ reason: 'batch aborted' }))
+                  : Effect.tapError(drive.source.getFile(id), () =>
+                      Effect.sync(() => {
+                        sunk = true
+                      }),
+                    ),
+              ),
+          },
+        }
+      }),
+      'half a batch failing',
+    )
+    expect(String(failure)).toContain(
+      'getFile(captable) failed AuthExpired; getFile(memo) failed AuthExpired',
+    )
+  })
+
+  it('fails the CursorExpired case when an evicted cursor still reads', async () => {
+    const failure = await chaosOutcome(
+      chaosWith((drive) => ({
+        chaos: { ...drive.chaos, evictCursors: () => {} },
+      })),
+      'a cursor the provider has forgotten',
+    )
+    expect(String(failure)).toContain('succeeded, expected CursorExpired')
+  })
+
+  it('fails the replay case when the same cursor gives a different page', async () => {
+    const failure = await chaosOutcome(
+      chaosWith((drive) => {
+        // Consumed on read: a cursor's changes are handed out once.
+        const read = new Set<string>()
+        return {
+          source: {
+            ...drive.source,
+            changes: (cursor) =>
+              Effect.map(drive.source.changes(cursor), (page) => {
+                if (cursor === null || !read.has(cursor)) {
+                  if (cursor !== null) read.add(cursor)
+                  return page
+                }
+                return { ...page, changes: [] }
+              }),
+          },
+        }
+      }),
+      'a page of changes replayed',
+    )
+    expect(String(failure)).toMatch(
+      /^ConformanceFailure: changes\(\S+\) gave .*"removed".*, then \{"changes":\[\],.*\} replayed$/,
+    )
+  })
+
+  it('fails the revoked case when a read still answers', async () => {
+    const failure = await chaosOutcome(
+      chaosWith((drive) => ({
+        source: {
+          ...drive.source,
+          getFolder: (id) =>
+            Effect.flatMap(
+              Effect.sync(() => drive.restore()),
+              () => drive.source.getFolder(id),
+            ),
+        },
+      })),
+      'a token revoked mid-run',
+    )
+    expect(String(failure)).toContain(
+      'getFolder with the token revoked succeeded, expected AuthExpired',
+    )
+  })
+
+  it(
+    'fails the large-file case, naming the bound, when the provider buffers the file whole',
+    async () => {
+      const failure = await chaosOutcome(
+        chaosWith((drive) => ({
+          source: {
+            ...drive.source,
+            getFile: (id) =>
+              Effect.flatMap(drive.source.getFile(id), (file) =>
+                Effect.promise(async () => {
+                  const held: Array<Uint8Array> = []
+                  const reader = file.stream.getReader()
+                  for (;;) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+                    held.push(value)
+                  }
+                  return {
+                    ...file,
+                    stream: new ReadableStream<Uint8Array>({
+                      pull(controller) {
+                        const next = held.shift()
+                        if (next === undefined) controller.close()
+                        else controller.enqueue(next)
+                      },
+                    }),
+                  }
+                }),
+              ),
+          },
+        })),
+        'getFile streams a 200 MB file',
+      )
+      expect(String(failure)).toContain(
+        `over the ${LARGE_FILE_MEMORY_BOUND / 1024 / 1024} MB bound — the file was buffered`,
+      )
+    },
+    CHAOS_TIMEOUT_MS,
+  )
+})
+
+describe('makeSha256', () => {
+  it('agrees with WebCrypto at every padding edge, fed in uneven pieces', async () => {
+    for (const length of [0, 1, 55, 56, 63, 64, 65, 119, 120, 1000]) {
+      const bytes = Uint8Array.from({ length }, (_, i) => (i * 7 + 3) % 256)
+      const hash = makeSha256()
+      for (let at = 0; at < length; at += 13)
+        hash.update(bytes.subarray(at, at + 13))
+      expect(hash.hex()).toBe(await Effect.runPromise(sha256Hex(bytes)))
+    }
+  })
+})
+
 describe('the fake Drive', () => {
+  it('lists a large file at its size and makes its chunks only as they are read', async () => {
+    const drive = makeFakeDrive({ largeFiles: [FAKE_DRIVE_SCAN] })
+    const page = await Effect.runPromise(drive.source.listFolder('legal'))
+    expect(page.entries.find((e) => e.id === 'scan')).toMatchObject({
+      kind: 'file',
+      size: FAKE_DRIVE_SCAN.size,
+    })
+    const file = await Effect.runPromise(drive.source.getFile('scan'))
+    const reader = file.stream.getReader()
+    const first = await reader.read()
+    expect(first.value?.byteLength).toBe(FAKE_DRIVE_SCAN.chunkSize)
+    await reader.cancel()
+    const [chunk] = fakeDriveLargeChunks(FAKE_DRIVE_SCAN)
+    expect(first.value).toEqual(chunk)
+  })
+
   const read = (stream: ReadableStream<Uint8Array>) =>
     new Response(stream).arrayBuffer().then((b) => new Uint8Array(b))
 

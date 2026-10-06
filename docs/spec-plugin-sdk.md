@@ -876,8 +876,8 @@ Layered; most value never touches a provider.
   spending a retry or charging the breaker, a key revoked mid-run fails the
   next job permanently and at once without the key in the error, and half a
   failing batch leaves the succeeding half written and the rest retrying.
-  "Webhook delivered twice" lands with the webhook ingress; the rest of the
-  list waits for the storage sources.
+  "Webhook delivered twice" lands with the webhook ingress; the storage
+  sources' half of the list is below.
 - **No network.** CI's `offline` job runs the worker's and every plugin's
   suite in a group whose outbound traffic is rejected (loopback open for
   Postgres), after a self-check that `https://example.com` does not answer.
@@ -911,8 +911,45 @@ Layered; most value never touches a provider.
   and no Postgres (`packages/sdk/src/testing/storage-source.test.ts`).
 - **Not yet:** `SPACES_FAKE_PROVIDERS=1` does not point anything at the fake
   Drive — the worker's fake registry stands a fake in per plugin, and that
-  wiring lands with the Google Drive plugin. The chaos cases themselves
-  (beyond the toggles' own tests) are the storage area's next slice.
+  wiring lands with the Google Drive plugin.
+
+**As built (layer 7, for storage sources — the chaos list).**
+
+- **A second suite beside the first**: `storageSourceChaos(subject)` returns
+  cases of the same shape, so a provider's test runs both. Its subject's
+  `make` hands back `{ source, chaos }`, where `chaos` is the provider's
+  bad-day handle (`rateLimit(calls, retryAfterMs)`, `evictCursors()`,
+  `vanish(id)`, `revoke()`/`restore()`) — the fake Drive's `chaos` is one,
+  and a plugin's test implements it over its HTTP fake. A happy-path
+  subject does not type-check as a chaos subject. The fixture
+  (`StorageSourceChaosFixture`, the fake's is `FAKE_DRIVE_CHAOS_FIXTURE`)
+  adds a file to vanish and a large file with its SHA-256; the subject adds
+  `secrets` and a `memory()` probe (`process.memoryUsage.rss` under node).
+- **Every bad day is a typed failure.** A throw or a rejected promise fails
+  a case as loudly as a wrong tag (the case says "died … not a typed
+  failure"). The cases: a 429 with `Retry-After: 1` is `RateLimited` with
+  `retryAfterMs` 1000, and a retry after sleeping that long succeeds; a file
+  deleted between list and get is `NotFound` naming it; half a batch — every
+  file in the data room read with that one vanished — reads the rest and
+  fails that one alone; an evicted change cursor is `CursorExpired` naming
+  it, and a fresh one reads; `changes(c)` replayed gives a deep-equal page
+  (the poll's idempotency); a token revoked mid-run fails all six methods
+  `AuthExpired` with no secret in the error, and `restore` brings them back.
+- **The 200 MB file is streamed, never held.** `makeFakeDrive({ largeFiles })`
+  takes files whose bytes are generated a 16 KiB chunk at a time on read
+  (`fakeDriveLargeChunks`; `FAKE_DRIVE_SCAN` is 200 MB). The case hashes
+  each chunk as it arrives with an incremental pure-JS SHA-256
+  (`makeSha256` — WebCrypto digests only a whole buffer), compares it with
+  the fixture's hash, and samples `memory()` per chunk: the peak may not
+  rise more than `LARGE_FILE_MEMORY_BOUND` (96 MB; read chunks are garbage
+  until V8 collects them late, near 50 MB cold) over the start, and the
+  file must be at least twice that so buffering always shows.
+- **Each assertion is shown to bite**: the sdk's own test runs every chaos
+  case against a fake broken for it — the rate-limit toggle off, the hint
+  lost, a rejected promise for a vanished file, a batch that aborts on the
+  first miss, eviction ignored, a cursor consumed on read, a revoke undone,
+  a provider that buffers the scan — and asserts the failure message.
+  "Webhook delivered twice" still lands with the webhook ingress.
 
 ## 14. Build order
 

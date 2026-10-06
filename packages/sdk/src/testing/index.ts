@@ -670,3 +670,21 @@ export type {
   StorageSourceSubject,
   ConformanceCase,
 } from './storage-source-conformance.ts'
+
+// The chaos list — the read half's bad days, as cases beside the happy path
+export {
+  FAKE_DRIVE_SCAN,
+  FAKE_DRIVE_CHAOS_FIXTURE,
+  fakeDriveLargeChunks,
+} from './fake-drive.ts'
+export type { FakeDriveLargeFile } from './fake-drive.ts'
+export {
+  storageSourceChaos,
+  LARGE_FILE_MEMORY_BOUND,
+  makeSha256,
+} from './storage-source-conformance.ts'
+export type {
+  StorageSourceChaos,
+  StorageSourceChaosFixture,
+  StorageSourceChaosSubject,
+} from './storage-source-conformance.ts'

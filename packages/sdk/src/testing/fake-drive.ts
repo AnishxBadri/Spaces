@@ -18,7 +18,11 @@ import type {
   StorageFolder,
   StorageSource,
 } from '../storage-source.ts'
-import type { StorageSourceFixture } from './storage-source-conformance.ts'
+import type {
+  StorageSourceChaos,
+  StorageSourceChaosFixture,
+  StorageSourceFixture,
+} from './storage-source-conformance.ts'
 
 /**
  * An in-process Google Drive behind the `StorageSource` read half: a seeded,
@@ -29,7 +33,10 @@ import type { StorageSourceFixture } from './storage-source-conformance.ts'
  * - Each seeded file carries an `md5Checksum` the way Drive's API does, and
  *   the fake never surfaces it: core hashes bytes itself.
  * - The toggles (`rateLimit`, `evictCursors`, `vanishAfterList`, `revoke`)
- *   are the chaos cases' seams; mutators append to the change feed.
+ *   are the chaos cases' seams, gathered as `chaos`; mutators append to the
+ *   change feed.
+ * - A large file (`largeFiles`) holds no bytes: its stream generates fixed
+ *   chunks on demand, so a 200 MB read costs one chunk of memory here.
  */
 
 export const GOOGLE_DOC_MIME = 'application/vnd.google-apps.document'
@@ -154,6 +161,62 @@ export const FAKE_DRIVE_FIXTURE: StorageSourceFixture = {
   missingId: 'never-seeded',
 }
 
+/**
+ * A file whose bytes are never held: `fakeDriveLargeChunks` makes them one
+ * chunk at a time when it is read. Not a seed item, so the seed's shape (and
+ * every reader of it) is unchanged by a 200 MB file.
+ */
+export type FakeDriveLargeFile = {
+  readonly id: string
+  readonly name: string
+  readonly parentId: string
+  readonly mime: string
+  readonly size: number
+  /** Bytes per streamed chunk; the last is shorter. */
+  readonly chunkSize: number
+}
+
+/**
+ * The bytes of a large file, generated: chunk `i` is filled with `i % 251`
+ * and starts with `i` as a big-endian u32, so a dropped, repeated or
+ * reordered chunk changes the SHA-256. Each chunk is a fresh allocation.
+ */
+export function* fakeDriveLargeChunks(
+  file: Pick<FakeDriveLargeFile, 'size' | 'chunkSize'>,
+): Generator<Uint8Array, void> {
+  for (let at = 0, i = 0; at < file.size; at += file.chunkSize, i += 1) {
+    const chunk = new Uint8Array(Math.min(file.chunkSize, file.size - at))
+    chunk.fill(i % 251)
+    if (chunk.byteLength >= 4) new DataView(chunk.buffer).setUint32(0, i)
+    yield chunk
+  }
+}
+
+/** A 200 MB diligence scan in `legal`, streamed in 16 KiB chunks, the size of a network read. */
+export const FAKE_DRIVE_SCAN: FakeDriveLargeFile = {
+  id: 'scan',
+  name: 'Diligence scan.pdf',
+  parentId: 'legal',
+  mime: 'application/pdf',
+  size: 200 * 1024 * 1024,
+  chunkSize: 16 * 1024,
+}
+
+/**
+ * What the chaos suite expects of `FAKE_DRIVE_SEED` plus `FAKE_DRIVE_SCAN`.
+ * The scan's SHA-256 was computed apart from the fake (node's `crypto`), so
+ * the suite's streaming hash and the chunk generator check each other.
+ */
+export const FAKE_DRIVE_CHAOS_FIXTURE: StorageSourceChaosFixture = {
+  ...FAKE_DRIVE_FIXTURE,
+  vanishingFileId: 'deck',
+  largeFile: {
+    fileId: FAKE_DRIVE_SCAN.id,
+    size: FAKE_DRIVE_SCAN.size,
+    sha256: '072c574d74e1e9a0a838f152c6f5644c9be16b89a6fb609d36da2c2f3f03af8b',
+  },
+}
+
 /** The connection a fake Drive pretends to hold. The secret and refresh token must never leave it. */
 export type FakeDriveCredentials = {
   readonly clientId: string
@@ -173,13 +236,18 @@ export const FAKE_DRIVE_CREDENTIALS: FakeDriveCredentials = {
   appId: 'fake-app',
 }
 
+/** An item's content: bytes held, or a large file's chunks made on read. */
+type Body =
+  | { readonly _tag: 'bytes'; readonly bytes: Uint8Array }
+  | { readonly _tag: 'lazy'; readonly file: FakeDriveLargeFile }
+
 type Item = {
   readonly id: string
   name: string
   readonly kind: 'folder' | 'file' | 'native'
   parentId: string | null
   readonly mime: string
-  bytes: Uint8Array
+  body: Body
   /** Drive's own checksum. Kept so a test can prove it is never surfaced. */
   md5Checksum: string
   version: number
@@ -207,6 +275,8 @@ export type FakeDrive = {
   readonly restore: () => void
   /** Drive's `md5Checksum` for an item — what a provider hash looks like. */
   readonly providerHash: (id: string) => string | undefined
+  /** The toggles above as the chaos suite's handle (`vanish` is `vanishAfterList`). */
+  readonly chaos: StorageSourceChaos
 }
 
 const encoder = new TextEncoder()
@@ -222,6 +292,36 @@ const fakeMd5 = (bytes: Uint8Array): string => {
   return h.toString(16).padStart(8, '0').repeat(4)
 }
 
+const sizeOf = (body: Body) =>
+  body._tag === 'bytes' ? body.bytes.byteLength : body.file.size
+
+/** Two chunks for held bytes, so a reader that keeps only the first is caught. */
+const streamOf = (body: Body): ReadableStream<Uint8Array> => {
+  if (body._tag === 'lazy') {
+    const chunks = fakeDriveLargeChunks(body.file)
+    // Pull-based: a chunk is made only when the reader asks for one.
+    return new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const next = chunks.next()
+        if (next.done) controller.close()
+        else controller.enqueue(next.value)
+      },
+      cancel() {
+        chunks.return()
+      },
+    })
+  }
+  const bytes = body.bytes.slice()
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      const half = Math.ceil(bytes.byteLength / 2)
+      controller.enqueue(bytes.subarray(0, half))
+      if (half < bytes.byteLength) controller.enqueue(bytes.subarray(half))
+      controller.close()
+    },
+  })
+}
+
 const BASE_MS = Date.UTC(2026, 0, 1)
 
 const LINK_PATTERNS: ReadonlyArray<RegExp> = [
@@ -234,6 +334,8 @@ export const makeFakeDrive = (
   options: {
     readonly seed?: ReadonlyArray<FakeDriveSeedItem>
     readonly credentials?: FakeDriveCredentials
+    /** Added after the seed; their bytes are generated on read. */
+    readonly largeFiles?: ReadonlyArray<FakeDriveLargeFile>
   } = {},
 ): FakeDrive => {
   const credentials = options.credentials ?? FAKE_DRIVE_CREDENTIALS
@@ -256,10 +358,14 @@ export const makeFakeDrive = (
     item.modifiedAt = tick()
   }
 
+  const placeable = (id: string, parentId: string | null) => {
+    if (items.has(id)) throw new Error(`fake drive: ${id} exists`)
+    if (parentId !== null && items.get(parentId)?.kind !== 'folder')
+      throw new Error(`fake drive: ${id}'s parent is not a folder`)
+  }
+
   const insert = (seed: FakeDriveSeedItem) => {
-    if (items.has(seed.id)) throw new Error(`fake drive: ${seed.id} exists`)
-    if (seed.parentId !== null && items.get(seed.parentId)?.kind !== 'folder')
-      throw new Error(`fake drive: ${seed.id}'s parent is not a folder`)
+    placeable(seed.id, seed.parentId)
     const bytes =
       seed.kind === 'folder'
         ? new Uint8Array()
@@ -277,21 +383,40 @@ export const makeFakeDrive = (
           : seed.kind === 'native'
             ? GOOGLE_DOC_MIME
             : seed.mime,
-      bytes,
+      body: { _tag: 'bytes', bytes },
       md5Checksum: fakeMd5(bytes),
       version: 1,
       modifiedAt: tick(),
     })
   }
 
+  const insertLarge = (file: FakeDriveLargeFile) => {
+    placeable(file.id, file.parentId)
+    if (!(file.chunkSize > 0 && file.size >= 0))
+      throw new Error(`fake drive: ${file.id} needs a positive chunk size`)
+    items.set(file.id, {
+      id: file.id,
+      name: file.name,
+      kind: 'file',
+      parentId: file.parentId,
+      mime: file.mime,
+      body: { _tag: 'lazy', file },
+      // Never the bytes: hashing 200 MB here would defeat the point.
+      md5Checksum: fakeMd5(encoder.encode(`${file.id}:${file.size}`)),
+      version: 1,
+      modifiedAt: tick(),
+    })
+  }
+
   for (const seed of options.seed ?? FAKE_DRIVE_SEED) insert(seed)
+  for (const file of options.largeFiles ?? []) insertLarge(file)
 
   const entryOf = (item: Item): StorageEntry => ({
     id: item.id,
     name: item.name,
     kind: item.kind === 'folder' ? 'folder' : 'file',
     mime: item.mime,
-    size: item.kind === 'file' ? item.bytes.byteLength : null,
+    size: item.kind === 'file' ? sizeOf(item.body) : null,
     modifiedAt: item.modifiedAt,
     changeToken: String(item.version),
     parentId: item.parentId,
@@ -410,17 +535,8 @@ export const makeFakeDrive = (
     yield* gate
     const item = yield* lookup(fileId)
     if (item.kind === 'folder') return yield* new NotFound({ id: fileId })
-    const bytes = item.bytes.slice()
     const result: StorageFile = {
-      stream: new ReadableStream<Uint8Array>({
-        start(controller) {
-          // Two chunks, so a reader that keeps only the first is caught.
-          const half = Math.ceil(bytes.byteLength / 2)
-          controller.enqueue(bytes.subarray(0, half))
-          if (half < bytes.byteLength) controller.enqueue(bytes.subarray(half))
-          controller.close()
-        },
-      }),
+      stream: streamOf(item.body),
       mime: item.kind === 'native' ? DOCX_MIME : item.mime,
       name: item.kind === 'native' ? `${item.name}.docx` : item.name,
       changeToken: String(item.version),
@@ -474,6 +590,28 @@ export const makeFakeDrive = (
     return config
   })
 
+  const chaos: StorageSourceChaos & {
+    readonly rateLimit: (calls: number, retryAfterMs?: number) => void
+  } = {
+    rateLimit: (calls, hint = 1000) => {
+      limited = calls
+      retryAfterMs = hint
+    },
+    evictCursors: () => {
+      generation += 1
+    },
+    vanish: (id) => {
+      mustGet(id)
+      vanishing.add(id)
+    },
+    revoke: () => {
+      revoked = true
+    },
+    restore: () => {
+      revoked = false
+    },
+  }
+
   const source: StorageSource = {
     resolveLink,
     listFolder,
@@ -511,29 +649,19 @@ export const makeFakeDrive = (
       const item = mustGet(id)
       if (item.kind === 'folder')
         throw new Error(`fake drive: ${id} is a folder`)
-      item.bytes =
+      const bytes =
         item.kind === 'native' ? docxBytes(content) : encoder.encode(content)
-      item.md5Checksum = fakeMd5(item.bytes)
+      item.body = { _tag: 'bytes', bytes }
+      item.md5Checksum = fakeMd5(bytes)
       touch(item)
       log.push({ id, removed: false })
     },
-    rateLimit: (calls, hint = 1000) => {
-      limited = calls
-      retryAfterMs = hint
-    },
-    evictCursors: () => {
-      generation += 1
-    },
-    vanishAfterList: (id) => {
-      mustGet(id)
-      vanishing.add(id)
-    },
-    revoke: () => {
-      revoked = true
-    },
-    restore: () => {
-      revoked = false
-    },
+    rateLimit: chaos.rateLimit,
+    evictCursors: chaos.evictCursors,
+    vanishAfterList: chaos.vanish,
+    revoke: chaos.revoke,
+    restore: chaos.restore,
     providerHash: (id) => items.get(id)?.md5Checksum,
+    chaos,
   }
 }

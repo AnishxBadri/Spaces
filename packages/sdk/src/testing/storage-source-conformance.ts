@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { Effect, Exit, Schema } from 'effect'
 import type {
   StorageEntry,
   StorageSource,
@@ -407,6 +407,517 @@ export const storageSourceConformance = (
           yield* check(
             leaked.length === 0,
             `pickerConfig reaches ${leaked.length} of the connection's secrets`,
+          )
+        }),
+      ),
+    },
+  ]
+}
+
+// ---------------------------------------------------------------------------
+// The chaos list — the bad days every provider is measured against
+// ---------------------------------------------------------------------------
+
+/**
+ * How a test flips a provider's bad days. The fake Drive is one (`chaos`);
+ * a real plugin's test implements it over its HTTP fake.
+ *
+ * - `rateLimit`: the next `calls` requests answer 429 with `Retry-After` of
+ *   `retryAfterMs`.
+ * - `evictCursors`: every change cursor handed out so far is forgotten (Drive's 410).
+ * - `vanish`: the item is deleted right after the next listing that shows it.
+ * - `revoke` / `restore`: the connection's token is refused, then honoured again.
+ */
+export type StorageSourceChaos = {
+  readonly rateLimit: (calls: number, retryAfterMs: number) => void
+  readonly evictCursors: () => void
+  readonly vanish: (id: string) => void
+  readonly revoke: () => void
+  readonly restore: () => void
+}
+
+/** The happy-path fixture plus what the chaos cases need of the same tree. */
+export type StorageSourceChaosFixture = StorageSourceFixture & {
+  /** A plain file (not the native doc) among `dataRoom.childIds`, with other files beside it. */
+  readonly vanishingFileId: string
+  /** A file large enough that buffering it whole would show, and its SHA-256. */
+  readonly largeFile: {
+    readonly fileId: string
+    readonly size: number
+    readonly sha256: string
+  }
+}
+
+/**
+ * A provider with its bad-day handle. `make` hands both back together, so a
+ * subject built for `storageSourceConformance` cannot be run here by accident.
+ */
+export type StorageSourceChaosSubject = {
+  readonly make: () => {
+    readonly source: StorageSource
+    readonly chaos: StorageSourceChaos
+  }
+  readonly fixture: StorageSourceChaosFixture
+  /** Strings that must never appear in a failure — the client secret, the refresh token. */
+  readonly secrets: ReadonlyArray<string>
+  /** Bytes the process holds now; under node, `() => process.memoryUsage.rss()`. */
+  readonly memory: () => number
+}
+
+/**
+ * How far memory may rise over the start while the large file streams.
+ * - Read chunks are garbage until V8 collects them, which it does late:
+ *   16 KiB chunks peaked near 50 MB cold, 1 MiB chunks near 100 MB.
+ * - Under half of a 200 MB file, so holding it whole always fails.
+ */
+export const LARGE_FILE_MEMORY_BOUND = 96 * 1024 * 1024
+
+const MB = 1024 * 1024
+
+type Outcome<TValue, TError> =
+  | { readonly _tag: 'ok'; readonly value: TValue }
+  | { readonly _tag: 'failed'; readonly error: TError }
+  | { readonly _tag: 'died'; readonly defect: string }
+
+/** How an effect ended, a defect (a throw, a rejected promise) told apart from a typed failure. */
+const outcomeOf = <TValue, TError>(
+  effect: Effect.Effect<TValue, TError>,
+): Effect.Effect<Outcome<TValue, TError>> =>
+  Effect.map(Effect.exit(effect), (exit): Outcome<TValue, TError> => {
+    if (Exit.isSuccess(exit)) return { _tag: 'ok', value: exit.value }
+    for (const reason of exit.cause.reasons)
+      if (reason._tag === 'Fail') return { _tag: 'failed', error: reason.error }
+    const die = exit.cause.reasons.find((r) => r._tag === 'Die')
+    return {
+      _tag: 'died',
+      defect: die === undefined ? 'interrupted' : String(die.defect),
+    }
+  })
+
+const told = <TValue, TError extends { readonly _tag: string }>(
+  outcome: Outcome<TValue, TError>,
+) =>
+  outcome._tag === 'ok'
+    ? 'succeeded'
+    : outcome._tag === 'failed'
+      ? `failed ${outcome.error._tag}`
+      : `died (${outcome.defect}) — a throw, not a typed failure`
+
+/** The typed failure `tag` from `effect`, or a ConformanceFailure saying what happened instead. */
+const expectTyped = <
+  TValue,
+  TError extends StorageSourceError,
+  TTag extends TError['_tag'],
+>(
+  label: string,
+  effect: Effect.Effect<TValue, TError>,
+  tag: TTag,
+): Effect.Effect<
+  Extract<TError, { readonly _tag: TTag }>,
+  ConformanceFailure
+> =>
+  Effect.flatMap(outcomeOf(effect), (outcome) => {
+    const isTag = (e: TError): e is Extract<TError, { readonly _tag: TTag }> =>
+      e._tag === tag
+    return outcome._tag === 'failed' && isTag(outcome.error)
+      ? Effect.succeed(outcome.error)
+      : Effect.fail(
+          new ConformanceFailure({
+            message: `${label} ${told(outcome)}, expected ${tag}`,
+          }),
+        )
+  })
+
+/** Reads a stream to its end, keeping nothing: counts, and each chunk handed to `onChunk`. */
+const drain = (
+  label: string,
+  stream: ReadableStream<Uint8Array>,
+  onChunk: (chunk: Uint8Array) => void = () => {},
+) =>
+  Effect.tryPromise({
+    try: async () => {
+      const reader = stream.getReader()
+      let bytes = 0
+      let chunks = 0
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) return { bytes, chunks }
+        bytes += value.byteLength
+        chunks += 1
+        onChunk(value)
+      }
+    },
+    catch: (e) =>
+      new ConformanceFailure({
+        message: `${label}'s stream errored: ${String(e)}`,
+      }),
+  })
+
+/** JSON with sorted keys: two plain values deep-equal exactly when these match. */
+const canonical = (value: unknown): string =>
+  Array.isArray(value)
+    ? `[${value.map(canonical).join(',')}]`
+    : typeof value === 'object' && value !== null
+      ? `{${Object.entries(value)
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`)
+          .join(',')}}`
+      : String(JSON.stringify(value))
+
+const SHA256_K = Uint32Array.from([
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
+  0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+  0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
+  0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+  0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+  0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+  0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+  0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+  0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+])
+
+const rotr = (x: number, n: number) => (x >>> n) | (x << (32 - n))
+
+/**
+ * SHA-256 fed a chunk at a time — what core does to bytes on arrival.
+ * WebCrypto digests only a whole buffer, and the kit reaches no node API.
+ */
+export const makeSha256 = () => {
+  const h = Uint32Array.from([
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c,
+    0x1f83d9ab, 0x5be0cd19,
+  ])
+  const w = new Uint32Array(64)
+  const block = new Uint8Array(64)
+  let held = 0
+  let total = 0
+
+  const blockView = new DataView(block.buffer)
+
+  const compress = (view: DataView, at: number) => {
+    for (let i = 0; i < 16; i += 1) w[i] = view.getUint32(at + i * 4)
+    for (let i = 16; i < 64; i += 1) {
+      const x = w[i - 15]
+      const y = w[i - 2]
+      const s0 = rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3)
+      const s1 = rotr(y, 17) ^ rotr(y, 19) ^ (y >>> 10)
+      w[i] = w[i - 16] + s0 + w[i - 7] + s1
+    }
+    let a = h[0]
+    let b = h[1]
+    let c = h[2]
+    let d = h[3]
+    let e = h[4]
+    let f = h[5]
+    let g = h[6]
+    let k = h[7]
+    for (let i = 0; i < 64; i += 1) {
+      const t1 =
+        (k +
+          (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) +
+          ((e & f) ^ (~e & g)) +
+          SHA256_K[i] +
+          w[i]) |
+        0
+      const t2 =
+        ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) +
+          ((a & b) ^ (a & c) ^ (b & c))) |
+        0
+      k = g
+      g = f
+      f = e
+      e = (d + t1) | 0
+      d = c
+      c = b
+      b = a
+      a = (t1 + t2) | 0
+    }
+    h[0] = h[0] + a
+    h[1] = h[1] + b
+    h[2] = h[2] + c
+    h[3] = h[3] + d
+    h[4] = h[4] + e
+    h[5] = h[5] + f
+    h[6] = h[6] + g
+    h[7] = h[7] + k
+  }
+
+  const update = (bytes: Uint8Array) => {
+    total += bytes.byteLength
+    let at = 0
+    if (held > 0) {
+      const take = Math.min(64 - held, bytes.byteLength)
+      block.set(bytes.subarray(0, take), held)
+      held += take
+      at = take
+      if (held < 64) return
+      compress(blockView, 0)
+      held = 0
+    }
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    for (; at + 64 <= bytes.byteLength; at += 64) compress(view, at)
+    block.set(bytes.subarray(at), 0)
+    held = bytes.byteLength - at
+  }
+
+  /** The digest as lowercase hex. Call once: it consumes the hasher. */
+  const hex = () => {
+    const bits = total * 8
+    const tail = new Uint8Array(held < 56 ? 64 : 128)
+    tail.set(block.subarray(0, held))
+    tail[held] = 0x80
+    const view = new DataView(tail.buffer)
+    view.setUint32(tail.byteLength - 8, Math.floor(bits / 0x100000000))
+    view.setUint32(tail.byteLength - 4, bits >>> 0)
+    for (let at = 0; at < tail.byteLength; at += 64) compress(view, at)
+    return Array.from(h, (x) => x.toString(16).padStart(8, '0')).join('')
+  }
+
+  return { update, hex }
+}
+
+/**
+ * The chaos list (docs/spec-plugin-sdk.md §13, layer 7) as cases, the same
+ * shape as `storageSourceConformance`, so a provider's test runs both.
+ *
+ * - Each bad day must surface as its typed failure: a throw or a rejected
+ *   promise fails the case as loudly as a wrong tag.
+ * - The large-file case reads `fixture.largeFile` whole; give it a generous
+ *   timeout in the runner.
+ */
+export const storageSourceChaos = (
+  subject: StorageSourceChaosSubject,
+): ReadonlyArray<ConformanceCase> => {
+  const { fixture } = subject
+  const fresh = (
+    body: (
+      made: ReturnType<StorageSourceChaosSubject['make']>,
+    ) => Effect.Effect<unknown, ConformanceFailure | StorageSourceError>,
+  ): ConformanceCase['run'] =>
+    Effect.suspend(() => body(subject.make())).pipe(Effect.asVoid)
+  const { folderId } = fixture.dataRoom
+  const gone = fixture.vanishingFileId
+
+  /** The data room listed in full — after which a `vanish(gone)` has taken effect. */
+  const listDataRoom = Effect.fn('listDataRoom')(function* (
+    source: StorageSource,
+  ) {
+    const entries = (yield* allPages(source, folderId, 100)).flat()
+    yield* check(
+      entries.some((e) => e.id === gone),
+      `listFolder(${folderId}) did not show ${gone} before it was deleted`,
+    )
+    return entries
+  })
+
+  const { largeFile } = fixture
+  const largeMb = Math.round(largeFile.size / MB)
+  const boundMb = LARGE_FILE_MEMORY_BOUND / MB
+
+  return [
+    {
+      name: 'a 429 with Retry-After: 1 is RateLimited carrying 1000 ms, and a retry after waiting it succeeds',
+      run: fresh(({ source, chaos }) =>
+        Effect.gen(function* () {
+          chaos.rateLimit(1, 1000)
+          const limited = yield* expectTyped(
+            `getFolder(${folderId}) after a seeded 429 with Retry-After: 1`,
+            source.getFolder(folderId),
+            'RateLimited',
+          )
+          yield* check(
+            limited.retryAfterMs === 1000,
+            `RateLimited carried retryAfterMs ${limited.retryAfterMs}, not the 1000 that Retry-After: 1 gave`,
+          )
+          yield* Effect.sleep(limited.retryAfterMs)
+          const folder = yield* outcomeOf(source.getFolder(folderId))
+          yield* check(
+            folder._tag === 'ok' && folder.value.id === folderId,
+            `getFolder(${folderId}) retried after the ${limited.retryAfterMs} ms hint ${told(folder)}`,
+          )
+        }),
+      ),
+    },
+    {
+      name: 'a file deleted between list and get is NotFound, typed — not a rejected promise',
+      run: fresh(({ source, chaos }) =>
+        Effect.gen(function* () {
+          chaos.vanish(gone)
+          yield* listDataRoom(source)
+          const missing = yield* expectTyped(
+            `getFile(${gone}) deleted after it was listed`,
+            source.getFile(gone),
+            'NotFound',
+          )
+          yield* check(
+            missing.id === gone,
+            `getFile(${gone}) failed NotFound naming ${show(missing.id)}`,
+          )
+        }),
+      ),
+    },
+    {
+      name: 'half a batch failing loses nothing: every other listed file reads, the vanished one alone is NotFound',
+      run: fresh(({ source, chaos }) =>
+        Effect.gen(function* () {
+          chaos.vanish(gone)
+          const files = (yield* listDataRoom(source)).filter(
+            (e) => e.kind === 'file',
+          )
+          yield* check(
+            files.length > 1,
+            `${folderId} lists ${files.length} file(s); a batch needs ${gone} and at least one other`,
+          )
+          const problems: Array<string> = []
+          for (const entry of files) {
+            const read = yield* outcomeOf(
+              Effect.flatMap(source.getFile(entry.id), (file) =>
+                drain(`getFile(${entry.id})`, file.stream),
+              ),
+            )
+            if (entry.id === gone) {
+              const typed =
+                read._tag === 'failed' &&
+                read.error._tag === 'NotFound' &&
+                read.error.id === gone
+              if (!typed)
+                problems.push(
+                  `getFile(${gone}) ${told(read)}, expected NotFound(${gone})`,
+                )
+            } else if (read._tag !== 'ok') {
+              problems.push(`getFile(${entry.id}) ${told(read)}`)
+            } else if (read.value.bytes === 0) {
+              problems.push(`getFile(${entry.id}) streamed no bytes`)
+            }
+          }
+          yield* check(
+            problems.length === 0,
+            `with ${gone} deleted mid-batch: ${problems.join('; ')}`,
+          )
+        }),
+      ),
+    },
+    {
+      name: 'a cursor the provider has forgotten is CursorExpired naming it, and a fresh cursor reads',
+      run: fresh(({ source, chaos }) =>
+        Effect.gen(function* () {
+          const start = yield* source.changes(null)
+          chaos.evictCursors()
+          const expired = yield* expectTyped(
+            `changes(${start.next}) after the provider forgot it`,
+            source.changes(start.next),
+            'CursorExpired',
+          )
+          yield* check(
+            expired.cursor === start.next,
+            `CursorExpired named ${show(expired.cursor)}, not ${show(start.next)}`,
+          )
+          const again = yield* source.changes(null)
+          const read = yield* outcomeOf(source.changes(again.next))
+          yield* check(
+            read._tag === 'ok',
+            `changes(${again.next}), a cursor handed out after the eviction, ${told(read)}`,
+          )
+        }),
+      ),
+    },
+    {
+      name: 'a page of changes replayed from the same cursor is the same result both times',
+      run: fresh(({ source, chaos }) =>
+        Effect.gen(function* () {
+          const start = yield* source.changes(null)
+          chaos.vanish(gone)
+          yield* listDataRoom(source)
+          const first = yield* source.changes(start.next)
+          const second = yield* source.changes(start.next)
+          yield* check(
+            first.changes.some((c) => c._tag === 'removed' && c.id === gone),
+            `changes(${start.next}) did not report ${gone}'s removal: ${show(first.changes)}`,
+          )
+          yield* check(
+            canonical(first) === canonical(second),
+            `changes(${start.next}) gave ${show(first)}, then ${show(second)} replayed`,
+          )
+        }),
+      ),
+    },
+    {
+      name: 'a token revoked mid-run fails every read AuthExpired without a secret in it, and restore brings it back',
+      run: fresh(({ source, chaos }) =>
+        Effect.gen(function* () {
+          yield* source.listFolder(folderId)
+          chaos.revoke()
+          const attempts: ReadonlyArray<
+            readonly [string, Effect.Effect<unknown, StorageSourceError>]
+          > = [
+            ['resolveLink', source.resolveLink(fixture.dataRoom.link)],
+            ['listFolder', source.listFolder(folderId)],
+            ['getFolder', source.getFolder(folderId)],
+            ['getFile', source.getFile(fixture.nativeDoc.fileId)],
+            ['changes', source.changes(null)],
+            ['pickerConfig', source.pickerConfig()],
+          ]
+          for (const [method, attempt] of attempts) {
+            const expired = yield* expectTyped(
+              `${method} with the token revoked`,
+              attempt,
+              'AuthExpired',
+            )
+            const text = `${String(expired)} ${JSON.stringify(expired)}`
+            const leaked = subject.secrets.filter((s) => text.includes(s))
+            yield* check(
+              leaked.length === 0,
+              `${method}'s AuthExpired carries ${leaked.length} of the connection's secrets`,
+            )
+          }
+          chaos.restore()
+          const back = yield* outcomeOf(source.listFolder(folderId))
+          yield* check(
+            back._tag === 'ok',
+            `listFolder(${folderId}) after restore ${told(back)}`,
+          )
+        }),
+      ),
+    },
+    {
+      name: `getFile streams a ${largeMb} MB file chunk by chunk, hashed as it arrives, peak memory within ${boundMb} MB of the start`,
+      run: fresh(({ source }) =>
+        Effect.gen(function* () {
+          const { fileId, size, sha256 } = largeFile
+          yield* check(
+            size >= 2 * LARGE_FILE_MEMORY_BOUND,
+            `the fixture's large file is ${largeMb} MB; under ${2 * boundMb} MB, buffering it would not show`,
+          )
+          const before = subject.memory()
+          let peak = 0
+          const hash = makeSha256()
+          const file = yield* source.getFile(fileId)
+          const read = yield* drain(
+            `getFile(${fileId})`,
+            file.stream,
+            (chunk) => {
+              hash.update(chunk)
+              peak = Math.max(peak, subject.memory() - before)
+            },
+          )
+          yield* check(
+            read.bytes === size,
+            `getFile(${fileId}) streamed ${read.bytes} bytes, not ${size}`,
+          )
+          yield* check(
+            read.chunks > 1,
+            `getFile(${fileId}) arrived as one ${largeMb} MB chunk — it was buffered`,
+          )
+          yield* check(
+            peak <= LARGE_FILE_MEMORY_BOUND,
+            `memory rose ${Math.round(peak / MB)} MB while ${fileId} streamed, over the ${boundMb} MB bound — the file was buffered`,
+          )
+          const ours = hash.hex()
+          yield* check(
+            ours === sha256,
+            `SHA-256 of the streamed ${fileId} is ${ours}, not ${sha256}`,
           )
         }),
       ),

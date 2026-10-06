@@ -533,3 +533,12 @@ above the port.
   nightly and opt-in. Chaos list: 429 + `Retry-After`, token revoked
   mid-sync, half a batch failing, webhook delivered twice, file deleted
   between list and get, Docs export, 200 MB file, cursor expired.
+  **As built:** the read half's chaos list is `storageSourceChaos` in
+  `@spaces/sdk/testing`, beside the happy-path suite, run against the fake
+  Drive with no network and no Postgres: each bad day a typed failure
+  (`RateLimited` carrying the `Retry-After` hint, `NotFound`,
+  `CursorExpired`, `AuthExpired`), half a batch read without losing the
+  good half, a replayed change page deep-equal, and a 200 MB file hashed
+  as it streams under a stated memory bound. The Docs export is in the
+  happy-path suite; "webhook delivered twice" waits for the push channel.
+  docs/spec-plugin-sdk.md §13 has the detail.
