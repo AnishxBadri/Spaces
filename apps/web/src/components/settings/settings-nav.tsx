@@ -121,6 +121,14 @@ export const SETTINGS_SECTIONS = [
     group: 'data',
     admin: true,
   },
+  {
+    // The installed plugins, their keys and settings. Admin-only, like
+    // every vault secret.
+    to: '/settings/integrations',
+    label: 'Integrations',
+    group: 'data',
+    admin: true,
+  },
   { to: '/settings/objects', label: 'Objects', group: 'objects', admin: false },
   {
     to: '/settings/currency',

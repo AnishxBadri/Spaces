@@ -2,6 +2,7 @@ import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { SettingsNav } from '#/components/settings/settings-nav'
 import {
   getSession,
+  countIntegrations,
   getWorkspace,
   listInvites,
   listMembers,
@@ -36,7 +37,9 @@ export const Route = createFileRoute('/_app/settings')({
         listFxRates(),
       ])
     const isAdmin = session?.user.role === 'admin'
-    const invites = isAdmin ? await listInvites() : []
+    const [invites, integrations] = isAdmin
+      ? await Promise.all([listInvites(), countIntegrations()])
+      : [[], null]
     return {
       me: session!.user,
       isAdmin,
@@ -44,6 +47,7 @@ export const Route = createFileRoute('/_app/settings')({
       members,
       templates,
       invites,
+      integrations,
       objects,
       fx,
     }
@@ -66,6 +70,10 @@ function SettingsShell() {
           '/settings/templates': data.templates.length,
           '/settings/objects': data.objects.length,
           '/settings/currency': data.fx.rates.length,
+          // Admin-only: a member's row is locked and prints no count.
+          ...(data.integrations === null
+            ? {}
+            : { '/settings/integrations': data.integrations }),
         }}
       />
       <div className="flex w-full max-w-[56.25rem] flex-col gap-12 px-8 pt-7 pb-8">

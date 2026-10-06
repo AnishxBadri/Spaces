@@ -53,6 +53,22 @@ const PLUGIN_MARKERS: ReadonlyArray<string> = [
   'provider.example/v1/organizations/enrich',
 ]
 
+/**
+ * The Integrations settings surface: the ledger and one plugin's card render
+ * from `integration.manifest` and the row, never from a bundle or the
+ * plugins directory.
+ */
+const INTEGRATIONS_SURFACE: ReadonlyArray<string> = [
+  'src/routes/_app/settings/integrations.tsx',
+  'src/routes/_app/settings/integrations_.$integrationId.tsx',
+  'src/components/integrations/integration-ledger.tsx',
+  'src/components/integrations/integration-settings.tsx',
+  'src/lib/server/integrations.ts',
+  'src/lib/integrations/ledger.ts',
+  'src/lib/integrations/admin.ts',
+  'src/lib/integrations/settings-form.ts',
+]
+
 describe('web never loads a plugin bundle', () => {
   const sources = walk(
     join(webRoot, 'src'),
@@ -77,6 +93,25 @@ describe('web never loads a plugin bundle', () => {
       )
     })
     expect(offenders).toEqual([])
+  })
+
+  it('the Integrations settings surface is among the modules checked, and reaches no plugin code', () => {
+    const checked = new Set(sources.map((f) => relative(webRoot, f)))
+    for (const file of INTEGRATIONS_SURFACE) {
+      expect(checked.has(file), file).toBe(true)
+      const text = readFileSync(join(webRoot, file), 'utf8')
+      const specs = [...text.matchAll(SPECIFIER)].map((m) => m[1])
+      expect(specs.filter(isPluginSpecifier), file).toEqual([])
+      expect(
+        PLUGINS_DIR_READS.filter((re) => re.test(text)).map(String),
+        file,
+      ).toEqual([])
+      // No filesystem at all: the card is drawn from the stored manifest.
+      expect(
+        specs.filter((s) => s === 'node:fs' || s === 'fs'),
+        file,
+      ).toEqual([])
+    }
   })
 
   it('the built output carries no plugin code and no plugins-directory read', () => {

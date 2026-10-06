@@ -43,6 +43,7 @@ import { Route as AppSettingsAiRouteImport } from './routes/_app/settings/ai'
 import { Route as AppSettingsArrivalRouteImport } from './routes/_app/settings/arrival'
 import { Route as AppSettingsCurrencyRouteImport } from './routes/_app/settings/currency'
 import { Route as AppSettingsEmbeddingsRouteImport } from './routes/_app/settings/embeddings'
+import { Route as AppSettingsIntegrationsRouteImport } from './routes/_app/settings/integrations'
 import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
 import { Route as AppSettingsObjectsRouteImport } from './routes/_app/settings/objects'
 import { Route as AppSettingsTemplatesRouteImport } from './routes/_app/settings/templates'
@@ -56,6 +57,7 @@ import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
 import { Route as ApiJobStatusEntityIdRouteImport } from './routes/api/job-status/$entityId'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
+import { Route as AppSettingsIntegrationsIntegrationIdRouteImport } from './routes/_app/settings/integrations_.$integrationId'
 import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings/objects_.$objectSlug'
 
 const IndexRoute = IndexRouteImport.update({
@@ -227,6 +229,11 @@ const AppSettingsEmbeddingsRoute = AppSettingsEmbeddingsRouteImport.update({
   path: '/embeddings',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsIntegrationsRoute = AppSettingsIntegrationsRouteImport.update({
+  id: '/integrations',
+  path: '/integrations',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsMembersRoute = AppSettingsMembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -292,6 +299,12 @@ const AppOObjectSlugRecordIdRoute = AppOObjectSlugRecordIdRouteImport.update({
   path: '/o/$objectSlug/$recordId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsIntegrationsIntegrationIdRoute =
+  AppSettingsIntegrationsIntegrationIdRouteImport.update({
+    id: '/integrations_/$integrationId',
+    path: '/integrations/$integrationId',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
 const AppSettingsObjectsObjectSlugRoute =
   AppSettingsObjectsObjectSlugRouteImport.update({
     id: '/objects_/$objectSlug',
@@ -332,6 +345,7 @@ export interface FileRoutesByFullPath {
   '/settings/arrival': typeof AppSettingsArrivalRoute
   '/settings/currency': typeof AppSettingsCurrencyRoute
   '/settings/embeddings': typeof AppSettingsEmbeddingsRoute
+  '/settings/integrations': typeof AppSettingsIntegrationsRoute
   '/settings/members': typeof AppSettingsMembersRoute
   '/settings/objects': typeof AppSettingsObjectsRoute
   '/settings/templates': typeof AppSettingsTemplatesRoute
@@ -346,6 +360,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/$': typeof ApiV1SplatRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
+  '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
 export interface FileRoutesByTo {
@@ -380,6 +395,7 @@ export interface FileRoutesByTo {
   '/settings/arrival': typeof AppSettingsArrivalRoute
   '/settings/currency': typeof AppSettingsCurrencyRoute
   '/settings/embeddings': typeof AppSettingsEmbeddingsRoute
+  '/settings/integrations': typeof AppSettingsIntegrationsRoute
   '/settings/members': typeof AppSettingsMembersRoute
   '/settings/objects': typeof AppSettingsObjectsRoute
   '/settings/templates': typeof AppSettingsTemplatesRoute
@@ -394,6 +410,7 @@ export interface FileRoutesByTo {
   '/api/v1/$': typeof ApiV1SplatRoute
   '/settings': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
+  '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
 export interface FileRoutesById {
@@ -431,6 +448,7 @@ export interface FileRoutesById {
   '/_app/settings/arrival': typeof AppSettingsArrivalRoute
   '/_app/settings/currency': typeof AppSettingsCurrencyRoute
   '/_app/settings/embeddings': typeof AppSettingsEmbeddingsRoute
+  '/_app/settings/integrations': typeof AppSettingsIntegrationsRoute
   '/_app/settings/members': typeof AppSettingsMembersRoute
   '/_app/settings/objects': typeof AppSettingsObjectsRoute
   '/_app/settings/templates': typeof AppSettingsTemplatesRoute
@@ -445,6 +463,7 @@ export interface FileRoutesById {
   '/api/v1/$': typeof ApiV1SplatRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
+  '/_app/settings/integrations_/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/_app/settings/objects_/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
 }
 export interface FileRouteTypes {
@@ -482,6 +501,7 @@ export interface FileRouteTypes {
     | '/settings/arrival'
     | '/settings/currency'
     | '/settings/embeddings'
+    | '/settings/integrations'
     | '/settings/members'
     | '/settings/objects'
     | '/settings/templates'
@@ -496,6 +516,7 @@ export interface FileRouteTypes {
     | '/api/v1/$'
     | '/settings/'
     | '/o/$objectSlug/$recordId'
+    | '/settings/integrations/$integrationId'
     | '/settings/objects/$objectSlug'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -530,6 +551,7 @@ export interface FileRouteTypes {
     | '/settings/arrival'
     | '/settings/currency'
     | '/settings/embeddings'
+    | '/settings/integrations'
     | '/settings/members'
     | '/settings/objects'
     | '/settings/templates'
@@ -544,6 +566,7 @@ export interface FileRouteTypes {
     | '/api/v1/$'
     | '/settings'
     | '/o/$objectSlug/$recordId'
+    | '/settings/integrations/$integrationId'
     | '/settings/objects/$objectSlug'
   id:
     | '__root__'
@@ -580,6 +603,7 @@ export interface FileRouteTypes {
     | '/_app/settings/arrival'
     | '/_app/settings/currency'
     | '/_app/settings/embeddings'
+    | '/_app/settings/integrations'
     | '/_app/settings/members'
     | '/_app/settings/objects'
     | '/_app/settings/templates'
@@ -594,6 +618,7 @@ export interface FileRouteTypes {
     | '/api/v1/$'
     | '/_app/settings/'
     | '/_app/o_/$objectSlug/$recordId'
+    | '/_app/settings/integrations_/$integrationId'
     | '/_app/settings/objects_/$objectSlug'
   fileRoutesById: FileRoutesById
 }
@@ -851,6 +876,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsEmbeddingsRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/integrations': {
+      id: '/_app/settings/integrations'
+      path: '/integrations'
+      fullPath: '/settings/integrations'
+      preLoaderRoute: typeof AppSettingsIntegrationsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/members': {
       id: '/_app/settings/members'
       path: '/members'
@@ -942,6 +974,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOObjectSlugRecordIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/integrations_/$integrationId': {
+      id: '/_app/settings/integrations_/$integrationId'
+      path: '/integrations/$integrationId'
+      fullPath: '/settings/integrations/$integrationId'
+      preLoaderRoute: typeof AppSettingsIntegrationsIntegrationIdRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/objects_/$objectSlug': {
       id: '/_app/settings/objects_/$objectSlug'
       path: '/objects/$objectSlug'
@@ -957,6 +996,7 @@ interface AppSettingsRouteChildren {
   AppSettingsArrivalRoute: typeof AppSettingsArrivalRoute
   AppSettingsCurrencyRoute: typeof AppSettingsCurrencyRoute
   AppSettingsEmbeddingsRoute: typeof AppSettingsEmbeddingsRoute
+  AppSettingsIntegrationsRoute: typeof AppSettingsIntegrationsRoute
   AppSettingsMembersRoute: typeof AppSettingsMembersRoute
   AppSettingsObjectsRoute: typeof AppSettingsObjectsRoute
   AppSettingsTemplatesRoute: typeof AppSettingsTemplatesRoute
@@ -964,6 +1004,7 @@ interface AppSettingsRouteChildren {
   AppSettingsUsageRoute: typeof AppSettingsUsageRoute
   AppSettingsWorkspaceRoute: typeof AppSettingsWorkspaceRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppSettingsIntegrationsIntegrationIdRoute: typeof AppSettingsIntegrationsIntegrationIdRoute
   AppSettingsObjectsObjectSlugRoute: typeof AppSettingsObjectsObjectSlugRoute
 }
 
@@ -972,6 +1013,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsArrivalRoute: AppSettingsArrivalRoute,
   AppSettingsCurrencyRoute: AppSettingsCurrencyRoute,
   AppSettingsEmbeddingsRoute: AppSettingsEmbeddingsRoute,
+  AppSettingsIntegrationsRoute: AppSettingsIntegrationsRoute,
   AppSettingsMembersRoute: AppSettingsMembersRoute,
   AppSettingsObjectsRoute: AppSettingsObjectsRoute,
   AppSettingsTemplatesRoute: AppSettingsTemplatesRoute,
@@ -979,6 +1021,8 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsUsageRoute: AppSettingsUsageRoute,
   AppSettingsWorkspaceRoute: AppSettingsWorkspaceRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppSettingsIntegrationsIntegrationIdRoute:
+    AppSettingsIntegrationsIntegrationIdRoute,
   AppSettingsObjectsObjectSlugRoute: AppSettingsObjectsObjectSlugRoute,
 }
 

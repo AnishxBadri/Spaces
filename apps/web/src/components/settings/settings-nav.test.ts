@@ -115,6 +115,7 @@ describe('the settings nav grammar', () => {
       'Embeddings',
       // arrival-1 (SPA-56): the forwarding mailbox and its app password.
       'Arrival',
+      'Integrations',
     ])
   })
 })
