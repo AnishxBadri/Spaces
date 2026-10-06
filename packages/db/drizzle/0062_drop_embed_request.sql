@@ -1,0 +1,1 @@
+DROP TABLE "embed_request" CASCADE;

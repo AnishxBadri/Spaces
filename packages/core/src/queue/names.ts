@@ -150,18 +150,6 @@ export const QUEUES = {
    * a failed row is re-run on its own, by the operator.
    */
   importCommit: 'import.commit',
-  /**
-   * The local embedding model's files → `<dataDir>/models` (D50). Enqueued
-   * by Settings → Embeddings' Download button only. Created `exclusive` and
-   * sent with `singletonKey = model.download:<model>`; the job writes its
-   * progress to its `job_run` row, which the section polls.
-   */
-  modelDownload: 'model.download',
-  /**
-   * The local model's Test: one word embedded in the worker. `exclusive`,
-   * keyed `model.test:<model>`; the first run loads the model.
-   */
-  modelTest: 'model.test',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

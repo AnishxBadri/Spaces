@@ -14,12 +14,6 @@ import {
   readEmbeddingSetupProgram,
   setSensitiveSlotProgram,
 } from '../../embedding-pin'
-import {
-  localModelsViewProgram,
-  startLocalModelDownloadProgram,
-  startLocalModelTestProgram,
-} from '../../local-model'
-import type { LocalJobStarted } from '../../local-model'
 import { readProviderMeta } from '../meta'
 import { providerFailure } from '../test-call'
 import {
@@ -36,8 +30,6 @@ import type {
   EmbeddingProvider,
   EmbeddingSlotView,
   EmbeddingTarget,
-  LocalModelInput,
-  LocalModelView,
 } from './ids'
 
 /**
@@ -81,8 +73,6 @@ export type EmbeddingSettingsView = {
   /** The sensitive slot beside the pin (SPA-83); null when unset. */
   slot: EmbeddingSlotView | null
   keys: EmbeddingKeyRow[]
-  /** The in-process models: files, download and Test (D50). */
-  local: LocalModelView[]
 }
 
 export type EmbeddingTestResult =
@@ -115,7 +105,6 @@ export const getEmbeddingSettingsProgram = Effect.fn('getEmbeddingSettings')(
     )
     const keys: EmbeddingKeyRow[] = []
     for (const provider of EMBEDDING_PROVIDERS) {
-      if (EMBEDDING_PROVIDER_INFO[provider].inProcess) continue
       const row = yield* readKey(provider)
       const meta = row ? readProviderMeta(row.meta) : null
       keys.push({
@@ -129,13 +118,7 @@ export const getEmbeddingSettingsProgram = Effect.fn('getEmbeddingSettings')(
         testedModel: meta?.embedTestModel ?? null,
       })
     }
-    const local = yield* localModelsViewProgram().pipe(
-      Effect.mapError(
-        (e) =>
-          new EmbeddingSettingsFailed({ message: e.message, cause: e.cause }),
-      ),
-    )
-    return { pin, slot, keys, local }
+    return { pin, slot, keys }
   },
 )
 
@@ -204,13 +187,6 @@ export const testEmbeddingProgram = Effect.fn('testEmbedding')(function* (
     }
   if (!model.emitsPin)
     return { ok: false, status: null, message: needsRepinNote(model) }
-  // The in-process model is tested by a job in the worker that holds it.
-  if (EMBEDDING_PROVIDER_INFO[target.provider].inProcess)
-    return {
-      ok: false,
-      status: null,
-      message: 'The local model is tested in the worker — use its Test',
-    }
 
   const result = yield* embedProgram([EMBED_TEST_TEXT], {
     caller: { type: 'user', id: actorId },
@@ -324,29 +300,4 @@ export async function setSensitiveSlotHandler(
 export async function clearSensitiveSlotHandler(): Promise<void> {
   await requireAdmin()
   return effectFn(clearSensitiveSlotProgram)()
-}
-
-// The local model (D50). `requireAdmin()` first, like the rest.
-
-const localStart =
-  (run: typeof startLocalModelDownloadProgram) => (model: string) =>
-    run(model).pipe(
-      Effect.mapError(
-        (e) =>
-          new EmbeddingSettingsFailed({ message: e.message, cause: e.cause }),
-      ),
-    )
-
-export async function startLocalModelDownloadHandler(
-  data: LocalModelInput,
-): Promise<LocalJobStarted> {
-  await requireAdmin()
-  return effectFn(localStart(startLocalModelDownloadProgram))(data.model)
-}
-
-export async function startLocalModelTestHandler(
-  data: LocalModelInput,
-): Promise<LocalJobStarted> {
-  await requireAdmin()
-  return effectFn(localStart(startLocalModelTestProgram))(data.model)
 }

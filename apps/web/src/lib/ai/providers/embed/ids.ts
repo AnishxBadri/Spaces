@@ -25,7 +25,6 @@ export const EMBEDDING_PROVIDERS = [
   'google',
   'voyage',
   'ollama',
-  'local',
 ] as const
 export type EmbeddingProvider = (typeof EMBEDDING_PROVIDERS)[number]
 
@@ -44,16 +43,12 @@ export const KEYED_EMBEDDING_PROVIDERS = [
  *   it reuses the LLM provider's credential (`embeddingCredentialProvider`).
  * - `defaultBaseUrl` — passed to the SDK explicitly, so an SDK's environment
  *   fallback never decides where text is sent.
- * - `inProcess` — the model runs inside the worker (transformers.js). No
- *   credential and no address: its files on disk are what a pin requires,
- *   and web reaches it through the `embed_request` seam. (D50)
  */
 export type EmbeddingProviderDescriptor = {
   id: EmbeddingProvider
   label: string
   local: boolean
   keyless: boolean
-  inProcess: boolean
   defaultBaseUrl: string
   keyPlaceholder: string
 }
@@ -67,7 +62,6 @@ export const EMBEDDING_PROVIDER_INFO: Record<
     label: 'OpenAI',
     local: false,
     keyless: false,
-    inProcess: false,
     defaultBaseUrl: 'https://api.openai.com/v1',
     keyPlaceholder: 'sk-…',
   },
@@ -76,7 +70,6 @@ export const EMBEDDING_PROVIDER_INFO: Record<
     label: 'Google',
     local: false,
     keyless: false,
-    inProcess: false,
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     keyPlaceholder: 'AIza…',
   },
@@ -85,7 +78,6 @@ export const EMBEDDING_PROVIDER_INFO: Record<
     label: 'Voyage',
     local: false,
     keyless: false,
-    inProcess: false,
     defaultBaseUrl: 'https://api.voyageai.com/v1',
     keyPlaceholder: 'pa-…',
   },
@@ -94,17 +86,7 @@ export const EMBEDDING_PROVIDER_INFO: Record<
     label: 'Ollama',
     local: true,
     keyless: true,
-    inProcess: false,
     defaultBaseUrl: PROVIDERS.ollama.defaultBaseUrl,
-    keyPlaceholder: '',
-  },
-  local: {
-    id: 'local',
-    label: 'Local model',
-    local: true,
-    keyless: true,
-    inProcess: true,
-    defaultBaseUrl: '',
     keyPlaceholder: '',
   },
 }
@@ -153,9 +135,6 @@ export type EmbeddingModelInfo = {
  *   model a sensitive slot is built for. `mxbai-embed-large` is 1024 and
  *   Ollama truncates nothing for it → greyed. Their price is 0 only because
  *   the field is a number; the estimate never reads it for a local provider.
- * - The local model (D50) `bge-base-en-v1.5` is 768 natively → pinnable. It
- *   runs in the worker once its files are in `<dataDir>/models`
- *   (`LOCAL_EMBEDDING_MODELS` holds its repo and files).
  */
 export const EMBEDDING_MODELS: ReadonlyArray<EmbeddingModelInfo> = [
   {
@@ -221,13 +200,6 @@ export const EMBEDDING_MODELS: ReadonlyArray<EmbeddingModelInfo> = [
     emitsPin: false,
     usdPerMillionTokens: 0,
   },
-  {
-    provider: 'local',
-    id: 'bge-base-en-v1.5',
-    nativeDims: 768,
-    emitsPin: true,
-    usdPerMillionTokens: 0,
-  },
 ]
 
 export const modelsFor = (
@@ -274,11 +246,9 @@ export const missingCredentialMessage = (
   provider: EmbeddingProvider,
   doing: string,
 ): string =>
-  EMBEDDING_PROVIDER_INFO[provider].inProcess
-    ? `Download the local model before ${doing}`
-    : EMBEDDING_PROVIDER_INFO[provider].keyless
-      ? `Save the ${EMBEDDING_PROVIDER_INFO[provider].label} address under Settings → AI · Providers before ${doing}`
-      : `Save a ${EMBEDDING_PROVIDER_INFO[provider].label} embedding key before ${doing}`
+  EMBEDDING_PROVIDER_INFO[provider].keyless
+    ? `Save the ${EMBEDDING_PROVIDER_INFO[provider].label} address under Settings → AI · Providers before ${doing}`
+    : `Save a ${EMBEDDING_PROVIDER_INFO[provider].label} embedding key before ${doing}`
 
 /**
  * Ollama answers 404 for a model the server has not pulled. The Test call
@@ -424,48 +394,6 @@ export const sensitiveEstimateLine = (e: BackfillEstimate): string =>
 export const backfillProgressLine = (embedded: number, total: number): string =>
   `embedded ${formatNumber(embedded, 0)} of ${formatNumber(total, 0)}`
 
-// The local model (D50): its files, its download job and its Test job, as
-// the section reads them. Each job's line is its `job_run` row's summary.
-
-/** One keyed job, from pg-boss's state and its newest `job_run` row. */
-export type LocalJobRun =
-  | { state: 'idle' }
-  | { state: 'queued' }
-  | { state: 'running'; line: string | null }
-  | { state: 'done'; line: string | null }
-  | { state: 'failed'; reason: string }
-
-export type LocalModelView = {
-  model: string
-  /** Every file a load reads is on disk — downloaded or copied by hand. */
-  present: boolean
-  /** The directory the files live in. */
-  dir: string
-  approxMegabytes: number
-  download: LocalJobRun
-  test: LocalJobRun
-  /** The newest Test of this model succeeded. */
-  testedOk: boolean
-}
-
-/** What a running Test says before it answers. */
-export const LOCAL_TEST_RUNNING_LINE =
-  'the first run loads the model — a few seconds'
-
-/** The Test job's summary: the model, the width, the head, the time. */
-export const localTestLine = (
-  model: string,
-  width: number,
-  head: ReadonlyArray<number>,
-  ms: number,
-  loaded: boolean,
-): string =>
-  `${model} · ${width} dims · [${head.map((v) => v.toFixed(4)).join(', ')}, …] · ${formatNumber(ms, 0)} ms${loaded ? ' · loaded the model' : ''}`
-
-/** The download's progress line, written while it runs. */
-export const localDownloadLine = (loaded: number, total: number): string =>
-  `downloading · ${formatNumber(loaded / 1_000_000, 0)} of ${formatNumber(total / 1_000_000, 0)} MB`
-
 // The server fns' inputs.
 
 export const embeddingProviderInput = z.object({
@@ -483,8 +411,3 @@ export const embeddingTargetInput = z.object({
   model: z.string().trim().min(1).max(200),
 })
 export type EmbeddingTarget = z.infer<typeof embeddingTargetInput>
-
-export const localModelInput = z.object({
-  model: z.string().trim().min(1).max(200),
-})
-export type LocalModelInput = z.infer<typeof localModelInput>

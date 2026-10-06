@@ -1663,37 +1663,16 @@ silently garbage** — search degrades quietly rather than erroring. This bites 
   pinned dimension, sensitivity routing, and being a dependency of core
   search all require the substrate to own them. Detail:
   `docs/spec-ai-substrate.md` §9.
-- **Local slot ordering, 2026-09-25: Ollama first, transformers.js second.**
-  Ollama is an HTTP server both processes already call (the LLM adapter's
-  keyless URL credential), so the embed adapter and the sensitive slot ship
-  as `ai-9b` (SPA-83) with no new dependency or seam. The in-process
-  transformers.js model is `ai-9c`, behind it, because query-time embedding
-  runs in **web** (`lib/search/query-embedding.ts`) and the model would live
-  in the **worker** — how web gets a vector from it is D50, open, answered
-  in that slice before it is built. LM Studio is out of scope until asked
-  for: it is a desktop app, and Ollama covers the server case.
-- **The local seam, answered 2026-10-06 (D50): Postgres `LISTEN`/`NOTIFY`
-  request/reply.** Web inserts an `embed_request` row (text, pinned model)
-  and notifies its id on `embed_request`; the worker embeds it with the
-  transformers.js model it holds, writes the 768 floats to the row and
-  notifies the id on `embed_reply`; web reads the row on its own LISTEN
-  connection. The vector never rides in a notification (8 KB cap); no env
-  variable and no port are added, so `DATABASE_URL` + `APP_URL` stay the
-  whole required env. No answer within the reply budget → `null`, and the
-  search is the lexical lane, never a hang. Rows are transient: web deletes
-  its own on read or timeout, the worker prunes stale ones. Rejected: a
-  worker HTTP `/embed` behind `WORKER_URL` (a new network surface, and a
-  split deploy must set the env by hand); web loading the model (breaks the
-  worker-only rule, +300 MB on web, inference on its loop); pg-boss round
-  trips (seconds).
-- **The local model itself** (`ai-9c`): provider `local`, `bge-base-en-v1.5`
-  (768 native, int8 ONNX), downloaded on click by the `model.download` job
-  (exclusive key `model.download:<model>`) into `<dataDir>/models` — never
-  baked into the image, and a directory copied there by hand counts the
-  same. The worker loads it lazily on first use, keeps one instance across
-  jobs and disposes it after an idle interval; Test is a `model.test` job.
-  Web never imports `@huggingface/transformers` (eslint, plus a grep of
-  `.output` after the build).
+- **Local embeddings are Ollama only (2026-10-06; supersedes the 2026-09-25
+  "Ollama first, transformers.js second" ordering).** Ollama is an HTTP
+  server both processes already call (the LLM adapter's keyless URL
+  credential), so the embed adapter and the sensitive slot need no new
+  dependency or seam. There is no in-process model. A transformers.js model
+  would put the ONNX runtime in every worker image and need a web↔worker
+  seam, all to save running one optional compose service. That makes D50
+  moot (withdrawn). The "opt-in local model downloaded to `/data/models`"
+  above therefore means an Ollama model. LM Studio is out of scope until
+  asked for: it is a desktop app, and Ollama covers the server case.
 - **`chunk` carries no space path.** spec-ai-substrate §9 (and
   spec-storage-sources) list the space ltree path among what a chunk
   carries, but a document can be filed in many spaces and one ltree column

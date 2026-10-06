@@ -167,16 +167,6 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
   message:
     'The web app imports @spaces/core and @spaces/sdk, never a plugin and never the worker (docs/spec-plugin-sdk.md §2: "web → core, sdk. Never plugins/*, never worker"). Plugin code runs in apps/worker only; web renders from manifests.',
 }
-// The local embedding model lives in the worker and nowhere else (D50): web
-// reaches it through the `embed_request` seam, and a web import of the
-// runtime would put ~400 MB of native code and the model's memory on web.
-// Core is imported by web, so it is fenced too. The build is checked as
-// well: scripts/check-client-bundle.sh greps apps/web/.output for it.
-const WEB_NEVER_LOADS_A_MODEL = {
-  regex: '^(@huggingface/transformers|onnxruntime-(node|web|common))(/|$)',
-  message:
-    'transformers.js runs in the worker only (D50) — web asks for a vector through the embed_request seam (requestLocalEmbeddingProgram), and core never loads a model.',
-}
 // Proved since SPA-181 (mono-11a), which lifted the worker out of
 // apps/web/src/worker into apps/worker — with one opening the spec does not
 // have, taken on the issue's option (a): the job modules still import server
@@ -196,12 +186,12 @@ const WEB_NEVER_LOADS_A_MODEL = {
 //   lib/ai/{attribute-run, classify-document, column-run, complete,
 //     embed-backfill, embed-document, embed-source, key-terms, read-deck,
 //     read-deck-summarize, run, sensitivity-for, suggest-spaces, summarize,
-//     vision, providers/embed/ids, providers/embed/local}
+//     vision}
 //   lib/arrival/{poll, schedule}
 //   lib/documents/{blob-refs, fetch-guard, on-extracted, vision-gate}
 //   lib/glossary/link-terms · lib/import/commit · lib/queue · lib/server/env
 // and, from tests only:
-//   lib/ai/{embed-chunks, embedding-pin, local-embed, propose, route,
+//   lib/ai/{embed-chunks, embedding-pin, propose, route, providers/embed/ids,
 //     providers/embed/settings}
 //   lib/arrival/{fixtures, settings}
 //   lib/documents/{clip, read-deck-gate, shelf, space-sources}
@@ -376,7 +366,6 @@ export default [
             // block owns `no-restricted-imports` for routes/ and components/
             // and a later block would replace these options, not extend them.
             WEB_NEVER_PLUGINS_NEVER_WORKER,
-            WEB_NEVER_LOADS_A_MODEL,
           ],
         },
       ],
@@ -390,7 +379,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [WEB_NEVER_PLUGINS_NEVER_WORKER, WEB_NEVER_LOADS_A_MODEL] },
+        { patterns: [WEB_NEVER_PLUGINS_NEVER_WORKER] },
       ],
     },
   },
@@ -432,7 +421,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [CORE_IMPORTS_DB_AND_SDK_ONLY, WEB_NEVER_LOADS_A_MODEL] },
+        { patterns: [CORE_IMPORTS_DB_AND_SDK_ONLY] },
       ],
     },
   },

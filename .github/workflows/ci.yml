@@ -151,15 +151,6 @@ jobs:
           [ -z "$SRC" ] || { echo "source directories in the image: $SRC" >&2; exit 1; }
           N="$(docker run --rm --entrypoint sh spaces:ci -c 'ls node_modules/.bin | grep -c tsx || true')"
           [ "$N" = 0 ] || { echo "tsx is in the image ($N)" >&2; exit 1; }
-      # D50: the local embedding model is downloaded to /data/models on the
-      # admin's click and never baked in — no model directory, no weights.
-      - name: No local model baked into the image
-        run: |
-          set -euo pipefail
-          M="$(docker run --rm --entrypoint sh spaces:ci -c 'ls -A /data/models 2>/dev/null | wc -l')"
-          [ "$M" = 0 ] || { echo "/data/models is not empty in the image ($M entries)" >&2; exit 1; }
-          W="$(docker run --rm --entrypoint sh spaces:ci -c 'find / -xdev \( -name "*.onnx" -o -name "*.onnx_data" \) 2>/dev/null | wc -l')"
-          [ "$W" = 0 ] || { echo "model weights are in the image ($W .onnx files)" >&2; exit 1; }
       - name: Record its size
         run: |
           set -euo pipefail

@@ -15,8 +15,7 @@ todos.json
 # turbo's local cache + per-task logs (no remote cache; the cache is this box)
 .turbo
 
-# runtime data (blobs, secret.key, and the local embedding model under
-# data/models — downloaded on click, never committed, never baked in)
+# runtime data (blobs + secret.key)
 data/
 
 # backup.sh output — a dump and every blob, never in git

@@ -15,7 +15,6 @@ import {
   EMBEDDING_PROVIDER_INFO,
   KEYED_EMBEDDING_PROVIDERS,
   LOCAL_PIN_HEADLINE,
-  LOCAL_TEST_RUNNING_LINE,
   NO_PIN_HEADLINE,
   NO_SLOT_HEADLINE,
   OLLAMA_URL_GUIDANCE,
@@ -34,8 +33,6 @@ import type {
   EmbeddingModelInfo,
   EmbeddingPinView,
   EmbeddingProvider,
-  LocalJobRun,
-  LocalModelView,
 } from '#/lib/ai/providers/embed/ids'
 import type { getEmbeddingSettings } from '#/lib/server-fns'
 import {
@@ -45,8 +42,6 @@ import {
   saveEmbeddingKey,
   setSensitiveSlot,
   startEmbedBackfill,
-  startLocalModelDownload,
-  startLocalModelTest,
   testEmbedding,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -79,11 +74,6 @@ type BackfillView = Awaited<ReturnType<typeof getEmbedBackfill>>
  * the Sensitive slot block offers it beside a cloud pin, and says in its
  * readout what search will and will not read.
  *
- * The local model (D50) runs inside the worker: its key row is its files —
- * Download, or Use downloaded model when they are already on disk — and its
- * Test is a worker job, so the download's progress and the Test's answer
- * are read from their `job_run` rows while the section polls.
- *
  * The Backfill block (SPA-136) shows how many chunks carry the pinned model
  * and what embedding the rest would cost; its button asks with that
  * estimate before anything is queued. With a local route it counts the
@@ -98,7 +88,7 @@ export function EmbeddingsSection({
 }) {
   const router = useRouter()
   const { confirm, confirmDialog } = useConfirm()
-  const { pin, slot, keys, local } = settings
+  const { pin, slot, keys } = settings
   const [provider, setProvider] = useState<EmbeddingProvider>(
     pin?.provider ?? 'openai',
   )
@@ -117,28 +107,7 @@ export function EmbeddingsSection({
   // The pin a chosen same-width model would replace: the note names it.
   const swapFrom =
     pin !== null && chosen !== undefined && !isPinned ? pin : null
-  // The in-process model has no key: its files on disk are what it needs.
-  const localView = descriptor.inProcess
-    ? (local.find((l) => l.model === (chosen?.id ?? model)) ?? local.at(0))
-    : undefined
-  const canCall =
-    chosen !== undefined &&
-    (descriptor.inProcess
-      ? localView?.present === true
-      : keyRow?.configured === true)
-  const localBusy =
-    localView !== undefined &&
-    [localView.download.state, localView.test.state].some(
-      (s) => s === 'queued' || s === 'running',
-    )
-
-  // While a local job is queued or running, the loader is re-read: its
-  // `job_run` line is the progress.
-  useEffect(() => {
-    if (!localBusy) return
-    const timer = setInterval(() => void router.invalidate(), 2000)
-    return () => clearInterval(timer)
-  }, [localBusy, router])
+  const canCall = chosen !== undefined && keyRow?.configured === true
 
   const providerItems: Array<SelectItem<EmbeddingProvider>> =
     EMBEDDING_PROVIDERS.map((id) => ({
@@ -182,33 +151,8 @@ export function EmbeddingsSection({
     }
   }
 
-  /** Queues one of the local model's jobs; its line arrives by polling. */
-  async function startLocal(
-    job: 'download' | 'test',
-    target: string,
-  ): Promise<void> {
-    setPending(job === 'download' ? 'key' : 'test')
-    setError(null)
-    setResult(null)
-    try {
-      const started =
-        job === 'download'
-          ? await startLocalModelDownload({ data: { model: target } })
-          : await startLocalModelTest({ data: { model: target } })
-      if (started.status === 'queue-unavailable')
-        setError('The worker queue is unreachable; try again shortly')
-      if (started.status === 'already-queued') toast.message('Already queued')
-      void router.invalidate()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start')
-    } finally {
-      setPending(null)
-    }
-  }
-
   async function test() {
     if (!chosen) return
-    if (descriptor.inProcess) return startLocal('test', chosen.id)
     setPending('test')
     setResult(null)
     try {
@@ -272,7 +216,7 @@ export function EmbeddingsSection({
           hint={
             descriptor.local
               ? `${descriptor.label} runs on a box you run; nothing leaves it.`
-              : 'Where text is sent to be embedded. Ollama and the local model run on your box; the rest are cloud.'
+              : 'Where text is sent to be embedded. Ollama is local; the rest are cloud.'
           }
         >
           <Select<EmbeddingProvider>
@@ -310,17 +254,7 @@ export function EmbeddingsSection({
           )}
         </ol>
 
-        {localView !== undefined ? (
-          <LocalModelFiles
-            view={localView}
-            disabled={pending !== null}
-            onDownload={() => void startLocal('download', localView.model)}
-            onUse={() => {
-              setModel(localView.model)
-              void startLocal('test', localView.model)
-            }}
-          />
-        ) : descriptor.keyless ? (
+        {descriptor.keyless ? (
           <SettingsRow
             label={`${descriptor.label} address`}
             hint={
@@ -393,11 +327,9 @@ export function EmbeddingsSection({
             size="sm"
             variant="outline"
             onClick={() => void test()}
-            disabled={pending !== null || !canCall || localBusy}
+            disabled={pending !== null || !canCall}
           >
-            {pending === 'test' || localView?.test.state === 'running'
-              ? 'Testing'
-              : 'Test'}
+            {pending === 'test' ? 'Testing' : 'Test'}
           </Button>
           <Button
             size="sm"
@@ -407,10 +339,6 @@ export function EmbeddingsSection({
             {isPinned ? 'Pinned' : swapFrom ? 'Swap' : 'Pin'}
           </Button>
         </div>
-
-        {localView !== undefined ? (
-          <LocalTestResult run={localView.test} />
-        ) : null}
 
         {result ? (
           <div
@@ -446,9 +374,7 @@ export function EmbeddingsSection({
           </span>
         </div>
 
-        {pin ? (
-          <SensitiveSlot pin={pin} slot={slot} keys={keys} local={local} />
-        ) : null}
+        {pin ? <SensitiveSlot pin={pin} slot={slot} keys={keys} /> : null}
 
         {backfill.pin ? (
           <Backfill initial={backfill} confirm={confirm} />
@@ -613,33 +539,24 @@ function SensitiveSlot({
   pin,
   slot,
   keys,
-  local,
 }: {
   pin: EmbeddingPinView
   slot: EmbeddingSettings['slot']
   keys: ReadonlyArray<EmbeddingKeyRow>
-  local: ReadonlyArray<LocalModelView>
 }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const pinLocal = EMBEDDING_PROVIDER_INFO[pin.provider].local
-  const green = [
-    ...keys.flatMap((k) =>
-      EMBEDDING_PROVIDER_INFO[k.provider].local &&
-      k.configured &&
-      k.lastTestOk === true &&
-      k.testedModel !== null
-        ? [{ provider: k.provider, model: k.testedModel }]
-        : [],
-    ),
-    ...local.flatMap((l) =>
-      l.present && l.testedOk
-        ? [{ provider: 'local' as const, model: l.model }]
-        : [],
-    ),
-  ]
+  const green = keys.flatMap((k) =>
+    EMBEDDING_PROVIDER_INFO[k.provider].local &&
+    k.configured &&
+    k.lastTestOk === true &&
+    k.testedModel !== null
+      ? [{ provider: k.provider, model: k.testedModel }]
+      : [],
+  )
   const candidate = slot ?? green.at(0) ?? null
 
   async function set() {
@@ -724,108 +641,6 @@ function SensitiveSlot({
         </div>
       ) : null}
     </>
-  )
-}
-
-/** A local job's state, said in the instrument's lowercase mono. */
-function localRunLine(run: LocalJobRun): string | null {
-  switch (run.state) {
-    case 'idle':
-      return null
-    case 'queued':
-      return 'queued'
-    case 'running':
-      return run.line ?? 'running'
-    case 'done':
-      return run.line
-    case 'failed':
-      return run.reason
-  }
-}
-
-/**
- * The local model's files (D50): where they live and the one button. Absent,
- * it downloads them; present — downloaded, or copied by hand — it uses them,
- * which runs the Test. While the download runs the row carries its progress.
- */
-function LocalModelFiles({
-  view,
-  disabled,
-  onDownload,
-  onUse,
-}: {
-  view: LocalModelView
-  disabled: boolean
-  onDownload: () => void
-  onUse: () => void
-}) {
-  const downloading =
-    view.download.state === 'queued' || view.download.state === 'running'
-  const line = downloading ? localRunLine(view.download) : null
-  return (
-    <>
-      <SettingsRow
-        label="Model files"
-        hint={
-          view.present
-            ? `On disk at ${view.dir}. Runs in the worker; nothing leaves this box.`
-            : `About ${view.approxMegabytes} MB, downloaded once to ${view.dir} — never part of the image.`
-        }
-      >
-        {line ? (
-          <span className="tabular mono text-micro text-graphite">{line}</span>
-        ) : null}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={view.present ? onUse : onDownload}
-          disabled={disabled || downloading}
-        >
-          {downloading
-            ? 'Downloading'
-            : view.present
-              ? 'Use downloaded model'
-              : 'Download local model'}
-        </Button>
-      </SettingsRow>
-      {view.download.state === 'failed' ? (
-        <div className="flex min-h-9 items-center border-b border-rule px-3 py-2">
-          <span role="alert" className="mono text-micro text-destructive">
-            {view.download.reason}
-          </span>
-        </div>
-      ) : null}
-    </>
-  )
-}
-
-/**
- * The local Test's answer, read from its job: while it runs, that the first
- * run loads the model; then the width and the head, or the reason.
- */
-function LocalTestResult({ run }: { run: LocalJobRun }) {
-  const line = localRunLine(run)
-  if (line === null) return null
-  const failed = run.state === 'failed'
-  return (
-    <div
-      role="status"
-      className="flex min-h-9 items-start gap-3 border-b border-rule px-3 py-2"
-    >
-      <span
-        className={cn(
-          'w-28 shrink-0 mono text-micro',
-          failed ? 'text-destructive' : 'text-graphite',
-        )}
-      >
-        {failed ? 'error' : run.state === 'done' ? 'tested' : 'testing'}
-      </span>
-      <span className="min-w-0 flex-1 mono text-label break-words">
-        {run.state === 'running' && run.line === null
-          ? LOCAL_TEST_RUNNING_LINE
-          : line}
-      </span>
-    </div>
   )
 }
 

@@ -4,11 +4,10 @@ import type { ResolvedCredential } from '@spaces/core/writes/vault'
 import { CredentialReadFailed, NoCredential } from '../index'
 import type { ResolveModelFailure } from '../index'
 import { readProviderMeta } from '../meta'
-import { EMBEDDING_PROVIDER_INFO, embeddingCredentialProvider } from './ids'
+import { embeddingCredentialProvider } from './ids'
 import type { EmbeddingProvider } from './ids'
 import type { EmbedAdapterInput, EmbedCall } from './adapter'
 import { googleEmbedCall } from './google'
-import { localEmbedCall } from './local'
 import { ollamaEmbedCall } from './ollama'
 import { openaiEmbedCall } from './openai'
 import { voyageEmbedCall } from './voyage'
@@ -29,7 +28,6 @@ const ADAPTERS: Record<
   google: googleEmbedCall,
   voyage: voyageEmbedCall,
   ollama: ollamaEmbedCall,
-  local: localEmbedCall,
 }
 
 /** The adapter for one provider, from an already-resolved credential. */
@@ -68,20 +66,9 @@ export const resolveEmbedCall = Effect.fn('resolveEmbedCall')(function* (
     maxRetries?: number
   },
 ): Effect.fn.Return<
-  { call: EmbedCall; credentialId: string | null },
+  { call: EmbedCall; credentialId: string },
   ResolveModelFailure
 > {
-  // The in-process model has no credential: its files are its key. (D50)
-  if (EMBEDDING_PROVIDER_INFO[provider].inProcess)
-    return {
-      call: embedCallFor(
-        provider,
-        { secret: '', meta: {} },
-        opts.modelId,
-        opts.dims,
-      ),
-      credentialId: null,
-    }
   const credential = yield* Effect.tryPromise({
     try: () =>
       resolveCredential(embeddingCredentialProvider(provider), opts.userId),

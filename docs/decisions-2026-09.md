@@ -220,17 +220,11 @@ Threads are edged on arrival to the people whose address matches an alias and th
 
 _Carried by_ `arrival-1` (SPA-56) · `arrival-2` (SPA-86). _Blocks_ `arrival-10`.
 
-### D50-local-embedding-seam — answered 2026-10-06
+### D50-local-embedding-seam — withdrawn
+
+_Withdrawn 2026-10-06 by the owner: **local embeddings are Ollama only**, and there is no in-process model. A transformers.js model adds the ONNX runtime (~44 MB plus `sharp`) to every worker image, a web↔worker seam and an idle model lifecycle. All of that buys only the step of running Ollama, which is one optional compose service for an operator already on Docker. `ai-9c` (SPA-161) was built on the LISTEN/NOTIFY answer, merged, then reverted. Its `embed_request` table stays in the journal (0061) and is dropped by 0062. The question below is moot._
 
 **When the local embedding model lives inside the worker, how does the web process get a query vector while the user types?**
-
-**Answered (owner, 2026-10-06): request/reply over Postgres `LISTEN`/`NOTIFY`.** Web writes a request row (the query text and the pinned model) and notifies its id on `embed_request`; the worker, already listening for plugin reloads, embeds the text with the lazily loaded transformers.js model, writes the 768 floats to that row and notifies the id back on `embed_reply`; web, listening on its own connection, reads the row and hands the vector to the search path. The vector never rides in the notification (8 KB cap); no new env variable, no port. A request no worker answers in time falls back to the lexical lane — the search never hangs. Request rows are transient: web deletes its own on read or timeout, and the worker prunes stale ones.
-
-- Rejected — worker HTTP `/embed` + `WORKER_URL`: a new network surface, and a split web/worker deploy must set the env by hand.
-- Rejected — web loads the model: breaks the worker-only rule, +300 MB on web, inference on its loop.
-- Rejected — pg-boss round trips: seconds, never an option.
-
-_Carried by_ `ai-9c` (SPA-161). The options as they stood before the answer:
 
 Query-time embedding runs in web (`apps/web/src/lib/search/query-embedding.ts`), a transformers.js model is memory inside the process that loaded it, and the worker-only rule forbids web from loading it. Ollama has no such problem — it is an HTTP server both processes call — which is why SPA-83 was resequenced on 2026-09-25 to Ollama-plus-sensitive-slot first, with the in-process model split into `ai-9c`.
 
@@ -238,7 +232,7 @@ Query-time embedding runs in web (`apps/web/src/lib/search/query-embedding.ts`),
 - **Request/reply over Postgres `LISTEN`/`NOTIFY`**, reply written to a row and its id notified — no port, no env; tens of ms plus inference; the 8 KB payload cap rules out the vector itself in the notification. _Reversal cost:_ Low.
 - **Web loads the model lazily when the pin is local** — simplest; kills the worker-only rule; +300 MB resident on web and inference on its loop. _Reversal cost:_ Moderate.
 
-Recorded in CONTEXT.md §Embeddings ("The local seam").
+**Not answered.** Carried by `ai-9c`, `hitl`, which records the answer in CONTEXT.md §Embeddings before building the seam. pg-boss round trips are seconds and are not an option.
 
 ---
 

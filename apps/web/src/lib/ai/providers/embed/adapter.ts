@@ -58,9 +58,6 @@ export function sdkDimensionOptions(
     // one pinnable model emits 768 natively, so nothing is asked for.
     case 'ollama':
       return {}
-    // The local model is not an SDK provider; bge-base emits 768 natively.
-    case 'local':
-      return {}
   }
 }
 

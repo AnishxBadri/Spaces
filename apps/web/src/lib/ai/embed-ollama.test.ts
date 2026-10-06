@@ -37,9 +37,6 @@ import {
  * fake. Nothing reaches a network.
  */
 
-// The settings view reads the local model's jobs from the queue.
-vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
-
 const NOMIC: EmbeddingTarget = { provider: 'ollama', model: 'nomic-embed-text' }
 const MXBAI: EmbeddingTarget = {
   provider: 'ollama',

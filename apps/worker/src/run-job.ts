@@ -100,11 +100,6 @@ export class JobContext extends Context.Service<
     readonly jobId: string
     readonly attempt: number
     readonly isFinalAttempt: boolean
-    /**
-     * Writes `line` to this attempt's `job_run.summary` while it runs — the
-     * row is still the wrapper's to write. Absent where no ledger records it.
-     */
-    readonly progress?: (line: string) => Effect.Effect<void>
   }
 >()('spaces/worker/JobContext') {}
 
@@ -275,8 +270,6 @@ export interface JobRunLedger {
     close: JobClose['close'] | null,
     charge: BreakerCharge | null,
   ) => Promise<boolean>
-  /** A running row's summary, overwritten; a ledger may record no progress. */
-  readonly progress?: (id: string, line: string) => Promise<void>
 }
 
 // ---------------------------------------------------------------------------
@@ -484,28 +477,7 @@ const postgresLedger: JobRunLedger = {
         })
       return tripped
     }),
-  progress: async (id, line) => {
-    await db
-      .update(jobRun)
-      .set({ summary: line.slice(0, 1000) })
-      .where(and(eq(jobRun.id, id), eq(jobRun.status, 'running')))
-  },
 }
-
-/** Progress is bookkeeping too: a failed write is logged, never a failure. */
-const progressOf =
-  (ledger: JobRunLedger, runId: string | null) =>
-  (line: string): Effect.Effect<void> => {
-    const write = ledger.progress
-    if (runId === null || write === undefined) return Effect.void
-    return Effect.promise(() =>
-      write(runId, line).catch((err: unknown) => {
-        console.error(
-          `[worker] could not write progress to job_run ${runId} — ${messageOf(err)}`,
-        )
-      }),
-    )
-  }
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -761,13 +733,7 @@ async function settle<TData, TServices>(
           Effect.provideService(
             def.run(parsed.data),
             JobContext,
-            JobContext.of({
-              queue,
-              jobId: job.id,
-              attempt,
-              isFinalAttempt,
-              progress: progressOf(ledger, runId),
-            }),
+            JobContext.of({ queue, jobId: job.id, attempt, isFinalAttempt }),
           ),
         ),
         options.layer,
