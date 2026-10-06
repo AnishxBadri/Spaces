@@ -25,9 +25,80 @@ function isTyping(e: KeyboardEvent) {
   )
 }
 
-/** Many bindings, one listener; chords share one armed state. */
+/**
+ * Every mounted `useHotkeys`, in effect order, behind one document listener.
+ * - One armed chord for the whole page, not one per instance: a key that
+ *   completes an armed chord is consumed by it and reaches no single-key
+ *   binding in any instance.
+ * - Any other key still visits each instance, as separate listeners did.
+ */
+const instances = new Set<{ current: Array<Binding> }>()
+let armed: { key: string; at: number } | null = null
+
+/** The handler of a mounted chord `first second`, if any instance has one. */
+function chordHandler(first: string, second: string) {
+  for (const inst of instances) {
+    for (const [spec, handler] of inst.current) {
+      if (spec.toLowerCase() === `${first} ${second}`) return handler
+    }
+  }
+  return null
+}
+
+function onKey(e: KeyboardEvent) {
+  const k = e.key.toLowerCase()
+  const mod = e.metaKey || e.ctrlKey
+  const now = Date.now()
+  const arm = armed
+  armed = null
+  const live = arm && now - arm.at < CHORD_WINDOW_MS ? arm.key : null
+  const guarded = mod || e.altKey || isTyping(e)
+
+  if (live !== null && !guarded) {
+    const handler = chordHandler(live, k)
+    if (handler) {
+      e.preventDefault()
+      handler()
+      return
+    }
+  }
+
+  // A handler may unmount an instance mid-dispatch; skip the ones it did.
+  for (const inst of [...instances]) {
+    if (!instances.has(inst)) continue
+    for (const [spec, handler] of inst.current) {
+      const s = spec.toLowerCase()
+      if (s.startsWith('mod+')) {
+        if (mod && !e.altKey && k === s.slice(4)) {
+          e.preventDefault()
+          handler()
+          break
+        }
+        continue
+      }
+      if (guarded) continue
+      if (s.includes(' ')) {
+        const [first] = s.split(' ')
+        // An armed prefix whose second key completed nothing just disarms.
+        if (live === first) continue
+        if (k === first) {
+          armed = { key: first, at: now }
+          e.preventDefault()
+          break
+        }
+        continue
+      }
+      if (k === s) {
+        e.preventDefault()
+        handler()
+        break
+      }
+    }
+  }
+}
+
+/** Many bindings; every instance shares one listener and one armed chord. */
 export function useHotkeys(bindings: Array<Binding>) {
-  const armed = useRef<{ key: string; at: number } | null>(null)
   const latest = useRef(bindings)
   latest.current = bindings
   // Re-register only when the set of keys changes; handlers read live.
@@ -35,49 +106,16 @@ export function useHotkeys(bindings: Array<Binding>) {
 
   useEffect(() => {
     if (!signature) return
-    function onKey(e: KeyboardEvent) {
-      const k = e.key.toLowerCase()
-      const mod = e.metaKey || e.ctrlKey
-      const now = Date.now()
-      const arm = armed.current
-      armed.current = null
-      for (const [spec, handler] of latest.current) {
-        const s = spec.toLowerCase()
-        if (s.startsWith('mod+')) {
-          if (mod && !e.altKey && k === s.slice(4)) {
-            e.preventDefault()
-            handler()
-            return
-          }
-          continue
-        }
-        if (mod || e.altKey || isTyping(e)) continue
-        if (s.includes(' ')) {
-          const [first, second] = s.split(' ')
-          if (arm && arm.key === first && now - arm.at < CHORD_WINDOW_MS) {
-            if (k === second) {
-              e.preventDefault()
-              handler()
-              return
-            }
-            continue
-          }
-          if (k === first) {
-            armed.current = { key: first, at: now }
-            e.preventDefault()
-            return
-          }
-          continue
-        }
-        if (k === s) {
-          e.preventDefault()
-          handler()
-          return
-        }
+    const inst = latest
+    if (instances.size === 0) document.addEventListener('keydown', onKey)
+    instances.add(inst)
+    return () => {
+      instances.delete(inst)
+      if (instances.size === 0) {
+        document.removeEventListener('keydown', onKey)
+        armed = null
       }
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
   }, [signature])
 }
 
