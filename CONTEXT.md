@@ -596,6 +596,9 @@ link(id, from_entity_id, to_entity_id, relation, attr_slug,
   -- graph (added 2026-07-30 with the attribute engine, migration 0005); the edge
   -- is unique on (from, to, relation, attr_slug), and attr_slug is '' elsewhere.
   -- See "Record-references materialize into the graph".
+  -- `contact_at` is retired (D60, migration 0059): a person's companies are the
+  -- `companies` attribute, materialized as `references` / 'companies'. The enum
+  -- value stays; nothing writes it.
 ```
 
 Real FKs on both sides. Typing `[[Orbital Composites]]` in a note materializes a `link` row —

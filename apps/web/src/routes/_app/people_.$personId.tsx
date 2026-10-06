@@ -347,6 +347,7 @@ function PersonRecordPage() {
                 objectLabel={'person'}
                 onAttributeSaved={() => router.invalidate()}
                 value={person.values[def.slug] ?? null}
+                refNames={person.refNames}
                 onSave={async (v) => {
                   await updateRecord({
                     data: { id: person.id, patch: { [def.slug]: v } },

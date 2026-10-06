@@ -37,7 +37,7 @@ import type { Condition } from '@spaces/core/views/filter'
  * `./paging` helpers `/o/$objectSlug` uses. Nothing here is a second pager.
  *
  * What is different is what a row carries beyond its values — a company's
- * domains, a person's emails and employer, and when either was last touched
+ * domains, a person's emails, and when either was last touched
  * by an interaction. Those were whole-table side queries: three `select`s
  * with no `where` that built a map of every alias in the database so fifty
  * rows could read fifty entries out of it. **They run over the page's ids
@@ -264,32 +264,30 @@ export const listCompaniesPageProgram = Effect.fn('listCompaniesPageProgram')(
   },
 )
 
-/** Employer per person, for the page's rows only. */
-async function employersFor(
+/**
+ * Names for the page's record-reference values — a person's `companies` and
+ * any custom reference — so the cells can print them. Merged-away targets
+ * are left out: their links have already moved to the winner.
+ */
+async function referenceNamesFor(
   ids: Array<string>,
-): Promise<Map<string, { id: string; name: string }>> {
-  if (ids.length === 0) return new Map()
+): Promise<Record<string, { name: string }>> {
+  if (ids.length === 0) return {}
   const rows = await db
-    .select({
-      personId: link.fromEntityId,
-      companyId: entity.id,
-      companyName: entity.canonicalName,
-    })
+    .select({ id: entity.id, name: entity.canonicalName })
     .from(link)
     .innerJoin(entity, eq(entity.id, link.toEntityId))
     .where(
       and(
-        eq(link.relation, 'contact_at'),
+        eq(link.relation, 'references'),
         isNull(entity.mergedIntoId),
         inArray(link.fromEntityId, ids),
       ),
     )
-  return new Map(
-    rows.map((r) => [r.personId, { id: r.companyId, name: r.companyName }]),
-  )
+  return Object.fromEntries(rows.map((r) => [r.id, { name: r.name }]))
 }
 
-/** The `/people` table: entity core + values + emails + employer. */
+/** The `/people` table: entity core + values + emails + reference names. */
 export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
   function* (conditions: Array<Condition>, options: ListPageOptions = {}) {
     const page = yield* pageOfKind(
@@ -298,10 +296,10 @@ export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
       conditions,
       options,
     )
-    const [emails, employers, touched] = yield* query(() =>
+    const [emails, refNames, touched] = yield* query(() =>
       Promise.all([
         aliasesFor('email', page.ids),
-        employersFor(page.ids),
+        referenceNamesFor(page.ids),
         lastTouchedFor(page.ids),
       ]),
     )
@@ -311,12 +309,12 @@ export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
         name: r.name,
         values: r.values,
         emails: emails.get(r.id) ?? [],
-        company: employers.get(r.id) ?? null,
         lastTouched: touched.get(r.id) ?? null,
         createdAt: r.createdAt.toISOString(),
       })),
       nextCursor: page.nextCursor,
       total: page.total,
+      refNames,
     }
   },
 )

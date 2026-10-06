@@ -35,6 +35,7 @@ import type {
 import type { CaptureObject } from '@spaces/core/writes/ai/capture-read'
 import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
 import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'
+import { setPersonCompanyInTx } from '#/lib/people/companies'
 
 // The propose half moved into core (SPA-204): every name it exported is
 // re-exported here unchanged, so the AI lanes, MCP, capture and their tests
@@ -79,10 +80,10 @@ export type {
  * payload rather than a flip; `acceptProgram` says the rule.
  *
  * Two kinds accept today: `attribute_patch` (a value, through the one write
- * path) and `identity` (SPA-105: a person, through `resolveEntity`, plus a
- * `contact_at` link to the record and — SPA-160 — the person written into
- * the reference field the claim came from). Every other kind is refused by
- * name.
+ * path) and `identity` (SPA-105: a person, through `resolveEntity`; a company
+ * record joins the person's `companies`, and — SPA-160 — the person is
+ * written into the reference field the claim came from). Every other kind is
+ * refused by name.
  *
  * **A captured page is an anchor too (SPA-134).** A capture names somebody
  * we usually hold no record for, so its read is anchored on the captured
@@ -90,8 +91,8 @@ export type {
  * there, and nothing else: a patch on a document is held to the registry of
  * the object its run read the page against (`patchAnchor`), and lands on the
  * one record of that object the page is filed on; an identity on a document
- * files the page on the person it resolves (`tagged_in`) rather than linking
- * them `contact_at` it — which is what then gives the patch its record.
+ * files the page on the person it resolves (`tagged_in`) rather than adding
+ * it to their companies — which is what then gives the patch its record.
  */
 
 /** Only a person accepts or rejects: the decision is what `decided_by` names. */
@@ -218,8 +219,9 @@ export type Accepted =
       /** What `resolveEntity` did: attached to a known person, or created one. */
       resolved: ResolveResult
       /**
-       * False when the person was already `contact_at` the record — or, for
-       * a captured page (SPA-134), when the page was already filed on them.
+       * True when this accept added the company record to the person's
+       * `companies` — or, for a captured page (SPA-134), filed the page on
+       * them. False when it was already so, and for any other record.
        */
       linked: boolean
       /**
@@ -254,8 +256,8 @@ export type Accepted =
 
 /**
  * Accept an identity (SPA-105, spec §11): the person a document named walks
- * through `resolveEntity` — the one door every creator uses — and is linked
- * `contact_at` the record the suggestion sits on.
+ * through `resolveEntity` — the one door every creator uses — and, when the
+ * suggestion sits on a company, gains it in their `companies`. (D60)
  *
  * - An exact email or LinkedIn match **attaches**: no new entity, and the
  *   name the document used becomes a name alias of the person already held.
@@ -265,16 +267,16 @@ export type Accepted =
  *
  * `resolveEntity` is Promise-shaped and writes on `db`, not on this
  * transaction, so the person it creates commits on its own connection
- * before the link and the flip below. The row lock this transaction holds
- * is what still serializes two accepts of one row: the second waits, then
- * reads `accepted`. If the link or the flip then fails, the person stays and
- * the suggestion stays open; a retry attaches by key or files the pair —
+ * before the value writes and the flip below. The row lock this transaction
+ * holds is what still serializes two accepts of one row: the second waits,
+ * then reads `accepted`. If a write or the flip then fails, the person stays
+ * and the suggestion stays open; a retry attaches by key or files the pair —
  * the one door's own doctrine, not a second person silently welded.
  *
  * Then the person is written into the field the claim was read off
  * (SPA-160; `fileIntoReference` below) — `founders` on a company, `people`
  * or `referred_by` on a deal — through the one write path, in this
- * transaction, so the link, the value and the flip commit together.
+ * transaction, so both values and the flip commit together.
  */
 async function acceptIdentityInTx(
   tx: Tx,
@@ -333,19 +335,23 @@ async function acceptIdentityInTx(
       filed: null,
     }
 
-  const inserted = await tx
-    .insert(link)
-    .values({
-      fromEntityId: resolved.entityId,
-      toEntityId: recordId,
-      relation: 'contact_at',
-      source: 'extracted',
-      createdBy: actor.id,
-    })
-    .onConflictDoNothing()
-    .returning({ id: link.id })
-  // A row proposed before SPA-160 names no field: it accepts as the link
-  // alone, which is all an identity used to write.
+  // The person is at the company the deck was read against. A deal or a
+  // custom record is not somewhere a person works; the field below says
+  // how they relate to it.
+  const joined =
+    record.kind === 'company'
+      ? await setPersonCompanyInTx(tx, {
+          personId: resolved.entityId,
+          companyId: recordId,
+          action: 'link',
+          actor,
+          source: 'suggestion',
+          suggestionId: row.id,
+          refs: row.refs,
+        })
+      : null
+  // A row proposed before SPA-160 names no field: it accepts as the company
+  // alone.
   const filed =
     claim.attribute === undefined
       ? null
@@ -356,7 +362,7 @@ async function acceptIdentityInTx(
           personId: resolved.entityId,
           actor,
         })
-  return { resolved, linked: inserted.length > 0, filed }
+  return { resolved, linked: joined !== null, filed }
 }
 
 /**
@@ -406,7 +412,7 @@ async function filePageOn(
  * - **single** (`referred_by`): set only when empty. A slot already holding
  *   somebody else is the operator's to change; an accept never overwrites it.
  * - A field retired, retyped or no longer aimed at people since the proposal
- *   is skipped rather than refused: the person and the link still stand.
+ *   is skipped rather than refused: the person and their company still stand.
  *
  * The record's row is locked before its value is read, so two identities
  * accepted concurrently on one record append in turn rather than each

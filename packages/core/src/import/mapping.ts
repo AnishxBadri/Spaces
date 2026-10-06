@@ -198,20 +198,20 @@ export function fitMapping(mapping: Mapping, columnCount: number): Mapping {
 
 /**
  * The alias table: a header that means a field without spelling it. Each
- * entry names a slug, which is then matched exactly as a header would be —
- * so `Website` finds the domain key only where the object has one, and
- * `Round` finds a `stage` only on an object that carries it.
+ * entry names slugs, tried in order and each matched exactly as a header
+ * would be — so `Website` finds the domain key only where the object has
+ * one, and `Company` is a person's `companies` but a company's name.
  */
-const ALIASES: Record<string, string> = {
-  website: 'domain',
-  company: 'name',
-  company_name: 'name',
-  deal_name: 'name',
-  person_name: 'name',
-  full_name: 'name',
-  round: 'stage',
-  email_address: 'email',
-  linkedin_url: 'linkedin',
+const ALIASES: Record<string, ReadonlyArray<string>> = {
+  website: ['domain'],
+  company: ['companies', 'name'],
+  company_name: ['name'],
+  deal_name: ['name'],
+  person_name: ['name'],
+  full_name: ['name'],
+  round: ['stage'],
+  email_address: ['email'],
+  linkedin_url: ['linkedin'],
 }
 
 /** The header's slug, or null when it has no letters or digits to match on. */
@@ -274,8 +274,12 @@ export function autoMap(
   pass((h) => (headerSlug(h) ? byName(h, attributes) : null))
   pass((h) => {
     const slug = headerSlug(h)
-    const alias = slug ? ALIASES[slug] : undefined
-    return alias ? bySlug(alias, registry, attributes) : null
+    const aliases = slug && Object.hasOwn(ALIASES, slug) ? ALIASES[slug] : []
+    for (const alias of aliases) {
+      const target = bySlug(alias, registry, attributes)
+      if (target && !taken.has(claimOf(target) ?? '')) return target
+    }
+    return null
   })
   return mapping
 }

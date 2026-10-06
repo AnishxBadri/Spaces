@@ -586,6 +586,100 @@ describe('mergeEntities', () => {
     expect(repointEvent.to).toBe(winner.entityId)
   })
 
+  it("repoints every person's companies when two companies merge", async () => {
+    const { resolveEntity } = await import('./resolve')
+    const { mergeEntities } = await import('./merge')
+    const { setValues } = await import('../attributes/values')
+    const { db } = await import('@spaces/db')
+    const { attributeEvent, entity, link } = await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+    const { and, eq, inArray } = await import('drizzle-orm')
+
+    const tag = randomUUID().slice(0, 8)
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    const company = async (name: string) =>
+      (
+        await resolveEntity({
+          kind: 'company',
+          name: `${name} ${tag}`,
+          keys: { domain: `${name.toLowerCase()}-${tag}.example` },
+          source: { class: 'manual' },
+        })
+      ).entityId
+    const person = async (name: string, companies: Array<string>) => {
+      const id = (
+        await resolveEntity({
+          kind: 'person',
+          name: `${name} ${tag}`,
+          source: { class: 'manual' },
+        })
+      ).entityId
+      await setValues({
+        entityId: id,
+        patch: { companies },
+        actor: { type: 'user', id: actor.id },
+      })
+      return id
+    }
+
+    const winner = await company('Vayu')
+    const loser = await company('Vayu Dup')
+    const other = await company('Kalpana')
+    // At the loser only; at the loser beside another; at both sides.
+    const onlyLoser = await person('Only', [loser])
+    const beside = await person('Beside', [other, loser])
+    const both = await person('Both', [winner, loser])
+
+    await mergeEntities({
+      winnerId: winner,
+      loserId: loser,
+      mergedBy: actor.id,
+    })
+
+    const valuesOf = async (id: string) =>
+      (
+        await db
+          .select({ values: entity.values })
+          .from(entity)
+          .where(eq(entity.id, id))
+      ).at(0)?.values.companies
+    expect(await valuesOf(onlyLoser)).toEqual([winner])
+    expect(await valuesOf(beside)).toEqual([other, winner])
+    // Both sides fold into one entry, not two.
+    expect(await valuesOf(both)).toEqual([winner])
+
+    const links = await db
+      .select({ from: link.fromEntityId, to: link.toEntityId })
+      .from(link)
+      .where(
+        and(
+          eq(link.relation, 'references'),
+          eq(link.attrSlug, 'companies'),
+          inArray(link.fromEntityId, [onlyLoser, beside, both]),
+        ),
+      )
+    expect(links.filter((l) => l.to === loser)).toEqual([])
+    expect(
+      links
+        .filter((l) => l.to === winner)
+        .map((l) => l.from)
+        .sort(),
+    ).toEqual([onlyLoser, beside, both].sort())
+
+    const repointed = await db
+      .select({ entityId: attributeEvent.entityId })
+      .from(attributeEvent)
+      .where(
+        and(
+          eq(attributeEvent.attrSlug, 'companies'),
+          eq(attributeEvent.source, 'merge'),
+        ),
+      )
+    expect(repointed.map((e) => e.entityId).sort()).toEqual(
+      [onlyLoser, beside, both].sort(),
+    )
+  })
+
   it('refuses cross-kind and self merges', async () => {
     const { resolveEntity } = await import('./resolve')
     const { mergeEntities } = await import('./merge')

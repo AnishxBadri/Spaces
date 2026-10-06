@@ -28,7 +28,6 @@ export type ContextEdge =
   | 'references'
   | 'tagged_in'
   | 'mentions'
-  | 'contact_at'
   | 'derived_from'
   | 'supersedes'
   | 'space'

@@ -190,8 +190,8 @@ function ContactRow({
  *   company's record — a row on this page nobody tagged here has to say
  *   where it came from;
  * - **there is no remove.** Removing is an untag and this person is not
- *   tagged here; the control belongs on the company's record, where the
- *   `contact_at` edge that put them on screen actually lives.
+ *   tagged here; the control belongs on the person's record, where the
+ *   `companies` value that put them on screen actually lives.
  */
 function InheritedContactRow({ contact }: { contact: InheritedContact }) {
   // One route table for the whole app. A company always has a page, so the

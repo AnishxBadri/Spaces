@@ -27,8 +27,8 @@ import type { Decider } from './propose'
 /**
  * SPA-105 — `suggestion(kind: 'identity')`. Accepting walks the claim
  * through `resolveEntity` (attach on an exact email/LinkedIn match, else
- * create and sweep names inline) and links the person `contact_at` the
- * record; rejecting writes nothing. Everything here is the real database —
+ * create and sweep names inline) and, on a company, adds it to the person's
+ * `companies`; rejecting writes nothing. Everything here is the real database —
  * the duplicate pair is read back from `duplicate_candidate` and through the
  * inbox's own list, never mocked. Per-file truncation gives this file a
  * clean database.
@@ -74,7 +74,8 @@ async function tally() {
   }
 }
 
-async function contactLinks(personId: string, recordId: string) {
+/** The edge a person's `companies` value materializes to one record. */
+async function companyLinks(personId: string, recordId: string) {
   return db
     .select()
     .from(link)
@@ -82,7 +83,8 @@ async function contactLinks(personId: string, recordId: string) {
       and(
         eq(link.fromEntityId, personId),
         eq(link.toEntityId, recordId),
-        eq(link.relation, 'contact_at'),
+        eq(link.relation, 'references'),
+        eq(link.attrSlug, 'companies'),
       ),
     )
 }
@@ -119,11 +121,19 @@ describe('accepting an identity', () => {
     expect(after.entities).toBe(before.entities)
     // The one link, and the deck's spelling kept as a name alias.
     expect(after.links).toBe(before.links + 1)
-    const links = await contactLinks(known.entityId, companyId)
+    const links = await companyLinks(known.entityId, companyId)
     expect(links).toHaveLength(1)
-    expect(links[0]).toMatchObject({
-      source: 'extracted',
-      createdBy: FIXTURE_ACTOR.id,
+    expect(links[0]).toMatchObject({ createdBy: FIXTURE_ACTOR.id })
+    // The company joined the person's `companies` with the suggestion as
+    // its receipt.
+    expect(await valueOf(known.entityId, 'companies')).toEqual([companyId])
+    const events = await eventsOn(known.entityId, 'companies')
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      source: 'suggestion',
+      suggestionId: proposed.id,
+      refs: ['doc:deck#0'],
+      actorId: FIXTURE_ACTOR.id,
     })
   })
 
@@ -221,13 +231,12 @@ describe('accepting an identity', () => {
       cards.some((c) => c.suggestions.some((s) => s.id === proposed.id)),
     ).toBe(false)
 
-    // The contact link, marked as extracted.
-    const links = await contactLinks(personId, companyId)
-    expect(links).toHaveLength(1)
-    expect(links[0].source).toBe('extracted')
+    // The company, in the new person's `companies`.
+    expect(await companyLinks(personId, companyId)).toHaveLength(1)
+    expect(await valueOf(personId, 'companies')).toEqual([companyId])
   })
 
-  it('writes the contact_at link once, even when the person is already a contact', async () => {
+  it('adds the company once, even when the person is already at it', async () => {
     const { companyId, tag } = await company()
     const email = `twice-${tag}@example.org`
     const first = await proposeIdentity(companyId, { name: 'Twice', email })
@@ -242,7 +251,8 @@ describe('accepting an identity', () => {
       entityId: a.resolved.entityId,
       action: 'attached',
     })
-    expect(await contactLinks(a.resolved.entityId, companyId)).toHaveLength(1)
+    expect(await companyLinks(a.resolved.entityId, companyId)).toHaveLength(1)
+    expect(await eventsOn(a.resolved.entityId, 'companies')).toHaveLength(1)
   })
 
   it('refuses a fields subset — an identity is accepted whole — and leaves the row open', async () => {
@@ -310,10 +320,10 @@ async function eventsOn(entityId: string, slug: string) {
 
 /**
  * SPA-160 — the field the claim was read off. Accepting writes the resolved
- * person into it, through the one write path, beside the `contact_at` link.
+ * person into it, through the one write path, beside the person's companies.
  */
 describe('accepting an identity into its field', () => {
-  it('sets a company founder into `founders` and writes the contact_at link', async () => {
+  it('sets a company founder into `founders` and the company into their `companies`', async () => {
     const { companyId, tag } = await company()
     const proposed = await proposeIdentity(companyId, {
       name: `Ada Founder ${tag}`,
@@ -330,7 +340,8 @@ describe('accepting an identity into its field', () => {
     expect(accepted.linked).toBe(true)
 
     expect(await valueOf(companyId, 'founders')).toEqual([personId])
-    expect(await contactLinks(personId, companyId)).toHaveLength(1)
+    expect(await valueOf(personId, 'companies')).toEqual([companyId])
+    expect(await companyLinks(personId, companyId)).toHaveLength(1)
 
     // Through the one write path: an event with the suggestion as receipt,
     // and the reference materialized as a `references` link.
@@ -401,7 +412,7 @@ describe('accepting an identity into its field', () => {
     expect(await valueOf(companyId, 'founders')).toEqual([a.resolved.entityId])
     // The second accept wrote nothing: no second event, one link.
     expect(await eventsOn(companyId, 'founders')).toHaveLength(1)
-    expect(await contactLinks(a.resolved.entityId, companyId)).toHaveLength(1)
+    expect(await companyLinks(a.resolved.entityId, companyId)).toHaveLength(1)
   })
 
   it('writes a deal-sourced claim into the deal’s `people`', async () => {
@@ -426,9 +437,11 @@ describe('accepting an identity into its field', () => {
     expect(await valueOf(deal.id, 'people')).toEqual([
       accepted.resolved.entityId,
     ])
+    // A deal is not somewhere a person works: `people` is the relation.
+    expect(accepted.linked).toBe(false)
     expect(
-      await contactLinks(accepted.resolved.entityId, deal.id),
-    ).toHaveLength(1)
+      await valueOf(accepted.resolved.entityId, 'companies'),
+    ).toBeUndefined()
   })
 
   it('fills an empty single-valued `referred_by`, and never overwrites a held one', async () => {
@@ -457,11 +470,12 @@ describe('accepting an identity into its field', () => {
     expect(a.filed).toBe('referred_by')
     expect(b.filed).toBeNull()
     expect(await valueOf(deal.id, 'referred_by')).toBe(a.resolved.entityId)
-    // The second person is still a contact: only the slot stays as it was.
-    expect(await contactLinks(b.resolved.entityId, deal.id)).toHaveLength(1)
+    // The second person stands, with no edge to the deal: the slot was held.
+    expect(b.linked).toBe(false)
+    expect(await valueOf(b.resolved.entityId, 'companies')).toBeUndefined()
   })
 
-  it('writes only the link for a row that names no field (proposed before SPA-160)', async () => {
+  it('writes only the company for a row that names no field (proposed before SPA-160)', async () => {
     const { companyId, tag } = await company()
     const proposed = await proposeIdentity(companyId, {
       name: `Legacy ${tag}`,
@@ -473,12 +487,12 @@ describe('accepting an identity into its field', () => {
     if (accepted.kind !== 'identity') throw new Error('not an identity')
     expect(accepted.filed).toBeNull()
     expect(await valueOf(companyId, 'founders')).toBeUndefined()
-    expect(
-      await contactLinks(accepted.resolved.entityId, companyId),
-    ).toHaveLength(1)
+    expect(await valueOf(accepted.resolved.entityId, 'companies')).toEqual([
+      companyId,
+    ])
   })
 
-  it('skips a field that does not take a person, keeping the link', async () => {
+  it('skips a field that does not take a person, keeping the company', async () => {
     const { companyId, tag } = await company()
     const proposed = await proposeIdentity(companyId, {
       name: `Misfiled ${tag}`,
@@ -491,7 +505,7 @@ describe('accepting an identity into its field', () => {
     expect(accepted.filed).toBeNull()
     expect(await valueOf(companyId, 'location')).toBeUndefined()
     expect(
-      await contactLinks(accepted.resolved.entityId, companyId),
+      await companyLinks(accepted.resolved.entityId, companyId),
     ).toHaveLength(1)
   })
 })

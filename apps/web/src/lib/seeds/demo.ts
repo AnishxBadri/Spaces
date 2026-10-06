@@ -4,7 +4,6 @@ import {
   company,
   entity,
   entitySpace,
-  link,
   note,
   person,
   space,
@@ -13,6 +12,7 @@ import {
 import { activity } from '@spaces/db/schema/activity'
 import type { EntityValues } from '@spaces/db/schema/entities'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { setValues } from '@spaces/core/writes/attributes/values'
 
 /**
  * Demo data — opt-in at setup, never automatic.
@@ -185,7 +185,7 @@ export async function seedDemoData(
     })
   }
 
-  // --- a person, contact_at a company -------------------------------------
+  // --- a person at a company ---------------------------------------------
   const personResult = await resolveEntity({
     kind: 'person',
     name: 'Ana Ruiz',
@@ -203,16 +203,12 @@ export async function seedDemoData(
     .where(eq(entity.id, personResult.entityId))
   const submerId = companyIds.get('Submer')
   if (submerId) {
-    await db
-      .insert(link)
-      .values({
-        fromEntityId: personResult.entityId,
-        toEntityId: submerId,
-        relation: 'contact_at',
-        source: 'manual',
-        createdBy: userId,
-      })
-      .onConflictDoNothing()
+    await setValues({
+      entityId: personResult.entityId,
+      patch: { companies: [submerId] },
+      actor: { type: 'user', id: userId },
+      source: 'seed',
+    })
   }
 
   // --- glossary -----------------------------------------------------------

@@ -214,6 +214,29 @@ describe('autoMap', () => {
     ])
   })
 
+  it("on people, Company finds the person's companies, beside the name", () => {
+    const people: MappingRegistry = {
+      identityKeys: CORE_IDENTITY_KEYS,
+      attributes: [
+        attr('p-companies', 'companies', 'Companies', 'record_reference', {
+          options: { targetKind: 'company', multi: true },
+        }),
+      ],
+    }
+    expect(autoMap(['Name', 'Company', 'Email'], people)).toEqual([
+      { target: 'name' },
+      { target: 'attribute', attributeId: 'p-companies' },
+      { target: 'identity', key: 'email' },
+    ])
+    // With no name column, Company still means where the person works.
+    expect(autoMap(['Company'], people)).toEqual([
+      { target: 'attribute', attributeId: 'p-companies' },
+    ])
+    expect(autoMap(['Companies'], people)).toEqual([
+      { target: 'attribute', attributeId: 'p-companies' },
+    ])
+  })
+
   it('never maps two headers onto one target — the second is ignored', () => {
     expect(autoMap(['Stage', 'stage', 'Round'], deals)).toEqual([
       { target: 'attribute', attributeId: 'a-stage' },

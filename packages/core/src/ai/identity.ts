@@ -19,8 +19,9 @@ export const identityPayloadSchema = z
      * The slug of the person-reference attribute the claim was read off
      * (SPA-160): `founders` on a company, `people` or `referred_by` on a
      * deal. Accepting writes the resolved person into that attribute on the
-     * record, beside the `contact_at` link. Optional because rows proposed
-     * before SPA-160 carry none — those accept as a link alone.
+     * record. Optional because rows proposed before SPA-160 carry none —
+     * those accept with the person alone (a company record also joins the
+     * person's `companies`).
      */
     attribute: z.string().trim().min(1).max(100).optional(),
   })

@@ -106,7 +106,6 @@ const edgeOf = (relation: string): ContextEdge =>
   relation === 'references' ||
   relation === 'tagged_in' ||
   relation === 'mentions' ||
-  relation === 'contact_at' ||
   relation === 'derived_from' ||
   relation === 'supersedes'
     ? relation
@@ -552,14 +551,12 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       case 'term':
         break // spaces via entity_space below; terms via task text
       default: {
-        // a linked record: the reference line, or the contact/mention name
+        // a linked record: the reference line, or the mention name
         if (l.relation === 'references' && l.fromEntityId === seedId) break // already an attribute
         const label =
           l.relation === 'references'
             ? `Referenced by ${other.kind}: ${other.name} (${l.attrSlug})`
-            : l.relation === 'contact_at'
-              ? `${other.kind === 'person' ? 'Contact' : 'Company'}: ${other.name}`
-              : `${other.kind}: ${other.name}`
+            : `${other.kind}: ${other.name}`
         candidates.push({
           ref: ref.attr(
             otherId,

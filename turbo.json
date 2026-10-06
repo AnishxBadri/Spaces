@@ -104,6 +104,19 @@
       "outputs": []
     },
 
+    // apps/web's suite also reads the worker's and the plugins' sources: the
+    // retired-`contact_at` scan proves no package writes one, and neither is
+    // a dependency whose files turbo would fold into this hash on its own.
+    "@spaces/web#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/worker/src/**",
+        "$TURBO_ROOT$/plugins/**/src/**"
+      ],
+      "outputs": []
+    },
+
     "typecheck": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$"],

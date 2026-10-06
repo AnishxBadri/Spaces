@@ -36,45 +36,39 @@ export const listPeople = createServerFn().handler(async () => {
     .orderBy(desc(entity.createdAt))
   if (rows.length === 0) return []
 
-  // Primary email + company per person, batched.
+  // Primary email + companies per person, batched.
   const emails = await db
     .select({ entityId: entityAlias.entityId, email: entityAlias.valueNorm })
     .from(entityAlias)
     .where(and(eq(entityAlias.kind, 'email'), eq(entityAlias.isIdentity, true)))
   const emailBy = new Map(emails.map((e) => [e.entityId, e.email]))
 
-  const companies = await db
-    .select({
-      personId: link.fromEntityId,
-      companyId: entity.id,
-      companyName: entity.canonicalName,
-    })
+  // Names for every `companies` value; the value decides which and in what order.
+  const { companyIdsOf, personCompanyEdge } =
+    await import('../people/companies')
+  const named = await db
+    .select({ id: entity.id, name: entity.canonicalName })
     .from(link)
     .innerJoin(entity, eq(entity.id, link.toEntityId))
-    .where(eq(link.relation, 'contact_at'))
-  const companyBy = new Map(
-    companies.map((c) => [
-      c.personId,
-      { id: c.companyId, name: c.companyName },
-    ]),
-  )
+    .where(and(personCompanyEdge, isNull(entity.mergedIntoId)))
+  const nameBy = new Map(named.map((c) => [c.id, c.name]))
 
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
     headline: jsonString(r.values.job_title),
     email: emailBy.get(r.id) ?? null,
-    company: companyBy.get(r.id) ?? null,
+    companies: companyIdsOf(r.values).flatMap((id) => {
+      const name = nameBy.get(id)
+      return name === undefined ? [] : [{ id, name }]
+    }),
     createdAt: r.createdAt.toISOString(),
   }))
 })
 
-/** Table rows for people: values + identity emails + company via contact_at. */
 /**
- * The `/people` table, on views-3's paging contract (SPA-96) — the same
- * change `listCompaniesTable` took, for the same reason. It selected every
- * person, then read every email alias and every `contact_at` edge in the
- * database to decorate them; both side queries run over the page's ids now.
+ * The `/people` table, on views-3's paging contract: values, identity emails
+ * and the names its reference cells show, read over the page's ids.
  *
  * The read is `listPeoplePageProgram` in `lib/views/directory.ts`, outside
  * `lib/server/` because this module is re-exported by the client-imported
@@ -117,17 +111,17 @@ export const createPerson = createServerFn({ method: 'POST' })
     for (const s of reembed) await enqueueSourceEmbed(s)
     // A manual birth's `entity.created`; null on an attach. (D65)
     await emitDomainEvent(emit)
+    // The picked company joins the person's `companies` through the one
+    // write path — on an attach too, where birth values are not written.
     if (data.companyId) {
-      await db
-        .insert(link)
-        .values({
-          fromEntityId: result.entityId,
-          toEntityId: data.companyId,
-          relation: 'contact_at',
-          source: 'manual',
-          createdBy: u.id,
-        })
-        .onConflictDoNothing()
+      const { setPersonCompanyProgram } = await import('../people/companies')
+      const { effectFn } = await import('./effect')
+      await effectFn(setPersonCompanyProgram)({
+        personId: result.entityId,
+        companyId: data.companyId,
+        action: 'link',
+        actor: { type: 'user', id: u.id },
+      })
     }
     if (result.action === 'created') {
       await db.insert(activity).values({
@@ -172,20 +166,28 @@ export const getPerson = createServerFn()
       .from(entityAlias)
       .where(eq(entityAlias.entityId, data.id))
 
-    const companies = await db
-      .select({
-        id: entity.id,
-        name: entity.canonicalName,
-      })
+    // Names for this person's reference values, `companies` among them, so
+    // the rail's cells and the Companies list can print them.
+    const referenced = await db
+      .select({ id: entity.id, name: entity.canonicalName })
       .from(link)
       .innerJoin(entity, eq(entity.id, link.toEntityId))
       .where(
         and(
           eq(link.fromEntityId, data.id),
-          eq(link.relation, 'contact_at'),
+          eq(link.relation, 'references'),
           isNull(entity.mergedIntoId),
         ),
       )
+    const nameBy = new Map(referenced.map((r) => [r.id, r.name]))
+    const refNames = Object.fromEntries(
+      referenced.map((r) => [r.id, { name: r.name }]),
+    )
+    const { companyIdsOf } = await import('../people/companies')
+    const companies = companyIdsOf(head.values).flatMap((id) => {
+      const name = nameBy.get(id)
+      return name === undefined ? [] : [{ id, name }]
+    })
 
     // Spaces this person is tagged into (SPA-99). `entity_space` always
     // accepted any kind, but until this slice only the company and custom
@@ -227,6 +229,7 @@ export const getPerson = createServerFn()
       emails: aliases.filter((a) => a.kind === 'email'),
       linkedins: aliases.filter((a) => a.kind === 'linkedin'),
       companies,
+      refNames,
       spaces,
       referencedBy,
       timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
@@ -259,27 +262,15 @@ export const setPersonCompany = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    if (data.action === 'link') {
-      await db
-        .insert(link)
-        .values({
-          fromEntityId: data.personId,
-          toEntityId: data.companyId,
-          relation: 'contact_at',
-          source: 'manual',
-          createdBy: u.id,
-        })
-        .onConflictDoNothing()
-    } else {
-      await db
-        .delete(link)
-        .where(
-          and(
-            eq(link.fromEntityId, data.personId),
-            eq(link.toEntityId, data.companyId),
-            eq(link.relation, 'contact_at'),
-          ),
-        )
-    }
+    // One company on or off the person's `companies`, through the one write
+    // path: an `attribute_event` and the `references` link it materializes.
+    const { setPersonCompanyProgram } = await import('../people/companies')
+    const { effectFn } = await import('./effect')
+    await effectFn(setPersonCompanyProgram)({
+      personId: data.personId,
+      companyId: data.companyId,
+      action: data.action,
+      actor: { type: 'user', id: u.id },
+    })
     return { ok: true }
   })

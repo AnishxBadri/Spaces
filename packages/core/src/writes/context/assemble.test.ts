@@ -357,6 +357,66 @@ describe('assembleProgram', () => {
     )
   })
 
+  it("reaches a person's companies through `references` at full edge weight", async () => {
+    const { resolveEntity } = await import('../entities/resolve')
+    const { setValues } = await import('../attributes/values')
+    const { assembleProgram } = await import('./assemble')
+    const { SimilarLaneEmpty } = await import('../../context/similar-lane')
+    const { DEFAULT_WEIGHTS } = await import('../../context/rank')
+    const { ref } = await import('../../context/ref')
+    const { Effect } = await import('effect')
+    const { db } = await import('@spaces/db')
+    const { user } = await import('@spaces/db/schema/auth')
+
+    const [me] = await db.select({ id: user.id }).from(user).limit(1)
+    const co = (
+      await resolveEntity({
+        kind: 'company',
+        name: `WorksAt ${tag}`,
+        keys: { domain: `worksat-${tag}.com` },
+        source: { class: 'manual' },
+      })
+    ).entityId
+    const person = (
+      await resolveEntity({
+        kind: 'person',
+        name: `Worker ${tag}`,
+        source: { class: 'manual' },
+      })
+    ).entityId
+    await setValues({
+      entityId: person,
+      patch: { companies: [co] },
+      actor: { type: 'user', id: me.id },
+    })
+    const assemble = (entityId: string) =>
+      Effect.runPromise(
+        assembleProgram(
+          { entityId },
+          { user: { id: me.id }, asOf: ASOF, budgetChars: 8000 },
+        ).pipe(Effect.provide(SimilarLaneEmpty)),
+      )
+
+    // From the company: the person, one hop out over `references`.
+    const fromCompany = (await assemble(co)).items.find(
+      (x) => x.ref === ref.attr(person, 'companies'),
+    )
+    expect(fromCompany).toMatchObject({ hop: 1, kind: 'attribute' })
+    expect(fromCompany?.structural).toBeCloseTo(
+      DEFAULT_WEIGHTS.hop[1] *
+        DEFAULT_WEIGHTS.edge.references *
+        DEFAULT_WEIGHTS.prior.attribute,
+    )
+    expect(DEFAULT_WEIGHTS.edge.references).toBe(1)
+
+    // From the person: a fact about them, at hop 0.
+    const fromPerson = (await assemble(person)).items.find(
+      (x) => x.ref === ref.attr(person, 'companies'),
+    )
+    expect(fromPerson).toMatchObject({ hop: 0, kind: 'attribute' })
+    expect(fromPerson?.text).toContain(`WorksAt ${tag}`)
+  })
+
   it('refuses with ContextLeak when a lane hands back a note canRead would refuse', async () => {
     const { assembleProgram } = await import('./assemble')
     const { SimilarLane } = await import('../../context/similar-lane')

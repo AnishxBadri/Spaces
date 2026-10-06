@@ -371,7 +371,7 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       // the deck reader had nowhere to put them: only a deal's `people` /
       // `referred_by` turned into identity suggestions, so a deck filed on
       // a bare company proposed none. Accepting such an identity writes the
-      // person here and links them `contact_at` the company.
+      // person here and adds the company to the person's `companies`.
       //
       // Appended, never slotted: `seedSystemAttributes` derives sortOrder
       // from the array index and only inserts what is missing (see
@@ -390,6 +390,17 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
     { slug: 'linkedin', name: 'LinkedIn', type: 'url' },
     { slug: 'twitter', name: 'Twitter', type: 'url' },
     { slug: 'phone', name: 'Phone', type: 'phone' },
+    {
+      // The companies this person is at (D60): angels, advisors and
+      // co-investors sit at several, hence multi. Written through the one
+      // write path, which materializes `link(references, 'companies')`;
+      // the `contact_at` relation it replaced is retired. Appended, never
+      // slotted — the seeder derives sortOrder from the array index.
+      slug: 'companies',
+      name: 'Companies',
+      type: 'record_reference',
+      options: { targetKind: 'company', multi: true },
+    },
   ],
   deal: [
     {

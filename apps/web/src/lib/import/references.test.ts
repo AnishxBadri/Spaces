@@ -220,6 +220,33 @@ describe('a Deals import finds its companies', () => {
   })
 })
 
+describe('a People import finds its companies', () => {
+  it("maps a Company column onto the person's companies and plans the reference", async () => {
+    const ohmium = await company('Ohmium People', 'ohmium-people.com')
+    const people = await objectId('people')
+    const companies = await attributeId(people, 'companies')
+    const batchId = await batch(
+      ['Name', 'Company'],
+      [['Ada Ohm', 'ohmium-people.com']],
+      people,
+    )
+    // The header guess, untouched: Company is where the person works.
+    const guessed = (
+      await db
+        .select({ mapping: importBatch.mapping })
+        .from(importBatch)
+        .where(eq(importBatch.id, batchId))
+    ).at(0)?.mapping
+    expect(guessed).toEqual([
+      { target: 'name' },
+      { target: 'attribute', attributeId: companies },
+    ])
+
+    await Effect.runPromise(planImportProgram(batchId))
+    expect((await plan(batchId, 1)).patch).toEqual({ [companies]: [ohmium] })
+  })
+})
+
 describe('a name two records answer to', () => {
   /**
    * Two companies born `Acme` and renamed since: a rename keeps the old

@@ -76,20 +76,18 @@ async function aCompany(name: string, spaceId?: string): Promise<string> {
   return ent.id
 }
 
-/** `link(contact_at)` — the edge the company page's Contacts rail reads. */
+/** The company joins the person's `companies`, through the one write path. */
 async function contactAt(personId: string, companyId: string): Promise<void> {
-  const { db } = await import('@spaces/db')
-  const { link } = await import('@spaces/db/schema')
-  await db
-    .insert(link)
-    .values({
-      fromEntityId: personId,
-      toEntityId: companyId,
-      relation: 'contact_at',
-      source: 'manual',
-      createdBy: await actorId(),
-    })
-    .onConflictDoNothing()
+  const { Effect } = await import('effect')
+  const { setPersonCompanyProgram } = await import('./companies')
+  await Effect.runPromise(
+    setPersonCompanyProgram({
+      personId,
+      companyId,
+      action: 'link',
+      actor: { type: 'user', id: await actorId() },
+    }),
+  )
 }
 
 async function tagInto(entityId: string, spaceId: string): Promise<void> {
@@ -146,7 +144,7 @@ describe('spaceContactsProgram', () => {
     expect(rows[1].headline).toBeNull()
   })
 
-  it('names the contact_at companies on a direct row, joined and ordered', async () => {
+  it("names the person's companies on a direct row, joined and ordered", async () => {
     const tag = randomUUID().slice(0, 8)
     const spaceId = await aSpace(tag)
     const personId = await aPerson(`Sarah ${tag}`, { spaceId })
@@ -197,7 +195,7 @@ describe('spaceContactsProgram', () => {
  * `entity` rows.
  */
 describe('spaceInheritedContactsProgram', () => {
-  it('reads people contact_at a company tagged into the space', async () => {
+  it('reads people at a company tagged into the space', async () => {
     const tag = randomUUID().slice(0, 8)
     const spaceId = await aSpace(tag)
     const companyId = await aCompany(`Ohmium ${tag}`, spaceId)
@@ -235,7 +233,7 @@ describe('spaceInheritedContactsProgram', () => {
     expect((await inheritedOf(spaceId)).map((r) => r.id)).toEqual([onlyCompany])
   })
 
-  it('gives one row per company when a person is contact at two here', async () => {
+  it('gives one row per company when a person is at two here', async () => {
     const tag = randomUUID().slice(0, 8)
     const spaceId = await aSpace(tag)
     const alpha = await aCompany(`Alpha ${tag}`, spaceId)
@@ -261,14 +259,15 @@ describe('spaceInheritedContactsProgram', () => {
 
     const kept = await aCompany(`Kept ${tag}`, spaceId)
     const mergedCompany = await aCompany(`Merged ${tag}`, spaceId)
-    await mergeAway(mergedCompany, kept)
 
     const live = await aPerson(`Live ${tag}`)
     const dead = await aPerson(`Dead ${tag}`)
     const hidden = await aPerson(`Hidden ${tag}`)
     await contactAt(live, kept)
     await contactAt(dead, kept)
+    // Written while the company was live: the write path refuses a merged one.
     await contactAt(hidden, mergedCompany)
+    await mergeAway(mergedCompany, kept)
     await mergeAway(dead, live)
 
     expect((await inheritedOf(spaceId)).map((r) => r.id)).toEqual([live])

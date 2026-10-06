@@ -67,7 +67,6 @@ export const DEFAULT_WEIGHTS: Weights = {
     space: 0.8,
     mentions: 0.7,
     co_investor: 0.6,
-    contact_at: 0.5,
     derived_from: 0.5,
     supersedes: 0.5,
   },

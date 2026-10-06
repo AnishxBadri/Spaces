@@ -414,6 +414,13 @@
       "when": 1790962730019,
       "tag": "0058_integration_cursors",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791267547662,
+      "tag": "0059_person_companies_attribute",
+      "breakpoints": true
     }
   ]
 }

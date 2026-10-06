@@ -2595,13 +2595,19 @@ async function seedCompanies(spaces: Ids, userId: string): Promise<Ids> {
 async function seedPeople(companies: Ids, userId: string): Promise<Ids> {
   const ids: Ids = new Map()
   for (const p of PEOPLE) {
+    // The employer is a birth value, `companies`, so `stamp` backdates its
+    // event with the rest of the birth.
+    const employer = p.at ? companies.get(p.at) : undefined
     const res = await resolveEntity({
       kind: 'person',
       name: p.name,
       keys: { email: p.email },
       source: { class: 'import' },
       createdBy: userId,
-      values: await known('person', p.values),
+      values: await known('person', {
+        ...p.values,
+        ...(employer ? { companies: [employer] } : {}),
+      }),
     })
     ids.set(p.name, res.entityId)
     if (res.action === 'created') {
@@ -2612,19 +2618,6 @@ async function seedPeople(companies: Ids, userId: string): Promise<Ids> {
         actorId: userId,
         when: at(p.added),
       })
-    }
-    const employer = p.at ? companies.get(p.at) : undefined
-    if (employer) {
-      await db
-        .insert(link)
-        .values({
-          fromEntityId: res.entityId,
-          toEntityId: employer,
-          relation: 'contact_at',
-          source: 'manual',
-          createdBy: userId,
-        })
-        .onConflictDoNothing()
     }
   }
   return ids

@@ -5,7 +5,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { AtSign, Building2, Plus, Users } from 'lucide-react'
+import { AtSign, Plus, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   keepPreviousData,
@@ -30,7 +30,6 @@ import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
 import { TemplatePicker } from '#/components/templates'
 import {
-  ChipLink,
   DateCell,
   InitialBadge,
   MetaCell,
@@ -207,6 +206,12 @@ function PeoplePage() {
   const pages = records.data?.pages
   const loaded = useMemo(() => pages ?? [initial], [pages, initial])
   const rows = useMemo(() => loaded.flatMap((p) => p.rows), [loaded])
+  // Names for the reference cells (Companies among them), every loaded page.
+  const refNames = useMemo(() => {
+    const out: Record<string, { name: string }> = {}
+    for (const p of loaded) Object.assign(out, p.refNames)
+    return out
+  }, [loaded])
   const total = loaded.at(-1)?.total ?? 0
 
   // Both halves: the loader for the registry and the views, the query for
@@ -261,23 +266,6 @@ function PeoplePage() {
             </MetaCell>
           ) : null,
       }),
-      col.accessor((r) => r.company?.name ?? '', {
-        id: 'company',
-        header: 'Company',
-        size: 170,
-        enableSorting: false,
-        cell: (info) =>
-          info.row.original.company ? (
-            <span className="flex px-1">
-              <ChipLink
-                to="/companies/$companyId"
-                params={{ companyId: info.row.original.company.id }}
-                icon={Building2}
-                label={info.row.original.company.name}
-              />
-            </span>
-          ) : null,
-      }),
       ...registry.map((def) =>
         col.accessor((r): unknown => r.values[def.slug] ?? null, {
           id: `attr:${def.slug}`,
@@ -289,6 +277,7 @@ function PeoplePage() {
                 def={def}
                 value={info.getValue()}
                 variant="cell"
+                refNames={refNames}
                 onSave={(v) => saveCell(info.row.original.id, def.slug, v)}
               />
             </AiCell>
@@ -311,7 +300,7 @@ function PeoplePage() {
     ]
     return defs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registry])
+  }, [registry, refNames])
 
   // No `getSortedRowModel` and no `getFilteredRowModel`: both would reorder
   // and narrow the loaded page and call that the answer. `manualSorting` /
@@ -553,20 +542,23 @@ function CreatePersonDialog({
             />
           </div>
 
-          {registry.map((def) => (
-            <div
-              key={def.slug}
-              className={cn('space-y-1.5', fieldSpanClass(def))}
-            >
-              <Label>{def.name}</Label>
-              <ValueEditor
-                def={def}
-                value={values[def.slug] ?? null}
-                variant="field"
-                onSave={(v) => setValues((s) => ({ ...s, [def.slug]: v }))}
-              />
-            </div>
-          ))}
+          {/* Companies has its picker above; `createPerson` writes it. */}
+          {registry
+            .filter((def) => def.slug !== 'companies')
+            .map((def) => (
+              <div
+                key={def.slug}
+                className={cn('space-y-1.5', fieldSpanClass(def))}
+              >
+                <Label>{def.name}</Label>
+                <ValueEditor
+                  def={def}
+                  value={values[def.slug] ?? null}
+                  variant="field"
+                  onSave={(v) => setValues((s) => ({ ...s, [def.slug]: v }))}
+                />
+              </div>
+            ))}
 
           {error ? (
             <p role="alert" className="text-ui text-destructive sm:col-span-2">

@@ -71,8 +71,8 @@ import type {
  *      company's `founders`, a deal's `people`, `referred_by`) becomes one
  *      `suggestion(kind: 'identity')` per person on the same record, citing
  *      that field's refs and naming the field (SPA-105, SPA-160); accepting
- *      one is `resolveEntity`, a `contact_at` link, and the person written
- *      into that field.
+ *      one is `resolveEntity`, the company in the person's `companies` when
+ *      the record is one, and the person written into that field.
  *      A claim on any other target (a deal's `company`) is held back with a
  *      rationale line — no accept path resolves it yet.
  *
@@ -780,6 +780,11 @@ function identityRationale(
   const def = read.registry.find((d) => d.slug === person.slug)
   const kind = KIND_LABEL[read.target.kind] ?? 'record'
   const as = person.claim.role === undefined ? '' : ` as ${person.claim.role}`
+  // Only a company joins the person's `companies` on accept. (D60)
+  const at =
+    read.target.kind === 'company'
+      ? `, adds ${read.target.name} to their companies and`
+      : ' and'
   const keys = [
     person.claim.email === undefined ? null : 'email',
     person.claim.linkedin === undefined ? null : 'LinkedIn',
@@ -787,8 +792,8 @@ function identityRationale(
   return [
     `Named in ${filename}${as}, read against the ${kind} field ${def?.name ?? person.slug}.`,
     keys.length > 0
-      ? `Accepting matches an existing person by ${keys.join(' or ')}, else creates one, links them contact at ${read.target.name} and sets them in ${def?.name ?? person.slug}.`
-      : `No email or LinkedIn given: accepting creates a person, links them contact at ${read.target.name} and sets them in ${def?.name ?? person.slug}; a near-identical name already held is filed as a duplicate candidate.`,
+      ? `Accepting matches an existing person by ${keys.join(' or ')}, else creates one${at} sets them in ${def?.name ?? person.slug}.`
+      : `No email or LinkedIn given: accepting creates a person${at} sets them in ${def?.name ?? person.slug}; a near-identical name already held is filed as a duplicate candidate.`,
   ].join('\n')
 }
 

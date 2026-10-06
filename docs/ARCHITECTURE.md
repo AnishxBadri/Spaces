@@ -104,6 +104,9 @@ link(from_entity, to_entity, relation: mentions | tagged_in | contact_at
      | derived_from | supersedes | references, source, attr_slug?)
 ```
 
+`contact_at` is retired (D60): a person's companies are the `companies` attribute,
+whose value materializes `references` links like every record reference.
+
 Typing `[[Orbital Composites]]` in a note materializes a link row — backlinks are one
 query. Record-reference attributes materialize `references` links in the same
 transaction, so rails, backlinks, and merge all live on one graph.

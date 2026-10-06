@@ -7,8 +7,6 @@ import {
   entity,
   entityAlias,
   entitySpace,
-  link,
-  person,
   space,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
@@ -173,28 +171,10 @@ export const getCompany = createServerFn()
       .innerJoin(entity, eq(entity.id, space.entityId))
       .where(eq(entitySpace.entityId, data.id))
 
-    // Contacts: people linked contact_at → this company.
-    const peopleRows = await db
-      .select({
-        id: entity.id,
-        name: entity.canonicalName,
-        values: entity.values,
-      })
-      .from(link)
-      .innerJoin(entity, eq(entity.id, link.fromEntityId))
-      .innerJoin(person, eq(person.entityId, entity.id))
-      .where(
-        and(
-          eq(link.toEntityId, data.id),
-          eq(link.relation, 'contact_at'),
-          isNull(entity.mergedIntoId),
-        ),
-      )
-    const people = peopleRows.map((p) => ({
-      id: p.id,
-      name: p.name,
-      headline: jsonString(p.values.job_title),
-    }))
+    // People: everyone whose `companies` names this company.
+    const { companyPeopleProgram } = await import('../people/companies')
+    const { effectFn } = await import('./effect')
+    const people = await effectFn(companyPeopleProgram)(data.id)
 
     const timeline = await db
       .select({
