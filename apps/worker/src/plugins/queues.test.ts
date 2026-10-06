@@ -323,7 +323,11 @@ describe('every declared job is a queue', () => {
     const id = await send('plugin.echo.echo', { entityId: companyId })
     expect(await settled('plugin.echo.echo', id)).toBe('completed')
 
-    const runs = await runsOf('plugin.echo.echo', echo.id)
+    // pg-boss settles before runJob closes the row; wait for the row.
+    const runs = await waitFor(
+      () => runsOf('plugin.echo.echo', echo.id),
+      (rows) => rows.length > 0 && rows.every((r) => r.status !== 'running'),
+    )
     expect(runs).toHaveLength(1)
     expect(runs.at(0)).toMatchObject({
       integrationId: echo.id,
