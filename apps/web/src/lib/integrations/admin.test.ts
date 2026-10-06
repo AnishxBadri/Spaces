@@ -18,7 +18,6 @@ import {
   enrichmentRecord,
   entity,
   integration,
-  jobRun,
 } from '@spaces/db/schema'
 import type { IntegrationManifest } from '@spaces/db/schema'
 import { resolveSecretById } from '@spaces/core/writes/vault'
@@ -37,12 +36,13 @@ import {
   saveIntegrationSettingsHandler,
   setIntegrationEnabledHandler,
 } from './admin'
-import { agoOf } from './ledger'
+import { agoOf, latestRunOf } from './ledger'
 
 /**
  * Settings → Integrations against a real database: the ledger reads every
- * plugin row with its state, last run and credits from the row, job_run and
- * enrichment_record; every write is admin-only and NOTIFYs `plugin_changed`
+ * plugin row with its state, last run and credits from the row and
+ * enrichment_record (a run is `runJob`'s alone to write, so the job_run half
+ * is `latestRunOf`, tested pure); every write is admin-only and NOTIFYs `plugin_changed`
  * with the plugin id. Rows are seeded with a stored manifest the way the
  * loader leaves them — no plugin code runs. The request is stubbed; the
  * session, `requireAdmin`, the vault and the database are real.
@@ -188,7 +188,6 @@ beforeEach(async () => {
   session.current = null
   // Every row of these tables, between tests; the file-level truncate runs once per file.
   const all = sql`true`
-  await db.delete(jobRun).where(all)
   await db.delete(enrichmentRecord).where(all)
   await db.update(integration).set({ credentialId: null }).where(all)
   await db.delete(integration).where(all)
@@ -259,17 +258,9 @@ describe('the ledger', () => {
       manifest: APOLLO,
       credentialId: stored.at(0)?.id ?? null,
       config: { dailyCreditCap: 40 },
+      lastRunAt: new Date(Date.now() - 4 * 60_000),
     })
     const ohmium = await company()
-    await db.insert(jobRun).values({
-      queue: 'plugin.apollo.enrichCompany',
-      integrationId: apollo.id,
-      entityId: ohmium,
-      status: 'succeeded',
-      attempt: 1,
-      startedAt: new Date(Date.now() - 4 * 60_000),
-      summary: '6 fields filled on Ohmium',
-    })
     await db.insert(enrichmentRecord).values([
       {
         entityId: ohmium,
@@ -321,7 +312,7 @@ describe('the ledger', () => {
       name: 'Apollo',
       version: '0.1.0',
       reason: null,
-      summary: '6 fields filled on Ohmium',
+      summary: APOLLO.description,
       lastRun: { ago: '4m ago', failed: false },
       credits: { used: 12, cap: 40 },
     })
@@ -348,6 +339,33 @@ describe('the ledger', () => {
     const detail = await getIntegrationHandler({ id: old.id })
     expect(detail.fix).toContain('^2.0')
     expect(detail.form).toEqual({ ok: true, fields: [] })
+  })
+
+  it('reads the last run from the latest job_run or the row, whichever is later', () => {
+    const now = Date.parse('2026-10-06T12:00:00Z')
+    const run = {
+      startedAt: new Date(now - 4 * 60_000),
+      status: 'failed' as const,
+      summary: '6 fields filled on Ohmium',
+    }
+    expect(latestRunOf(run, null, now)).toEqual({
+      summary: '6 fields filled on Ohmium',
+      lastRun: { ago: '4m ago', failed: true },
+    })
+    expect(
+      latestRunOf(
+        { ...run, status: 'succeeded' },
+        new Date(now - 2 * 3_600_000),
+        now,
+      ),
+    ).toEqual({
+      summary: '6 fields filled on Ohmium',
+      lastRun: { ago: '4m ago', failed: false },
+    })
+    expect(latestRunOf(undefined, null, now)).toEqual({
+      summary: null,
+      lastRun: null,
+    })
   })
 
   it('agoOf reads minutes, hours, days', () => {

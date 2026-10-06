@@ -7,6 +7,7 @@ import {
   eq,
   gte,
   inArray,
+  isNull,
   notLike,
   sql,
 } from 'drizzle-orm'
@@ -20,6 +21,8 @@ import {
 } from '@spaces/db/schema'
 import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
+import { newestVersionsProgram, updateOf } from './registry'
+import type { RegistrySource } from './registry'
 import { formValuesOf, settingsFormOf } from './settings-form'
 import type { FormValues, SettingsForm } from './settings-form'
 
@@ -29,7 +32,9 @@ import type { FormValues, SettingsForm } from './settings-form'
  * row's settings form and key fields.
  * - Rendered from the row and its stored manifest alone: web never reads
  *   the plugins directory and never loads a bundle.
- * - Never a first-party `core.*` row, which is a channel, not a plugin.
+ * - Never a first-party `core.*` row, which is a channel, not a plugin, and
+ *   never an uninstalled one (`removed_at`): those rows stay only so what
+ *   the plugin wrote still names it.
  */
 
 export class IntegrationReadFailed extends Schema.TaggedError<IntegrationReadFailed>()(
@@ -70,6 +75,8 @@ export type IntegrationRow = {
   readonly credits: { readonly used: number; readonly cap: number | null }
   /** Runs failed in a row, as the breaker counts them. */
   readonly errorCount: number
+  /** The registry's newer version, when it has one. */
+  readonly update: string | null
 }
 
 /** One vault secret the manifest asks for. One entry per slot, so a second secret is one more entry. */
@@ -167,6 +174,40 @@ const fixOf = (row: Row, manifest: Manifest | null): string | null => {
     : `Install a version of ${manifest.name} built for this host's sdk, or update Spaces to one that meets ${manifest.sdk}.`
 }
 
+/** A plugin's latest `job_run`, as the ledger reads it. */
+export type LatestRun = {
+  readonly startedAt: Date
+  readonly status: (typeof jobRun.$inferSelect)['status']
+  readonly summary: string | null
+}
+
+/**
+ * The last-run lane and the run's one line: the later of the latest run's
+ * start and the row's `last_run_at`, failed only when that run failed.
+ */
+export const latestRunOf = (
+  run: LatestRun | undefined,
+  lastRunAt: Date | null,
+  now: number,
+): {
+  readonly lastRun: IntegrationRow['lastRun']
+  readonly summary: string | null
+} => {
+  const lastAt = [run?.startedAt, lastRunAt]
+    .filter((d): d is Date => d instanceof Date)
+    .reduce<Date | null>((a, b) => (a === null || b > a ? b : a), null)
+  return {
+    summary: run?.summary ?? null,
+    lastRun:
+      lastAt === null
+        ? null
+        : {
+            ago: agoOf(now - lastAt.getTime()),
+            failed: run?.status === 'failed',
+          },
+  }
+}
+
 const utcMidnight = sql`(date_trunc('day', now() at time zone 'UTC') at time zone 'UTC')`
 
 const displaySchema = z.object({ display: z.string() })
@@ -174,6 +215,7 @@ const displaySchema = z.object({ display: z.string() })
 /** Rows, latest runs and today's spend for the given integrations, read together. */
 const readRows = Effect.fn('readRows')(function* (
   rows: ReadonlyArray<Row>,
+  source: RegistrySource,
 ): Effect.fn.Return<
   Array<{ row: Row; manifest: Manifest | null; view: IntegrationRow }>,
   IntegrationReadFailed
@@ -209,13 +251,15 @@ const readRows = Effect.fn('readRows')(function* (
       )
       .groupBy(enrichmentRecord.integrationId),
   )
+  const newest = yield* newestVersionsProgram(source)
   const now = yield* Clock.currentTimeMillis
   return rows.map((row) => {
     const manifest = manifestOf(row.manifest)
-    const run = runs.find((r) => r.integrationId === row.id)
-    const lastAt = [run?.startedAt, row.lastRunAt]
-      .filter((d): d is Date => d instanceof Date)
-      .reduce<Date | null>((a, b) => (a === null || b > a ? b : a), null)
+    const latest = latestRunOf(
+      runs.find((r) => r.integrationId === row.id),
+      row.lastRunAt,
+      now,
+    )
     const name = manifest?.name ?? row.capabilityId
     return {
       row,
@@ -228,29 +272,29 @@ const readRows = Effect.fn('readRows')(function* (
         enabled: row.enabled,
         state: stateOf(row, manifest),
         reason: row.lastError,
-        summary: run?.summary ?? manifest?.description ?? null,
-        lastRun:
-          lastAt === null
-            ? null
-            : {
-                ago: agoOf(now - lastAt.getTime()),
-                failed: run?.status === 'failed',
-              },
+        summary: latest.summary ?? manifest?.description ?? null,
+        lastRun: latest.lastRun,
         credits: {
           used: spend.find((s) => s.integrationId === row.id)?.used ?? 0,
           cap: capOf(row.config, manifest),
         },
         errorCount: row.errorCount,
+        update: updateOf(newest, row.capabilityId, row.version),
       },
     }
   })
 })
 
-const plugins = notLike(integration.capabilityId, 'core.%')
+const plugins = and(
+  notLike(integration.capabilityId, 'core.%'),
+  isNull(integration.removedAt),
+)
 
 /** Every installed plugin, by id. */
 export const integrationLedgerProgram = Effect.fn('integrationLedgerProgram')(
-  function* (): Effect.fn.Return<Array<IntegrationRow>, IntegrationReadFailed> {
+  function* (
+    source: RegistrySource = {},
+  ): Effect.fn.Return<Array<IntegrationRow>, IntegrationReadFailed> {
     const rows = yield* query(() =>
       db
         .select()
@@ -258,7 +302,7 @@ export const integrationLedgerProgram = Effect.fn('integrationLedgerProgram')(
         .where(plugins)
         .orderBy(asc(integration.capabilityId), asc(integration.createdAt)),
     )
-    return (yield* readRows(rows)).map((r) => r.view)
+    return (yield* readRows(rows, source)).map((r) => r.view)
   },
 )
 
@@ -276,6 +320,7 @@ export const integrationCountProgram = Effect.fn('integrationCountProgram')(
 export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
   function* (
     id: string,
+    source: RegistrySource = {},
   ): Effect.fn.Return<
     IntegrationDetail,
     IntegrationReadFailed | IntegrationNotFound
@@ -290,7 +335,7 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
       return yield* new IntegrationNotFound({
         message: 'That integration is not installed',
       })
-    const read = (yield* readRows([found])).at(0)
+    const read = (yield* readRows([found], source)).at(0)
     if (!read)
       return yield* new IntegrationNotFound({
         message: 'That integration is not installed',

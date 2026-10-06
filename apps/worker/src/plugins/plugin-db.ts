@@ -8,6 +8,7 @@ import { db } from '@spaces/db'
 import { JobPermanent, JobRetryable, PluginDb } from '@spaces/sdk'
 import type { JobError, JsonObject, JsonValue } from '@spaces/sdk'
 import type { BoundIntegration } from '@spaces/core/writes/ports/binding'
+import { pluginSchemaName } from '@spaces/core/writes/plugins/schema'
 import { splitStatements } from './sql-split'
 
 /**
@@ -35,8 +36,7 @@ export const JOURNAL_TABLE = 'spaces_migrations'
 /** Postgres truncates identifiers past 63 bytes; a schema name never is. */
 const IDENT_MAX = 63
 
-export const pluginSchemaName = (pluginId: string): string =>
-  `plugin_${pluginId.replaceAll('-', '_')}`
+export { pluginSchemaName }
 
 const ident = (name: string): string => `"${name.replaceAll('"', '""')}"`
 
@@ -420,9 +420,11 @@ export const PluginDbLive = (
 }
 
 /**
- * Drops a plugin's schema, its tables and its journal, as the owning user.
- * Uninstall's drop-data option is the caller this exists for; without it the
- * schema survives an uninstall and a reinstall finds its data and journal.
+ * Drops a plugin's schema, its tables and its journal, as the owning user,
+ * on a pooled connection. Uninstall's drop-data option runs the same
+ * statement (`dropPluginSchemaStatement`) inside its own transaction; without
+ * it the schema survives an uninstall and a reinstall finds its data and
+ * journal.
  */
 export const dropPluginSchema = Effect.fn('dropPluginSchema')(function* (
   pluginId: string,

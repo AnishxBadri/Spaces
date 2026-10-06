@@ -85,6 +85,13 @@ export const integration = pgTable('integration', {
   errorCount: integer('error_count').notNull().default(0),
   lastRunAt: timestamp('last_run_at', { withTimezone: true }),
   lastError: text('last_error'),
+  /**
+   * Set by uninstall; the row is never deleted. Every `source_ref`,
+   * `actor_ref` and `enrichment_record.integration_id` pointing here keeps
+   * its attribution ("Apollo, since removed"), and a reinstall of the same
+   * plugin id clears it on this row rather than minting another.
+   */
+  removedAt: timestamp('removed_at', { withTimezone: true }),
   /** The admin who installed it; null for a row the seed or an import made. */
   createdBy: text('created_by').references(() => user.id),
   createdAt: timestamp('created_at', { withTimezone: true })

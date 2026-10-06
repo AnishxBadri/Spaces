@@ -32,6 +32,7 @@ const base: IntegrationRow = {
   lastRun: { ago: '4m ago', failed: false },
   credits: { used: 12, cap: 100 },
   errorCount: 0,
+  update: null,
 }
 
 const rows: Array<IntegrationRow> = [
@@ -80,6 +81,7 @@ const render = () =>
       actions={{
         onToggle: () => undefined,
         onReset: () => undefined,
+        onUpdate: () => undefined,
         pending: null,
       }}
     />,
@@ -146,6 +148,24 @@ describe('IntegrationLedger', () => {
     expect(needsKey).not.toContain('missing credential')
   })
 
+  it('shows a newer registry version and offers Update on a running row', () => {
+    const html = renderToStaticMarkup(
+      <IntegrationLedger
+        rows={[{ ...base, update: '0.2.0' }]}
+        actions={{
+          onToggle: () => undefined,
+          onReset: () => undefined,
+          onUpdate: () => undefined,
+          pending: null,
+        }}
+      />,
+    )
+    const row = rowFor(html, 'enabled')
+    expect(row).toContain('→ 0.2.0')
+    expect(row).toContain('>Update</button>')
+    expect(row).not.toContain('Configure')
+  })
+
   it('says so in one line when nothing is installed', () => {
     const html = renderToStaticMarkup(
       <IntegrationLedger
@@ -153,6 +173,7 @@ describe('IntegrationLedger', () => {
         actions={{
           onToggle: () => undefined,
           onReset: () => undefined,
+          onUpdate: () => undefined,
           pending: null,
         }}
       />,

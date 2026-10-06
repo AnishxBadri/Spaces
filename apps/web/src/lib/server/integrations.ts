@@ -3,7 +3,8 @@ import { z } from 'zod'
 
 /**
  * Settings → Integrations: the installed plugins, one plugin's settings and
- * key, on/off and breaker reset. Admin only — every handler opens with
+ * key, on/off and breaker reset, and the registry's Install, Update and
+ * Uninstall. Admin only — every handler opens with
  * `requireAdmin()`; the bodies are imported inside the handlers so their
  * database code never reaches the client bundle.
  */
@@ -15,6 +16,11 @@ export type {
   SecretField,
 } from '../integrations/ledger'
 export type { SettingsSaved } from '../integrations/admin'
+export type {
+  AvailablePlugin,
+  InstallOutcome,
+  RegistryView,
+} from '../integrations/install'
 export type {
   FormValue,
   FormValues,
@@ -90,6 +96,39 @@ export const saveIntegrationSecret = createServerFn({ method: 'POST' })
     const { saveIntegrationSecretHandler } =
       await import('../integrations/admin')
     return saveIntegrationSecretHandler(data)
+  })
+
+/** What the registry offers that is not installed. */
+export const listAvailableIntegrations = createServerFn().handler(async () => {
+  const { listAvailableHandler } = await import('../integrations/install')
+  return listAvailableHandler()
+})
+
+/** Fetches, verifies and unpacks the registry's newest version; the worker enables it. */
+export const installIntegration = createServerFn({ method: 'POST' })
+  .validator(z.object({ pluginId: z.string().min(1).max(64) }))
+  .handler(async ({ data }) => {
+    const { installIntegrationHandler } =
+      await import('../integrations/install')
+    return installIntegrationHandler(data)
+  })
+
+/** Moves an installed plugin to the registry's newest version, keeping one back. */
+export const updateIntegration = createServerFn({ method: 'POST' })
+  .validator(byId)
+  .handler(async ({ data }) => {
+    const { upgradeIntegrationHandler } =
+      await import('../integrations/install')
+    return upgradeIntegrationHandler(data)
+  })
+
+/** Deletes the files and the key; the row stays, soft-deleted, so what it wrote still names it. */
+export const uninstallIntegration = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid(), dropData: z.boolean() }))
+  .handler(async ({ data }) => {
+    const { uninstallIntegrationHandler } =
+      await import('../integrations/install')
+    return uninstallIntegrationHandler(data)
   })
 
 /** Deletes the key; the row reads degraded('missing credential'). */

@@ -1,7 +1,9 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, ne, notLike, sql } from 'drizzle-orm'
+import { and, eq, isNull, notLike, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { credential, integration } from '@spaces/db/schema'
+import { integration } from '@spaces/db/schema'
+import { releaseCredential } from '@spaces/core/writes/plugins/credential'
+import { PLUGIN_CHANGED } from '@spaces/core/writes/plugins/install'
 import { redact, storeCredential } from '@spaces/core/writes/vault'
 import { requireAdmin } from '#/lib/server/shared'
 import {
@@ -24,8 +26,7 @@ import type { FormValues } from './settings-form'
  *   display is stored (on the credential's `meta`) and returned.
  */
 
-/** The worker's LISTEN channel; the payload is the plugin id. */
-export const PLUGIN_CHANGED = 'plugin_changed'
+export { PLUGIN_CHANGED }
 
 /** The loader's reason for a row whose manifest requires a key it lacks. */
 export const MISSING_CREDENTIAL = 'missing credential'
@@ -57,6 +58,7 @@ const rowOf = Effect.fn('rowOf')(function* (id: string) {
         and(
           eq(integration.id, id),
           notLike(integration.capabilityId, 'core.%'),
+          isNull(integration.removedAt),
         ),
       ),
   )).at(0)
@@ -219,25 +221,14 @@ export const removeIntegrationSecretProgram = Effect.fn(
               },
         )
         .where(eq(integration.id, row.id))
-      // The vault row goes only when no other integration still holds it.
-      const holders = await tx
-        .select({ id: integration.id })
-        .from(integration)
-        .where(
-          and(
-            eq(integration.credentialId, credentialId),
-            ne(integration.id, row.id),
-          ),
-        )
-      if (holders.length === 0)
-        await tx.delete(credential).where(eq(credential.id, credentialId))
+      await releaseCredential(tx, row.id, credentialId)
     }),
   )
   yield* notifyChanged(row.capabilityId)
 })
 
 /** A refusal's own sentence, or a generic one; never a stack or a cause. */
-const run = async <T, TError>(
+export const run = async <T, TError>(
   program: Effect.Effect<T, TError>,
 ): Promise<T> => {
   try {

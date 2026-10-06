@@ -13,7 +13,8 @@ import { cn } from '#/lib/utils'
  * - degraded — amber row, the worker's reason, Fix;
  * - tripped — rose row, the breaker's reason, Reset;
  * - off — the switch off and the row in graphite, nothing wrong.
- * A missing key is `not yet`: no tint, Add key.
+ * A missing key is `not yet`: no tint, Add key. A newer version in the
+ * registry shows beside the version, and a running row offers Update.
  */
 
 /** The word in the status lane. */
@@ -70,6 +71,7 @@ export function creditsOf(row: IntegrationRow): string {
 export type LedgerActions = {
   readonly onToggle: (row: IntegrationRow, enabled: boolean) => void
   readonly onReset: (row: IntegrationRow) => void
+  readonly onUpdate: (row: IntegrationRow) => void
   /** The row whose write is in flight; its controls are disabled. */
   readonly pending: string | null
 }
@@ -119,7 +121,16 @@ function ActionLane({
         </Link>
       )
     default:
-      return (
+      return row.update !== null ? (
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={actions.pending === row.id}
+          onClick={() => actions.onUpdate(row)}
+        >
+          Update
+        </Button>
+      ) : (
         <Link to={to} params={params} className={LINK}>
           Configure
         </Link>
@@ -166,6 +177,14 @@ function LedgerLine({
         <span className="shrink-0 mono text-micro text-graphite">
           {row.version}
         </span>
+        {row.update !== null ? (
+          <span
+            className="shrink-0 mono text-micro text-primary"
+            title={`${row.update} is in the registry`}
+          >
+            → {row.update}
+          </span>
+        ) : null}
       </span>
       <span
         className={cn(

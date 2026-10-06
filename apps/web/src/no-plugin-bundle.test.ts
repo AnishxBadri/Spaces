@@ -28,11 +28,15 @@ const SPECIFIER =
 
 /**
  * A specifier that reaches plugin code or the worker that hosts it. Core's
- * own `plugins/` modules (lock, verify, credit) are the host's, not a plugin's.
+ * own `plugins/` modules (lock, verify, credit) and `writes/plugins/` (the
+ * installer, which moves bytes and never imports them) are the host's, not a
+ * plugin's.
  */
 const isPluginSpecifier = (spec: string): boolean =>
   spec.startsWith('@spaces/plugin-') ||
-  (/(^|\/)plugins\//.test(spec) && !spec.startsWith('@spaces/core/plugins/')) ||
+  (/(^|\/)plugins\//.test(spec) &&
+    !spec.startsWith('@spaces/core/plugins/') &&
+    !spec.startsWith('@spaces/core/writes/plugins/')) ||
   spec.includes('apps/worker') ||
   spec.startsWith('@spaces/worker')
 

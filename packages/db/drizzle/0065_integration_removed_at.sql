@@ -1,0 +1,1 @@
+ALTER TABLE "integration" ADD COLUMN "removed_at" timestamp with time zone;

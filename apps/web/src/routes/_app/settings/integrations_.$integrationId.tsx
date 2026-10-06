@@ -1,7 +1,8 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { useState } from 'react'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
+  DropDataOption,
   SecretFieldRow,
   SettingsFields,
 } from '#/components/integrations/integration-settings'
@@ -25,6 +26,8 @@ import {
   saveIntegrationSecret,
   saveIntegrationSettings,
   setIntegrationEnabled,
+  uninstallIntegration,
+  updateIntegration,
 } from '#/lib/server-fns'
 import type { FormValue, IntegrationDetail } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -75,6 +78,8 @@ function metaOf(detail: IntegrationDetail): string {
 
 function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
   const router = useRouter()
+  const navigate = useNavigate()
+  const dropData = useRef(false)
   const { confirm, confirmDialog } = useConfirm()
   const [pending, setPending] = useState(false)
   const [values, setValues] = useState(detail.values)
@@ -121,6 +126,37 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
     setDirty(true)
   }
 
+  async function uninstall() {
+    dropData.current = false
+    const ok = await confirm({
+      title: `Uninstall ${detail.name}?`,
+      body: (
+        <>
+          Its files and its key are deleted. What it filled stays, marked as
+          filled by {detail.name}, since removed.
+          <DropDataOption
+            onChange={(next) => {
+              dropData.current = next
+            }}
+          />
+        </>
+      ),
+      action: 'Uninstall',
+    })
+    if (!ok) return
+    setPending(true)
+    try {
+      await uninstallIntegration({
+        data: { id: detail.id, dropData: dropData.current },
+      })
+      toast(`${detail.name} uninstalled`)
+      await navigate({ to: '/settings/integrations' })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not uninstall')
+      setPending(false)
+    }
+  }
+
   const tripped = detail.state === 'tripped'
   return (
     <SettingsSection
@@ -143,6 +179,29 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
               Reset
             </Button>
           ) : null}
+          {detail.update !== null ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pending}
+              onClick={() =>
+                void act(
+                  () => updateIntegration({ data: { id: detail.id } }),
+                  `${detail.name} updated to ${detail.update ?? ''} · reloading`,
+                )
+              }
+            >
+              Update to {detail.update}
+            </Button>
+          ) : null}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            onClick={() => void uninstall()}
+          >
+            Uninstall
+          </Button>
           <Switch
             checked={detail.enabled}
             disabled={pending}

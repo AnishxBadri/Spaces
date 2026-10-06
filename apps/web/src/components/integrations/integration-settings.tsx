@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
+import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
 import { Switch } from '#/components/ui/switch'
@@ -274,5 +276,33 @@ export function SecretFieldRow({
         ) : null}
       </div>
     </form>
+  )
+}
+
+/**
+ * Uninstall's one option: also drop the plugin's own tables. Off by default,
+ * so a reinstall finds its data where it left it.
+ */
+export function DropDataOption({
+  onChange,
+}: {
+  onChange: (dropData: boolean) => void
+}) {
+  const [checked, setChecked] = useState(false)
+  const toggle = (next: boolean) => {
+    setChecked(next)
+    onChange(next)
+  }
+  return (
+    <span className="mt-3 flex items-center gap-2">
+      <Checkbox
+        id="uninstall-drop-data"
+        checked={checked}
+        onCheckedChange={toggle}
+      />
+      <label htmlFor="uninstall-drop-data" className="text-label">
+        Also delete the data it keeps in its own tables
+      </label>
+    </span>
   )
 }

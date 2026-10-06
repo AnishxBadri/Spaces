@@ -3,7 +3,7 @@ import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { Data, Effect } from 'effect'
-import { and, eq, notLike } from 'drizzle-orm'
+import { and, eq, isNull, notLike } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
@@ -25,7 +25,8 @@ import type { PluginDbOptions } from './plugin-db'
  * `makePluginHost`.
  *
  * - Discovers enabled `integration` rows, never a `core.*` row (a
- *   first-party channel, not a plugin). Rows are the intent: files with no
+ *   first-party channel, not a plugin) and never an uninstalled one
+ *   (`removed_at`, kept for provenance). Rows are the intent: files with no
  *   row are ignored, a row with no files is degraded naming the path.
  * - Validates the manifest, the sdk range, the bundle sha against lock.json
  *   (no entry loads unpinned), what `requires` asks of the row, and that
@@ -354,6 +355,7 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
       .where(
         and(
           eq(integration.enabled, true),
+          isNull(integration.removedAt),
           notLike(integration.capabilityId, 'core.%'),
           options.only === undefined
             ? undefined

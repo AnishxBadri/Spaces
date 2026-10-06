@@ -425,6 +425,39 @@ unsafe-entry · manifest-missing · manifest-mismatch`, checking the
   still write core tables. The role guards a plugin's mistakes, not a hostile
   plugin: SQL that means to can `RESET ROLE` from the owner's session, which
   is why trust remains signing (D54).
+- **Install, upgrade and uninstall, as built (SPA-222, sdk-21b).** One
+  installer routine, `runInstaller` (`@spaces/core/writes/plugins/install`),
+  behind three entry points — `installPlugin`, `upgradePlugin`,
+  `uninstallPlugin` — each with exactly one caller, the program behind its
+  server fn in Settings → Integrations (a source-scanning test holds that).
+  It takes tarball bytes and the entry that names them, so the air-gapped
+  upload feeds the same routine; web reads the committed `registry.json`,
+  fetches the newest entry's tarball and hands the bytes over. Verification
+  (`verifyPlugin`) runs before anything is written, so a refusal leaves no
+  directory, no lock.json edit and no row. The files land in
+  `<data>/plugins/<id>/<version>/` by a rename from `plugins/.staging/`,
+  `current` is a relative symlink swapped by renaming a fresh one over it,
+  `lock.json` is `{ core, plugins: { <id>: { version, sha256 } } }` written
+  by rename, and the row is written `installing` and enabled — then
+  `NOTIFY plugin_changed` after the commit, and the worker's reload marks it
+  enabled (or degraded, `missing credential`, until the key is pasted). An
+  upgrade is the same path to a new version directory: the previous one is
+  kept one back and anything older is removed; a tripped row stays tripped.
+  Every run holds one advisory lock. **Uninstall keeps provenance (owner
+  decision 2026-10-06):** the `integration` row is soft-deleted —
+  `removed_at` set, `enabled` false — and never hard-deleted, so every
+  `source_ref`, `attribute_event.actor_ref`,
+  `enrichment_record.integration_id` and `signal.source_ref` pointing at it
+  stays, and the record timeline names it "Apollo, since removed"
+  (`sinceRemoved`). Uninstall deletes `<data>/plugins/<id>/`, the lock entry
+  and the credential (unbound, then deleted unless another row holds it —
+  the same `releaseCredential` removing a key uses); its one option drops
+  `plugin_<id>` in the same transaction, and without it the schema survives.
+  The loader and the Integrations ledger skip removed rows; the registry
+  pane offers the plugin again, and reinstalling the same id clears
+  `removed_at` on that row rather than minting a new one. Rejected: nulling
+  the references — tidy tables, but the values would read as hand-entered
+  (D12's append-only spirit).
 
 **Workers and jobs.** pg-boss stays the queue (paradigm 6); the worker is a
 plain Node process whose handlers become Effect programs run by one

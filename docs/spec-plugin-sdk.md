@@ -575,6 +575,20 @@ Same page: Installed (version, status, last run, last error, credits),
 update badge → one click, disable (key kept), uninstall (key deleted,
 schema optionally dropped, files removed).
 
+**As built (sdk-21b).** `runInstaller` (`@spaces/core/writes/plugins/install`)
+is the one routine; `installPlugin` / `upgradePlugin` / `uninstallPlugin`
+are its entry points, each called once, from the program behind its server
+fn (asserted by a source-scanning test). It takes bytes plus the entry, so
+an upload can feed it. Verify first, then stage under `plugins/.staging/`
+and rename into `<id>/<version>/`, swap the `current` symlink by rename,
+write `lock.json` (`{ core, plugins: { <id>: { version, sha256 } } }`),
+upsert the row (`installing`, enabled) and NOTIFY after commit. Upgrade keeps
+one version back and prunes older ones. Uninstall soft-deletes the row
+(`integration.removed_at`, migration 0065) so provenance survives ("Apollo,
+since removed"), deletes the files, the lock entry and the key, and drops
+`plugin_<id>` only when asked; a reinstall reuses the row. CONTEXT.md
+"Plugin architecture" has the decision.
+
 ## 10. Hosting lifecycle
 
 ```

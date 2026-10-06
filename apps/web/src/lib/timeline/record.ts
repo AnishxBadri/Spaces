@@ -13,6 +13,7 @@ import {
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { jsonRecord, jsonString } from '@spaces/core/json'
+import { sinceRemoved } from '@spaces/core/plugins/registry'
 import type { Json } from '@spaces/core/json'
 import { resolveRefsProgram } from '@spaces/core/writes/context/names'
 import type { ResolvedRef } from '@spaces/core/writes/context/names'
@@ -61,20 +62,25 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     // reader needs, and the row id is the join, not the name (sdk-9). The
     // manifest's `name` once the loader has validated the plugin
     // (`integration.manifest`, sdk-11); the capability id before that, and
-    // for a first-party `core.*` row, which has no manifest.
+    // for a first-party `core.*` row, which has no manifest. An uninstalled
+    // plugin keeps its row, so what it wrote reads "Apollo, since removed".
     const integrations = yield* query(() =>
       db
         .select({
           id: integration.id,
           capabilityId: integration.capabilityId,
           manifest: integration.manifest,
+          removedAt: integration.removedAt,
         })
         .from(integration),
     )
     const integrationNames = new Map(
       integrations.map((i) => [
         i.id,
-        jsonString(jsonRecord(i.manifest).name) ?? i.capabilityId,
+        sinceRemoved(
+          jsonString(jsonRecord(i.manifest).name) ?? i.capabilityId,
+          i.removedAt,
+        ),
       ]),
     )
 
