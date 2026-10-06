@@ -58,6 +58,54 @@ name, and is shown afterwards only as its redacted tail.
   first, or the consent screen refuses. Ask the fund's Box admin before the
   first Connect.
 
+**The dance (decided 2026-10-07).** A connection is a data grant, never a
+login: better-auth stays email-and-password only (a test reads `auth.ts`
+for `socialProviders`). The two legs are core's, once, for every provider.
+
+- **Outbound — `GET /api/connections/<provider>/start`.** Query:
+  `product` (required, D66: `drive` · `calendar` · `gmail` under google,
+  `box` under box), `scopes` (comma-separated registry `value`s; default the
+  product's base set — `openid email drive.file` for Drive) and `return` (a
+  same-origin path; default `/settings/connections`). No session → 401. An
+  unknown provider, product or scope, a scope that belongs to another
+  product, or a `return` that leaves the site → 400 naming it. No active
+  `credential(kind: oauth_client)` for the provider → `ProviderUnconfigured`,
+  a 409 whose text names Settings → Connections — never a redirect to a
+  half-built URL. Otherwise a 302 to the provider's `authUrl` with
+  `client_id`, `redirect_uri` (`<APP_URL without trailing slash>/api/connections/<provider>/callback`),
+  `response_type=code`, `scope` (the registry `wire` strings, space-joined,
+  exactly the ones asked for), `state`, `code_challenge` and
+  `code_challenge_method=S256`; for google also `access_type=offline` and
+  `prompt=consent`, without which no refresh token comes back.
+- **The state** is signed, not encrypted: `<base64url(canonical JSON)>.<base64url(HMAC-SHA256)>`,
+  the HMAC key derived from the master key (HKDF, label
+  `spaces:connect-state`). The payload: session user id, provider, product,
+  scope `value`s, return path, a nonce and `issuedAt`. Life: ten minutes.
+  `verifyState` (core, `writes/connections/state`) fails `StateInvalid` with
+  a reason — `tampered` (bad signature or malformed), `expired`, or
+  `wrong-user` (the callback's session is not the one that started).
+- **The `code_verifier` lives in a cookie, decided.** Not inside the state
+  (the state passes through the provider and its logs, which would defeat
+  PKCE) and not in a row (a table for a ten-minute secret, and a sweep for
+  abandoned dances). The start leg sets exactly one cookie per dance:
+  - name `spaces_pkce_<nonce>`, the nonce the signed state carries; value
+    the verifier (32 random bytes, base64url, 43 characters);
+  - `Path=` the callback's own path (`/api/connections/<provider>/callback`,
+    under any path APP_URL carries), `Max-Age=600`, `HttpOnly`,
+    `SameSite=Lax` (the provider's redirect back is a top-level GET, which
+    Lax sends), and `Secure` exactly when APP_URL is https.
+  - The callback verifies the state first, then reads the cookie the
+    state's nonce names (`readVerifierCookie`) — a cookie from another
+    dance is never found — and clears it (`clearVerifierCookie`, same name
+    and path, `Max-Age=0`) whatever the outcome. No cookie → the dance is
+    refused, as for an expired state.
+  - Every later provider takes this as given; nothing re-decides it.
+- **Tests run against an in-repo fake IdP**, a node `http` server on an
+  ephemeral loopback port (`startFakeIdp`, core `writes/connections/fake-idp`),
+  not a container. Its `/authorize` records each query and answers 302 to
+  the `redirect_uri` with a `code` and the `state`; the start program takes
+  the provider table as an argument, so a test points an `authUrl` at it.
+
 **Coexist by role, decided:** Drive/Box = the fund's archive and
 collaboration surface, also an arrival channel. Our blob + derived layers =
 the index and the AI working set. Bytes-of-record: Drive when a mirror is

@@ -14,7 +14,7 @@ import {
 } from '@spaces/core/writes/vault'
 import { effectFn } from '#/lib/server/effect'
 import { describeExternalOrigin } from '#/lib/server/external-origin'
-import { requireAdmin } from '#/lib/server/shared'
+import { requireAdmin, requireUser } from '#/lib/server/shared'
 import type { ProviderAppInput, ProviderAppRow } from './input'
 
 /**
@@ -73,6 +73,23 @@ export const getProviderAppsProgram = Effect.fn('getProviderApps')(
 )
 
 /**
+ * The providers with an active OAuth client — which Connect controls a
+ * member may use. Ids only: nothing about the client leaves.
+ */
+export const getConfiguredProvidersProgram = Effect.fn(
+  'getConfiguredProviders',
+)(function* (): Effect.fn.Return<ProviderId[], ProviderAppFailed> {
+  const configured: ProviderId[] = []
+  for (const provider of PROVIDER_IDS) {
+    const row = yield* query('Could not read the OAuth client', () =>
+      readWorkspaceCredential(provider, KIND),
+    )
+    if (row?.status === 'active') configured.push(provider)
+  }
+  return configured
+})
+
+/**
  * Saves a provider's client. A secret replaces the stored one; an empty
  * secret keeps it and changes only the client id — which needs a stored one.
  */
@@ -116,6 +133,12 @@ export const setProviderAppProgram = Effect.fn('setProviderApp')(function* (
 export async function getProviderAppsHandler(): Promise<ProviderAppRow[]> {
   await requireAdmin()
   return effectFn(getProviderAppsProgram)()
+}
+
+/** Any signed-in member: connecting is theirs, the client is the admin's. */
+export async function getConfiguredProvidersHandler(): Promise<ProviderId[]> {
+  await requireUser()
+  return effectFn(getConfiguredProvidersProgram)()
 }
 
 export async function setProviderAppHandler(

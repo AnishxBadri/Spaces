@@ -8,7 +8,11 @@ import {
   storeCredential,
 } from '@spaces/core/writes/vault'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { getProviderAppsHandler, setProviderAppHandler } from './provider-apps'
+import {
+  getConfiguredProvidersHandler,
+  getProviderAppsHandler,
+  setProviderAppHandler,
+} from './provider-apps'
 
 /**
  * Settings → Connections, the OAuth-client block, driven through the
@@ -196,6 +200,28 @@ describe('the redirect URI', () => {
     const moved = await getProviderAppsHandler()
     expect(moved.at(0)?.redirectUri).toBe(
       'https://example.com/spaces/api/connections/google/callback',
+    )
+  })
+})
+
+describe('which providers a member can connect to', () => {
+  it('lists only providers with an active client, to a member, ids only', async () => {
+    await db.delete(credential).where(eq(credential.kind, 'oauth_client'))
+    asMember()
+    expect(await getConfiguredProvidersHandler()).toEqual([])
+    asAdmin()
+    await setProviderAppHandler({
+      provider: 'google',
+      clientId: CLIENT_ID,
+      clientSecret: SECRET,
+    })
+    asMember()
+    expect(await getConfiguredProvidersHandler()).toEqual(['google'])
+  })
+
+  it('refuses no session', async () => {
+    await expect(getConfiguredProvidersHandler()).rejects.toThrow(
+      'Unauthorized',
     )
   })
 })

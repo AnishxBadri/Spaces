@@ -31,11 +31,13 @@ const underPrefix = (path: string) =>
 
 /**
  * Raw by design, and mounted today. The job-status stream is SSE (D64); the
- * webhook ingress verifies an HMAC over the exact raw body.
+ * webhook ingress verifies an HMAC over the exact raw body; a connect leg is
+ * a browser redirect to and from the provider, with a cookie.
  */
 const RAW = [
   '/api/auth/$',
   '/api/blob/$key',
+  '/api/connections/$provider/start',
   '/api/health',
   '/api/job-status/$entityId',
   '/api/mcp',

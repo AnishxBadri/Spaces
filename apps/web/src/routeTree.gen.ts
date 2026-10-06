@@ -61,6 +61,7 @@ import { Route as ApiWebhooksIdRouteImport } from './routes/api/webhooks/$id'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
 import { Route as AppSettingsIntegrationsIntegrationIdRouteImport } from './routes/_app/settings/integrations_.$integrationId'
 import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings/objects_.$objectSlug'
+import { Route as ApiConnectionsProviderStartRouteImport } from './routes/api/connections/$provider/start'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -323,6 +324,12 @@ const AppSettingsObjectsObjectSlugRoute =
     path: '/objects/$objectSlug',
     getParentRoute: () => AppSettingsRoute,
   } as any)
+const ApiConnectionsProviderStartRoute =
+  ApiConnectionsProviderStartRouteImport.update({
+    id: '/api/connections/$provider/start',
+    path: '/api/connections/$provider/start',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -376,6 +383,7 @@ export interface FileRoutesByFullPath {
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
+  '/api/connections/$provider/start': typeof ApiConnectionsProviderStartRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -428,6 +436,7 @@ export interface FileRoutesByTo {
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
+  '/api/connections/$provider/start': typeof ApiConnectionsProviderStartRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -483,6 +492,7 @@ export interface FileRoutesById {
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/_app/settings/integrations_/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/_app/settings/objects_/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
+  '/api/connections/$provider/start': typeof ApiConnectionsProviderStartRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -538,6 +548,7 @@ export interface FileRouteTypes {
     | '/o/$objectSlug/$recordId'
     | '/settings/integrations/$integrationId'
     | '/settings/objects/$objectSlug'
+    | '/api/connections/$provider/start'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -590,6 +601,7 @@ export interface FileRouteTypes {
     | '/o/$objectSlug/$recordId'
     | '/settings/integrations/$integrationId'
     | '/settings/objects/$objectSlug'
+    | '/api/connections/$provider/start'
   id:
     | '__root__'
     | '/'
@@ -644,6 +656,7 @@ export interface FileRouteTypes {
     | '/_app/o_/$objectSlug/$recordId'
     | '/_app/settings/integrations_/$integrationId'
     | '/_app/settings/objects_/$objectSlug'
+    | '/api/connections/$provider/start'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -659,6 +672,7 @@ export interface RootRouteChildren {
   ApiJobStatusEntityIdRoute: typeof ApiJobStatusEntityIdRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
   ApiWebhooksIdRoute: typeof ApiWebhooksIdRoute
+  ApiConnectionsProviderStartRoute: typeof ApiConnectionsProviderStartRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1027,6 +1041,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsObjectsObjectSlugRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/api/connections/$provider/start': {
+      id: '/api/connections/$provider/start'
+      path: '/api/connections/$provider/start'
+      fullPath: '/api/connections/$provider/start'
+      preLoaderRoute: typeof ApiConnectionsProviderStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1142,6 +1163,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiJobStatusEntityIdRoute: ApiJobStatusEntityIdRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
   ApiWebhooksIdRoute: ApiWebhooksIdRoute,
+  ApiConnectionsProviderStartRoute: ApiConnectionsProviderStartRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
