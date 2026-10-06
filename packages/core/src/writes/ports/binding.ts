@@ -9,7 +9,7 @@ import { redact } from '../vault/crypto'
  */
 export type BoundIntegration = Pick<
   typeof integration.$inferSelect,
-  'id' | 'capabilityId' | 'config' | 'credentialId'
+  'id' | 'capabilityId' | 'config' | 'credentialId' | 'connectionId'
 >
 
 /**

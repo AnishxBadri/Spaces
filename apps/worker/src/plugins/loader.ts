@@ -445,15 +445,12 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
         capabilityId: row.capabilityId,
         config: row.config,
         credentialId: row.credentialId,
+        connectionId: row.connectionId,
       }
       loaded.push({
         integrationId: row.id,
         row: bound,
-        fingerprint: JSON.stringify({
-          bundle: ok.bundleUrl,
-          row: bound,
-          connectionId: row.connectionId,
-        }),
+        fingerprint: JSON.stringify({ bundle: ok.bundleUrl, row: bound }),
         manifest: ok.manifest,
         settings: ok.settings,
         jobs: ok.jobs,

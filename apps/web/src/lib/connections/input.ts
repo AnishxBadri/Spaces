@@ -28,3 +28,22 @@ export type ProviderAppRow = {
   /** `<APP_URL>/api/connections/<provider>/callback`, read per request. */
   redirectUri: string
 }
+
+/** One of the session user's connections, by id. */
+export const connectionIdInput = z.object({ connectionId: z.uuid() })
+
+export type ConnectionIdInput = z.infer<typeof connectionIdInput>
+
+/** A connection after a refresh, as Settings → Connections draws it. Never a token. */
+export type ConnectionCustodyRow = {
+  connectionId: string
+  status: 'active' | 'error' | 'revoked'
+  /** When the access token lapses, ISO; null when the provider did not say. */
+  expiresAt: string | null
+}
+
+/** What a revoke did at the provider: `already-revoked` when it no longer knew the token. */
+export type ConnectionRevokeResult = {
+  connectionId: string
+  outcome: 'revoked' | 'already-revoked'
+}

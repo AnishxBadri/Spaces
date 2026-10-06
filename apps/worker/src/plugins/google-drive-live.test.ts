@@ -106,6 +106,7 @@ describe('google-drive with the fakes on', () => {
       capabilityId: 'google-drive',
       config: {},
       credentialId: null,
+      connectionId: null,
     }
     const secretsOf = async (
       fakes: ReturnType<typeof cassetteProviders> | null,

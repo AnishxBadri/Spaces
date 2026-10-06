@@ -52,6 +52,7 @@ const boundRow = (
   capabilityId,
   config: {},
   credentialId,
+  connectionId: null,
 })
 
 /** The Http and Secrets a grant of `['Http', 'Secrets']` hands the job. */

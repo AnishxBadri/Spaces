@@ -484,6 +484,36 @@ admin re-binds with their own connection. This is why copy-in matters
 (§7). Errors increment the plugin's breaker like any job; the binding pauses,
 never the worker.
 
+**As built — token custody (2026-10-07, SPA-228).** One accessor,
+`accessTokenFor(connectionId)` (core, `writes/connections/token`), takes no
+user and is what `Secrets.accessToken()` delegates to on the bound row's
+`connection_id`; no plugin holds a refresh token or a client secret.
+
+- **Refresh under a row lock.** One transaction: `SELECT … FOR UPDATE` on
+  the `account_connection` row, then decide on what the lock re-read. More
+  than 60 s left → the stored token. Otherwise `grant_type=refresh_token`
+  at the registry's `tokenUrl` with the `oauth_client` credential, and the
+  new bundle written back (a rotated refresh token replaces the old, else
+  the old stays), with `expires_at` and, when sent,
+  `refresh_token_expires_at`. A concurrent caller in another process waits
+  on the lock and returns the winner's token: one token request, one live
+  refresh token, proven with two db clients on separate pools.
+- **Failures are typed.** A 4xx naming an error (429 aside) → row `error`,
+  `error_reason` the provider's `error: error_description`, scopes and
+  bundle untouched, `AuthExpired`. No answer, a 5xx or no OAuth client →
+  `ProviderUnavailable`, nothing written. An `error` or `revoked` row →
+  `AuthExpired` without a provider call. `Secrets.accessToken()` reports
+  all of them as `NotConnected` with the reason.
+- **Revoke.** `revokeConnection` (core, `writes/connections/revoke`) POSTs
+  the refresh token (else the access token) to the registry's `revokeUrl` —
+  Box also gets the client id and secret — under the same row lock, then
+  sets `revoked`. A 4xx is logged and answered `already-revoked`; no answer
+  or a 5xx fails `ProviderUnavailable` and leaves the row. Disconnect calls
+  it, then deletes the row.
+- **The session user's hand on it** is two server fns, `refreshConnection`
+  (forces a refresh) and `revokeConnection`, each answering 'Not your
+  connection' for any id that is not the caller's.
+
 ### 5.6 Conflicts, decided
 
 - Same file in two bound folders → one blob, two documents, filed in both.
@@ -574,6 +604,11 @@ other way.
 | permission lost / token revoked        | binding `error`, surfaces on Today and Connections; existing documents unaffected                                       |
 | cursor expired (Drive 410)             | full re-list of the bound subtree, idempotent on `external_id`                                                          |
 | our own export seen by the poll        | `external_id` match → no-op                                                                                             |
+
+**As built (SPA-228):** "token revoked" reaches a job as `NotConnected` from
+`Secrets.accessToken()` once a refresh is refused — the connection row is
+already `error` with the provider's reason by then. Marking the binding
+`error` from it is the binding's (§5.5).
 
 ## 9. Derived layers — the storage layer as the AI substrate sees it (decided 2026-09-15)
 

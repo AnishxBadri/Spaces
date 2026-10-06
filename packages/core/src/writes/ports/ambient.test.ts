@@ -38,6 +38,7 @@ const bound = (over: Partial<BoundIntegration> = {}): BoundIntegration => ({
   capabilityId: 'echo',
   config: {},
   credentialId: null,
+  connectionId: null,
   ...over,
 })
 
