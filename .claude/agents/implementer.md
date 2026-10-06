@@ -62,9 +62,9 @@ each with its own Postgres-backed suites. So every test and gate command is
 light by default:
 
 - **Your test database is the slot the dispatch prompt names** —
-  `spaces_agent_a_test` or `spaces_agent_b_test` — exported before any test
+  `spaces_agent_a_test`, `spaces_agent_b_test` or `spaces_agent_c_test` — exported before any test
   command, every time, core included:
-  `export DATABASE_URL_TEST=postgresql://spaces:spaces@localhost:5432/spaces_agent_<a|b>_test`
+  `export DATABASE_URL_TEST=postgresql://spaces:spaces@localhost:5432/spaces_agent_<a|b|c>_test`
   (match the credentials to `.env.local`'s `DATABASE_URL`). The slots are
   reused across issues, so they are already migrated and only new migrations
   apply. Never invent a per-issue name, and never run a test without the
