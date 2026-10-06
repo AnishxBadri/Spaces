@@ -178,6 +178,40 @@ the export); shared drives and My Drive both work. Box uses the events
 stream or `folder/items?sort=date`; Box Notes export; enterprise SSO consent
 is admin-gated (docs say so).
 
+**As built — the read half (2026-10-07, SPA-229).** `StorageSource` in
+`@spaces/sdk` (`packages/sdk/src/storage-source.ts`) types the read half;
+the four write members are optional opaque placeholders until write-through
+(§6), so a read-only provider type-checks. Where it differs from the sketch
+above:
+
+- **Every method returns an `Effect`** whose failures are tagged errors
+  exported beside it — `NotFound { id }`, `CursorExpired { cursor }`,
+  `RateLimited { retryAfterMs }`, `AuthExpired { reason }` — never a throw.
+  Each method's error channel names only the ones it can raise.
+- **`getFolder(folderId) → { id, name, parents }`** is new: `parents` is
+  `{ id, name }[]` from the drive root to the immediate parent (empty for a
+  root; a shared drive's root is a root). The binding nesting guard and
+  change-subtree filtering read ancestry from it.
+- **No `hash` anywhere.** An entry carries `changeToken` (the provider's
+  version or modified time, compared for equality only) and `parentId`
+  (null for a root); `getFile` returns `{ stream: ReadableStream<Uint8Array>,
+mime, name, changeToken }` — a web stream, never a buffer, and for a
+  native doc the export's mime and name. Core hashes the bytes on arrival.
+- **`listFolder(folderId, { cursor?, pageSize? })`** — the page size is a
+  hint the conformance suite pins at 2; `next` is absent on the last page.
+- **`changes(cursor | null)`** — `null` asks for a starting cursor (no
+  changes); each change is `{ _tag: 'changed', entry }` with the latest
+  state, or `{ _tag: 'removed', id }`; `next` is always present.
+- **`pickerConfig()`** returns a `JsonObject` — serialisable by type — and
+  the suite proves no client secret or refresh token is reachable from it.
+- **Manifest:** a `provides: 'storage-source'` plugin whose job `uses`
+  `Facts` or `Ai` is refused by `manifestSchema` (`STORAGE_SOURCE_WITHHELD`).
+
+The fake Drive (`makeFakeDrive`, a seeded data room with a shared-drive
+root and a native Doc exporting to docx) and the happy-path conformance
+suite (`storageSourceConformance`) are in `@spaces/sdk/testing`;
+`docs/spec-plugin-sdk.md` §13 has the details.
+
 ## 5. Bindings — pointing a folder or file at a node (decided 2026-09-14)
 
 ### 5.1 The table

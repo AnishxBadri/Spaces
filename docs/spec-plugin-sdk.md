@@ -323,8 +323,9 @@ under-estimate overruns by at most one batch.
 them; they call nothing:
 
 ```ts
-storage-source: { resolveLink(url); listFolder(id, cursor?); getFile(id); changes(cursor);
-                  putFile(folderId, name, stream); move; rename; ensureFolder(path); pickerConfig() }
+storage-source: { resolveLink(url); listFolder(id, { cursor?, pageSize? }); getFolder(id);
+                  getFile(id); changes(cursor | null); pickerConfig();
+                  putFile?; move?; rename?; ensureFolder? }   // write half: project 22
 ```
 
 A plugin that implements it says `provides: 'storage-source'` in the
@@ -332,6 +333,17 @@ manifest. It never decides filing — core's `resolveItem` (storage design,
 CONTEXT "Storage sources") maps folders to entities; the plugin is a bytes
 pipe with hints (`source_path`, folder names). Its body is owned by the
 storage area (project 20).
+
+**As built — the read half (SPA-229).** The read half is typed in
+`StorageSource` (`@spaces/sdk`): each method returns an `Effect` failing
+with the tagged `NotFound`, `CursorExpired`, `RateLimited { retryAfterMs }`
+or `AuthExpired`; `getFile` streams a `ReadableStream<Uint8Array>`; no
+member carries a provider hash. The shapes are in
+`docs/spec-storage-sources.md` §4's as-built note. **The grant rule** is the
+manifest's: `manifestSchema` refuses a `provides: 'storage-source'` plugin
+any job whose `uses` names `Facts` or `Ai` (`STORAGE_SOURCE_WITHHELD`),
+naming the rule; every other port in `PORT_NAMES` stays grantable, and
+`manifest.test.ts` walks the whole list.
 
 ### 5.1 As built (2026-10-01, SPA-200/201/202/203/204)
 
@@ -869,6 +881,38 @@ Layered; most value never touches a provider.
 - **No network.** CI's `offline` job runs the worker's and every plugin's
   suite in a group whose outbound traffic is rejected (loopback open for
   Postgres), after a self-check that `https://example.com` does not answer.
+
+**As built (layers 2 and 3, for storage sources — the read half).**
+
+- **The fake Drive is in-process, not a server**, and lives in the testing
+  kit: `makeFakeDrive({ seed?, credentials? })` from `@spaces/sdk/testing`
+  is a `StorageSource` over a mutable seeded tree (`FAKE_DRIVE_SEED`: a My
+  Drive root, a data room of five children, a three-deep folder, a
+  shared-drive root, one native Google Doc that exports to docx bytes).
+  Mutators (`add`, `remove`, `rename`, `move`, `edit`) feed the change
+  log; toggles for the chaos list — `rateLimit(calls, retryAfterMs)`,
+  `evictCursors()` (Drive's 410), `vanishAfterList(id)` (deleted between
+  list and get), `revoke()`/`restore()`. Each file carries a Drive-style
+  `md5Checksum` that the fake never surfaces, so a test can prove it.
+- **Conformance is a function, not a file**:
+  `storageSourceConformance({ make, fixture, secrets })` returns named
+  cases (`{ name, run: Effect }`), so the sdk takes no vitest dependency; a
+  provider's test runs them with
+  `it.each(cases)('$name', ({ run }) => Effect.runPromise(run))`. The
+  `fixture` is what the seeded tree holds, written separately from the seed
+  (`FAKE_DRIVE_FIXTURE`), so an entry deleted from the seed fails the
+  paging case naming it — nothing skips for being absent. The cases:
+  `resolveLink` (folder, file, foreign → null), `listFolder` at page size 2
+  (no duplicate, no omission, no extra), the native doc exported and hashed
+  by the suite (SHA-256 over the stream; any `hash`/`checksum`/`md5`/`sha`
+  key on a result fails), `getFolder` ancestry to the root, `NotFound`
+  typed on a missing id, `changes(null)` and back, and `pickerConfig` as
+  plain JSON with none of the `secrets` in it. The suite needs no network
+  and no Postgres (`packages/sdk/src/testing/storage-source.test.ts`).
+- **Not yet:** `SPACES_FAKE_PROVIDERS=1` does not point anything at the fake
+  Drive — the worker's fake registry stands a fake in per plugin, and that
+  wiring lands with the Google Drive plugin. The chaos cases themselves
+  (beyond the toggles' own tests) are the storage area's next slice.
 
 ## 14. Build order
 

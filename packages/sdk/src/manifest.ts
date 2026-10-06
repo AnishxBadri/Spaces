@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { DOMAIN_EVENTS, PORT_NAMES } from './contract.ts'
+import type { PortName } from './contract.ts'
 import { isVersion, parseSdkRange } from './range.ts'
 
 /**
@@ -100,6 +101,16 @@ const jobSchema = z.strictObject({
     })
     .optional(),
 })
+
+/**
+ * The ports a `provides: 'storage-source'` plugin is never granted, in any
+ * job: it is a bytes pipe with hints — core files what it delivers and fires
+ * its own features on `document.extracted`.
+ */
+export const STORAGE_SOURCE_WITHHELD = [
+  'Facts',
+  'Ai',
+] as const satisfies ReadonlyArray<PortName>
 
 export const ACTION_TARGETS = ['company', 'person', 'deal'] as const
 
@@ -204,6 +215,17 @@ export const manifestSchema = z
             job.trigger === 'event'
               ? 'an event job needs on'
               : `on is only for an event job, and ${name} is ${job.trigger}`,
+        })
+      }
+      if (m.provides === 'storage-source') {
+        job.uses.forEach((port, i) => {
+          if (STORAGE_SOURCE_WITHHELD.some((withheld) => withheld === port)) {
+            ctx.addIssue({
+              code: 'custom',
+              path: ['jobs', name, 'uses', i],
+              message: `a storage-source plugin is granted no ${STORAGE_SOURCE_WITHHELD.join(' and no ')} port — it delivers bytes and never decides filing or calls Ai, and ${name} uses ${port}`,
+            })
+          }
         })
       }
     }

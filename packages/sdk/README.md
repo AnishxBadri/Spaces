@@ -56,8 +56,12 @@ One file, to be read and reviewed as one; it moves only on an SDK major.
   type each job by its manifest entry; the `cost` hook on action jobs (D53);
   `DomainEvent` / `DOMAIN_EVENTS`; `JobError` (`JobRetryable`,
   `JobRateLimited`, `JobPermanent` — the worker's tags).
-- `StorageSource` (`src/storage-source.ts`) — a provider interface with a
-  TODO body the storage area (project 20) owns.
+- `StorageSource` (`src/storage-source.ts`) — the storage-source provider
+  interface: the read half typed (`resolveLink`, `listFolder`, `getFolder`,
+  `getFile`, `changes`, `pickerConfig`, failing with `NotFound`,
+  `CursorExpired`, `RateLimited`, `AuthExpired`), the write half optional
+  placeholders. `@spaces/sdk/testing` has a fake Drive (`makeFakeDrive`)
+  and the conformance suite (`storageSourceConformance`).
 
 ## Ports (sdk-5) — `src/ports.ts`
 

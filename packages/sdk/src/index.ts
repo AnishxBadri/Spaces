@@ -2,8 +2,9 @@
  * @spaces/sdk — what a plugin imports (docs/spec-plugin-sdk.md §3–§6): the
  * manifest, the version check and `definePlugin` (sdk-3); the frozen
  * contract — port names, claims, trigger shapes, the cost hook, job errors
- * (sdk-4a, `contract.ts`); the port tags (sdk-5, `ports.ts`). The testing
- * kit is `@spaces/sdk/testing`.
+ * (sdk-4a, `contract.ts`); the port tags (sdk-5, `ports.ts`); the
+ * storage-source provider interface (`storage-source.ts`). The testing kit
+ * is `@spaces/sdk/testing`.
  */
 export { SDK_VERSION } from './version.ts'
 export { satisfiesSdk, parseSdkRange, isVersion } from './range.ts'
@@ -11,6 +12,7 @@ export type { SdkCheck } from './range.ts'
 export {
   TRIGGERS,
   ACTION_TARGETS,
+  STORAGE_SOURCE_WITHHELD,
   manifestSchema,
   defineManifest,
   toManifestJson,
@@ -81,7 +83,26 @@ export type {
   FileJob,
   JobFor,
 } from './contract.ts'
-export type { StorageSource } from './storage-source.ts'
+export {
+  NotFound,
+  CursorExpired,
+  RateLimited,
+  AuthExpired,
+} from './storage-source.ts'
+export type {
+  StorageSource,
+  StorageSourceError,
+  LinkTarget,
+  StorageEntry,
+  FolderPage,
+  ListFolderOptions,
+  FolderRef,
+  StorageFolder,
+  StorageFile,
+  StorageChange,
+  ChangePage,
+  PickerConfig,
+} from './storage-source.ts'
 export {
   Identity,
   Facts,

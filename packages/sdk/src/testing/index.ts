@@ -642,3 +642,31 @@ export const testPorts = (options: TestPortsOptions = {}) => {
     import: importer,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Storage sources — a fake Drive and the read half's conformance suite
+// ---------------------------------------------------------------------------
+
+export {
+  makeFakeDrive,
+  FAKE_DRIVE_SEED,
+  FAKE_DRIVE_FIXTURE,
+  FAKE_DRIVE_CREDENTIALS,
+  GOOGLE_DOC_MIME,
+  DOCX_MIME,
+} from './fake-drive.ts'
+export type {
+  FakeDrive,
+  FakeDriveSeedItem,
+  FakeDriveCredentials,
+} from './fake-drive.ts'
+export {
+  storageSourceConformance,
+  ConformanceFailure,
+  sha256Hex,
+} from './storage-source-conformance.ts'
+export type {
+  StorageSourceFixture,
+  StorageSourceSubject,
+  ConformanceCase,
+} from './storage-source-conformance.ts'

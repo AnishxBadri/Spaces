@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { PORT_NAMES } from './contract.ts'
 import {
+  STORAGE_SOURCE_WITHHELD,
   manifestSchema,
   settingsJsonSchema,
   toManifestJson,
@@ -255,6 +257,44 @@ describe('manifestSchema', () => {
     })
   })
 
+  describe('provides storage-source', () => {
+    // The port-grant table (docs/spec-plugin-sdk.md §4): a storage-source
+    // provider never fills facts and never calls Ai; every other port in
+    // PORT_NAMES stays grantable.
+    const storageSource = (uses: Array<string>) => {
+      const m = { ...base(), provides: 'storage-source' }
+      m.jobs = { sync: { trigger: 'schedule', schedule: '*/5 * * * *', uses } }
+      return m
+    }
+
+    it('withholds exactly Facts and Ai', () => {
+      expect([...STORAGE_SOURCE_WITHHELD].sort()).toEqual(['Ai', 'Facts'])
+    })
+
+    const granted = PORT_NAMES.filter(
+      (p) => !STORAGE_SOURCE_WITHHELD.some((w) => w === p),
+    )
+
+    it.each(granted)('grants %s', (port) => {
+      expect(issues(storageSource([port]))).toEqual([])
+    })
+
+    it.each([...STORAGE_SOURCE_WITHHELD])(
+      'refuses a job that uses %s, naming the rule',
+      (port) => {
+        const found = issues(storageSource(['Http', port]))
+        expect(found).toEqual([
+          `jobs.sync.uses.1: a storage-source plugin is granted no Facts and no Ai port — it delivers bytes and never decides filing or calls Ai, and sync uses ${port}`,
+        ])
+      },
+    )
+
+    it('leaves Facts and Ai to a plugin that provides nothing', () => {
+      const m = storageSource(['Facts', 'Ai'])
+      expect(issues({ ...m, provides: undefined })).toEqual([])
+    })
+  })
+
   it('carries the rest of the §3 shape', () => {
     const m = {
       ...base(),
@@ -269,7 +309,7 @@ describe('manifestSchema', () => {
     }
     m.jobs.enrich = {
       trigger: 'action',
-      uses: ['Facts'],
+      uses: ['Content'],
       concurrency: 2,
       timeout: '60s',
       retry: 3,
