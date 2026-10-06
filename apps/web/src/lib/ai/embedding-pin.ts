@@ -11,6 +11,7 @@ import { readProviderMeta } from './providers/meta'
 import {
   EMBEDDING_PROVIDER_INFO,
   PIN_DIMS,
+  embeddingCredentialKind,
   embeddingCredentialProvider,
   findEmbeddingModel,
   isEmbeddingProvider,
@@ -195,7 +196,10 @@ const requireKey = Effect.fn('pinEmbedding.requireKey')(function* (
 ): Effect.fn.Return<void, PinRefused | EmbeddingPinReadFailed> {
   const key = yield* Effect.tryPromise({
     try: () =>
-      readWorkspaceCredential(embeddingCredentialProvider(target.provider)),
+      readWorkspaceCredential(
+        embeddingCredentialProvider(target.provider),
+        embeddingCredentialKind(target.provider),
+      ),
     catch: (cause) => new EmbeddingPinReadFailed({ cause }),
   })
   if (!key || key.status !== 'active')
@@ -316,7 +320,10 @@ const testedGreen = Effect.fn('sensitiveSlot.testedGreen')(function* (
 ): Effect.fn.Return<boolean | 'no-credential', EmbeddingPinReadFailed> {
   const row = yield* Effect.tryPromise({
     try: () =>
-      readWorkspaceCredential(embeddingCredentialProvider(target.provider)),
+      readWorkspaceCredential(
+        embeddingCredentialProvider(target.provider),
+        embeddingCredentialKind(target.provider),
+      ),
     catch: (cause) => new EmbeddingPinReadFailed({ cause }),
   })
   if (!row || row.status !== 'active') return 'no-credential'

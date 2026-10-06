@@ -71,12 +71,13 @@ export const credential = pgTable(
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
   },
   (t) => [
-    // One credential per (scope, provider, user): a user row per user, and
-    // one workspace row per provider. NULLS NOT DISTINCT is what makes the
-    // workspace row's null user_id collide — and what `storeCredential`'s
-    // ON CONFLICT targets for both scopes.
+    // One credential per (scope, provider, kind, user): a user row per user,
+    // and one workspace row per provider and kind — so a Gemini `llm` key and
+    // a Google `oauth_client` both live on provider `google`. NULLS NOT
+    // DISTINCT is what makes the workspace row's null user_id collide — and
+    // what `storeCredential`'s ON CONFLICT targets for both scopes.
     unique('credential_user_unique')
-      .on(t.scope, t.provider, t.userId)
+      .on(t.scope, t.provider, t.kind, t.userId)
       .nullsNotDistinct(),
   ],
 )

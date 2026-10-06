@@ -1,0 +1,2 @@
+ALTER TABLE "credential" DROP CONSTRAINT "credential_user_unique";--> statement-breakpoint
+ALTER TABLE "credential" ADD CONSTRAINT "credential_user_unique" UNIQUE NULLS NOT DISTINCT("scope","provider","kind","user_id");

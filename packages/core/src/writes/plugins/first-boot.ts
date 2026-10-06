@@ -216,12 +216,6 @@ const seedOne = Effect.fn('seedOne')(function* (seed: SeedCredential) {
       Effect.as(false),
     )
   if (!PLUGIN_ID.test(pluginId)) return yield* skip('not a plugin id')
-  if (
-    (yield* query('reading the vault', () =>
-      readWorkspaceCredential(pluginId),
-    )) !== undefined
-  )
-    return false
   const row = (yield* liveRows([pluginId])).at(0)
   if (row === undefined) return yield* skip(`${pluginId} is not installed`)
   const manifest = manifestSchema.safeParse(row.manifest)
@@ -229,6 +223,12 @@ const seedOne = Effect.fn('seedOne')(function* (seed: SeedCredential) {
     ? manifest.data.requires?.credential?.kind
     : undefined
   if (kind === undefined) return yield* skip(`${pluginId} takes no key`)
+  if (
+    (yield* query('reading the vault', () =>
+      readWorkspaceCredential(pluginId, kind),
+    )) !== undefined
+  )
+    return false
   const admin = yield* firstAdmin
   if (admin === undefined)
     return yield* skip(

@@ -37,6 +37,27 @@ exactly one plugin. Same machinery, different fan-out. The OAuth dance
 (PKCE, refresh, encryption, revocation) is core, once, per provider; plugins
 declare `requires.connection: { provider, scopes }` and never implement it.
 
+**Registering a provider (operator, once).** Settings → Connections, as an
+admin, shows one OAuth client group per provider in the code registry
+(`PROVIDERS`: google, box), each with its redirect URI. Paste that URI into
+the provider's console exactly as shown — it is
+`<APP_URL without trailing slash>/api/connections/<provider>/callback`, so
+change `APP_URL` first if the public origin is not settled — then paste the
+client ID and secret back. The secret is stored as a workspace
+`credential(kind: oauth_client)` beside any LLM key on the same provider
+name, and is shown afterwards only as its redacted tail.
+
+- **Google: Internal vs Testing.** A fund on Google Workspace makes the
+  OAuth app _Internal_ — no verification, every user in the org. Anyone else
+  runs it in _Testing_: at most 100 named test users, and refresh tokens
+  expire after 7 days, so every connection asks for consent again weekly.
+  Recorded in CONTEXT.md "Email / calendar ingestion".
+- **Box: enterprise SSO needs admin consent.** In a Box Enterprise that
+  enforces SSO, a user cannot authorize a new app alone: the Box enterprise
+  admin must authorize (or allow-list) the app in the Box Admin Console
+  first, or the consent screen refuses. Ask the fund's Box admin before the
+  first Connect.
+
 **Coexist by role, decided:** Drive/Box = the fund's archive and
 collaboration surface, also an arrival channel. Our blob + derived layers =
 the index and the AI working set. Bytes-of-record: Drive when a mirror is
@@ -486,7 +507,8 @@ above the port.
 - Space page Sources: same two links; bound folder shown as a source.
 - `/documents`: `source` column, filter by provider; unfiled filter.
 - Settings → Connections (per user): connections, their bindings, status,
-  last sync, unlink. Settings → Providers (admin): Google / Box OAuth apps.
+  last sync, unlink; on the same page, for an admin only, the Google / Box
+  OAuth apps (no separate Providers page).
 - Today: binding errors, files waiting for filing, files waiting for export.
 
 ## 13. Deferred, with the reason on record

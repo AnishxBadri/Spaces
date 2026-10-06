@@ -36,16 +36,18 @@ describe('resolveCredential', () => {
       meta,
     })
 
-    const resolved = await resolveCredential('meta-reader')
+    const resolved = await resolveCredential('meta-reader', 'llm')
     expect(resolved).toMatchObject({
       scope: 'workspace',
       secret: 'sk-meta-reader-0001',
       meta,
     })
-    await expect(resolveSecret('meta-reader')).resolves.toBe(
+    await expect(resolveSecret('meta-reader', 'llm')).resolves.toBe(
       'sk-meta-reader-0001',
     )
-    await expect(resolveCredential('nobody-saved-this')).resolves.toBeNull()
+    await expect(
+      resolveCredential('nobody-saved-this', 'llm'),
+    ).resolves.toBeNull()
   })
 
   it('merges meta keys without touching the ciphertext', async () => {
@@ -57,7 +59,7 @@ describe('resolveCredential', () => {
     })
     await mergeCredentialMeta(id, { lastTestOk: false, baseUrl: null })
 
-    const resolved = await resolveCredential('meta-merge')
+    const resolved = await resolveCredential('meta-merge', 'llm')
     expect(resolved?.secret).toBe('sk-meta-merge-0001')
     expect(resolved?.meta).toEqual({
       baseUrl: null,
@@ -69,9 +71,8 @@ describe('resolveCredential', () => {
 
 describe('a workspace key saved twice', () => {
   it('replaces the one row instead of adding a second', async () => {
-    // `credential_user_unique` is (scope, provider, user_id) and a workspace
-    // row's user_id is null, which Postgres counts as distinct — so an upsert
-    // on that index never fired and the second save used to insert.
+    // A workspace row's user_id is null; `credential_user_unique` is NULLS
+    // NOT DISTINCT, so the second save conflicts and updates the first.
     await storeCredential({
       ...base,
       provider: 'twice',
@@ -89,7 +90,7 @@ describe('a workspace key saved twice', () => {
       .from(credential)
       .where(eq(credential.provider, 'twice'))
     expect(value).toBe(1)
-    await expect(resolveCredential('twice')).resolves.toMatchObject({
+    await expect(resolveCredential('twice', 'llm')).resolves.toMatchObject({
       secret: 'sk-second-key-0002',
       meta: { baseUrl: 'https://b.example/v1' },
     })

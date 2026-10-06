@@ -28,6 +28,7 @@
     "./ai/*": "./src/ai/*.ts",
     "./import/*": "./src/import/*.ts",
     "./plugins/*": "./src/plugins/*.ts",
+    "./providers/*": "./src/providers/*.ts",
     "./search/*": "./src/search/*.ts"
   },
   "scripts": {

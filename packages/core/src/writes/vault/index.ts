@@ -59,23 +59,30 @@ export const credentialInput = z
 
 export type CredentialInput = z.infer<typeof credentialInput>
 
+/** What a row holds. A lookup names it: one provider may hold several kinds. */
+export type CredentialKind = CredentialInput['kind']
+
 function aadFor(scope: string, provider: string): string {
   return `${scope}:${provider}`
 }
 
-function workspaceRow(provider: string) {
+function workspaceRow(provider: string, kind: CredentialKind) {
   return and(
     eq(credential.scope, 'workspace'),
     eq(credential.provider, provider),
+    eq(credential.kind, kind),
     isNull(credential.userId),
   )
 }
 
 /**
  * Writes (or replaces) one credential: one upsert on `credential_user_unique`
- * for both scopes. The constraint is NULLS NOT DISTINCT, so a workspace row's
- * null `user_id` conflicts like a user's id does, and two first-time saves
- * racing each other leave one row holding the later key.
+ * for both scopes.
+ * - The constraint is NULLS NOT DISTINCT, so a workspace row's null
+ *   `user_id` conflicts like a user's id does, and two first-time saves
+ *   racing each other leave one row holding the later key.
+ * - `kind` is in the target: a Google `oauth_client` never replaces a
+ *   Gemini `llm` key on provider `google`.
  */
 export async function storeCredential(rawInput: CredentialInput) {
   const input = credentialInput.parse(rawInput)
@@ -97,8 +104,13 @@ export async function storeCredential(rawInput: CredentialInput) {
       createdBy: input.createdBy,
     })
     .onConflictDoUpdate({
-      target: [credential.scope, credential.provider, credential.userId],
-      set: { kind: input.kind, secretEnc, meta, status: 'active' },
+      target: [
+        credential.scope,
+        credential.provider,
+        credential.kind,
+        credential.userId,
+      ],
+      set: { secretEnc, meta, status: 'active' },
     })
     .returning({ id: credential.id })
   return { id: row.id, display: redact(input.secret) }
@@ -123,6 +135,7 @@ export type ResolvedCredential = {
  */
 export async function resolveCredential(
   provider: string,
+  kind: CredentialKind,
   userId?: string,
 ): Promise<ResolvedCredential | null> {
   if (userId) {
@@ -134,6 +147,7 @@ export async function resolveCredential(
           and(
             eq(credential.scope, 'user'),
             eq(credential.provider, provider),
+            eq(credential.kind, kind),
             eq(credential.userId, userId),
             eq(credential.status, 'active'),
           ),
@@ -155,7 +169,7 @@ export async function resolveCredential(
     await db
       .select()
       .from(credential)
-      .where(and(workspaceRow(provider), eq(credential.status, 'active')))
+      .where(and(workspaceRow(provider, kind), eq(credential.status, 'active')))
       .limit(1)
   ).at(0)
   if (wsRow) {
@@ -174,9 +188,10 @@ export async function resolveCredential(
 /** The secret alone — `resolveCredential` for callers that need no meta. */
 export async function resolveSecret(
   provider: string,
+  kind: CredentialKind,
   userId?: string,
 ): Promise<string | null> {
-  return (await resolveCredential(provider, userId))?.secret ?? null
+  return (await resolveCredential(provider, kind, userId))?.secret ?? null
 }
 
 /**
@@ -199,10 +214,13 @@ export async function resolveSecretById(id: string): Promise<string | null> {
 }
 
 /**
- * The workspace row for a provider, without its secret — what a settings
- * ledger draws. Nothing is decrypted and nothing is touched.
+ * The workspace row for a provider and kind, without its secret — what a
+ * settings ledger draws. Nothing is decrypted and nothing is touched.
  */
-export async function readWorkspaceCredential(provider: string) {
+export async function readWorkspaceCredential(
+  provider: string,
+  kind: CredentialKind,
+) {
   return (
     await db
       .select({
@@ -214,7 +232,7 @@ export async function readWorkspaceCredential(provider: string) {
         lastUsedAt: credential.lastUsedAt,
       })
       .from(credential)
-      .where(workspaceRow(provider))
+      .where(workspaceRow(provider, kind))
       .limit(1)
   ).at(0)
 }

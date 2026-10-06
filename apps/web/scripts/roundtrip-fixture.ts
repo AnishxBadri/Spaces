@@ -150,7 +150,7 @@ async function verify() {
 
   // The real vault, so the assertion is "secret.key came back", not "a row
   // came back": a wrong key throws inside AES-GCM instead of decrypting.
-  const back = await resolveSecret(FIXTURE.provider)
+  const back = await resolveSecret(FIXTURE.provider, 'llm')
   if (back !== secret) {
     throw new Error(
       `[fixture] the stored credential did not decrypt to what was planted (got ${back === null ? 'null' : 'a different value'})`,

@@ -19,6 +19,7 @@ import { providerFailure } from '../test-call'
 import {
   EMBEDDING_PROVIDERS,
   EMBEDDING_PROVIDER_INFO,
+  embeddingCredentialKind,
   embeddingCredentialProvider,
   findEmbeddingModel,
   needsRepinNote,
@@ -81,7 +82,11 @@ export type EmbeddingTestResult =
 
 const readKey = (provider: EmbeddingProvider) =>
   Effect.tryPromise({
-    try: () => readWorkspaceCredential(embeddingCredentialProvider(provider)),
+    try: () =>
+      readWorkspaceCredential(
+        embeddingCredentialProvider(provider),
+        embeddingCredentialKind(provider),
+      ),
     catch: (cause) =>
       new EmbeddingSettingsFailed({
         message: 'Could not read the embedding keys',

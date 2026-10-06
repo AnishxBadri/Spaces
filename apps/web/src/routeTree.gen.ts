@@ -41,6 +41,7 @@ import { Route as AppPortfolioHoldingIdRouteImport } from './routes/_app/portfol
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsAiRouteImport } from './routes/_app/settings/ai'
 import { Route as AppSettingsArrivalRouteImport } from './routes/_app/settings/arrival'
+import { Route as AppSettingsConnectionsRouteImport } from './routes/_app/settings/connections'
 import { Route as AppSettingsCurrencyRouteImport } from './routes/_app/settings/currency'
 import { Route as AppSettingsEmbeddingsRouteImport } from './routes/_app/settings/embeddings'
 import { Route as AppSettingsIntegrationsRouteImport } from './routes/_app/settings/integrations'
@@ -220,6 +221,11 @@ const AppSettingsArrivalRoute = AppSettingsArrivalRouteImport.update({
   path: '/arrival',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsConnectionsRoute = AppSettingsConnectionsRouteImport.update({
+  id: '/connections',
+  path: '/connections',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsCurrencyRoute = AppSettingsCurrencyRouteImport.update({
   id: '/currency',
   path: '/currency',
@@ -349,6 +355,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$holdingId': typeof AppPortfolioHoldingIdRoute
   '/settings/ai': typeof AppSettingsAiRoute
   '/settings/arrival': typeof AppSettingsArrivalRoute
+  '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/currency': typeof AppSettingsCurrencyRoute
   '/settings/embeddings': typeof AppSettingsEmbeddingsRoute
   '/settings/integrations': typeof AppSettingsIntegrationsRoute
@@ -400,6 +407,7 @@ export interface FileRoutesByTo {
   '/portfolio/$holdingId': typeof AppPortfolioHoldingIdRoute
   '/settings/ai': typeof AppSettingsAiRoute
   '/settings/arrival': typeof AppSettingsArrivalRoute
+  '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/currency': typeof AppSettingsCurrencyRoute
   '/settings/embeddings': typeof AppSettingsEmbeddingsRoute
   '/settings/integrations': typeof AppSettingsIntegrationsRoute
@@ -454,6 +462,7 @@ export interface FileRoutesById {
   '/_app/portfolio_/$holdingId': typeof AppPortfolioHoldingIdRoute
   '/_app/settings/ai': typeof AppSettingsAiRoute
   '/_app/settings/arrival': typeof AppSettingsArrivalRoute
+  '/_app/settings/connections': typeof AppSettingsConnectionsRoute
   '/_app/settings/currency': typeof AppSettingsCurrencyRoute
   '/_app/settings/embeddings': typeof AppSettingsEmbeddingsRoute
   '/_app/settings/integrations': typeof AppSettingsIntegrationsRoute
@@ -508,6 +517,7 @@ export interface FileRouteTypes {
     | '/portfolio/$holdingId'
     | '/settings/ai'
     | '/settings/arrival'
+    | '/settings/connections'
     | '/settings/currency'
     | '/settings/embeddings'
     | '/settings/integrations'
@@ -559,6 +569,7 @@ export interface FileRouteTypes {
     | '/portfolio/$holdingId'
     | '/settings/ai'
     | '/settings/arrival'
+    | '/settings/connections'
     | '/settings/currency'
     | '/settings/embeddings'
     | '/settings/integrations'
@@ -612,6 +623,7 @@ export interface FileRouteTypes {
     | '/_app/portfolio_/$holdingId'
     | '/_app/settings/ai'
     | '/_app/settings/arrival'
+    | '/_app/settings/connections'
     | '/_app/settings/currency'
     | '/_app/settings/embeddings'
     | '/_app/settings/integrations'
@@ -875,6 +887,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsArrivalRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/connections': {
+      id: '/_app/settings/connections'
+      path: '/connections'
+      fullPath: '/settings/connections'
+      preLoaderRoute: typeof AppSettingsConnectionsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/currency': {
       id: '/_app/settings/currency'
       path: '/currency'
@@ -1014,6 +1033,7 @@ declare module '@tanstack/react-router' {
 interface AppSettingsRouteChildren {
   AppSettingsAiRoute: typeof AppSettingsAiRoute
   AppSettingsArrivalRoute: typeof AppSettingsArrivalRoute
+  AppSettingsConnectionsRoute: typeof AppSettingsConnectionsRoute
   AppSettingsCurrencyRoute: typeof AppSettingsCurrencyRoute
   AppSettingsEmbeddingsRoute: typeof AppSettingsEmbeddingsRoute
   AppSettingsIntegrationsRoute: typeof AppSettingsIntegrationsRoute
@@ -1031,6 +1051,7 @@ interface AppSettingsRouteChildren {
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsAiRoute: AppSettingsAiRoute,
   AppSettingsArrivalRoute: AppSettingsArrivalRoute,
+  AppSettingsConnectionsRoute: AppSettingsConnectionsRoute,
   AppSettingsCurrencyRoute: AppSettingsCurrencyRoute,
   AppSettingsEmbeddingsRoute: AppSettingsEmbeddingsRoute,
   AppSettingsIntegrationsRoute: AppSettingsIntegrationsRoute,

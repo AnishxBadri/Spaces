@@ -8,12 +8,13 @@ import { aiRun, credential, integration, mailbox } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { encryptSecret } from './crypto'
-import { resolveSecret, storeCredential } from './index'
+import { resolveCredential, resolveSecret, storeCredential } from './index'
 
 /**
- * `credential_user_unique` is NULLS NOT DISTINCT: one workspace row per
- * provider is the database's rule, not the write path's, and
- * `storeCredential` is one upsert on it for both scopes.
+ * `credential_user_unique` is NULLS NOT DISTINCT on (scope, provider, kind,
+ * user_id): one workspace row per provider and kind is the database's rule,
+ * not the write path's, and `storeCredential` is one upsert on it for both
+ * scopes.
  */
 
 const workspaceKey = (provider: string, secret: string) =>
@@ -159,8 +160,64 @@ describe('migration 0060: duplicate credentials collapse', () => {
   })
 })
 
-describe('one workspace credential per provider', () => {
-  it('refuses a second workspace row for a provider', async () => {
+describe('one workspace credential per provider and kind', () => {
+  it('is the constraint the database holds', async () => {
+    const constraint = await db.execute<{ def: string }>(sql`
+      select pg_get_constraintdef(oid) as def from pg_constraint
+      where conname = 'credential_user_unique'`)
+    expect(constraint.rows.at(0)?.def).toBe(
+      'UNIQUE NULLS NOT DISTINCT (scope, provider, kind, user_id)',
+    )
+  })
+
+  it('keeps a Gemini llm key and a Google oauth_client apart on provider google', async () => {
+    const gemini = await storeCredential({
+      ...workspaceKey('google', 'AIza-gemini-key-0001'),
+      meta: { display: 'AIza…0001' },
+    })
+    const client = await storeCredential({
+      scope: 'workspace',
+      provider: 'google',
+      kind: 'oauth_client',
+      secret: 'GOCSPX-client-secret-0002',
+      meta: { clientId: '48213.apps.googleusercontent.com' },
+      createdBy: FIXTURE_ACTOR.id,
+    })
+
+    expect(client.id).not.toBe(gemini.id)
+    expect(await rowsFor('google')).toHaveLength(2)
+    await expect(resolveCredential('google', 'llm')).resolves.toEqual({
+      id: gemini.id,
+      scope: 'workspace',
+      secret: 'AIza-gemini-key-0001',
+      meta: { display: 'AIza…0001' },
+    })
+    await expect(resolveCredential('google', 'oauth_client')).resolves.toEqual({
+      id: client.id,
+      scope: 'workspace',
+      secret: 'GOCSPX-client-secret-0002',
+      meta: { clientId: '48213.apps.googleusercontent.com' },
+    })
+
+    // Saving the client again replaces the client, and only the client.
+    await storeCredential({
+      scope: 'workspace',
+      provider: 'google',
+      kind: 'oauth_client',
+      secret: 'GOCSPX-client-secret-0003',
+      meta: { clientId: '48213.apps.googleusercontent.com' },
+      createdBy: FIXTURE_ACTOR.id,
+    })
+    expect(await rowsFor('google')).toHaveLength(2)
+    await expect(resolveSecret('google', 'llm')).resolves.toBe(
+      'AIza-gemini-key-0001',
+    )
+    await expect(resolveSecret('google', 'oauth_client')).resolves.toBe(
+      'GOCSPX-client-secret-0003',
+    )
+  })
+
+  it('refuses a second workspace row for a provider and kind', async () => {
     await db.insert(credential).values(rawWorkspaceRow('openai', 'sk-one'))
     await expect(
       db.insert(credential).values(rawWorkspaceRow('openai', 'sk-two')),
@@ -184,7 +241,9 @@ describe('one workspace credential per provider', () => {
     await second
 
     expect(await rowsFor('race')).toHaveLength(1)
-    await expect(resolveSecret('race')).resolves.toBe('sk-second-save-0002')
+    await expect(resolveSecret('race', 'llm')).resolves.toBe(
+      'sk-second-save-0002',
+    )
   })
 
   it('a burst of concurrent saves leaves exactly one row', async () => {
@@ -196,12 +255,12 @@ describe('one workspace credential per provider', () => {
     const rows = await rowsFor('burst')
     expect(rows).toHaveLength(1)
     expect(new Set(saved.map((s) => s.id))).toEqual(new Set([rows[0].id]))
-    expect(secrets).toContain(await resolveSecret('burst'))
+    expect(secrets).toContain(await resolveSecret('burst', 'llm'))
   })
 })
 
 describe('user-scoped credentials', () => {
-  it('keep one row per (scope, provider, user), upserted on save', async () => {
+  it('keep one row per (scope, provider, kind, user), upserted on save', async () => {
     const other = {
       id: 'vault-second-user',
       name: 'Second User',
@@ -239,12 +298,14 @@ describe('user-scoped credentials', () => {
       .from(credential)
       .where(eq(credential.provider, 'openai'))
     expect(rows).toHaveLength(3)
-    await expect(resolveSecret('openai', FIXTURE_ACTOR.id)).resolves.toBe(
-      'sk-mine-again-0002',
-    )
-    await expect(resolveSecret('openai', other.id)).resolves.toBe(
+    await expect(
+      resolveSecret('openai', 'llm', FIXTURE_ACTOR.id),
+    ).resolves.toBe('sk-mine-again-0002')
+    await expect(resolveSecret('openai', 'llm', other.id)).resolves.toBe(
       'sk-theirs-00000003',
     )
-    await expect(resolveSecret('openai')).resolves.toBe('sk-workspace-00004')
+    await expect(resolveSecret('openai', 'llm')).resolves.toBe(
+      'sk-workspace-00004',
+    )
   })
 })

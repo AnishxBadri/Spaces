@@ -129,6 +129,14 @@ export const SETTINGS_SECTIONS = [
     group: 'data',
     admin: true,
   },
+  {
+    // Each member's own connections; the providers' OAuth clients on the
+    // same page are drawn for an admin only, so the row is open to all.
+    to: '/settings/connections',
+    label: 'Connections',
+    group: 'data',
+    admin: false,
+  },
   { to: '/settings/objects', label: 'Objects', group: 'objects', admin: false },
   {
     to: '/settings/currency',

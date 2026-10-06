@@ -1773,6 +1773,8 @@ credential(id, scope: workspace|user, provider,
 ```
 
 - Envelope encryption, AES-256-GCM, AAD = `scope:provider`. Master key from `MASTER_KEY` env.
+- One row per `(scope, provider, kind, user)`: a Gemini `llm` key and the Google `oauth_client`
+  both live on provider `google`, so every lookup names its kind.
 - Auto-generated on first boot to `./data/secret.key` if absent. **Losing it makes every stored
   key unrecoverable — docs must say this in bold.**
 - Write-only in UI (show `sk-...4f2a`), redacted in logs, decrypt only in worker.
@@ -2122,6 +2124,8 @@ archive.
 - **Google verification is avoidable** because users bring their own GCP project + OAuth client:
   - Fund on Google Workspace -> OAuth app type **Internal** -> no verification, unlimited org users. Push this.
   - Otherwise -> **Testing** mode, up to 100 users, refresh tokens expire in 7 days. Document the annoyance.
+  - Operator steps (redirect URI from `APP_URL`, where the client goes) and Box's enterprise-SSO
+    admin consent: `docs/spec-storage-sources.md` §1, "Registering a provider".
 - Needs noise filtering — not every thread is a deal. Heuristics + cheap classifier, else the
   pipeline fills with garbage.
 

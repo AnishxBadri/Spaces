@@ -208,6 +208,7 @@ const hasActiveCredential = (provider: LlmProvider, userId: string | null) =>
       .where(
         and(
           eq(credential.provider, provider),
+          eq(credential.kind, 'llm'),
           eq(credential.status, 'active'),
           userId === null
             ? workspaceKey

@@ -91,7 +91,7 @@ export const readMailboxSettingsProgram = Effect.fn('readMailboxSettings')(
   function* (): Effect.fn.Return<MailboxSettingsView, MailboxSettingsFailed> {
     const box = yield* query('Could not read the mailbox', firstMailbox)
     const credential = yield* query('Could not read the app password', () =>
-      readWorkspaceCredential(MAILBOX_PROVIDER),
+      readWorkspaceCredential(MAILBOX_PROVIDER, 'mailbox'),
     )
     const run = (yield* query('Could not read the last poll', () =>
       db

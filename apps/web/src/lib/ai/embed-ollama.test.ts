@@ -128,7 +128,7 @@ describe('the Test call through Ollama', () => {
       .select({ provider: credential.provider, kind: credential.kind })
       .from(credential)
     expect(rows).toEqual([{ provider: 'ollama', kind: 'llm' }])
-    const row = await readWorkspaceCredential('ollama')
+    const row = await readWorkspaceCredential('ollama', 'llm')
     if (!row) throw new Error('the Ollama row is gone')
     const meta = readProviderMeta(row.meta)
     expect(meta).toMatchObject({
@@ -160,7 +160,7 @@ describe('the Test call through Ollama', () => {
     })
     if (result.ok) throw new Error('unreachable')
     expect(result.message).toContain('ollama pull nomic-embed-text')
-    const row = await readWorkspaceCredential('ollama')
+    const row = await readWorkspaceCredential('ollama', 'llm')
     expect(readProviderMeta(row?.meta ?? {}).embedTestOk).toBe(false)
   })
 

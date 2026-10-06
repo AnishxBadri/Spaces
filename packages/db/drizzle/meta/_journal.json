@@ -477,6 +477,13 @@
       "when": 1791308464206,
       "tag": "0067_integration_upgrade_record",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1791315924649,
+      "tag": "0068_oauth_client_credential",
+      "breakpoints": true
     }
   ]
 }

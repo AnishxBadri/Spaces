@@ -67,7 +67,7 @@ export const resolveLanguageModel = Effect.fn('resolveLanguageModel')(
     ResolveModelFailure
   > {
     const credential = yield* Effect.tryPromise({
-      try: () => resolveCredential(provider, opts.userId),
+      try: () => resolveCredential(provider, 'llm', opts.userId),
       catch: (cause) => new CredentialReadFailed({ cause }),
     })
     if (!credential) return yield* new NoCredential({ provider })

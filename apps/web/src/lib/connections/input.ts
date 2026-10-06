@@ -1,0 +1,30 @@
+import { z } from 'zod'
+import { PROVIDER_IDS } from '@spaces/core/providers/registry'
+import type { ProviderId } from '@spaces/core/providers/registry'
+
+/**
+ * A provider's OAuth app as Settings → Connections saves it. Client-safe: the
+ * server fn validates with it and the section types its draft by it.
+ * - `clientSecret` empty keeps the stored secret; a first save needs one.
+ */
+export const providerAppInput = z.object({
+  provider: z.enum(PROVIDER_IDS),
+  clientId: z.string().trim().min(1, 'Paste the client ID').max(512),
+  clientSecret: z.string().trim().max(4000),
+})
+
+export type ProviderAppInput = z.infer<typeof providerAppInput>
+
+/** One provider's OAuth app as the section draws it. The secret never leaves. */
+export type ProviderAppRow = {
+  provider: ProviderId
+  label: string
+  configured: boolean
+  clientId: string | null
+  /** `redact()` of the stored secret; null when none is stored. */
+  secretDisplay: string | null
+  /** When the secret was last saved, ISO; null when none is stored. */
+  secretSetAt: string | null
+  /** `<APP_URL>/api/connections/<provider>/callback`, read per request. */
+  redirectUri: string
+}

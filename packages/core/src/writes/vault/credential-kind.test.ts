@@ -5,7 +5,12 @@ import { db } from '@spaces/db'
 import { credential } from '@spaces/db/schema'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { encryptSecret } from './crypto'
-import { CREDENTIAL_KINDS, resolveSecret, storeCredential } from './index'
+import {
+  CREDENTIAL_KINDS,
+  readWorkspaceCredential,
+  resolveSecret,
+  storeCredential,
+} from './index'
 import type { CredentialInput } from './index'
 
 /**
@@ -49,7 +54,7 @@ describe('a row written before the enum widened', () => {
         .where(eq(credential.provider, 'anthropic'))
     ).at(0)
     expect(row?.kind).toBe('llm')
-    await expect(resolveSecret('anthropic')).resolves.toBe(secret)
+    await expect(resolveSecret('anthropic', 'llm')).resolves.toBe(secret)
 
     // And moving that row onto a value the enum only just gained changes
     // nothing about the ciphertext, which is the whole argument for why the
@@ -58,7 +63,7 @@ describe('a row written before the enum widened', () => {
       .update(credential)
       .set({ kind: 'embedding' })
       .where(eq(credential.provider, 'anthropic'))
-    await expect(resolveSecret('anthropic')).resolves.toBe(secret)
+    await expect(resolveSecret('anthropic', 'embedding')).resolves.toBe(secret)
   })
 })
 
@@ -85,7 +90,9 @@ describe('the vault write path', () => {
         secret,
       })
       expect(display).not.toContain(secret.slice(4, -4))
-      await expect(resolveSecret(`provider-${kind}`)).resolves.toBe(secret)
+      await expect(resolveSecret(`provider-${kind}`, kind)).resolves.toBe(
+        secret,
+      )
     }
 
     const stored = await db
@@ -99,6 +106,38 @@ describe('the vault write path', () => {
       )
     expect(stored.map((r) => r.kind).sort()).toEqual(
       [...CREDENTIAL_KINDS].sort(),
+    )
+  })
+
+  it('holds two kinds on one provider, each read by its own kind', async () => {
+    await storeCredential({
+      ...base,
+      provider: 'google',
+      kind: 'llm',
+      secret: 'AIza-gemini-key-0001',
+      meta: { display: 'AIza…0001' },
+    })
+    await storeCredential({
+      ...base,
+      provider: 'google',
+      kind: 'oauth_client',
+      secret: 'GOCSPX-client-secret-0002',
+      meta: { clientId: '48213.apps.googleusercontent.com' },
+    })
+
+    const llm = await readWorkspaceCredential('google', 'llm')
+    const client = await readWorkspaceCredential('google', 'oauth_client')
+    expect(llm).toMatchObject({ kind: 'llm', meta: { display: 'AIza…0001' } })
+    expect(client).toMatchObject({
+      kind: 'oauth_client',
+      meta: { clientId: '48213.apps.googleusercontent.com' },
+    })
+    expect(await readWorkspaceCredential('google', 'embedding')).toBeUndefined()
+    await expect(resolveSecret('google', 'llm')).resolves.toBe(
+      'AIza-gemini-key-0001',
+    )
+    await expect(resolveSecret('google', 'oauth_client')).resolves.toBe(
+      'GOCSPX-client-secret-0002',
     )
   })
 

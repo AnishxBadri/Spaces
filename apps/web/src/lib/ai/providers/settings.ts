@@ -65,7 +65,7 @@ export const listAiProvidersProgram = Effect.fn('listAiProviders')(
     const rows: AiProviderRow[] = []
     for (const provider of LLM_PROVIDERS) {
       const row = yield* write('Could not read the providers', () =>
-        readWorkspaceCredential(provider),
+        readWorkspaceCredential(provider, 'llm'),
       )
       const meta = row ? readProviderMeta(row.meta) : null
       rows.push({
@@ -118,7 +118,7 @@ export const saveAiKeyProgram = Effect.fn('saveAiKey')(function* (
   // No key: the base URL and headers change on the key already saved. A
   // null clears the stored value — `readProviderMeta` reads it as absent.
   const existing = yield* write('Could not read the provider', () =>
-    readWorkspaceCredential(data.provider),
+    readWorkspaceCredential(data.provider, 'llm'),
   )
   if (!existing) {
     if (!PROVIDERS[data.provider].keyless)

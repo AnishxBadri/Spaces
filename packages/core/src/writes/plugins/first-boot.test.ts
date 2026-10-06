@@ -275,7 +275,9 @@ describe('SPACES_CREDENTIAL_<ID>', () => {
       },
     ])
     expect((await rowsWithXmin()).at(0)?.credentialId).toBe(keys.at(0)?.id)
-    expect(await resolveSecret('echo-key')).toBe('env-secret-1234')
+    expect(await resolveSecret('echo-key', 'enrichment')).toBe(
+      'env-secret-1234',
+    )
   })
 
   it('keeps the key changed in the UI across a reboot with the variable still set', async () => {
@@ -299,7 +301,7 @@ describe('SPACES_CREDENTIAL_<ID>', () => {
     const before = await rowsWithXmin()
 
     expect(await boot(env)).toEqual({ installed: [], seeded: [] })
-    expect(await resolveSecret('echo-key')).toBe('ui-secret-5678')
+    expect(await resolveSecret('echo-key', 'enrichment')).toBe('ui-secret-5678')
     expect(await workspaceKeys()).toHaveLength(1)
     expect(await rowsWithXmin()).toEqual(before)
   })

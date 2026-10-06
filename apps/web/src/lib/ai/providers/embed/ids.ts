@@ -234,6 +234,12 @@ export const isEmbeddingProvider = (
 export const embeddingCredentialProvider = (provider: EmbeddingProvider) =>
   EMBEDDING_PROVIDER_INFO[provider].keyless ? provider : `embed:${provider}`
 
+/** The kind of that row: a keyless provider's is the LLM row, so `llm`. */
+export const embeddingCredentialKind = (
+  provider: EmbeddingProvider,
+): 'llm' | 'embedding' =>
+  EMBEDDING_PROVIDER_INFO[provider].keyless ? 'llm' : 'embedding'
+
 /**
  * Where to point an embedding provider's address, said once for the
  * Embeddings section: the three deployments Ollama is run in beside Spaces.

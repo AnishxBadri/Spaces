@@ -4,7 +4,7 @@ import type { ResolvedCredential } from '@spaces/core/writes/vault'
 import { CredentialReadFailed, NoCredential } from '../index'
 import type { ResolveModelFailure } from '../index'
 import { readProviderMeta } from '../meta'
-import { embeddingCredentialProvider } from './ids'
+import { embeddingCredentialKind, embeddingCredentialProvider } from './ids'
 import type { EmbeddingProvider } from './ids'
 import type { EmbedAdapterInput, EmbedCall } from './adapter'
 import { googleEmbedCall } from './google'
@@ -71,7 +71,11 @@ export const resolveEmbedCall = Effect.fn('resolveEmbedCall')(function* (
 > {
   const credential = yield* Effect.tryPromise({
     try: () =>
-      resolveCredential(embeddingCredentialProvider(provider), opts.userId),
+      resolveCredential(
+        embeddingCredentialProvider(provider),
+        embeddingCredentialKind(provider),
+        opts.userId,
+      ),
     catch: (cause) => new CredentialReadFailed({ cause }),
   })
   if (!credential) return yield* new NoCredential({ provider })

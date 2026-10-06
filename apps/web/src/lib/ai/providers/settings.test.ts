@@ -301,7 +301,7 @@ describe('SPA-39: an admin saving Ollama with no key', () => {
     // the vault decrypts it back to ''.
     const stored = await storedRow('ollama')
     expect(stored?.secretEnc.length).toBe(1 + 12 + 16)
-    expect((await resolveCredential('ollama'))?.secret).toBe('')
+    expect((await resolveCredential('ollama', 'llm'))?.secret).toBe('')
   })
 
   it('ignores a key sent for a keyless provider and keeps its headers', async () => {
@@ -312,7 +312,7 @@ describe('SPA-39: an admin saving Ollama with no key', () => {
       baseUrl: 'http://localhost:11434',
       headers: 'X-Proxy-Token: t-1',
     })
-    expect((await resolveCredential('ollama'))?.secret).toBe('')
+    expect((await resolveCredential('ollama', 'llm'))?.secret).toBe('')
     const row = (await listAiProvidersHandler()).find(
       (p) => p.provider === 'ollama',
     )
@@ -411,11 +411,11 @@ describe('SPA-39: Google and OpenRouter keys through the same row shape', () => 
       lastTestOk: null,
     })
     expect(JSON.stringify(row)).not.toContain(c.key)
-    expect((await resolveCredential(c.provider))?.secret).toBe(c.key)
+    expect((await resolveCredential(c.provider, 'llm'))?.secret).toBe(c.key)
 
     // Saved, a keyless save changes the base URL and keeps the key.
     await saveAiKeyHandler({ provider: c.provider, baseUrl: '', headers: '' })
-    expect((await resolveCredential(c.provider))?.secret).toBe(c.key)
+    expect((await resolveCredential(c.provider, 'llm'))?.secret).toBe(c.key)
     const after = (await listAiProvidersHandler()).find(
       (p) => p.provider === c.provider,
     )
