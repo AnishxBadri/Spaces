@@ -297,10 +297,17 @@ export const configOf = <TSettings extends z.ZodType>(
 // ---------------------------------------------------------------------------
 
 /**
- * SQL scoped to the plugin's own Postgres schema, `plugin_<id>` — its own
- * tables, never `public.*` DDL. The SDK cannot depend on drizzle, so the
- * surface is parameterised SQL and rows as JSON. TODO(first plugin with
- * tables — RSS, project 20): the live implementation and its test Layer.
+ * SQL in the plugin's own Postgres schema, `plugin_<id>` (hyphens become
+ * underscores). The SDK cannot depend on drizzle, so the surface is
+ * parameterised SQL and rows as JSON.
+ *
+ * - One statement per call, in its own transaction, as the `plugin_runtime`
+ *   role: unqualified names resolve in `plugin_<id>` then `public`; reading
+ *   `public.*` works, writing it is refused by Postgres.
+ * - The schema's tables come from the package's `migrations/*.sql`, applied
+ *   at load in lexical order against the plugin's own journal, forward-only.
+ *   An FK to `public.entity(id)` is allowed; nothing in `public` points back.
+ * - A refused statement is `JobPermanent`; a lost connection `JobRetryable`.
  */
 export class PluginDb extends Context.Service<
   PluginDb,

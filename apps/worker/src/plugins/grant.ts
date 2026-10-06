@@ -14,6 +14,7 @@ import { JudgmentLive } from '@spaces/core/writes/ports/judgment'
 import type { LogSink } from '@spaces/core/writes/ports/log'
 import { ReadLive } from '@spaces/core/writes/ports/read'
 import { ReceiptsLive } from '@spaces/core/writes/ports/receipts'
+import { PluginDbLive } from './plugin-db'
 
 /**
  * The grant: the Layer one (integration, job) runs on, built from exactly
@@ -27,7 +28,7 @@ import { ReceiptsLive } from '@spaces/core/writes/ports/receipts'
  */
 
 /** Ports this host has no live Layer for; a job declaring one degrades its plugin. */
-export const UNPROVIDED_PORTS: ReadonlyArray<PortName> = ['Ai', 'PluginDb']
+export const UNPROVIDED_PORTS: ReadonlyArray<PortName> = ['Ai']
 
 /** The first (job, port) in the manifest this host cannot provide. */
 export const unprovidedPort = (
@@ -114,8 +115,10 @@ export const grantLayer = (
       case 'Import':
         standalone.push(ImportLive(row))
         break
-      case 'Ai':
       case 'PluginDb':
+        standalone.push(PluginDbLive(row))
+        break
+      case 'Ai':
         standalone.push(
           Layer.effectDiscard(
             Effect.fail(

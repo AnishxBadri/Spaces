@@ -396,6 +396,35 @@ unsafe-entry · manifest-missing · manifest-mismatch`, checking the
   signature over the whole tarball before parsing a byte of it; with the
   marker present an unsigned archive verifies with the warning
   `unsigned (allowed by .allow-unsigned)`.
+- **Plugin schemas and containment, as built (SPA-224, sdk-24a; owner
+  decision 2026-10-06).** Loader step 5 runs after the bundle imports and
+  before any queue registers, for a plugin that ships `migrations/` or
+  declares `PluginDb`. **Containment is a restricted role, `plugin_runtime`**:
+  the worker, connected as DATABASE_URL's owning user, creates it (`nologin`,
+  race-safe; the role is cluster-wide, its grants per database), grants it
+  USAGE on `public`, SELECT on its tables (re-applied every load) and
+  REFERENCES on `entity(id)` — nothing that writes — and refuses to go on if
+  it can create in `public` or write any table there by any grant. The
+  plugin's schema is `plugin_<id>` (hyphens → underscores) **owned by that
+  role**, and both the migrations and every `PluginDb` query run after
+  `set local role plugin_runtime` with `search_path = plugin_<id>, public`
+  inside a transaction on a pooled connection, so DDL or a write into
+  `public` is refused by Postgres and the role never leaks to the pool. Only
+  DATABASE_URL is needed. **Fallback:** a database that refuses CREATE ROLE
+  (a managed Postgres) degrades that plugin with the refusal as its reason —
+  never silently uncontained. The migration convention: `migrations/*.sql`
+  in lexical order (the plugin build copies them into `dist/`), each file
+  split into statements that run alone so `last_error` names the refused
+  one, all pending files in one transaction under an advisory lock, journaled
+  in `plugin_<id>.spaces_migrations` (name, sha256) — forward-only: an edited
+  applied file or a journal row with no file degrades the plugin. FKs from a
+  plugin schema to `public.entity(id)` are allowed; none may point back
+  (tested). `dropPluginSchema` is uninstall's drop-data option; without it
+  the schema and journal survive a reinstall. Rejected: a statement scan
+  plus a pinned `search_path` — it works anywhere, but a runtime query could
+  still write core tables. The role guards a plugin's mistakes, not a hostile
+  plugin: SQL that means to can `RESET ROLE` from the owner's session, which
+  is why trust remains signing (D54).
 
 **Workers and jobs.** pg-boss stays the queue (paradigm 6); the worker is a
 plain Node process whose handlers become Effect programs run by one

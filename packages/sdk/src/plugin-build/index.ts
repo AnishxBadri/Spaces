@@ -1,4 +1,5 @@
-import { writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Plugin as VitePlugin, UserConfig } from 'vite'
@@ -12,7 +13,7 @@ import type { Plugin } from '../plugin.ts'
  *
  *   export default pluginBuildConfig()
  *
- * It writes two files into `dist/`:
+ * It writes into `dist/`:
  *
  * - `bundle.mjs` — the plugin's code in one ESM file, every third-party
  *   dependency it has inlined, and exactly three bare imports left for the
@@ -26,6 +27,9 @@ import type { Plugin } from '../plugin.ts'
  *   so a build that would write a manifest the loader refuses fails here.
  *   The manifest is read from the bundle it describes, not from a second
  *   entry, so the two cannot disagree.
+ * - `migrations/*.sql` — the package's own `migrations/` copied as is. The
+ *   loader applies them in lexical order in schema `plugin_<id>` against the
+ *   plugin's own journal; the packer puts them in the tarball.
  */
 
 /** The bare specifiers a plugin bundle leaves to the host. */
@@ -83,6 +87,31 @@ const emitManifest = (): VitePlugin => {
   }
 }
 
+/** Copies the package's `migrations/*.sql` into `<outDir>/migrations/`. */
+const copyMigrations = (): VitePlugin => {
+  let root = '.'
+  let outDir = 'dist'
+  return {
+    name: 'spaces-plugin-migrations',
+    apply: 'build',
+    configResolved(config) {
+      root = config.root
+      outDir = path.resolve(config.root, config.build.outDir)
+    },
+    async writeBundle() {
+      const from = path.join(root, 'migrations')
+      if (!existsSync(from)) return
+      const files = (await readdir(from)).filter((f) => f.endsWith('.sql'))
+      if (files.length === 0) return
+      const to = path.join(outDir, 'migrations')
+      await mkdir(to, { recursive: true })
+      for (const file of files.sort()) {
+        await copyFile(path.join(from, file), path.join(to, file))
+      }
+    },
+  }
+}
+
 export const pluginBuildConfig = (
   options: PluginBuildOptions = {},
 ): UserConfig => ({
@@ -100,5 +129,5 @@ export const pluginBuildConfig = (
       output: { format: 'esm', entryFileNames: 'bundle.mjs' },
     },
   },
-  plugins: [emitManifest()],
+  plugins: [emitManifest(), copyMigrations()],
 })

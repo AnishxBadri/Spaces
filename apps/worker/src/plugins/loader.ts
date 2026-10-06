@@ -16,10 +16,12 @@ import { SDK_VERSION, manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
 import { unprovidedPort } from './grant'
 import { resolvePluginImportsToHost } from './host-resolve'
+import { migratePlugin } from './plugin-db'
+import type { PluginDbOptions } from './plugin-db'
 
 /**
  * Boot reconciliation: decides whether each plugin may run at all, before
- * any queue registers. Steps 1–4 and 8 of the loader; step 6 is
+ * any queue registers. Steps 1–5 and 8 of the loader; step 6 is
  * `makePluginHost`.
  *
  * - Discovers enabled `integration` rows, never a `core.*` row (a
@@ -29,6 +31,8 @@ import { resolvePluginImportsToHost } from './host-resolve'
  *   (no entry loads unpinned), what `requires` asks of the row, and that
  *   every port a job declares is one this host provides (`UNPROVIDED_PORTS`).
  * - Imports `bundle.mjs` with its bare imports resolved to the host's copies.
+ * - Migrates a plugin that ships `migrations/` or uses `PluginDb` in its own
+ *   schema, as the `plugin_runtime` role (`migratePlugin`).
  * - Marks `integration.status` with the reason in `last_error` and the
  *   manifest in `integration.manifest`, which web renders from — web never
  *   reads `/data` and never runs plugin code.
@@ -86,6 +90,8 @@ export type ReconcileOptions = {
   readonly pluginsRoot?: string
   /** One plugin's rows (its `capabilityId`) instead of every enabled row. */
   readonly only?: string
+  /** The connection and role step 5 runs as; defaults to the db pool and `plugin_runtime`. */
+  readonly pluginDb?: PluginDbOptions
 }
 
 export const pluginsRootDir = (): string => path.join(dataDir(), 'plugins')
@@ -153,6 +159,8 @@ type Checked = {
   readonly onEnable?: LoadedHook
   readonly onDisable?: LoadedHook
   readonly pinned: boolean
+  /** The migration files step 5 applied on this load. */
+  readonly migrated: ReadonlyArray<string>
 }
 
 /**
@@ -164,6 +172,7 @@ const check = (
   row: Row,
   pluginsRoot: string,
   lock: Lock | Degraded,
+  pluginDb: PluginDbOptions,
   onManifest: (stored: IntegrationManifest) => void,
 ) =>
   Effect.gen(function* () {
@@ -273,6 +282,26 @@ const check = (
       })
     }
 
+    // 5. migrate — the plugin's own schema, journal and role, before any
+    // queue can run a job against them.
+    const migrationsDir = path.join(dir, 'migrations')
+    const hasMigrations = existsSync(migrationsDir)
+    const usesDb = Object.values(manifest.jobs).some((job) =>
+      job.uses.includes('PluginDb'),
+    )
+    const migrated =
+      hasMigrations || usesDb
+        ? yield* migratePlugin(
+            id,
+            hasMigrations ? migrationsDir : null,
+            pluginDb,
+          ).pipe(
+            Effect.mapError(
+              (error) => new Degraded({ reason: truncate(error.reason) }),
+            ),
+          )
+        : null
+
     return {
       bundleUrl,
       manifest,
@@ -282,6 +311,7 @@ const check = (
       ...(onEnable === undefined ? {} : { onEnable }),
       ...(onDisable === undefined ? {} : { onDisable }),
       pinned: entry !== undefined,
+      migrated: migrated?.applied ?? [],
     } satisfies Checked
   })
 
@@ -333,6 +363,7 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
       .orderBy(integration.capabilityId, integration.createdAt),
   )
   const lock = readLock(pluginsRoot)
+  const pluginDb = options.pluginDb ?? {}
 
   const verdicts: Array<Verdict> = []
   const loaded: Array<LoadedPlugin> = []
@@ -349,7 +380,7 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
       continue
     }
     let stored: IntegrationManifest | null = null
-    const outcome = yield* check(row, pluginsRoot, lock, (m) => {
+    const outcome = yield* check(row, pluginsRoot, lock, pluginDb, (m) => {
       stored = m
     }).pipe(Effect.result)
     if (outcome._tag === 'Success') {
@@ -385,7 +416,7 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
         status: 'enabled',
         reason: null,
         pinned: ok.pinned,
-        line: `[plugins] ${row.capabilityId} ${ok.manifest.version}: enabled${ok.pinned ? '' : ' (unpinned: no lock.json entry)'}`,
+        line: `[plugins] ${row.capabilityId} ${ok.manifest.version}: enabled${ok.pinned ? '' : ' (unpinned: no lock.json entry)'}${ok.migrated.length === 0 ? '' : `; migrated ${ok.migrated.join(', ')}`}`,
       })
     } else {
       const reason = outcome.failure.reason

@@ -367,7 +367,7 @@ describe('a Layer per (integration, job)', () => {
 })
 
 describe('ports this host does not provide', () => {
-  it.each(['Ai', 'PluginDb'] as const)(
+  it.each(['Ai'] as const)(
     'degrades a plugin whose job declares %s, naming the port, and builds nothing',
     async (port) => {
       const root = newPluginsRoot()

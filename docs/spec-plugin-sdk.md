@@ -511,6 +511,13 @@ core); no FK from `public.*` to a plugin schema (core never depends on a
 plugin); shared-enum edits impossible by construction. Uninstall =
 optional `DROP SCHEMA`.
 
+**As built (sdk-24a).** Containment is the `plugin_runtime` role, created by
+the migration runner as the owning user and entered with `SET ROLE`; it reads
+`public`, writes only the `plugin_<id>` schema it owns, and a database that
+refuses `CREATE ROLE` degrades the plugin. Migrations are `migrations/*.sql`
+in lexical order, journaled in `plugin_<id>.spaces_migrations`. CONTEXT.md
+"Plugin architecture" (runtime and hosting contracts) has the whole record.
+
 ## 9. Registry, signing, install from the running deployment
 
 ```

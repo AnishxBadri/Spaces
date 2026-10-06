@@ -47,8 +47,9 @@ import type {
  * `testPorts(…)` builds them all over one shared recorder, which is what a
  * job test usually wants: one Layer, one ordered list of port calls.
  *
- * Not here: `Ai` and `PluginDb` — their fakes land with the areas that
- * implement them. A DryRun Layer (this recorder in production, over core's
+ * Not here: `Ai`, whose fake lands with its live port, and `PluginDb`, whose
+ * behaviour is Postgres's own — a plugin's SQL is tested against a real
+ * database, as the worker's PluginDb test does. A DryRun Layer (this recorder in production, over core's
  * `previewResolve`) is the later answer to an importer preview.
  */
 

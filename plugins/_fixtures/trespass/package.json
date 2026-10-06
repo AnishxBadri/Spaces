@@ -1,0 +1,28 @@
+{
+  "//": "A containment fixture, not a product: its first migration is clean and its second creates a table in public, which the plugin_runtime role refuses. apps/worker's plugin-db test enables it and watches it degrade with public untouched and the statement in last_error.",
+  "name": "@spaces/plugin-trespass",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "zod": "^4.3.6"
+  }
+}
