@@ -1,13 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   entity,
   entityAlias,
   entitySpace,
-  interaction,
-  interactionEntity,
   link,
   person,
   space,
@@ -223,24 +221,16 @@ export const getPerson = createServerFn()
       .orderBy(desc(activity.at))
       .limit(50)
 
-    // The latest interaction on any edge, as the People list's Last touched.
-    const touched = (
-      await db
-        .select({ last: sql<string | null>`max(${interaction.occurredAt})` })
-        .from(interactionEntity)
-        .innerJoin(
-          interaction,
-          eq(interaction.id, interactionEntity.interactionId),
-        )
-        .where(eq(interactionEntity.entityId, data.id))
-    ).at(0)?.last
+    const { personReadoutsProgram } = await import('../records/readouts')
+    const { effectFn } = await import('./effect')
+    const readouts = await effectFn(personReadoutsProgram)(data.id, new Date())
 
     return {
       id: head.id,
       name: head.name,
       mergedIntoId: head.mergedIntoId,
       values: head.values,
-      lastTouched: touched ? new Date(touched).toISOString() : null,
+      readouts,
       emails: aliases.filter((a) => a.kind === 'email'),
       linkedins: aliases.filter((a) => a.kind === 'linkedin'),
       companies,

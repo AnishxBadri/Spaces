@@ -1,4 +1,4 @@
-import { formatDate } from '@spaces/core/format'
+import { DASH, readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
 import {
   createFileRoute,
   Link,
@@ -167,11 +167,25 @@ function PersonRecordPage() {
         name={person.name}
         readouts={[
           {
-            label: 'Last touched',
-            value: formatDate(person.lastTouched) || '—',
-            tone: person.lastTouched ? undefined : 'muted',
+            label: 'Last contact',
+            value: readoutDayAgo(
+              person.readouts.lastContact,
+              person.readouts.today,
+            ),
           },
-          { label: 'Emails', value: `${person.emails.length}` },
+          {
+            label: 'Last email',
+            value: readoutDay(person.readouts.lastEmail, person.readouts.today),
+          },
+          // A dash until calendar sync.
+          { label: 'Next meeting', value: DASH },
+          {
+            label: 'First contact',
+            value: readoutDay(
+              person.readouts.firstContact,
+              person.readouts.today,
+            ),
+          },
         ]}
       />
 

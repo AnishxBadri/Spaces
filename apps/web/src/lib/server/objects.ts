@@ -279,6 +279,9 @@ export const getObjectRecord = createServerFn()
     const referencedBy = await referencedByRows(data.id)
     const users = await db.select({ id: user.id, name: user.name }).from(user)
     const userNames = Object.fromEntries(users.map((u) => [u.id, u.name]))
+    const { recordReadoutsProgram } = await import('../records/readouts')
+    const { effectFn } = await import('./effect')
+    const readouts = await effectFn(recordReadoutsProgram)(data.id, new Date())
 
     return {
       id: head.id,
@@ -299,6 +302,7 @@ export const getObjectRecord = createServerFn()
       },
       spaces,
       referencedBy,
+      readouts,
       refNames: {
         ...Object.fromEntries(
           outRefs.map((r) => [

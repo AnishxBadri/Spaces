@@ -56,7 +56,6 @@ function TermPage() {
           {
             label: 'Also',
             value: term.aliases.length > 0 ? term.aliases.join(' · ') : '—',
-            kind: 'text',
             tone: term.aliases.length > 0 ? undefined : 'muted',
           },
           { label: 'Mentions', value: `${mentions.total}` },

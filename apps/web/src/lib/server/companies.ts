@@ -175,6 +175,8 @@ export const getCompany = createServerFn()
     const { companyPeopleProgram } = await import('../people/companies')
     const { effectFn } = await import('./effect')
     const people = await effectFn(companyPeopleProgram)(data.id)
+    const { companyReadoutsProgram } = await import('../records/readouts')
+    const readouts = await effectFn(companyReadoutsProgram)(data.id, new Date())
 
     const timeline = await db
       .select({
@@ -198,6 +200,7 @@ export const getCompany = createServerFn()
       aliases,
       spaces,
       people,
+      readouts,
       timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
     }
   })

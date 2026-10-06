@@ -30,7 +30,9 @@ import {
   RecordBody,
   RecordHeader,
 } from '#/components/record/record-parts'
-import { OptionChip, optionLabel } from '#/components/attributes/value-editor'
+import { OptionChip } from '#/components/attributes/value-editor'
+import { fmtPct } from '@spaces/core/portfolio/format'
+import { DASH, readoutDayAgo } from '#/lib/records/readout-format'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
@@ -149,17 +151,6 @@ function CompanyRecordPage() {
     }
   }
 
-  const fundingDef = registry.find((d) => d.slug === 'funding_stage')
-  const fundingStage =
-    fundingDef && company.values.funding_stage
-      ? optionLabel(fundingDef, company.values.funding_stage)
-      : null
-  const location =
-    typeof company.values.location === 'string' ? company.values.location : null
-  const foundedRaw: unknown = company.values.founded_year
-  const founded =
-    foundedRaw === null || foundedRaw === undefined ? null : String(foundedRaw)
-
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
@@ -211,25 +202,28 @@ function CompanyRecordPage() {
           ) : null
         }
         readouts={[
-          { label: 'Deals', value: `${deals.length}` },
           {
-            label: 'Stage',
-            value: fundingStage ?? '—',
-            kind: 'text',
-            tone: fundingStage ? undefined : 'muted',
+            label: 'Last contact',
+            value: readoutDayAgo(
+              company.readouts.lastContact,
+              company.readouts.today,
+            ),
+          },
+          // A dash until calendar sync.
+          { label: 'Next meeting', value: DASH },
+          {
+            label: 'Moving, 30 days',
+            value: `${company.readouts.moving30}`,
+            tone: company.readouts.moving30 === 0 ? 'muted' : undefined,
           },
           {
-            label: 'Location',
-            value: location ?? '—',
-            kind: 'text',
-            tone: location ? undefined : 'muted',
+            label: 'Ownership',
+            value: !company.readouts.ownership
+              ? DASH
+              : company.readouts.ownership.kind === 'implied'
+                ? `~${fmtPct(company.readouts.ownership.pct)}`
+                : fmtPct(company.readouts.ownership.pct),
           },
-          {
-            label: 'Founded',
-            value: founded ?? '—',
-            tone: founded ? undefined : 'muted',
-          },
-          { label: 'Spaces', value: `${company.spaces.length}` },
         ]}
       />
 

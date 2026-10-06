@@ -40,9 +40,8 @@ import { TaskComposer } from '#/components/task-composer'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { fmtMoney } from '@spaces/core/portfolio/format'
-import { localToday } from '@spaces/core/tasks/parse-due'
+import { readoutDay, readoutDayUntil } from '#/lib/records/readout-format'
 import { useHotkey } from '#/lib/use-hotkey'
-import { jsonString } from '@spaces/core/json'
 import {
   countOpenSuggestions,
   createNote,
@@ -122,20 +121,15 @@ function DealRecordPage() {
       Object.entries(deal.userNames).map(([id, name]) => [id, { name }]),
     ),
   }
-  const companyId = jsonString(deal.values.company)
-  // refNames' Record index type hides misses — annotate the lookup honestly.
-  const companyRef: { name: string } | undefined = companyId
-    ? deal.refNames[companyId]
-    : undefined
   const stageDef = registry.find((d) => d.slug === 'stage')
   const stageOptions = stageDef?.options.options ?? []
   const stageOption = stageOptions.find((o) => o.id === deal.values.stage)
   // Move-stage never offers a retired stage; the header chip still shows one.
   const liveStages = stageOptions.filter((o) => !o.archived)
 
-  // The readouts: our check, the company, the owner, the close, and days in
-  // the current stage — the last from the stage log, never stored.
-  const today = localToday()
+  // The readouts: our check, the close, days in stage against the stage's
+  // median, and the last contact through the company and people (D49).
+  const { readouts } = deal
   const valueCode =
     registry.find((d) => d.slug === 'value')?.options.code ?? 'USD'
   const rawValue = deal.values.value
@@ -145,24 +139,9 @@ function DealRecordPage() {
       : typeof rawValue === 'string' && rawValue !== ''
         ? Number(rawValue)
         : null
-  const ownerId = jsonString(deal.values.owner)
-  const ownerName = ownerId ? deal.userNames[ownerId] : undefined
   const closeDate =
     typeof deal.values.close_date === 'string' ? deal.values.close_date : null
-  const daysUntil = (iso: string) =>
-    Math.round(
-      (new Date(`${iso}T00:00:00Z`).getTime() -
-        new Date(`${today}T00:00:00Z`).getTime()) /
-        86_400_000,
-    )
-  const stageEntered =
-    timeline.find(
-      (i) => i.type === 'attrs' && i.changes.some((c) => c.slug === 'stage'),
-    )?.at ?? deal.createdAt
-  const daysInStage = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(stageEntered).getTime()) / 86_400_000),
-  )
+  const daysInStage = readouts.daysInStage
   const peopleIds = Array.isArray(deal.values.people)
     ? deal.values.people.map(String)
     : []
@@ -305,39 +284,25 @@ function DealRecordPage() {
             tone: ourCheck === null ? 'muted' : undefined,
           },
           {
-            label: 'Company',
-            value: companyId ? (
-              <Link
-                to="/companies/$companyId"
-                params={{ companyId }}
-                className="focus-ring hover:underline"
-              >
-                {companyRef?.name ?? 'Company'}
-              </Link>
-            ) : (
-              '—'
-            ),
-            kind: 'text',
-            tone: companyId ? undefined : 'muted',
-          },
-          {
-            label: 'Owner',
-            value: ownerName ?? '—',
-            kind: 'text',
-            tone: ownerName ? undefined : 'muted',
-          },
-          {
             label: 'Close',
-            value: closeDate
-              ? `${closeDate} ${daysUntil(closeDate) < 0 ? '−' : ''}${Math.abs(daysUntil(closeDate))}d`
-              : '—',
-            tone: closeDate
-              ? daysUntil(closeDate) < 0
+            value: readoutDayUntil(closeDate, readouts.today),
+            tone:
+              closeDate !== null && closeDate < readouts.today
                 ? 'bad'
-                : undefined
-              : 'muted',
+                : undefined,
           },
-          { label: 'Days in stage', value: `${daysInStage}` },
+          {
+            label: 'Days in stage',
+            value:
+              readouts.medianDaysInStage === null
+                ? `${daysInStage}`
+                : `${daysInStage} · med ${Math.round(readouts.medianDaysInStage)}`,
+            tone: readouts.pastTwiceMedian ? 'bad' : undefined,
+          },
+          {
+            label: 'Last contact',
+            value: readoutDay(readouts.lastContact, readouts.today),
+          },
         ]}
       />
 

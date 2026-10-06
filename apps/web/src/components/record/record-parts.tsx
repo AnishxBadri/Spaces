@@ -11,11 +11,15 @@ import { cn } from '#/lib/utils'
  * keep their data and handlers.
  */
 
+/**
+ * One cell of the readout strip: a number or a date, never a word.
+ * - `muted` is graphite: a zero, or nothing to measure. A bare `—` reads
+ *   graphite without asking.
+ * - `bad` is crimson, for a value past its threshold.
+ */
 export type RecordReadout = {
   label: ReactNode
   value: ReactNode
-  /** Names are sans; everything measured is mono (the default). */
-  kind?: 'mono' | 'text' | undefined
   tone?: 'muted' | 'bad' | undefined
 }
 
@@ -50,27 +54,28 @@ export function RecordHeader({
         {badges}
       </div>
       {readouts && readouts.length > 0 ? (
-        <div className="flex h-14 overflow-x-auto">
+        // Variant B: equal cells on rules under a hairline, the value in
+        // mono over a sentence-case label.
+        <div className="flex h-16 overflow-x-auto border-t border-hairline">
           {readouts.map((r, i) => (
             <div
               key={i}
-              className="flex shrink-0 flex-col justify-center gap-0.5 border-r border-rule px-6 first:pl-0 last:border-r-0"
+              className="flex max-w-55 min-w-28 flex-1 basis-0 flex-col justify-center gap-0.5 border-r border-rule px-4 first:pl-0 last:border-r-0"
             >
-              <span className="field-label text-graphite">{r.label}</span>
               <span
                 className={cn(
-                  'truncate font-medium',
-                  r.kind === 'text'
-                    ? 'text-title leading-4.5'
-                    : 'mono text-lg leading-5.5',
-                  r.tone === 'muted'
-                    ? 'text-graphite'
-                    : r.tone === 'bad'
-                      ? 'text-destructive'
+                  'truncate mono text-page leading-6.5',
+                  r.tone === 'bad'
+                    ? 'text-destructive'
+                    : r.tone === 'muted' || r.value === '—'
+                      ? 'text-graphite'
                       : 'text-foreground',
                 )}
               >
                 {r.value}
+              </span>
+              <span className="truncate text-label text-graphite">
+                {r.label}
               </span>
             </div>
           ))}

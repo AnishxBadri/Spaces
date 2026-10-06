@@ -34,6 +34,7 @@ import { Select } from '#/components/ui/select'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { recordPath } from '#/lib/record-path'
+import { DASH, readoutDayAgo } from '#/lib/records/readout-format'
 import {
   countOpenSuggestions,
   createNote,
@@ -175,9 +176,20 @@ function ObjectRecordPage() {
           />
         }
         readouts={[
-          { label: 'Object', value: record.object.singular, kind: 'text' },
-          { label: 'Spaces', value: `${record.spaces.length}` },
-          { label: 'Referenced by', value: `${record.referencedBy.length}` },
+          {
+            label: 'Last contact',
+            value: readoutDayAgo(
+              record.readouts.lastContact,
+              record.readouts.today,
+            ),
+          },
+          // A dash until calendar sync.
+          { label: 'Next meeting', value: DASH },
+          {
+            label: 'Moving, 30 days',
+            value: `${record.readouts.moving30}`,
+            tone: record.readouts.moving30 === 0 ? 'muted' : undefined,
+          },
         ]}
       />
 

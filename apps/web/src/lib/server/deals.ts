@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
-import { attributeEvent, entity, link } from '@spaces/db/schema'
+import { entity, link } from '@spaces/db/schema'
 import { mandate } from '@spaces/db/schema/workspace'
 import { jsonString } from '@spaces/core/json'
 import type { EntityValues } from '@spaces/db/schema/entities'
@@ -183,6 +183,10 @@ export const getDeal = createServerFn()
       }
     }
 
+    const { dealReadoutsProgram } = await import('../records/readouts')
+    const { effectFn } = await import('./effect')
+    const readouts = await effectFn(dealReadoutsProgram)(data.id, new Date())
+
     return {
       id: head.id,
       name: head.name,
@@ -190,6 +194,7 @@ export const getDeal = createServerFn()
       values,
       createdAt: head.createdAt.toISOString(),
       outsideMandate,
+      readouts,
       refNames: Object.fromEntries(
         refs.map((r) => [r.toId, { name: r.name, kind: r.kind }]),
       ),
@@ -197,87 +202,10 @@ export const getDeal = createServerFn()
     }
   })
 
-/**
- * Funnel stats over the stage change log (attribute_event, attr_slug =
- * 'stage') — nothing stored, everything derived: median days a live deal
- * has sat in its current stage, and the all-time terminal split. The stage
- * history was free the moment attribute_event existed; this is the first
- * read that cashes it in.
- */
+/** Funnel stats for Today and the deals list — `stageFunnelProgram`. */
 export const dealFunnelStats = createServerFn().handler(async () => {
   await requireUser()
-  const deals = await db
-    .select({
-      id: entity.id,
-      name: entity.canonicalName,
-      values: entity.values,
-    })
-    .from(entity)
-    .where(and(eq(entity.kind, 'deal'), isNull(entity.mergedIntoId)))
-  const events = await db
-    .select({
-      entityId: attributeEvent.entityId,
-      to: attributeEvent.to,
-      at: attributeEvent.at,
-    })
-    .from(attributeEvent)
-    .where(
-      and(
-        eq(attributeEvent.attrSlug, 'stage'),
-        inArray(
-          attributeEvent.entityId,
-          deals.map((d) => d.id),
-        ),
-      ),
-    )
-    .orderBy(desc(attributeEvent.at))
-
-  // Latest stage-entry time per deal = the newest event whose `to` matches
-  // the current stage (events are newest-first, so first hit wins).
-  const enteredAt = new Map<string, number>()
-  for (const d of deals) {
-    const stage = d.values.stage ?? null
-    const hit = events.find((e) => e.entityId === d.id && e.to === stage)
-    if (hit) enteredAt.set(d.id, hit.at.getTime())
-  }
-
-  const now = Date.now()
-  const daysByStage = new Map<string, Array<number>>()
-  const countByStage = new Map<string, number>()
-  for (const d of deals) {
-    const stage = String(d.values.stage ?? '')
-    if (!stage) continue
-    countByStage.set(stage, (countByStage.get(stage) ?? 0) + 1)
-    const entered = enteredAt.get(d.id)
-    if (entered !== undefined) {
-      const list = daysByStage.get(stage) ?? []
-      list.push((now - entered) / 86_400_000)
-      daysByStage.set(stage, list)
-    }
-  }
-
-  const medianDays: Record<string, number> = {}
-  for (const [stage, days] of daysByStage) {
-    const sorted = [...days].sort((a, b) => a - b)
-    medianDays[stage] = sorted[Math.floor(sorted.length / 2)]
-  }
-
-  // Per-deal staleness for the Today page — clients filter by group/cutoff.
-  const daysInStage = deals
-    .map((d) => {
-      const entered = enteredAt.get(d.id)
-      return {
-        id: d.id,
-        name: d.name,
-        stage: String(d.values.stage ?? ''),
-        days: entered === undefined ? null : (now - entered) / 86_400_000,
-      }
-    })
-    .filter((d) => d.stage)
-
-  return {
-    countByStage: Object.fromEntries(countByStage),
-    medianDaysInStage: medianDays,
-    daysInStage,
-  }
+  const { stageFunnelProgram } = await import('../deals/funnel')
+  const { effectFn } = await import('./effect')
+  return effectFn(stageFunnelProgram)(Date.now())
 })
