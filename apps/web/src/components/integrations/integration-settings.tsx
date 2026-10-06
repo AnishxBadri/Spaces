@@ -130,13 +130,18 @@ function Control({
   }
 }
 
-/** The Settings group: the generated form, or why the manifest cannot be drawn. */
+/**
+ * The Settings group: the generated form, or why the manifest cannot be drawn.
+ * Headed `not yet` while a required setting has no value, as the Key group is
+ * while no key is saved.
+ */
 export function SettingsFields({
   form,
   values,
   errors,
   disabled,
   dirty,
+  notYet = false,
   onChange,
   onSave,
 }: {
@@ -145,6 +150,7 @@ export function SettingsFields({
   errors: { readonly [key: string]: string }
   disabled: boolean
   dirty: boolean
+  notYet?: boolean
   onChange: (key: string, value: FormValue) => void
   onSave: () => void
 }) {
@@ -172,7 +178,7 @@ export function SettingsFields({
       <SectionHead
         as="h3"
         title="Settings"
-        count={String(form.fields.length)}
+        count={notYet ? 'not yet' : String(form.fields.length)}
         action={
           <Button type="submit" size="sm" disabled={disabled || !dirty}>
             Save settings

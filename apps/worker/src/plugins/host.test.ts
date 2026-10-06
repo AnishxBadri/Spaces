@@ -65,7 +65,12 @@ const install = (root: string, fixture: string) => {
 const writeBundle = (
   root: string,
   id: string,
-  options: { readonly uses?: ReadonlyArray<PortName>; readonly hooks?: string },
+  options: {
+    readonly uses?: ReadonlyArray<PortName>
+    readonly hooks?: string
+    /** The bundle's settings schema, as zod source; `z.object({})` when omitted. */
+    readonly settings?: string
+  },
 ) => {
   const dir = path.join(root, id, 'current')
   mkdirSync(dir, { recursive: true })
@@ -89,7 +94,7 @@ const writeBundle = (
       "import { z } from 'zod'",
       `const calls = globalThis[Symbol.for('spaces.worker.host-test.hooks')]`,
       'export default {',
-      `  manifest: { id: '${id}', settings: z.object({}) },`,
+      `  manifest: { id: '${id}', settings: ${options.settings ?? 'z.object({})'} },`,
       '  jobs: { ping: () => Effect.void },',
       options.hooks ?? '',
       '}',
@@ -388,6 +393,47 @@ describe('ports this host does not provide', () => {
       expect(enqueue.built).toBe(0)
     },
   )
+})
+
+describe('a config the settings schema refuses', () => {
+  const settings =
+    'z.object({ feedUrl: z.string(), maxItems: z.int().default(20) })'
+
+  it('a required setting with no value degrades as “missing settings”; saving it runs the plugin', async () => {
+    const root = newPluginsRoot()
+    writeBundle(root, 'feed', { uses: ['Config'], settings })
+    const feed = await row('feed')
+    const { host } = await boot(root)
+    expect(await rowById(feed.id)).toMatchObject({
+      status: 'degraded',
+      lastError: 'missing settings',
+    })
+    expect(host.granted(feed.id, 'ping')).toBeNull()
+
+    await db
+      .update(integration)
+      .set({ config: { feedUrl: 'https://feed.example/rss' } })
+      .where(eq(integration.id, feed.id))
+    await boot(root)
+    expect(await rowById(feed.id)).toMatchObject({
+      status: 'enabled',
+      lastError: null,
+    })
+  })
+
+  it('a value present and wrong keeps the reason naming the field', async () => {
+    const root = newPluginsRoot()
+    writeBundle(root, 'feed', { uses: ['Config'], settings })
+    const feed = await row('feed')
+    await db
+      .update(integration)
+      .set({ config: { feedUrl: 7 } })
+      .where(eq(integration.id, feed.id))
+    await boot(root)
+    expect((await rowById(feed.id))?.lastError).toMatch(
+      /^feed's config is invalid at feedUrl: /,
+    )
+  })
 })
 
 describe('lifecycle hooks', () => {

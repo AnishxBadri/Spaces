@@ -148,6 +148,38 @@ describe('IntegrationLedger', () => {
     expect(needsKey).not.toContain('missing credential')
   })
 
+  it('reads a required setting with no value as not yet, with Set up', () => {
+    const html = renderToStaticMarkup(
+      <IntegrationLedger
+        rows={[
+          {
+            ...base,
+            pluginId: 'rss',
+            name: 'RSS',
+            state: 'needs-setup',
+            reason: 'missing settings',
+            lastRun: null,
+            credits: { used: 0, cap: null },
+          },
+        ]}
+        actions={{
+          onToggle: () => undefined,
+          onReset: () => undefined,
+          onUpdate: () => undefined,
+          pending: null,
+        }}
+      />,
+    )
+    const needsSetup = rowFor(html, 'needs-setup')
+    expect(needsSetup).toContain('Not set up yet')
+    expect(needsSetup).toContain('>not yet<')
+    expect(needsSetup).toContain('>Set up<')
+    expect(needsSetup).not.toContain('badge-')
+    expect(needsSetup).not.toContain('text-destructive')
+    expect(needsSetup).not.toContain('missing settings')
+    expect(needsSetup).not.toContain('>Fix<')
+  })
+
   it('shows a newer registry version and offers Update on a running row', () => {
     const html = renderToStaticMarkup(
       <IntegrationLedger

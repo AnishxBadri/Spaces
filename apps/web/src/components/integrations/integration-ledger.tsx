@@ -13,8 +13,9 @@ import { cn } from '#/lib/utils'
  * - degraded — amber row, the worker's reason, Fix;
  * - tripped — rose row, the breaker's reason, Reset;
  * - off — the switch off and the row in graphite, nothing wrong.
- * A missing key is `not yet`: no tint, Add key. A newer version in the
- * registry shows beside the version, and a running row offers Update.
+ * A missing key or a required setting with no value is `not yet`: no tint,
+ * Add key or Set up. A newer version in the registry shows beside the
+ * version, and a running row offers Update.
  */
 
 /** The word in the status lane. */
@@ -22,6 +23,7 @@ export const STATE_WORD: Record<IntegrationState, string> = {
   enabled: 'enabled',
   starting: 'starting',
   'needs-key': 'not yet',
+  'needs-setup': 'not yet',
   degraded: 'degraded',
   tripped: 'tripped',
   off: 'off',
@@ -42,6 +44,7 @@ const DOT: Record<IntegrationState, string> = {
   enabled: 'bg-primary',
   starting: 'border border-graphite',
   'needs-key': 'border border-graphite',
+  'needs-setup': 'border border-graphite',
   degraded: 'bg-destructive',
   tripped: 'bg-destructive',
   off: 'bg-rule',
@@ -52,6 +55,8 @@ export function middleOf(row: IntegrationRow): string {
   switch (row.state) {
     case 'needs-key':
       return 'No key yet'
+    case 'needs-setup':
+      return 'Not set up yet'
     case 'degraded':
       return row.reason ?? 'the worker could not load it'
     case 'tripped':
@@ -118,6 +123,16 @@ function ActionLane({
           className={cn(LINK, 'font-medium text-primary')}
         >
           Add key
+        </Link>
+      )
+    case 'needs-setup':
+      return (
+        <Link
+          to={to}
+          params={params}
+          className={cn(LINK, 'font-medium text-primary')}
+        >
+          Set up
         </Link>
       )
     default:

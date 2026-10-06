@@ -324,6 +324,7 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
         errors={errors}
         disabled={pending}
         dirty={dirty}
+        notYet={detail.state === 'needs-setup'}
         onChange={change}
         onSave={() => void saveSettings()}
       />

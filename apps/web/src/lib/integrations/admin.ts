@@ -32,6 +32,9 @@ export { PLUGIN_CHANGED }
 /** The loader's reason for a row whose manifest requires a key it lacks. */
 export const MISSING_CREDENTIAL = 'missing credential'
 
+/** ConfigLive's reason for a row lacking a required setting with no default. */
+export { MISSING_SETTINGS } from '@spaces/core/writes/ports/config'
+
 export class IntegrationRefused extends Schema.TaggedError<IntegrationRefused>()(
   'IntegrationRefused',
   { message: Schema.String },

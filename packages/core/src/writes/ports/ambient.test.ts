@@ -11,7 +11,7 @@ import { storeCredential } from '../vault/index'
 import { AmbientPortsLive } from './ambient'
 import { makeScrub } from './binding'
 import type { BoundIntegration } from './binding'
-import { ConfigLive } from './config'
+import { ConfigLive, MISSING_SETTINGS } from './config'
 import { HttpLive } from './http'
 import type { FetchLike } from './http'
 import { LogLive } from './log'
@@ -131,6 +131,48 @@ describe('ConfigLive', () => {
       pluginId: 'echo',
       path: 'times',
     })
+  })
+
+  /** rss's shape: two required settings with no default, one with. */
+  const required = z.object({
+    feedUrl: z.httpUrl(),
+    record: z.string(),
+    maxItems: z.int().default(20),
+  })
+  const reasonOf = async (config: BoundIntegration['config']) =>
+    failureOf(
+      await Effect.runPromiseExit(
+        Effect.provide(Effect.void, ConfigLive(bound({ config }), required)),
+      ),
+    ).reason
+
+  it('a required setting with no value and no default is “missing settings”, not an error', async () => {
+    expect(await reasonOf({})).toBe(MISSING_SETTINGS)
+    expect(await reasonOf({ feedUrl: 'https://feed.example/rss' })).toBe(
+      MISSING_SETTINGS,
+    )
+    // One missing outweighs another present and wrong: set up first.
+    expect(await reasonOf({ feedUrl: 'not a url' })).toBe(MISSING_SETTINGS)
+  })
+
+  it('a value present and wrong keeps the reason naming the field', async () => {
+    expect(
+      await reasonOf({ feedUrl: 'not a url', record: 'r1', maxItems: 20 }),
+    ).toMatch(/^echo's config is invalid at feedUrl: /)
+    expect(
+      await reasonOf({
+        feedUrl: 'https://feed.example/rss',
+        record: 'r1',
+        maxItems: 'many',
+      }),
+    ).toMatch(/^echo's config is invalid at maxItems: /)
+  })
+
+  it('a schema whose every setting has a default accepts an empty row', async () => {
+    const exit = await Effect.runPromiseExit(
+      Effect.provide(Effect.void, ConfigLive(bound(), settings)),
+    )
+    expect(Exit.isSuccess(exit)).toBe(true)
   })
 })
 

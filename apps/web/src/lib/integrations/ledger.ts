@@ -21,6 +21,7 @@ import {
 } from '@spaces/db/schema'
 import type { credentialKind } from '@spaces/db/schema'
 import { webhookSecretProvider } from '@spaces/core/writes/ingress/receive'
+import { MISSING_SETTINGS } from '@spaces/core/writes/ports/config'
 import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
 import { describeExternalOrigin } from '#/lib/server/external-origin'
@@ -55,11 +56,18 @@ export class IntegrationNotFound extends Schema.TaggedError<IntegrationNotFound>
  * - `off`: the operator's switch (`enabled = false`).
  * - `tripped`: the worker's breaker (`enabled`, status `disabled`); reset clears it.
  * - `needs-key`: the manifest requires a key the row does not have — not yet, not an error.
+ * - `needs-setup`: a required setting has no value yet (`missing settings`) — not yet, too.
  * - `degraded`: the worker could not load it, with the reason.
  * - `starting`: installed, not yet looked at by the worker.
  */
 export type IntegrationState =
-  'enabled' | 'starting' | 'needs-key' | 'degraded' | 'tripped' | 'off'
+  | 'enabled'
+  | 'starting'
+  | 'needs-key'
+  | 'needs-setup'
+  | 'degraded'
+  | 'tripped'
+  | 'off'
 
 export type IntegrationRow = {
   readonly id: string
@@ -166,6 +174,8 @@ export const stateOf = (
   if (row.status === 'disabled') return 'tripped'
   if (manifest?.requires?.credential !== undefined && row.credentialId === null)
     return 'needs-key'
+  if (row.status === 'degraded' && row.lastError === MISSING_SETTINGS)
+    return 'needs-setup'
   if (row.status === 'degraded') return 'degraded'
   if (row.status === 'installing') return 'starting'
   return 'enabled'

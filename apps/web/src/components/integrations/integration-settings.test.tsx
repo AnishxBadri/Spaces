@@ -55,6 +55,26 @@ describe('SettingsFields', () => {
     expect(html).toContain('Save settings')
   })
 
+  it('heads the group not yet while a required setting has no value, else with its count', () => {
+    if (!form.ok) throw new Error(form.reason)
+    const html = renderToStaticMarkup(
+      <SettingsFields
+        form={form}
+        values={{}}
+        errors={{}}
+        disabled={false}
+        dirty={false}
+        notYet
+        onChange={() => undefined}
+        onSave={() => undefined}
+      />,
+    )
+    expect(html).toContain('not yet')
+    expect(html).not.toContain('badge-')
+    expect(fields()).not.toContain('not yet')
+    expect(fields()).toContain('>4<')
+  })
+
   it('shows a refused value against its field, rose, with not saved', () => {
     const html = fields({ cacheDays: 'must be between 0 and 3650' })
     expect(html).toContain('must be between 0 and 3650 · not saved')

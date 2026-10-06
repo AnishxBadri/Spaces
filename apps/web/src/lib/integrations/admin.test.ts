@@ -26,6 +26,7 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { recordActionsProgram } from './actions'
 import {
   MISSING_CREDENTIAL,
+  MISSING_SETTINGS,
   PLUGIN_CHANGED,
   countIntegrationsHandler,
   getIntegrationHandler,
@@ -474,6 +475,53 @@ describe('the settings form', () => {
       autoEnrich: true,
     })
     await heardSoon(['apollo'])
+  })
+
+  it('a required setting with no value reads not yet, not degraded; a good save reloads it', async () => {
+    asAdmin()
+    const rss = await install({
+      manifest: {
+        ...fixture('rss'),
+        settings: JSON.parse(
+          JSON.stringify(
+            settingsJsonSchema(
+              z.object({
+                feedUrl: z.httpUrl(),
+                record: z.string(),
+                maxItems: z.int().min(1).max(100).default(20),
+              }),
+            ),
+          ),
+        ),
+      },
+      status: 'degraded',
+      lastError: MISSING_SETTINGS,
+    })
+    expect((await listIntegrationsHandler()).at(0)).toMatchObject({
+      pluginId: 'rss',
+      state: 'needs-setup',
+    })
+    expect((await getIntegrationHandler({ id: rss.id })).state).toBe(
+      'needs-setup',
+    )
+
+    expect(
+      await saveIntegrationSettingsHandler({
+        id: rss.id,
+        values: {
+          feedUrl: 'https://feed.example/rss',
+          record: 'r1',
+          maxItems: '20',
+        },
+      }),
+    ).toEqual({ ok: true })
+    expect((await rowOf(rss.id)).config).toEqual({
+      feedUrl: 'https://feed.example/rss',
+      record: 'r1',
+      maxItems: 20,
+    })
+    // The worker's reload is what writes `enabled`; the save hands it over.
+    await heardSoon(['rss'])
   })
 
   it('refuses to save against a manifest whose settings the form cannot draw', async () => {
