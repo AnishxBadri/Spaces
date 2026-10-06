@@ -32,5 +32,5 @@ export function isApiScope(value: string): value is ApiScope {
 export const API_SCOPE_HINTS: Record<ApiScope, string> = {
   'capture:write': 'Post captured pages from the browser extension',
   'records:read': 'Read records you can see',
-  'suggestions:write': 'Propose changes to the inbox, never write them',
+  'suggestions:write': 'Propose changes for Review, never write them',
 }

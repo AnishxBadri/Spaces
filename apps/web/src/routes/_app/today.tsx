@@ -320,7 +320,7 @@ function TodayPage() {
             tone: 'warn',
             to: '/settings/currency',
           },
-          { label: 'Review inbox', value: inboxCount, to: '/inbox' },
+          { label: 'Review', value: inboxCount, to: '/review' },
           {
             label: 'Unfiled',
             value: unfiledCount,

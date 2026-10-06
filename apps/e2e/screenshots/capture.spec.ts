@@ -98,7 +98,7 @@ const SHOTS: ReadonlyArray<Shot> = [
     ready: heading,
   },
   { file: 'import.png', path: () => '/import', ready: heading },
-  { file: 'inbox.png', path: () => '/inbox', ready: heading },
+  { file: 'review.png', path: () => '/review', ready: heading },
 ]
 
 /** One id from the instance's database — the first row `sql` returns. */
@@ -433,8 +433,8 @@ const FRAGMENTS: ReadonlyArray<Fragment> = [
       boxOf(around(exact(page.locator('main'), 'Description'), 'Team size')),
   },
   {
-    name: 'inbox-duplicate',
-    path: () => '/inbox',
+    name: 'review-duplicate',
+    path: () => '/review',
     ready: heading,
     clip: (page) =>
       boxOf(around(exact(page, 'Same Company?'), 'Merge B into A')),

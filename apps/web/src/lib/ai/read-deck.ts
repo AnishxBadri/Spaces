@@ -434,7 +434,7 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
       skipped: [
         {
           entityId: against.anchorEntityId,
-          reason: 'Already read: this page’s suggestions are in the inbox',
+          reason: 'Already read: this page’s suggestions are in Review',
         },
       ],
     }

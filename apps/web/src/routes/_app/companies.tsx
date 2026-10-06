@@ -373,7 +373,7 @@ function CompaniesPage() {
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
         {openDuplicates > 0 ? (
           <Link
-            to="/inbox"
+            to="/review"
             className="focus-ring mt-4 flex items-center gap-2 rounded-md border border-rule bg-bone px-3 py-2 text-ui transition-colors duration-150 ease-out-quart hover:bg-bone"
           >
             <Copy className="size-3.5 text-graphite" strokeWidth={1.75} />

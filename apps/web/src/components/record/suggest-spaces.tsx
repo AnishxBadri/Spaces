@@ -12,7 +12,7 @@ import type { SuggestSpacesStatus } from '#/lib/server-fns'
 /**
  * "Suggest spaces" (SPA-103) — the Spaces rail's one AI verb. Pressing it
  * enqueues one classify run for this record; the run proposes a `space_tag`
- * suggestion per space it places the record in, and those land in /inbox
+ * suggestion per space it places the record in, and those land in Review
  * and on this rail's "Waiting" chips (SPA-114) — this control draws no
  * pending state of its own beyond its label.
  *
@@ -63,7 +63,7 @@ export function SuggestSpacesAction({ entityId }: { entityId: string }) {
           toast.message('No new space to suggest for this record')
         else
           toast.success(
-            `${String(status.proposed)} space${status.proposed === 1 ? '' : 's'} suggested · review in the inbox`,
+            `${String(status.proposed)} space${status.proposed === 1 ? '' : 's'} suggested · waiting in Review`,
           )
         void router.invalidate()
       }
@@ -116,7 +116,7 @@ export function SuggestSpacesAction({ entityId }: { entityId: string }) {
       type="button"
       disabled={running}
       onClick={() => void press()}
-      title="Ask the classify lane which spaces this record belongs in; each lands in the inbox as a suggestion"
+      title="Ask the classify lane which spaces this record belongs in; each lands in Review as a suggestion"
       className="focus-ring mt-1 flex h-7 items-center gap-1.5 text-label text-graphite hover:text-foreground disabled:opacity-60"
     >
       <Sparkles className="size-3" strokeWidth={1.75} aria-hidden />

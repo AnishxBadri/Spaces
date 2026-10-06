@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import type { BatchOutcome, SuggestionItem } from '#/lib/server-fns'
-import { InboxItem, PayloadFallback, rendererFor } from './inbox.tsx'
+import { InboxItem, PayloadFallback, rendererFor } from './review.tsx'
 
 /**
  * SPA-76. The review inbox is a queue over typed rows, and the renderer map

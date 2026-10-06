@@ -14,7 +14,7 @@ import {
  * (`record-files.tsx`, `useDeckReader`): the gate is asked once per record —
  * the synthesize lane routed, with a live credential, and to a local model
  * when the record resolves sensitive — and the run is a worker job, polled
- * while it runs, whose end is a toast: the suggestion is in the inbox, or
+ * while it runs, whose end is a toast: the suggestion is in Review, or
  * the job's own sentence ("Nothing to summarize: …").
  */
 
@@ -71,7 +71,7 @@ export function useSummarizer(
       if (stateOf(previous.current, id) !== 'summarizing') continue
       if (status.state === 'failed') toast.error(status.message)
       if (status.state === 'done')
-        toast.success('Summary drafted · the note is in the inbox')
+        toast.success('Summary drafted · the note is in Review')
     }
     previous.current = next
     setStatuses(next)

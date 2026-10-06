@@ -936,7 +936,7 @@ function useExtractionPolling(
  *
  * The read runs on the worker. While any deck is reading the tab polls
  * `readDeckStatus`; a read that settles says so in a toast — the suggestions
- * are in the inbox, or the job's own failure sentence — and the button
+ * are in Review, or the job's own failure sentence — and the button
  * comes back.
  *
  * Read deck and summarize (SPA-100) sits beside it when the synthesize lane
@@ -999,7 +999,7 @@ function useDeckReader(
       if (stateOf(previous.current, id) !== 'reading') continue
       if (status.state === 'failed') toast.error(status.message)
       if (status.state === 'done')
-        toast.success('Deck read · the suggestions are in the inbox')
+        toast.success('Deck read · the suggestions are in Review')
     }
     previous.current = next
     setStatuses(next)

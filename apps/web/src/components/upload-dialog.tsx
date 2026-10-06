@@ -180,7 +180,7 @@ export function UploadDialog() {
             ) : null}
             {mode === 'unfiled' ? (
               <p className="text-label text-graphite">
-                It lands in the inbox with no record and no space. File it later
+                It lands unfiled, with no record and no space. File it later
                 from the row — the file and its text stay either way.
               </p>
             ) : null}

@@ -48,6 +48,17 @@ describe('custom objects', () => {
         }),
       ),
     ).rejects.toThrow(ObjectRejected)
+    // The review queue's path and the two old paths that redirect to it.
+    for (const plural of ['Review', 'Inbox', 'Dedupe'])
+      await expect(
+        Effect.runPromise(
+          createObjectProgram({
+            singular: plural,
+            plural,
+            createdBy: actor.id,
+          }),
+        ),
+      ).rejects.toThrow('is taken by the app')
     const fund = await Effect.runPromise(
       createObjectProgram({
         singular: `Fund ${tag}`,

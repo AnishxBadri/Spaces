@@ -24,6 +24,7 @@ import { Route as AppMandateRouteImport } from './routes/_app/mandate'
 import { Route as AppNotesRouteImport } from './routes/_app/notes'
 import { Route as AppPeopleRouteImport } from './routes/_app/people'
 import { Route as AppPortfolioRouteImport } from './routes/_app/portfolio'
+import { Route as AppReviewRouteImport } from './routes/_app/review'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSpacesRouteImport } from './routes/_app/spaces'
 import { Route as AppTasksRouteImport } from './routes/_app/tasks'
@@ -129,6 +130,11 @@ const AppPeopleRoute = AppPeopleRouteImport.update({
 const AppPortfolioRoute = AppPortfolioRouteImport.update({
   id: '/portfolio',
   path: '/portfolio',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReviewRoute = AppReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -308,6 +314,7 @@ export interface FileRoutesByFullPath {
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
   '/portfolio': typeof AppPortfolioRoute
+  '/review': typeof AppReviewRoute
   '/settings': typeof AppSettingsRouteWithChildren
   '/spaces': typeof AppSpacesRoute
   '/tasks': typeof AppTasksRoute
@@ -356,6 +363,7 @@ export interface FileRoutesByTo {
   '/notes': typeof AppNotesRoute
   '/people': typeof AppPeopleRoute
   '/portfolio': typeof AppPortfolioRoute
+  '/review': typeof AppReviewRoute
   '/spaces': typeof AppSpacesRoute
   '/tasks': typeof AppTasksRoute
   '/today': typeof AppTodayRoute
@@ -405,6 +413,7 @@ export interface FileRoutesById {
   '/_app/notes': typeof AppNotesRoute
   '/_app/people': typeof AppPeopleRoute
   '/_app/portfolio': typeof AppPortfolioRoute
+  '/_app/review': typeof AppReviewRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/spaces': typeof AppSpacesRoute
   '/_app/tasks': typeof AppTasksRoute
@@ -455,6 +464,7 @@ export interface FileRouteTypes {
     | '/notes'
     | '/people'
     | '/portfolio'
+    | '/review'
     | '/settings'
     | '/spaces'
     | '/tasks'
@@ -503,6 +513,7 @@ export interface FileRouteTypes {
     | '/notes'
     | '/people'
     | '/portfolio'
+    | '/review'
     | '/spaces'
     | '/tasks'
     | '/today'
@@ -551,6 +562,7 @@ export interface FileRouteTypes {
     | '/_app/notes'
     | '/_app/people'
     | '/_app/portfolio'
+    | '/_app/review'
     | '/_app/settings'
     | '/_app/spaces'
     | '/_app/tasks'
@@ -704,6 +716,13 @@ declare module '@tanstack/react-router' {
       path: '/portfolio'
       fullPath: '/portfolio'
       preLoaderRoute: typeof AppPortfolioRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/review': {
+      id: '/_app/review'
+      path: '/review'
+      fullPath: '/review'
+      preLoaderRoute: typeof AppReviewRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/settings': {
@@ -978,6 +997,7 @@ interface AppRouteChildren {
   AppNotesRoute: typeof AppNotesRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppPortfolioRoute: typeof AppPortfolioRoute
+  AppReviewRoute: typeof AppReviewRoute
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppSpacesRoute: typeof AppSpacesRoute
   AppTasksRoute: typeof AppTasksRoute
@@ -1005,6 +1025,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppNotesRoute: AppNotesRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppPortfolioRoute: AppPortfolioRoute,
+  AppReviewRoute: AppReviewRoute,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppSpacesRoute: AppSpacesRoute,
   AppTasksRoute: AppTasksRoute,

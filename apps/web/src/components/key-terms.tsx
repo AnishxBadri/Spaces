@@ -17,7 +17,7 @@ import { offersKeyTerms } from '#/lib/documents/key-terms-gate'
  * when the record resolves sensitive — and a row shows the button only when
  * `offersKeyTerms` says so: a `legal` or `dd` document, its text extracted,
  * filed on a deal. The read is a worker job, polled while it runs, whose end
- * is a toast: the note is in the inbox, or the job's own sentence.
+ * is a toast: the note is in Review, or the job's own sentence.
  */
 
 type Documents = Awaited<ReturnType<typeof listRecordDocuments>>
@@ -74,7 +74,7 @@ export function useKeyTermsExtractor(
       if (stateOf(previous.current, id) !== 'extracting') continue
       if (status.state === 'failed') toast.error(status.message)
       if (status.state === 'done')
-        toast.success('Key terms read · the note is in the inbox')
+        toast.success('Key terms read · the note is in Review')
     }
     previous.current = next
     setStatuses(next)

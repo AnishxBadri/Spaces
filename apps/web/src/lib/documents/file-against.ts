@@ -80,6 +80,6 @@ export function fileAgainstFor(target: UploadTarget): FileAgainst {
 export function filingNote(target: UploadTarget | null): string {
   if (target === null) return 'choose one first'
   return target.kind === 'unfiled'
-    ? 'files unfiled — it lands in the inbox'
+    ? 'files unfiled — no record, no space'
     : `files against ${target.name}`
 }

@@ -176,7 +176,7 @@ what they are: `deal-board`, `record-timeline`, `tasks-rail`,
 | Portfolio                 | `routes/_app/portfolio*.tsx`, `lib/server/portfolio.ts`, `lib/portfolio/*`, `db/schema/portfolio.ts`                      |
 | Invested → holding        | `birthHolding` in `lib/server/shared.ts` (both updateRecord and createDeal paths)                                         |
 | Attribute engine          | `lib/attributes/registry.ts`, `components/attributes/`, `db/schema/attributes.ts`                                         |
-| Identity / dedupe / merge | `lib/entities/*`, `routes/_app/inbox.tsx`                                                                                 |
+| Identity / dedupe / merge | `lib/entities/*`, `routes/_app/review.tsx`                                                                                |
 | Spaces / taxonomy         | `routes/_app/spaces*.tsx`, `lib/server/spaces.ts`, ltree paths in `db/schema/entities.ts`                                 |
 | Notes / memos             | `routes/_app/notes*.tsx`, `components/editor/`, mentions-sync in `lib/server/notes.ts`                                    |
 | Documents pipeline        | `lib/server/documents.ts` → queue → `worker/jobs/extract-document.ts`; `lib/storage/`                                     |

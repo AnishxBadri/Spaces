@@ -133,7 +133,7 @@ export const proposeSuggestionProgram = Effect.fn('proposeSuggestionProgram')(
       entityId: row.entityId,
       status: 'open',
       fields: Object.keys(jsonRecord(row.payload)).sort(),
-      note: 'Queued for review in the Spaces inbox. Nothing on the record changes until a person accepts it.',
+      note: 'Queued in Review in Spaces. Nothing on the record changes until a person accepts it.',
     }
   },
 )

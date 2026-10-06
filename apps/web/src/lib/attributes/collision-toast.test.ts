@@ -10,7 +10,7 @@ import { collisionToast } from './collision-toast'
  * Pure — no database, no React, no `sonner`.
  */
 describe('collisionToast', () => {
-  it('names the object singular and the normalized value, and points at the inbox in prose', () => {
+  it('names the object singular and the normalized value, and points at Review in prose', () => {
     expect(
       collisionToast(
         {
@@ -21,7 +21,7 @@ describe('collisionToast', () => {
       ),
     ).toEqual({
       title: 'Another Fund claims acme.com',
-      description: 'Both records exist. Review the pair in the review inbox.',
+      description: 'Both records exist. The pair is waiting in Review.',
     })
   })
 

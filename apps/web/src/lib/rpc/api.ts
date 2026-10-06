@@ -476,11 +476,11 @@ const Captured = Schema.Struct({
   documentId: Schema.String,
   url: Schema.String.annotate({
     description:
-      'Where the capture shows in the app: the record it was filed on, or the unfiled inbox',
+      'Where the capture shows in the app: the record it was filed on, or the unfiled documents on the shelf',
   }),
   extraction: Schema.Literals(['queued', 'skipped']).annotate({
     description:
-      'queued: the page will be read against the declared object and its suggestions land in the inbox. skipped: no object was declared, or no model is routed for the extract lane — the page is filed all the same.',
+      'queued: the page will be read against the declared object and its suggestions land in Review. skipped: no object was declared, or no model is routed for the extract lane — the page is filed all the same.',
   }),
 })
 
@@ -514,7 +514,7 @@ class CaptureGroup extends HttpApiGroup.make('capture')
         OpenApi.annotations({
           summary: 'Capture a page',
           description:
-            'Files a page’s text as a document: a text/plain blob named by the title, with the page’s URL on the row, filed on the target record or left unfiled, extraction queued behind it. With `object` declared and the extract lane routed, the page is also read against that object’s fields and its suggestions land in the inbox, anchored on the page; `extraction` says whether that read was queued. Re-posting the same text to the same record answers the same document. Runs as the token’s user.',
+            'Files a page’s text as a document: a text/plain blob named by the title, with the page’s URL on the row, filed on the target record or left unfiled, extraction queued behind it. With `object` declared and the extract lane routed, the page is also read against that object’s fields and its suggestions land in Review, anchored on the page; `extraction` says whether that read was queued. Re-posting the same text to the same record answers the same document. Runs as the token’s user.',
         }),
       ),
   )

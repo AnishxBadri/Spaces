@@ -261,8 +261,8 @@ named file rather than designing. Name the pattern you copied in the PR descript
 `useTablePrefs` under a frozen key, `EmptyState` at zero. **No attribute registry and
 no `ViewBar`** — saved views address objects, and a shelf is not one.
 
-**A queue** — pairs or suggestions a human decides one at a time (`/inbox`, the
-suggestion queue). → **`/inbox`**, `apps/web/src/routes/_app/inbox.tsx`. `PageHeader`
+**A queue** — pairs or suggestions a human decides one at a time (`/review`, the
+suggestion queue). → **`/review`**, `apps/web/src/routes/_app/review.tsx`. `PageHeader`
 whose description is a mono count line, a `max-w-220` column of cards, each card
 carrying its own accept/dismiss with a toast, `EmptyState` at zero. Not a table: a queue
 row is a decision, not a cell.

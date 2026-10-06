@@ -472,7 +472,7 @@ const attributeRunInRun = Effect.fn('attributeRun.inRun')(function* (
   // Checked again here: two presses can race past the button's check.
   if (yield* openFor(record.id, def.slug))
     return yield* new AttributeRunRefused({
-      message: `${def.name} already has a proposal waiting in the inbox`,
+      message: `${def.name} already has a proposal waiting in Review`,
     })
 
   const context = yield* recordContextProgram({

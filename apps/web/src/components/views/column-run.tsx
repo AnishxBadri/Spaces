@@ -70,14 +70,14 @@ export function columnRunConfirm(
       body:
         estimate.total === 0
           ? 'The view holds no records.'
-          : `Every record in the view already has a ${estimate.attributeName} proposal waiting in the inbox.`,
+          : `Every record in the view already has a ${estimate.attributeName} proposal waiting in Review.`,
       rows,
       keep: 'Close',
       kind: 'primary',
     }
   return {
     title: `Run ${estimate.attributeName} on “${estimate.viewName}”?`,
-    body: `One call per record the saved view holds without a proposal. Each answer lands in the inbox as a suggestion under one header; nothing is written until it is accepted. The run stops at today’s AI cap.`,
+    body: `One call per record the saved view holds without a proposal. Each answer lands in Review as a suggestion under one header; nothing is written until it is accepted. The run stops at today’s AI cap.`,
     rows,
     action: `Run ${count(estimate.calls)}`,
     keep: 'Cancel',
@@ -153,7 +153,7 @@ export function useColumnRun({
       switch (r.status) {
         case 'queued':
           toast(`Column run queued: ${count(r.calls)} records`, {
-            description: 'Suggestions arrive in the inbox under one header.',
+            description: 'Suggestions arrive in Review under one header.',
           })
           break
         case 'already-running':

@@ -35,8 +35,8 @@ import type { RegistryEntry } from './value-editor'
  *   research for research.
  * - **An open proposal → "proposed"**: the Waiting chip's shape and mark
  *   (DESIGN.md "Waiting chip", SPA-114 — "SPA-72's proposed table cell
- *   inherits this chip"), a pointer into `/inbox` scoped to the record. It
- *   is never a verb: accept and reject live in the inbox (D44), and a
+ *   inherits this chip"), a pointer into `/review` scoped to the record. It
+ *   is never a verb: accept and reject live in Review (D44), and a
  *   pressed cell with a proposal waiting is refused by the server anyway.
  *
  * `AiCellsProvider` reads once for every record a surface shows — the
@@ -149,7 +149,7 @@ export function AiCellsProvider({
             if (status.state === 'done')
               if (status.proposed === 0)
                 toast.message(`No answer for ${def.name}`)
-              else toast.success(`${def.name} proposed · review in the inbox`)
+              else toast.success(`${def.name} proposed · waiting in Review`)
             void refresh()
             void router.invalidate()
           })
@@ -177,7 +177,9 @@ export function AiCellsProvider({
             return
           stop()
           if (result.status === 'already-proposed') {
-            toast.message(`${def.name} already has a proposal in the inbox`)
+            toast.message(
+              `${def.name} already has a proposal waiting in Review`,
+            )
             void refresh()
           }
           if (result.status === 'queue-unavailable')
@@ -226,9 +228,9 @@ export function AiCell({
       <div className="min-w-0 flex-1">{children}</div>
       {isProposed ? (
         <Link
-          to="/inbox"
+          to="/review"
           search={{ record: entityId, lane: 'suggestions' }}
-          title={`A proposed ${def.name} is waiting in the inbox`}
+          title={`A proposed ${def.name} is waiting in Review`}
           onClick={(e) => e.stopPropagation()}
           className="mention-chip focus-ring shrink-0"
         >
@@ -243,7 +245,7 @@ export function AiCell({
           title={
             isRunning
               ? `Asking for ${def.name}…`
-              : `Ask the ${ai.lane} lane for ${def.name}; the answer lands in the inbox as a suggestion`
+              : `Ask the ${ai.lane} lane for ${def.name}; the answer lands in Review as a suggestion`
           }
           onClick={(e) => {
             e.stopPropagation()

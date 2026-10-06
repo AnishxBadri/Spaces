@@ -127,7 +127,7 @@ export function buildMcpServer(reader: TokenUser): McpServer {
     {
       title: 'Propose a suggestion',
       description:
-        'Propose attribute values for one record. Nothing is written: the proposal lands in the Spaces review inbox, labelled with this token, and a person accepts or rejects it. The patch is keyed by attribute slug (see get_record), each field wrapped as {value, refs, confidence}; it is validated against the record’s live attribute registry and refused field by field.',
+        'Propose attribute values for one record. Nothing is written: the proposal lands in Review in Spaces, labelled with this token, and a person accepts or rejects it. The patch is keyed by attribute slug (see get_record), each field wrapped as {value, refs, confidence}; it is validated against the record’s live attribute registry and refused field by field.',
       inputSchema: {
         entity: z
           .string()

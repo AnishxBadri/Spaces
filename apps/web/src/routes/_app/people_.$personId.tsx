@@ -499,7 +499,7 @@ function ContactField({
       if (result.outcome === 'suggested_duplicate') {
         toast(`Another person already owns that ${kind}`, {
           description:
-            'Flagged as a possible duplicate — review it in the review inbox.',
+            'Flagged as a possible duplicate — the pair is waiting in Review.',
         })
       }
       setDraft('')

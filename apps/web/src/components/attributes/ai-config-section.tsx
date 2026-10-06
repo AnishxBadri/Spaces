@@ -110,8 +110,8 @@ export function AiConfigSection({
         })}
       </ul>
       <p className="flex h-8 items-center px-3 mono text-micro text-graphite">
-        manual, per cell · every answer lands in the inbox as a suggestion ·
-        types are unchanged
+        manual, per cell · every answer lands in Review as a suggestion · types
+        are unchanged
       </p>
     </section>
   )

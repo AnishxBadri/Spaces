@@ -50,7 +50,7 @@ export function collisionToast(
     if (report.identity[slug] !== 'suggested_duplicate') continue
     return {
       title: `Another ${singular} claims ${value}`,
-      description: 'Both records exist. Review the pair in the review inbox.',
+      description: 'Both records exist. The pair is waiting in Review.',
     }
   }
   return null

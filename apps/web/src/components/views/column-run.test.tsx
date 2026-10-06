@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { columnRunStatusLine } from '#/components/inbox/column-run-group'
-import { PayloadFallback, rendererFor } from '#/routes/_app/inbox.tsx'
+import { PayloadFallback, rendererFor } from '#/routes/_app/review.tsx'
 import { columnRunConfirm, useColumnRun } from './column-run'
 
 /**
