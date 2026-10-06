@@ -9,15 +9,19 @@ block before designing anything); synthesis in `docs/ARCHITECTURE.md`; ADRs in
 ## Where the work is (read before picking anything up)
 
 - **Linear, team `Spaces` (SPA)** is the store of record for work that is
-  scheduled: 139 issues, `SPA-16`…`SPA-155`, across projects 1–13 with 44
-  milestones and real blocking relations. An issue body is the spec; do not
-  re-derive it. Two saved views are the whole workflow: **grabbable now**
-  (`afk`, no open blockers) and **needs me** (`hitl`).
+  scheduled. Since 2026-10-06 the live set is projects **19–26** plus
+  **Corrections** (`SPA-215`…`SPA-299` and the nine open issues carried over
+  from 1–18), with 30 milestones and blocking relations among the new issues;
+  projects 1–18 are shipped and their Done issues archived (free-plan cap).
+  An issue body is the spec; do not re-derive it. Two saved views are the
+  whole workflow: **grabbable now** (`afk`, no open blockers) and **needs
+  me** (`hitl`).
 - `docs/roadmap-2026-09.md` — all 23 projects and their order (1–12 as a
   shipped list), the milestones of 13–23, the decisions still ahead with
   their options, open audit findings and the audit's cut list.
-- `docs/roadmap-backlog.md` — the 98 slices of projects 14–23, in full. Not in
-  Linear on purpose: publish a project when you reach it, not before.
+- `docs/roadmap-backlog.md` — every slice of projects 14–26 in full, the
+  source the Linear bodies were pasted from. Projects 19–26 were published
+  2026-10-06; amend a body here and in Linear together.
 - `docs/decisions-2026-09.md` — the 48 decisions, all closed. A slice labelled
   `hitl` usually is because of one; read its decision before designing.
 - Labels that change how you work: **`migration`** means the slice runs

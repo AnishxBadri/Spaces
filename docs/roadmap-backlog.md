@@ -1,6 +1,6 @@
 # Backlog bodies — projects 14 to 26
 
-_The 98 slices that were **not** published to Linear. For projects 1–13 the Linear issues are the store of record and this file carries nothing; for 14–26 nothing else holds the substance, so it lives here._
+_The slice bodies of projects 14–26. Projects 19–26 and Corrections were published to Linear on 2026-10-06 (`SPA-215`…`SPA-299`), each issue carrying its body verbatim with a footer naming the slice key; this file stays the source — amend both together. Projects 14–18 shipped from Linear before that; their sections here are history._
 
 _Siblings: `docs/roadmap-2026-09.md` (all 23 projects and the audit), `docs/decisions-2026-09.md` (the 48 closed decisions), and the four `docs/spec-*.md` contracts these slices implement. Ordered exactly as the roadmap orders them. Published at the same time as the rest of the plan (2026-09-15, reconciled) and unchanged since, except where a decision in `docs/decisions-2026-09.md` amends a slice — those amendments are noted inline and the decision is authoritative._
 
