@@ -15,6 +15,7 @@ import type {
  * claims. Provider JSON in, port arguments out — no Effect, no ports.
  * - Fields are parsed, never trusted: an absent or null field claims nothing.
  * - Values are keyed by the slugs `SYSTEM_ATTRIBUTES` seeds for the kind.
+ * - A domain, email or LinkedIn URL is an identity key, never a value.
  */
 
 export const APOLLO_API = 'https://api.apollo.io/api/v1'
@@ -119,7 +120,6 @@ export const organizationEnrichment = (
       ...(org.short_description ? { description: org.short_description } : {}),
       ...(org.founded_year ? { founded_year: org.founded_year } : {}),
       ...(location ? { location } : {}),
-      ...(org.linkedin_url ? { linkedin: org.linkedin_url } : {}),
     },
   })
 }
@@ -155,7 +155,6 @@ export const personEnrichment = (
     values: {
       ...(person.title ? { job_title: person.title } : {}),
       ...(location ? { location } : {}),
-      ...(person.linkedin_url ? { linkedin: person.linkedin_url } : {}),
       ...(person.twitter_url ? { twitter: person.twitter_url } : {}),
     },
   })

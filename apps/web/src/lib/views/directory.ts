@@ -1,5 +1,15 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, exists, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  eq,
+  exists,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   attribute,
@@ -67,15 +77,15 @@ const query = <T>(run: () => Promise<T>) =>
     catch: (cause) => new DirectoryQueryFailed({ cause }),
   })
 
+type ShownAliasKind = 'domain' | 'email' | 'linkedin'
+
 /**
- * The text box narrows on the name **or** on the identity alias the surface
- * shows in its second column — a domain on /companies, an email on /people.
- * The box used to be a client filter over every loaded row and matched both,
- * so moving it to SQL without the alias half would have quietly deleted
- * "find the company whose domain I remember". Correlated `exists`, not a
- * join: a company with three domains must still be one row.
+ * The text box narrows on the name **or** on an identity alias the surface
+ * shows as a column — a domain or LinkedIn on /companies, an email or
+ * LinkedIn on /people. Correlated `exists`, not a join: a company with three
+ * domains must still be one row.
  */
-const aliasMatch = (kind: 'domain' | 'email', q: string): SQL =>
+const aliasMatch = (kinds: ReadonlyArray<ShownAliasKind>, q: string): SQL =>
   exists(
     db
       .select({ one: sql`1` })
@@ -83,18 +93,18 @@ const aliasMatch = (kind: 'domain' | 'email', q: string): SQL =>
       .where(
         and(
           eq(entityAlias.entityId, entity.id),
-          eq(entityAlias.kind, kind),
+          inArray(entityAlias.kind, [...kinds]),
           ilike(entityAlias.valueNorm, likeArg(q)),
         ),
       ),
   )
 
-const nameOrAlias = (kind: 'domain' | 'email', q: string) =>
-  or(ilike(entity.canonicalName, likeArg(q)), aliasMatch(kind, q))
+const nameOrAlias = (kinds: ReadonlyArray<ShownAliasKind>, q: string) =>
+  or(ilike(entity.canonicalName, likeArg(q)), aliasMatch(kinds, q))
 
 /** Identity aliases of one kind, for the page's rows only. */
 async function aliasesFor(
-  kind: 'domain' | 'email',
+  kind: ShownAliasKind,
   ids: Array<string>,
 ): Promise<Map<string, Array<string>>> {
   if (ids.length === 0) return new Map()
@@ -108,6 +118,8 @@ async function aliasesFor(
         inArray(entityAlias.entityId, ids),
       ),
     )
+    // Oldest first, so a column that shows one shows the first claimed.
+    .orderBy(asc(entityAlias.createdAt), asc(entityAlias.id))
   const by = new Map<string, Array<string>>()
   for (const r of rows)
     by.set(r.entityId, [...(by.get(r.entityId) ?? []), r.value])
@@ -232,18 +244,19 @@ const pageOfKind = Effect.fn('pageOfKind')(function* (
   }
 })
 
-/** The `/companies` table: entity core + values + domains + spaces. */
+/** The `/companies` table: entity core + values + domains + LinkedIn + spaces. */
 export const listCompaniesPageProgram = Effect.fn('listCompaniesPageProgram')(
   function* (conditions: Array<Condition>, options: ListPageOptions = {}) {
     const page = yield* pageOfKind(
       'company',
-      (q) => nameOrAlias('domain', q),
+      (q) => nameOrAlias(['domain', 'linkedin'], q),
       conditions,
       options,
     )
-    const [domains, spaces, touched] = yield* query(() =>
+    const [domains, linkedins, spaces, touched] = yield* query(() =>
       Promise.all([
         aliasesFor('domain', page.ids),
+        aliasesFor('linkedin', page.ids),
         spacesFor(page.ids),
         lastTouchedFor(page.ids),
       ]),
@@ -254,6 +267,7 @@ export const listCompaniesPageProgram = Effect.fn('listCompaniesPageProgram')(
         name: r.name,
         values: r.values,
         domains: domains.get(r.id) ?? [],
+        linkedins: linkedins.get(r.id) ?? [],
         spaces: spaces.get(r.id) ?? [],
         lastTouched: touched.get(r.id) ?? null,
         createdAt: r.createdAt.toISOString(),
@@ -287,18 +301,19 @@ async function referenceNamesFor(
   return Object.fromEntries(rows.map((r) => [r.id, { name: r.name }]))
 }
 
-/** The `/people` table: entity core + values + emails + reference names. */
+/** The `/people` table: entity core + values + emails + LinkedIn + reference names. */
 export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
   function* (conditions: Array<Condition>, options: ListPageOptions = {}) {
     const page = yield* pageOfKind(
       'person',
-      (q) => nameOrAlias('email', q),
+      (q) => nameOrAlias(['email', 'linkedin'], q),
       conditions,
       options,
     )
-    const [emails, refNames, touched] = yield* query(() =>
+    const [emails, linkedins, refNames, touched] = yield* query(() =>
       Promise.all([
         aliasesFor('email', page.ids),
+        aliasesFor('linkedin', page.ids),
         referenceNamesFor(page.ids),
         lastTouchedFor(page.ids),
       ]),
@@ -309,6 +324,7 @@ export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
         name: r.name,
         values: r.values,
         emails: emails.get(r.id) ?? [],
+        linkedins: linkedins.get(r.id) ?? [],
         lastTouched: touched.get(r.id) ?? null,
         createdAt: r.createdAt.toISOString(),
       })),

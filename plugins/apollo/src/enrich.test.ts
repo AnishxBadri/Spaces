@@ -127,7 +127,6 @@ describe('enrichCompany', () => {
         'Warehouse picking robots that learn a new SKU from one demonstration.',
       founded_year: 2019,
       location: 'Pune, India',
-      linkedin: 'http://www.linkedin.com/company/northwind-robotics',
     })
     expect(ports.facts.calls[0]?.input).toMatchObject({
       receiptId: 'receipt-1',
@@ -213,7 +212,6 @@ describe('enrichPerson', () => {
     expect(ports.facts.values.get('entity-0')).toEqual({
       job_title: 'Co-founder & CTO',
       location: 'Pune, India',
-      linkedin: 'http://www.linkedin.com/in/meera-kulkarni-robots',
       twitter: 'https://twitter.com/meerak',
     })
   })

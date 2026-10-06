@@ -237,6 +237,30 @@ describe('autoMap', () => {
     ])
   })
 
+  it('maps LinkedIn on people and companies to the identity key, never the archived attribute', () => {
+    const archivedLinkedin = attr('x-linkedin', 'linkedin', 'LinkedIn', 'url', {
+      archived: true,
+    })
+    const core: MappingRegistry = {
+      identityKeys: CORE_IDENTITY_KEYS,
+      attributes: [archivedLinkedin],
+    }
+    expect(mappableAttributes(core)).toEqual([])
+    expect(autoMap(['Name', 'LinkedIn'], core)).toEqual([
+      { target: 'name' },
+      { target: 'identity', key: 'linkedin' },
+    ])
+    expect(autoMap(['Name', 'LinkedIn URL'], core)).toEqual([
+      { target: 'name' },
+      { target: 'identity', key: 'linkedin' },
+    ])
+    expect(specFor({ target: 'identity', key: 'linkedin' }, core)).toEqual({
+      kind: 'typed',
+      type: 'url',
+      options: { identityKey: 'linkedin' },
+    })
+  })
+
   it('never maps two headers onto one target — the second is ignored', () => {
     expect(autoMap(['Stage', 'stage', 'Round'], deals)).toEqual([
       { target: 'attribute', attributeId: 'a-stage' },

@@ -405,6 +405,52 @@ describe('a domain identity alias', () => {
   })
 })
 
+describe('a LinkedIn column on People', () => {
+  it('maps to the identity key: a known URL attaches, a new one is born as an alias', async () => {
+    const people = await objectId('people')
+    const ishaan = await resolveEntity({
+      kind: 'person',
+      name: 'Ishaan Mehra',
+      keys: { linkedin: 'https://linkedin.com/in/ishaanmehra-import' },
+      source: { class: 'manual' },
+    })
+    const batchId = await plannedBatch(
+      ['Name', 'LinkedIn'],
+      [
+        ['I. Mehra', 'https://www.linkedin.com/in/IshaanMehra-import/'],
+        ['Revathi Iyer', 'linkedin.com/in/revathi-import'],
+      ],
+      people,
+    )
+    const run = await commit(batchId)
+    expect(run.attached).toBe(1)
+    const [first, second] = await rowsOf(batchId)
+    expect(first.entityId).toBe(ishaan.entityId)
+    if (second.entityId === null) throw new Error('row 2 wrote no record')
+
+    const born = await db
+      .select({
+        valueNorm: entityAlias.valueNorm,
+        isIdentity: entityAlias.isIdentity,
+        values: entity.values,
+      })
+      .from(entityAlias)
+      .innerJoin(entity, eq(entity.id, entityAlias.entityId))
+      .where(
+        and(
+          eq(entityAlias.entityId, second.entityId),
+          eq(entityAlias.kind, 'linkedin'),
+        ),
+      )
+    expect(born).toHaveLength(1)
+    expect(born[0]).toMatchObject({
+      valueNorm: 'linkedin.com/in/revathi-import',
+      isIdentity: true,
+    })
+    expect(born[0].values).not.toHaveProperty('linkedin')
+  })
+})
+
 describe('collisions and merges', () => {
   it('refuses an undecided collision, folds a merge, and records a skip', async () => {
     const companies = await objectId('companies')

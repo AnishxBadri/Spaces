@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { Globe, Layers, X } from 'lucide-react'
+import { Globe, Layers, Linkedin, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { SaveAsTemplateAction } from '#/components/templates'
@@ -44,6 +44,7 @@ import { PluginActions } from '#/components/record/plugin-actions'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import {
   addCompanyDomain,
+  addCompanyLinkedin,
   countOpenSuggestions,
   createNote,
   getCompany,
@@ -364,6 +365,10 @@ function CompanyRecordPage() {
               />
             ))}
             <DomainsField companyId={company.id} domains={domains} />
+            <LinkedinField
+              companyId={company.id}
+              linkedins={company.aliases.filter((a) => a.kind === 'linkedin')}
+            />
             <PropertyCell label="">
               <AttributeCreateDialog
                 objectKind="company"
@@ -472,6 +477,77 @@ function DomainsField({
             className="focus-ring mono text-micro text-graphite hover:text-foreground"
           >
             + domain
+          </button>
+        )}
+      </div>
+    </PropertyCell>
+  )
+}
+
+/** The company's LinkedIn page: an identity alias, like its domains. */
+function LinkedinField({
+  companyId,
+  linkedins,
+}: {
+  companyId: string
+  linkedins: Array<{ id: string; valueNorm: string }>
+}) {
+  const router = useRouter()
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  async function add() {
+    const value = draft.trim()
+    if (!value) return setAdding(false)
+    try {
+      const result = await addCompanyLinkedin({
+        data: { id: companyId, value },
+      })
+      if (result.outcome === 'suggested_duplicate') {
+        toast('Another company already owns that LinkedIn page', {
+          description:
+            'Flagged as a possible duplicate — the pair is waiting in Review.',
+        })
+      }
+      setDraft('')
+      setAdding(false)
+      void router.invalidate()
+    } catch {
+      toast.error('Not a LinkedIn URL')
+    }
+  }
+
+  return (
+    <PropertyCell label="LinkedIn">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        {linkedins.map((l) => (
+          <span
+            key={l.id}
+            className="flex min-w-0 items-center gap-1 mono text-label"
+          >
+            <Linkedin
+              className="size-3 shrink-0 text-graphite"
+              strokeWidth={1.75}
+            />
+            <span className="truncate">{l.valueNorm}</span>
+          </span>
+        ))}
+        {adding ? (
+          <Input
+            autoFocus
+            value={draft}
+            placeholder="linkedin.com/company/…"
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={add}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+            className="h-6 w-44 mono text-label"
+          />
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            className="focus-ring mono text-micro text-graphite hover:text-foreground"
+          >
+            + add
           </button>
         )}
       </div>

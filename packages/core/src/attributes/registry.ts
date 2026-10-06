@@ -327,6 +327,10 @@ const opt = (
  * `company | person | deal`, so an attribute can never reach a space or a
  * document — the two things sensitivity most needs to cover. It is the
  * `entity.sensitive` column instead, resolved by `resolveSensitivity`.
+ *
+ * No identity key is here either: a person's or a company's domain, email,
+ * LinkedIn and CIN are `entity_alias` rows, written through `resolveEntity`
+ * and `addIdentityAlias`, never `entity.values`.
  */
 export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
   company: [
@@ -364,7 +368,6 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
     },
     { slug: 'location', name: 'Location', type: 'text' },
     { slug: 'founded_year', name: 'Founded', type: 'number' },
-    { slug: 'linkedin', name: 'LinkedIn', type: 'url' },
     {
       // The people who started it (SPA-160). A company deck names its
       // founders, and without a person reference on the company registry
@@ -387,7 +390,6 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
     { slug: 'job_title', name: 'Job title', type: 'text' },
     { slug: 'description', name: 'Description', type: 'text' },
     { slug: 'location', name: 'Location', type: 'text' },
-    { slug: 'linkedin', name: 'LinkedIn', type: 'url' },
     { slug: 'twitter', name: 'Twitter', type: 'url' },
     { slug: 'phone', name: 'Phone', type: 'phone' },
     {

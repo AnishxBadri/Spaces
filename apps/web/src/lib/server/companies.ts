@@ -283,6 +283,18 @@ export const addCompanyDomain = createServerFn({ method: 'POST' })
     return result
   })
 
+/** A company's LinkedIn page, with the same tripwire as its domains. */
+export const addCompanyLinkedin = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({ id: z.string().uuid(), value: z.string().trim().max(255) }),
+  )
+  .handler(async ({ data }) => {
+    await requireUser()
+    return addIdentityAlias(data.id, 'linkedin', data.value, {
+      class: 'manual',
+    })
+  })
+
 export const tagIntoSpace = createServerFn({ method: 'POST' })
   .validator(
     z.object({ entityId: z.string().uuid(), spaceId: z.string().uuid() }),

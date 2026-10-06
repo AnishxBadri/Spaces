@@ -139,7 +139,6 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
       "values": {
         "description": "Warehouse picking robots that learn a new SKU from one demonstration.",
         "founded_year": 2019,
-        "linkedin": "http://www.linkedin.com/company/northwind-robotics",
         "location": "Pune, India",
       },
     },
@@ -296,7 +295,6 @@ exports[`enrichPerson > matches by email and adds the email and LinkedIn before 
       "receiptId": "receipt-1",
       "values": {
         "job_title": "Co-founder & CTO",
-        "linkedin": "http://www.linkedin.com/in/meera-kulkarni-robots",
         "location": "Pune, India",
         "twitter": "https://twitter.com/meerak",
       },

@@ -1048,7 +1048,7 @@ enum branch in any registry read. `description` landed 2026-09 (migration
   **a sourced fact may fill an empty field; anything generated, or anything
   conflicting with what a human wrote, waits for a human.**
   - _Deterministic facts_ (Apollo-class lookups: employee count, HQ, founded
-    year, LinkedIn — externally checkable, receipt stored): **direct write,
+    year — externally checkable, receipt stored): **direct write,
     fill-blanks only**, through setValues so attribute_event logs it with the
     stored `enrichment_record` raw response as provenance anchor; per-field
     history makes every write revertable. A conflict with an existing value —
@@ -1130,10 +1130,14 @@ enum branch in any registry read. `description` landed 2026-09 (migration
 ### Seeded system attributes (decided 2026-07)
 
 - **Company:** description (text) · business_model (multi-select) · funding_stage (select:
-  Pre-seed → Public/Bootstrapped) · location (text) · founded_year (number) · linkedin (url).
-  Website is the domain alias rendered, never an attribute.
-- **Person:** job_title (text) · description · location · linkedin (url) · twitter (url) ·
-  phone (phone). Emails are identity aliases, not attributes.
+  Pre-seed → Public/Bootstrapped) · location (text) · founded_year (number).
+  Website is the domain alias rendered, never an attribute; LinkedIn likewise.
+- **Person:** job_title (text) · description · location · twitter (url) ·
+  phone (phone). Emails and LinkedIn are identity aliases, not attributes.
+- **LinkedIn left the registry 2026-10-06** (migration 0063): every person/company
+  `values.linkedin` became a `linkedin` identity alias and the two attribute rows were
+  archived, so a URL typed on the record now helps `resolveEntity` match. The record
+  pages and the People/Companies lists read it from `entity_alias`.
 - **Deal:** stage (status) · value (currency) · company (ref, required single) · people
   (ref, multi) · owner (actor) · close_date (date) · source (select: Inbound · Referral ·
   Outbound · Event) · close_reason (text — **added 2026-08-08** with the board, the

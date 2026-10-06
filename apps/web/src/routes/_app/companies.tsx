@@ -10,7 +10,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Building2, Copy, Globe, Layers, Plus } from 'lucide-react'
+import { Building2, Copy, Globe, Layers, Linkedin, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   keepPreviousData,
@@ -279,6 +279,19 @@ function CompaniesPage() {
             </MetaCell>
           ) : null,
       }),
+      col.accessor((r) => r.linkedins.at(0) ?? '', {
+        id: 'linkedin',
+        header: 'LinkedIn',
+        size: 180,
+        // An identity alias like the column before it: a join, so no sort.
+        enableSorting: false,
+        cell: (info) => {
+          const first = info.row.original.linkedins.at(0)
+          return first === undefined ? null : (
+            <MetaCell icon={Linkedin}>{first}</MetaCell>
+          )
+        },
+      }),
       ...registry.map((def) =>
         col.accessor((r): unknown => r.values[def.slug] ?? null, {
           id: `attr:${def.slug}`,
@@ -396,7 +409,7 @@ function CompaniesPage() {
               table={table}
               filter={globalFilter}
               onFilterChange={setGlobalFilter}
-              filterPlaceholder="Filter by name or domain…"
+              filterPlaceholder="Filter by name, domain or LinkedIn…"
               filterLabel="Filter companies"
               noun={{ one: 'company', many: 'companies' }}
               total={total}

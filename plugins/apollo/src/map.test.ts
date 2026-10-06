@@ -23,7 +23,6 @@ describe('the organization mapping', () => {
         'Warehouse picking robots that learn a new SKU from one demonstration.',
       founded_year: 2019,
       location: 'Pune, India',
-      linkedin: 'http://www.linkedin.com/company/northwind-robotics',
     })
     expect(claims.receipt.raw).toEqual(fixture('organization.json'))
   })
@@ -60,7 +59,6 @@ describe('the person mapping', () => {
     expect(claims.facts('r')?.values).toEqual({
       job_title: 'Co-founder & CTO',
       location: 'Pune, India',
-      linkedin: 'http://www.linkedin.com/in/meera-kulkarni-robots',
       twitter: 'https://twitter.com/meerak',
     })
   })

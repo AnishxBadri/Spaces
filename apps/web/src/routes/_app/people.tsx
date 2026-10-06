@@ -5,7 +5,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { AtSign, Plus, Users } from 'lucide-react'
+import { AtSign, Linkedin, Plus, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   keepPreviousData,
@@ -151,9 +151,9 @@ function PeoplePage() {
   const { sorting, setSorting } = vs
   /**
    * The text box is a **server** narrowing now (SPA-96): `ILIKE` on the name
-   * or on any identity email, debounced. A client `globalFilter` over the
-   * loaded rows stopped being able to tell the truth the moment the table
-   * stopped loading every row. The employer dropped out of what it matches —
+   * or on any identity email or LinkedIn, debounced. A client `globalFilter`
+   * over the loaded rows stopped being able to tell the truth the moment the
+   * table stopped loading every row. The employer dropped out of what it matches —
    * that is a join, not a column — so the placeholder no longer promises it.
    */
   const [globalFilter, setGlobalFilter] = useState('')
@@ -266,6 +266,19 @@ function PeoplePage() {
             </MetaCell>
           ) : null,
       }),
+      col.accessor((r) => r.linkedins.at(0) ?? '', {
+        id: 'linkedin',
+        header: 'LinkedIn',
+        size: 180,
+        // An identity alias like the column before it: a join, so no sort.
+        enableSorting: false,
+        cell: (info) => {
+          const first = info.row.original.linkedins.at(0)
+          return first === undefined ? null : (
+            <MetaCell icon={Linkedin}>{first}</MetaCell>
+          )
+        },
+      }),
       ...registry.map((def) =>
         col.accessor((r): unknown => r.values[def.slug] ?? null, {
           id: `attr:${def.slug}`,
@@ -352,7 +365,7 @@ function PeoplePage() {
               table={table}
               filter={globalFilter}
               onFilterChange={setGlobalFilter}
-              filterPlaceholder="Filter by name or email…"
+              filterPlaceholder="Filter by name, email or LinkedIn…"
               filterLabel="Filter people"
               noun={{ one: 'person', many: 'people' }}
               total={total}

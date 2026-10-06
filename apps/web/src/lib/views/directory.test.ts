@@ -296,3 +296,57 @@ describe('listPeopleTable — paged, counted and filtered in SQL', () => {
     expect(after.total).toBe(4)
   })
 })
+
+describe('the LinkedIn column on /people and /companies', () => {
+  it('reads the linkedin aliases, oldest first, and narrows the text box on them', async () => {
+    const { Effect } = await import('effect')
+    const { listCompaniesPageProgram, listPeoplePageProgram } =
+      await import('./directory')
+    const { addIdentityAlias, resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
+    const tag = randomUUID().slice(0, 8)
+
+    const person = await resolveEntity({
+      kind: 'person',
+      name: `Linus ${tag}`,
+      keys: { linkedin: `https://www.linkedin.com/in/linus-${tag}/` },
+      source: { class: 'manual' },
+    })
+    await addIdentityAlias(
+      person.entityId,
+      'linkedin',
+      `linkedin.com/in/linus-second-${tag}`,
+      { class: 'manual' },
+    )
+    const company = await resolveEntity({
+      kind: 'company',
+      name: `Orbit ${tag}`,
+      keys: {
+        domain: `orbit-${tag}.example`,
+        linkedin: `linkedin.com/company/orbit-${tag}`,
+      },
+      source: { class: 'manual' },
+    })
+
+    const peoplePage = await Effect.runPromise(
+      listPeoplePageProgram([], { q: `linus-${tag}`, limit: 50 }),
+    )
+    expect(peoplePage.rows.map((r) => r.id)).toEqual([person.entityId])
+    expect(peoplePage.rows[0].linkedins).toEqual([
+      `linkedin.com/in/linus-${tag}`,
+      `linkedin.com/in/linus-second-${tag}`,
+    ])
+    expect(peoplePage.rows[0].values).not.toHaveProperty('linkedin')
+
+    const companiesPage = await Effect.runPromise(
+      listCompaniesPageProgram([], {
+        q: `linkedin.com/company/orbit-${tag}`,
+        limit: 50,
+      }),
+    )
+    expect(companiesPage.rows.map((r) => r.id)).toEqual([company.entityId])
+    expect(companiesPage.rows[0].linkedins).toEqual([
+      `linkedin.com/company/orbit-${tag}`,
+    ])
+  })
+})

@@ -193,35 +193,6 @@ exports[`schemaFor > compiles the company registry — the deck reader's output 
       "title": "Funding stage",
       "type": "object",
     },
-    "linkedin": {
-      "additionalProperties": false,
-      "properties": {
-        "confidence": {
-          "maximum": 1,
-          "minimum": 0,
-          "type": "number",
-        },
-        "refs": {
-          "description": "Refs of the context items this value was read from",
-          "items": {
-            "type": "string",
-          },
-          "type": "array",
-        },
-        "value": {
-          "format": "uri",
-          "maxLength": 500,
-          "type": "string",
-        },
-      },
-      "required": [
-        "value",
-        "refs",
-        "confidence",
-      ],
-      "title": "LinkedIn",
-      "type": "object",
-    },
     "location": {
       "additionalProperties": false,
       "properties": {
