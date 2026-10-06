@@ -4,6 +4,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   jsonb,
   uuid,
@@ -76,10 +77,13 @@ export const credential = pgTable(
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
   },
   (t) => [
-    // One credential per (scope, provider) per user. Workspace rows have
-    // null user_id and Postgres treats nulls as distinct, so this index does
-    // not make them unique — and no other index does.
-    uniqueIndex('credential_user_unique').on(t.scope, t.provider, t.userId),
+    // One credential per (scope, provider, user): a user row per user, and
+    // one workspace row per provider. NULLS NOT DISTINCT is what makes the
+    // workspace row's null user_id collide — and what `storeCredential`'s
+    // ON CONFLICT targets for both scopes.
+    unique('credential_user_unique')
+      .on(t.scope, t.provider, t.userId)
+      .nullsNotDistinct(),
   ],
 )
 

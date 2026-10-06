@@ -421,6 +421,13 @@
       "when": 1791267547662,
       "tag": "0059_person_companies_attribute",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791269741136,
+      "tag": "0060_credential_unique_nulls",
+      "breakpoints": true
     }
   ]
 }

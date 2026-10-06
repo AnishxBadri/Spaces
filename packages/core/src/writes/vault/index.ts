@@ -72,12 +72,10 @@ function workspaceRow(provider: string) {
 }
 
 /**
- * Writes (or replaces) one credential. A user row upserts on its unique
- * index; a workspace row cannot, because `credential_user_unique` covers
- * `(scope, provider, user_id)` and Postgres treats the workspace row's null
- * `user_id` as distinct from every other null — `ON CONFLICT` never fires, and
- * a second save would add a second row that resolution could pick instead of
- * the new one. So the workspace path locks its row and updates it in place.
+ * Writes (or replaces) one credential: one upsert on `credential_user_unique`
+ * for both scopes. The constraint is NULLS NOT DISTINCT, so a workspace row's
+ * null `user_id` conflicts like a user's id does, and two first-time saves
+ * racing each other leave one row holding the later key.
  */
 export async function storeCredential(rawInput: CredentialInput) {
   const input = credentialInput.parse(rawInput)
@@ -87,45 +85,11 @@ export async function storeCredential(rawInput: CredentialInput) {
   )
   const meta = input.meta ?? {}
 
-  if (input.scope === 'workspace') {
-    const id = await db.transaction(async (tx) => {
-      const existing = (
-        await tx
-          .select({ id: credential.id })
-          .from(credential)
-          .where(workspaceRow(input.provider))
-          .limit(1)
-          .for('update')
-      ).at(0)
-      if (existing) {
-        await tx
-          .update(credential)
-          .set({ kind: input.kind, secretEnc, meta, status: 'active' })
-          .where(eq(credential.id, existing.id))
-        return existing.id
-      }
-      const [row] = await tx
-        .insert(credential)
-        .values({
-          scope: 'workspace',
-          userId: null,
-          provider: input.provider,
-          kind: input.kind,
-          secretEnc,
-          meta,
-          createdBy: input.createdBy,
-        })
-        .returning({ id: credential.id })
-      return row.id
-    })
-    return { id, display: redact(input.secret) }
-  }
-
   const [row] = await db
     .insert(credential)
     .values({
       scope: input.scope,
-      userId: input.userId,
+      userId: input.scope === 'workspace' ? null : input.userId,
       provider: input.provider,
       kind: input.kind,
       secretEnc,
@@ -134,7 +98,7 @@ export async function storeCredential(rawInput: CredentialInput) {
     })
     .onConflictDoUpdate({
       target: [credential.scope, credential.provider, credential.userId],
-      set: { secretEnc, meta, status: 'active' },
+      set: { kind: input.kind, secretEnc, meta, status: 'active' },
     })
     .returning({ id: credential.id })
   return { id: row.id, display: redact(input.secret) }
