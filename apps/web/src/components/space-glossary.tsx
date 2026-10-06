@@ -37,7 +37,7 @@ export function SpaceGlossary({
         <TermRow key={t.id} term={t} />
       ))}
       {adding ? (
-        <li className="border-b border-rule py-3">
+        <li className="border-b border-rule px-3 py-3">
           <TermForm
             spaceId={spaceId}
             onDone={() => {
@@ -52,12 +52,12 @@ export function SpaceGlossary({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 text-left transition-colors hover:bg-bone"
+            className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left transition-colors hover:bg-bone"
           >
             <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
               +
             </span>
-            <span className="min-w-0 flex-1 truncate text-ui text-graphite">
+            <span className="min-w-0 flex-1 truncate text-body text-graphite">
               {terms.length === 0 ? 'Define a term…' : 'Define another…'}
             </span>
             <kbd className="shrink-0 mono text-micro text-graphite">↵</kbd>
@@ -75,7 +75,7 @@ function TermRow({ term }: { term: Term }) {
 
   if (editing) {
     return (
-      <li className="border-b border-rule py-3">
+      <li className="border-b border-rule px-3 py-3">
         <TermForm
           spaceId={term.spaceId}
           existing={term}
@@ -90,12 +90,12 @@ function TermRow({ term }: { term: Term }) {
   }
 
   return (
-    <li className="group flex flex-col gap-1 border-b border-rule py-2.5">
+    <li className="group flex flex-col gap-1 border-b border-rule px-3 py-2.5">
       <div className="flex items-baseline gap-2.5">
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="focus-ring text-ui font-medium hover:underline"
+          className="focus-ring text-body font-medium hover:underline"
         >
           {term.name}
         </button>

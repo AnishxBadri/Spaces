@@ -103,8 +103,8 @@ function SpacesPage() {
                 <Link
                   to="/spaces/$spaceId"
                   params={{ spaceId: s.id }}
-                  className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 transition-colors hover:bg-bone"
-                  style={{ paddingLeft: `${s.depth * 24}px` }}
+                  className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 pr-3 transition-colors hover:bg-bone"
+                  style={{ paddingLeft: `${12 + s.depth * 24}px` }}
                 >
                   {s.depth > 0 ? (
                     <span className="w-3.5 shrink-0 text-center mono text-label text-graphite">
@@ -118,7 +118,7 @@ function SpacesPage() {
                   )}
                   <span
                     className={cn(
-                      'min-w-0 flex-1 truncate text-ui',
+                      'min-w-0 flex-1 truncate text-body',
                       s.depth === 0 && 'font-medium',
                     )}
                   >
@@ -135,12 +135,12 @@ function SpacesPage() {
               <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 text-left transition-colors hover:bg-bone"
+                className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 text-left transition-colors hover:bg-bone"
               >
                 <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
                   +
                 </span>
-                <span className="min-w-0 flex-1 truncate text-ui text-graphite">
+                <span className="min-w-0 flex-1 truncate text-body text-graphite">
                   New space… nest it under a parent, or stamp a saved breakdown
                 </span>
                 <span className="shrink-0 text-graphite">

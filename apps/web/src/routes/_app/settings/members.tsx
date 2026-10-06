@@ -111,7 +111,7 @@ function MembersSection({
         {members.map((m) => (
           <li
             key={m.id}
-            className="flex h-12 items-center gap-3 border-b border-rule"
+            className="flex h-12 items-center gap-3 border-b border-rule px-3"
           >
             <InitialsMark name={m.name} />
             <span className="min-w-0 flex-1">
@@ -236,7 +236,7 @@ function MembersSection({
               {invites.map((inv) => (
                 <li
                   key={inv.id}
-                  className="flex h-8 items-center gap-2 border-b border-rule mono text-micro text-graphite"
+                  className="flex h-8 items-center gap-2 border-b border-rule px-3 mono text-micro text-graphite"
                 >
                   <span className="min-w-0 flex-1 truncate">
                     {inv.email ?? 'open link'} · {inv.role} · expires{' '}

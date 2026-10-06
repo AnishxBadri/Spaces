@@ -136,7 +136,7 @@ function PreviewBody({ doc }: { doc: Doc }) {
           `-mx-5 -mt-5` breakout must be cancelled here or the head hangs
           20px outside the sheet (2026-09-30). Serif name, mono context
           beside it, the one action in the right lane before `esc`. */}
-      <DialogHeader className="mx-0 mt-0 mb-0 h-11 shrink-0 flex-nowrap items-center gap-3 py-0 pr-14 pl-5">
+      <DialogHeader className="mx-0 mt-0 mb-0 h-12 shrink-0 flex-nowrap items-center gap-3 py-0 pr-14 pl-5">
         <DialogTitle className="min-w-0 truncate text-title leading-5">
           {doc.filename}
         </DialogTitle>

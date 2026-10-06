@@ -74,7 +74,7 @@ function DialogContent({
           // head's right lane.
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="focus-ring absolute top-[0.9375rem] right-5 mono text-micro text-graphite transition-colors duration-150 hover:text-foreground disabled:pointer-events-none"
+            className="focus-ring absolute top-4 right-5 mono text-micro text-graphite transition-colors duration-150 hover:text-foreground disabled:pointer-events-none"
           >
             esc<span className="sr-only">ape — close</span>
           </DialogPrimitive.Close>
@@ -88,9 +88,10 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="dialog-header"
-      // 44px head: serif title, mono context beside it, hairline under.
+      // 48px head on bone: serif title, mono context beside it, hairline
+      // under. The body below stays paper.
       className={cn(
-        '-mx-5 -mt-5 mb-5 flex min-h-11 flex-row flex-wrap items-baseline gap-x-2.5 border-b border-hairline px-5 py-[0.6875rem] pr-14 text-left',
+        '-mx-5 -mt-5 mb-5 flex min-h-12 flex-row flex-wrap items-baseline gap-x-2.5 border-b border-hairline bg-bone px-5 py-3 pr-14 text-left',
         className,
       )}
       {...props}

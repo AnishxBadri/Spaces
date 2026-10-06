@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { backfillConfirmOptions, confirmThenStart } from './embed-backfill-flow'
 import { SettingsRow, SettingsSection } from './settings-section'
+import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { Input } from '#/components/ui/input'
@@ -203,13 +204,12 @@ export function EmbeddingsSection({
       blurb="Which model turns text into vectors for search. Search reads only the pinned model's vectors."
       crumb="Data & AI"
     >
-      <div className="flex flex-col pt-5">
-        <div className="flex items-baseline gap-3 border-b border-hairline pb-2">
-          <h3 className="label-caps text-foreground">Pin</h3>
-          <span className="mono text-micro text-graphite">
-            {pin ? pinHeadline(pin) : NO_PIN_HEADLINE}
-          </span>
-        </div>
+      <div className="flex flex-col pt-8">
+        <SectionHead
+          as="h3"
+          title="Pin"
+          count={pin ? pinHeadline(pin) : NO_PIN_HEADLINE}
+        />
 
         <SettingsRow
           label="Provider"
@@ -229,7 +229,7 @@ export function EmbeddingsSection({
           />
         </SettingsRow>
 
-        <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
+        <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 field-label leading-4 text-graphite">
           <span className="w-5 shrink-0" />
           <span className="w-56 shrink-0">Model</span>
           <span className="w-20 shrink-0">Emits</span>
@@ -310,7 +310,7 @@ export function EmbeddingsSection({
           </SettingsRow>
         )}
 
-        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule py-2">
+        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule px-3 py-2">
           {error ? (
             <span
               role="alert"
@@ -343,7 +343,7 @@ export function EmbeddingsSection({
         {result ? (
           <div
             role="status"
-            className="flex min-h-9 items-start gap-3 border-b border-rule py-2"
+            className="flex min-h-9 items-start gap-3 border-b border-rule px-3 py-2"
           >
             <span
               className={cn(
@@ -365,7 +365,7 @@ export function EmbeddingsSection({
           </div>
         ) : null}
 
-        <div className="flex h-8 items-center justify-between">
+        <div className="flex h-8 items-center justify-between px-3">
           <span className="label-caps font-normal text-graphite">
             {PIN_DIMS} dimensions · admin only
           </span>
@@ -476,12 +476,12 @@ function Backfill({
 
   return (
     <>
-      <div className="flex items-baseline gap-3 border-b border-hairline pt-5 pb-2">
-        <h3 className="label-caps text-foreground">Backfill</h3>
-        <span className="tabular mono text-micro text-graphite">
-          {runLine(view)}
-        </span>
-      </div>
+      <SectionHead
+        as="h3"
+        title="Backfill"
+        count={<span className="tabular">{runLine(view)}</span>}
+        className="mt-8"
+      />
       <SettingsRow
         label="Embed what is stored"
         hint={
@@ -516,7 +516,7 @@ function Backfill({
         </Button>
       </SettingsRow>
       {error || run.state === 'failed' ? (
-        <div className="flex min-h-9 items-center border-b border-rule py-2">
+        <div className="flex min-h-9 items-center border-b border-rule px-3 py-2">
           <span role="alert" className="mono text-micro text-destructive">
             {error ?? (run.state === 'failed' ? run.reason : null)}
           </span>
@@ -592,16 +592,18 @@ function SensitiveSlot({
 
   return (
     <>
-      <div className="flex items-baseline gap-3 border-b border-hairline pt-5 pb-2">
-        <h3 className="label-caps text-foreground">Sensitive slot</h3>
-        <span className="mono text-micro text-graphite">
-          {pinLocal
+      <SectionHead
+        as="h3"
+        title="Sensitive slot"
+        count={
+          pinLocal
             ? LOCAL_PIN_HEADLINE
             : slot
               ? slotHeadline(slot)
-              : NO_SLOT_HEADLINE}
-        </span>
-      </div>
+              : NO_SLOT_HEADLINE
+        }
+        className="mt-8"
+      />
       {pinLocal ? null : candidate === null ? (
         <SettingsRow
           label="Local model"
@@ -632,7 +634,7 @@ function SensitiveSlot({
         </SettingsRow>
       )}
       {error ? (
-        <div className="flex min-h-9 items-center border-b border-rule py-2">
+        <div className="flex min-h-9 items-center border-b border-rule px-3 py-2">
           <span role="alert" className="mono text-micro text-destructive">
             {error}
           </span>
@@ -662,7 +664,7 @@ function ModelRow({
         aria-checked={on}
         onClick={onChoose}
         className={cn(
-          'focus-ring-inset flex h-row w-full items-center gap-3 text-left transition-colors',
+          'focus-ring-inset flex h-row w-full items-center gap-3 px-3 text-left transition-colors',
           on ? 'bg-selected' : 'hover:bg-bone',
         )}
       >
@@ -703,7 +705,7 @@ function GreyedModelRow({ model }: { model: EmbeddingModelInfo }) {
   return (
     <li
       aria-disabled="true"
-      className="flex h-row items-center gap-3 border-b border-rule bg-bone-deep text-graphite"
+      className="flex h-row items-center gap-3 border-b border-rule bg-bone-deep px-3 text-graphite"
     >
       <span className="w-5 shrink-0" />
       <span className="w-56 shrink-0 truncate mono text-label">{model.id}</span>

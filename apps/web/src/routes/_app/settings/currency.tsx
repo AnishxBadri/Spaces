@@ -5,6 +5,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from '#/components/settings/settings-section'
+import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { setBaseCurrency, setFxRate } from '#/lib/server-fns'
@@ -131,18 +132,15 @@ function FxSection({
         ) : null}
       </SettingsRow>
 
-      <div className="flex flex-col pt-5">
-        <div className="flex items-baseline justify-between pb-2">
-          <div className="flex items-baseline gap-3">
-            <h3 className="label-caps text-foreground">Rates</h3>
-            <span className="mono text-micro text-graphite">
-              {rates.length} · sparse, dated, newest wins
-            </span>
-          </div>
-        </div>
+      <div className="flex flex-col pt-8">
+        <SectionHead
+          as="h3"
+          title="Rates"
+          count={`${rates.length} · sparse, dated, newest wins`}
+        />
 
         {/* The ledger head. */}
-        <div className="flex h-8 items-center border-y border-hairline field-label leading-4 text-graphite">
+        <div className="flex h-8 items-center border-b border-hairline px-3 field-label leading-4 text-graphite">
           <span className="w-35 shrink-0">Pair</span>
           <span className="w-40 shrink-0 pr-4 text-right">Rate</span>
           <span className="w-35 shrink-0">As of</span>
@@ -154,7 +152,7 @@ function FxSection({
             <div
               key={`${r.currency}:${r.date}`}
               className={cn(
-                'flex h-9 items-center border-b border-rule',
+                'flex h-9 items-center border-b border-rule px-3',
                 live ? 'text-foreground' : 'text-graphite',
               )}
             >
@@ -177,7 +175,7 @@ function FxSection({
         {/* The composer row: a rate is appended, never edited. */}
         <form
           onSubmit={addRate}
-          className="flex min-h-9 flex-wrap items-center gap-2 border-b border-rule py-1"
+          className="flex min-h-9 flex-wrap items-center gap-2 border-b border-rule px-3 py-1"
         >
           <span className="mono text-micro text-primary">+</span>
           <Input
@@ -223,7 +221,7 @@ function FxSection({
           ) : null}
         </form>
 
-        <div className="flex h-8 items-center justify-between">
+        <div className="flex h-8 items-center justify-between px-3">
           <span className="label-caps font-normal text-graphite">
             {rates.length} rate{rates.length === 1 ? '' : 's'} · {currencies}{' '}
             currenc{currencies === 1 ? 'y' : 'ies'}

@@ -42,8 +42,8 @@ bad; a zero reads graphite.
 inputs, `rounded-none` everywhere else — no 4, 6, 8 or 12, no pills, no circles.
 Shadows are hard offsets: popover `shadow-[2px_2px_0_0_var(--hairline)]`, dialog
 `shadow-[3px_3px_0_0_var(--hairline)]`. Nothing blurs. Spacing is 4 8 12 16 24 32 and
-the page gutter is 32 (`px-8`). Heights: table row 36 (`h-row`), ledger row 40, section
-head 44, control 32, small 26, badge 20, nav row 30, readout strip 56–64, dialog head
+the page gutter is 32 (`px-8`). Heights: table row 36 (`h-row`), ledger row 40 (`h-ledger-row`),
+section head 44, control 32, small 26, badge 20, nav row 30, readout strip 56–64, dialog head
 48, dialog foot 52.
 
 ### The named type steps (`DESIGN.md` §3)
@@ -186,7 +186,7 @@ needs.
 | primitive                                                                         | file                                                    | for                                                                                                 |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `PageHeader`, `KeyHint`, `ReadoutStrip`                                           | `apps/web/src/components/page-header.tsx`               | P1 — serif title or sentence, mono eyebrow/readout, actions right, hairline under                   |
-| `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`                      | `apps/web/src/components/ledger-section.tsx`            | P2/P3 — bone head band (title + mono count), 40px rows on rules, a fixed mono lane, value-vs-median |
+| `SectionHead`, `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`       | `apps/web/src/components/ledger-section.tsx`            | P2/P3 — bone head band (title + mono count), 40px rows on rules, a fixed mono lane, value-vs-median |
 | `RecordHeader`, `RecordBody`, `RecordSection`, `PropertyGrid`, `PropertyCell`     | `apps/web/src/components/record/record-parts.tsx`       | P7 — the record anatomy: crumb, readouts, property grid, sections                                   |
 | `RailSection`, `RailRow`, `RailItem`, `RailEmpty`, `StageStepper`                 | `apps/web/src/components/record/record-parts.tsx`       | the bone rail right of a record                                                                     |
 | `InitialsMark`, `DitherMark`, `initialsOf`                                        | `apps/web/src/components/record/record-parts.tsx`       | ink initials squares and 1-bit fallback marks                                                       |

@@ -370,7 +370,7 @@ function TodayPage() {
                       onCheckedChange={() => void complete(t.id)}
                       aria-label="Complete task"
                     />
-                    <span className="min-w-0 truncate text-ui">
+                    <span className="min-w-0 truncate text-body">
                       {t.content}
                     </span>
                     {t.entities[0] ? (
@@ -397,7 +397,7 @@ function TodayPage() {
                       className="focus-ring-inset flex h-full w-full items-center gap-3 text-left"
                     >
                       <span className="mono text-micro text-primary">+</span>
-                      <span className="min-w-0 truncate text-ui text-graphite">
+                      <span className="min-w-0 truncate text-body text-graphite">
                         Add a task…
                       </span>
                       <span className="flex-1" />
@@ -428,9 +428,9 @@ function TodayPage() {
                     <Link
                       to="/deals/$dealId"
                       params={{ dealId: d.id }}
-                      className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 hover:bg-bone"
+                      className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 hover:bg-bone"
                     >
-                      <span className="w-65 shrink-0 truncate text-ui font-medium">
+                      <span className="w-65 shrink-0 truncate text-body font-medium">
                         {d.name}
                       </span>
                       <span className="flex w-[6.875rem] shrink-0">
@@ -489,9 +489,9 @@ function TodayPage() {
                     <Link
                       to="/portfolio/$holdingId"
                       params={{ holdingId: h.id }}
-                      className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 hover:bg-bone"
+                      className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 hover:bg-bone"
                     >
-                      <span className="w-65 shrink-0 truncate text-ui font-medium">
+                      <span className="w-65 shrink-0 truncate text-body font-medium">
                         {h.companyName}
                       </span>
                       <span className="min-w-0 truncate mono text-micro text-graphite">
@@ -519,7 +519,9 @@ function TodayPage() {
           {holdings.holdings.length > 0 ? (
             <section className="flex flex-col border-b border-hairline px-6 py-5">
               <div className="flex items-baseline justify-between pb-2.5">
-                <h2 className="label-caps text-graphite">Portfolio</h2>
+                <h2 className="text-title font-medium text-foreground">
+                  Portfolio
+                </h2>
                 <span className="mono text-micro text-graphite">
                   {holdings.baseCurrency} · {holdings.holdings.length} holding
                   {holdings.holdings.length === 1 ? '' : 's'}
@@ -559,7 +561,9 @@ function TodayPage() {
           {activity.length > 0 ? (
             <section className="flex flex-col px-6 py-5">
               <div className="flex items-baseline justify-between pb-2.5">
-                <h2 className="label-caps text-graphite">Ledger</h2>
+                <h2 className="text-title font-medium text-foreground">
+                  Ledger
+                </h2>
                 <span className="mono text-micro text-graphite">
                   {activity.length} entries
                 </span>

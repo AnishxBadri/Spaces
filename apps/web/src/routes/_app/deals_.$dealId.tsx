@@ -433,7 +433,7 @@ function DealRecordPage() {
             <LogInteractionDialog
               seed={{ id: deal.id, name: deal.name, kind: 'deal' }}
               trigger={
-                <button className="focus-ring-inset flex h-row w-full items-center gap-3 border-t border-b border-rule text-left">
+                <button className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 border-b border-rule px-3 text-left">
                   <span className="mono text-micro text-primary">+</span>
                   <span className="min-w-0 truncate text-ui text-graphite">
                     Log a call, meeting, or note…

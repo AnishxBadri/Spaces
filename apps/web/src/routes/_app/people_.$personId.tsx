@@ -398,7 +398,6 @@ function PersonRecordPage() {
         {person.referencedBy.map((group) => (
           <RecordSection
             key={group.attrSlug}
-            rule
             label={group.label}
             meta={`${group.items.length}`}
           >
@@ -421,16 +420,16 @@ function PersonRecordPage() {
                   </>
                 )
                 return (
-                  <li key={item.id} className="border-t border-rule">
+                  <li key={item.id} className="border-b border-rule">
                     {href ? (
                       <Link
                         to={href}
-                        className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
+                        className="focus-ring-inset flex h-ledger-row items-center gap-3 px-3 text-ui hover:bg-bone"
                       >
                         {body}
                       </Link>
                     ) : (
-                      <span className="flex h-row items-center gap-3 text-ui text-graphite">
+                      <span className="flex h-ledger-row items-center gap-3 px-3 text-ui text-graphite">
                         {body}
                       </span>
                     )}
@@ -449,7 +448,7 @@ function PersonRecordPage() {
             <LogInteractionDialog
               seed={{ id: person.id, name: person.name, kind: 'person' }}
               trigger={
-                <button className="focus-ring-inset flex h-row w-full items-center gap-3 border-t border-b border-rule text-left">
+                <button className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 border-b border-rule px-3 text-left">
                   <span className="mono text-micro text-primary">+</span>
                   <span className="min-w-0 truncate text-ui text-graphite">
                     Log a call, meeting, or note…

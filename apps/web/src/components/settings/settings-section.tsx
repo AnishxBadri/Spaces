@@ -24,9 +24,10 @@ import type { SettingsCrumb } from './settings-nav'
  *   - a **hairline under** the head, then the rows.
  *
  * Rows are `SettingsRow`: 48px on a rule, label and hint left, the control
- * right. A ledger inside a section (the FX rates table) takes a
- * `field-label` head on `border-y-hairline` instead, with lanes shared by
- * head and rows.
+ * right, inset to the group band's title. A group inside a section opens
+ * with `SectionHead` (the bone band, `as="h3"`), 32px below what precedes
+ * it; a ledger in a group (the FX rates table) puts a `field-label` column
+ * head under the band, with lanes shared by head and rows.
  */
 export function SettingsSection({
   title,
@@ -62,7 +63,8 @@ export function SettingsSection({
   )
 }
 
-/** One row: label + hint left, the control right. 48px on a rule. */
+/** One row: label + hint left, the control right. 48px on a rule, inset
+ *  12px so the label sits under a group band's title. */
 export function SettingsRow({
   label,
   hint,
@@ -73,7 +75,7 @@ export function SettingsRow({
   children?: ReactNode
 }) {
   return (
-    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-rule py-2">
+    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-rule px-3 py-2">
       <div className="flex min-w-0 flex-col">
         <span className="text-ui font-medium">{label}</span>
         {hint ? <span className="text-label text-graphite">{hint}</span> : null}

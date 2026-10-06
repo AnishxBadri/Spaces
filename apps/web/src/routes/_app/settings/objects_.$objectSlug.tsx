@@ -8,6 +8,7 @@ import { ObjectDialog } from '#/components/objects/object-dialog'
 import { RegistryList } from '#/components/attributes/registry-list'
 import { KeyHint } from '#/components/page-header'
 import { SettingsSection } from '#/components/settings/settings-section'
+import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import {
@@ -184,15 +185,11 @@ function ObjectAttributesPage() {
             lives in entity_alias, not in this column. */}
       {object.isSystem ? null : (
         <section className="mt-8 flex flex-col">
-          <div
-            aria-hidden
-            className="flex h-8 items-center gap-3 border-b border-hairline label-caps text-graphite"
-          >
-            <span className="min-w-0 flex-1">Identity keys</span>
-            <span className="mono text-micro">
-              {object.identityKeys.length} declared
-            </span>
-          </div>
+          <SectionHead
+            as="h3"
+            title="Identity keys"
+            count={`${object.identityKeys.length} declared`}
+          />
           {editable ? (
             <ul aria-label={`${object.plural} identity keys`}>
               {IDENTITY_KEYS.map((key) => {
@@ -200,7 +197,7 @@ function ObjectAttributesPage() {
                 const on = object.identityKeys.includes(key)
                 return (
                   <li key={key}>
-                    <label className="flex h-row cursor-pointer items-center gap-3 border-b border-rule text-ui">
+                    <label className="flex h-ledger-row cursor-pointer items-center gap-3 border-b border-rule px-3 text-body">
                       <Checkbox
                         checked={on}
                         disabled={saving !== null}
@@ -223,7 +220,7 @@ function ObjectAttributesPage() {
                 return (
                   <li
                     key={key}
-                    className="flex h-row items-center gap-3 border-b border-rule text-ui"
+                    className="flex h-ledger-row items-center gap-3 border-b border-rule px-3 text-body"
                   >
                     <span className="min-w-0 flex-1">{backing.name}</span>
                     <span className="mono text-micro text-graphite">
@@ -233,19 +230,19 @@ function ObjectAttributesPage() {
                 )
               })}
               {object.identityKeys.length === 0 ? (
-                <li className="flex h-row items-center border-b border-rule text-ui text-graphite">
+                <li className="flex h-ledger-row items-center border-b border-rule px-3 text-ui text-graphite">
                   None — records here are matched by name alone.
                 </li>
               ) : null}
             </ul>
           )}
           {object.hasRecords ? (
-            <p className="flex h-row items-center text-ui text-graphite">
+            <p className="flex h-ledger-row items-center px-3 text-ui text-graphite">
               Frozen: {object.plural} has records, and a key that justified a
               record&apos;s identity cannot be withdrawn under it.
             </p>
           ) : (
-            <p className="flex h-8 items-center mono text-micro text-graphite">
+            <p className="flex h-8 items-center px-3 mono text-micro text-graphite">
               revisable while empty · ticking one creates its attribute,
               unticking one deletes it
             </p>

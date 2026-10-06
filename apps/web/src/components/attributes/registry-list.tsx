@@ -112,7 +112,7 @@ export function RegistryList({
       <section className="flex flex-col">
         <div
           aria-hidden
-          className="flex h-8 items-center gap-3 border-b border-hairline label-caps text-graphite"
+          className="flex h-8 items-center gap-3 border-b border-hairline px-3 label-caps text-graphite"
         >
           <span className={LANE.grip} />
           <span className="min-w-0 flex-1">Attribute</span>
@@ -152,12 +152,12 @@ export function RegistryList({
             />
           ))}
           {ordered.length === 0 ? (
-            <li className="flex h-row items-center border-b border-rule text-ui text-graphite">
+            <li className="flex h-row items-center border-b border-rule px-3 text-ui text-graphite">
               No attributes yet — add the first one above.
             </li>
           ) : null}
         </ol>
-        <div className="flex h-8 items-center mono text-micro text-graphite">
+        <div className="flex h-8 items-center px-3 mono text-micro text-graphite">
           <span>{ordered.length} live · drag ⋮⋮ or ↑↓ to reorder</span>
         </div>
       </section>
@@ -168,7 +168,7 @@ export function RegistryList({
             type="button"
             aria-expanded={showArchived}
             onClick={() => setShowArchived((v) => !v)}
-            className="focus-ring-inset flex h-8 items-center gap-2 border-b border-hairline text-left"
+            className="focus-ring-inset flex h-8 items-center gap-2 border-b border-hairline px-3 text-left"
           >
             <span className="w-3 mono text-micro text-graphite">
               {showArchived ? '⌄' : '›'}
@@ -295,7 +295,7 @@ function AttributeRow({
         over && 'bg-bone',
       )}
     >
-      <div className="flex min-h-10 items-center gap-3 py-2">
+      <div className="flex min-h-10 items-center gap-3 px-3 py-2">
         <span
           aria-hidden
           className={cn(
@@ -405,7 +405,7 @@ function AttributeRow({
       </div>
 
       {hasOptions && options.length > 0 ? (
-        <div className="flex flex-wrap gap-1 pb-2.5 pl-9">
+        <div className="flex flex-wrap gap-1 pr-3 pb-2.5 pl-12">
           {options.map((o, i) => (
             <Badge
               key={o.id}

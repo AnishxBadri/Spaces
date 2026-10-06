@@ -129,7 +129,7 @@ function SpacePage() {
   const zero = (n: number) => (n === 0 ? ('muted' as const) : undefined)
 
   const rowLink =
-    'focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 transition-colors hover:bg-bone'
+    'focus-ring-inset -ml-3 flex h-full min-w-0 flex-1 items-center gap-3 pl-3 transition-colors hover:bg-bone'
 
   return (
     <div className="flex min-h-full flex-col">
@@ -345,7 +345,7 @@ function SpacePage() {
               <Link
                 to="/notes/$noteId"
                 params={{ noteId: f.id }}
-                className="focus-ring-inset flex flex-col gap-2 py-4 transition-colors hover:bg-bone"
+                className="focus-ring-inset flex flex-col gap-2 px-3 py-4 transition-colors hover:bg-bone"
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <h3 className="min-w-0 truncate text-title font-medium">
@@ -374,12 +374,12 @@ function SpacePage() {
               onClick={() =>
                 void newNote(spc.filed.length === 0 ? 'memo' : undefined)
               }
-              className={cn(rowLink, 'text-left')}
+              className={cn(rowLink, '-mr-3 pr-3 text-left')}
             >
               <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
                 +
               </span>
-              <span className="min-w-0 flex-1 truncate text-ui text-graphite">
+              <span className="min-w-0 flex-1 truncate text-body text-graphite">
                 {spc.filed.length === 0 ? 'Write the memo…' : 'File another…'}
               </span>
               <span className="shrink-0 text-graphite">
@@ -443,7 +443,7 @@ function SpacePage() {
                 className={rowLink}
               >
                 <DitherMark size={14} />
-                <span className="min-w-0 flex-1 truncate text-ui font-medium">
+                <span className="min-w-0 flex-1 truncate text-body font-medium">
                   {c.name}
                 </span>
                 {c.stage ? (
@@ -493,13 +493,13 @@ function SpacePage() {
                 <Link
                   to="/o/$objectSlug/$recordId"
                   params={{ objectSlug: r.objectSlug, recordId: r.id }}
-                  className={rowLink}
+                  className={cn(rowLink, '-mr-3 pr-3')}
                 >
                   <Boxes
                     className="size-3.5 shrink-0 text-foreground"
                     strokeWidth={1.75}
                   />
-                  <span className="min-w-0 flex-1 truncate text-ui font-medium">
+                  <span className="min-w-0 flex-1 truncate text-body font-medium">
                     {r.name}
                   </span>
                   <LedgerFigure tone="muted" wide>

@@ -5,7 +5,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from '#/components/settings/settings-section'
-import { LedgerRow } from '#/components/ledger-section'
+import { LedgerRow, SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
@@ -120,16 +120,14 @@ function ProvidersSection({
       blurb="Which model providers this workspace calls, with whose key."
       crumb="Data & AI"
     >
-      <div className="flex flex-col pt-5">
-        <div className="flex items-baseline gap-3 pb-2">
-          <h3 className="label-caps text-foreground">Providers</h3>
-          <span className="mono text-micro text-graphite">
-            {providers.filter((p) => p.configured).length} of {providers.length}{' '}
-            configured
-          </span>
-        </div>
+      <div className="flex flex-col pt-8">
+        <SectionHead
+          as="h3"
+          title="Providers"
+          count={`${providers.filter((p) => p.configured).length} of ${providers.length} configured`}
+        />
 
-        <div className="flex h-8 items-center border-y border-hairline field-label leading-4 text-graphite">
+        <div className="flex h-8 items-center border-b border-hairline px-3 field-label leading-4 text-graphite">
           <span className="w-28 shrink-0">Provider</span>
           <span className="w-24 shrink-0">Status</span>
           <span className="w-28 shrink-0">Key</span>
@@ -145,7 +143,7 @@ function ProvidersSection({
           <ProviderForm key={row.provider} row={row} />
         ))}
 
-        <div className="flex h-8 items-center justify-between">
+        <div className="flex h-8 items-center justify-between px-3">
           <span className="label-caps font-normal text-graphite">
             workspace keys · admin only
           </span>
@@ -191,7 +189,7 @@ function ProviderLedgerRow({ row }: { row: ProviderRow }) {
   const status = statusOf(row)
   return (
     <>
-      <div className="flex h-9 items-center border-b border-rule">
+      <div className="flex h-9 items-center border-b border-rule px-3">
         <span className="w-28 shrink-0 text-ui font-medium">{row.label}</span>
         <span
           className={cn(
@@ -225,7 +223,7 @@ function ProviderLedgerRow({ row }: { row: ProviderRow }) {
       {result ? (
         <div
           role="status"
-          className="flex min-h-9 items-start gap-3 border-b border-rule py-2"
+          className="flex min-h-9 items-start gap-3 border-b border-rule px-3 py-2"
         >
           <span
             className={cn(
@@ -350,7 +348,7 @@ function ProviderForm({ row }: { row: ProviderRow }) {
           className="focus-ring w-72 rounded-md border border-rule bg-paper px-2.5 py-1.5 mono text-label outline-none placeholder:text-graphite"
         />
       </SettingsRow>
-      <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule py-2">
+      <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule px-3 py-2">
         {error ? (
           <span
             role="alert"
@@ -413,20 +411,19 @@ function RoutingSection({
       blurb="Which provider and model each lane calls, at each sensitivity."
       crumb="Data & AI"
     >
-      <div className="flex flex-col pt-5">
-        <div className="flex items-baseline gap-3 pb-2">
-          <h3 className="label-caps text-foreground">Lanes</h3>
-          <span className="mono text-micro text-graphite">
-            {routed} of {AI_LANES.length * AI_SENSITIVITIES.length} routed
-          </span>
-        </div>
-        <p className="pb-3 text-label text-graphite">
+      <div className="flex flex-col pt-8">
+        <SectionHead
+          as="h3"
+          title="Lanes"
+          count={`${routed} of ${AI_LANES.length * AI_SENSITIVITIES.length} routed`}
+        />
+        <p className="px-3 py-3 text-label text-graphite">
           A lane with no model routed hides the features that use it. Sensitive
           routes must be local (Ollama). Records and spaces are marked sensitive
           on their own pages, not here.
         </p>
 
-        <div className="flex h-8 items-center gap-3 border-y border-hairline field-label leading-4 text-graphite">
+        <div className="flex h-8 items-center gap-3 border-y border-hairline px-3 field-label leading-4 text-graphite">
           <span className="w-24 shrink-0">Lane</span>
           <span className="min-w-0 flex-1" />
           {AI_SENSITIVITIES.map((s) => (
@@ -438,7 +435,7 @@ function RoutingSection({
         <ol>
           {AI_LANES.map((lane) => (
             <LedgerRow key={lane}>
-              <span className="w-24 shrink-0 text-ui font-medium capitalize">
+              <span className="w-24 shrink-0 text-body font-medium capitalize">
                 {lane}
               </span>
               <span className="min-w-0 flex-1 truncate text-label text-graphite">
@@ -457,7 +454,7 @@ function RoutingSection({
           ))}
         </ol>
 
-        <div className="flex h-8 items-center justify-between">
+        <div className="flex h-8 items-center justify-between px-3">
           <span className="label-caps font-normal text-graphite">
             lane × sensitivity · admin only
           </span>
@@ -622,11 +619,8 @@ function CapsSection({ caps, usage }: { caps: CapsView; usage: UsageToday }) {
       blurb="How many tokens the workspace may spend on AI, counted from every call's usage."
       crumb="Data & AI"
     >
-      <form onSubmit={save} className="flex flex-col pt-5">
-        <div className="flex items-baseline gap-3 border-b border-hairline pb-2">
-          <h3 className="label-caps text-foreground">Ceilings</h3>
-          <span className="mono text-micro text-graphite">{readout}</span>
-        </div>
+      <form onSubmit={save} className="flex flex-col pt-8">
+        <SectionHead as="h3" title="Ceilings" count={readout} />
         <SettingsRow
           label="Daily tokens"
           hint="Tokens in and out across every lane, per UTC day. Blank is no cap."
@@ -661,7 +655,7 @@ function CapsSection({ caps, usage }: { caps: CapsView; usage: UsageToday }) {
             className="w-40 mono"
           />
         </SettingsRow>
-        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule py-2">
+        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule px-3 py-2">
           {error ? (
             <span
               role="alert"
@@ -689,7 +683,7 @@ function CapsSection({ caps, usage }: { caps: CapsView; usage: UsageToday }) {
               : `${tokens(usage.used)} of ${tokens(caps.dailyTokens)} tokens`}
           </span>
         </SettingsRow>
-        <div className="flex h-8 items-center justify-between">
+        <div className="flex h-8 items-center justify-between px-3">
           <span className="label-caps font-normal text-graphite">
             tokens per workspace · admin only
           </span>

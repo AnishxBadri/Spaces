@@ -103,7 +103,7 @@ function NotesPage() {
           }
         />
       ) : (
-        <div className="flex flex-col gap-6 px-8 pt-6 pb-8">
+        <div className="flex flex-col gap-8 px-8 pt-6 pb-8">
           {thisWeek.length > 0 ? (
             <LedgerSection
               label="This week"
@@ -134,13 +134,13 @@ function NoteLedgerRow({ note }: { note: NoteRow }) {
       <Link
         to="/notes/$noteId"
         params={{ noteId: note.id }}
-        className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 transition-colors hover:bg-bone"
+        className="focus-ring-inset -mx-3 flex h-full min-w-0 flex-1 items-center gap-3 px-3 transition-colors hover:bg-bone"
       >
         <FileText
           className="size-3.5 shrink-0 text-foreground"
           strokeWidth={1.75}
         />
-        <span className="max-w-[40%] shrink-0 truncate text-ui font-medium">
+        <span className="max-w-[40%] shrink-0 truncate text-body font-medium">
           {note.title}
         </span>
         <span className="min-w-0 flex-1 truncate text-ui text-graphite">

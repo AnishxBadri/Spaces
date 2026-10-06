@@ -2,11 +2,59 @@ import type { ReactNode } from 'react'
 import { cn } from '#/lib/utils'
 
 /**
- * P2 — Ledger section (Instrument, 2026-09-10). Caps label + mono count
- * left, one mono link right, hairline under the head. Rows are 36px on
- * rules; the last row may be a composer. The section is a list, so the
- * rows are `<li>`s and the caller decides what a row is (a link, a task
- * with its checkbox, a composer trigger).
+ * The section head band (the Separation Rule): a hairline opens the section,
+ * then 44px of bone with a rule under. Title in sentence case at the title
+ * step, a mono count beside it, the head's one action right. `LedgerSection`,
+ * `RecordSection` and a group inside a settings section all draw this band.
+ */
+export function SectionHead({
+  title,
+  count,
+  action,
+  as: Heading = 'h2',
+  className,
+}: {
+  title: ReactNode
+  /** Mono readout beside the title — "5 · 2 overdue". */
+  count?: ReactNode
+  /** The head's one action, mono, right. */
+  action?: ReactNode
+  /** `h3` for a group inside a section that already has a heading. */
+  as?: 'h2' | 'h3' | undefined
+  className?: string | undefined
+}) {
+  return (
+    <div
+      className={cn(
+        'flex h-11 shrink-0 items-center justify-between gap-4 border-t border-b border-t-hairline border-b-rule bg-bone px-3',
+        className,
+      )}
+    >
+      <div className="flex min-w-0 items-baseline gap-3">
+        <Heading className="min-w-0 truncate text-title font-medium text-foreground">
+          {title}
+        </Heading>
+        {count ? (
+          <span className="shrink-0 mono text-micro text-graphite">
+            {count}
+          </span>
+        ) : null}
+      </div>
+      {action ? (
+        <div className="flex shrink-0 items-baseline gap-3 mono text-micro text-graphite">
+          {action}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * P2 — Ledger section. The bone head band (title + mono count left, one
+ * mono link right), then 40px rows on rules; the last row may be a
+ * composer. The section is a list, so the rows are `<li>`s and the caller
+ * decides what a row is (a link, a task with its checkbox, a composer
+ * trigger).
  */
 export function LedgerSection({
   label,
@@ -25,17 +73,7 @@ export function LedgerSection({
 }) {
   return (
     <section className={cn('flex flex-col', className)}>
-      <div className="flex items-baseline justify-between border-b border-hairline pb-2">
-        <div className="flex items-baseline gap-3">
-          <h2 className="label-caps text-foreground">{label}</h2>
-          {count ? (
-            <span className="mono text-micro text-graphite">{count}</span>
-          ) : null}
-        </div>
-        {link ? (
-          <div className="mono text-micro text-graphite">{link}</div>
-        ) : null}
-      </div>
+      <SectionHead title={label} count={count} action={link} />
       <ol>{children}</ol>
     </section>
   )
@@ -55,7 +93,11 @@ export function rowWashClass(wash: boolean | undefined): string {
   return wash === true ? 'row-wash' : ''
 }
 
-/** A 36px row on a rule. `last` drops the rule so a composer can follow. */
+/**
+ * A 40px ledger row on a rule, inset to the head band's title. The primary
+ * is body (14) in ink, with at most one graphite meta line. `last` drops the
+ * rule so a composer can follow.
+ */
 export function LedgerRow({
   children,
   className,
@@ -71,7 +113,7 @@ export function LedgerRow({
   return (
     <li
       className={cn(
-        'flex h-row items-center gap-3',
+        'flex h-ledger-row items-center gap-3 px-3',
         !last && 'border-b border-rule',
         rowWashClass(wash),
         className,

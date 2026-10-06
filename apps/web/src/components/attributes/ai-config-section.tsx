@@ -8,6 +8,7 @@ import {
   readAiConfig,
 } from '@spaces/core/ai/attribute-ai'
 import type { AiAttributeMode } from '@spaces/core/ai/attribute-ai'
+import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Segmented } from '#/components/ui/segmented'
 import { updateAttribute } from '#/lib/server-fns'
@@ -27,8 +28,8 @@ import type { RegistryAttr } from './registry-list'
  * attribute whose type holds none is not listed. The program refuses the
  * rest anyway; the panel just never offers them.
  *
- * Laid out as the Identity keys ledger below the registry: a caps head on a
- * hairline, one row per attribute on a rule, the editor opening under its
+ * Laid out as the Identity keys ledger below the registry: the bone head
+ * band, one row per attribute on a rule, the editor opening under its
  * row. Reshaping is admin-owned, like every other attribute setting.
  */
 
@@ -56,19 +57,20 @@ export function AiConfigSection({
   if (eligible.length === 0) return null
   return (
     <section className="mt-8 flex flex-col">
-      <div
-        aria-hidden
-        className="flex h-8 items-center gap-3 border-b border-hairline label-caps text-graphite"
-      >
-        <span className="min-w-0 flex-1">AI attributes</span>
-        <span className="mono text-micro">{configured} configured</span>
-      </div>
+      <SectionHead
+        as="h3"
+        title="AI attributes"
+        count={`${configured} configured`}
+      />
       <ul aria-label={`${objectPlural} AI attributes`}>
         {eligible.map((attr) => {
           const ai = readAiConfig(attr)
           return (
-            <li key={attr.id} className="flex flex-col border-b border-rule">
-              <div className="flex h-row items-center gap-3 text-ui">
+            <li
+              key={attr.id}
+              className="flex flex-col border-b border-rule px-3"
+            >
+              <div className="flex h-ledger-row items-center gap-3 text-body">
                 <span className="min-w-0 flex-1 truncate">{attr.name}</span>
                 <span className="mono text-micro text-graphite">
                   {TYPE_LABELS[attr.type] ?? attr.type}
@@ -107,7 +109,7 @@ export function AiConfigSection({
           )
         })}
       </ul>
-      <p className="flex h-8 items-center mono text-micro text-graphite">
+      <p className="flex h-8 items-center px-3 mono text-micro text-graphite">
         manual, per cell · every answer lands in the inbox as a suggestion ·
         types are unchanged
       </p>

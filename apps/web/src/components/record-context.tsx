@@ -89,7 +89,7 @@ export function RecordContext({ entityId }: { entityId: string }) {
               never falls back to words (lib/ai/similar.ts), so a switch
               that could only ever return nothing is not offered. */}
           {query.data?.similarAvailable === true ? (
-            <div className="flex h-row items-center border-b border-rule">
+            <div className="flex h-ledger-row items-center border-b border-rule px-3">
               <Switch
                 checked={similar}
                 disabled={query.isFetching}
@@ -175,7 +175,7 @@ function ContextGroup({
   if (rows.length === 0) return null
   return (
     <li>
-      <div className="flex h-row items-end gap-3 border-b border-rule pb-1">
+      <div className="flex h-row items-end gap-3 border-b border-rule px-3 pb-1">
         <span className="label-caps text-label text-graphite">{label}</span>
         <span className="mono text-micro text-graphite">{rows.length}</span>
       </div>
@@ -196,7 +196,7 @@ function ContextRow({ item }: { item: RecordContextItem }) {
   const line = item.text.split('\n')[0] ?? item.text
   return (
     <LedgerRow>
-      <span className="min-w-0 flex-1 truncate text-ui" title={item.text}>
+      <span className="min-w-0 flex-1 truncate text-body" title={item.text}>
         {line}
       </span>
       <span

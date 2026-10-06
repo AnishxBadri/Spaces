@@ -110,7 +110,7 @@ export function SpaceContacts({
         {inherited.length > 0 ? (
           <li>
             <details className="group/inherited">
-              <summary className="focus-ring flex h-row cursor-pointer list-none items-center gap-2 border-b border-rule mono text-micro text-graphite transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+              <summary className="focus-ring flex h-ledger-row cursor-pointer list-none items-center gap-2 border-b border-rule px-3 mono text-micro text-graphite transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
                 <ChevronRight
                   className="size-3 shrink-0 transition-transform group-open/inherited:rotate-90"
                   strokeWidth={2}
@@ -159,10 +159,10 @@ function ContactRow({
       <Link
         to="/people/$personId"
         params={{ personId: contact.id }}
-        className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 transition-colors hover:bg-bone"
+        className="focus-ring-inset -ml-3 flex h-full min-w-0 flex-1 items-center gap-3 pl-3 transition-colors hover:bg-bone"
       >
         <InitialsMark name={contact.name} outline />
-        <span className="min-w-0 flex-1 truncate text-ui font-medium">
+        <span className="min-w-0 flex-1 truncate text-body font-medium">
           {contact.name}
         </span>
         <span className="min-w-0 shrink truncate text-right mono text-micro text-graphite max-md:hidden">
@@ -204,10 +204,12 @@ function InheritedContactRow({ contact }: { contact: InheritedContact }) {
       <Link
         to="/people/$personId"
         params={{ personId: contact.id }}
-        className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-3 transition-colors hover:bg-bone"
+        className="focus-ring-inset -ml-3 flex h-full min-w-0 flex-1 items-center gap-3 pl-3 transition-colors hover:bg-bone"
       >
         <InitialsMark name={contact.name} outline />
-        <span className="min-w-0 flex-1 truncate text-ui">{contact.name}</span>
+        <span className="min-w-0 flex-1 truncate text-body">
+          {contact.name}
+        </span>
         {contact.headline ? (
           <span className="min-w-0 shrink truncate text-right mono text-micro text-graphite max-md:hidden">
             {contact.headline}

@@ -131,9 +131,14 @@
      Nothing rounder exists — no pills, no circles (Instrument, 2026-09). */
   --radius: 0.125rem;
 
-  /* Row rhythm — the ledger's baseline. Header and body rows share a height so
-     a sticky header sits flush against the first row. */
+  /* Row rhythm.
+     - `--row-h` is the record table's row: header and body share it so a
+       sticky header sits flush against the first row. The table is a
+       spreadsheet and keeps 36.
+     - `--ledger-row-h` is every ledger's row — record sections, Today,
+       settings ledgers — and the composer row that ends one. */
   --row-h: 2.25rem;
+  --ledger-row-h: 2.5rem;
 
   /* The z-index scale (DESIGN.md, Interaction Engineering): five values, no
      others. Anything that needs local ordering isolates instead of climbing.
@@ -192,6 +197,7 @@
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 
   --spacing-row: var(--row-h);
+  --spacing-ledger-row: var(--ledger-row-h);
 
   --color-paper: var(--paper);
   --color-bone: var(--bone);

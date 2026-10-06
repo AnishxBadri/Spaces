@@ -198,7 +198,6 @@ export function RecordFiles({
       className="flex flex-col"
     >
       <RecordSection
-        rule
         label="Files"
         meta={
           documents.length === 0
@@ -232,7 +231,7 @@ export function RecordFiles({
             {pending.map((p) => (
               <li
                 key={p.key}
-                className="flex h-9 items-center gap-2.5 border-t border-rule text-ui"
+                className="flex h-9 items-center gap-2.5 border-t border-rule px-3 text-ui first:border-t-0"
               >
                 <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper">
                   {p.error ? (
@@ -359,7 +358,7 @@ function DocumentRow({
   }
 
   return (
-    <li className="group flex min-h-9 items-center gap-2.5 border-t border-rule py-1 text-ui">
+    <li className="group flex min-h-9 items-center gap-2.5 border-t border-rule px-3 py-1 text-ui first:border-t-0">
       <DocumentTile kind={doc.kind} filename={doc.filename} />
       <div className="flex min-w-0 flex-1 flex-col">
         <button

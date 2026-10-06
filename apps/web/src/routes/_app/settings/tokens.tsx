@@ -6,6 +6,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from '#/components/settings/settings-section'
+import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
@@ -145,7 +146,7 @@ function TokensRoute() {
         {error ? (
           <p
             role="alert"
-            className="border-b border-rule py-2 mono text-micro text-destructive"
+            className="border-b border-rule px-3 py-2 mono text-micro text-destructive"
           >
             {error}
           </p>
@@ -154,15 +155,14 @@ function TokensRoute() {
 
       {created ? <CreatedStrip created={created} /> : null}
 
-      <div className="flex flex-col pt-5">
-        <div className="flex items-baseline gap-3 pb-2">
-          <h3 className="label-caps text-foreground">Your tokens</h3>
-          <span className="mono text-micro text-graphite">
-            {live} live · {tokens.length - live} revoked
-          </span>
-        </div>
+      <div className="flex flex-col pt-8">
+        <SectionHead
+          as="h3"
+          title="Your tokens"
+          count={`${live} live · ${tokens.length - live} revoked`}
+        />
 
-        <div className="flex h-8 items-center border-y border-hairline field-label leading-4 text-graphite">
+        <div className="flex h-8 items-center border-b border-hairline px-3 field-label leading-4 text-graphite">
           <span className="min-w-0 flex-1">Name</span>
           <span className="w-32 shrink-0">Token</span>
           <span className="w-40 shrink-0">Scopes</span>
@@ -171,7 +171,7 @@ function TokensRoute() {
           <span className="w-16 shrink-0" />
         </div>
         {tokens.length === 0 ? (
-          <p className="border-b border-rule py-3 text-label text-graphite">
+          <p className="border-b border-rule px-3 py-3 text-label text-graphite">
             None yet. Create one above and paste it into your assistant’s MCP
             settings.
           </p>
@@ -180,7 +180,7 @@ function TokensRoute() {
             <div
               key={t.id}
               className={cn(
-                'flex h-9 items-center border-b border-rule',
+                'flex h-9 items-center border-b border-rule px-3',
                 t.revokedAt && 'text-graphite',
               )}
             >
@@ -222,7 +222,7 @@ function TokensRoute() {
           ))
         )}
 
-        <div className="flex h-8 items-center justify-between">
+        <div className="flex h-8 items-center justify-between px-3">
           <span className="label-caps font-normal text-graphite">
             yours only · read as you
           </span>

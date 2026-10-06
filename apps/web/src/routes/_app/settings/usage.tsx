@@ -1,5 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
+import { SectionHead } from '#/components/ledger-section'
 import { SettingsSection } from '#/components/settings/settings-section'
 import { SUGGESTION_KIND_WORD } from '#/components/inbox/suggestion-card'
 import { formatNumber } from '@spaces/core/format'
@@ -69,14 +70,13 @@ function UsageRoute() {
       blurb="Every AI action as a run: what it read, which models it called, what it cost and what it proposed."
       crumb="Data & AI"
     >
-      <div className="flex flex-col pt-5">
-        <div className="flex items-baseline gap-3 pb-2">
-          <h3 className="label-caps text-foreground">Runs</h3>
-          <span className="mono text-micro text-graphite">
-            {usage.runs.length} listed · {formatNumber(spent)} tokens
-          </span>
-        </div>
-        <div className="flex h-8 items-center gap-3 border-y border-hairline field-label leading-4 text-graphite">
+      <div className="flex flex-col pt-8">
+        <SectionHead
+          as="h3"
+          title="Runs"
+          count={`${usage.runs.length} listed · ${formatNumber(spent)} tokens`}
+        />
+        <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 field-label leading-4 text-graphite">
           <span className="min-w-0 flex-1">Task</span>
           <span className="w-36 shrink-0">Record</span>
           <span className="w-28 shrink-0">Who</span>
@@ -86,7 +86,7 @@ function UsageRoute() {
           <span className="w-36 shrink-0 text-right">Suggestions</span>
         </div>
         {usage.runs.length === 0 ? (
-          <p className="border-b border-rule py-3 text-label text-graphite">
+          <p className="border-b border-rule px-3 py-3 text-label text-graphite">
             No runs yet. Read a deck, summarize a document or suggest spaces,
             and each shows here as one run.
           </p>
@@ -98,7 +98,7 @@ function UsageRoute() {
       </div>
 
       {asked === null ? null : run === null ? (
-        <p className="mt-5 border-y border-rule py-3 text-label text-graphite">
+        <p className="mt-5 border-y border-rule px-3 py-3 text-label text-graphite">
           That run is not in the log.
         </p>
       ) : (
@@ -136,7 +136,7 @@ function RunRow({ run, open }: { run: RunItem; open: boolean }) {
       search={open ? {} : { run: run.id }}
       aria-current={open ? 'true' : undefined}
       className={cn(
-        'focus-ring-inset flex h-9 items-center gap-3 border-b border-rule hover:bg-bone',
+        'focus-ring-inset flex h-9 items-center gap-3 border-b border-rule px-3 hover:bg-bone',
         open && 'bg-bone',
       )}
     >
@@ -174,7 +174,9 @@ function RunPanel({ detail }: { detail: RunDetail }) {
     <div className="mt-5 flex flex-col border border-rule">
       <div className="flex items-baseline justify-between gap-3 border-b border-rule bg-bone px-3 py-2">
         <div className="flex min-w-0 items-baseline gap-3">
-          <h3 className="label-caps text-foreground">Run · {run.task}</h3>
+          <h3 className="min-w-0 truncate text-title font-medium text-foreground">
+            Run · {run.task}
+          </h3>
           <span className="truncate mono text-micro text-graphite">
             {run.who} · {stamp(run.startedAt)}
             {run.finishedAt ? ` → ${stamp(run.finishedAt)}` : ' · unfinished'}
@@ -353,13 +355,12 @@ function StepRow({ step, index }: { step: RunStep; index: number }) {
 function LoneCalls({ calls }: { calls: ReadonlyArray<LoneCall> }) {
   return (
     <div className="flex flex-col pt-8">
-      <div className="flex items-baseline gap-3 pb-2">
-        <h3 className="label-caps text-foreground">Calls outside a run</h3>
-        <span className="mono text-micro text-graphite">
-          {calls.length} · the settings Test call
-        </span>
-      </div>
-      <div className="flex h-8 items-center gap-3 border-y border-hairline field-label leading-4 text-graphite">
+      <SectionHead
+        as="h3"
+        title="Calls outside a run"
+        count={`${calls.length} · the settings Test call`}
+      />
+      <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 field-label leading-4 text-graphite">
         <span className="w-20 shrink-0">Lane</span>
         <span className="min-w-0 flex-1">Provider · model</span>
         <span className="w-28 shrink-0">Who</span>
@@ -367,14 +368,14 @@ function LoneCalls({ calls }: { calls: ReadonlyArray<LoneCall> }) {
         <span className="w-28 shrink-0 text-right">Tokens in / out</span>
       </div>
       {calls.length === 0 ? (
-        <p className="border-b border-rule py-3 text-label text-graphite">
+        <p className="border-b border-rule px-3 py-3 text-label text-graphite">
           None — every call so far was a step of a run.
         </p>
       ) : (
         calls.map((c) => (
           <div
             key={c.id}
-            className="flex h-9 items-center gap-3 border-b border-rule"
+            className="flex h-9 items-center gap-3 border-b border-rule px-3"
           >
             <span className="w-20 shrink-0 mono text-micro">{c.lane}</span>
             <span className="min-w-0 flex-1 truncate mono text-micro">

@@ -57,17 +57,15 @@ export function RecordNotes({
       }
     >
       {rows.length === 0 ? (
-        <p className="border-t border-rule py-2 text-label text-graphite">
-          No notes.
-        </p>
+        <p className="px-3 py-2 text-label text-graphite">No notes.</p>
       ) : (
         <ol>
           {rows.map((n) => (
-            <li key={n.id} className="border-t border-rule">
+            <li key={n.id} className="border-b border-rule">
               <Link
                 to="/notes/$noteId"
                 params={{ noteId: n.id }}
-                className="focus-ring-inset flex h-row items-center gap-3 text-ui hover:bg-bone"
+                className="focus-ring-inset flex h-ledger-row items-center gap-3 px-3 text-ui hover:bg-bone"
               >
                 <span className="min-w-0 truncate font-serif text-title font-medium">
                   {n.title}

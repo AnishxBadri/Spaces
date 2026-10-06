@@ -2,6 +2,7 @@ import { useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { SettingsRow, SettingsSection } from './settings-section'
+import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Switch } from '#/components/ui/switch'
@@ -121,13 +122,8 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
       blurb="An address you forward or BCC mail to. Threads land on the people and companies they match."
       crumb="Data & AI"
     >
-      <div className="flex flex-col pt-5">
-        <div className="flex items-baseline gap-3 border-b border-hairline pb-2">
-          <h3 className="label-caps text-foreground">Mailbox</h3>
-          <span className="mono text-micro text-graphite">
-            {readout(saved)}
-          </span>
-        </div>
+      <div className="flex flex-col pt-8">
+        <SectionHead as="h3" title="Mailbox" count={readout(saved)} />
 
         <SettingsRow
           label="Address"
@@ -215,7 +211,7 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
           />
         </SettingsRow>
 
-        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule py-2">
+        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule px-3 py-2">
           {error ? (
             <span
               role="alert"
@@ -244,7 +240,7 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
         {result ? (
           <div
             role="status"
-            className="flex min-h-9 items-start gap-3 border-b border-rule py-2"
+            className="flex min-h-9 items-start gap-3 border-b border-rule px-3 py-2"
           >
             <span
               className={cn(
@@ -283,7 +279,7 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
           </SettingsRow>
         ) : null}
 
-        <div className="flex h-8 items-center justify-between">
+        <div className="flex h-8 items-center justify-between px-3">
           <span className="label-caps font-normal text-graphite">
             forwarded bodies are shared · admin only
           </span>

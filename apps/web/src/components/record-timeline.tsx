@@ -159,7 +159,7 @@ export function RecordLedger({
   const hidden = history.length - shown.length
   return (
     <>
-      <RecordSection rule label="Interactions" meta={`${interactions.length}`}>
+      <RecordSection label="Interactions" meta={`${interactions.length}`}>
         {composer}
         <RecordTimeline
           items={interactions}
@@ -168,7 +168,7 @@ export function RecordLedger({
           empty={composer ? null : 'None logged.'}
         />
       </RecordSection>
-      <RecordSection rule label="History" meta={`${history.length}`}>
+      <RecordSection label="History" meta={`${history.length}`}>
         <RecordTimeline
           items={shown}
           registry={registry}
@@ -179,7 +179,7 @@ export function RecordLedger({
           <button
             type="button"
             onClick={() => setUnfolded(true)}
-            className="focus-ring-inset flex h-row w-full items-center gap-3 text-left mono text-micro text-graphite hover:text-foreground"
+            className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-3 text-left mono text-micro text-graphite hover:text-foreground"
           >
             <span className="text-primary">+</span>
             {hidden} more
@@ -204,7 +204,7 @@ function Row({
   return (
     <li
       className={cn(
-        'flex items-start gap-4 py-2',
+        'flex items-start gap-4 px-3 py-2',
         !last && 'border-b border-rule',
       )}
     >
@@ -236,7 +236,7 @@ export function RecordTimeline({
 }) {
   if (items.length === 0) {
     return empty === null ? null : (
-      <p className="py-2 text-label text-graphite">{empty}</p>
+      <p className="px-3 py-2 text-label text-graphite">{empty}</p>
     )
   }
   return (

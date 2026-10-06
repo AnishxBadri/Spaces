@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { SectionHead } from '#/components/ledger-section'
 import { cn } from '#/lib/utils'
 
 /**
@@ -92,7 +93,7 @@ export function RecordBody({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
-      <div className="flex min-w-0 flex-1 flex-col gap-6 px-8 pt-6 pb-8">
+      <div className="flex min-w-0 flex-1 flex-col gap-8 px-8 pt-6 pb-8">
         {children}
       </div>
       {rail ? (
@@ -104,38 +105,24 @@ export function RecordBody({
   )
 }
 
-/** A section of the page: caps label left, mono meta right, optional
- *  hairline above when it follows prose. */
+/** A section of the page: the bone head band (sentence-case title, mono
+ *  meta beside it, the one action right), then its content on paper. */
 export function RecordSection({
   label,
   meta,
   action,
-  rule,
   children,
   className,
 }: {
   label: ReactNode
   meta?: ReactNode
   action?: ReactNode
-  rule?: boolean
   children: ReactNode
   className?: string
 }) {
   return (
-    <section
-      className={cn(
-        'flex flex-col',
-        rule && 'border-t border-hairline pt-3',
-        className,
-      )}
-    >
-      <div className="flex items-baseline justify-between gap-4 pb-2">
-        <h2 className="label-caps text-graphite">{label}</h2>
-        <div className="flex items-baseline gap-3 mono text-micro text-graphite">
-          {meta}
-          {action}
-        </div>
-      </div>
+    <section className={cn('flex flex-col', className)}>
+      <SectionHead title={label} count={meta} action={action} />
       {children}
     </section>
   )
@@ -219,7 +206,8 @@ export function PropertyCell({
   )
 }
 
-/** A rail section on bone: caps label, mono meta, rows on rules. */
+/** A rail section on bone: sentence-case title at the title step, mono
+ *  meta right, rows on rules. The rail is already bone, so no band. */
 export function RailSection({
   label,
   meta,
@@ -239,7 +227,9 @@ export function RailSection({
       )}
     >
       <div className="flex items-baseline justify-between gap-3 pb-2">
-        <h2 className="label-caps text-graphite">{label}</h2>
+        <h2 className="min-w-0 truncate text-title font-medium text-foreground">
+          {label}
+        </h2>
         {meta ? (
           <div className="flex items-baseline gap-3 mono text-micro text-graphite">
             {meta}

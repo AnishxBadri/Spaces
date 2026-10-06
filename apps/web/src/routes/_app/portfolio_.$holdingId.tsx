@@ -347,7 +347,7 @@ function EventSection({
     >
       {confirmDialog}
       {rows.length === 0 ? (
-        <li className="py-2 text-label text-graphite">{empty}</li>
+        <li className="px-3 py-2 text-label text-graphite">{empty}</li>
       ) : (
         rows.map((r, i) => {
           const struck = r.reversedAt !== null
@@ -372,7 +372,7 @@ function EventSection({
               </span>
               <span
                 className={cn(
-                  'min-w-0 flex-1 truncate text-ui',
+                  'min-w-0 flex-1 truncate text-body',
                   struck && 'text-graphite line-through',
                   isReversal && 'text-graphite',
                 )}

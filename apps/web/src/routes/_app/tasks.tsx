@@ -464,7 +464,7 @@ function TaskItem({
       />
       <span
         className={cn(
-          'min-w-0 truncate text-ui transition-colors duration-150',
+          'min-w-0 truncate text-body transition-colors duration-150',
           (done || leaving) && 'text-graphite line-through',
         )}
       >

@@ -492,8 +492,10 @@ load-bearing rules promoted here:
 A page reads as stacked sections, and each section separates itself from its neighbours
 by at least two of three means: **material**, **space**, **ink weight**. Approved by the
 owner on 2026-10-05 after the storage and email drafts read as one flat plane. The
-shipped surfaces still draw the earlier caps heads and 36px ledger rows until the port
-slice lands; new surfaces are born on this grammar.
+shared primitives draw it — `SectionHead` (the band, inside `LedgerSection`,
+`RecordSection` and settings groups), `LedgerRow` at `h-ledger-row`, `DialogHeader`,
+the confirm — so every surface built on them follows; rows sit 12px in from the
+band's edge, under its title.
 
 - **Material.** A section head is a 44px band on bone — title, count, tabs, filters and
   the head's one action live in it. A Drive folder band and a group band inside a
