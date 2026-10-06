@@ -1,0 +1,182 @@
+# Plugin releases. A `plugin-<id>@X.Y.Z` tag — pushed by the Version and tag
+# workflow when a release PR bumps plugins/<id> — tests, packs, signs and
+# publishes that plugin, and commits its registry.json entry.
+#
+# Order is the contract, and nothing is published until the end:
+#
+#   version   the tag must be plugin-<id>@X.Y.Z and X.Y.Z must be what
+#             plugins/<id>/package.json carries
+#   test      the plugin's own suite — a red suite and nothing is packed
+#   publish   build → the plugin's `pack:plugin` (the sdk packer) signs with
+#             the SPACES_PLUGIN_SIGNING_KEY secret → the key must be one
+#             plugin-keys/ holds → GitHub release with the .tgz, .sha256,
+#             .sig and the registry entry → download the release back and
+#             check registry.json against it with core's verifyPlugin → one
+#             commit on main: registry.json
+#
+# All of publish is scripts/release-plugin.ts; this file only orders it. The
+# image carries registry.json as committed, so the next core@ image is the
+# first to list a new plugin version.
+#
+# Dry run: a pull request that touches the release path runs everything for
+# plugins/apollo at its current version, signed with a throwaway key, and
+# publishes and commits nothing — the registry diff lands in the job summary.
+name: Plugin release
+
+on:
+  push:
+    tags: ['plugin-*@*']
+  pull_request:
+    paths:
+      - .github/workflows/plugin-release.yml
+      - scripts/release-plugin.ts
+      - scripts/release/**
+      - packages/sdk/src/pack/**
+      - registry.json
+      - plugin-keys/**
+
+concurrency:
+  group: plugin-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DRY_RUN: ${{ github.event_name != 'push' }}
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.v.outputs.id }}
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        name: The tag names exactly the version plugins/<id>/package.json carries
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            TAG="$GITHUB_REF_NAME"
+          else
+            TAG="plugin-apollo@$(jq -r .version plugins/apollo/package.json)"
+            echo "dry run — checking a pretend tag, $TAG"
+          fi
+          if [[ ! "$TAG" =~ ^plugin-([a-z][a-z0-9]*(-[a-z0-9]+)*)@([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::$TAG is not plugin-<id>@X.Y.Z — refusing to publish"
+            exit 1
+          fi
+          ID="${BASH_REMATCH[1]}"
+          VERSION="${BASH_REMATCH[3]}"
+          PKG_FILE="plugins/$ID/package.json"
+          if [ ! -f "$PKG_FILE" ]; then
+            echo "::error::$TAG names $ID, and there is no $PKG_FILE"
+            exit 1
+          fi
+          NAME="$(jq -r .name "$PKG_FILE")"
+          PKG="$(jq -r .version "$PKG_FILE")"
+          if [ "$NAME" != "@spaces/plugin-$ID" ]; then
+            echo "::error::$PKG_FILE is $NAME, not @spaces/plugin-$ID"
+            exit 1
+          fi
+          if [ "$VERSION" != "$PKG" ]; then
+            echo "::error::the tag says $VERSION and $PKG_FILE says $PKG — the tag and the code must agree"
+            exit 1
+          fi
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "releasing @spaces/plugin-$ID $VERSION from $TAG"
+
+  # The plugin's own suite, against the sdk built from the tagged commit. A red
+  # job here and `publish` never starts.
+  test:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      PLUGIN: '@spaces/plugin-${{ needs.version.outputs.id }}'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the plugin and the sdk it builds against
+        run: pnpm exec turbo run build --filter="$PLUGIN"
+      - name: The plugin's tests
+        run: pnpm --filter "$PLUGIN" test
+
+  publish:
+    needs: [version, test]
+    runs-on: ubuntu-latest
+    # One registry.json writer at a time, whichever plugin it is.
+    concurrency:
+      group: plugin-registry
+      cancel-in-progress: false
+    permissions:
+      contents: write # the GitHub release and the registry.json commit on main
+    env:
+      ID: ${{ needs.version.outputs.id }}
+      TAG: ${{ needs.version.outputs.tag }}
+      PLUGIN: '@spaces/plugin-${{ needs.version.outputs.id }}'
+    steps:
+      - uses: actions/checkout@v4
+      # main, holding only registry.json: the entry is committed on main as it
+      # is now, not as it was at the tag. Sparse, so the repo's prettier config
+      # found from it is the tagged checkout's, which has node_modules.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: registry-main
+          sparse-checkout: registry.json
+          sparse-checkout-cone-mode: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the plugin
+        run: pnpm exec turbo run build --filter="$PLUGIN"
+
+      - name: Pack, sign, release, check against the release, commit registry.json
+        if: env.DRY_RUN != 'true'
+        env:
+          SPACES_PLUGIN_SIGNING_KEY: ${{ secrets.SPACES_PLUGIN_SIGNING_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git -C registry-main config user.name 'github-actions[bot]'
+          git -C registry-main config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          pnpm exec tsx scripts/release-plugin.ts "$ID" --tag "$TAG" \
+            --out "$RUNNER_TEMP/release" --registry registry-main/registry.json \
+            | tee "$RUNNER_TEMP/release.log"
+          {
+            echo "### Published $TAG"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/release.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dry run — pack with a throwaway key, check, and show the registry diff
+        if: env.DRY_RUN == 'true'
+        run: |
+          set -euo pipefail
+          pnpm exec tsx scripts/release-plugin.ts --no-push "$ID" --tag "$TAG" \
+            --out "$RUNNER_TEMP/release"
+          {
+            echo "### Dry run — nothing published"
+            echo
+            echo "A \`$TAG\` tag would release these files and commit this registry.json change:"
+            echo
+            ls -1 "$RUNNER_TEMP/release" | sed 's/^/- /'
+            echo
+            echo '```diff'
+            cat "$RUNNER_TEMP/release/registry.diff"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

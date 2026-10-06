@@ -1,0 +1,29 @@
+{
+  "baseBranch": "main",
+  "access": "restricted",
+  "fixed": [],
+  "linked": [],
+  "updateInternalDependencies": "patch",
+  "changelog": false,
+  "commit": false,
+  "privatePackages": { "version": true, "tag": true },
+  "ignore": [
+    "@spaces/web",
+    "@spaces/worker",
+    "@spaces/db",
+    "@spaces/core",
+    "@spaces/config",
+    "@spaces/e2e",
+    "@spaces/site",
+    "@spaces/plugin-echo",
+    "@spaces/plugin-old-sdk",
+    "@spaces/plugin-tampered",
+    "@spaces/plugin-importer",
+    "@spaces/plugin-needs-key",
+    "@spaces/plugin-overreach",
+    "@spaces/plugin-researcher",
+    "@spaces/plugin-versioned",
+    "@spaces/plugin-throws",
+    "@spaces/plugin-syncer"
+  ]
+}

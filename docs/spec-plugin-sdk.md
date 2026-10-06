@@ -527,7 +527,10 @@ key id format, the key directory and the tar choice.
 v0: tarballs on GitHub Releases, index committed in-repo and copied into
 the image (offline installs see the shipped list; live refresh when
 outbound HTTPS exists). v1 upgrade: OCI artifacts in GHCR (one auth, one
-mirror story) — not now.
+mirror story) — not now. As built (ship-9): a `plugin-<id>@X.Y.Z` tag runs
+`plugin-release.yml` → `scripts/release-plugin.ts`, which publishes the
+release and commits the entry; the procedure is in CONTEXT.md "Plugin
+architecture".
 
 **Install flow, admin only, no redeploy:**
 

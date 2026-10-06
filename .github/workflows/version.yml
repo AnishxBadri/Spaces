@@ -1,0 +1,70 @@
+# Version and tag (changesets). Every push to main does one of two things:
+#
+#   pending changesets   open or update the release PR: `pnpm release:version`
+#                        bumps core (the root package), the sdk and each plugin
+#                        a changeset names — each on its own line — and syncs
+#                        the manifest and SDK_VERSION lines
+#   none (the release    `pnpm release:tag` tags whatever that push bumped —
+#   PR just merged)      `core@X.Y.Z` for release.yml, `plugin-<id>@X.Y.Z` for
+#                        plugin-release.yml, `sdk@X.Y.Z` as a record — and
+#                        pushes each tag on its own
+#
+# RELEASE_TOKEN is a fine-grained token with contents and pull-requests write
+# on this repository. It is required because a tag or a PR pushed with the
+# workflow's own GITHUB_TOKEN starts no workflow: the tags would never build
+# the image or the plugin, and the release PR would never run CI. Without it
+# this workflow warns and does nothing.
+name: Version and tag
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: version-and-tag
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  changesets:
+    runs-on: ubuntu-latest
+    steps:
+      - id: token
+        name: A token whose pushes start workflows
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::warning::RELEASE_TOKEN is not set — no release PR is opened and no tag is pushed (GITHUB_TOKEN's pushes start no workflow)"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      # Full history: `release:tag` reads each package.json at the commit
+      # before this push.
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+      - uses: pnpm/action-setup@v4
+        if: steps.token.outputs.ok == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.token.outputs.ok == 'true'
+      - uses: changesets/action@v1
+        if: steps.token.outputs.ok == 'true'
+        with:
+          version: pnpm release:version
+          publish: pnpm release:tag --since ${{ github.event.before }}
+          title: 'Release: version packages'
+          commit: 'Release: version packages'
+          createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}

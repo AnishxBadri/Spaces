@@ -198,12 +198,17 @@
       "outputs": []
     },
 
+    // `@spaces/sdk#build` and core's source: the release scripts under
+    // scripts/release import `@spaces/sdk/pack` (whose types are dist/) and
+    // core's plugin verifier, and the type-aware rules read both.
     "//#lint:root": {
+      "dependsOn": ["@spaces/sdk#build"],
       "inputs": [
         "eslint.config.js",
         "packages/config/eslint.base.js",
         "packages/config/eslint-rules/**",
-        "scripts/**"
+        "scripts/**",
+        "packages/core/src/**"
       ],
       "outputs": []
     },
@@ -214,12 +219,41 @@
     // roundtrip fixture into apps/web instead.
     // eslint-rules/** left this list with SPA-180: it is packages/config's
     // now, under that package's own `typecheck` task.
+    // The release scripts reach `@spaces/sdk` (dist/) and core's plugin
+    // verifier, so the sdk is built first and core's source is an input.
     "//#typecheck:root": {
+      "dependsOn": ["@spaces/sdk#build"],
       "inputs": [
         "tsconfig.json",
         "scripts/**",
         "eslint.config.js",
-        "prettier.config.js"
+        "prettier.config.js",
+        "packages/core/src/**"
+      ],
+      "outputs": []
+    },
+
+    // The root half of gate 2: the release scripts' tests (scripts/**/*.test.ts,
+    // `scripts/vitest.config.ts`). They read every package.json and the
+    // changesets config, the committed registry.json and plugin-keys/, run
+    // core's verifier, and dry-run a release of the echo fixture — whose
+    // build is therefore a dependency. No database.
+    "//#test:root": {
+      "dependsOn": ["@spaces/sdk#build", "@spaces/plugin-echo#build"],
+      "inputs": [
+        "package.json",
+        "pnpm-workspace.yaml",
+        "scripts/**",
+        ".changeset/**",
+        "registry.json",
+        "plugin-keys/**",
+        "apps/*/package.json",
+        "packages/*/package.json",
+        "packages/sdk/src/version.ts",
+        "packages/core/src/**",
+        "plugins/*/package.json",
+        "plugins/*/src/manifest.ts",
+        "plugins/_fixtures/*/package.json"
       ],
       "outputs": []
     }

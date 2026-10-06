@@ -11,8 +11,22 @@ then choose the key, and never from the environment.
   file whose key does not hash to its name is not trusted.
 - A rotation adds the new key beside the old one, so a release signed by either
   verifies; the old file leaves once no published version needs it.
-- The private half is a GitHub Actions secret used only by the plugin release
-  workflow (ship-9, project 19). No private key is ever committed; tests
-  generate ephemeral pairs.
+- The private half is the GitHub Actions secret **`SPACES_PLUGIN_SIGNING_KEY`**
+  (the PEM, whole), used only by `.github/workflows/plugin-release.yml` — the
+  same variable `spaces-plugin-pack` reads. No private key is ever committed;
+  tests and the `--no-push` dry run generate throwaway pairs.
 
-Empty until the first signing key is minted with that workflow.
+Minting the release key, once:
+
+```sh
+openssl genpkey -algorithm ed25519 -out spaces-plugin-signing.pem   # outside the repo
+pnpm exec tsx scripts/plugin-key.ts spaces-plugin-signing.pem       # writes plugin-keys/<keyId>.pub
+```
+
+Commit the `.pub`, paste the PEM into the `SPACES_PLUGIN_SIGNING_KEY`
+repository secret, and keep the file offline. A plugin release refuses to
+publish under a key this directory does not hold, because the image could not
+verify it; and an image only trusts keys it was built with, so the `.pub` must
+reach a `core@` release before plugins signed with it install anywhere.
+
+Empty until that key is minted.
