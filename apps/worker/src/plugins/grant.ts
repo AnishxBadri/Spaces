@@ -1,5 +1,6 @@
-import { Data, Effect, Layer } from 'effect'
+import { Data, Effect, Layer, Redacted } from 'effect'
 import type { z } from 'zod'
+import { Secrets } from '@spaces/sdk'
 import type { Manifest, PortName } from '@spaces/sdk'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { AmbientPortsLive } from '@spaces/core/writes/ports/ambient'
@@ -14,9 +15,8 @@ import { JudgmentLive } from '@spaces/core/writes/ports/judgment'
 import type { LogSink } from '@spaces/core/writes/ports/log'
 import { ReadLive } from '@spaces/core/writes/ports/read'
 import { ReceiptsLive } from '@spaces/core/writes/ports/receipts'
-import { SecretsLive } from '@spaces/core/writes/ports/secrets'
 import { standInFor } from './fakes/switch'
-import type { FakeProviders } from './fakes/switch'
+import type { FakeProviders, StandIn } from './fakes/switch'
 import { PluginDbLive } from './plugin-db'
 
 /**
@@ -65,6 +65,25 @@ export type GrantOptions = {
   readonly fakes?: FakeProviders | null
 }
 
+/** The bound Secrets with a stand-in's access token, and its key when `secret` is given. */
+const standInSecrets = (
+  standIn: StandIn,
+  secret: string | null,
+): Layer.Layer<Secrets, never, Secrets> =>
+  Layer.effect(
+    Secrets,
+    Effect.gen(function* () {
+      const bound = yield* Secrets
+      return Secrets.of({
+        get:
+          secret === null
+            ? bound.get
+            : () => Effect.succeed(Redacted.make(secret)),
+        accessToken: () => Effect.succeed(Redacted.make(standIn.accessToken)),
+      })
+    }),
+  )
+
 const mergeList = <TError, TIn>(
   layers: ReadonlyArray<Layer.Layer<never, TError, TIn>>,
 ): Layer.Layer<never, TError, TIn> =>
@@ -96,12 +115,22 @@ export const grantLayer = (
       ...(fetch === undefined ? {} : { fetch }),
       ...(options.sink === undefined ? {} : { sink: options.sink }),
     })
-    // An unkeyed row a fake stands in for gets the fake's key; merged last,
-    // so it is the Secrets the job sees. A bound credential is still used.
+    // A faked plugin's Secrets, merged last so it is the one the job sees:
+    // the fake's access token, and the fake's key for an unkeyed row (a
+    // bound credential is still used).
     standalone.push(
-      standIn === null || row.credentialId !== null
+      standIn === null
         ? ambient
-        : Layer.merge(ambient, SecretsLive(row, standIn.secret)),
+        : Layer.merge(
+            ambient,
+            Layer.provide(
+              standInSecrets(
+                standIn,
+                row.credentialId === null ? standIn.secret : null,
+              ),
+              ambient,
+            ),
+          ),
     )
   }
   for (const port of new Set(uses)) {

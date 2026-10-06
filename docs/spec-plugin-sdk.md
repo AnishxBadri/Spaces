@@ -909,9 +909,10 @@ Layered; most value never touches a provider.
   typed on a missing id, `changes(null)` and back, and `pickerConfig` as
   plain JSON with none of the `secrets` in it. The suite needs no network
   and no Postgres (`packages/sdk/src/testing/storage-source.test.ts`).
-- **Not yet:** `SPACES_FAKE_PROVIDERS=1` does not point anything at the fake
-  Drive — the worker's fake registry stands a fake in per plugin, and that
-  wiring lands with the Google Drive plugin.
+- `SPACES_FAKE_PROVIDERS=1` stands Drive's v3 REST API in process
+  (`makeFakeDriveApi` over the fake Drive) in for the `google-drive` plugin,
+  with a fake access token, so the real plugin code runs with no network and
+  no connection.
 
 **As built (layer 7, for storage sources — the chaos list).**
 

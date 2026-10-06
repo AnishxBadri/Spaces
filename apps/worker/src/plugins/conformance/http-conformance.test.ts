@@ -128,4 +128,27 @@ describe.each(IMPLEMENTATIONS)('Http — $name', (impl) => {
     expect(wait).toBeGreaterThanOrEqual(900)
     expect(wait).toBeLessThanOrEqual(1000)
   })
+
+  it('streams a body as its bytes, and fails a 429 that persists the same way', async () => {
+    const stream = Effect.gen(function* () {
+      const response = yield* (yield* Http).stream({
+        method: 'GET',
+        url: PROVIDER_URL,
+      })
+      const text = yield* Effect.promise(() =>
+        new Response(response.body).text(),
+      )
+      return { status: response.status, text }
+    })
+    const exit = await exitOn(
+      impl.make(PROVIDER_URL, [{ status: 200, body: 'PK bytes' }]),
+      stream,
+    )
+    expect(exit).toEqual(Exit.succeed({ status: 200, text: 'PK bytes' }))
+    const limited = { status: 429, headers: { 'Retry-After': '1' }, body: '' }
+    const failure = failureOf(
+      await exitOn(impl.make(PROVIDER_URL, [limited, limited]), stream),
+    )
+    expect(failure?._tag).toBe('JobRateLimited')
+  })
 })

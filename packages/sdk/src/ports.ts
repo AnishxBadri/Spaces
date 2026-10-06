@@ -341,10 +341,26 @@ export type HttpResponse = {
 }
 
 /**
+ * A response whose body is handed over as it arrives — a file download.
+ * The caller reads the body to its end or cancels it; an unread body holds
+ * the connection open.
+ */
+export type HttpStreamResponse = {
+  readonly status: number
+  /** Lower-cased names. */
+  readonly headers: { readonly [name: string]: string }
+  readonly body: ReadableStream<Uint8Array>
+}
+
+/**
  * Rate-limited fetch — no raw `fetch` in a plugin. The live port throttles on
  * `Retry-After` / `X-RateLimit-*`, injects the credential where the manifest
  * says, and maps a 429 to `JobRateLimited`; any other status comes back as a
  * response for the job to judge.
+ *
+ * - `request` reads the body as text: JSON and feeds.
+ * - `stream` never buffers the body and never decodes it: bytes, of any
+ *   size. Same throttle, same 429 rule.
  */
 export class Http extends Context.Service<
   Http,
@@ -352,6 +368,9 @@ export class Http extends Context.Service<
     readonly request: (
       request: HttpRequest,
     ) => Effect.Effect<HttpResponse, JobError>
+    readonly stream: (
+      request: HttpRequest,
+    ) => Effect.Effect<HttpStreamResponse, JobError>
   }
 >()('spaces/sdk/Http') {}
 

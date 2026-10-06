@@ -9,14 +9,18 @@ import type { FetchLike } from '@spaces/core/writes/ports/http'
  * - Off (anything but `1`), `loadFakeProviders` returns null and never
  *   imports the fakes, so the live path cannot reach one.
  * - `standInFor` is the one question the loader (the `requires.credential`
- *   check) and the grant (Http, Secrets) ask.
+ *   and `requires.connection` checks) and the grant (Http, Secrets) ask.
  */
 export const FAKE_PROVIDERS_ENV = 'SPACES_FAKE_PROVIDERS'
 
-/** What a fake gives one plugin: its Http transport, and a key for an unkeyed row. */
+/**
+ * What a fake gives one plugin: its Http transport, a key for an unkeyed
+ * row, and the OAuth access token `Secrets.accessToken()` hands out.
+ */
 export type StandIn = {
   readonly fetch: FetchLike
   readonly secret: string
+  readonly accessToken: string
 }
 
 export type FakeProviders = {

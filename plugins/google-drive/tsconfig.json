@@ -1,0 +1,17 @@
+{
+  "extends": "../../packages/config/tsconfig.base.json",
+
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": ["node_modules", "dist"],
+
+  "compilerOptions": {
+    // The tests read dist/ with node:fs and the sandbox script reads its
+    // token from the environment; the plugin's own code reaches no node API.
+    "types": ["node"]
+  }
+}

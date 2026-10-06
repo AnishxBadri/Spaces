@@ -437,50 +437,58 @@ export const HttpTest = (
 ): TestPort<Http> => {
   const { calls, record } = tap('Http', options.recorder)
   const pending = [...script]
-  const layer = Layer.succeed(Http, {
-    request: (request: HttpRequest) =>
-      Effect.suspend((): Effect.Effect<HttpResponse, JobError> => {
-        const input = { ...request, headers: lowerKeys(request.headers) }
-        const at = pending.findIndex(
-          (s) =>
-            (s.method ?? 'GET') === request.method &&
-            (typeof s.url === 'string'
-              ? s.url === request.url
-              : s.url.test(request.url)),
+  const answer = (method: 'request' | 'stream', request: HttpRequest) =>
+    Effect.suspend((): Effect.Effect<HttpResponse, JobError> => {
+      const input = { ...request, headers: lowerKeys(request.headers) }
+      const at = pending.findIndex(
+        (s) =>
+          (s.method ?? 'GET') === request.method &&
+          (typeof s.url === 'string'
+            ? s.url === request.url
+            : s.url.test(request.url)),
+      )
+      const entry = at < 0 ? undefined : pending[at]
+      if (entry === undefined) {
+        record(method, input, '<unscripted>')
+        return Effect.fail(
+          new JobPermanent({
+            reason: `HttpTest: no scripted response for ${request.method} ${request.url}`,
+          }),
         )
-        const entry = at < 0 ? undefined : pending[at]
-        if (entry === undefined) {
-          record('request', input, '<unscripted>')
-          return Effect.fail(
-            new JobPermanent({
-              reason: `HttpTest: no scripted response for ${request.method} ${request.url}`,
-            }),
-          )
-        }
-        if (!entry.repeat) pending.splice(at, 1)
-        const body = entry.response.body
-        const response: HttpResponse = {
-          status: entry.response.status ?? 200,
-          headers: lowerKeys(entry.response.headers),
-          body:
-            body === undefined
-              ? ''
-              : typeof body === 'string'
-                ? body
-                : JSON.stringify(body),
-        }
-        record('request', input, response)
-        if (response.status === 429) {
-          const seconds = Number(response.headers['retry-after'] ?? '60')
-          return Effect.fail(
-            new JobRateLimited({
-              reason: `${request.url} is rate-limited`,
-              retryAfterMs: (Number.isFinite(seconds) ? seconds : 60) * 1000,
-            }),
-          )
-        }
-        return Effect.succeed(response)
-      }),
+      }
+      if (!entry.repeat) pending.splice(at, 1)
+      const body = entry.response.body
+      const response: HttpResponse = {
+        status: entry.response.status ?? 200,
+        headers: lowerKeys(entry.response.headers),
+        body:
+          body === undefined
+            ? ''
+            : typeof body === 'string'
+              ? body
+              : JSON.stringify(body),
+      }
+      record(method, input, response)
+      if (response.status === 429) {
+        const seconds = Number(response.headers['retry-after'] ?? '60')
+        return Effect.fail(
+          new JobRateLimited({
+            reason: `${request.url} is rate-limited`,
+            retryAfterMs: (Number.isFinite(seconds) ? seconds : 60) * 1000,
+          }),
+        )
+      }
+      return Effect.succeed(response)
+    })
+  const layer = Layer.succeed(Http, {
+    request: (request) => answer('request', request),
+    // The scripted body as UTF-8 bytes, in one chunk.
+    stream: (request) =>
+      Effect.map(answer('stream', request), (response) => ({
+        status: response.status,
+        headers: response.headers,
+        body: new Blob([response.body]).stream(),
+      })),
   })
   return { layer, calls }
 }
@@ -688,3 +696,17 @@ export type {
   StorageSourceChaosFixture,
   StorageSourceChaosSubject,
 } from './storage-source-conformance.ts'
+
+// Drive's REST API over the fake Drive, and an Http port over a fetch
+export {
+  makeFakeDriveApi,
+  HttpFetchTest,
+  DRIVE_API,
+  DRIVE_FOLDER_MIME,
+} from './fake-drive-api.ts'
+export type {
+  FakeDriveApi,
+  FakeDriveApiOptions,
+  DriveApiRequest,
+  FetchLike,
+} from './fake-drive-api.ts'

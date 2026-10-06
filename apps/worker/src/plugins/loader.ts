@@ -256,15 +256,13 @@ const check = (
     }
 
     // 3. validate — what the manifest requires of the row. A provider fake
-    // hands the job a key of its own, so it satisfies the credential.
-    if (
-      manifest.requires?.credential &&
-      row.credentialId === null &&
-      standInFor(fakes, id) === null
-    ) {
+    // hands the job a key and an access token of its own, so it satisfies
+    // the credential and the connection.
+    const faked = standInFor(fakes, id) !== null
+    if (manifest.requires?.credential && row.credentialId === null && !faked) {
       return yield* new Degraded({ reason: 'missing credential' })
     }
-    if (manifest.requires?.connection && row.connectionId === null) {
+    if (manifest.requires?.connection && row.connectionId === null && !faked) {
       return yield* new Degraded({ reason: 'missing connection' })
     }
 

@@ -26,7 +26,13 @@ export type {
   AuthoredManifest,
 } from './manifest.ts'
 export { definePlugin } from './plugin.ts'
-export type { Plugin, PluginJobs, LifecycleHook } from './plugin.ts'
+export type {
+  Plugin,
+  PluginJobs,
+  LifecycleHook,
+  StorageSourceProvider,
+  StorageSourceMember,
+} from './plugin.ts'
 export {
   PORT_NAMES,
   DOCUMENT_KINDS,
@@ -140,6 +146,7 @@ export type {
   HttpMethod,
   HttpRequest,
   HttpResponse,
+  HttpStreamResponse,
   LogFields,
   ImportRefusal,
   StageResult,

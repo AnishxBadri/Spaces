@@ -281,6 +281,49 @@ root and a native Doc exporting to docx) and the happy-path conformance
 suite (`storageSourceConformance`) are in `@spaces/sdk/testing`;
 `docs/spec-plugin-sdk.md` §13 has the details.
 
+**As built — the Google Drive plugin, read side (2026-10-07, SPA-236).**
+`plugins/google-drive` implements the read half over Drive's v3 REST API
+and nothing else:
+
+- **How core reaches it.** `definePlugin({ manifest, jobs, storageSource })`
+  — `storageSource` is a `StorageSourceProvider`: an Effect that builds the
+  `StorageSource` over Http, Secrets, Log and Config, which the host
+  provides bound to the row. The type requires it when the manifest says
+  `provides: 'storage-source'` and refuses it otherwise. The token is
+  `Secrets.accessToken()`, fetched per call.
+- **Bytes stream.** The Http port gained `stream` (body handed over unread);
+  `request` reads text and would corrupt a binary. Docs → docx, Sheets →
+  xlsx, Slides → pdf through `files.export`; anything else `alt=media`. A
+  Form or shortcut has no bytes and is `NotFound`.
+- **`changeToken` is Drive's `version`** (else `modifiedTime`). An export is
+  not byte-stable — the test exports one unchanged Doc twice: two shas, one
+  token.
+- **`resolveLink`** reads `/file/d/`, `/drive/folders/` (shared drives
+  included), `/open?id=` and the editor forms `/document/d/`,
+  `/spreadsheets/d/`, `/presentation/d/` (with `/u/<n>/`), then asks Drive
+  what the id names; anything else is null.
+- **`changes` reads every drive the connection sees.** The cursor is one
+  page token per drive: My Drive's `changes.list` sends no `driveId`, no
+  `corpora` and no all-drives flag; each shared drive's sends `driveId`,
+  `includeItemsFromAllDrives` and `supportsAllDrives`. A shared drive that
+  appears starts at now; a 410 (or a vanished drive) is `CursorExpired`. A
+  token that may not list shared drives (`drive.file`) reads My Drive only.
+- **Failures.** 401 and scope 403s → `AuthExpired`; Drive's 429 and
+  rate-limit 403s → `RateLimited` with `Retry-After`; 5xx and a dropped
+  connection → `RateLimited` at a 5 s floor; 404 and other 403s →
+  `NotFound`; a request Drive calls malformed is a defect.
+- **`pickerConfig`** names the script, the scope (`drive.file`) and the
+  views — no token, no secret — and asks Drive's `about` first, so a
+  refused connection is `AuthExpired` rather than a picker that cannot open.
+- **Fake and demo.** `makeFakeDriveApi()` in `@spaces/sdk/testing` answers
+  the v3 endpoints over a `FakeDrive` (its toggles drive the HTTP answers,
+  every request is recorded); the plugin passes `storageSourceConformance`
+  and `storageSourceChaos` (with the 200 MB scan streamed through
+  `alt=media`) against it. `SPACES_FAKE_PROVIDERS=1` stands it in for
+  `google-drive` with a fake access token, which also satisfies the
+  loader's `requires.connection`. `scripts/sandbox.ts` runs the conformance
+  suite against a real Drive, opt-in, not wired into CI.
+
 ## 5. Bindings — pointing a folder or file at a node (decided 2026-09-14)
 
 ### 5.1 The table

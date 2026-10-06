@@ -1,6 +1,11 @@
 import { Clock, Effect, Layer, Semaphore } from 'effect'
 import { Http, JobRateLimited, JobRetryable } from '@spaces/sdk'
-import type { HttpRequest, HttpResponse } from '@spaces/sdk'
+import type {
+  HttpRequest,
+  HttpResponse,
+  HttpStreamResponse,
+  JobError,
+} from '@spaces/sdk'
 import { noScrub } from './binding'
 import type { Scrub } from './binding'
 
@@ -30,7 +35,8 @@ import type { Scrub } from './binding'
  * a shared throttle (in Postgres) is the fix when that deployment exists.
  *
  * Network failures are `JobRetryable`; any other status comes back as a
- * response for the job to judge. Every error reason passes through the
+ * response for the job to judge. `request` reads the body as text; `stream`
+ * hands it over unread, so a download is never buffered here. Every error reason passes through the
  * binding's scrub, so a key carried in a URL is never written whole.
  * Time is Effect's `Clock`, so a test drives it with `TestClock`.
  */
@@ -140,7 +146,14 @@ export const HttpLive = (options: HttpLiveOptions): Layer.Layer<Http> => {
     throttle.nextAt = Math.max(throttle.nextAt, at)
   }
 
-  const send = (request: HttpRequest) =>
+  /**
+   * One attempt: the throttle's turn, the fetch, and what the answer says
+   * about the next call. A 429's body is cancelled, never handed on.
+   */
+  const send = <TBody>(
+    request: HttpRequest,
+    read: (res: Response) => Promise<TBody>,
+  ) =>
     Effect.gen(function* () {
       yield* turn
       const headers: Record<string, string> = {}
@@ -169,33 +182,45 @@ export const HttpLive = (options: HttpLiveOptions): Layer.Layer<Http> => {
           }),
         catch: failed,
       })
-      const text = yield* Effect.tryPromise({
-        try: () => res.text(),
-        catch: failed,
-      })
       const responseHeaders: Record<string, string> = {}
       res.headers.forEach((value, name) => {
         responseHeaders[name.toLowerCase()] = value
       })
-      const response: HttpResponse = {
-        status: res.status,
-        headers: responseHeaders,
-        body: text,
-      }
       const now = yield* Clock.currentTimeMillis
       const until = waitUntil(responseHeaders, now)
       if (until !== null) holdUntil(until)
       else if (res.status === 429) holdUntil(now + DEFAULT_RETRY_AFTER_MS)
-      return response
+      if (res.status === 429) {
+        yield* Effect.ignore(
+          Effect.tryPromise(() => res.body?.cancel() ?? Promise.resolve()),
+        )
+        return { limited: true, headers: responseHeaders } as const
+      }
+      const content = yield* Effect.tryPromise({
+        try: () => read(res),
+        catch: failed,
+      })
+      return {
+        limited: false,
+        response: {
+          status: res.status,
+          headers: responseHeaders,
+          body: content,
+        },
+      } as const
     })
 
-  const request = (input: HttpRequest) =>
+  /** Retried once on a 429; a second 429 fails `JobRateLimited` with the provider's wait. */
+  const retried = <TBody>(
+    input: HttpRequest,
+    read: (res: Response) => Promise<TBody>,
+  ) =>
     Effect.gen(function* () {
-      const first = yield* send(input)
-      if (first.status !== 429) return first
+      const first = yield* send(input, read)
+      if (!first.limited) return first.response
       // The throttle now holds until the provider's time; `turn` waits it out.
-      const second = yield* send(input)
-      if (second.status !== 429) return second
+      const second = yield* send(input, read)
+      if (!second.limited) return second.response
       const now = yield* Clock.currentTimeMillis
       return yield* new JobRateLimited({
         reason: scrub(`${input.method} ${input.url} answered 429 twice`),
@@ -207,5 +232,21 @@ export const HttpLive = (options: HttpLiveOptions): Layer.Layer<Http> => {
       })
     })
 
-  return Layer.succeed(Http, Http.of({ request }))
+  const request = (input: HttpRequest): Effect.Effect<HttpResponse, JobError> =>
+    retried(input, (res) => res.text())
+
+  /** The body handed over unread; a bodiless answer streams nothing. */
+  const stream = (
+    input: HttpRequest,
+  ): Effect.Effect<HttpStreamResponse, JobError> =>
+    retried(input, (res) =>
+      Promise.resolve(
+        res.body ??
+          new ReadableStream<Uint8Array>({
+            start: (controller) => controller.close(),
+          }),
+      ),
+    )
+
+  return Layer.succeed(Http, Http.of({ request, stream }))
 }
