@@ -1,4 +1,5 @@
 import { Cause, Effect, Fiber } from 'effect'
+import type { FakeProviders } from './fakes/switch'
 import type { HostVerdict, PluginHost } from './host'
 import { reconcilePlugins } from './loader'
 import type { ReconcileOptions, Reconciled, Verdict } from './loader'
@@ -22,6 +23,8 @@ export type PluginReloaderOptions = {
   readonly host: PluginHost
   /** Defaults to `<dataDir()>/plugins`. */
   readonly pluginsRoot?: string
+  /** `SPACES_FAKE_PROVIDERS`, handed to every reconcile. */
+  readonly fakes?: FakeProviders | null
   /** Defaults to `reconcilePlugins`. */
   readonly reconcile?: (
     options: ReconcileOptions,
@@ -48,10 +51,12 @@ export const makePluginReloader = (
   const reconcile = options.reconcile ?? reconcilePlugins
   const debounceMs = options.debounceMs ?? 50
   const log = options.log ?? ((line: string) => console.log(line))
-  const root =
-    options.pluginsRoot === undefined
+  const root = {
+    ...(options.pluginsRoot === undefined
       ? {}
-      : { pluginsRoot: options.pluginsRoot }
+      : { pluginsRoot: options.pluginsRoot }),
+    ...(options.fakes === undefined ? {} : { fakes: options.fakes }),
+  }
 
   let pending: Pending = { all: false, ids: new Set() }
   let draining: Fiber.Fiber<void> | null = null

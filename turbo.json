@@ -52,10 +52,13 @@
     // (the identity normalizers), and the sdk's exports point at dist/, so a
     // fresh checkout's `pnpm dev` must build it before vite and the worker
     // start. For every other package `^build` is a no-op.
+    // SPACES_FAKE_PROVIDERS reaches the worker through here: turbo's strict
+    // env mode hands a task only the variables it names.
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": ["SPACES_FAKE_PROVIDERS"]
     },
 
     // `tsr generate` reads the route files and tsr.config.json and writes the

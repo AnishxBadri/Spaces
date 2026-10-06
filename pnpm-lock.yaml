@@ -421,6 +421,9 @@ importers:
       '@spaces/plugin-airtable':
         specifier: workspace:*
         version: link:../../plugins/airtable
+      '@spaces/plugin-apollo':
+        specifier: workspace:*
+        version: link:../../plugins/apollo
       '@spaces/plugin-echo':
         specifier: workspace:*
         version: link:../../plugins/_fixtures/echo

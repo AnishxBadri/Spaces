@@ -14,6 +14,8 @@ import type { BoundIntegration } from '@spaces/core/writes/ports/binding'
 import { dataDir } from '@spaces/core/writes/vault/key'
 import { SDK_VERSION, manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
+import { standInFor } from './fakes/switch'
+import type { FakeProviders } from './fakes/switch'
 import { unprovidedPort } from './grant'
 import { resolvePluginImportsToHost } from './host-resolve'
 import { migratePlugin } from './plugin-db'
@@ -93,6 +95,8 @@ export type ReconcileOptions = {
   readonly only?: string
   /** The connection and role step 5 runs as; defaults to the db pool and `plugin_runtime`. */
   readonly pluginDb?: PluginDbOptions
+  /** `SPACES_FAKE_PROVIDERS`: a plugin a fake stands in for needs no credential. */
+  readonly fakes?: FakeProviders | null
 }
 
 export const pluginsRootDir = (): string => path.join(dataDir(), 'plugins')
@@ -174,6 +178,7 @@ const check = (
   pluginsRoot: string,
   lock: Lock | Degraded,
   pluginDb: PluginDbOptions,
+  fakes: FakeProviders | null,
   onManifest: (stored: IntegrationManifest) => void,
 ) =>
   Effect.gen(function* () {
@@ -248,8 +253,13 @@ const check = (
       })
     }
 
-    // 3. validate — what the manifest requires of the row
-    if (manifest.requires?.credential && row.credentialId === null) {
+    // 3. validate — what the manifest requires of the row. A provider fake
+    // hands the job a key of its own, so it satisfies the credential.
+    if (
+      manifest.requires?.credential &&
+      row.credentialId === null &&
+      standInFor(fakes, id) === null
+    ) {
       return yield* new Degraded({ reason: 'missing credential' })
     }
     if (manifest.requires?.connection && row.connectionId === null) {
@@ -366,6 +376,7 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
   )
   const lock = readLock(pluginsRoot)
   const pluginDb = options.pluginDb ?? {}
+  const fakes = options.fakes ?? null
 
   const verdicts: Array<Verdict> = []
   const loaded: Array<LoadedPlugin> = []
@@ -382,9 +393,16 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
       continue
     }
     let stored: IntegrationManifest | null = null
-    const outcome = yield* check(row, pluginsRoot, lock, pluginDb, (m) => {
-      stored = m
-    }).pipe(Effect.result)
+    const outcome = yield* check(
+      row,
+      pluginsRoot,
+      lock,
+      pluginDb,
+      fakes,
+      (m) => {
+        stored = m
+      },
+    ).pipe(Effect.result)
     if (outcome._tag === 'Success') {
       const ok = outcome.success
       yield* mark(row, {

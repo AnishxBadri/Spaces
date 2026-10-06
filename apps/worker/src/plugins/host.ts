@@ -36,6 +36,7 @@ import type { FetchLike } from '@spaces/core/writes/ports/http'
 import type { LogSink } from '@spaces/core/writes/ports/log'
 import { BREAKER_REASON } from '../run-job'
 import type { JobBreaker } from '../run-job'
+import type { FakeProviders } from './fakes/switch'
 import { grantLayer } from './grant'
 import { messageOf, truncate } from './loader'
 import type { LoadedHook, LoadedPlugin } from './loader'
@@ -83,6 +84,8 @@ export type PluginHostOptions = {
   readonly queues?: PluginQueuesOptions
   readonly fetch?: FetchLike
   readonly sink?: LogSink
+  /** `SPACES_FAKE_PROVIDERS`: what the grant swaps in for a faked provider. */
+  readonly fakes?: FakeProviders | null
 }
 
 /** One plugin's outcome from `wire` or `release`, and the line boot prints. */
@@ -297,6 +300,7 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
             : { rpm: plugin.manifest.http.rateLimit.rpm }),
           ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
           ...(options.sink === undefined ? {} : { sink: options.sink }),
+          ...(options.fakes === undefined ? {} : { fakes: options.fakes }),
         }),
         scope,
       ).pipe(Effect.exit)

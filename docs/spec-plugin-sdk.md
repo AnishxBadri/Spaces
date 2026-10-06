@@ -789,6 +789,46 @@ Layered; most value never touches a provider.
 8. **Browser E2E** (Playwright, standing want): upload → preview; connect
    Drive (fake IdP) → pick → filed.
 
+**As built (layers 2, 3 and 7, for the enrichers).**
+
+- **Cassettes, no msw.** A provider's recorded answers are committed beside
+  its plugin at `plugins/<id>/fixtures/cassette/cassette.json`: interactions
+  matched on method and URL, exact first, a `*` query value matching
+  anything and spliced into the response file's `{{name}}`; the header the
+  provider reads its key from; what it answers a revoked key. The worker
+  serves one through the Http port's own `fetch` seam, so the live throttle,
+  scrub and 429 handling are what runs against it. A small mutable fake
+  sits in front of the cassette (`makeFakeProvider`): a revoked key, a run
+  of 429s with a `Retry-After`, a failing URL. Apollo has one; a stateful
+  provider (Drive, Gmail) gets its own fake when its plugin lands.
+- **`SPACES_FAKE_PROVIDERS=1`** (passed through turbo's `dev`) makes the
+  worker stand a fake in for every plugin that committed a cassette: the
+  grant hands it the fake's transport, and an unkeyed row a fake key, which
+  is also why the loader's `requires.credential` check lets that row load
+  (`standInFor` is the one question both ask). Unset, the fakes module is
+  never imported. Outside a workspace — the image — there are no cassettes,
+  so every plugin runs live whatever the flag says.
+- **Conformance.** One file per port under the worker's
+  `plugins/conformance/`, each `describe.each` over an `IMPLEMENTATIONS`
+  array: the live port on the test database and the SDK's in-memory one
+  (Http, Secrets, Config, Log, Read, Identity, Facts, Receipts, Content's
+  interaction and signal lanes, Judgment, Import). The provider-facing
+  contract is `enricher-conformance` over `ENRICHERS` — Apollo alone today,
+  so that file is the contract written down rather than a comparison; a
+  second enricher is one more entry. PluginDb has one implementation (its
+  behaviour is Postgres's) and Ai none yet.
+- **Chaos.** `chaos.test.ts` runs each enricher's real bundle through a real
+  pg-boss and `runJob` against its fake: a 429 waits the provider's
+  `Retry-After`, a 429 that persists re-sends the job for then without
+  spending a retry or charging the breaker, a key revoked mid-run fails the
+  next job permanently and at once without the key in the error, and half a
+  failing batch leaves the succeeding half written and the rest retrying.
+  "Webhook delivered twice" lands with the webhook ingress; the rest of the
+  list waits for the storage sources.
+- **No network.** CI's `offline` job runs the worker's and every plugin's
+  suite in a group whose outbound traffic is rejected (loopback open for
+  Postgres), after a self-check that `https://example.com` does not answer.
+
 ## 14. Build order
 
 1. `packages/sdk`: manifest, ports, kinds, claims, `definePlugin`, testing

@@ -562,6 +562,22 @@ the same loader → registry fetch, signing, settings-UI install → plugin
 schemas with the first plugin that needs tables (RSS). Never: plugin React,
 plugin db handle, plugin DDL in `public.*`, shared-enum vendor names.
 
+**Testing: a plugin passes or does not ship.** Most of the value never
+touches a provider (spec §13). A provider's recorded answers are a cassette
+committed beside its plugin (`fixtures/cassette/`), served through the Http
+port's own fetch seam behind a small mutable fake (a revoked key, a run of
+429s, a failing URL), so the live throttle and scrub are what the tests run.
+`SPACES_FAKE_PROVIDERS=1` makes those fakes the dev and demo environment: a
+plugin with a cassette gets the fake's transport and, unkeyed, a fake key —
+which is why the loader's credential check lets it load — and with the flag
+unset the fakes are never imported; the image carries no cassettes. Each
+port has one conformance file, parameterised over its implementations (the
+live port and the SDK's in-memory one), and the enricher contract over
+`ENRICHERS` (Apollo alone, so for now the contract written down, not a
+comparison). The chaos list runs the real bundle through pg-boss and
+`runJob` against the fakes, on the harness's per-worker test database, and
+CI's `offline` job runs the worker and plugin suites with egress rejected.
+
 **Release procedure (changesets; core, the sdk and each plugin version independently):**
 
 1. **Changeset** — a change carries `.changeset/*.md` naming `spaces` (core, the root package), `@spaces/sdk` or `@spaces/plugin-<id>`; a package bumps only for a changeset that names it, so an sdk release re-releases no plugin.

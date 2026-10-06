@@ -1,0 +1,43 @@
+{
+  "//": "What SPACES_FAKE_PROVIDERS=1 answers in place of api.apollo.io, and what the worker's chaos and conformance suites run against. Matched on method and URL, exact URLs first; a query value of \"*\" matches any value and is spliced into the response file wherever it says {{name}}. Files are relative to fixtures/. The key travels in the x-api-key header and is never recorded.",
+  "keyHeader": "x-api-key",
+  "interactions": [
+    {
+      "method": "POST",
+      "url": "https://api.apollo.io/api/v1/organizations/enrich?domain=northwind-robotics.example",
+      "status": 200,
+      "file": "organization.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.apollo.io/api/v1/organizations/enrich?domain=no-such-company.example",
+      "status": 200,
+      "file": "organization-not-found.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.apollo.io/api/v1/people/match?email=meera%40northwind-robotics.example",
+      "status": 200,
+      "file": "person.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.apollo.io/api/v1/organizations/enrich?domain=*",
+      "status": 200,
+      "file": "cassette/organization-any.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.apollo.io/api/v1/people/match?email=*",
+      "status": 200,
+      "file": "cassette/person-any.json"
+    },
+    {
+      "method": "POST",
+      "url": "https://api.apollo.io/api/v1/people/match?linkedin_url=*",
+      "status": 200,
+      "file": "cassette/person-by-linkedin.json"
+    }
+  ],
+  "revoked": { "status": 401, "file": "cassette/error-401.json" }
+}

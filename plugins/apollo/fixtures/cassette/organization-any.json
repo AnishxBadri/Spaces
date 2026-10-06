@@ -1,0 +1,22 @@
+{
+  "organization": {
+    "id": "64b7f0c2a1e3d900015f0000",
+    "name": "{{domain}}",
+    "website_url": "http://www.{{domain}}",
+    "linkedin_url": "http://www.linkedin.com/company/{{domain}}",
+    "twitter_url": null,
+    "founded_year": 2018,
+    "primary_domain": "{{domain}}",
+    "industry": "computer software",
+    "keywords": ["b2b software", "workflow automation"],
+    "estimated_num_employees": 42,
+    "raw_address": "Kreuzberg, Berlin, Germany",
+    "city": "Berlin",
+    "state": "Berlin",
+    "country": "Germany",
+    "short_description": "Workflow software for operations teams at mid-sized manufacturers.",
+    "total_funding": 4000000,
+    "total_funding_printed": "4M"
+  },
+  "credits_consumed": 1
+}

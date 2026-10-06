@@ -5,6 +5,7 @@ import { requireEnv } from '#web/lib/server/env'
 import { QUEUES } from '@spaces/core/queue/names'
 import { startHeartbeat, workerIdentity } from './heartbeat'
 import { workerEnqueue } from './plugins/enqueue'
+import { FAKE_PROVIDERS_ENV, loadFakeProviders } from './plugins/fakes/switch'
 import { makePluginHost } from './plugins/host'
 import { listenPluginChanged } from './plugins/listen'
 import { makePluginReloader } from './plugins/reload'
@@ -71,11 +72,19 @@ async function main() {
   // crashes the box — so even a database error here is logged and the
   // worker goes on. After boot, `plugin_changed` reloads through the same
   // reloader (`listenPluginChanged` below).
+  // SPACES_FAKE_PROVIDERS=1: a plugin with an in-repo provider fake runs
+  // against it, keyless. Unset, nothing of the fakes is loaded.
+  const fakes = await loadFakeProviders()
+  if (fakes !== null)
+    console.log(
+      `[plugins] ${FAKE_PROVIDERS_ENV}=1: plugins with a recorded cassette answer from it, not the network`,
+    )
   const plugins = makePluginHost({
     enqueue: workerEnqueue(requireEnv('DATABASE_URL')),
     queues: { boss, host },
+    fakes,
   })
-  const reloader = makePluginReloader({ host: plugins })
+  const reloader = makePluginReloader({ host: plugins, fakes })
   reloader.request(null)
   await Effect.runPromise(reloader.settled())
 

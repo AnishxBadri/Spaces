@@ -124,6 +124,71 @@ jobs:
           path: apps/e2e/test-results/
           retention-days: 7
 
+  # The plugin suites with the network cut: the worker's (its chaos and
+  # conformance suites run every provider fake) and every plugin's own, run
+  # in a group whose outbound traffic the kernel rejects. Only loopback stays
+  # open — the Postgres service is published there — so a test that reached a
+  # provider fails here instead of passing on a machine with a network. The
+  # runner keeps its own network: the rule matches the `nonet` group, and
+  # only the test command runs in it.
+  # continue-on-error until this job has run green once on main; then drop
+  # that line and make `offline` a required check.
+  offline:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    services:
+      db:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: spaces
+          POSTGRES_PASSWORD: spaces
+          POSTGRES_DB: spaces
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U spaces -d spaces"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://spaces:spaces@localhost:5432/spaces
+      TURBO_TELEMETRY_DISABLED: '1'
+      DO_NOT_TRACK: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Built while the network is still there; under the cut, the suites'
+      # `^build` edges replay these from turbo's local cache.
+      - name: Build what the suites load
+        run: pnpm exec turbo run build --filter=@spaces/worker^... --filter='./plugins/*' --filter='./plugins/_fixtures/*'
+      - name: Cut the network for the nonet group (loopback stays open)
+        run: |
+          sudo groupadd --force nonet
+          echo "$USER ALL=(ALL:ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/nonet
+          for ipt in iptables ip6tables; do
+            sudo "$ipt" -A OUTPUT -m owner --gid-owner nonet -o lo -j ACCEPT
+            sudo "$ipt" -A OUTPUT -m owner --gid-owner nonet -j REJECT
+          done
+      # The self-check: a request out must fail and Postgres on loopback must
+      # answer, both from inside the group, or the suite below proves nothing.
+      - name: Self-check — no route out, Postgres on loopback
+        run: |
+          offline() { sudo -E -u "$USER" -g nonet env "PATH=$PATH" "HOME=$HOME" "$@"; }
+          if offline curl -sS --max-time 10 -o /dev/null https://example.com; then
+            echo "::error::https://example.com answered from inside nonet: the network is not cut"
+            exit 1
+          fi
+          offline node -e "require('node:net').connect(5432, '127.0.0.1').on('connect', () => process.exit(0)).on('error', (e) => { console.error(e.message); process.exit(1) })"
+      - name: Worker and plugin suites, offline
+        run: |
+          sudo -E -u "$USER" -g nonet env "PATH=$PATH" "HOME=$HOME" \
+            pnpm exec turbo run test --filter=@spaces/worker --filter='./plugins/*' --filter='./plugins/_fixtures/*'
+
   # The runtime image, built once per run as its own named job (SPA-183), so
   # a broken build is red under its own name rather than as the first step of
   # whichever job happened to try it. Also the build guard (SPA-152): the

@@ -39,6 +39,7 @@
   "devDependencies": {
     "@spaces/config": "workspace:*",
     "@spaces/plugin-airtable": "workspace:*",
+    "@spaces/plugin-apollo": "workspace:*",
     "@spaces/plugin-echo": "workspace:*",
     "@spaces/plugin-hooked": "workspace:*",
     "@spaces/plugin-importer": "workspace:*",

@@ -1,0 +1,15 @@
+{
+  "person": {
+    "id": "64c1d2e3f4a5b60001000001",
+    "name": null,
+    "linkedin_url": "{{linkedin_url}}",
+    "title": "Head of Operations",
+    "email_status": null,
+    "twitter_url": null,
+    "email": null,
+    "city": "Berlin",
+    "country": "Germany",
+    "seniority": "head",
+    "functions": ["operations"]
+  }
+}

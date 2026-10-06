@@ -14,6 +14,9 @@ import { JudgmentLive } from '@spaces/core/writes/ports/judgment'
 import type { LogSink } from '@spaces/core/writes/ports/log'
 import { ReadLive } from '@spaces/core/writes/ports/read'
 import { ReceiptsLive } from '@spaces/core/writes/ports/receipts'
+import { SecretsLive } from '@spaces/core/writes/ports/secrets'
+import { standInFor } from './fakes/switch'
+import type { FakeProviders } from './fakes/switch'
 import { PluginDbLive } from './plugin-db'
 
 /**
@@ -58,6 +61,8 @@ export type GrantOptions = {
   readonly enqueue: Layer.Layer<Enqueue>
   readonly fetch?: FetchLike
   readonly sink?: LogSink
+  /** `SPACES_FAKE_PROVIDERS`: a fake standing in for this plugin's provider wins over `fetch`. */
+  readonly fakes?: FakeProviders | null
 }
 
 const mergeList = <TError, TIn>(
@@ -83,13 +88,20 @@ export const grantLayer = (
   const handsBack: Array<Layer.Layer<never, never, Enqueue>> = []
 
   if (uses.some((port) => AMBIENT.includes(port))) {
+    const standIn = standInFor(options.fakes, row.capabilityId)
+    const fetch = standIn?.fetch ?? options.fetch
+    const ambient = AmbientPortsLive(row, {
+      settings: options.settings,
+      ...(options.rpm === undefined ? {} : { rpm: options.rpm }),
+      ...(fetch === undefined ? {} : { fetch }),
+      ...(options.sink === undefined ? {} : { sink: options.sink }),
+    })
+    // An unkeyed row a fake stands in for gets the fake's key; merged last,
+    // so it is the Secrets the job sees. A bound credential is still used.
     standalone.push(
-      AmbientPortsLive(row, {
-        settings: options.settings,
-        ...(options.rpm === undefined ? {} : { rpm: options.rpm }),
-        ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-        ...(options.sink === undefined ? {} : { sink: options.sink }),
-      }),
+      standIn === null || row.credentialId !== null
+        ? ambient
+        : Layer.merge(ambient, SecretsLive(row, standIn.secret)),
     )
   }
   for (const port of new Set(uses)) {
