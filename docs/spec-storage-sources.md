@@ -100,11 +100,46 @@ for `socialProviders`). The two legs are core's, once, for every provider.
     and path, `Max-Age=0`) whatever the outcome. No cookie → the dance is
     refused, as for an expired state.
   - Every later provider takes this as given; nothing re-decides it.
+- **Inbound — `GET /api/connections/<provider>/callback`.** No session →
+  a 401. Then, in order: `verifyState` against the session user (a bad
+  signature, a state older than ten minutes, another user's state, or a
+  state for another provider → 400); the provider's `error=` param → 400
+  naming it; the verifier cookie the state's nonce names, missing → 400 as
+  for an expired state. The code is traded at the registry's `tokenUrl`
+  (`grant_type=authorization_code`, `code`, `code_verifier`, the same
+  `redirect_uri`, and the `oauth_client` id and secret in the form body),
+  then the account is read from `userinfoUrl` with the access token —
+  google `sub` and `email`, box `id` and `login`. A refused exchange or an
+  unreadable account → `ExchangeFailed`, a 502; nothing is written before
+  both succeed. Then one upsert on `account_connection_unique`
+  `(user_id, provider, product, external_email)`:
+  - `tokens_enc` — `{ accessToken, refreshToken, tokenType }` as one JSON
+    string through the vault's `encryptSecret`, AAD
+    `connection:<user_id>:<provider>` (`encryptBundle`, core
+    `writes/connections/bundle`); another user's AAD fails the GCM tag.
+  - `scopes` — what the provider granted: the response's `scope` split on
+    spaces and mapped back to registry `value`s through `wire` (Google's
+    `…/auth/userinfo.email` is `email`); a response with no `scope` granted
+    exactly what was asked (RFC 6749 §5.1, which is Box). Never the
+    requested set.
+  - `expires_at` = now + `expires_in`; `refresh_token_expires_at` = now +
+    `refresh_token_expires_in` when the response carries it, else null
+    (Google's Testing-mode seven days is not in the response).
+  - `external_account_id` and `external_email` from userinfo; `status`
+    back to `active` and `error_reason` to null, so a repeat dance revives
+    an `error` row.
+  - Then a 302 to the state's return path. The verifier cookie is cleared
+    on every answer whose state is genuinely signed (`signedNonce`), refusal
+    or success; a forged state names no cookie of ours.
 - **Tests run against an in-repo fake IdP**, a node `http` server on an
   ephemeral loopback port (`startFakeIdp`, core `writes/connections/fake-idp`),
   not a container. Its `/authorize` records each query and answers 302 to
-  the `redirect_uri` with a `code` and the `state`; the start program takes
-  the provider table as an argument, so a test points an `authUrl` at it.
+  the `redirect_uri` with a `code` and the `state`; `/token` trades a code
+  once and only with the `code_verifier` whose S256 challenge `/authorize`
+  recorded (400 `invalid_grant` otherwise), with a partial-grant mode that
+  withholds scopes; `/userinfo` and `/2.0/users/me` answer its bearer
+  tokens in Google's and Box's shapes. Both programs take the provider
+  table as an argument, so a test points the URLs at it.
 
 **Coexist by role, decided:** Drive/Box = the fund's archive and
 collaboration surface, also an arrival channel. Our blob + derived layers =

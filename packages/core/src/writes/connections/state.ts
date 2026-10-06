@@ -88,6 +88,41 @@ export function signState(
 const invalid = (reason: StateInvalid['reason'], message: string) =>
   new StateInvalid({ reason, message })
 
+type Signed =
+  | { readonly ok: true; readonly payload: typeof Payload.Type }
+  | { readonly ok: false; readonly message: string }
+
+/** The payload, when the signature holds; age and user are not checked. */
+function signedPayload(token: string, master: Buffer): Signed {
+  const parts = token.split('.')
+  const [payload, signature] = parts
+  if (parts.length !== 2 || !payload || !signature)
+    return { ok: false, message: 'The connect state is malformed' }
+  const given = Buffer.from(signature, 'base64url')
+  const wanted = mac(master, payload)
+  if (given.length !== wanted.length || !timingSafeEqual(given, wanted))
+    return { ok: false, message: 'The connect state was altered' }
+  const decoded = decodePayload(
+    Buffer.from(payload, 'base64url').toString('utf8'),
+  )
+  if (Option.isNone(decoded))
+    return { ok: false, message: 'The connect state is malformed' }
+  return { ok: true, payload: decoded.value }
+}
+
+/**
+ * The nonce a genuinely signed state names, even an expired one or another
+ * user's — so a refused callback still clears its verifier cookie. Null when
+ * the signature does not hold: a forged state names no cookie.
+ */
+export function signedNonce(
+  token: string,
+  master: Buffer = loadMasterKey(),
+): string | null {
+  const signed = signedPayload(token, master)
+  return signed.ok ? signed.payload.nonce : null
+}
+
 /**
  * The state a callback was handed, checked: signature, then life, then the
  * session user. A malformed token is `tampered` like a re-signed one.
@@ -97,20 +132,9 @@ export const verifyState = Effect.fn('verifyState')(function* (
   expected: { readonly userId: string; readonly now?: number },
   master: Buffer = loadMasterKey(),
 ): Effect.fn.Return<ConnectState, StateInvalid> {
-  const parts = token.split('.')
-  const [payload, signature] = parts
-  if (parts.length !== 2 || !payload || !signature)
-    return yield* invalid('tampered', 'The connect state is malformed')
-  const given = Buffer.from(signature, 'base64url')
-  const wanted = mac(master, payload)
-  if (given.length !== wanted.length || !timingSafeEqual(given, wanted))
-    return yield* invalid('tampered', 'The connect state was altered')
-  const decoded = decodePayload(
-    Buffer.from(payload, 'base64url').toString('utf8'),
-  )
-  if (Option.isNone(decoded))
-    return yield* invalid('tampered', 'The connect state is malformed')
-  const state = decoded.value
+  const signed = signedPayload(token, master)
+  if (!signed.ok) return yield* invalid('tampered', signed.message)
+  const state = signed.payload
   const now = expected.now ?? Date.now()
   if (now - state.issuedAt > STATE_TTL_MS || state.issuedAt > now)
     return yield* invalid('expired', 'The connect request expired; start again')

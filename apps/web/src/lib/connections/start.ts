@@ -195,7 +195,8 @@ export const connectStartProgram = Effect.fn('connectStart')(function* (
   }
 })
 
-const sessionUser = Effect.fn('connectSession')(function* (
+/** The session's user, or `ConnectUnauthorized`; both legs read it. */
+export const sessionUser = Effect.fn('connectSession')(function* (
   request: Request,
 ): Effect.fn.Return<{ id: string }, ConnectUnauthorized | ConnectFailed> {
   const session = yield* Effect.tryPromise({
@@ -210,7 +211,8 @@ const sessionUser = Effect.fn('connectSession')(function* (
   return { id: session.user.id }
 })
 
-const text = (status: number, body: string) =>
+/** A plain-text answer no cache keeps. */
+export const text = (status: number, body: string) =>
   new Response(body, {
     status,
     headers: {

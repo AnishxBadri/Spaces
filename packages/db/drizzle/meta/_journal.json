@@ -484,6 +484,13 @@
       "when": 1791315924649,
       "tag": "0068_oauth_client_credential",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1791321042511,
+      "tag": "0069_account_connection_grant",
+      "breakpoints": true
     }
   ]
 }

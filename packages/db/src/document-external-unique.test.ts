@@ -69,12 +69,14 @@ describe('document storage-source provenance in Postgres', () => {
         {
           userId: `u-${tag}`,
           provider: 'google',
+          product: 'drive',
           externalEmail: `binder-${tag}@fund.example`,
           tokensEnc: Buffer.from('not a real token'),
         },
         {
           userId: `u-${tag}`,
           provider: 'box',
+          product: 'box',
           externalEmail: `binder-${tag}@fund.example`,
           tokensEnc: Buffer.from('not a real token'),
         },

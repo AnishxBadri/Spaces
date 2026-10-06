@@ -83,9 +83,9 @@ export const credential = pgTable(
 )
 
 /**
- * OAuth grants for data ingestion (Gmail/Calendar) — NEVER conflated with
- * auth sessions. "Login with Google" ≠ "sync my Gmail": different scopes,
- * consent, lifetime.
+ * OAuth grants for data ingestion (Gmail/Calendar/Drive/Box) — NEVER
+ * conflated with auth sessions. "Login with Google" ≠ "sync my Gmail":
+ * different scopes, consent, lifetime.
  */
 export const connectionStatus = pgEnum('connection_status', [
   'active',
@@ -93,6 +93,14 @@ export const connectionStatus = pgEnum('connection_status', [
   'revoked',
 ])
 
+/**
+ * One grant per user, provider, product (D66) and provider account.
+ * - `tokens_enc` is one encrypted JSON bundle (access, refresh, type), AAD
+ *   `connection:<user_id>:<provider>` — `encryptBundle`, never the
+ *   credential AAD.
+ * - `scopes` holds registry `value`s the provider granted, never the ones
+ *   asked for.
+ */
 export const accountConnection = pgTable(
   'account_connection',
   {
@@ -101,18 +109,33 @@ export const accountConnection = pgTable(
       .notNull()
       .references(() => user.id),
     provider: text('provider').notNull(),
+    /** `drive` · `calendar` · `gmail` under google, `box` under box. */
+    product: text('product').notNull(),
     externalEmail: text('external_email').notNull(),
+    /** The provider's own account id: Google `sub`, Box user `id`. */
+    externalAccountId: text('external_account_id'),
     tokensEnc: bytea('tokens_enc').notNull(),
+    scopes: text('scopes').array().notNull().default([]),
+    /** When the access token lapses. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    /** When the refresh token lapses, when the provider says (Box). */
+    refreshTokenExpiresAt: timestamp('refresh_token_expires_at', {
+      withTimezone: true,
+    }),
     status: connectionStatus('status').notNull().default('active'),
+    /** The provider's reason when `status` is `error`. */
+    errorReason: text('error_reason'),
     lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
+    // The callback's upsert target.
     uniqueIndex('account_connection_unique').on(
       t.userId,
       t.provider,
+      t.product,
       t.externalEmail,
     ),
   ],

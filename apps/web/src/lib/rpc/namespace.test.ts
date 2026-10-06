@@ -37,6 +37,7 @@ const underPrefix = (path: string) =>
 const RAW = [
   '/api/auth/$',
   '/api/blob/$key',
+  '/api/connections/$provider/callback',
   '/api/connections/$provider/start',
   '/api/health',
   '/api/job-status/$entityId',

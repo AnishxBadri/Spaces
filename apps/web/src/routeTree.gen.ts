@@ -61,6 +61,7 @@ import { Route as ApiWebhooksIdRouteImport } from './routes/api/webhooks/$id'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
 import { Route as AppSettingsIntegrationsIntegrationIdRouteImport } from './routes/_app/settings/integrations_.$integrationId'
 import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings/objects_.$objectSlug'
+import { Route as ApiConnectionsProviderCallbackRouteImport } from './routes/api/connections/$provider/callback'
 import { Route as ApiConnectionsProviderStartRouteImport } from './routes/api/connections/$provider/start'
 
 const IndexRoute = IndexRouteImport.update({
@@ -324,6 +325,12 @@ const AppSettingsObjectsObjectSlugRoute =
     path: '/objects/$objectSlug',
     getParentRoute: () => AppSettingsRoute,
   } as any)
+const ApiConnectionsProviderCallbackRoute =
+  ApiConnectionsProviderCallbackRouteImport.update({
+    id: '/api/connections/$provider/callback',
+    path: '/api/connections/$provider/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiConnectionsProviderStartRoute =
   ApiConnectionsProviderStartRouteImport.update({
     id: '/api/connections/$provider/start',
@@ -383,6 +390,7 @@ export interface FileRoutesByFullPath {
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
+  '/api/connections/$provider/callback': typeof ApiConnectionsProviderCallbackRoute
   '/api/connections/$provider/start': typeof ApiConnectionsProviderStartRoute
 }
 export interface FileRoutesByTo {
@@ -436,6 +444,7 @@ export interface FileRoutesByTo {
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
+  '/api/connections/$provider/callback': typeof ApiConnectionsProviderCallbackRoute
   '/api/connections/$provider/start': typeof ApiConnectionsProviderStartRoute
 }
 export interface FileRoutesById {
@@ -492,6 +501,7 @@ export interface FileRoutesById {
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/_app/settings/integrations_/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/_app/settings/objects_/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
+  '/api/connections/$provider/callback': typeof ApiConnectionsProviderCallbackRoute
   '/api/connections/$provider/start': typeof ApiConnectionsProviderStartRoute
 }
 export interface FileRouteTypes {
@@ -548,6 +558,7 @@ export interface FileRouteTypes {
     | '/o/$objectSlug/$recordId'
     | '/settings/integrations/$integrationId'
     | '/settings/objects/$objectSlug'
+    | '/api/connections/$provider/callback'
     | '/api/connections/$provider/start'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -601,6 +612,7 @@ export interface FileRouteTypes {
     | '/o/$objectSlug/$recordId'
     | '/settings/integrations/$integrationId'
     | '/settings/objects/$objectSlug'
+    | '/api/connections/$provider/callback'
     | '/api/connections/$provider/start'
   id:
     | '__root__'
@@ -656,6 +668,7 @@ export interface FileRouteTypes {
     | '/_app/o_/$objectSlug/$recordId'
     | '/_app/settings/integrations_/$integrationId'
     | '/_app/settings/objects_/$objectSlug'
+    | '/api/connections/$provider/callback'
     | '/api/connections/$provider/start'
   fileRoutesById: FileRoutesById
 }
@@ -672,6 +685,7 @@ export interface RootRouteChildren {
   ApiJobStatusEntityIdRoute: typeof ApiJobStatusEntityIdRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
   ApiWebhooksIdRoute: typeof ApiWebhooksIdRoute
+  ApiConnectionsProviderCallbackRoute: typeof ApiConnectionsProviderCallbackRoute
   ApiConnectionsProviderStartRoute: typeof ApiConnectionsProviderStartRoute
 }
 
@@ -1041,6 +1055,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsObjectsObjectSlugRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/api/connections/$provider/callback': {
+      id: '/api/connections/$provider/callback'
+      path: '/api/connections/$provider/callback'
+      fullPath: '/api/connections/$provider/callback'
+      preLoaderRoute: typeof ApiConnectionsProviderCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/connections/$provider/start': {
       id: '/api/connections/$provider/start'
       path: '/api/connections/$provider/start'
@@ -1163,6 +1184,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiJobStatusEntityIdRoute: ApiJobStatusEntityIdRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
   ApiWebhooksIdRoute: ApiWebhooksIdRoute,
+  ApiConnectionsProviderCallbackRoute: ApiConnectionsProviderCallbackRoute,
   ApiConnectionsProviderStartRoute: ApiConnectionsProviderStartRoute,
 }
 export const routeTree = rootRouteImport

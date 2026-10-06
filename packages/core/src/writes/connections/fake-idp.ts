@@ -1,36 +1,97 @@
+import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
 /**
  * An in-repo OAuth identity provider for tests: a node http server on an
  * ephemeral loopback port, no container, no network beyond the loopback.
- * - `/authorize` records each request's query and answers 302 to its
- *   `redirect_uri` with a `code` and the `state` it was given.
- * - Point a provider's `authUrl` at `authUrl` through the start program's
- *   `providers` argument.
+ * - `GET /authorize` records the query and answers 302 to `redirect_uri`
+ *   with a `code` and the `state` it was given.
+ * - `POST /token` trades a code once, only with the `code_verifier` whose
+ *   S256 challenge `/authorize` recorded — otherwise 400 `invalid_grant`.
+ * - `GET /userinfo` (Google's shape, `sub`/`email`) and `GET /2.0/users/me`
+ *   (Box's, `id`/`login`) answer a bearer token `/token` issued.
+ * - Point a provider's URLs at it through a program's `providers` argument.
  */
+
+export type FakeIdpMode = {
+  /** Wire scopes `/token` leaves out of its grant: a partial consent. */
+  withheldScopes: Array<string>
+  /** Answer `/token` with no `scope` field, as Box does. */
+  omitScope: boolean
+  /** Seconds, sent as `refresh_token_expires_in` when set. */
+  refreshTokenExpiresIn: number | null
+}
+
+export type FakeIdpAccount = { sub: string; email: string }
 
 export type FakeIdp = {
   /** `http://127.0.0.1:<port>` */
   readonly origin: string
   readonly authUrl: string
+  readonly tokenUrl: string
+  /** Google's shape. */
+  readonly userinfoUrl: string
+  /** Box's shape. */
+  readonly boxUserUrl: string
   /** Every `/authorize` query, in arrival order. */
   readonly authorizeRequests: Array<URLSearchParams>
+  /** Every `/token` form body, in arrival order. */
+  readonly tokenRequests: Array<URLSearchParams>
   /** The codes handed out, in the order they were issued. */
   readonly issuedCodes: Array<string>
+  /** Switches a test flips; `reset()` puts them back. */
+  readonly mode: FakeIdpMode
+  /** Whose account the userinfo endpoints describe. */
+  account: FakeIdpAccount
+  readonly reset: () => void
   readonly close: () => Promise<void>
 }
 
+type Pending = { challenge: string | null; scope: string }
+
+const FRESH_ACCOUNT: FakeIdpAccount = {
+  sub: '109876543210987654321',
+  email: 'anish@fund.example',
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Array<Buffer> = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', reject)
+  })
+}
+
+const s256 = (verifier: string) =>
+  createHash('sha256').update(verifier).digest('base64url')
+
 export async function startFakeIdp(): Promise<FakeIdp> {
   const authorizeRequests: Array<URLSearchParams> = []
+  const tokenRequests: Array<URLSearchParams> = []
   const issuedCodes: Array<string> = []
+  const pending = new Map<string, Pending>()
+  const accessTokens = new Set<string>()
+  const mode: FakeIdpMode = {
+    withheldScopes: [],
+    omitScope: false,
+    refreshTokenExpiresIn: null,
+  }
+  const idp = { account: { ...FRESH_ACCOUNT } }
 
-  const server = createServer((req, res) => {
-    const url = new URL(req.url ?? '/', 'http://fake-idp.invalid')
-    if (req.method !== 'GET' || url.pathname !== '/authorize') {
-      res.writeHead(404).end('Not found')
-      return
-    }
+  const json = (
+    res: ServerResponse,
+    status: number,
+    body: Record<string, unknown>,
+  ) => {
+    res
+      .writeHead(status, { 'content-type': 'application/json' })
+      .end(JSON.stringify(body))
+  }
+
+  const authorize = (url: URL, res: ServerResponse) => {
     authorizeRequests.push(url.searchParams)
     const redirect = url.searchParams.get('redirect_uri')
     if (redirect === null) {
@@ -39,11 +100,84 @@ export async function startFakeIdp(): Promise<FakeIdp> {
     }
     const code = `fake-code-${String(issuedCodes.length + 1)}`
     issuedCodes.push(code)
+    pending.set(code, {
+      challenge: url.searchParams.get('code_challenge'),
+      scope: url.searchParams.get('scope') ?? '',
+    })
     const back = new URL(redirect)
     back.searchParams.set('code', code)
     const state = url.searchParams.get('state')
     if (state !== null) back.searchParams.set('state', state)
     res.writeHead(302, { location: back.toString() }).end()
+  }
+
+  const token = (form: URLSearchParams, res: ServerResponse) => {
+    tokenRequests.push(form)
+    const invalid = (description: string) =>
+      json(res, 400, { error: 'invalid_grant', error_description: description })
+    if (form.get('grant_type') !== 'authorization_code')
+      return json(res, 400, { error: 'unsupported_grant_type' })
+    const code = form.get('code') ?? ''
+    const grant = pending.get(code)
+    if (grant === undefined) return invalid('Unknown or used code')
+    const verifier = form.get('code_verifier')
+    if (verifier === null || verifier === '')
+      return invalid('Missing code verifier')
+    if (grant.challenge === null || s256(verifier) !== grant.challenge)
+      return invalid('Invalid code verifier')
+    pending.delete(code)
+    const accessToken = `fake-access-${code}`
+    accessTokens.add(accessToken)
+    const granted = grant.scope
+      .split(' ')
+      .filter((s) => s !== '' && !mode.withheldScopes.includes(s))
+    json(res, 200, {
+      access_token: accessToken,
+      refresh_token: `fake-refresh-${code}`,
+      token_type: 'Bearer',
+      expires_in: 3599,
+      ...(mode.omitScope ? {} : { scope: granted.join(' ') }),
+      ...(mode.refreshTokenExpiresIn === null
+        ? {}
+        : { refresh_token_expires_in: mode.refreshTokenExpiresIn }),
+    })
+  }
+
+  const bearer = (req: IncomingMessage): boolean => {
+    const header = req.headers.authorization ?? ''
+    return (
+      header.startsWith('Bearer ') && accessTokens.has(header.slice(7).trim())
+    )
+  }
+
+  const server = createServer((req, res) => {
+    const url = new URL(req.url ?? '/', 'http://fake-idp.invalid')
+    const route = `${req.method ?? ''} ${url.pathname}`
+    switch (route) {
+      case 'GET /authorize':
+        return authorize(url, res)
+      case 'POST /token':
+        readBody(req).then(
+          (body) => token(new URLSearchParams(body), res),
+          () => res.writeHead(400).end(),
+        )
+        return
+      case 'GET /userinfo':
+        if (!bearer(req)) return json(res, 401, { error: 'invalid_token' })
+        return json(res, 200, {
+          sub: idp.account.sub,
+          email: idp.account.email,
+        })
+      case 'GET /2.0/users/me':
+        if (!bearer(req)) return json(res, 401, { error: 'invalid_token' })
+        return json(res, 200, {
+          type: 'user',
+          id: idp.account.sub,
+          login: idp.account.email,
+        })
+      default:
+        res.writeHead(404).end('Not found')
+    }
   })
 
   await new Promise<void>((resolve) => {
@@ -58,8 +192,27 @@ export async function startFakeIdp(): Promise<FakeIdp> {
   return {
     origin,
     authUrl: `${origin}/authorize`,
+    tokenUrl: `${origin}/token`,
+    userinfoUrl: `${origin}/userinfo`,
+    boxUserUrl: `${origin}/2.0/users/me`,
     authorizeRequests,
+    tokenRequests,
     issuedCodes,
+    mode,
+    get account() {
+      return idp.account
+    },
+    set account(next: FakeIdpAccount) {
+      idp.account = next
+    },
+    reset: () => {
+      authorizeRequests.length = 0
+      tokenRequests.length = 0
+      mode.withheldScopes = []
+      mode.omitScope = false
+      mode.refreshTokenExpiresIn = null
+      idp.account = { ...FRESH_ACCOUNT }
+    },
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()))
