@@ -539,3 +539,17 @@ _Carried by_ the record port slice beside SPA-214 for shipped routes, and the an
 _Rejected:_ `Identity.resolve` and `Facts.fill` row by row (no SDK change, but no preview, no `import_batch`, no batch void and no idempotent re-run).
 
 _Carried by_ SPA-172 (`plugins/airtable`).
+
+### D75-identity-is-a-unique-attribute
+
+**Is identity (a person's emails, a company's domains) an attribute or something outside the attribute engine?** Until now it lived only in `entity_alias`: never in `entity.values`, never in views, imports or the API's `values`. Each record page drew it with its own hand-built rows, and SPA-300 moved LinkedIn there too. The owner compared Attio's people object, where `email_addresses` is an ordinary multi-value attribute marked **unique** and LinkedIn is plain text. Answered (owner, 2026-10-06): **identity is a unique attribute, and `entity_alias` is its index.**
+
+- **Person `emails`, company `domains` and company `cin` are system attributes**, multi-valued, carrying `options.identityKey`. They live in `entity.values` like every other value, so the record page, views, filters, import mapping, history and the API all see them with no special path.
+- **`entity_alias` stays, as the enforcer.** `setValues` mirrors every identity-key value into an `is_identity` alias in the same transaction. This is the machinery custom objects' identity keys already use (SPA-95): `claimIdentityAlias` in a savepoint, a concurrent `23505` becomes a `duplicate_candidate`, and a removed value retires its alias. The partial unique index on `(kind, value_norm) WHERE is_identity` is still what makes "one owner per key" true under concurrency, and `resolveEntity` still matches on it. Postgres cannot index uniqueness inside a jsonb array; Attio gets it from storing one row per value, and the alias table is that row for the keys that need it.
+- **LinkedIn is a plain `url` attribute on people and companies**: optional, not unique, not matched on, as in Attio. This reverses SPA-300's move of LinkedIn into `entity_alias`. A recaptured founder is matched by email when there is one, and otherwise reaches Review as a fuzzy-name duplicate candidate.
+- **Name aliases are unchanged.** They are history, never identity, and stay alias-only.
+- **Supersedes** the rule in CONTEXT.md "Hard exclusions, never attributes … all identity" and the seeded-attributes note that emails and LinkedIn are aliases, not attributes.
+
+_Rejected:_ identity only in `entity_alias` (the shape until now: invisible to views, imports and the API, and drawn by hand on each page); identity as plain attributes with no index (uniqueness becomes check-then-write in application code, and two concurrent imports both pass); LinkedIn as a unique identity key (Attio does not; the owner chose the simpler field).
+
+_Carried by_ the Corrections slice that follows SPA-300. SPA-302 is cancelled, because the API's `values` now carry identity, and SPA-303 is rewritten so the deck reader fills the LinkedIn attribute again.

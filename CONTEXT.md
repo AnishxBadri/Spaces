@@ -951,9 +951,13 @@ enum branch in any registry read. `description` landed 2026-09 (migration
 - **Unified storage:** all attribute values — system and custom — live in `entity.values`
   jsonb, keyed by slug. One write path, one validator (zod per type at write time), one
   renderer, one indexing story. No column-vs-jsonb branching anywhere.
-- **Hard exclusions, never attributes:** `kind`, `canonical_name`, `merged_into_id`, and
-  all identity (domains/emails/linkedin/cin live in `entity_alias` under resolution rules).
+- **Hard exclusions, never attributes:** `kind`, `canonical_name`, `merged_into_id`.
   The opinionated core stays code-owned; attributes are display/filter/sort data.
+- **Identity is a unique attribute (D75, 2026-10-06; supersedes "identity is never an
+  attribute").** Person `emails`, company `domains` and company `cin` are multi-valued
+  system attributes carrying `options.identityKey`; `setValues` mirrors each value into an
+  `is_identity` alias in the same transaction, and that alias table — its partial unique
+  index — is what enforces one owner per key and what `resolveEntity` matches on.
 - **Type menu is fixed** (users define attributes, never types): text, number, currency,
   date, checkbox, select, multi-select, status (options carry a group:
   active/parked/closed), domain, email, url, phone, rating, **record-reference**,
@@ -1131,13 +1135,12 @@ enum branch in any registry read. `description` landed 2026-09 (migration
 
 - **Company:** description (text) · business_model (multi-select) · funding_stage (select:
   Pre-seed → Public/Bootstrapped) · location (text) · founded_year (number).
-  Website is the domain alias rendered, never an attribute; LinkedIn likewise.
+  domains (domain, multi, identity) · cin (text, identity) · linkedin (url, plain) (D75).
 - **Person:** job_title (text) · description · location · twitter (url) ·
-  phone (phone). Emails and LinkedIn are identity aliases, not attributes.
-- **LinkedIn left the registry 2026-10-06** (migration 0063): every person/company
-  `values.linkedin` became a `linkedin` identity alias and the two attribute rows were
-  archived, so a URL typed on the record now helps `resolveEntity` match. The record
-  pages and the People/Companies lists read it from `entity_alias`.
+  phone (phone) · emails (email, multi, identity) · linkedin (url, plain) (D75).
+- **LinkedIn is a plain attribute (D75).** SPA-300 (migration 0063) briefly made it a
+  `linkedin` identity alias; D75 reverses that, as Attio models it: optional, not
+  unique, not matched on.
 - **Deal:** stage (status) · value (currency) · company (ref, required single) · people
   (ref, multi) · owner (actor) · close_date (date) · source (select: Inbound · Referral ·
   Outbound · Event) · close_reason (text — **added 2026-08-08** with the board, the
@@ -1361,7 +1364,8 @@ see "Lists — deferred").
 ### Entity resolution & merge
 
 **Doctrine: deterministic auto, probabilistic suggest.** Identity comes only from
-deterministic keys — domain, email, LinkedIn URL, CIN. Exact key match auto-attaches. Fuzzy
+deterministic keys — domain, email, CIN (LinkedIn URL on people and companies is a plain
+attribute since D75; a custom object may still declare `linkedin` as its identity key). Exact key match auto-attaches. Fuzzy
 name match **suggests, never merges** — no threshold is safe ("Stripe" payments vs "Stripe"
 design agency corrupts silently). Fuzzy feeds a dedupe inbox; a human clicks.
 
