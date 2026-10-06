@@ -13,6 +13,7 @@ import { ExtractionStore, extractDocument } from './jobs/extract-document'
 import { clipDocument } from './jobs/clip-document'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
+import { pruneIngress } from './jobs/prune-ingress'
 import { readDeck } from './jobs/read-deck'
 import { summarize } from './jobs/summarize'
 import { embedDocument } from './jobs/embed-document'
@@ -414,6 +415,12 @@ async function main() {
     { includeMetadata: true },
     runJob(sweepOrphanBlobs, { host, layer: Layer.empty }),
   )
+  // Stored webhook deliveries past their retention: one delete, no Layer.
+  await boss.work(
+    QUEUES.pruneIngress,
+    { includeMetadata: true },
+    runJob(pruneIngress, { host, layer: Layer.empty }),
+  )
 
   // Nightly dedupe sweep at 03:30.
   await boss.schedule(QUEUES.dedupeSweep, '30 3 * * *', undefined, {
@@ -424,6 +431,11 @@ async function main() {
   // beside it, so the two nightly scans never contend for the same tick on a
   // single-worker self-host.
   await boss.schedule(QUEUES.sweepOrphanBlobs, '10 4 * * *', undefined, {
+    tz: 'Etc/UTC',
+  })
+
+  // And the ingress prune at 04:40, after both.
+  await boss.schedule(QUEUES.pruneIngress, '40 4 * * *', undefined, {
     tz: 'Etc/UTC',
   })
 

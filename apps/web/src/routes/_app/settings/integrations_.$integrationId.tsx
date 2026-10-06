@@ -3,8 +3,10 @@ import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   DropDataOption,
+  SECRET_GROUPS,
   SecretFieldRow,
   SettingsFields,
+  WebhookUrlRow,
 } from '#/components/integrations/integration-settings'
 import {
   STATE_WORD,
@@ -29,7 +31,11 @@ import {
   uninstallIntegration,
   updateIntegration,
 } from '#/lib/server-fns'
-import type { FormValue, IntegrationDetail } from '#/lib/server-fns'
+import type {
+  FormValue,
+  IntegrationDetail,
+  SecretField,
+} from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
@@ -157,6 +163,50 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
     }
   }
 
+  function secretRow(field: SecretField) {
+    return (
+      <SecretFieldRow
+        key={field.slot}
+        field={field}
+        value={secrets[field.slot] ?? ''}
+        disabled={pending}
+        onChange={(v) => setSecrets((s) => ({ ...s, [field.slot]: v }))}
+        onSave={() =>
+          void act(async () => {
+            const { display } = await saveIntegrationSecret({
+              data: {
+                id: detail.id,
+                slot: field.slot,
+                secret: secrets[field.slot] ?? '',
+              },
+            })
+            setSecrets((s) => ({ ...s, [field.slot]: '' }))
+            return display
+          }, `${field.label} saved · reloading`)
+        }
+        onRemove={() =>
+          void confirm({
+            title: `Remove the ${field.label}?`,
+            body:
+              field.slot === 'webhook'
+                ? `${detail.name} refuses webhook deliveries until a new secret is saved.`
+                : `${detail.name} stops until a new key is saved.`,
+            action: 'Remove',
+          }).then((ok) => {
+            if (ok)
+              void act(
+                () =>
+                  removeIntegrationSecret({
+                    data: { id: detail.id, slot: field.slot },
+                  }),
+                `${field.label} removed`,
+              )
+          })
+        }
+      />
+    )
+  }
+
   const tripped = detail.state === 'tripped'
   return (
     <SettingsSection
@@ -245,57 +295,28 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
         </div>
       ) : null}
 
-      {detail.secrets.length > 0 ? (
-        <div className="flex flex-col pt-8">
-          <SectionHead
-            as="h3"
-            title="Key"
-            count={
-              detail.secrets.every((s) => s.display !== null)
-                ? 'saved'
-                : 'not yet'
-            }
-          />
-          {detail.secrets.map((field) => (
-            <SecretFieldRow
-              key={field.slot}
-              field={field}
-              value={secrets[field.slot] ?? ''}
-              disabled={pending}
-              onChange={(v) => setSecrets((s) => ({ ...s, [field.slot]: v }))}
-              onSave={() =>
-                void act(async () => {
-                  const { display } = await saveIntegrationSecret({
-                    data: {
-                      id: detail.id,
-                      slot: field.slot,
-                      secret: secrets[field.slot] ?? '',
-                    },
-                  })
-                  setSecrets((s) => ({ ...s, [field.slot]: '' }))
-                  return display
-                }, `${field.label} saved · reloading`)
-              }
-              onRemove={() =>
-                void confirm({
-                  title: `Remove the ${field.label}?`,
-                  body: `${detail.name} stops until a new key is saved.`,
-                  action: 'Remove',
-                }).then((ok) => {
-                  if (ok)
-                    void act(
-                      () =>
-                        removeIntegrationSecret({
-                          data: { id: detail.id, slot: field.slot },
-                        }),
-                      `${field.label} removed`,
-                    )
-                })
+      {SECRET_GROUPS.map(({ slot, title }) => {
+        const fields = detail.secrets.filter((s) => s.slot === slot)
+        const url = slot === 'webhook' ? detail.webhookUrl : null
+        if (fields.length === 0 && url === null) return null
+        return (
+          <div key={slot} className="flex flex-col pt-8">
+            <SectionHead
+              as="h3"
+              title={fields.length === 0 ? 'Webhook' : title}
+              count={
+                fields.length === 0
+                  ? null
+                  : fields.every((s) => s.display !== null)
+                    ? 'saved'
+                    : 'not yet'
               }
             />
-          ))}
-        </div>
-      ) : null}
+            {url !== null ? <WebhookUrlRow url={url} /> : null}
+            {fields.map(secretRow)}
+          </div>
+        )
+      })}
 
       <SettingsFields
         form={detail.form}

@@ -80,6 +80,14 @@ export const integration = pgTable('integration', {
   cursors: jsonb('cursors').$type<IntegrationCursors>(),
   /** BYOK key (an Apollo token); null for a plugin that needs none. */
   credentialId: uuid('credential_id').references(() => credential.id),
+  /**
+   * The webhook signing secret, for a manifest declaring
+   * `ingress.signature: 'hmac-sha256'`; null until the operator saves one.
+   * One column per secret slot — never overloads `credential_id`.
+   */
+  webhookCredentialId: uuid('webhook_credential_id').references(
+    () => credential.id,
+  ),
   /** OAuth grant (a Gmail mailbox); null for a plugin that needs none. */
   connectionId: uuid('connection_id').references(() => accountConnection.id),
   errorCount: integer('error_count').notNull().default(0),

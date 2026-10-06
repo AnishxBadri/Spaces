@@ -29,17 +29,21 @@ const apiRoutes = (): Array<string> => {
 const underPrefix = (path: string) =>
   path === API_PREFIX || path.startsWith(`${API_PREFIX}/`)
 
-/** Raw by design, and mounted today. The job-status stream is SSE (D64). */
+/**
+ * Raw by design, and mounted today. The job-status stream is SSE (D64); the
+ * webhook ingress verifies an HMAC over the exact raw body.
+ */
 const RAW = [
   '/api/auth/$',
   '/api/blob/$key',
   '/api/health',
   '/api/job-status/$entityId',
   '/api/mcp',
+  '/api/webhooks/$id',
 ]
 
-/** Raw by design, mounted by the ingress slice (sdk-23) when it lands. */
-const RAW_TO_COME = ['/api/webhooks/$provider']
+/** Raw by design, not mounted yet. */
+const RAW_TO_COME: ReadonlyArray<string> = []
 
 describe(`the ${API_PREFIX} namespace`, () => {
   it('is one splat route and nothing else', () => {

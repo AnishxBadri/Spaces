@@ -458,6 +458,23 @@ unsafe-entry · manifest-missing · manifest-mismatch`, checking the
   `removed_at` on that row rather than minting a new one. Rejected: nulling
   the references — tidy tables, but the values would read as hand-entered
   (D12's append-only spirit).
+- **Webhook ingress, as built (sdk-23).** `POST /api/webhooks/<integration
+id>` — the row id, never the plugin id. Web runs core's
+  `receiveWebhookProgram` and never plugin code: it looks the row up, then
+  answers one identical 404 unless the row is enabled, running, not removed
+  and its stored manifest declares `ingress` and a `webhook` job, so an id
+  cannot be probed. `ingress.signature: 'hmac-sha256'` means
+  `x-spaces-signature: sha256=<hex HMAC of the raw body>`, checked in
+  constant time against the webhook secret — a second secret slot on the
+  integration card, stored in the vault as kind `webhook` under provider
+  `<plugin id>:webhook` (the plugin id already names its API key, and
+  `credential` is unique per provider) and bound to its own column,
+  `integration.webhook_credential_id`; a missing or wrong signature, or no
+  saved secret, is 401. Bodies over 1 MiB are 413 before anything is read
+  past the limit. An accepted delivery is stored raw in `ingress_payload`
+  and `{ payload, receivedAt }` is enqueued on each webhook job's
+  `plugin.<id>.<job>` queue; 200 follows at once. **Retention: 7 days**
+  (`INGRESS_RETENTION_DAYS`), deleted by the nightly `ingress.prune` job.
 
 **Workers and jobs.** pg-boss stays the queue (paradigm 6); the worker is a
 plain Node process whose handlers become Effect programs run by one

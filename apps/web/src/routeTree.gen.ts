@@ -56,6 +56,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
 import { Route as ApiJobStatusEntityIdRouteImport } from './routes/api/job-status/$entityId'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
+import { Route as ApiWebhooksIdRouteImport } from './routes/api/webhooks/$id'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
 import { Route as AppSettingsIntegrationsIntegrationIdRouteImport } from './routes/_app/settings/integrations_.$integrationId'
 import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings/objects_.$objectSlug'
@@ -294,6 +295,11 @@ const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
   path: '/api/v1/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWebhooksIdRoute = ApiWebhooksIdRouteImport.update({
+  id: '/api/webhooks/$id',
+  path: '/api/webhooks/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppOObjectSlugRecordIdRoute = AppOObjectSlugRecordIdRouteImport.update({
   id: '/o_/$objectSlug/$recordId',
   path: '/o/$objectSlug/$recordId',
@@ -358,6 +364,7 @@ export interface FileRoutesByFullPath {
   '/api/blob/$key': typeof ApiBlobKeyRoute
   '/api/job-status/$entityId': typeof ApiJobStatusEntityIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/api/webhooks/$id': typeof ApiWebhooksIdRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
@@ -408,6 +415,7 @@ export interface FileRoutesByTo {
   '/api/blob/$key': typeof ApiBlobKeyRoute
   '/api/job-status/$entityId': typeof ApiJobStatusEntityIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/api/webhooks/$id': typeof ApiWebhooksIdRoute
   '/settings': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
@@ -461,6 +469,7 @@ export interface FileRoutesById {
   '/api/blob/$key': typeof ApiBlobKeyRoute
   '/api/job-status/$entityId': typeof ApiJobStatusEntityIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/api/webhooks/$id': typeof ApiWebhooksIdRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/_app/settings/integrations_/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
@@ -514,6 +523,7 @@ export interface FileRouteTypes {
     | '/api/blob/$key'
     | '/api/job-status/$entityId'
     | '/api/v1/$'
+    | '/api/webhooks/$id'
     | '/settings/'
     | '/o/$objectSlug/$recordId'
     | '/settings/integrations/$integrationId'
@@ -564,6 +574,7 @@ export interface FileRouteTypes {
     | '/api/blob/$key'
     | '/api/job-status/$entityId'
     | '/api/v1/$'
+    | '/api/webhooks/$id'
     | '/settings'
     | '/o/$objectSlug/$recordId'
     | '/settings/integrations/$integrationId'
@@ -616,6 +627,7 @@ export interface FileRouteTypes {
     | '/api/blob/$key'
     | '/api/job-status/$entityId'
     | '/api/v1/$'
+    | '/api/webhooks/$id'
     | '/_app/settings/'
     | '/_app/o_/$objectSlug/$recordId'
     | '/_app/settings/integrations_/$integrationId'
@@ -634,6 +646,7 @@ export interface RootRouteChildren {
   ApiBlobKeyRoute: typeof ApiBlobKeyRoute
   ApiJobStatusEntityIdRoute: typeof ApiJobStatusEntityIdRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
+  ApiWebhooksIdRoute: typeof ApiWebhooksIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -967,6 +980,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/webhooks/$id': {
+      id: '/api/webhooks/$id'
+      path: '/api/webhooks/$id'
+      fullPath: '/api/webhooks/$id'
+      preLoaderRoute: typeof ApiWebhooksIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/o_/$objectSlug/$recordId': {
       id: '/_app/o_/$objectSlug/$recordId'
       path: '/o/$objectSlug/$recordId'
@@ -1100,6 +1120,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBlobKeyRoute: ApiBlobKeyRoute,
   ApiJobStatusEntityIdRoute: ApiJobStatusEntityIdRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
+  ApiWebhooksIdRoute: ApiWebhooksIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

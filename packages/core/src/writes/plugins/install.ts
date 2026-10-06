@@ -321,11 +321,12 @@ const remove = async (
         removedAt: new Date(),
         enabled: false,
         credentialId: null,
+        webhookCredentialId: null,
         ...(op.dropData ? { cursors: null } : {}),
       })
       .where(eq(integration.id, live.id))
-    if (live.credentialId !== null)
-      await releaseCredential(tx, live.id, live.credentialId)
+    for (const held of [live.credentialId, live.webhookCredentialId])
+      if (held !== null) await releaseCredential(tx, live.id, held)
     if (op.dropData) await tx.execute(dropPluginSchemaStatement(id))
 
     const lock = await readLock(root).catch(() => null)

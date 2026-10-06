@@ -1,5 +1,4 @@
 import {
-  customType,
   pgEnum,
   pgTable,
   text,
@@ -10,13 +9,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { user } from './auth'
+import { bytea } from './helpers'
 import type { Json } from '../json'
-
-const bytea = customType<{ data: Buffer }>({
-  dataType() {
-    return 'bytea'
-  },
-})
 
 /**
  * BYOK credential vault. One framework, all providers — LLM keys are just

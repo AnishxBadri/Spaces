@@ -1,0 +1,30 @@
+{
+  "//": "A fixture, not a product: one `webhook` job, `ingest`, that reads the delivered payload `{ entityId, title }` and emits it as a signal on that record through Content.emitSignal. Its manifest declares `ingress: { signature: 'hmac-sha256' }`, so web verifies a delivery before the worker ever sees it. The worker's ingress live test drives it end to end.",
+  "name": "@spaces/plugin-hooked",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
+    "zod": "^4.3.6"
+  }
+}

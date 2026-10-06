@@ -1,4 +1,4 @@
-import { and, eq, ne } from 'drizzle-orm'
+import { and, eq, ne, or } from 'drizzle-orm'
 import type { db } from '@spaces/db'
 import { credential, integration } from '@spaces/db/schema'
 
@@ -6,8 +6,9 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 /**
  * Deletes the vault row an integration held, unless another integration
- * still holds it. The caller has already unbound it from `integrationId` in
- * the same transaction. Removing a key and uninstalling both end here.
+ * still holds it in any secret slot. The caller has already unbound it from
+ * `integrationId` in the same transaction. Removing a key and uninstalling
+ * both end here.
  */
 export const releaseCredential = async (
   tx: Tx,
@@ -19,7 +20,10 @@ export const releaseCredential = async (
     .from(integration)
     .where(
       and(
-        eq(integration.credentialId, credentialId),
+        or(
+          eq(integration.credentialId, credentialId),
+          eq(integration.webhookCredentialId, credentialId),
+        ),
         ne(integration.id, integrationId),
       ),
     )

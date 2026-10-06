@@ -19,8 +19,11 @@ import {
   integration,
   jobRun,
 } from '@spaces/db/schema'
+import type { credentialKind } from '@spaces/db/schema'
+import { webhookSecretProvider } from '@spaces/core/writes/ingress/receive'
 import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
+import { describeExternalOrigin } from '#/lib/server/external-origin'
 import { newestVersionsProgram, updateOf } from './registry'
 import type { RegistrySource } from './registry'
 import { formValuesOf, settingsFormOf } from './settings-form'
@@ -79,9 +82,53 @@ export type IntegrationRow = {
   readonly update: string | null
 }
 
+/** A vault secret a manifest can ask for, each bound to its own `integration` column. */
+export type SecretSlot = 'credential' | 'webhook'
+
+type Row = typeof integration.$inferSelect
+type CredentialKind = (typeof credentialKind.enumValues)[number]
+
+/**
+ * Where each slot lives: the kind and provider it is stored under in the
+ * vault and the column that binds it. A third secret is one more entry.
+ * - `required`: the loader degrades a row without it ('missing credential').
+ */
+export const SECRET_SLOTS: {
+  readonly [S in SecretSlot]: {
+    readonly kindOf: (manifest: Manifest) => CredentialKind | undefined
+    readonly provider: (pluginId: string) => string
+    readonly held: (row: Row) => string | null
+    readonly bind: (
+      credentialId: string | null,
+    ) => Pick<Partial<Row>, 'credentialId' | 'webhookCredentialId'>
+    readonly label: (name: string) => string
+    readonly required: boolean
+  }
+} = {
+  credential: {
+    kindOf: (m) => m.requires?.credential?.kind,
+    provider: (pluginId) => pluginId,
+    held: (row) => row.credentialId,
+    bind: (credentialId) => ({ credentialId }),
+    label: (name) => `${name} key`,
+    required: true,
+  },
+  webhook: {
+    kindOf: (m) =>
+      m.ingress?.signature === 'hmac-sha256' ? 'webhook' : undefined,
+    provider: webhookSecretProvider,
+    held: (row) => row.webhookCredentialId,
+    bind: (webhookCredentialId) => ({ webhookCredentialId }),
+    label: (name) => `${name} webhook secret`,
+    required: false,
+  },
+}
+
+const SLOT_ORDER: ReadonlyArray<SecretSlot> = ['credential', 'webhook']
+
 /** One vault secret the manifest asks for. One entry per slot, so a second secret is one more entry. */
 export type SecretField = {
-  readonly slot: 'credential'
+  readonly slot: SecretSlot
   readonly label: string
   /** The redacted display stored at save time; null when nothing is saved. */
   readonly display: string | null
@@ -95,6 +142,8 @@ export type IntegrationDetail = IntegrationRow & {
   /** The form's starting values, from `integration.config`. */
   readonly values: FormValues
   readonly secrets: ReadonlyArray<SecretField>
+  /** Where a provider posts deliveries, when the manifest declares ingress. */
+  readonly webhookUrl: string | null
 }
 
 const query = <T>(run: () => Promise<T>) =>
@@ -108,8 +157,6 @@ export const manifestOf = (stored: unknown): Manifest | null => {
   const parsed = manifestSchema.safeParse(stored)
   return parsed.success ? parsed.data : null
 }
-
-type Row = typeof integration.$inferSelect
 
 export const stateOf = (
   row: Row,
@@ -157,14 +204,14 @@ const capOf = (
   return fallback.success ? fallback.data : null
 }
 
-const secretsOf = (
+/** `<APP_URL>/api/webhooks/<integration id>`: the row id, never the plugin id. */
+export const webhookUrlOf = (
   manifest: Manifest | null,
-  name: string,
-  display: string | null,
-): ReadonlyArray<SecretField> =>
-  manifest?.requires?.credential === undefined
-    ? []
-    : [{ slot: 'credential', label: `${name} key`, display }]
+  id: string,
+): string | null =>
+  manifest?.ingress === undefined
+    ? null
+    : `${describeExternalOrigin(process.env.APP_URL).origin}/api/webhooks/${id}`
 
 const fixOf = (row: Row, manifest: Manifest | null): string | null => {
   if (manifest === null || row.status !== 'degraded') return null
@@ -341,16 +388,32 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
         message: 'That integration is not installed',
       })
     const { row, manifest, view } = read
-    const stored =
-      row.credentialId === null
-        ? undefined
-        : (yield* query(() =>
-            db
-              .select({ meta: credential.meta })
-              .from(credential)
-              .where(eq(credential.id, row.credentialId ?? '')),
-          )).at(0)
-    const display = displaySchema.safeParse(stored?.meta)
+    const secrets: Array<SecretField> = []
+    for (const slot of SLOT_ORDER) {
+      const spec = SECRET_SLOTS[slot]
+      if (manifest === null || spec.kindOf(manifest) === undefined) continue
+      const held = spec.held(row)
+      const stored =
+        held === null
+          ? undefined
+          : (yield* query(() =>
+              db
+                .select({ meta: credential.meta })
+                .from(credential)
+                .where(eq(credential.id, held)),
+            )).at(0)
+      const display = displaySchema.safeParse(stored?.meta)
+      secrets.push({
+        slot,
+        label: spec.label(view.name),
+        display:
+          held === null
+            ? null
+            : display.success
+              ? display.data.display
+              : '••••',
+      })
+    }
     const form: SettingsForm =
       manifest === null
         ? {
@@ -365,15 +428,8 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
       fix: fixOf(row, manifest),
       form,
       values: form.ok ? formValuesOf(form.fields, row.config) : {},
-      secrets: secretsOf(
-        manifest,
-        view.name,
-        row.credentialId === null
-          ? null
-          : display.success
-            ? display.data.display
-            : '••••',
-      ),
+      secrets,
+      webhookUrl: webhookUrlOf(manifest, row.id),
     }
   },
 )

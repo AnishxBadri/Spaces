@@ -150,6 +150,12 @@ export const QUEUES = {
    * a failed row is re-run on its own, by the operator.
    */
   importCommit: 'import.commit',
+  /**
+   * Nightly delete of stored webhook deliveries past
+   * `INGRESS_RETENTION_DAYS`. One statement; retried, since a re-run of a
+   * delete by cutoff is a no-op.
+   */
+  pruneIngress: 'ingress.prune',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

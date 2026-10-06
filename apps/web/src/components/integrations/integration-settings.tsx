@@ -10,15 +10,17 @@ import type {
   FormValue,
   FormValues,
   SecretField,
+  SecretSlot,
   SettingsField,
   SettingsForm,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
- * One plugin's settings card, drawn from its manifest: the key fields its
- * `requires` asks for, then one row per setting — a switch for a boolean, a
- * picker for an enum, a field for a number or a string.
+ * One plugin's settings card, drawn from its manifest: one group per secret
+ * slot it asks for (its key, its webhook secret with the webhook URL), then
+ * one row per setting — a switch for a boolean, a picker for an enum, a
+ * field for a number or a string.
  * - A field that failed its schema turns its row rose and says why under the
  *   label, with `not saved`; nothing is written until every field passes.
  * - A saved key is never shown: the row reads its redacted display.
@@ -205,9 +207,48 @@ export function SettingsFields({
   )
 }
 
+/** Each secret slot's group heading, in the order the card draws them. */
+export const SECRET_GROUPS: ReadonlyArray<{
+  readonly slot: SecretSlot
+  readonly title: string
+}> = [
+  { slot: 'credential', title: 'Key' },
+  { slot: 'webhook', title: 'Webhook secret' },
+]
+
+const nounOf = (slot: SecretSlot) => (slot === 'webhook' ? 'secret' : 'key')
+
 /**
- * One key field. Write-only: the input starts empty every time; a saved key
- * reads as its redacted display, and an empty save keeps it.
+ * Where the provider posts deliveries. Read-only; the row id in it is what
+ * makes it unguessable, so it is shown only here, to the admin.
+ */
+export function WebhookUrlRow({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-rule px-3 py-2">
+      <div className="flex min-w-0 flex-col">
+        <span className="text-ui font-medium">Webhook URL</span>
+        <span className="truncate mono text-micro text-graphite select-all">
+          {url}
+        </span>
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() =>
+          void navigator.clipboard.writeText(url).then(() => setCopied(true))
+        }
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * One secret field. Write-only: the input starts empty every time; a saved
+ * secret reads as its redacted display, and an empty save keeps it.
  */
 export function SecretFieldRow({
   field,
@@ -225,6 +266,7 @@ export function SecretFieldRow({
   onRemove: () => void
 }) {
   const saved = field.display !== null
+  const noun = nounOf(field.slot)
   const id = `secret-${field.slot}`
   return (
     <form
@@ -251,7 +293,7 @@ export function SecretFieldRow({
           autoComplete="off"
           spellCheck={false}
           value={value}
-          placeholder={saved ? '••••••••' : 'Paste the key'}
+          placeholder={saved ? '••••••••' : `Paste the ${noun}`}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
           className="w-72 mono"
@@ -261,7 +303,7 @@ export function SecretFieldRow({
           size="sm"
           disabled={disabled || value.trim() === ''}
         >
-          Save key
+          Save {noun}
         </Button>
         {saved ? (
           <Button

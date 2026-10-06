@@ -1,0 +1,12 @@
+{
+  "extends": "../../../packages/config/tsconfig.base.json",
+
+  "include": ["src/**/*.ts", "vite.config.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist"],
+
+  "compilerOptions": {
+    // The build test reads dist/ with node:fs; the plugin's own code
+    // (src/index.ts, src/manifest.ts) reaches no node API.
+    "types": ["node"]
+  }
+}

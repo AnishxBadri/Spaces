@@ -16,6 +16,7 @@
     "@spaces/e2e",
     "@spaces/site",
     "@spaces/plugin-echo",
+    "@spaces/plugin-hooked",
     "@spaces/plugin-old-sdk",
     "@spaces/plugin-tampered",
     "@spaces/plugin-importer",

@@ -590,3 +590,97 @@ describe('the key field', () => {
     expect(await db.select().from(credential)).toEqual([])
   })
 })
+
+describe('the webhook secret field', () => {
+  const WEBHOOK_SECRET = 'whsec-0123456789-abcd'
+  /** A plugin with a key and a signed webhook job: two slots, two vault rows. */
+  const RECORDER: IntegrationManifest = {
+    ...APOLLO,
+    id: 'recorder',
+    name: 'Recorder',
+    jobs: {
+      enrichCompany: { trigger: 'action', uses: ['Read', 'Secrets'] },
+      ingest: { trigger: 'webhook', uses: ['Content'] },
+    },
+    ingress: { signature: 'hmac-sha256' },
+  }
+
+  it('is a second slot: stored as kind webhook under its own provider, bound to its own column, with the webhook URL', async () => {
+    asAdmin()
+    const recorder = await install({ manifest: RECORDER })
+    const before = await getIntegrationHandler({ id: recorder.id })
+    expect(before.secrets).toEqual([
+      { slot: 'credential', label: 'Recorder key', display: null },
+      { slot: 'webhook', label: 'Recorder webhook secret', display: null },
+    ])
+    expect(before.webhookUrl).toMatch(
+      new RegExp(`^https?://[^/]+/api/webhooks/${recorder.id}$`),
+    )
+
+    await saveIntegrationSecretHandler({
+      id: recorder.id,
+      slot: 'credential',
+      secret: 'recorder-api-key-000000',
+    })
+    await saveIntegrationSecretHandler({
+      id: recorder.id,
+      slot: 'webhook',
+      secret: WEBHOOK_SECRET,
+    })
+    const webhook = (
+      await db
+        .select()
+        .from(credential)
+        .where(eq(credential.provider, 'recorder:webhook'))
+    ).at(0)
+    expect(webhook).toMatchObject({ kind: 'webhook', scope: 'workspace' })
+    const row = await rowOf(recorder.id)
+    expect(row.webhookCredentialId).toBe(webhook?.id)
+    expect(row.credentialId).not.toBeNull()
+    expect(row.credentialId).not.toBe(row.webhookCredentialId)
+    expect(await resolveSecretById(webhook?.id ?? '')).toBe(WEBHOOK_SECRET)
+    const after = await getIntegrationHandler({ id: recorder.id })
+    expect(after.secrets.map((s) => [s.slot, s.display !== null])).toEqual([
+      ['credential', true],
+      ['webhook', true],
+    ])
+    expect(JSON.stringify(after)).not.toContain(WEBHOOK_SECRET)
+  })
+
+  it('removing it deletes only that secret and leaves the row running', async () => {
+    asAdmin()
+    const recorder = await install({ manifest: RECORDER })
+    await saveIntegrationSecretHandler({
+      id: recorder.id,
+      slot: 'credential',
+      secret: 'recorder-api-key-000000',
+    })
+    await saveIntegrationSecretHandler({
+      id: recorder.id,
+      slot: 'webhook',
+      secret: WEBHOOK_SECRET,
+    })
+    await removeIntegrationSecretHandler({ id: recorder.id, slot: 'webhook' })
+    const row = await rowOf(recorder.id)
+    expect(row).toMatchObject({ webhookCredentialId: null, status: 'enabled' })
+    expect(row.credentialId).not.toBeNull()
+    expect((await db.select().from(credential)).map((c) => c.provider)).toEqual(
+      ['recorder'],
+    )
+  })
+
+  it('a plugin without a signed ingress refuses one and shows no URL', async () => {
+    asAdmin()
+    const apollo = await install({ manifest: APOLLO })
+    await expect(
+      saveIntegrationSecretHandler({
+        id: apollo.id,
+        slot: 'webhook',
+        secret: WEBHOOK_SECRET,
+      }),
+    ).rejects.toThrow('apollo does not take a webhook secret')
+    expect((await getIntegrationHandler({ id: apollo.id })).webhookUrl).toBe(
+      null,
+    )
+  })
+})

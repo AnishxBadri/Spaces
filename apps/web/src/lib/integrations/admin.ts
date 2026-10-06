@@ -8,12 +8,13 @@ import { redact, storeCredential } from '@spaces/core/writes/vault'
 import { requireAdmin } from '#/lib/server/shared'
 import {
   IntegrationNotFound,
+  SECRET_SLOTS,
   integrationCountProgram,
   integrationDetailProgram,
   integrationLedgerProgram,
   manifestOf,
 } from './ledger'
-import type { IntegrationDetail, IntegrationRow } from './ledger'
+import type { IntegrationDetail, IntegrationRow, SecretSlot } from './ledger'
 import { checkSettings, mergeConfig, settingsFormOf } from './settings-form'
 import type { FormValues } from './settings-form'
 
@@ -139,24 +140,31 @@ export const saveIntegrationSettingsProgram = Effect.fn(
   return { ok: true }
 })
 
-/** A secret slot the manifest's `requires` declares. */
-export type SecretSlot = 'credential'
+export type { SecretSlot }
 
-const credentialKindOf = Effect.fn('credentialKindOf')(function* (
+/** The vault kind a slot is stored under, or refused when the manifest asks for no such secret. */
+const slotKindOf = Effect.fn('slotKindOf')(function* (
   row: typeof integration.$inferSelect,
+  slot: SecretSlot,
 ) {
-  const kind = manifestOf(row.manifest)?.requires?.credential?.kind
+  const manifest = manifestOf(row.manifest)
+  const kind =
+    manifest === null ? undefined : SECRET_SLOTS[slot].kindOf(manifest)
   if (kind === undefined)
     return yield* new IntegrationRefused({
-      message: `${row.capabilityId} does not take a key`,
+      message:
+        slot === 'webhook'
+          ? `${row.capabilityId} does not take a webhook secret`
+          : `${row.capabilityId} does not take a key`,
     })
   return kind
 })
 
 /**
- * Store the pasted key as the workspace credential for this plugin
- * (provider = plugin id) and bind it to the row. The worker's reload is what
- * moves the row from degraded('missing credential') to enabled.
+ * Store the pasted secret as the workspace credential for this plugin's slot
+ * (`SECRET_SLOTS` names its provider) and bind it to the slot's column. The
+ * worker's reload is what moves a row from degraded('missing credential') to
+ * enabled.
  */
 export const saveIntegrationSecretProgram = Effect.fn(
   'saveIntegrationSecretProgram',
@@ -167,7 +175,8 @@ export const saveIntegrationSecretProgram = Effect.fn(
   secret: string,
 ): Effect.fn.Return<{ display: string }, Failure> {
   const row = yield* rowOf(id)
-  const kind = yield* credentialKindOf(row)
+  const kind = yield* slotKindOf(row, slot)
+  const spec = SECRET_SLOTS[slot]
   const key = secret.trim()
   if (key === '')
     return yield* new IntegrationRefused({ message: 'Paste a key first' })
@@ -175,7 +184,7 @@ export const saveIntegrationSecretProgram = Effect.fn(
   const stored = yield* write(() =>
     storeCredential({
       scope: 'workspace',
-      provider: row.capabilityId,
+      provider: spec.provider(row.capabilityId),
       kind,
       secret: key,
       meta: { display, slot },
@@ -185,7 +194,7 @@ export const saveIntegrationSecretProgram = Effect.fn(
   yield* write(() =>
     db
       .update(integration)
-      .set({ credentialId: stored.id })
+      .set(spec.bind(stored.id))
       .where(eq(integration.id, row.id)),
   )
   yield* notifyChanged(row.capabilityId)
@@ -193,16 +202,19 @@ export const saveIntegrationSecretProgram = Effect.fn(
 })
 
 /**
- * Unbind and delete the plugin's key. The row reads degraded('missing
- * credential') at once — what the loader would write — so its record actions
- * go before the worker's reload; a tripped row keeps its breaker.
+ * Unbind and delete one slot's secret. Removing a required key reads the row
+ * degraded('missing credential') at once — what the loader would write — so
+ * its record actions go before the worker's reload; a tripped row keeps its
+ * breaker. Removing the webhook secret leaves the row running, and its
+ * deliveries refused until a new one is saved.
  */
 export const removeIntegrationSecretProgram = Effect.fn(
   'removeIntegrationSecretProgram',
 )(function* (id: string, slot: SecretSlot): Effect.fn.Return<void, Failure> {
   const row = yield* rowOf(id)
-  yield* credentialKindOf(row)
-  const credentialId = row.credentialId
+  yield* slotKindOf(row, slot)
+  const spec = SECRET_SLOTS[slot]
+  const credentialId = spec.held(row)
   if (credentialId === null)
     return yield* new IntegrationRefused({
       message: `No ${slot} is saved`,
@@ -212,10 +224,10 @@ export const removeIntegrationSecretProgram = Effect.fn(
       await tx
         .update(integration)
         .set(
-          row.status === 'disabled'
-            ? { credentialId: null }
+          !spec.required || row.status === 'disabled'
+            ? spec.bind(null)
             : {
-                credentialId: null,
+                ...spec.bind(null),
                 status: 'degraded',
                 lastError: MISSING_CREDENTIAL,
               },

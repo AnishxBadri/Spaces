@@ -326,9 +326,16 @@ describe('uninstall', () => {
       secret: 'echo-key-000000000000',
       createdBy: FIXTURE_ACTOR.id,
     })
+    const webhook = await storeCredential({
+      scope: 'workspace',
+      provider: 'echo:webhook',
+      kind: 'webhook',
+      secret: 'echo-webhook-secret-0000',
+      createdBy: FIXTURE_ACTOR.id,
+    })
     await db
       .update(integration)
-      .set({ credentialId: stored.id })
+      .set({ credentialId: stored.id, webhookCredentialId: webhook.id })
       .where(eq(integration.id, integrationId))
     // A record the plugin created.
     const { entityId } = await resolveEntity({
@@ -343,14 +350,16 @@ describe('uninstall', () => {
 
     expect(existsSync(path.join(plugins(), 'echo'))).toBe(false)
     expect(lockJson()).toEqual({ core: CORE_VERSION, plugins: {} })
-    expect(
-      await db.select().from(credential).where(eq(credential.id, stored.id)),
-    ).toEqual([])
+    for (const held of [stored.id, webhook.id])
+      expect(
+        await db.select().from(credential).where(eq(credential.id, held)),
+      ).toEqual([])
     const [row] = await rowsOf('echo')
     expect(row).toMatchObject({
       id: integrationId,
       enabled: false,
       credentialId: null,
+      webhookCredentialId: null,
     })
     expect(row.removedAt).toBeInstanceOf(Date)
     const [born] = await db

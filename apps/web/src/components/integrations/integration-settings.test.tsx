@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { settingsJsonSchema } from '@spaces/sdk'
 import { formValuesOf, settingsFormOf } from '#/lib/integrations/settings-form'
-import { SecretFieldRow, SettingsFields } from './integration-settings'
+import {
+  SecretFieldRow,
+  SettingsFields,
+  WebhookUrlRow,
+} from './integration-settings'
 
 /**
  * The generated card: one control per setting kind, a refused value inline
@@ -107,5 +111,36 @@ describe('SecretFieldRow', () => {
     expect(html).toContain('Apollo key')
     expect(html).toContain('Not set yet')
     expect(html).not.toContain('Remove')
+  })
+})
+
+describe('the webhook group', () => {
+  it('the webhook secret field speaks of a secret, not a key', () => {
+    const html = renderToStaticMarkup(
+      <SecretFieldRow
+        field={{
+          slot: 'webhook',
+          label: 'Hooked webhook secret',
+          display: null,
+        }}
+        value=""
+        disabled={false}
+        onChange={() => undefined}
+        onSave={() => undefined}
+        onRemove={() => undefined}
+      />,
+    )
+    expect(html).toContain('Hooked webhook secret')
+    expect(html).toContain('Paste the secret')
+    expect(html).toContain('Save secret')
+  })
+
+  it('the webhook URL is a read-only line with Copy', () => {
+    const url = 'https://deals.example.com/api/webhooks/0b5cbe3e'
+    const html = renderToStaticMarkup(<WebhookUrlRow url={url} />)
+    expect(html).toContain('Webhook URL')
+    expect(html).toContain(url)
+    expect(html).toContain('Copy')
+    expect(html).not.toContain('<input')
   })
 })

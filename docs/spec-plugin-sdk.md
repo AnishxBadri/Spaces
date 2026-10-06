@@ -674,6 +674,33 @@ manifests, never a UI (the tasks decision already rejected a builder).
 - **Ingress**: web verifies the manifest-declared signature (generic HMAC,
   no plugin code), stores the raw payload, enqueues `plugin.<id>.ingest`,
   returns 200 in ms. Route mounted only for enabled rows — disabled → 404.
+  **As built (sdk-23):** the route is `POST /api/webhooks/<integration row
+id>` — the row's uuid, not the plugin id, so it is unguessable and names
+  one install. There is no "mounted" flag (§7 step 7's row flag was not
+  needed): the route always exists and answers only for a row that is
+  enabled, status `enabled`, not removed, and whose stored
+  `integration.manifest` declares `ingress` and a `webhook` job; every
+  other case — disabled, degraded, tripped, installing, removed, unknown or
+  malformed id — is the same 404 body after the same row lookup. The
+  program is core's `receiveWebhookProgram`
+  (`@spaces/core/writes/ingress/receive`); web's route only enforces the
+  size limit (`INGRESS_MAX_BYTES`, 1 MiB, against Content-Length and again
+  while reading → 413) and maps refusals to statuses. For
+  `hmac-sha256` the sender puts `sha256=<hex>` of the raw body in
+  `x-spaces-signature`; the secret is the row's `webhook_credential_id`
+  (vault kind `webhook`, provider `<plugin id>:webhook`, saved on the
+  integration card), compared with `timingSafeEqual`; a missing header, a
+  wrong signature or no saved secret is 401 with nothing stored or
+  enqueued. An accepted delivery is stored raw in `ingress_payload`
+  (headers minus cookie/authorization, body as bytea), then
+  `{ payload, receivedAt }` — the `WebhookInput` the job receives, payload
+  parsed as JSON or else the text — is enqueued on `plugin.<id>.<job>` for
+  each `webhook` job the manifest declares (`.interactive` appended for an
+  interactive one); there is no fixed `ingest` name. Stored but not queued
+  answers 503 so the sender retries. Rows are deleted after
+  `INGRESS_RETENTION_DAYS` (7) by the nightly `ingress.prune` job (04:40
+  UTC). A per-provider header name is not in the manifest yet; adding
+  `ingress.header` would be a minor.
 - **Isolation**: contract 2 (worker death kills the container) means an
   uncaught throw must be impossible past the wrapper. Failure → retry with
   backoff → after N, fail + `integration.error_count++`. Breaker: N

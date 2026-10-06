@@ -14,6 +14,7 @@ export type {
   IntegrationRow,
   IntegrationState,
   SecretField,
+  SecretSlot,
 } from '../integrations/ledger'
 export type { SettingsSaved } from '../integrations/admin'
 export type {
@@ -81,9 +82,9 @@ export const saveIntegrationSettings = createServerFn({ method: 'POST' })
     return saveIntegrationSettingsHandler(data)
   })
 
-const secretSlot = z.enum(['credential'])
+const secretSlot = z.enum(['credential', 'webhook'])
 
-/** Stores the pasted key in the vault; returns only its redacted display. */
+/** Stores the pasted key or webhook secret in the vault; returns only its redacted display. */
 export const saveIntegrationSecret = createServerFn({ method: 'POST' })
   .validator(
     z.object({
@@ -131,7 +132,7 @@ export const uninstallIntegration = createServerFn({ method: 'POST' })
     return uninstallIntegrationHandler(data)
   })
 
-/** Deletes the key; the row reads degraded('missing credential'). */
+/** Deletes a slot's secret; without its key the row reads degraded('missing credential'). */
 export const removeIntegrationSecret = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid(), slot: secretSlot }))
   .handler(async ({ data }) => {

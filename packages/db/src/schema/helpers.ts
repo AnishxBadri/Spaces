@@ -16,3 +16,10 @@ export const ltree = customType<{ data: string }>({
     return 'ltree'
   },
 })
+
+/** Raw bytes, as a Node `Buffer`. */
+export const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return 'bytea'
+  },
+})
