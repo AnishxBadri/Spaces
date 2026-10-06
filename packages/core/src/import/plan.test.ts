@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CORE_IDENTITY_KEYS } from '../attributes/registry'
 import {
+  MALFORMED_ROW,
   NEEDS_NAME,
   alsoCreateWhy,
   applyDecision,
@@ -87,6 +88,13 @@ function input(
 const verdicts = (rows: Array<PlannedRow>) => rows.map((r) => r.plan.verdict)
 
 describe('reading a row', () => {
+  it('a row staged with no cells is a malformed unit: it fails alone, on its name', () => {
+    const out = readRow([], mapping, companies)
+    expect(out.errors).toEqual([{ column: 0, raw: '', reason: MALFORMED_ROW }])
+    expect(out.patch).toEqual({})
+    expect(out.skippedCells).toEqual([])
+  })
+
   it('reads name, key and attributes into the write shapes', () => {
     const out = readRow(
       ['  Acme  ', 'https://Acme.com/', '1,200', '', 'seed'],

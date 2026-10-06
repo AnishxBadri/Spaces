@@ -6,7 +6,7 @@ import * as sdk from './index.ts'
 import { defineManifest } from './manifest.ts'
 import { definePlugin } from './plugin.ts'
 import { ConfigTest } from './testing/index.ts'
-import { Facts, Identity, PORTS, configOf } from './ports.ts'
+import { Facts, Identity, Import, PORTS, configOf } from './ports.ts'
 
 describe('the port tags', () => {
   // The keys are how the host's Layer finds the tag a bundle yields — part
@@ -24,6 +24,7 @@ describe('the port tags', () => {
         "Facts": "spaces/sdk/Facts",
         "Http": "spaces/sdk/Http",
         "Identity": "spaces/sdk/Identity",
+        "Import": "spaces/sdk/Import",
         "Judgment": "spaces/sdk/Judgment",
         "Log": "spaces/sdk/Log",
         "PluginDb": "spaces/sdk/PluginDb",
@@ -116,6 +117,42 @@ describe("a job's R is bounded by its uses (D51)", () => {
               const facts = yield* Facts
               yield* facts.fill({ entityId, values: {} })
             }),
+        },
+      })
+    expect(typeof undeclared).toBe('function')
+  })
+})
+
+describe('a file job granted Import, and one it is withheld from', () => {
+  const manifest = defineManifest({
+    manifestVersion: 1,
+    id: 'dialect',
+    version: '1.0.0',
+    sdk: '^1.1',
+    name: 'Dialect',
+    description: 'Hands core a grid.',
+    settings: z.object({}),
+    jobs: {
+      read: { trigger: 'file', uses: ['Import'] },
+      readWithout: { trigger: 'file', uses: ['Log'] },
+    },
+  })
+  const stage = (filename: string) =>
+    Effect.gen(function* () {
+      yield* (yield* Import).stage({
+        columns: ['Name'],
+        rows: [{ ordinal: 1, cells: [filename] }],
+      })
+    })
+
+  it('typechecks the job that declared Import and refuses the one that did not', () => {
+    const undeclared = () =>
+      definePlugin({
+        manifest,
+        jobs: {
+          read: ({ filename }) => stage(filename),
+          // @ts-expect-error — Import is not in this job's uses
+          readWithout: ({ filename }) => stage(filename),
         },
       })
     expect(typeof undeclared).toBe('function')

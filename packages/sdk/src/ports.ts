@@ -8,6 +8,7 @@ import type {
   EntityId,
   FactClaim,
   IdentityClaim,
+  ImportGrid,
   InteractionClaim,
   JobError,
   JsonObject,
@@ -21,7 +22,7 @@ import type {
 import type { AuthoredManifest } from './manifest.ts'
 
 /**
- * The twelve ports (sdk-5; docs/spec-plugin-sdk.md §4). Effect service tags
+ * The ports (docs/spec-plugin-sdk.md §4). Effect service tags
  * and no implementations: a plugin imports these, core implements them over
  * the real database (`packages/core/src/writes/ports/`, sdk-6a…sdk-10), and
  * the loader provides the implementations bound to one `integration` row,
@@ -372,6 +373,44 @@ export class Log extends Context.Service<
 >()('spaces/sdk/Log') {}
 
 // ---------------------------------------------------------------------------
+// Import
+// ---------------------------------------------------------------------------
+
+/** A row the port could not read, by its ordinal, and why. */
+export type ImportRefusal = {
+  readonly ordinal: number
+  readonly reason: string
+}
+
+/**
+ * What `Import.stage` landed.
+ * - `staged` counts every placed row, the malformed ones included.
+ * - `malformed`: placed under its ordinal with no cells, so it plans as
+ *   `no-land` and the rest of the batch commits.
+ * - `refused`: no usable ordinal, so not placed at all.
+ */
+export type StageResult = {
+  readonly batchId: string
+  readonly staged: number
+  readonly malformed: ReadonlyArray<ImportRefusal>
+  readonly refused: ReadonlyArray<ImportRefusal>
+}
+
+/**
+ * A dialect's grid into the import batch the wizard is waiting on (D39 as
+ * amended). Core walks it through the same mapping, preview, commit and
+ * batch void as a hand-mapped CSV; the plugin never maps or commits. Only a
+ * `file` job the import wizard started has a batch to stage into — anything
+ * else fails permanently. Staging twice writes nothing the second time.
+ */
+export class Import extends Context.Service<
+  Import,
+  {
+    readonly stage: (grid: ImportGrid) => Effect.Effect<StageResult, JobError>
+  }
+>()('spaces/sdk/Import') {}
+
+// ---------------------------------------------------------------------------
 // The name → tag map (D51's grant)
 // ---------------------------------------------------------------------------
 
@@ -389,6 +428,7 @@ export const PORTS = {
   PluginDb,
   Http,
   Log,
+  Import,
 } as const satisfies { readonly [K in PortName]: unknown }
 
 /**
@@ -410,6 +450,7 @@ export type PortServices = {
   readonly PluginDb: PluginDb
   readonly Http: Http
   readonly Log: Log
+  readonly Import: Import
 }
 
 export type PortService<TName extends PortName> = PortServices[TName]

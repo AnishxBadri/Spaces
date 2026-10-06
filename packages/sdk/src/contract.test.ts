@@ -12,6 +12,9 @@ import type {
   FilingTarget,
   IdentityClaim,
   IdentityKeys,
+  ImportCell,
+  ImportGrid,
+  ImportRow,
   InteractionClaim,
   JudgmentClaim,
   NoteProposal,
@@ -71,6 +74,15 @@ describe('claims carry no provenance (D52)', () => {
     expectTypeOf<
       Extract<KeysOf<AttributeProposal>, Provenance>
     >().toEqualTypeOf<never>()
+    expectTypeOf<
+      Extract<KeysOf<ImportGrid>, Provenance>
+    >().toEqualTypeOf<never>()
+    expectTypeOf<
+      Extract<KeysOf<ImportRow>, Provenance>
+    >().toEqualTypeOf<never>()
+    expectTypeOf<Extract<ImportCell, object>>().toEqualTypeOf<
+      ReadonlyArray<string>
+    >()
   })
 
   it('refuses a provenance field on a claim literal', () => {
@@ -133,7 +145,8 @@ describe('refs are the D4 grammar', () => {
 })
 
 describe('PORT_NAMES', () => {
-  it('is the spec §4 table minus Clock', () => {
+  // Appended only: a reordered or removed name is an SDK major.
+  it('is the spec §4 table minus Clock, Import appended by SDK 1.1', () => {
     expect(PORT_NAMES).toEqual([
       'Identity',
       'Facts',
@@ -147,6 +160,7 @@ describe('PORT_NAMES', () => {
       'PluginDb',
       'Http',
       'Log',
+      'Import',
     ])
   })
 })

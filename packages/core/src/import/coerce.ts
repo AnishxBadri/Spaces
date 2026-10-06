@@ -1,3 +1,4 @@
+import { splitImportList } from '@spaces/sdk/import-grid'
 import { valueValidator } from '../attributes/registry'
 import type {
   AttributeOptions,
@@ -193,9 +194,11 @@ function coerceSingleOption(
 /**
  * A multi-select cell is one label, or several separated by commas or
  * semicolons. The whole cell is tried as one label first, so an option whose
- * label itself holds a comma still matches. Every label must be an option:
- * one unknown refuses the cell, naming each unknown, rather than importing
- * the known half and dropping the rest in silence.
+ * label itself holds a comma still matches; a quoted label (`"Health,
+ * Wellness",B2B` — how a dialect plugin's list lands) is read whole. Every
+ * label must be an option: one unknown refuses the cell, naming each
+ * unknown, rather than importing the known half and dropping the rest in
+ * silence.
  */
 function coerceMultiOption(
   options: ReadonlyArray<SelectOption>,
@@ -203,10 +206,12 @@ function coerceMultiOption(
 ): Coercion {
   const whole = matchOption(options, raw)
   if (whole.kind === 'live') return accept([whole.id])
-  const labels = raw
-    .split(/[,;]/)
-    .map((l) => l.trim())
-    .filter((l) => l !== '')
+  const labels =
+    splitImportList(raw) ??
+    raw
+      .split(/[,;]/)
+      .map((l) => l.trim())
+      .filter((l) => l !== '')
   const ids: Array<string> = []
   const unknown: Array<string> = []
   const archived: Array<string> = []

@@ -9,6 +9,7 @@ import {
   ImportHeader,
   PreviewGrid,
   PreviousImportNotice,
+  ReadingNotice,
   SheetTabs,
   StepStrip,
   refuseContinue,
@@ -223,6 +224,7 @@ function ImportBatchPage() {
   const canContinue =
     staged &&
     !busy &&
+    batch.reading === null &&
     (step === 1 || batch.mode === 'ledger' || batch.targetObjectId !== null)
 
   function onContinue() {
@@ -329,6 +331,15 @@ function ImportBatchPage() {
     const timer = window.setInterval(() => void router.invalidate(), 1500)
     return () => window.clearInterval(timer)
   }, [live, router])
+
+  // An import plugin is staging the rows: re-read until they arrive. A run
+  // that failed may still be retried, so the page keeps asking.
+  const reading = batch.reading !== null
+  useEffect(() => {
+    if (!reading) return
+    const timer = window.setInterval(() => void router.invalidate(), 1500)
+    return () => window.clearInterval(timer)
+  }, [reading, router])
 
   // ⌘↵ is printed inside Continue and Commit, so it works wherever they do.
   useEffect(() => {
@@ -515,7 +526,9 @@ function ImportBatchPage() {
           disabled={busy || !staged}
           onSelect={(sheet) => void selectSheet(sheet)}
         />
-        {mapping ? (
+        {batch.reading ? (
+          <ReadingNotice reading={batch.reading} />
+        ) : mapping ? (
           <>
             <IdentityStrip
               view={mapping}

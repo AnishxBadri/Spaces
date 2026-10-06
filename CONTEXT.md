@@ -284,7 +284,8 @@ stamped by the port from the bound `integration` row (a plugin cannot forge
 who wrote what): `Identity` (resolveEntity / addIdentityAlias) · `Facts`
 (setValues, fill-blanks, conflict → suggestion) · `Content` (document /
 interaction / signal) · `Judgment` (review inbox) · `Receipts`
-(enrichment_record) · `Ai` (lane + budget, never a model or a key) · `Read`
+(enrichment_record) · `Import` (a staged `import_batch`, pre-mapping; SDK
+1.1) · `Ai` (lane + budget, never a model or a key) · `Read`
 (canRead as integration) · `Secrets` (vault, worker-only decrypt) · `Config`
 (manifest-typed) · `PluginDb` (drizzle scoped to `plugin_<id>` schema) ·
 `Http` (rate-limited, header-driven throttle) · `Log`. **Ports are granted
@@ -311,6 +312,26 @@ no handle grammar. An `action` job may declare a pure `cost` hook returning
 `webhook` job is a plain job on the stored payload with no plugin `verify`
 (2026-10-01): the signature is manifest-declared (`ingress.signature`) and
 core checks it in web, because plugin code never runs there.
+
+**Amended 2026-10-06 (owner; D39 amended, SPA-172): a dialect importer hands
+core a grid.** A `file` job that reads a dialect calls the `Import` port —
+`Import.stage({ columns, rows })`, each row carrying its ordinal — and core
+lands the grid in `import_batch`/`import_row`. From there it is an ordinary
+staged batch: the same mapping, preview, commit and batch void (D12) as a
+hand-mapped CSV, so the idempotent re-run holds too. The plugin does only the
+dialect's work (for Airtable: comma-joined multi-selects split into lists,
+linked-record display names kept as names, attachments reduced to their URLs)
+and never maps, previews, commits or writes a record; D52 holds because the
+job still calls a port. "An importer speaks claims, never a grid" now reads
+"a grid is pre-mapping input; the plugin never maps or commits." A unit of
+output that does not decode fails its own row and the rest commits. A `file`
+job may declare `accepts: { filename }`, a pattern web matches a dropped file
+against — web reads it from `integration.manifest`, enqueues the job with the
+stored blob and the waiting batch, and never runs plugin code; with no
+runnable plugin matching, the same file takes the plain CSV path. `Import`
+and `accepts` are additive: **SDK 1.1.0**, a minor. Rejected:
+`Identity.resolve`/`Facts.fill` row by row, which needs no SDK change but
+loses the preview, the batch, batch void and the re-run.
 
 **AI is substrate, not a plugin.** It sits _below_ the SDK as the `Ai`
 port: plugins consume the extract/classify/synthesize lanes, sensitivity
@@ -1896,6 +1917,10 @@ suggestions). No category needs a new lane; that's the design check.
    PDF into the document pipeline before they expire.
 10. **Migration/import** — CSV/Airtable/Notion/CRM import; onboarding-
     critical (every prospective user has deal flow in a spreadsheet today).
+    The pipeline is core's (read, mapping, preview, commit, batch void); a
+    dialect is a plugin — a `file` job that hands core a grid through the
+    `Import` port and never maps or commits (D39 as amended 2026-10-06).
+    Airtable's CSV export is the first tenant (`plugins/airtable`).
 11. **Outbound** — MCP server (AI agents), generic webhooks/API (n8n
     automation), digest delivery channel (Monday brief → Slack/Telegram/
     email; pull-based doctrine, delivered somewhere). The digest is banked:

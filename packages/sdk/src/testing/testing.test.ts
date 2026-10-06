@@ -1,13 +1,23 @@
 import { Effect, Exit, Redacted } from 'effect'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { PortName } from '../contract.ts'
-import { Content, Facts, Http, Identity, Log, Read, Secrets } from '../ports.ts'
+import {
+  Content,
+  Facts,
+  Http,
+  Identity,
+  Import,
+  Log,
+  Read,
+  Secrets,
+} from '../ports.ts'
 import type { PortServices } from '../ports.ts'
 import {
   ContentTest,
   FactsTest,
   HttpTest,
   IdentityTest,
+  ImportTest,
   ReadTest,
   SecretsTest,
   readEntity,
@@ -264,6 +274,49 @@ describe('HttpTest', () => {
     expect(failureOf(exit)).toMatchObject({
       _tag: 'JobPermanent',
       reason: `HttpTest: no scripted response for POST ${url}`,
+    })
+  })
+})
+
+describe('ImportTest', () => {
+  const grid = {
+    columns: ['Name', 'Business model'],
+    rows: [
+      { ordinal: 1, cells: ['Acme', ['B2B', 'Marketplace']] },
+      { ordinal: 2, cells: ['Beta'] },
+    ],
+  }
+
+  it('lands the grid as the live port does, and a second stage writes nothing', () => {
+    const importer = ImportTest()
+    const [first, second] = Effect.runSync(
+      Effect.gen(function* () {
+        const port = yield* Import
+        return [yield* port.stage(grid), yield* port.stage(grid)]
+      }).pipe(Effect.provide(importer.layer)),
+    )
+    expect(first).toEqual({
+      batchId: 'batch-1',
+      staged: 2,
+      malformed: [],
+      refused: [],
+    })
+    expect(second).toEqual(first)
+    expect(importer.rows).toEqual([
+      { rowNum: 1, cells: ['Acme', 'B2B,Marketplace'], reason: null },
+      { rowNum: 2, cells: ['Beta', ''], reason: null },
+    ])
+  })
+
+  it('fails permanently on a grid with no row it could place', () => {
+    const exit = Effect.runSyncExit(
+      Import.use((port) => port.stage({ columns: ['Name'], rows: [] })).pipe(
+        Effect.provide(ImportTest().layer),
+      ),
+    )
+    expect(failureOf(exit)).toMatchObject({
+      _tag: 'JobPermanent',
+      reason: 'the grid has no row that could be placed',
     })
   })
 })

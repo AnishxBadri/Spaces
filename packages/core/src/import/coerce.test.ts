@@ -265,6 +265,21 @@ describe('multi_select', () => {
     refuses('multi_select', { options: MODELS }, ['B2B, legacy'])
     refuses('multi_select', {}, ['B2B'])
   })
+  it('reads a quoted label whole, as an import plugin lands a list', () => {
+    const withComma: Array<SelectOption> = [
+      ...MODELS,
+      { id: 'hw', label: 'Health, Wellness' },
+    ]
+    accepts('multi_select', { options: withComma }, [
+      ['"Health, Wellness",B2B', ['hw', 'b2b']],
+      ['"Health, Wellness"', ['hw']],
+    ])
+    expect(
+      reasonOf(
+        coerce('multi_select', { options: withComma }, '"Health, Fitness",B2B'),
+      ),
+    ).toBe('"Health, Fitness" is not an option of this attribute')
+  })
 })
 
 describe('domain', () => {

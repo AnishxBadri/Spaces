@@ -64,11 +64,11 @@ export type Ref =
 // ---------------------------------------------------------------------------
 
 /**
- * The ports a job may declare in `uses` (D51) — twelve, the spec §4 table
- * minus Clock (Effect ships one; plugin code reads time through it). The
- * manifest validates `uses` against this list, sdk-5 declares a service tag
- * per name, and the loader builds a job's Layer from exactly the names it
- * lists.
+ * The ports a job may declare in `uses` (D51) — the spec §4 table minus Clock
+ * (Effect ships one; plugin code reads time through it). The manifest
+ * validates `uses` against this list, each name has a service tag, and the
+ * loader builds a job's Layer from exactly the names it lists.
+ * - Appended only: `Import` arrived in SDK 1.1.0, a minor.
  */
 export const PORT_NAMES = [
   'Identity',
@@ -83,6 +83,7 @@ export const PORT_NAMES = [
   'PluginDb',
   'Http',
   'Log',
+  'Import',
 ] as const
 export type PortName = (typeof PORT_NAMES)[number]
 
@@ -253,6 +254,33 @@ export type JudgmentClaim = {
   readonly refs: ReadonlyArray<Ref>
 }
 
+/**
+ * One cell of an import grid: text, or a list — a multi-select's labels,
+ * several linked names, several URLs. The plugin splits a dialect's joined
+ * cell; core lands it and the mapping reads it.
+ */
+export type ImportCell = string | ReadonlyArray<string>
+
+/**
+ * One data row. `ordinal` is its 1-based place among the file's data rows —
+ * what a per-row error names, so it is the plugin's to say, not the order
+ * rows happen to arrive in.
+ */
+export type ImportRow = {
+  readonly ordinal: number
+  readonly cells: ReadonlyArray<ImportCell>
+}
+
+/**
+ * `Import.stage(grid)`: pre-mapping input (D39 as amended). The header and
+ * the rows, nothing else — no target, no mapping, no values: mapping,
+ * preview and commit are core's, exactly as for a hand-mapped CSV.
+ */
+export type ImportGrid = {
+  readonly columns: ReadonlyArray<string>
+  readonly rows: ReadonlyArray<ImportRow>
+}
+
 // ---------------------------------------------------------------------------
 // Job errors — what a job may fail with, and what runJob maps
 // ---------------------------------------------------------------------------
@@ -354,7 +382,10 @@ export type WebhookJob<TServices = unknown> = (
   input: WebhookInput,
 ) => Effect.Effect<void, JobError, TServices>
 
-/** `file` — an importer: CSV, a WhatsApp export. Speaks claims, never a grid (D39). */
+/**
+ * `file` — an importer: a dialect export, a WhatsApp export. A dialect hands
+ * core a grid through `Import`; anything else speaks claims (D39 as amended).
+ */
 export type FileInput = {
   readonly stream: ReadableStream<Uint8Array>
   readonly filename: string

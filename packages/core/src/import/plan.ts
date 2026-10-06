@@ -102,6 +102,14 @@ export type ReadRow = {
 }
 
 /**
+ * A staged row with no cells: an import plugin's unit that did not decode,
+ * placed under its ordinal so it fails alone. A row staged from a sheet is
+ * always padded to the sheet's width, so it is never empty.
+ */
+export const MALFORMED_ROW =
+  'The import plugin sent this row in a shape it could not read'
+
+/**
  * One staged row under the mapping: every mapped cell through the column's
  * spec (`readCell` — the coercer, or the CIN normalizer). **Red is a cell,
  * never a row** (SPA-166's contract): a cell that does not read is a
@@ -125,6 +133,15 @@ export function readRow(
     skippedCells: [],
     refs: [],
     references: [],
+  }
+  if (cells.length === 0 && mapping.length > 0) {
+    const name = mapping.findIndex((t) => t.target === 'name')
+    out.errors.push({
+      column: Math.max(name, 0),
+      raw: '',
+      reason: MALFORMED_ROW,
+    })
+    return out
   }
   mapping.forEach((target, column) => {
     const spec = specFor(target, registry)

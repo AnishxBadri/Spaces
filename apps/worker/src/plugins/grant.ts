@@ -9,6 +9,7 @@ import { ContentLive } from '@spaces/core/writes/ports/content'
 import { FactsLive } from '@spaces/core/writes/ports/facts'
 import type { FetchLike } from '@spaces/core/writes/ports/http'
 import { IdentityLive } from '@spaces/core/writes/ports/identity'
+import { ImportLive } from '@spaces/core/writes/ports/import'
 import { JudgmentLive } from '@spaces/core/writes/ports/judgment'
 import type { LogSink } from '@spaces/core/writes/ports/log'
 import { ReadLive } from '@spaces/core/writes/ports/read'
@@ -109,6 +110,9 @@ export const grantLayer = (
         break
       case 'Read':
         standalone.push(ReadLive(row))
+        break
+      case 'Import':
+        standalone.push(ImportLive(row))
         break
       case 'Ai':
       case 'PluginDb':

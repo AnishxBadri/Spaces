@@ -42,12 +42,14 @@ company). `IdentityTest` uses the same functions.
 
 One file, to be read and reviewed as one; it moves only on an SDK major.
 
-- `PORT_NAMES` — the twelve ports a job may list in `uses` (the spec §4
-  table minus Clock); the manifest validates `uses` against it.
+- `PORT_NAMES` — the thirteen ports a job may list in `uses` (the spec §4
+  table minus Clock; `Import` appended in 1.1.0); the manifest validates
+  `uses` against it.
 - The claims — the typed arguments of the write-port methods (D52):
   `IdentityClaim`, `AliasClaim`, `FactClaim`, `ReceiptClaim`, the three
   `_tag`-ged Content claims (`DocumentClaim`, `InteractionClaim`,
-  `SignalClaim`) and `JudgmentClaim`. None carries a source, actor or
+  `SignalClaim`), `JudgmentClaim` and the import grid (`ImportGrid`,
+  `ImportRow`, `ImportCell`; 1.1.0). None carries a source, actor or
   integration field — provenance is the port's (`contract.test.ts`).
 - `Ref` — the shipped citation grammar (D4) as a type; a URL is not a ref.
 - The five trigger shapes and `JobFor<trigger>`, which `definePlugin` uses to
@@ -59,8 +61,9 @@ One file, to be read and reviewed as one; it moves only on an SDK major.
 
 ## Ports (sdk-5) — `src/ports.ts`
 
-Twelve Effect service tags — `Identity`, `Facts`, `Content`, `Judgment`,
-`Receipts`, `Ai`, `Read`, `Secrets`, `Config`, `PluginDb`, `Http`, `Log` —
+Thirteen Effect service tags — `Identity`, `Facts`, `Content`, `Judgment`,
+`Receipts`, `Ai`, `Read`, `Secrets`, `Config`, `PluginDb`, `Http`, `Log`,
+`Import` —
 each `class X extends Context.Service<X, Shape>()('spaces/sdk/X') {}`, with
 no implementations (core's `writes/ports/` implements them; the loader binds
 them to one integration row). The service keys are contract: a snapshot test
@@ -78,8 +81,9 @@ In-memory Layers that record every call and mint deterministic ids
 (`entity-1`, `receipt-1`, …): `IdentityTest`, `FactsTest`, `ContentTest`,
 `JudgmentTest`, `ReceiptsTest`, `ReadTest`, `SecretsTest`, `ConfigTest`,
 `HttpTest` (scripted responses, exact request headers, a scripted 429 fails
-`JobRateLimited`) and `LogTest` — each `{ layer, calls }`. `testPorts(…)`
-builds all ten over one recorder. No database, no network:
+`JobRateLimited`), `LogTest` and `ImportTest` (the grid landed as the live
+port lands it, `@spaces/sdk/import-grid`) — each `{ layer, calls }`.
+`testPorts(…)` builds all eleven over one recorder. No database, no network:
 `plugins/_fixtures/echo/src/enrich.test.ts` runs a whole job on them, and CI
 runs it with `DATABASE_URL` unset. `Ai` and `PluginDb` have no fake yet.
 

@@ -3,16 +3,28 @@ import { eq, sql } from 'drizzle-orm'
 import type { PgBoss } from 'pg-boss'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { integration } from '@spaces/db/schema'
+import { importBatch, integration } from '@spaces/db/schema'
+import { runLinePrefix } from '@spaces/core/import/commit'
+import { fileJobData } from '@spaces/core/import/dialect'
+import type { FileJobData } from '@spaces/core/import/dialect'
 import { pluginQueueName } from '@spaces/core/queue/names'
 import type { PluginQueueName } from '@spaces/core/queue/names'
+import { ImportRun } from '@spaces/core/writes/ports/import'
+import { storage } from '@spaces/core/writes/storage'
 import {
   ACTION_TARGETS,
   DOMAIN_EVENTS,
   JobPermanent,
+  JobRateLimited,
   JobRetryable,
 } from '@spaces/sdk'
-import type { CostHook, JobDeclaration, JobError, Manifest } from '@spaces/sdk'
+import type {
+  CostHook,
+  FileInput,
+  JobDeclaration,
+  JobError,
+  Manifest,
+} from '@spaces/sdk'
 import { runJob } from '../run-job'
 import type {
   JobBreaker,
@@ -233,6 +245,93 @@ const webhookData = z.object({
   receivedAt: z.string().min(1),
 })
 
+// ---------------------------------------------------------------------------
+// A file job run from its queue
+// ---------------------------------------------------------------------------
+
+/** The stored bytes as the stream a file job is handed. */
+const streamOf = (bytes: Uint8Array): ReadableStream<Uint8Array> =>
+  new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes)
+      controller.close()
+    },
+  })
+
+/** The same failure, its reason led by `prefix` so the batch page finds it. */
+const prefixed = (prefix: string, error: JobError): JobError => {
+  switch (error._tag) {
+    case 'JobPermanent':
+      return new JobPermanent({ reason: `${prefix}${error.reason}` })
+    case 'JobRetryable':
+      return new JobRetryable({ reason: `${prefix}${error.reason}` })
+    case 'JobRateLimited':
+      return new JobRateLimited({
+        reason: `${prefix}${error.reason}`,
+        retryAfterMs: error.retryAfterMs,
+      })
+  }
+}
+
+const stagedRows = (batchId: string) =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .select({ rowCount: importBatch.rowCount })
+        .from(importBatch)
+        .where(eq(importBatch.id, batchId))
+        .then((rows) => rows.at(0)?.rowCount ?? 0),
+    catch: (error) =>
+      new JobRetryable({
+        reason: `could not read import batch ${batchId}: ${messageOf(error)}`,
+      }),
+  })
+
+/**
+ * One queued file job: the stored bytes as its stream. With a `batchId` the
+ * import wizard is waiting on, the run is scoped to that batch for the
+ * Import port, and its line is led by `batch <id> · `, as the commit's is,
+ * which is how the batch page finds the reader's run.
+ */
+export const runFileJob = (
+  integrationId: string,
+  plan: PluginQueue,
+  invoke: Invoke,
+  data: FileJobData,
+) =>
+  Effect.gen(function* () {
+    const prefix = data.batchId === undefined ? '' : runLinePrefix(data.batchId)
+    const bytes = yield* Effect.tryPromise({
+      try: () => storage().getBytes(data.blobSha),
+      catch: (error) =>
+        new JobRetryable({
+          reason: `${prefix}could not read the stored file: ${messageOf(error)}`,
+        }),
+    })
+    const input: FileInput = {
+      stream: streamOf(bytes),
+      filename: data.filename,
+      mime: data.mime,
+    }
+    if (data.batchId === undefined) {
+      yield* invoke(integrationId, plan.job, input)
+      return
+    }
+    const batchId = data.batchId
+    yield* invoke(integrationId, plan.job, input).pipe(
+      Effect.provideService(ImportRun, { batchId }),
+      Effect.mapError((error) => prefixed(prefix, error)),
+    )
+    const rows = yield* stagedRows(batchId).pipe(
+      Effect.mapError((error) => prefixed(prefix, error)),
+    )
+    if (rows === 0)
+      return yield* new JobPermanent({
+        reason: `${prefix}${plan.queue} read the file and staged no rows`,
+      })
+    return `${prefix}${rows} rows staged by ${plan.queue}`
+  })
+
 /** What every plugin JobDef shares: name, retry, timeout, concurrency. */
 const common = (plan: PluginQueue) => ({
   name: plan.queue,
@@ -360,19 +459,14 @@ const workPlan = (
         breaker,
       )
     case 'file':
-      // A file job is handed a stream in-process; a queued job has no way
-      // to carry one, so whatever arrives here is refused, not guessed at.
+      // A queued job cannot carry a stream, so it carries the stored blob's
+      // digest and the worker reads the bytes back.
       return work(
         options,
         {
           ...common(plan),
-          schema: z.unknown(),
-          run: () =>
-            Effect.fail(
-              new JobPermanent({
-                reason: `${plan.queue} is a file job, which is not run from its queue`,
-              }),
-            ),
+          schema: fileJobData,
+          run: (data) => runFileJob(integrationId, plan, invoke, data),
           refs: () => integrationRef,
         },
         concurrency,

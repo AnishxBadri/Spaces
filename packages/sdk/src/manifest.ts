@@ -47,6 +47,16 @@ const DURATION = /^[1-9]\d*(?:ms|s|m|h)$/
 /** A five-field cron expression, as `boss.schedule` takes it. */
 const CRON = /^\S+(?:\s+\S+){4}$/
 
+/** Whether a manifest pattern compiles, as web will compile it. */
+const compiles = (pattern: string): boolean => {
+  try {
+    new RegExp(pattern, 'i')
+    return true
+  } catch {
+    return false
+  }
+}
+
 const jobSchema = z.strictObject({
   trigger: z.enum(TRIGGERS),
   // The ports this job is granted — the admin reads this list at install,
@@ -79,6 +89,16 @@ const jobSchema = z.strictObject({
     .optional(),
   retry: z.int().nonnegative().optional(),
   interactive: z.boolean().optional(),
+  // A file job's claim on dropped files: a pattern, matched
+  // case-insensitively against the filename, that web reads from the stored
+  // manifest to route a drop without running plugin code. (SDK 1.1)
+  accepts: z
+    .strictObject({
+      filename: z.string().min(1).refine(compiles, {
+        error: 'accepts.filename is a regular expression',
+      }),
+    })
+    .optional(),
 })
 
 export const ACTION_TARGETS = ['company', 'person', 'deal'] as const
@@ -167,6 +187,13 @@ export const manifestSchema = z
             job.trigger === 'schedule'
               ? 'a schedule job needs schedule'
               : `schedule is only for a schedule job, and ${name} is ${job.trigger}`,
+        })
+      }
+      if (job.accepts !== undefined && job.trigger !== 'file') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['jobs', name, 'accepts'],
+          message: `accepts is only for a file job, and ${name} is ${job.trigger}`,
         })
       }
       if ((job.trigger === 'event') !== (job.on !== undefined)) {

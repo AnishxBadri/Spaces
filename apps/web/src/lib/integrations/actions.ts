@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, eq, notLike } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, integration } from '@spaces/db/schema'
 import { manifestSchema } from '@spaces/sdk'
@@ -7,6 +7,7 @@ import type { ACTION_TARGETS } from '@spaces/sdk'
 import { pluginQueueName } from '@spaces/core/queue/names'
 import type { PluginQueueName } from '@spaces/core/queue/names'
 import { enqueue } from '#/lib/queue'
+import { runnable } from '#/lib/integrations/runnable'
 import { requireUser } from '#/lib/server/shared'
 
 /**
@@ -82,12 +83,6 @@ export const declaredActions = (manifest: unknown): ReadonlyArray<Declared> => {
     ]
   })
 }
-
-const runnable = and(
-  eq(integration.enabled, true),
-  eq(integration.status, 'enabled'),
-  notLike(integration.capabilityId, 'core.%'),
-)
 
 /** The controls a record of `kind` carries, in plugin order. */
 export const recordActionsProgram = Effect.fn('recordActionsProgram')(

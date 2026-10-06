@@ -43,7 +43,7 @@ _Forty-eight decisions surfaced by the reconciliation pass of 2026-09-15 and clo
 | P16   | **D15-tags-registries-and-the-upgrade-window** — Does `latest` move, do we publish to Docker Hub as well as GHCR, and how far back does upgrade CI test?        | Option 1, and correct CONTEXT in ship-11's PR: "every prior release" becomes the stated window, with the reason.                                       | `ship-8`              | 2      |
 | P16   | **D16-signing-scheme** — Do images and plugin tarballs share one signing scheme, or two deliberately different ones?                                            | Option 1, recorded in CONTEXT with the reason stated as the verifier's identity: the image verifier is a human with cosign, the plugin verifier [...]  | `ship-8`              | 2      |
 | P16   | **D26-worker-bundler** — Which bundler produces the source-free worker image — tsup, which is not installed, or `vite build [...]                               | Option 1, with whichever wins recorded in CONTEXT and the reason stated.                                                                               | `mono-13b`            | 0      |
-| P17   | **D39-importer-parse-signature** — Does a plugin importer's `parse(file)` return a grid for the mapping wizard, or Claims?                                      | Option 1, carried by sdk-4a since that is where the kind interfaces freeze; import-10 becomes a consumer.                                              | `sdk-4a`              | 1      |
+| P17   | **D39-importer-parse-signature** — Does a plugin importer's `parse(file)` return a grid for the mapping wizard, or Claims?                                      | Option 1, carried by sdk-4a; **amended 2026-10-06**: a grid through the `Import` port is pre-mapping input (see the addendum).                         | `sdk-4a`              | 1      |
 | P19   | **D7-entity-refs-and-plugin-fks** — What merge strategy and context role do this plan's roughly ten new entity-referencing columns get, and [...]               | Option 1, carried by sdk-24a (which defines what a plugin schema may do) with the per-column entries landing in each column's own slice. Correct [...] | `sdk-24a`             | 8      |
 | P21   | **D38-retention-of-derived-layers-and-payloads** — When `retain: text` throws the bytes away, what happens to the page-image cache, the extraction cache, [...] | Option 1, carried by storage-12 so the retain policy covers derived layers in the same sentence it covers bytes.                                       | `storage-12`          | 4      |
 | P23   | **D33-feeds-core-or-plugin** — Is the RSS feed poller a plugin, or core?                                                                                        | Option 1, carried by arrival-8, with spec-plugin-sdk §5's poller example changed from RSS to something that actually needs the port.                   | `arrival-8`           | 1      |
@@ -249,6 +249,8 @@ _Amended 2026-10-01 (checkpoint review):_ a `webhook` job carries no plugin `ver
 ### D52-ports-not-returned-claims
 
 **Does a job return claims for a core router, or call ports?** Answered: **it calls ports.** Each write port calls its lane at once and returns what the lane decided (`Identity.resolve` → the entity id; `Facts.fill` → the refused conflicts). "Claims" are the typed arguments of the write-port methods — the semver-frozen vocabulary, carrying no source/actor/integration field. No router, no batch, no handle grammar; the testing kit's recording Layers mint deterministic fake ids; a DryRun Layer over `previewResolve` is the later answer to an importer preview. Rejected: declarative claims (a handle grammar, a router and dependency ordering re-deriving rules the lanes already hold, and a job that cannot react to a refused fill) and both at once. D39 survives: an importer still speaks claims, never a grid. Carried by `sdk-4a` and `sdk-5`.
+
+_Amended 2026-10-06 (D39, amended):_ a dialect importer hands core a grid through the `Import` port — pre-mapping input that core walks through the same mapping, preview and commit as a hand-mapped CSV. The job still calls a port; it still never maps, commits or writes a record.
 
 ### D53-cost-hook
 
@@ -525,3 +527,15 @@ _Carried by_ no slice yet; precedes D72's watches.
 _Rejected:_ stacked collapsed sections (the 09-30 answer, superseded now that two sections are products); a rail right of the tabs (two structures side by side, the view starved of width); an "Overview" tab that re-summarises (the readout strip and the details column already do); hiding empty tabs (loses the index); a Context tab (introspection of the assembler, routinely empty on a fresh record, and every use it had — see the sources, pin, exclude — has a home on the answer card or a row menu).
 
 _Carried by_ the record port slice beside SPA-214 for shipped routes, and the anatomy sheets O1–O4 on the canvas; E1 and S1 are the Interactions and Files tabs of the same record.
+
+### D39-importer-parse-signature — amended
+
+**Does a dialect importer hand core claims or a grid?** Amended by the owner while carrying SPA-172: **a grid is pre-mapping input; the plugin never maps or commits.** A `file` job that reads a dialect (an Airtable CSV export first) calls a new `Import` port, `Import.stage({ columns, rows })`, each row carrying its ordinal. The plugin does the dialect's work — splits comma-joined multi-selects into lists, keeps linked-record display names as names, reduces attachments to their URLs — and stops there. Core lands the grid in `import_batch`/`import_row`, and from there it walks the mapping, preview, commit and batch void a hand-mapped CSV walks. The plugin never maps, previews or commits, and never writes a record.
+
+- **D52 holds:** the job calls a port, it does not return a grid. **D12 holds:** the batch is an ordinary staged batch, so batch reversal and the idempotent re-run apply unchanged.
+- **Per-row errors stay per-row.** A unit of output that does not decode fails its own row: placed rows land with no cells and plan as `no-land`, unplaceable ones are returned to the job as refused, and the rest of the batch commits.
+- **`Import` is additive:** SDK 1.0.0 → **1.1.0**, a minor. So is the optional `accepts: { filename }` on a `file` job, which is how web routes a dropped file to an enabled plugin without running plugin code.
+
+_Rejected:_ `Identity.resolve` and `Facts.fill` row by row (no SDK change, but no preview, no `import_batch`, no batch void and no idempotent re-run).
+
+_Carried by_ SPA-172 (`plugins/airtable`).

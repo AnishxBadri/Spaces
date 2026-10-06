@@ -183,7 +183,8 @@ function delimitedSheet(bytes: Uint8Array, filename: string): Sheet {
   return toSheet(baseName(filename), parseDelimited(text, delimiter))
 }
 
-function baseName(filename: string): string {
+/** A delimited file's one sheet name: its filename stem. */
+export function baseName(filename: string): string {
   const base = filename.split(/[\\/]/).pop() ?? filename
   const dot = base.lastIndexOf('.')
   return dot > 0 ? base.slice(0, dot) : base

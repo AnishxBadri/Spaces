@@ -142,6 +142,11 @@ export const mappingObjectOf = Effect.fn('mappingObjectOf')(function* (
  */
 const mappableBatch = Effect.fn('mappableBatch')(function* (batchId: string) {
   const batch = yield* editableBatch(batchId)
+  // Only a batch an import plugin has yet to stage is ever empty.
+  if (batch.rowCount === 0)
+    return yield* new ImportRefused({
+      reason: 'This file is still being read by its import plugin',
+    })
   if (batch.mode !== 'records' || batch.targetObjectId === null)
     return yield* new ImportRefused({
       reason: 'Choose the object these rows go into first',

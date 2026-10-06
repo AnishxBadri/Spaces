@@ -370,6 +370,36 @@ export function PreviousImportNotice({
   )
 }
 
+/** A batch an import plugin has yet to stage, as `loadImportBatchProgram` reads it. */
+export type ImportReading = {
+  status: 'waiting' | 'running' | 'failed'
+  error: string | null
+}
+
+function readingLine(reading: ImportReading): string {
+  switch (reading.status) {
+    case 'waiting':
+      return 'An import plugin reads this file in the background; its rows appear here when it has.'
+    case 'running':
+      return 'An import plugin is reading this file.'
+    case 'failed':
+      return `The import plugin could not read this file: ${reading.error ?? 'no reason given'}. Discard it, disable the plugin and drop the file again to map it by hand.`
+  }
+}
+
+export function ReadingNotice({ reading }: { reading: ImportReading }) {
+  return (
+    <section className="flex flex-wrap items-center gap-3 border border-rule bg-bone px-4 py-3">
+      <span className="label-caps text-foreground">
+        {reading.status === 'failed' ? 'Not read' : 'Reading'}
+      </span>
+      <span className="mono text-label text-graphite">
+        {readingLine(reading)}
+      </span>
+    </section>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Define: object + mode
 // ---------------------------------------------------------------------------

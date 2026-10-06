@@ -126,6 +126,7 @@ bundle.
       uses: ['Identity', 'Facts', 'Http', …],                          // §4 — the ports this job is granted
       schedule?: cron,                   // trigger = schedule
       on?: ['entity.created'],           // trigger = event
+      accepts?: { filename: regex },     // trigger = file — which dropped files web routes to it (SDK 1.1)
       concurrency?: n, timeout?: '60s', retry?: n, interactive?: boolean,
     }
   },
@@ -156,6 +157,7 @@ one `integration` row. The plugin never links against core.
 | `Content`      | `fileDocument`, `logInteraction`, `emitSignal`    | document pipeline / `interaction` / `signal`                                                         |
 | `Judgment`     | `suggest(claim)`                                  | review inbox; never a silent write                                                                   |
 | `Receipts`     | `store(entityId, raw)`                            | `enrichment_record` — the provenance anchor                                                          |
+| `Import`       | `stage({ columns, rows })`                        | lands a grid in the waiting `import_batch`; mapping, preview and commit stay core's (SDK 1.1)        |
 | `Ai`           | `complete(lane, items, schema?)`                  | AI substrate: lane routing, sensitivity gate, cost attributed to this integration                    |
 | `Read`         | `entity(id)`, `search(q)`, later `context(id, …)` | `canRead` as actor `integration` — private notes never visible; `search` lexical + fuzzy in v1 (D56) |
 | `Secrets`      | `get()`, `accessToken()`                          | vault decrypt in the worker only; scoped to this row's credential / connection                       |
@@ -290,8 +292,9 @@ integrationId or sourceRef field — provenance is the port's, from the bound
 row. There is no batch, no router and no handle grammar: dependency order is
 the order the job's code runs in, and each lane keeps its own idempotency
 (`resolveEntity` on identity keys, `Facts.fill` inside the row lock,
-interactions on `message_id`). An importer (the `file` trigger) still speaks
-claims, never a grid (D39) — it speaks them through Identity/Facts/Content.
+interactions on `message_id`). An importer of documents (the `file`
+trigger) speaks claims through Identity/Facts/Content; a **dialect importer
+hands core a grid** through `Import` (D39 as amended 2026-10-06, §5.2).
 
 The claims (sdk-4a): `IdentityClaim { kind: company | person, keys:
 { domain?, email?, linkedin?, cin? }, name? }` and `AliasClaim`;
@@ -358,6 +361,62 @@ reader does not re-derive it from the tests:
   `document.filed` activity row carries `actorType`/`integrationId` so the
   timeline names the plugin. A merged-away `fileAgainst` id files on the
   survivor.
+
+### 5.2 The `Import` port — a dialect is a plugin, the pipeline stays core (SDK 1.1.0, D39 amended 2026-10-06)
+
+A dialect (an Airtable CSV export first; Notion and CRM exports later) is a
+`file` job that reads the file and calls `Import.stage` once with the grid:
+
+```ts
+Import.stage(grid: {
+  columns: ReadonlyArray<string>                        // the header, in order
+  rows: ReadonlyArray<{
+    ordinal: number                                     // 1-based data row — per-row errors name it
+    cells: ReadonlyArray<string | ReadonlyArray<string>> // a list cell: a multi-select's labels, several names, several URLs
+  }>
+}) → Effect<{ batchId, staged, malformed: Array<{ ordinal, reason }>, refused: Array<{ ordinal, reason }> }, JobError>
+```
+
+- **Pre-mapping input, never claims.** Core lands the grid in the
+  `import_batch` the import wizard is waiting on, and the batch then walks
+  the same mapping, preview, commit and batch void (D12) as a hand-mapped
+  CSV. The plugin never maps, previews, commits or writes a record; the
+  rejected alternative — `Identity.resolve`/`Facts.fill` row by row — loses
+  the preview, the batch, batch void and the idempotent re-run.
+- **The dialect's work is the plugin's.** For Airtable: comma-joined
+  multi-selects are split into lists, linked-record display names are kept
+  as names (never resolved to ids in the plugin), attachments arrive as their
+  URLs.
+- **A list cell lands as text core can read back.** Its items, quoted where
+  they hold a separator or a quote, joined with `,` — which reproduces the
+  dialect's own cell, so every non-list column reads exactly as the plain CSV
+  would, and the multi-select reader splits it back item for item (an option
+  label holding a comma included). Every label must still be an existing
+  option: an unknown one refuses the cell, never mints an option.
+- **Per-row errors stay per-row.** A row the port cannot decode (a cell that
+  is neither text nor a list of text, more cells than columns) is staged
+  under its ordinal with no cells, returned in `malformed` with its reason,
+  and plans as `no-land`; a row it cannot
+  place (an ordinal that is not a positive whole number, or one already
+  used) is returned in `refused`. The rest of the batch stages and commits.
+  A grid with no placeable row fails the job permanently.
+- **Idempotent.** A second `stage` into a batch that already holds rows
+  writes nothing and answers with what is there.
+- **Routing.** The job declares `accepts: { filename }`, a regular expression
+  (case-insensitive) on the dropped file's name. Web reads it from
+  `integration.manifest` — never from the bundle — and, for a runnable
+  integration whose matching `file` job `uses` `Import`, stores the blob,
+  creates the waiting batch (status `staged`, no rows) and enqueues
+  `plugin.<id>.<job>` with `{ batchId, blobSha, filename, mime }`. The
+  worker hands the job the stored bytes as its stream and the batch through
+  a run-scoped reference only the `Import` port reads; the run's
+  `job_run.summary` is led by `batch <id> · `, as the commit's is. A job
+  that fails for good marks the batch `failed`. With no runnable plugin
+  matching — the plugin disabled, say — the same file takes the plain CSV
+  path and its explicit mapping step.
+- **SDK 1.1.0.** `Import`, its claim types and `accepts` are additive: a
+  minor. A plugin that uses them declares `sdk: '^1.1'`, so a 1.0 host
+  degrades it by range before it parses the manifest.
 
 ## 6. `definePlugin()` and the testing kit
 

@@ -119,6 +119,32 @@ describe('manifestSchema', () => {
       )
     })
 
+    it('takes accepts on a file job only, as a pattern that compiles', () => {
+      const m = base()
+      m.jobs.read = {
+        trigger: 'file',
+        uses: ['Import'],
+        accepts: { filename: '-[^/]* view\\.csv$' },
+      }
+      expect(issues(m)).toEqual([])
+      m.jobs.read = {
+        trigger: 'file',
+        uses: ['Import'],
+        accepts: { filename: '([' },
+      }
+      expect(issues(m)).toEqual([
+        'jobs.read.accepts.filename: accepts.filename is a regular expression',
+      ])
+      m.jobs.read = {
+        trigger: 'action',
+        uses: ['Import'],
+        accepts: { filename: 'x' },
+      }
+      expect(issues(m)).toEqual([
+        'jobs.read.accepts: accepts is only for a file job, and read is action',
+      ])
+    })
+
     it('requires schedule iff the trigger is schedule', () => {
       const m = base()
       m.jobs.sync = { trigger: 'schedule', uses: ['Http'] }

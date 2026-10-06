@@ -14,12 +14,15 @@ import type {
   JsonValue,
   PortName,
 } from '../contract.ts'
+import { landImportGrid } from '../import-grid.ts'
+import type { LandedRow } from '../import-grid.ts'
 import {
   Config,
   Content,
   Facts,
   Http,
   Identity,
+  Import,
   Judgment,
   Log,
   NotConnected,
@@ -34,6 +37,7 @@ import type {
   HttpResponse,
   LogFields,
   ReadEntity,
+  StageResult,
 } from '../ports.ts'
 
 /**
@@ -518,6 +522,58 @@ export const LogTest = (
 }
 
 // ---------------------------------------------------------------------------
+// Import
+// ---------------------------------------------------------------------------
+
+/**
+ * One waiting batch, `batch-1`, landed exactly as the live port lands it
+ * (`landImportGrid`): `rows` is what the import reader would see — a list
+ * cell as its joined text, a malformed row with null cells and its reason.
+ * A second `stage` writes nothing and answers with what is there, as the
+ * live port does; a grid with no column or no placeable row fails
+ * permanently.
+ */
+export const ImportTest = (
+  options: { readonly recorder?: Recorder } = {},
+): TestPort<Import> & {
+  readonly rows: ReadonlyArray<LandedRow>
+  readonly columns: ReadonlyArray<string>
+} => {
+  const { calls, record } = tap('Import', options.recorder)
+  const rows: Array<LandedRow> = []
+  const columns: Array<string> = []
+  let landed: StageResult | null = null
+  const layer = Layer.succeed(Import, {
+    stage: (grid) =>
+      Effect.suspend(() => {
+        if (landed !== null)
+          return Effect.succeed(record('stage', grid, landed))
+        const read = landImportGrid(grid)
+        if ('unreadable' in read || read.rows.length === 0) {
+          const reason =
+            'unreadable' in read
+              ? read.unreadable
+              : 'the grid has no row that could be placed'
+          record('stage', grid, `<refused: ${reason}>`)
+          return Effect.fail(new JobPermanent({ reason }))
+        }
+        rows.push(...read.rows)
+        columns.push(...read.columns)
+        landed = {
+          batchId: 'batch-1',
+          staged: read.rows.length,
+          malformed: read.rows.flatMap((r) =>
+            r.reason === null ? [] : [{ ordinal: r.rowNum, reason: r.reason }],
+          ),
+          refused: read.refused,
+        }
+        return Effect.succeed(record('stage', grid, landed))
+      }),
+  })
+  return { layer, calls, rows, columns }
+}
+
+// ---------------------------------------------------------------------------
 // All of them
 // ---------------------------------------------------------------------------
 
@@ -532,7 +588,7 @@ export type TestPortsOptions = {
 }
 
 /**
- * Every test port over one recorder: `layer` provides all ten, `calls` is
+ * Every test port over one recorder: `layer` provides all eleven, `calls` is
  * every port call in the order the job made it, and each port's own handle
  * is there for its extra state (`facts.values`, `log.lines`).
  */
@@ -563,8 +619,10 @@ export const testPorts = (options: TestPortsOptions = {}) => {
   const config = ConfigTest(options.config ?? {}, { recorder })
   const http = HttpTest(options.http ?? [], { recorder })
   const log = LogTest({ recorder })
+  const importer = ImportTest({ recorder })
   return {
     layer: Layer.mergeAll(
+      importer.layer,
       identity.layer,
       facts.layer,
       content.layer,
@@ -587,5 +645,6 @@ export const testPorts = (options: TestPortsOptions = {}) => {
     config,
     http,
     log,
+    import: importer,
   }
 }

@@ -1,16 +1,23 @@
 import { Readable } from 'node:stream'
 import { Effect, Schema } from 'effect'
-import { and, asc, count, desc, eq, isNotNull, ne, or } from 'drizzle-orm'
+import { and, asc, count, desc, eq, isNotNull, like, ne, or } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   importBatch,
   importRow,
+  integration,
+  jobRun,
   objectDef,
   pendingBlob,
 } from '@spaces/db/schema'
 import { MAX_UPLOAD_BYTES, formatBytes } from '@spaces/core/documents'
-import { GridRefused, readGrid } from '@spaces/core/import/read'
+import { runLinePrefix } from '@spaces/core/import/commit'
+import { importReaderOf } from '@spaces/core/import/dialect'
+import type { FileJobData, ImportReader } from '@spaces/core/import/dialect'
+import { GridRefused, baseName, readGrid } from '@spaces/core/import/read'
 import { reclaimBlobIfOrphaned } from '#/lib/documents/blob-refs'
+import { runnable } from '#/lib/integrations/runnable'
+import { enqueue } from '#/lib/queue'
 import { putBlobProgram } from '@spaces/core/writes/documents/intake'
 import { storage } from '@spaces/core/writes/storage'
 import type { Grid, Sheet } from '@spaces/core/import/read'
@@ -220,6 +227,148 @@ export const previousImportOf = Effect.fn('previousImportOf')(function* (
 })
 
 // ---------------------------------------------------------------------------
+// A dialect plugin's file
+// ---------------------------------------------------------------------------
+
+/**
+ * The runnable integration whose file job reads a dropped file of this
+ * name into an import batch, or null — from the stored manifests, in plugin
+ * order. Web never loads a bundle. (D39 as amended)
+ */
+export const importReaderFor = Effect.fn('importReaderFor')(function* (
+  filename: string,
+): Effect.fn.Return<
+  (ImportReader & { readonly integrationId: string }) | null,
+  ImportFailed
+> {
+  const rows = yield* query(() =>
+    db
+      .select({ id: integration.id, manifest: integration.manifest })
+      .from(integration)
+      .where(runnable)
+      .orderBy(asc(integration.capabilityId), asc(integration.createdAt)),
+  )
+  for (const row of rows) {
+    const reader = importReaderOf(row.manifest, filename)
+    if (reader !== null) return { ...reader, integrationId: row.id }
+  }
+  return null
+})
+
+/**
+ * The waiting batch for a reader: the bytes stored, the batch born with no
+ * rows, and the plugin's file job sent with both. Null when the job could
+ * not be sent — the batch goes and the caller takes the plain CSV path.
+ */
+const stageForReader = Effect.fn('stageForReader')(function* (
+  input: StageImportInput,
+  reader: ImportReader,
+): Effect.fn.Return<StageImportResult | null, ImportRefused | ImportFailed> {
+  const { filename } = input
+  yield* checkTarget(input.mode, input.targetObjectId)
+  const blob = yield* putBlobProgram({
+    stream: Readable.from([Buffer.from(input.bytes)]),
+    mime: input.mime,
+    preparedBy: input.userId,
+  }).pipe(
+    Effect.catchTags({
+      DocumentTooLarge: () =>
+        new ImportRefused({
+          reason: `${filename} is larger than the ${formatBytes(MAX_UPLOAD_BYTES)} limit`,
+        }),
+      DocumentIntakeFailed: (e) => new ImportFailed({ cause: e.cause }),
+    }),
+  )
+  if (!input.allowDuplicate) {
+    const previous = yield* previousImportOf(blob.sha, null)
+    if (previous) return { kind: 'duplicate', previous }
+  }
+  const sheet = baseName(filename)
+  const batchId = yield* query(() =>
+    db.transaction(async (tx) => {
+      const inserted = (
+        await tx
+          .insert(importBatch)
+          .values({
+            blobSha: blob.sha,
+            filename,
+            sizeBytes: blob.sizeBytes,
+            sheet,
+            sheets: [sheet],
+            headerRow: null,
+            header: null,
+            rowCount: 0,
+            mode: input.mode,
+            targetObjectId: input.targetObjectId,
+            createdBy: input.userId,
+          })
+          .returning({ id: importBatch.id })
+      ).at(0)
+      if (!inserted) throw new Error('import_batch insert returned no row')
+      await tx.delete(pendingBlob).where(eq(pendingBlob.sha, blob.sha))
+      return inserted.id
+    }),
+  )
+  const data: FileJobData = {
+    batchId,
+    blobSha: blob.sha,
+    filename,
+    mime: input.mime,
+  }
+  const jobId = yield* query(() => enqueue(reader.queue, data))
+  if (jobId !== null) return { kind: 'staged', batchId }
+  yield* query(() => db.delete(importBatch).where(eq(importBatch.id, batchId)))
+  return null
+})
+
+/** How the reader of a batch with no rows yet is doing. */
+export type ImportReading = {
+  /** The plugin's run, from its `job_run` line; null before it starts. */
+  status: 'waiting' | 'running' | 'failed'
+  /** The failed run's reason, its batch prefix dropped. */
+  error: string | null
+}
+
+/**
+ * A staged batch with no rows is waiting on its reader — a sheet is refused
+ * before it stages empty. Its latest plugin run is found the way the
+ * commit's is: by the `batch <id> · ` its line leads with.
+ */
+const readingOf = Effect.fn('readingOf')(function* (
+  batch: typeof importBatch.$inferSelect,
+): Effect.fn.Return<ImportReading | null, ImportFailed> {
+  if (batch.status !== 'staged' || batch.rowCount > 0) return null
+  const prefix = runLinePrefix(batch.id)
+  const last = yield* query(() =>
+    db
+      .select({ status: jobRun.status, error: jobRun.error })
+      .from(jobRun)
+      .where(
+        and(
+          like(jobRun.queue, 'plugin.%'),
+          or(
+            like(jobRun.summary, `${prefix}%`),
+            like(jobRun.error, `%${prefix}%`),
+          ),
+        ),
+      )
+      .orderBy(desc(jobRun.startedAt))
+      .limit(1)
+      .then((rows) => rows.at(0)),
+  )
+  if (!last) return { status: 'waiting', error: null }
+  if (last.status === 'failed') {
+    const error = last.error ?? ''
+    const at = error.indexOf(prefix)
+    return {
+      status: 'failed',
+      error: at === -1 ? error : error.slice(at + prefix.length),
+    }
+  }
+  return { status: 'running', error: null }
+})
+
+// ---------------------------------------------------------------------------
 // Stage
 // ---------------------------------------------------------------------------
 
@@ -241,6 +390,10 @@ export type StageImportResult =
 /**
  * Size → read → target → blob → (earlier import?) → batch + rows.
  *
+ * A records file a runnable dialect plugin accepts goes to it instead: the
+ * batch is born waiting and the plugin's file job stages its rows
+ * (`stageForReader`). Disable the plugin and the same file takes this path.
+ *
  * Every refusal comes before the store: an over-limit file, a file
  * `readGrid` refuses (legacy .xls, over `MAX_IMPORT_ROWS`), an empty sheet or
  * a bad target stores nothing. Bytes already imported answer with the
@@ -261,6 +414,14 @@ export const stageImportProgram = Effect.fn('stageImportProgram')(function* (
     return yield* new ImportRefused({
       reason: `${filename} is larger than the ${formatBytes(MAX_UPLOAD_BYTES)} limit`,
     })
+
+  if (input.mode === 'records') {
+    const reader = yield* importReaderFor(filename)
+    if (reader !== null) {
+      const routed = yield* stageForReader(input, reader)
+      if (routed !== null) return routed
+    }
+  }
 
   const grid = yield* readGridOrRefuse(bytes, filename)
   const sheet = pickSheet(grid)
@@ -433,6 +594,8 @@ export type ImportBatchView = {
   preview: Array<{ rowNum: number; cells: Array<string> }>
   /** The latest other batch staged from the same bytes. */
   previous: PreviousImport | null
+  /** Set while an import plugin has yet to stage this batch's rows. */
+  reading: ImportReading | null
 }
 
 export const loadImportBatchProgram = Effect.fn('loadImportBatchProgram')(
@@ -456,6 +619,7 @@ export const loadImportBatchProgram = Effect.fn('loadImportBatchProgram')(
         .limit(PREVIEW_ROWS),
     )
     const previous = yield* previousImportOf(batch.blobSha, batch.id)
+    const reading = yield* readingOf(batch)
     return {
       id: batch.id,
       filename: batch.filename,
@@ -473,6 +637,7 @@ export const loadImportBatchProgram = Effect.fn('loadImportBatchProgram')(
       createdAt: batch.createdAt.toISOString(),
       preview,
       previous,
+      reading,
     }
   },
 )
