@@ -72,6 +72,11 @@ jobs:
         run: env -u DATABASE_URL pnpm --filter @spaces/plugin-echo exec vitest run src/enrich.test.ts
       - name: turbo run build
         run: pnpm run build
+      # The client bundle carries no drizzle schema. A build-output check, so
+      # it runs here on the bundle just built — vitest runs before the build
+      # and its cache does not key on `.output`.
+      - name: No drizzle schema in the client bundle
+        run: bash scripts/check-client-bundle.sh
 
   # The browser suite (SPA-184): `pnpm e2e` — turbo builds @spaces/web, the
   # harness boots it twice against databases it creates on this service and

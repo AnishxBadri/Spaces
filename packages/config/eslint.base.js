@@ -58,6 +58,45 @@ const SERVER_ONLY = {
   message:
     'Server helpers are server-only. Client code imports from the server-fns barrel (apps/web/src/lib/server-fns.ts).',
 }
+// @spaces/db in a module the browser loads ships drizzle and every table the
+// import reaches. Client code reads enum value lists from @spaces/core or a
+// local literal.
+const NO_DB_IN_CLIENT = {
+  regex: '^@spaces/db(/|$)',
+  allowTypeImports: true,
+  message:
+    '@spaces/db is server-only in apps/web — a value import from client code ships the drizzle schema to the browser. Read enum value lists from @spaces/core (or a local literal), use `import type`, or move the code into a server module (DB_SERVER_MODULES in packages/config/eslint.base.js).',
+}
+// The apps/web modules allowed a value import of @spaces/db: server
+// directories, server routes, boot and seeds, tests.
+// - lib/server is client-imported through the server-fns barrel; only
+//   handler bodies are stripped, so a module-level table reference there
+//   still ships. scripts/check-client-bundle.sh catches that after the build.
+const DB_SERVER_MODULES = [
+  'apps/web/src/db/**',
+  'apps/web/src/test/**',
+  'apps/web/src/**/*.test.{ts,tsx}',
+  'apps/web/src/routes/api/**',
+  'apps/web/src/lib/server/**',
+  'apps/web/src/lib/auth.ts',
+  'apps/web/src/lib/{ai,arrival,deals,documents,glossary,import,inbox,integrations,interactions,mcp,members,notes,people,portfolio,rpc,search,seeds,spaces,tasks,timeline,tokens,views}/**',
+]
+// Client modules inside those directories (the client build's module graph):
+// they stay fenced.
+const CLIENT_MODULES_IN_SERVER_DIRS = [
+  'apps/web/src/lib/ai/lanes.ts',
+  'apps/web/src/lib/ai/providers/{ids,meta}.ts',
+  'apps/web/src/lib/ai/providers/embed/ids.ts',
+  'apps/web/src/lib/arrival/input.ts',
+  'apps/web/src/lib/documents/{file-against,key-terms-gate,note-drop,project,read-deck-gate,registry,upload,uri-list,vision-gate}.ts',
+  'apps/web/src/lib/import/upload.ts',
+  'apps/web/src/lib/inbox/to-review.ts',
+  'apps/web/src/lib/integrations/job-status-view.ts',
+  'apps/web/src/lib/search/waves.ts',
+  'apps/web/src/lib/tasks/focus.ts',
+  'apps/web/src/lib/timeline/stamp.ts',
+  'apps/web/src/lib/tokens/scopes.ts',
+]
 const NO_DIRECT_ENTITY_VALUES = {
   selector:
     "CallExpression[callee.property.name='set'][callee.object.callee.property.name='update'][callee.object.arguments.0.name='entity'] > ObjectExpression > Property[key.name='values']",
@@ -343,6 +382,25 @@ export default [
         { patterns: [WEB_NEVER_PLUGINS_NEVER_WORKER] },
       ],
     },
+  },
+  // The client fence: @spaces/db is server-only in apps/web — fenced
+  // everywhere, then opened for the modules DB_SERVER_MODULES names.
+  // - Its own rule name, so it composes with the blocks above instead of
+  //   replacing their `no-restricted-imports` options.
+  // - Type imports erase and stay allowed.
+  {
+    files: ['apps/web/src/**'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [NO_DB_IN_CLIENT] },
+      ],
+    },
+  },
+  {
+    files: DB_SERVER_MODULES,
+    ignores: CLIENT_MODULES_IN_SERVER_DIRS,
+    rules: { '@typescript-eslint/no-restricted-imports': 'off' },
   },
   // The other package boundaries (spec §2, SPA-180). One block per package
   // directory. The failing cases: `import { fmtMoney } from
