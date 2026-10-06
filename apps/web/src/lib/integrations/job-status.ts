@@ -59,9 +59,11 @@ export const jobStatusSnapshotProgram = Effect.fn('jobStatusSnapshotProgram')(
           summary: jobRun.summary,
           error: jobRun.error,
           lost: workerLost,
+          // finished_at is the worker's clock, now() the database's; clamp the skew.
+          // greatest() skips NULL, so a still-open run must stay outside it.
           closedAgoMs: sql<
             number | null
-          >`(extract(epoch from now() - ${jobRun.finishedAt}) * 1000)::float8`,
+          >`(case when ${jobRun.finishedAt} is null then null else greatest(0, extract(epoch from now() - ${jobRun.finishedAt}) * 1000) end)::float8`,
         })
         .from(jobRun)
         .leftJoin(workerHeartbeat, eq(workerHeartbeat.role, WORKER_ROLE))

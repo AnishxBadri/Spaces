@@ -165,11 +165,13 @@ describe('db/boot.ts (real database)', () => {
     for (const table of SEED_TABLES) baseline.push(await countRows(table))
   }, 120_000)
 
+  // DROP DATABASE forces a checkpoint, which outlasts the default hook
+  // timeout when the other vitest workers are writing.
   afterAll(async () => {
     if (tmpRoot) rmSync(tmpRoot, { recursive: true, force: true })
     if (adminUrl)
       await adminExec(`drop database if exists ${TEST_DB} with (force)`)
-  })
+  }, 120_000)
 
   it('derives the same hashes drizzle recorded for the current journal', async () => {
     const { Client } = await import('pg')
