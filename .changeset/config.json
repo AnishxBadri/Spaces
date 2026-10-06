@@ -6,7 +6,10 @@
   "updateInternalDependencies": "patch",
   "changelog": false,
   "commit": false,
-  "privatePackages": { "version": true, "tag": true },
+  "privatePackages": {
+    "version": true,
+    "tag": true
+  },
   "ignore": [
     "@spaces/web",
     "@spaces/worker",
@@ -25,6 +28,8 @@
     "@spaces/plugin-researcher",
     "@spaces/plugin-versioned",
     "@spaces/plugin-throws",
-    "@spaces/plugin-syncer"
+    "@spaces/plugin-syncer",
+    "@spaces/plugin-tabled",
+    "@spaces/plugin-trespass"
   ]
 }
