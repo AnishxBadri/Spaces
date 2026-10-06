@@ -653,6 +653,30 @@ contract 5) stays true.
   worker's own copies through a `node:module` resolve hook, which is why the
   worker bundle leaves `@spaces/sdk` external and the image carries it in
   `/app/node_modules`. `/api/health` lists `degradedPlugins`.
+- **Upgrade, as built (sdk-13).** "Satisfying" is one rule
+  (`updateFor` / `runsOn`, `@spaces/core/plugins/registry`): newer than the
+  installed version, `minCore` at or below `CORE_VERSION`, and the entry's
+  sdk range admitting `SDK_VERSION` (`satisfiesSdk`). The ledger's badge
+  names the newest satisfying version and Update takes exactly that one;
+  when the registry's newest fails the rule the row shows no badge and says
+  why (`2.0.0 needs sdk ^2.0; this host provides 1.1.0`). Install and the
+  Available pane never offer an entry this host cannot run
+  (`newestPerPlugin`). An upgrade writes the row's upgrade record —
+  `upgraded_from`, `upgraded_at`, `upgrade_migrated` null (migration 0067)
+  — and the loader answers it after step 5: true once any migration file
+  applied since the upgrade (sticky), false when step 5 applied none,
+  including a failing run, which rolls back whole. The ledger and the card
+  read it as `rollback available`, `rollback unsafe — restore from backup`,
+  or not yet known; rollback itself is the restore, not a button. A
+  failing migration leaves the row degraded with the refused statement, the
+  previous directory intact, `public` untouched, and `current`, lock.json
+  and the row all naming the new version. An upgrade the installer refuses
+  changes nothing; one whose lock.json write fails swaps `current` back.
+  `SPACES_PLUGINS_AUTOUPDATE=compatible` runs in the worker at boot, before
+  the first reconcile (it owns the data directory and the loader, and web
+  may be a separate container): every installed row takes its satisfying
+  target from the bundled snapshot through `upgradePlugin`, one log line per
+  take or refusal; unset or any other value does nothing, silently.
 
 ## 11. Workers and jobs
 

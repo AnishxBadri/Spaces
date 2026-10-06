@@ -33,6 +33,8 @@ const base: IntegrationRow = {
   credits: { used: 12, cap: 100 },
   errorCount: 0,
   update: null,
+  held: null,
+  rollback: null,
 }
 
 const rows: Array<IntegrationRow> = [
@@ -196,6 +198,50 @@ describe('IntegrationLedger', () => {
     expect(row).toContain('→ 0.2.0')
     expect(row).toContain('>Update</button>')
     expect(row).not.toContain('Configure')
+  })
+
+  it('names no badge when the newest version needs more than this host, and says why', () => {
+    const html = renderToStaticMarkup(
+      <IntegrationLedger
+        rows={[
+          {
+            ...base,
+            held: '2.0.0 needs sdk ^2.0; this host provides 1.1.0',
+          },
+        ]}
+        actions={{
+          onToggle: () => undefined,
+          onReset: () => undefined,
+          onUpdate: () => undefined,
+          pending: null,
+        }}
+      />,
+    )
+    const row = rowFor(html, 'enabled')
+    expect(row).not.toContain('→')
+    expect(row).not.toContain('>Update</button>')
+    expect(row).toContain('2.0.0 needs sdk ^2.0; this host provides 1.1.0')
+  })
+
+  it.each([
+    ['available', 'rollback available'],
+    ['unsafe', 'rollback unsafe — restore from backup'],
+    ['unknown', 'rollback not known until it loads'],
+  ] as const)('reads the upgrade record as %s', (answer, word) => {
+    const html = renderToStaticMarkup(
+      <IntegrationLedger
+        rows={[{ ...base, rollback: { from: '0.0.9', answer } }]}
+        actions={{
+          onToggle: () => undefined,
+          onReset: () => undefined,
+          onUpdate: () => undefined,
+          pending: null,
+        }}
+      />,
+    )
+    const row = rowFor(html, 'enabled')
+    expect(row).toContain(`>${word}<`)
+    expect(row).toContain('Upgraded from 0.0.9')
   })
 
   it('says so in one line when nothing is installed', () => {

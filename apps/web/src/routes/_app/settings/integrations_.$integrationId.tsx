@@ -9,6 +9,7 @@ import {
   WebhookUrlRow,
 } from '#/components/integrations/integration-settings'
 import {
+  ROLLBACK_WORD,
   STATE_WORD,
   creditsOf,
 } from '#/components/integrations/integration-ledger'
@@ -80,6 +81,30 @@ function metaOf(detail: IntegrationDetail): string {
     detail.lastRun ? `ran ${detail.lastRun.ago}` : 'never ran',
     `${creditsOf(detail)} today`,
   ].join(' · ')
+}
+
+/** Under the meta line: the last upgrade's rollback answer, and why no update is offered. */
+function VersionLines({ detail }: { detail: IntegrationDetail }) {
+  const { rollback, held } = detail
+  if (rollback === null && held === null) return null
+  return (
+    <div className="flex flex-col gap-1 px-3 pt-1 mono text-micro">
+      {rollback !== null ? (
+        <span
+          className={
+            rollback.answer === 'unsafe'
+              ? 'text-[var(--badge-amber-ink)]'
+              : 'text-graphite'
+          }
+        >
+          Upgraded from {rollback.from} · {ROLLBACK_WORD[rollback.answer]}
+        </span>
+      ) : null}
+      {held !== null ? (
+        <span className="text-graphite">No update offered: {held}</span>
+      ) : null}
+    </div>
+  )
 }
 
 function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
@@ -271,6 +296,7 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
       <p className="px-3 pt-3 mono text-micro text-graphite">
         {metaOf(detail)}
       </p>
+      <VersionLines detail={detail} />
       {detail.state === 'degraded' || tripped ? (
         <div
           role="status"

@@ -6,8 +6,9 @@ import { describe, expect, it } from 'vitest'
 /**
  * Install, upgrade and uninstall go through one installer routine. Install
  * has exactly three callers — the registry install and the upload, each
- * behind its server fn, and first boot's SPACES_PLUGINS; upgrade and
- * uninstall one each, the program behind its server fn. Checked over
+ * behind its server fn, and first boot's SPACES_PLUGINS; upgrade two, the
+ * program behind its server fn and the worker's boot autoupdate; uninstall
+ * one, the program behind its server fn. Checked over
  * the source text of every shipping file in apps/ and packages/ (tests
  * excluded), so a second caller fails here naming its file.
  */
@@ -18,6 +19,7 @@ const INSTALLER = 'packages/core/src/writes/plugins/install.ts'
 const WEB = 'apps/web/src/lib/integrations/install.ts'
 const FNS = 'apps/web/src/lib/server/integrations.ts'
 const FIRST_BOOT = 'packages/core/src/writes/plugins/first-boot.ts'
+const AUTOUPDATE = 'apps/worker/src/plugins/autoupdate.ts'
 
 const sourceFiles = (dir: string): Array<string> => {
   const out: Array<string> = []
@@ -81,10 +83,11 @@ describe('the installer has one caller per entry point', () => {
   })
 
   it.each([
-    ['upgradePlugin', 'upgradeFromRegistryProgram'],
-    ['uninstallPlugin', 'uninstallIntegrationProgram'],
-  ])('%s is called once, by %s', (entry, program) => {
-    expect(callsOf(entry)).toEqual([WEB])
+    // The boot autoupdate is upgrade's one other door.
+    ['upgradePlugin', 'upgradeFromRegistryProgram', [WEB, AUTOUPDATE]],
+    ['uninstallPlugin', 'uninstallIntegrationProgram', [WEB]],
+  ])('%s is called by %s', (entry, program, callers) => {
+    expect(callsOf(entry)).toEqual(callers)
     expect(programBody(WEB, program)).toContain(`${entry}(`)
   })
 

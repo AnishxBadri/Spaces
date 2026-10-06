@@ -1,6 +1,10 @@
+import { SDK_VERSION, isVersion, satisfiesSdk } from '@spaces/sdk'
+import { CORE_VERSION } from './core-version.ts'
+
 /**
- * The registry, read as versions: which entry is newest per plugin, and
- * whether it is newer than what a row has installed. Pure.
+ * The registry, read as versions: which entries this host can run, the
+ * newest of them per plugin, and the update an installed row is offered.
+ * Pure.
  */
 
 const VERSION =
@@ -30,17 +34,113 @@ export const compareVersions = (a: string, b: string): number => {
   return pa < pb ? -1 : 1
 }
 
-/** The newest entry for each plugin id, in the order ids first appear. */
-export const newestPerPlugin = <T extends { id: string; version: string }>(
-  entries: ReadonlyArray<T>,
-): Array<T> => {
-  const newest = new Map<string, T>()
-  for (const entry of entries) {
-    const held = newest.get(entry.id)
-    if (held === undefined || compareVersions(entry.version, held.version) > 0)
-      newest.set(entry.id, entry)
+/** What a registry entry is checked against: this core's version and its sdk's. */
+export type HostVersions = { readonly core: string; readonly sdk: string }
+
+export const THIS_HOST: HostVersions = { core: CORE_VERSION, sdk: SDK_VERSION }
+
+/** The fields of a registry entry the satisfying rule reads. */
+export type VersionedEntry = {
+  readonly id: string
+  readonly version: string
+  /** The entry's sdk range, `^1.0`. */
+  readonly sdk: string
+  /** The oldest core it runs on; absent means any. */
+  readonly minCore?: string | undefined
+}
+
+export type Runnable =
+  { readonly ok: true } | { readonly ok: false; readonly reason: string }
+
+/**
+ * Whether `host` can run `entry`: its `minCore` is at or below this core and
+ * its sdk range admits this sdk. A refusal is the sentence the ledger shows,
+ * naming the entry's version and both sides.
+ */
+export const runsOn = (
+  entry: VersionedEntry,
+  host: HostVersions = THIS_HOST,
+): Runnable => {
+  const { minCore } = entry
+  if (minCore !== undefined) {
+    if (!isVersion(minCore))
+      return {
+        ok: false,
+        reason: `${entry.version} names an unreadable minCore "${minCore}"`,
+      }
+    if (compareVersions(host.core, minCore) < 0)
+      return {
+        ok: false,
+        reason: `${entry.version} needs Spaces ${minCore} or newer; this is ${host.core}`,
+      }
   }
-  return [...newest.values()]
+  if (!satisfiesSdk(entry.sdk, host.sdk).ok)
+    return {
+      ok: false,
+      reason: `${entry.version} needs sdk ${entry.sdk}; this host provides ${host.sdk}`,
+    }
+  return { ok: true }
+}
+
+const newestOf = <T extends VersionedEntry>(
+  entries: ReadonlyArray<T>,
+): T | undefined =>
+  entries.reduce<T | undefined>(
+    (held, e) =>
+      held === undefined || compareVersions(e.version, held.version) > 0
+        ? e
+        : held,
+    undefined,
+  )
+
+/**
+ * The newest entry this host can run for each plugin id, in the order ids
+ * first appear. An entry it cannot run is never offered — not to install,
+ * not to upgrade to.
+ */
+export const newestPerPlugin = <T extends VersionedEntry>(
+  entries: ReadonlyArray<T>,
+  host: HostVersions = THIS_HOST,
+): Array<T> => {
+  const runnable = entries.filter((e) => runsOn(e, host).ok)
+  return [...new Set(runnable.map((e) => e.id))].flatMap((id) => {
+    const newest = newestOf(runnable.filter((e) => e.id === id))
+    return newest === undefined ? [] : [newest]
+  })
+}
+
+export type UpdateOffer<T> = {
+  /** The newest satisfying version past the installed one: the badge and the one click. */
+  readonly target: T | null
+  /** The registry's newest version when this host cannot run it, and why. */
+  readonly held: { readonly version: string; readonly reason: string } | null
+}
+
+/**
+ * The update an installed plugin is offered. Satisfying means newer than
+ * `installed`, `minCore` met, and an sdk range admitting this host's sdk —
+ * one rule for the badge, the Update click and
+ * `SPACES_PLUGINS_AUTOUPDATE=compatible`.
+ */
+export const updateFor = <T extends VersionedEntry>(
+  entries: ReadonlyArray<T>,
+  pluginId: string,
+  installed: string,
+  host: HostVersions = THIS_HOST,
+): UpdateOffer<T> => {
+  const newer = entries.filter(
+    (e) => e.id === pluginId && compareVersions(e.version, installed) > 0,
+  )
+  const target = newestOf(newer.filter((e) => runsOn(e, host).ok)) ?? null
+  const newest = newestOf(newer)
+  if (newest === undefined || newest === target) return { target, held: null }
+  const refusal = runsOn(newest, host)
+  return {
+    target,
+    held: refusal.ok
+      ? null
+      : { version: newest.version, reason: refusal.reason },
+  }
 }
 
 /**

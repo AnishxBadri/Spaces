@@ -40,7 +40,11 @@ import { dropPluginSchemaStatement } from './schema.ts'
  *   directory, no lock.json edit, no row.
  * - Files land in `<data>/plugins/<id>/<version>/` by a rename from a staging
  *   directory, `current` is swapped by renaming a fresh symlink over it, and
- *   one version back is kept; older ones are removed.
+ *   one version back is kept; older ones are removed. An upgrade that
+ *   fails leaves `current`, lock.json and the row at the previous version.
+ * - An upgrade writes a new upgrade record on the row (`upgradedFrom`,
+ *   `upgradeMigrated` null); the loader answers whether a migration ran,
+ *   which is what decides rollback against restore.
  * - Uninstall soft-deletes the row (`removed_at`) and never deletes it, so
  *   every `source_ref` and `actor_ref` keeps naming the plugin. A reinstall of
  *   the same id clears `removed_at` on that row.
@@ -183,6 +187,31 @@ const prune = async (
   }
 }
 
+/**
+ * Places `version`, swaps `current` to it and pins `lock`, then removes the
+ * version before last. A lock.json that cannot be written swaps `current`
+ * back, so `current` and lock.json never disagree.
+ */
+const land = async (
+  root: string,
+  dir: string,
+  version: string,
+  files: ReadonlyMap<string, Uint8Array>,
+  previous: string | null,
+  lock: Lock,
+): Promise<void> => {
+  await placeVersion(root, dir, version, files)
+  await swapCurrent(dir, version)
+  try {
+    await writeLock(root, lock)
+  } catch (error) {
+    if (previous !== null && previous !== version)
+      await swapCurrent(dir, previous)
+    throw error
+  }
+  await prune(dir, [version, previous])
+}
+
 const notifyChanged = (pluginId: string) =>
   Effect.tryPromise({
     try: () =>
@@ -242,33 +271,42 @@ const put = async (
     const lock = await readLock(root)
     const dir = path.join(root, id)
     const previous = await currentVersion(dir)
-    await placeVersion(root, dir, version, files)
-    await swapCurrent(dir, version)
-    await prune(dir, [version, previous])
-    await writeLock(root, {
-      ...lock,
-      core,
-      plugins: {
-        ...lock.plugins,
-        [id]: { version, sha256: bundleSha256(bundle) },
-      },
-    })
+    // The row first, then the disk: a failure on disk rolls the row back.
+    const landed = () =>
+      land(root, dir, version, files, previous, {
+        ...lock,
+        core,
+        plugins: {
+          ...lock.plugins,
+          [id]: { version, sha256: bundleSha256(bundle) },
+        },
+      })
 
     if (op.kind === 'upgrade' && live) {
       const tripped = live.status === 'disabled'
+      const moved = previous !== null && previous !== version
       await tx
         .update(integration)
         .set({
           version,
           manifest,
           ...(tripped ? {} : { status: 'installing', lastError: null }),
+          // A new upgrade record; the loader answers `upgradeMigrated`.
+          ...(moved
+            ? {
+                upgradedFrom: previous,
+                upgradedAt: new Date(),
+                upgradeMigrated: null,
+              }
+            : {}),
         })
         .where(eq(integration.id, live.id))
+      await landed()
       return {
         integrationId: live.id,
         pluginId: id,
         version,
-        previous: previous === version ? null : previous,
+        previous: moved ? previous : null,
       }
     }
     const fresh = {
@@ -279,12 +317,16 @@ const put = async (
       lastError: null,
       errorCount: 0,
       removedAt: null,
+      upgradedFrom: null,
+      upgradedAt: null,
+      upgradeMigrated: null,
     }
     if (removed) {
       await tx
         .update(integration)
         .set(fresh)
         .where(eq(integration.id, removed.id))
+      await landed()
       return {
         integrationId: removed.id,
         pluginId: id,
@@ -303,6 +345,7 @@ const put = async (
         .returning({ id: integration.id })
     ).at(0)
     if (!inserted) throw new Error('integration insert returned no row')
+    await landed()
     return { integrationId: inserted.id, pluginId: id, version, previous: null }
   })
 }
@@ -348,8 +391,9 @@ const remove = async (
 
 /**
  * The one installer routine. `install`, `upgrade` and `uninstall` are its
- * only callers; each of those has one caller, the server fn behind its
- * button (asserted by test).
+ * only callers. Their callers are counted by test: install's are the
+ * registry install, the upload and first boot; upgrade's the Update button
+ * and the worker's boot autoupdate; uninstall's its button alone.
  */
 export const runInstaller = Effect.fn('runInstaller')(function* (
   op: InstallerOp,

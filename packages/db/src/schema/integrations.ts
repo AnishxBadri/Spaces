@@ -100,6 +100,17 @@ export const integration = pgTable('integration', {
    * plugin id clears it on this row rather than minting another.
    */
   removedAt: timestamp('removed_at', { withTimezone: true }),
+  /**
+   * The last upgrade, the rollback answer's record. Null on a row never
+   * upgraded; an install or reinstall clears all three.
+   * - `upgradedFrom`: the version `current` pointed at before, kept one back.
+   * - `upgradeMigrated`: whether the loader's step 5 applied any migration
+   *   file since — null until it runs, sticky once true. False means the
+   *   previous directory can be swapped back; true means restore from backup.
+   */
+  upgradedFrom: text('upgraded_from'),
+  upgradedAt: timestamp('upgraded_at', { withTimezone: true }),
+  upgradeMigrated: boolean('upgrade_migrated'),
   /** The admin who installed it; null for a row the seed or an import made. */
   createdBy: text('created_by').references(() => user.id),
   createdAt: timestamp('created_at', { withTimezone: true })

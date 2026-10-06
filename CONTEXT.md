@@ -462,7 +462,28 @@ unsafe-entry · manifest-missing · manifest-mismatch`, checking the
   pane offers the plugin again, and reinstalling the same id clears
   `removed_at` on that row rather than minting a new one. Rejected: nulling
   the references — tidy tables, but the values would read as hand-entered
-  (D12's append-only spirit).
+  (D12's append-only spirit). **Upgrade as a flow (SPA-231, sdk-13).** An
+  entry _satisfies_ when it is newer than the installed version, its
+  `minCore` is at or below this core and its sdk range admits this sdk —
+  one rule (`updateFor`, `@spaces/core/plugins/registry`) for the ledger's
+  badge, the Update click and boot autoupdate; an entry this host cannot
+  run is never offered to install or upgrade to, and a held newest version
+  says why on the row. The rollback answer is a record, not a guess: an
+  upgrade sets `integration.upgraded_from`/`upgraded_at` and nulls
+  `upgrade_migrated` (migration 0067); the loader sets it after step 5 —
+  true once any migration file applied since (sticky; the previous version
+  can no longer read its schema), false when none did, including a failed
+  run, which rolls back whole. The ledger reads `rollback available` (the
+  previous directory, kept one back, can be swapped back) or
+  `rollback unsafe — restore from backup`; rollback stays the restore, not
+  a button (spec §10). `SPACES_PLUGINS_AUTOUPDATE=compatible` (anything else, or
+  unset, is off and silent; not in the required set) runs **in the worker
+  at boot, before the first reconcile**: the worker owns the data directory
+  and the loader and runs even when web is a separate container, and the
+  taken version loads in the same boot. It is `upgradePlugin`'s one caller
+  besides the Update button. Rejected: autoupdate in web's boot — web may
+  not be up, and the worker would hear the NOTIFY only after its own
+  reconcile.
 - **Webhook ingress, as built (sdk-23).** `POST /api/webhooks/<integration
 id>` — the row id, never the plugin id. Web runs core's
   `receiveWebhookProgram` and never plugin code: it looks the row up, then

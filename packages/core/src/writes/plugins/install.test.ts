@@ -296,12 +296,79 @@ describe('upgrade', () => {
       id: integrationId,
       version: '1.1.0',
       status: 'installing',
+      upgradedFrom: '1.0.0',
+      upgradeMigrated: null,
     })
+    expect(row.upgradedAt).toBeInstanceOf(Date)
     expect(await heard('echo')).toBe(true)
 
-    await upgrade(echo('2.0.0'))
+    const v3 = echo('2.0.0', { bundle: 'export default { three: true }\n' })
+    await upgrade(v3)
+    // Exactly one previous directory: the version before last is gone.
     expect(readdirSync(dir).sort()).toEqual(['1.1.0', '2.0.0', 'current'])
+    expect(existsSync(path.join(dir, '1.0.0'))).toBe(false)
+    expect(existsSync(path.join(dir, '1.1.0', 'bundle.mjs'))).toBe(true)
     expect(lstatSync(path.join(dir, 'current')).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(path.join(dir, 'current'))).toBe('2.0.0')
+    expect(lockJson()).toMatchObject({
+      plugins: { echo: { version: '2.0.0', sha256: sha(bundleOf(v3)) } },
+    })
+    expect((await rowsOf('echo')).at(0)).toMatchObject({
+      version: '2.0.0',
+      upgradedFrom: '1.1.0',
+      upgradeMigrated: null,
+    })
+  })
+
+  it('a refused upgrade leaves current, lock.json, the row and its upgrade record as they were', async () => {
+    await install(echo('1.0.0'))
+    await upgrade(echo('1.1.0'))
+    await db
+      .update(integration)
+      .set({ upgradeMigrated: true })
+      .where(eq(integration.capabilityId, 'echo'))
+    const dir = path.join(plugins(), 'echo')
+    const lockBefore = readFileSync(path.join(plugins(), 'lock.json'), 'utf8')
+    const rowBefore = (await rowsOf('echo')).at(0)
+    notified = []
+
+    const v2 = echo('2.0.0')
+    const exit = await Effect.runPromiseExit(
+      upgradePlugin(
+        {
+          ...v2,
+          entry: { ...v2.entry, sha256: '0'.repeat(64) },
+          trust,
+        },
+        { dataDir: data },
+      ),
+    )
+    expect(failureOf(exit)).toMatchObject({
+      _tag: 'PluginRefused',
+      code: 'sha-mismatch',
+    })
+    expect(readFileSync(path.join(plugins(), 'lock.json'), 'utf8')).toBe(
+      lockBefore,
+    )
+    expect(readlinkSync(path.join(dir, 'current'))).toBe('1.1.0')
+    expect(lockJson()).toMatchObject({
+      plugins: { echo: { version: '1.1.0' } },
+    })
+    expect(readdirSync(dir).sort()).toEqual(['1.0.0', '1.1.0', 'current'])
+    expect((await rowsOf('echo')).at(0)).toEqual(rowBefore)
+    expect(notified).toEqual([])
+  })
+
+  it('a reinstall after uninstall starts with no upgrade record', async () => {
+    await install(echo('1.0.0'))
+    await upgrade(echo('1.1.0'))
+    await uninstall('echo')
+    await install(echo('1.1.0'))
+    expect((await rowsOf('echo')).at(0)).toMatchObject({
+      upgradedFrom: null,
+      upgradedAt: null,
+      upgradeMigrated: null,
+    })
   })
 
   it('refuses a plugin that is not installed', async () => {

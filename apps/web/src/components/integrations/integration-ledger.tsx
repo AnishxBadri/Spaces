@@ -14,8 +14,10 @@ import { cn } from '#/lib/utils'
  * - tripped — rose row, the breaker's reason, Reset;
  * - off — the switch off and the row in graphite, nothing wrong.
  * A missing key or a required setting with no value is `not yet`: no tint,
- * Add key or Set up. A newer version in the registry shows beside the
- * version, and a running row offers Update.
+ * Add key or Set up. The newest satisfying registry version shows beside
+ * the version, and a running row offers Update; a newer version this host
+ * cannot run says why instead. After an upgrade the row says whether going
+ * back is a swap or a restore.
  */
 
 /** The word in the status lane. */
@@ -64,6 +66,25 @@ export function middleOf(row: IntegrationRow): string {
     default:
       return row.summary ?? ''
   }
+}
+
+/** The rollback answer as the ledger and the card word it. */
+export const ROLLBACK_WORD: Record<
+  NonNullable<IntegrationRow['rollback']>['answer'],
+  string
+> = {
+  available: 'rollback available',
+  unsafe: 'rollback unsafe — restore from backup',
+  unknown: 'rollback not known until it loads',
+}
+
+/** The middle lane's trailing note: why no update, and the rollback answer. */
+export function versionNoteOf(row: IntegrationRow): string | null {
+  const parts = [
+    row.held,
+    row.rollback === null ? null : ROLLBACK_WORD[row.rollback.answer],
+  ].filter((p): p is string => p !== null)
+  return parts.length === 0 ? null : parts.join(' · ')
 }
 
 /** `12 / 100 cr`, `3 cr`, or a dash when nothing was spent and nothing is capped. */
@@ -163,6 +184,7 @@ function LedgerLine({
   last: boolean
 }) {
   const off = row.state === 'off'
+  const note = versionNoteOf(row)
   return (
     <li
       data-state={row.state}
@@ -201,14 +223,33 @@ function LedgerLine({
           </span>
         ) : null}
       </span>
-      <span
-        className={cn(
-          'min-w-0 flex-1 truncate text-ui',
-          MIDDLE_INK[row.state] ?? 'text-graphite',
-        )}
-        title={middleOf(row)}
-      >
-        {middleOf(row)}
+      <span className="flex min-w-0 flex-1 items-baseline gap-3">
+        <span
+          className={cn(
+            'min-w-0 flex-1 truncate text-ui',
+            MIDDLE_INK[row.state] ?? 'text-graphite',
+          )}
+          title={middleOf(row)}
+        >
+          {middleOf(row)}
+        </span>
+        {note !== null ? (
+          <span
+            className={cn(
+              'shrink-0 mono text-micro',
+              row.rollback?.answer === 'unsafe'
+                ? 'text-[var(--badge-amber-ink)]'
+                : 'text-graphite',
+            )}
+            title={
+              row.rollback === null
+                ? note
+                : `Upgraded from ${row.rollback.from} · ${note}`
+            }
+          >
+            {note}
+          </span>
+        ) : null}
       </span>
       <span className="w-24 shrink-0 numeric text-micro text-graphite">
         {creditsOf(row)}

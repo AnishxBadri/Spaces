@@ -3,10 +3,9 @@ import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
-import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
+import { manifestSchema } from '@spaces/sdk'
 import type { RegistryEntry } from '@spaces/sdk/pack'
-import { CORE_VERSION } from '@spaces/core/plugins/core-version'
-import { compareVersions, newestPerPlugin } from '@spaces/core/plugins/registry'
+import { newestPerPlugin } from '@spaces/core/plugins/registry'
 import {
   fetchPluginTarball,
   readRegistryFile,
@@ -102,20 +101,12 @@ export const credentialSeeds = (env: FirstBootEnv): Array<SeedCredential> =>
     return [{ variable, pluginId, secret }]
   })
 
-/** The newest entry for `pluginId` this core and SDK can load. */
+/** The newest entry for `pluginId` this core and SDK can load (`runsOn`). */
 export const newestSatisfying = (
   entries: ReadonlyArray<RegistryEntry>,
   pluginId: string,
 ): RegistryEntry | undefined =>
-  newestPerPlugin(
-    entries.filter(
-      (e) =>
-        e.id === pluginId &&
-        satisfiesSdk(e.sdk).ok &&
-        (e.minCore === undefined ||
-          compareVersions(CORE_VERSION, e.minCore) >= 0),
-    ),
-  ).at(0)
+  newestPerPlugin(entries.filter((e) => e.id === pluginId)).at(0)
 
 const reasonOf = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause)

@@ -35,7 +35,8 @@ import type { PluginDbOptions } from './plugin-db'
  *   every port a job declares is one this host provides (`UNPROVIDED_PORTS`).
  * - Imports `bundle.mjs` with its bare imports resolved to the host's copies.
  * - Migrates a plugin that ships `migrations/` or uses `PluginDb` in its own
- *   schema, as the `plugin_runtime` role (`migratePlugin`).
+ *   schema, as the `plugin_runtime` role (`migratePlugin`), and answers an
+ *   upgraded row's record: whether any file applied (`upgradeMigratedOf`).
  * - Marks `integration.status` with the reason in `last_error` and the
  *   manifest in `integration.manifest`, which web renders from — web never
  *   reads `/data` and never runs plugin code.
@@ -180,6 +181,7 @@ const check = (
   pluginDb: PluginDbOptions,
   fakes: FakeProviders | null,
   onManifest: (stored: IntegrationManifest) => void,
+  onMigrated: (applied: ReadonlyArray<string>) => void,
 ) =>
   Effect.gen(function* () {
     const id = row.capabilityId
@@ -307,11 +309,14 @@ const check = (
             hasMigrations ? migrationsDir : null,
             pluginDb,
           ).pipe(
+            // A refusal rolled the whole run back: nothing was applied.
+            Effect.tapError(() => Effect.sync(() => onMigrated([]))),
             Effect.mapError(
               (error) => new Degraded({ reason: truncate(error.reason) }),
             ),
           )
         : null
+    onMigrated(migrated?.applied ?? [])
 
     return {
       bundleUrl,
@@ -326,6 +331,19 @@ const check = (
     } satisfies Checked
   })
 
+/**
+ * The answer to the row's upgrade record: did any migration run since the
+ * upgrade. Unknown until step 5 runs; true once any file applied, and never
+ * back to false — the previous version can no longer read the schema.
+ */
+export const upgradeMigratedOf = (
+  row: Pick<Row, 'upgradedFrom' | 'upgradeMigrated'>,
+  migrated: ReadonlyArray<string> | null,
+): boolean | null => {
+  if (row.upgradedFrom === null || migrated === null) return row.upgradeMigrated
+  return row.upgradeMigrated === true || migrated.length > 0
+}
+
 /** Write the row only when something the loader owns would change. */
 const mark = (
   row: Row,
@@ -333,19 +351,28 @@ const mark = (
     readonly status: 'enabled' | 'degraded'
     readonly lastError: string | null
     readonly manifest: IntegrationManifest | null
+    /** The files step 5 applied; null when the load stopped before it. */
+    readonly migrated: ReadonlyArray<string> | null
   },
 ) =>
   Effect.gen(function* () {
     const manifest = next.manifest ?? row.manifest
+    const upgradeMigrated = upgradeMigratedOf(row, next.migrated)
     const unchanged =
       row.status === next.status &&
       row.lastError === next.lastError &&
+      row.upgradeMigrated === upgradeMigrated &&
       isDeepStrictEqual(row.manifest, manifest)
     if (unchanged) return
     yield* Effect.tryPromise(() =>
       db
         .update(integration)
-        .set({ status: next.status, lastError: next.lastError, manifest })
+        .set({
+          status: next.status,
+          lastError: next.lastError,
+          manifest,
+          upgradeMigrated,
+        })
         .where(eq(integration.id, row.id)),
     )
   })
@@ -393,6 +420,7 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
       continue
     }
     let stored: IntegrationManifest | null = null
+    let migrated: ReadonlyArray<string> | null = null
     const outcome = yield* check(
       row,
       pluginsRoot,
@@ -402,6 +430,9 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
       (m) => {
         stored = m
       },
+      (applied) => {
+        migrated = applied
+      },
     ).pipe(Effect.result)
     if (outcome._tag === 'Success') {
       const ok = outcome.success
@@ -409,6 +440,7 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
         status: 'enabled',
         lastError: null,
         manifest: ok.stored,
+        migrated,
       })
       const bound: BoundIntegration = {
         id: row.id,
@@ -444,6 +476,7 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
         status: 'degraded',
         lastError: reason,
         manifest: stored,
+        migrated,
       })
       verdicts.push({
         integrationId: row.id,

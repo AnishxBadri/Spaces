@@ -7,6 +7,11 @@ import { startHeartbeat, workerIdentity } from './heartbeat'
 import { workerEnqueue } from './plugins/enqueue'
 import { FAKE_PROVIDERS_ENV, loadFakeProviders } from './plugins/fakes/switch'
 import { makePluginHost } from './plugins/host'
+import {
+  AUTOUPDATE_ENV,
+  autoupdateModeOf,
+  autoupdatePlugins,
+} from './plugins/autoupdate'
 import { listenPluginChanged } from './plugins/listen'
 import { makePluginReloader } from './plugins/reload'
 import { pgBossHost, runJob } from './run-job'
@@ -85,6 +90,11 @@ async function main() {
     fakes,
   })
   const reloader = makePluginReloader({ host: plugins, fakes })
+  // Off unless SPACES_PLUGINS_AUTOUPDATE=compatible; before the first
+  // reconcile, so a version taken here loads in this boot.
+  await Effect.runPromise(
+    autoupdatePlugins(autoupdateModeOf(process.env[AUTOUPDATE_ENV])),
+  )
   reloader.request(null)
   await Effect.runPromise(reloader.settled())
 

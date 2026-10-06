@@ -20,12 +20,13 @@ import {
   jobRun,
 } from '@spaces/db/schema'
 import type { credentialKind } from '@spaces/db/schema'
+import { updateFor } from '@spaces/core/plugins/registry'
 import { webhookSecretProvider } from '@spaces/core/writes/ingress/receive'
 import { MISSING_SETTINGS } from '@spaces/core/writes/ports/config'
 import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
 import { describeExternalOrigin } from '#/lib/server/external-origin'
-import { newestVersionsProgram, updateOf } from './registry'
+import { registryEntriesProgram } from './registry'
 import type { RegistrySource } from './registry'
 import { formValuesOf, settingsFormOf } from './settings-form'
 import type { FormValues, SettingsForm } from './settings-form'
@@ -86,8 +87,40 @@ export type IntegrationRow = {
   readonly credits: { readonly used: number; readonly cap: number | null }
   /** Runs failed in a row, as the breaker counts them. */
   readonly errorCount: number
-  /** The registry's newer version, when it has one. */
+  /** The newest satisfying registry version past this one: the badge and Update's target. */
   readonly update: string | null
+  /** Why the registry's newest version is not offered: `2.0.0 needs sdk ^2.0; this host provides 1.1.0`. */
+  readonly held: string | null
+  /** The last upgrade and whether going back is a swap or a restore; null when never upgraded. */
+  readonly rollback: Rollback | null
+}
+
+/**
+ * The rollback answer, read from the row's upgrade record, never guessed:
+ * - `available`: no migration ran since the upgrade; the previous
+ *   directory, kept one back, can be swapped back;
+ * - `unsafe`: one did, and the previous version cannot read its schema —
+ *   restore from backup;
+ * - `unknown`: the worker has not loaded the new version yet.
+ */
+export type Rollback = {
+  readonly from: string
+  readonly answer: 'available' | 'unsafe' | 'unknown'
+}
+
+export const rollbackOf = (
+  row: Pick<Row, 'upgradedFrom' | 'upgradeMigrated'>,
+): Rollback | null => {
+  if (row.upgradedFrom === null) return null
+  return {
+    from: row.upgradedFrom,
+    answer:
+      row.upgradeMigrated === null
+        ? 'unknown'
+        : row.upgradeMigrated
+          ? 'unsafe'
+          : 'available',
+  }
 }
 
 /** A vault secret a manifest can ask for, each bound to its own `integration` column. */
@@ -308,7 +341,7 @@ const readRows = Effect.fn('readRows')(function* (
       )
       .groupBy(enrichmentRecord.integrationId),
   )
-  const newest = yield* newestVersionsProgram(source)
+  const entries = yield* registryEntriesProgram(source)
   const now = yield* Clock.currentTimeMillis
   return rows.map((row) => {
     const manifest = manifestOf(row.manifest)
@@ -318,6 +351,7 @@ const readRows = Effect.fn('readRows')(function* (
       now,
     )
     const name = manifest?.name ?? row.capabilityId
+    const offer = updateFor(entries, row.capabilityId, row.version)
     return {
       row,
       manifest,
@@ -336,7 +370,9 @@ const readRows = Effect.fn('readRows')(function* (
           cap: capOf(row.config, manifest),
         },
         errorCount: row.errorCount,
-        update: updateOf(newest, row.capabilityId, row.version),
+        update: offer.target?.version ?? null,
+        held: offer.target === null ? (offer.held?.reason ?? null) : null,
+        rollback: rollbackOf(row),
       },
     }
   })
