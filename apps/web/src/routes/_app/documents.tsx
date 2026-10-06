@@ -210,23 +210,6 @@ function DocumentsPage() {
   const [previewing, setPreviewing] = useState<DocumentRow | null>(null)
   const prefs = useTablePrefs(PREFS_KEY)
 
-  /**
-   * `?view=` on a cold load — a pasted link, a reload, a second user opening
-   * a shared view. `useViewState` pushes a view's columns when the active id
-   * *changes*; arriving already on one is not a change, so the shelf seeds
-   * them itself, once. It runs **during render**, so the first paint is
-   * already the view's layout rather than the browser's last local one — the
-   * sort and conditions come from the hook's own initializers for the same
-   * reason. (The four object lists have the same gap and would want the same
-   * seed lifted into the hook; that is not this slice's file to open.)
-   */
-  const [seeded, setSeeded] = useState(false)
-  if (!seeded) {
-    setSeeded(true)
-    const arriving = views.find((v) => v.id === activeId)
-    if (arriving) prefs.setColumnVisibility(arriving.columns)
-  }
-
   const vs = useViewState({
     views,
     activeId: activeId ?? null,
@@ -269,8 +252,8 @@ function DocumentsPage() {
 
   /**
    * The other way in: a pasted `?view=` link, a reload, back/forward. Columns
-   * and conditions are seeded during render (above, and in `useViewState`'s
-   * initializers) because they are React state; `filed` is a `loaderDeps` key,
+   * and conditions are seeded during render by `useViewState` because they
+   * are React state; `filed` is a `loaderDeps` key,
    * so restoring it is a navigation and a navigation cannot happen during a
    * render. `undefined` as the initial value is what makes the first pass
    * count as a change — `null` is the legitimate "no view" id.

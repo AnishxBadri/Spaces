@@ -14,6 +14,8 @@ import type { ViewSnapshot } from './view-bar'
  * Applying is derived state set during render, not an effect: the first
  * render already shows the view (no flash of "All"), and there is no
  * effect for React's concurrent lanes to interleave with.
+ * - `setColumnVisibility` is called during render, so it must set state on
+ *   the component that calls this hook.
  */
 export function useViewState<TExtra extends ViewExtra>({
   views,
@@ -52,7 +54,11 @@ export function useViewState<TExtra extends ViewExtra>({
     () => fromView(active).sorting,
   )
   const [extra, setExtra] = useState<TExtra>(() => fromView(active).extra)
-  const [appliedId, setAppliedId] = useState<string | null>(activeId)
+  // `undefined` until the first render has run: arriving on a view is not a
+  // change of id, but its columns live on the page and still have to land.
+  const [appliedId, setAppliedId] = useState<string | null | undefined>(
+    undefined,
+  )
 
   function apply(v: ViewRow | null) {
     const next = fromView(v)
@@ -63,8 +69,15 @@ export function useViewState<TExtra extends ViewExtra>({
     setAppliedId(v?.id ?? null)
   }
 
-  // The URL changed to another view (back/forward, a pasted link): re-sync.
-  if (activeId !== appliedId) apply(active)
+  if (appliedId === undefined) {
+    // Cold `?view=` load: sort, conditions and extra came from the
+    // initializers above; column visibility is the page's state, so push it.
+    if (active) setColumnVisibility(active.columns)
+    setAppliedId(activeId)
+  } else if (activeId !== appliedId) {
+    // The URL changed to another view (back/forward, a pasted link): re-sync.
+    apply(active)
+  }
 
   const snapshot: ViewSnapshot = {
     filter: conditions,
