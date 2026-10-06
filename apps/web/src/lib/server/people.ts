@@ -11,10 +11,7 @@ import {
   space,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
-import {
-  addIdentityAlias,
-  resolveEntity,
-} from '@spaces/core/writes/entities/resolve'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { jsonString } from '@spaces/core/json'
 import { groupReferencedBy, referencedByRows, requireUser } from './shared'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
@@ -156,16 +153,6 @@ export const getPerson = createServerFn()
     ).at(0)
     if (!head) throw new Error('Person not found')
 
-    const aliases = await db
-      .select({
-        id: entityAlias.id,
-        kind: entityAlias.kind,
-        value: entityAlias.value,
-        valueNorm: entityAlias.valueNorm,
-      })
-      .from(entityAlias)
-      .where(eq(entityAlias.entityId, data.id))
-
     // Names for this person's reference values, `companies` among them, so
     // the rail's cells and the Companies list can print them.
     const referenced = await db
@@ -231,30 +218,12 @@ export const getPerson = createServerFn()
       mergedIntoId: head.mergedIntoId,
       values: head.values,
       readouts,
-      emails: aliases.filter((a) => a.kind === 'email'),
-      linkedins: aliases.filter((a) => a.kind === 'linkedin'),
       companies,
       refNames,
       spaces,
       referencedBy,
       timeline: timeline.map((t) => ({ ...t, at: t.at.toISOString() })),
     }
-  })
-
-/** Email/LinkedIn add with the same tripwire semantics as company domains. */
-export const addPersonContact = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({
-      id: z.string().uuid(),
-      kind: z.enum(['email', 'linkedin']),
-      value: z.string().trim().max(255),
-    }),
-  )
-  .handler(async ({ data }) => {
-    await requireUser()
-    return addIdentityAlias(data.id, data.kind, data.value, {
-      class: 'manual',
-    })
   })
 
 export const setPersonCompany = createServerFn({ method: 'POST' })

@@ -111,7 +111,7 @@ export const MALFORMED_ROW =
 
 /**
  * One staged row under the mapping: every mapped cell through the column's
- * spec (`readCell` — the coercer, or the CIN normalizer). **Red is a cell,
+ * spec (`readCell`, the coercer). **Red is a cell,
  * never a row** (SPA-166's contract): a cell that does not read is a
  * skipped cell with its reason, and the row still lands with that value
  * left blank — an identity cell included, in which case the row matches on
@@ -148,10 +148,7 @@ export function readRow(
     if (spec === null || target.target === 'new' || target.target === 'ledger')
       return
     const raw = cells.at(column) ?? ''
-    if (
-      spec.kind === 'typed' &&
-      (spec.type === 'record_reference' || spec.type === 'actor_reference')
-    ) {
+    if (spec.type === 'record_reference' || spec.type === 'actor_reference') {
       if (target.target === 'attribute' && raw.trim() !== '')
         out.refs.push({ column, attributeId: target.attributeId, raw })
       return
@@ -666,7 +663,6 @@ const KEY_LABELS: Record<CoreIdentityKey, string> = {
   domain: 'domain',
   email: 'email',
   linkedin: 'linkedin',
-  cin: 'cin',
 }
 
 function firstKey(

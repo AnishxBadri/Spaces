@@ -35,7 +35,12 @@ export type DuplicateReason = Record<string, string>
 export type MergeSnapshotEntry = {
   table: string
   action:
-    'repointed' | 'dropped' | 'field_filled' | 'field_conflict' | 'inserted'
+    | 'repointed'
+    | 'dropped'
+    | 'field_filled'
+    | 'field_conflict'
+    | 'field_unioned'
+    | 'inserted'
   pk: Record<string, unknown>
   old: Record<string, unknown>
 }
@@ -138,13 +143,12 @@ export const aliasKind = pgEnum('alias_kind', [
   'domain',
   'email',
   'linkedin',
-  'cin',
 ])
 
 /**
- * The keys that identify a person or a company: every alias kind but `name`.
- * Derived from the enum so there is one notion of identity;
- * `CORE_IDENTITY_KEYS` is the runtime list, typed against this.
+ * The identity keys: every alias kind but `name`. Derived from the enum so
+ * there is one notion of identity; `CORE_IDENTITY_KEYS` is the runtime list,
+ * typed against this.
  */
 export type CoreIdentityKey = Exclude<
   (typeof aliasKind.enumValues)[number],
@@ -152,10 +156,10 @@ export type CoreIdentityKey = Exclude<
 >
 
 /**
- * Identity lives here, not on side tables — single source of truth.
- * Deterministic keys (domain/email/linkedin/cin) carry is_identity and are
- * globally unique; writing a colliding identity alias must be converted by
- * resolveEntity() into a duplicate_candidate instead of an error.
+ * The identity index. Deterministic keys (domain/email/linkedin) carry
+ * is_identity and are globally unique; the values themselves live in
+ * `entity.values` and `setValues` mirrors each one here (D75). A colliding
+ * identity alias becomes a duplicate_candidate, never an error.
  * Name aliases are never identity and never unique — they only feed pg_trgm.
  */
 export const entityAlias = pgTable(

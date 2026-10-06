@@ -61,7 +61,7 @@ export type IdentityClaim = {
   name: string
   domain?: string
   email?: string
-  /** A person's LinkedIn URL — an identity key `resolveEntity` matches on. */
+  /** A person's LinkedIn URL — never matched on; a new person keeps it. */
   linkedin?: string
   /** A person's role as the context states it ("CEO") — shown, never matched. */
   role?: string
@@ -91,9 +91,15 @@ function writeShape(def: SchemaAttribute): JsonSchema | null {
     case 'text':
       return { type: 'string', maxLength: 2000 }
     case 'domain':
-      return { type: 'string', format: 'hostname', maxLength: 255 }
-    case 'email':
-      return { type: 'string', format: 'email', maxLength: 255 }
+    case 'email': {
+      const one: JsonSchema =
+        def.type === 'domain'
+          ? { type: 'string', format: 'hostname', maxLength: 255 }
+          : { type: 'string', format: 'email', maxLength: 255 }
+      return def.options.multi
+        ? { type: 'array', items: one, uniqueItems: true, maxItems: 50 }
+        : one
+    }
     case 'url':
       return { type: 'string', format: 'uri', maxLength: 500 }
     case 'phone':
@@ -136,9 +142,10 @@ function writeShape(def: SchemaAttribute): JsonSchema | null {
         : null
     }
     case 'record_reference': {
-      // A person is claimed by the keys a person has (SPA-105): email and
-      // LinkedIn, which `resolveEntity` matches on, and the role the deck
-      // gives them. Every other target keeps the company-shaped claim.
+      // A person is claimed by their email, which `resolveEntity` matches
+      // on, their LinkedIn, which a new person keeps as a value, and the
+      // role the deck gives them. Every other target keeps the
+      // company-shaped claim.
       const claim =
         def.options.targetKind === 'person' ? PERSON_CLAIM_SCHEMA : CLAIM_SCHEMA
       return def.options.multi

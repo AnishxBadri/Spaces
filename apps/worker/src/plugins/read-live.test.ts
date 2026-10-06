@@ -143,7 +143,7 @@ describe('the echo enrich job, on ReadTest and on ReadLive', () => {
         readEntity({
           id: companyId,
           name: 'Northwind Robotics',
-          keys: { domain: [DOMAIN], email: [], linkedin: [], cin: [] },
+          keys: { domain: [DOMAIN], email: [], linkedin: [] },
         }),
       ],
       recorder: fake.recorder,

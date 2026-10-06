@@ -151,7 +151,12 @@ beforeAll(async () => {
         kind: 'company' as const,
         objectId: companiesObject,
         canonicalName: `Company ${String(i).padStart(2, '0')}`,
-        values: { description: `Maker #${i}`, gone_attr: 'stale' },
+        // Identity is an attribute (D75): the domain is a value and an alias.
+        values: {
+          description: `Maker #${i}`,
+          domains: [`company-${i}.example`],
+          gone_attr: 'stale',
+        },
       })),
     )
     .returning({ id: entity.id })
@@ -344,7 +349,7 @@ describe('records.list — paging', () => {
     const first = body.rows.find((r) => r.id === fixture.orbitalId)
     expect(first).toMatchObject({
       name: 'Company 00',
-      values: { description: 'Maker #0' },
+      values: { description: 'Maker #0', domains: ['company-0.example'] },
       domains: ['company-0.example'],
     })
     // Not an attribute in the registry, so not something a caller could read.
@@ -448,7 +453,7 @@ describe('records.get', () => {
       kind: 'company',
       name: 'Company 00',
       object: { slug: 'companies' },
-      values: { description: 'Maker #0' },
+      values: { description: 'Maker #0', domains: ['company-0.example'] },
     })
     expect(record.values).not.toHaveProperty('gone_attr')
   })

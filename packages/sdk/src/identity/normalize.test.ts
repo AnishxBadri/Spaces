@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   domainHost,
   isRoleEmail,
-  normalizeCin,
   normalizeDomain,
   normalizeEmail,
   normalizeLinkedin,
@@ -79,15 +78,6 @@ describe('normalizeLinkedin', () => {
   })
   it('rejects non-linkedin', () => {
     expect(normalizeLinkedin('https://twitter.com/foo')).toBeNull()
-  })
-})
-
-describe('normalizeCin', () => {
-  it('accepts a structurally valid CIN', () => {
-    expect(normalizeCin('U72900KA2015PTC080052')).toBe('U72900KA2015PTC080052')
-  })
-  it('rejects malformed input', () => {
-    expect(normalizeCin('12345')).toBeNull()
   })
 })
 

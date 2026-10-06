@@ -319,12 +319,21 @@ export const updateAttributeProgram = Effect.fn('updateAttributeProgram')(
           .select({
             plural: objectDef.plural,
             identityKeys: objectDef.identityKeys,
+            isSystem: objectDef.isSystem,
           })
           .from(objectDef)
           .where(eq(objectDef.id, attr.objectId))
           .then((rows) => rows.at(0)),
       )
-      if (owner && owner.identityKeys.includes(identityKey))
+      // A core object's identity attribute (a person's emails, a company's
+      // domains) is what `resolveEntity` births records through. (D75)
+      if (owner?.isSystem)
+        return yield* new IdentityKeyAttributeLocked({
+          key: identityKey,
+          object: owner.plural,
+          message: `${attr.name} is how ${owner.plural} are identified and cannot be archived`,
+        })
+      if (owner && owner.identityKeys.some((k) => k === identityKey))
         return yield* new IdentityKeyAttributeLocked({
           key: identityKey,
           object: owner.plural,

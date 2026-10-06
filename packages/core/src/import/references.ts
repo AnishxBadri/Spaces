@@ -1,5 +1,4 @@
 import {
-  normalizeCin,
   normalizeDomain,
   normalizeEmail,
   normalizeLinkedin,
@@ -90,7 +89,7 @@ export function referenceKey(raw: string): string {
 /**
  * The identity key a reference cell reads as, if any — one, chosen by the
  * cell's shape and offered only when the referenced object carries that
- * key: a LinkedIn URL, else an address (anything with an `@`), else a CIN,
+ * key: a LinkedIn URL, else an address (anything with an `@`),
  * else a domain (a single token that has a registrable domain). A company
  * name has spaces or no public suffix, so it reads as none of them.
  */
@@ -103,7 +102,6 @@ export function cellIdentityKind(
   if (has('linkedin') && normalizeLinkedin(s) !== null) return 'linkedin'
   if (s.includes('@'))
     return has('email') && normalizeEmail(s) !== null ? 'email' : null
-  if (has('cin') && normalizeCin(s) !== null) return 'cin'
   if (has('domain') && !/\s/.test(s) && normalizeDomain(s) !== null)
     return 'domain'
   return null

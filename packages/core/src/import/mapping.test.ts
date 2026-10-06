@@ -95,17 +95,10 @@ const funds: MappingRegistry = {
 }
 
 describe('identity keys come from one helper', () => {
-  it('gives company and person the core four, a deal none, a custom object its declaration', () => {
+  it('gives a company its domain, a person their email, a deal none, a custom object its declaration', () => {
     const core = { isSystem: true, identityKeys: [] }
-    expect(identityKeysOf({ ...core, slug: 'companies' })).toEqual([
-      'domain',
-      'email',
-      'linkedin',
-      'cin',
-    ])
-    expect(identityKeysOf({ ...core, slug: 'people' })).toEqual(
-      CORE_IDENTITY_KEYS,
-    )
+    expect(identityKeysOf({ ...core, slug: 'companies' })).toEqual(['domain'])
+    expect(identityKeysOf({ ...core, slug: 'people' })).toEqual(['email'])
     expect(identityKeysOf({ ...core, slug: 'deals' })).toEqual([])
     expect(
       identityKeysOf({
@@ -120,8 +113,9 @@ describe('identity keys come from one helper', () => {
     ).toEqual([])
   })
 
-  it('derives the core-only keys from the core four', () => {
-    expect(CORE_ONLY_IDENTITY_KEYS).toEqual(['email', 'cin'])
+  it('derives the core-only keys from the identity keys', () => {
+    expect(CORE_IDENTITY_KEYS).toEqual(['domain', 'email', 'linkedin'])
+    expect(CORE_ONLY_IDENTITY_KEYS).toEqual(['email'])
   })
 })
 
@@ -237,28 +231,26 @@ describe('autoMap', () => {
     ])
   })
 
-  it('maps LinkedIn on people and companies to the identity key, never the archived attribute', () => {
-    const archivedLinkedin = attr('x-linkedin', 'linkedin', 'LinkedIn', 'url', {
-      archived: true,
+  it('maps LinkedIn on people to the plain attribute, and Emails to the identity key', () => {
+    const linkedin = attr('p-linkedin', 'linkedin', 'LinkedIn', 'url')
+    const emails = attr('p-emails', 'emails', 'Emails', 'email', {
+      options: { multi: true, identityKey: 'email' },
     })
-    const core: MappingRegistry = {
-      identityKeys: CORE_IDENTITY_KEYS,
-      attributes: [archivedLinkedin],
+    const people: MappingRegistry = {
+      identityKeys: ['email'],
+      attributes: [linkedin, emails],
     }
-    expect(mappableAttributes(core)).toEqual([])
-    expect(autoMap(['Name', 'LinkedIn'], core)).toEqual([
+    // The identity-backed attribute is offered once, as the key it backs.
+    expect(mappableAttributes(people)).toEqual([linkedin])
+    expect(autoMap(['Name', 'LinkedIn', 'Emails'], people)).toEqual([
       { target: 'name' },
-      { target: 'identity', key: 'linkedin' },
+      { target: 'attribute', attributeId: 'p-linkedin' },
+      { target: 'identity', key: 'email' },
     ])
-    expect(autoMap(['Name', 'LinkedIn URL'], core)).toEqual([
+    expect(autoMap(['Name', 'LinkedIn URL'], people)).toEqual([
       { target: 'name' },
-      { target: 'identity', key: 'linkedin' },
+      { target: 'attribute', attributeId: 'p-linkedin' },
     ])
-    expect(specFor({ target: 'identity', key: 'linkedin' }, core)).toEqual({
-      kind: 'typed',
-      type: 'url',
-      options: { identityKey: 'linkedin' },
-    })
   })
 
   it('never maps two headers onto one target — the second is ignored', () => {
@@ -430,17 +422,17 @@ describe('reading a mapped column', () => {
     })
   })
 
-  it('warns on an identity key with blanks and reads a CIN through its normalizer', () => {
-    const target: ColumnTarget = { target: 'identity', key: 'cin' }
+  it('warns on an identity key with blanks and reads an email as an address', () => {
+    const target: ColumnTarget = { target: 'identity', key: 'email' }
     const spec = specFor(target, {
-      identityKeys: CORE_IDENTITY_KEYS,
+      identityKeys: ['email'],
       attributes: [],
     })
-    if (!spec) throw new Error('cin is mapped')
-    const summary = summarizeSpec(spec, ['U72900KA2015PTC082123', '', 'nope'])
+    if (!spec) throw new Error('email is mapped')
+    const summary = summarizeSpec(spec, ['ana@submer.com', '', 'nope'])
     expect(summary.parsed).toBe(1)
     expect(summary.failures.map((f) => f.raw)).toEqual(['nope'])
-    const clean = summarizeSpec(spec, ['U72900KA2015PTC082123', ''])
+    const clean = summarizeSpec(spec, ['ana@submer.com', ''])
     expect(columnStatus(target, spec, clean, 1)).toBe('warn')
     expect(columnStatus(target, spec, clean, 0)).toBe('ok')
   })

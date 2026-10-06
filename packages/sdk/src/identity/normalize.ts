@@ -167,12 +167,6 @@ export function normalizeLinkedin(input: string): string | null {
   return `linkedin.com/${m[1]}/${decodeURIComponent(m[2])}`
 }
 
-/** Indian CIN: 21 chars, uppercase. Structural check only. */
-export function normalizeCin(input: string): string | null {
-  const raw = input.trim().toUpperCase().replace(/\s/g, '')
-  return /^[LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}$/.test(raw) ? raw : null
-}
-
 /**
  * URL → absolute http(s) href. A bare host (`acme.com/about`) gains
  * `https://`, which is what a spreadsheet column of websites almost always

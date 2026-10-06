@@ -15,7 +15,7 @@ import type {
  * claims. Provider JSON in, port arguments out — no Effect, no ports.
  * - Fields are parsed, never trusted: an absent or null field claims nothing.
  * - Values are keyed by the slugs `SYSTEM_ATTRIBUTES` seeds for the kind.
- * - A domain, email or LinkedIn URL is an identity key, never a value.
+ * - A domain or an email is an identity key; a LinkedIn URL is a value. (D75)
  */
 
 export const APOLLO_API = 'https://api.apollo.io/api/v1'
@@ -112,14 +112,12 @@ export const organizationEnrichment = (
   const domain = org.primary_domain ?? org.website_url
   const location = place(org.city, org.country)
   return enrichment(entityId, raw, {
-    keys: {
-      ...(domain ? { domain } : {}),
-      ...(org.linkedin_url ? { linkedin: org.linkedin_url } : {}),
-    },
+    keys: domain ? { domain } : {},
     values: {
       ...(org.short_description ? { description: org.short_description } : {}),
       ...(org.founded_year ? { founded_year: org.founded_year } : {}),
       ...(location ? { location } : {}),
+      ...(org.linkedin_url ? { linkedin: org.linkedin_url } : {}),
     },
   })
 }
@@ -148,13 +146,11 @@ export const personEnrichment = (
       : null
   const location = place(person.city, person.country)
   return enrichment(entityId, raw, {
-    keys: {
-      ...(email ? { email } : {}),
-      ...(person.linkedin_url ? { linkedin: person.linkedin_url } : {}),
-    },
+    keys: email ? { email } : {},
     values: {
       ...(person.title ? { job_title: person.title } : {}),
       ...(location ? { location } : {}),
+      ...(person.linkedin_url ? { linkedin: person.linkedin_url } : {}),
       ...(person.twitter_url ? { twitter: person.twitter_url } : {}),
     },
   })

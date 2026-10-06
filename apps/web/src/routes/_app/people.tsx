@@ -5,7 +5,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { AtSign, Linkedin, Plus, Users } from 'lucide-react'
+import { Plus, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   keepPreviousData,
@@ -32,9 +32,10 @@ import { TemplatePicker } from '#/components/templates'
 import {
   DateCell,
   InitialBadge,
-  MetaCell,
   RecordLinkCell,
 } from '#/components/table/cells'
+import { collisionToast } from '#/lib/attributes/collision-toast'
+import { identityFirst } from '#/lib/attributes/identity-first'
 import {
   AddColumnButton,
   RecordTable,
@@ -151,9 +152,9 @@ function PeoplePage() {
   const { sorting, setSorting } = vs
   /**
    * The text box is a **server** narrowing now (SPA-96): `ILIKE` on the name
-   * or on any identity email or LinkedIn, debounced. A client `globalFilter`
-   * over the loaded rows stopped being able to tell the truth the moment the
-   * table stopped loading every row. The employer dropped out of what it matches —
+   * or on any identity email, debounced. A client `globalFilter` over the
+   * loaded rows stopped being able to tell the truth the moment the table
+   * stopped loading every row. The employer dropped out of what it matches —
    * that is a join, not a column — so the placeholder no longer promises it.
    */
   const [globalFilter, setGlobalFilter] = useState('')
@@ -227,7 +228,12 @@ function PeoplePage() {
 
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
-      await updateRecord({ data: { id: entityId, patch: { [slug]: value } } })
+      const result = await updateRecord({
+        data: { id: entityId, patch: { [slug]: value } },
+      })
+      const collision = collisionToast(result, 'person')
+      if (collision)
+        toast(collision.title, { description: collision.description })
       refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
@@ -251,35 +257,9 @@ function PeoplePage() {
           />
         ),
       }),
-      col.accessor((r) => r.emails.join(', '), {
-        id: 'emails',
-        header: 'Email',
-        size: 200,
-        // The sort is a SQL order by over `entity` now, and emails, the
-        // employer and last-touched are all joins; offering the menu would
-        // promise an order nobody can serve.
-        enableSorting: false,
-        cell: (info) =>
-          info.row.original.emails.length > 0 ? (
-            <MetaCell icon={AtSign}>
-              {info.row.original.emails.join(', ')}
-            </MetaCell>
-          ) : null,
-      }),
-      col.accessor((r) => r.linkedins.at(0) ?? '', {
-        id: 'linkedin',
-        header: 'LinkedIn',
-        size: 180,
-        // An identity alias like the column before it: a join, so no sort.
-        enableSorting: false,
-        cell: (info) => {
-          const first = info.row.original.linkedins.at(0)
-          return first === undefined ? null : (
-            <MetaCell icon={Linkedin}>{first}</MetaCell>
-          )
-        },
-      }),
-      ...registry.map((def) =>
+      // Emails are an attribute like any other (D75), so they sort and
+      // filter through the views compiler; shown first, beside the name.
+      ...identityFirst(registry).map((def) =>
         col.accessor((r): unknown => r.values[def.slug] ?? null, {
           id: `attr:${def.slug}`,
           header: def.name,
@@ -365,7 +345,7 @@ function PeoplePage() {
               table={table}
               filter={globalFilter}
               onFilterChange={setGlobalFilter}
-              filterPlaceholder="Filter by name, email or LinkedIn…"
+              filterPlaceholder="Filter by name or email…"
               filterLabel="Filter people"
               noun={{ one: 'person', many: 'people' }}
               total={total}
@@ -555,9 +535,14 @@ function CreatePersonDialog({
             />
           </div>
 
-          {/* Companies has its picker above; `createPerson` writes it. */}
+          {/* Companies has its picker above and Email its field, the key the
+              create matches on; `createPerson` writes both. */}
           {registry
-            .filter((def) => def.slug !== 'companies')
+            .filter(
+              (def) =>
+                def.slug !== 'companies' &&
+                def.options?.identityKey === undefined,
+            )
             .map((def) => (
               <div
                 key={def.slug}

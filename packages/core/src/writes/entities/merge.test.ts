@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest'
  */
 describe('mergeEntities', () => {
   it('repoints everything, redirects the loser, snapshots the lot', async () => {
-    const { resolveEntity, addIdentityAlias } = await import('./resolve')
+    const { resolveEntity } = await import('./resolve')
+    const { addIdentityValue } = await import('../attributes/identity-values')
     const { mergeEntities } = await import('./merge')
     const { db } = await import('@spaces/db')
     const {
@@ -199,12 +200,12 @@ describe('mergeEntities', () => {
     expect(reResolved.entityId).toBe(winner.entityId)
 
     // Adding winner's own domain back reports already_own via redirect.
-    const own = await addIdentityAlias(
-      loser.entityId,
-      'domain',
-      `mergeco-${tag}.com`,
-      { class: 'manual' },
-    )
+    const own = await addIdentityValue({
+      entityId: loser.entityId,
+      key: 'domain',
+      value: `mergeco-${tag}.com`,
+      actor: { type: 'user', id: actor.id },
+    })
     expect(own.outcome).toBe('already_own')
   })
 
@@ -678,6 +679,91 @@ describe('mergeEntities', () => {
     expect(repointed.map((e) => e.entityId).sort()).toEqual(
       [onlyLoser, beside, both].sort(),
     )
+  })
+
+  it("unions two companies' domains on the survivor, aliases and value alike", async () => {
+    const { resolveEntity } = await import('./resolve')
+    const { mergeEntities } = await import('./merge')
+    const { setValues } = await import('../attributes/values')
+    const { db } = await import('@spaces/db')
+    const { attributeEvent, entity, entityAlias, mergeEvent } =
+      await import('@spaces/db/schema')
+    const { user } = await import('@spaces/db/schema/auth')
+    const { and, eq } = await import('drizzle-orm')
+
+    const tag = randomUUID().slice(0, 8)
+    const [actor] = await db.select({ id: user.id }).from(user).limit(1)
+    const company = async (name: string, domain: string) =>
+      (
+        await resolveEntity({
+          kind: 'company',
+          name: `${name} ${tag}`,
+          keys: { domain },
+          source: { class: 'manual' },
+        })
+      ).entityId
+    const winner = await company('Union W', `union-${tag}.com`)
+    const loser = await company('Union L', `union-${tag}.in`)
+    await setValues({
+      entityId: loser,
+      patch: { domains: [`union-${tag}.in`, `union-${tag}.co.uk`] },
+      actor: { type: 'user', id: actor.id },
+    })
+
+    const { mergeEventId } = await mergeEntities({
+      winnerId: winner,
+      loserId: loser,
+      mergedBy: actor.id,
+    })
+
+    const survivor = (
+      await db
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, winner))
+    ).at(0)
+    expect(survivor?.values.domains).toEqual([
+      `union-${tag}.com`,
+      `union-${tag}.in`,
+      `union-${tag}.co.uk`,
+    ])
+    const aliases = await db
+      .select({ valueNorm: entityAlias.valueNorm })
+      .from(entityAlias)
+      .where(
+        and(
+          eq(entityAlias.entityId, winner),
+          eq(entityAlias.kind, 'domain'),
+          eq(entityAlias.isIdentity, true),
+        ),
+      )
+    expect(aliases.map((a) => a.valueNorm).sort()).toEqual(
+      [`union-${tag}.co.uk`, `union-${tag}.com`, `union-${tag}.in`].sort(),
+    )
+
+    const [logged] = await db
+      .select()
+      .from(attributeEvent)
+      .where(
+        and(
+          eq(attributeEvent.entityId, winner),
+          eq(attributeEvent.attrSlug, 'domains'),
+          eq(attributeEvent.source, 'merge'),
+        ),
+      )
+    expect(logged).toMatchObject({
+      actorType: 'system',
+      from: [`union-${tag}.com`],
+    })
+    const [event] = await db
+      .select()
+      .from(mergeEvent)
+      .where(eq(mergeEvent.id, mergeEventId))
+    expect(
+      event.snapshot.some(
+        (s) => s.action === 'field_unioned' && s.old.field === 'domains',
+      ),
+    ).toBe(true)
   })
 
   it('refuses cross-kind and self merges', async () => {

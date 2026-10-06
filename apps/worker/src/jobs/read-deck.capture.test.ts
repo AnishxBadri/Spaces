@@ -331,16 +331,30 @@ describe('capture extraction (SPA-134)', () => {
 
   it('an identity matching a person already held attaches to them, and the patch applies to that person', async () => {
     const tag = randomUUID().slice(0, 8)
+    const email = `katya-${tag}@milev.example`
+    // Matched by email: a LinkedIn URL identifies nobody (D75).
     const held = await resolveEntity({
       kind: 'person',
       name: `K. Milev ${tag}`,
-      keys: { linkedin: `https://www.linkedin.com/in/katya-milev-${tag}/` },
+      keys: { email },
       source: { class: 'manual' },
     })
     const { documentId } = Captured.parse(
       await (await post(profile(tag))).json(),
     )
-    await runQueued(documentId, PERSON_ANSWER(documentId, tag))
+    await runQueued(documentId, {
+      ...PERSON_ANSWER(documentId, tag),
+      _subject: {
+        value: {
+          name: `Katya Milev ${tag}`,
+          role: 'Founder & CEO',
+          email,
+          linkedin: `https://www.linkedin.com/in/katya-milev-${tag}/`,
+        },
+        refs: [`doc:${documentId}#0`],
+        confidence: 0.95,
+      },
+    })
     const rows = await onDocument(documentId)
     const actor = { type: 'user' as const, id: USER }
     const accepted = await Effect.runPromise(

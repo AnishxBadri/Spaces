@@ -144,9 +144,9 @@ export const createObject = createServerFn({ method: 'POST' })
       icon: z.string().max(40).optional(),
       /**
        * Opt-in identity (§9). The enum is the two keys the dialog offers;
-       * `email` and `cin` arrive as free strings from anything but the
-       * dialog and are refused *by name* in the program, which is where the
-       * reason lives.
+       * `email` arrives as a free string from anything but the dialog and
+       * is refused *by name* in the program, which is where the reason
+       * lives.
        */
       identityKeys: z.array(z.string().max(20)).max(4).optional(),
     }),

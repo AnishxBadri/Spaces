@@ -377,18 +377,19 @@ describe('identity-backed attribute writes', () => {
     ).toBe(true)
   })
 
-  it('no core object carries an identity key — in the registry or in the database', async () => {
+  it('a core object declares no key: its identity attributes are seeded (D75)', async () => {
     const { db } = await import('@spaces/db')
     const { attribute, objectDef } = await import('@spaces/db/schema')
     const { eq, sql } = await import('drizzle-orm')
     const { OBJECT_KINDS, SYSTEM_ATTRIBUTES } =
       await import('@spaces/core/attributes/registry')
 
-    for (const kind of OBJECT_KINDS) {
-      for (const def of SYSTEM_ATTRIBUTES[kind]) {
-        expect(def.options?.identityKey).toBe(undefined)
-      }
-    }
+    const seeded = OBJECT_KINDS.flatMap((kind) =>
+      SYSTEM_ATTRIBUTES[kind]
+        .filter((def) => def.options?.identityKey !== undefined)
+        .map((def) => `${kind}.${def.slug}`),
+    )
+    expect(seeded).toEqual(['company.domains', 'person.emails'])
 
     const system = await db
       .select({ slug: objectDef.slug, keys: objectDef.identityKeys })
@@ -398,12 +399,15 @@ describe('identity-backed attribute writes', () => {
     for (const row of system) expect(row.keys).toEqual([])
 
     const backed = await db
-      .select({ slug: attribute.slug })
+      .select({ object: objectDef.slug, slug: attribute.slug })
       .from(attribute)
       .innerJoin(objectDef, eq(objectDef.id, attribute.objectId))
       .where(
         sql`${objectDef.isSystem} and ${attribute.options} ->> 'identityKey' is not null`,
       )
-    expect(backed).toEqual([])
+    expect(backed.map((b) => `${b.object}.${b.slug}`).sort()).toEqual([
+      'companies.domains',
+      'people.emails',
+    ])
   })
 })

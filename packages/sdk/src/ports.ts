@@ -69,7 +69,7 @@ export type AliasOutcome = 'added' | 'already_own' | 'suggested_duplicate'
 
 export type AliasResult = {
   readonly keys: ReadonlyArray<{
-    readonly key: 'domain' | 'email' | 'linkedin' | 'cin'
+    readonly key: 'domain' | 'email' | 'linkedin'
     readonly outcome: AliasOutcome
   }>
 }
@@ -199,7 +199,6 @@ export type ReadEntity = {
     readonly domain: ReadonlyArray<string>
     readonly email: ReadonlyArray<string>
     readonly linkedin: ReadonlyArray<string>
-    readonly cin: ReadonlyArray<string>
   }
   /** Attribute values by slug. */
   readonly values: JsonObject

@@ -97,12 +97,13 @@ export type IdentityKind = 'company' | 'person'
 /**
  * Identity keys, as the provider gave them — the port normalizes (sdk-4b
  * puts the one normalizer in this package so plugin and choke point agree).
+ * A company is identified by its domain and a person by their email; a
+ * LinkedIn URL identifies neither and only fills a new record's LinkedIn.
  */
 export type IdentityKeys = {
   readonly domain?: string
   readonly email?: string
   readonly linkedin?: string
-  readonly cin?: string
 }
 
 /**

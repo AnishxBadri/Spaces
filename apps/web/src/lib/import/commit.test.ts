@@ -402,11 +402,19 @@ describe('a domain identity alias', () => {
     expect(aliases).toEqual([
       { value: 'example.com', valueNorm: 'example.com' },
     ])
+    // …and the same host is the record's `domains` value (D75).
+    const born = (
+      await db
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, row.entityId))
+    ).at(0)
+    expect(born?.values.domains).toEqual(['example.com'])
   })
 })
 
 describe('a LinkedIn column on People', () => {
-  it('maps to the identity key: a known URL attaches, a new one is born as an alias', async () => {
+  it('maps to the plain attribute: the URL is a value and matches nobody', async () => {
     const people = await objectId('people')
     const ishaan = await resolveEntity({
       kind: 'person',
@@ -415,39 +423,37 @@ describe('a LinkedIn column on People', () => {
       source: { class: 'manual' },
     })
     const batchId = await plannedBatch(
-      ['Name', 'LinkedIn'],
+      ['Name', 'LinkedIn', 'Email'],
       [
-        ['I. Mehra', 'https://www.linkedin.com/in/IshaanMehra-import/'],
-        ['Revathi Iyer', 'linkedin.com/in/revathi-import'],
+        [
+          'I. Mehra',
+          'https://www.linkedin.com/in/IshaanMehra-import/',
+          'ishaan-import@vayuorbital.com',
+        ],
       ],
       people,
     )
     const run = await commit(batchId)
-    expect(run.attached).toBe(1)
-    const [first, second] = await rowsOf(batchId)
-    expect(first.entityId).toBe(ishaan.entityId)
-    if (second.entityId === null) throw new Error('row 2 wrote no record')
+    expect(run.attached).toBe(0)
+    const [row] = await rowsOf(batchId)
+    if (row.entityId === null) throw new Error('row 1 wrote no record')
+    expect(row.entityId).not.toBe(ishaan.entityId)
 
-    const born = await db
-      .select({
-        valueNorm: entityAlias.valueNorm,
-        isIdentity: entityAlias.isIdentity,
-        values: entity.values,
-      })
-      .from(entityAlias)
-      .innerJoin(entity, eq(entity.id, entityAlias.entityId))
-      .where(
-        and(
-          eq(entityAlias.entityId, second.entityId),
-          eq(entityAlias.kind, 'linkedin'),
-        ),
-      )
-    expect(born).toHaveLength(1)
-    expect(born[0]).toMatchObject({
-      valueNorm: 'linkedin.com/in/revathi-import',
-      isIdentity: true,
+    const born = (
+      await db
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, row.entityId))
+    ).at(0)
+    expect(born?.values).toMatchObject({
+      linkedin: 'https://www.linkedin.com/in/IshaanMehra-import/',
+      emails: ['ishaan-import@vayuorbital.com'],
     })
-    expect(born[0].values).not.toHaveProperty('linkedin')
+    const linkedinAliases = await db
+      .select({ id: entityAlias.id })
+      .from(entityAlias)
+      .where(eq(entityAlias.kind, 'linkedin'))
+    expect(linkedinAliases).toEqual([])
   })
 })
 

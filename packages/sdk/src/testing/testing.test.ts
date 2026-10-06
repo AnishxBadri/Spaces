@@ -125,9 +125,9 @@ describe('IdentityTest', () => {
       }).pipe(Effect.provide(identity.layer)),
     )
     expect(result.r).toEqual({ entityId: 'entity-7', outcome: 'attached' })
+    // A LinkedIn URL identifies nobody, so it is no claim at all.
     expect(result.aliases.keys).toEqual([
       { key: 'domain', outcome: 'suggested_duplicate' },
-      { key: 'linkedin', outcome: 'added' },
     ])
   })
 })

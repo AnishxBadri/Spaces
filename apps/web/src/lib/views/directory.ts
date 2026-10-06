@@ -77,15 +77,14 @@ const query = <T>(run: () => Promise<T>) =>
     catch: (cause) => new DirectoryQueryFailed({ cause }),
   })
 
-type ShownAliasKind = 'domain' | 'email' | 'linkedin'
+type ShownAliasKind = 'domain' | 'email'
 
 /**
- * The text box narrows on the name **or** on an identity alias the surface
- * shows as a column — a domain or LinkedIn on /companies, an email or
- * LinkedIn on /people. Correlated `exists`, not a join: a company with three
- * domains must still be one row.
+ * The text box narrows on the name **or** on an identity alias — a domain on
+ * /companies, an email on /people. Correlated `exists`, not a join: a
+ * company with three domains must still be one row.
  */
-const aliasMatch = (kinds: ReadonlyArray<ShownAliasKind>, q: string): SQL =>
+const aliasMatch = (kind: ShownAliasKind, q: string): SQL =>
   exists(
     db
       .select({ one: sql`1` })
@@ -93,14 +92,14 @@ const aliasMatch = (kinds: ReadonlyArray<ShownAliasKind>, q: string): SQL =>
       .where(
         and(
           eq(entityAlias.entityId, entity.id),
-          inArray(entityAlias.kind, [...kinds]),
+          eq(entityAlias.kind, kind),
           ilike(entityAlias.valueNorm, likeArg(q)),
         ),
       ),
   )
 
-const nameOrAlias = (kinds: ReadonlyArray<ShownAliasKind>, q: string) =>
-  or(ilike(entity.canonicalName, likeArg(q)), aliasMatch(kinds, q))
+const nameOrAlias = (kind: ShownAliasKind, q: string) =>
+  or(ilike(entity.canonicalName, likeArg(q)), aliasMatch(kind, q))
 
 /** Identity aliases of one kind, for the page's rows only. */
 async function aliasesFor(
@@ -244,19 +243,22 @@ const pageOfKind = Effect.fn('pageOfKind')(function* (
   }
 })
 
-/** The `/companies` table: entity core + values + domains + LinkedIn + spaces. */
+/**
+ * The `/companies` table: entity core + values + spaces. `domains` is the
+ * identity index read back, for the API's `records.list`; the values carry
+ * the same domains as an attribute.
+ */
 export const listCompaniesPageProgram = Effect.fn('listCompaniesPageProgram')(
   function* (conditions: Array<Condition>, options: ListPageOptions = {}) {
     const page = yield* pageOfKind(
       'company',
-      (q) => nameOrAlias(['domain', 'linkedin'], q),
+      (q) => nameOrAlias('domain', q),
       conditions,
       options,
     )
-    const [domains, linkedins, spaces, touched] = yield* query(() =>
+    const [domains, spaces, touched] = yield* query(() =>
       Promise.all([
         aliasesFor('domain', page.ids),
-        aliasesFor('linkedin', page.ids),
         spacesFor(page.ids),
         lastTouchedFor(page.ids),
       ]),
@@ -267,7 +269,6 @@ export const listCompaniesPageProgram = Effect.fn('listCompaniesPageProgram')(
         name: r.name,
         values: r.values,
         domains: domains.get(r.id) ?? [],
-        linkedins: linkedins.get(r.id) ?? [],
         spaces: spaces.get(r.id) ?? [],
         lastTouched: touched.get(r.id) ?? null,
         createdAt: r.createdAt.toISOString(),
@@ -301,19 +302,18 @@ async function referenceNamesFor(
   return Object.fromEntries(rows.map((r) => [r.id, { name: r.name }]))
 }
 
-/** The `/people` table: entity core + values + emails + LinkedIn + reference names. */
+/** The `/people` table: entity core + values + identity emails + reference names. */
 export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
   function* (conditions: Array<Condition>, options: ListPageOptions = {}) {
     const page = yield* pageOfKind(
       'person',
-      (q) => nameOrAlias(['email', 'linkedin'], q),
+      (q) => nameOrAlias('email', q),
       conditions,
       options,
     )
-    const [emails, linkedins, refNames, touched] = yield* query(() =>
+    const [emails, refNames, touched] = yield* query(() =>
       Promise.all([
         aliasesFor('email', page.ids),
-        aliasesFor('linkedin', page.ids),
         referenceNamesFor(page.ids),
         lastTouchedFor(page.ids),
       ]),
@@ -324,7 +324,6 @@ export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
         name: r.name,
         values: r.values,
         emails: emails.get(r.id) ?? [],
-        linkedins: linkedins.get(r.id) ?? [],
         lastTouched: touched.get(r.id) ?? null,
         createdAt: r.createdAt.toISOString(),
       })),

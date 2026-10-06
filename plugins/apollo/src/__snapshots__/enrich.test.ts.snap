@@ -10,7 +10,6 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
     "output": {
       "id": "entity-0",
       "keys": {
-        "cin": [],
         "domain": [
           "northwind-robotics.example",
         ],
@@ -115,7 +114,6 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
       "entityId": "entity-0",
       "keys": {
         "domain": "northwind-robotics.example",
-        "linkedin": "http://www.linkedin.com/company/northwind-robotics",
       },
     },
     "output": {
@@ -123,10 +121,6 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
         {
           "key": "domain",
           "outcome": "already_own",
-        },
-        {
-          "key": "linkedin",
-          "outcome": "added",
         },
       ],
     },
@@ -139,6 +133,7 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
       "values": {
         "description": "Warehouse picking robots that learn a new SKU from one demonstration.",
         "founded_year": 2019,
+        "linkedin": "http://www.linkedin.com/company/northwind-robotics",
         "location": "Pune, India",
       },
     },
@@ -152,7 +147,6 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
       "fields": {
         "aliases": [
           "domain:already_own",
-          "linkedin:added",
         ],
         "conflicts": [],
         "endpoint": "organizations/enrich",
@@ -166,7 +160,7 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
 ]
 `;
 
-exports[`enrichPerson > matches by email and adds the email and LinkedIn before filling 1`] = `
+exports[`enrichPerson > matches by email and adds the email before filling, LinkedIn among the values 1`] = `
 [
   {
     "call": "Read.entity",
@@ -176,7 +170,6 @@ exports[`enrichPerson > matches by email and adds the email and LinkedIn before 
     "output": {
       "id": "entity-0",
       "keys": {
-        "cin": [],
         "domain": [],
         "email": [
           "meera@northwind-robotics.example",
@@ -272,7 +265,6 @@ exports[`enrichPerson > matches by email and adds the email and LinkedIn before 
       "entityId": "entity-0",
       "keys": {
         "email": "meera@northwind-robotics.example",
-        "linkedin": "http://www.linkedin.com/in/meera-kulkarni-robots",
       },
     },
     "output": {
@@ -280,10 +272,6 @@ exports[`enrichPerson > matches by email and adds the email and LinkedIn before 
         {
           "key": "email",
           "outcome": "already_own",
-        },
-        {
-          "key": "linkedin",
-          "outcome": "added",
         },
       ],
     },
@@ -295,6 +283,7 @@ exports[`enrichPerson > matches by email and adds the email and LinkedIn before 
       "receiptId": "receipt-1",
       "values": {
         "job_title": "Co-founder & CTO",
+        "linkedin": "http://www.linkedin.com/in/meera-kulkarni-robots",
         "location": "Pune, India",
         "twitter": "https://twitter.com/meerak",
       },
@@ -309,7 +298,6 @@ exports[`enrichPerson > matches by email and adds the email and LinkedIn before 
       "fields": {
         "aliases": [
           "email:already_own",
-          "linkedin:added",
         ],
         "conflicts": [],
         "endpoint": "people/match",

@@ -26,7 +26,7 @@ import type { Decider } from './propose'
 
 /**
  * SPA-105 — `suggestion(kind: 'identity')`. Accepting walks the claim
- * through `resolveEntity` (attach on an exact email/LinkedIn match, else
+ * through `resolveEntity` (attach on an exact email match, else
  * create and sweep names inline) and, on a company, adds it to the person's
  * `companies`; rejecting writes nothing. Everything here is the real database —
  * the duplicate pair is read back from `duplicate_candidate` and through the
@@ -137,7 +137,7 @@ describe('accepting an identity', () => {
     })
   })
 
-  it('attaches on a LinkedIn match the same way', async () => {
+  it('never attaches on a LinkedIn URL: the new person keeps it as a value (D75)', async () => {
     const { companyId, tag } = await company()
     const known = await resolveEntity({
       kind: 'person',
@@ -153,11 +153,11 @@ describe('accepting an identity', () => {
       acceptProgram(proposed.id, ACCEPTER),
     )
     if (accepted.kind !== 'identity') throw new Error('not an identity')
-    expect(accepted.resolved).toMatchObject({
-      entityId: known.entityId,
-      action: 'attached',
-      matchedOn: 'linkedin',
-    })
+    expect(accepted.resolved.action).toBe('created')
+    expect(accepted.resolved.entityId).not.toBe(known.entityId)
+    expect(await valueOf(accepted.resolved.entityId, 'linkedin')).toBe(
+      `https://linkedin.com/in/linus-${tag}/`,
+    )
   })
 
   it('creates a near-identical name with no keys as a new person, and files the pair in the inbox', async () => {

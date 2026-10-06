@@ -74,6 +74,40 @@ exports[`schemaFor > compiles the company registry — the deck reader's output 
       "title": "Description",
       "type": "object",
     },
+    "domains": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "items": {
+            "format": "hostname",
+            "maxLength": 255,
+            "type": "string",
+          },
+          "maxItems": 50,
+          "type": "array",
+          "uniqueItems": true,
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "Domains",
+      "type": "object",
+    },
     "founded_year": {
       "additionalProperties": false,
       "properties": {
@@ -191,6 +225,35 @@ exports[`schemaFor > compiles the company registry — the deck reader's output 
         "confidence",
       ],
       "title": "Funding stage",
+      "type": "object",
+    },
+    "linkedin": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+        "refs": {
+          "description": "Refs of the context items this value was read from",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "value": {
+          "format": "uri",
+          "maxLength": 500,
+          "type": "string",
+        },
+      },
+      "required": [
+        "value",
+        "refs",
+        "confidence",
+      ],
+      "title": "LinkedIn",
       "type": "object",
     },
     "location": {

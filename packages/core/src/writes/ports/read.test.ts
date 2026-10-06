@@ -72,8 +72,9 @@ describe('ReadLive.entity', () => {
         domain: ['northwind-robotics.example'],
         email: [],
         linkedin: [],
-        cin: [],
       },
+      // Identity is an attribute too (D75): the domain is in the values.
+      values: { domains: ['northwind-robotics.example'] },
     })
     expect(JSON.stringify(record)).not.toContain('Sequoia')
   })

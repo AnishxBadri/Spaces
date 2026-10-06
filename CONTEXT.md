@@ -281,7 +281,7 @@ not by reading the diff.
 
 **Ports = the SDK contract.** Effect service tags, one per lane, provenance
 stamped by the port from the bound `integration` row (a plugin cannot forge
-who wrote what): `Identity` (resolveEntity / addIdentityAlias) · `Facts`
+who wrote what): `Identity` (resolveEntity / addIdentityValue) · `Facts`
 (setValues, fill-blanks, conflict → suggestion) · `Content` (document /
 interaction / signal) · `Judgment` (review inbox) · `Receipts`
 (enrichment_record) · `Import` (a staged `import_batch`, pre-mapping; SDK
@@ -722,9 +722,10 @@ mechanisms, never mixed:
 
 ```
 company(entity_id)   -- kind markers only. Attribute values live in
-person(entity_id)    -- entity.values; identity (domain/cin/emails/linkedin)
-                     -- lives in entity_alias. Corrected 2026-09-15 — the old
-                     -- sketch listed domain/cin/sector[]/emails/linkedin here,
+person(entity_id)    -- entity.values, identity included (a company's domains,
+                     -- a person's emails; D75), with entity_alias as its
+                     -- index. Corrected 2026-09-15 — the old sketch listed
+                     -- identity and sector[] columns here,
                      -- against "Unified storage" + "Hard exclusions" (2026-07)
                      -- and against "Spaces vs attributes": there is no sector
                      -- field anywhere, ever.
@@ -958,6 +959,13 @@ enum branch in any registry read. `description` landed 2026-09 (migration
   attributes carrying `options.identityKey`; `setValues` mirrors each value into an
   `is_identity` alias in the same transaction, and that alias table — its partial unique
   index — is what enforces one owner per key and what `resolveEntity` matches on.
+  Built (migration 0064): each element is claimed before the value is written, so an
+  element another record holds is refused at that element — left out of the value, raised
+  as a `duplicate_candidate`, named in `identityClaims` — while the rest of the patch
+  writes; the stored array and the aliases never disagree. Elements are stored as written
+  (a domain as its host) and compared on the identity normal form. A merge unions both
+  sides' arrays on the survivor. A birth's keys are its first value; a LinkedIn key on a
+  person or company matches nothing and fills a new record's `linkedin`.
 - **Type menu is fixed** (users define attributes, never types): text, number, currency,
   date, checkbox, select, multi-select, status (options carry a group:
   active/parked/closed), domain, email, url, phone, rating, **record-reference**,
@@ -1057,10 +1065,11 @@ enum branch in any registry read. `description` landed 2026-09 (migration
     stored `enrichment_record` raw response as provenance anchor; per-field
     history makes every write revertable. A conflict with an existing value —
     especially a human edit — is never silent: it becomes an "Apollo says X,
-    you have Y — accept?" prompt. Identity keys (domain/linkedin) never touch
-    values: they enter as aliases via resolveEntity, where collisions become
-    duplicate_candidates (Apollo's real failure mode — wrong company match —
-    lands in the dedupe inbox by construction).
+    you have Y — accept?" prompt. Identity keys (domain/email) enter through
+    the Identity port's `resolve`/`addAlias`, which write the identity attribute
+    through setValues (D75), where collisions become duplicate_candidates
+    (Apollo's real failure mode — wrong company match — lands in the dedupe
+    inbox by construction).
   - _Generated judgment_ (AI classify/summarize/prompt): fully gated through a
     **`suggestion` table** — (entity, attr_slug, value, source ai|apollo|gmail,
     confidence, provenance jsonb, status open|accepted|dismissed). Chips on the
@@ -1135,8 +1144,8 @@ enum branch in any registry read. `description` landed 2026-09 (migration
 
 - **Company:** description (text) · business_model (multi-select) · funding_stage (select:
   Pre-seed → Public/Bootstrapped) · location (text) · founded_year (number).
-  domains (domain, multi, identity) · linkedin (url, plain) (D75). No CIN: Spaces is
-  country-agnostic, and a user who tracks it adds their own attribute.
+  domains (domain, multi, identity) · linkedin (url, plain) (D75). No registration
+  number: Spaces is country-agnostic, and a user who tracks one adds their own attribute.
 - **Person:** job_title (text) · description · location · twitter (url) ·
   phone (phone) · emails (email, multi, identity) · linkedin (url, plain) (D75).
 - **LinkedIn is a plain attribute (D75).** SPA-300 (migration 0063) briefly made it a
@@ -1365,8 +1374,8 @@ see "Lists — deferred").
 ### Entity resolution & merge
 
 **Doctrine: deterministic auto, probabilistic suggest.** Identity comes only from
-deterministic keys — domain and email (since D75 LinkedIn on people and companies is a
-plain attribute and CIN is not a core key; a custom object may still declare `domain` or
+deterministic keys — a company's domains and a person's emails (since D75 LinkedIn on
+people and companies is a plain attribute; a custom object may still declare `domain` or
 `linkedin` as its identity key). Exact key match auto-attaches. Fuzzy
 name match **suggests, never merges** — no threshold is safe ("Stripe" payments vs "Stripe"
 design agency corrupts silently). Fuzzy feeds a dedupe inbox; a human clicks.
@@ -1375,7 +1384,7 @@ design agency corrupts silently). Fuzzy feeds a dedupe inbox; a human clicks.
 entity(id, kind, canonical_name, merged_into_id → entity,
        source_class, source_ref → integration, created_by, created_at)
 
-entity_alias(id, entity_id, kind: name|domain|email|linkedin|cin,
+entity_alias(id, entity_id, kind: name|domain|email|linkedin,
              value, value_norm, is_identity bool,
              source_class, source_ref → integration)
   -- UNIQUE partial index on (kind, value_norm) WHERE is_identity
@@ -2335,7 +2344,7 @@ per-company metric aliases, Indian fiscal periods and lakh/crore units.
 Outlook is cut from v1: it doubles the OAuth doc and the sync adapter work for a user base
 that skews Google Workspace.
 
-**Indian data sources** (MCA/CIN registry, Tracxn/Crunchbase licensing) have no cheap legal enrichment source, and scraping is a legal and reliability liability. The answer is BYOK for data too.
+**Indian data sources** (the MCA company registry, Tracxn/Crunchbase licensing) have no cheap legal enrichment source, and scraping is a legal and reliability liability. The answer is BYOK for data too.
 
 **Object-model build (phases 1–5): done, 2026-07.** Attribute engine, Attio-style tables
 for Companies/People/Deals with inline typed editing and add-column, registry rails,

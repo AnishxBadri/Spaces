@@ -10,7 +10,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Building2, Copy, Globe, Layers, Linkedin, Plus } from 'lucide-react'
+import { Building2, Copy, Layers, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   keepPreviousData,
@@ -32,12 +32,9 @@ import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
 import { DitherMark } from '#/components/record/record-parts'
 import { TemplatePicker } from '#/components/templates'
-import {
-  ChipLink,
-  DateCell,
-  MetaCell,
-  RecordLinkCell,
-} from '#/components/table/cells'
+import { ChipLink, DateCell, RecordLinkCell } from '#/components/table/cells'
+import { collisionToast } from '#/lib/attributes/collision-toast'
+import { identityFirst } from '#/lib/attributes/identity-first'
 import {
   AddColumnButton,
   RecordTable,
@@ -240,7 +237,12 @@ function CompaniesPage() {
 
   async function saveCell(entityId: string, slug: string, value: unknown) {
     try {
-      await updateRecord({ data: { id: entityId, patch: { [slug]: value } } })
+      const result = await updateRecord({
+        data: { id: entityId, patch: { [slug]: value } },
+      })
+      const collision = collisionToast(result, 'company')
+      if (collision)
+        toast(collision.title, { description: collision.description })
       refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save')
@@ -264,35 +266,9 @@ function CompaniesPage() {
           />
         ),
       }),
-      col.accessor((r) => r.domains.join(', '), {
-        id: 'domains',
-        header: 'Domains',
-        size: 170,
-        // The sort is a SQL order by over `entity` now, and domains, spaces
-        // and last-touched are all joins; offering the menu would promise an
-        // order nobody can serve (the same call `/o/$objectSlug` made).
-        enableSorting: false,
-        cell: (info) =>
-          info.row.original.domains.length > 0 ? (
-            <MetaCell icon={Globe}>
-              {info.row.original.domains.join(', ')}
-            </MetaCell>
-          ) : null,
-      }),
-      col.accessor((r) => r.linkedins.at(0) ?? '', {
-        id: 'linkedin',
-        header: 'LinkedIn',
-        size: 180,
-        // An identity alias like the column before it: a join, so no sort.
-        enableSorting: false,
-        cell: (info) => {
-          const first = info.row.original.linkedins.at(0)
-          return first === undefined ? null : (
-            <MetaCell icon={Linkedin}>{first}</MetaCell>
-          )
-        },
-      }),
-      ...registry.map((def) =>
+      // Domains are an attribute like any other (D75), so they sort and
+      // filter through the views compiler; shown first, beside the name.
+      ...identityFirst(registry).map((def) =>
         col.accessor((r): unknown => r.values[def.slug] ?? null, {
           id: `attr:${def.slug}`,
           header: def.name,
@@ -409,7 +385,7 @@ function CompaniesPage() {
               table={table}
               filter={globalFilter}
               onFilterChange={setGlobalFilter}
-              filterPlaceholder="Filter by name, domain or LinkedIn…"
+              filterPlaceholder="Filter by name or domain…"
               filterLabel="Filter companies"
               noun={{ one: 'company', many: 'companies' }}
               total={total}
@@ -573,20 +549,23 @@ function CreateCompanyDialog({ registry }: { registry: Array<RegistryEntry> }) {
             />
           </div>
 
-          {registry.map((def) => (
-            <div
-              key={def.slug}
-              className={cn('space-y-1.5', fieldSpanClass(def))}
-            >
-              <Label>{def.name}</Label>
-              <ValueEditor
-                def={def}
-                value={values[def.slug] ?? null}
-                variant="field"
-                onSave={(v) => setValues((s) => ({ ...s, [def.slug]: v }))}
-              />
-            </div>
-          ))}
+          {/* Domains have their own field above, the key the create matches on. */}
+          {registry
+            .filter((def) => def.options?.identityKey === undefined)
+            .map((def) => (
+              <div
+                key={def.slug}
+                className={cn('space-y-1.5', fieldSpanClass(def))}
+              >
+                <Label>{def.name}</Label>
+                <ValueEditor
+                  def={def}
+                  value={values[def.slug] ?? null}
+                  variant="field"
+                  onSave={(v) => setValues((s) => ({ ...s, [def.slug]: v }))}
+                />
+              </div>
+            ))}
 
           {error ? (
             <p role="alert" className="text-ui text-destructive sm:col-span-2">

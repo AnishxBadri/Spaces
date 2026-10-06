@@ -5,7 +5,7 @@ import type { RecordedCall } from '@spaces/sdk/testing'
 import type { ReadEntity } from '@spaces/sdk'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { jobs } from './index.ts'
-import { APOLLO_API } from './map.ts'
+import { APOLLO_API, endpointUrl } from './map.ts'
 import { fixture } from './test-fixtures.ts'
 
 /**
@@ -36,7 +36,6 @@ const company = readEntity({
     domain: ['northwind-robotics.example'],
     email: [],
     linkedin: [],
-    cin: [],
   },
 })
 
@@ -48,7 +47,6 @@ const person = readEntity({
     domain: [],
     email: ['meera@northwind-robotics.example'],
     linkedin: [],
-    cin: [],
   },
 })
 
@@ -127,6 +125,7 @@ describe('enrichCompany', () => {
         'Warehouse picking robots that learn a new SKU from one demonstration.',
       founded_year: 2019,
       location: 'Pune, India',
+      linkedin: 'http://www.linkedin.com/company/northwind-robotics',
     })
     expect(ports.facts.calls[0]?.input).toMatchObject({
       receiptId: 'receipt-1',
@@ -198,7 +197,7 @@ describe('enrichCompany', () => {
 })
 
 describe('enrichPerson', () => {
-  it('matches by email and adds the email and LinkedIn before filling', async () => {
+  it('matches by email and adds the email before filling, LinkedIn among the values', async () => {
     const ports = portsFor(person, PERSON_URL, { body: fixture('person.json') })
     expect((await run(jobs.enrichPerson, ports))._tag).toBe('Success')
     expect(callLog(ports.calls)).toMatchSnapshot()
@@ -206,14 +205,31 @@ describe('enrichPerson', () => {
       entityId: 'entity-0',
       keys: {
         email: 'meera@northwind-robotics.example',
-        linkedin: 'http://www.linkedin.com/in/meera-kulkarni-robots',
       },
     })
     expect(ports.facts.values.get('entity-0')).toEqual({
       job_title: 'Co-founder & CTO',
       location: 'Pune, India',
+      linkedin: 'http://www.linkedin.com/in/meera-kulkarni-robots',
       twitter: 'https://twitter.com/meerak',
     })
+  })
+
+  it('asks by the LinkedIn value when the person has no email', async () => {
+    const linkedin = 'https://www.linkedin.com/in/meera-kulkarni-robots'
+    const byLinkedin = readEntity({
+      id: 'entity-0',
+      kind: 'person',
+      name: 'Meera Kulkarni',
+      values: { linkedin },
+    })
+    const ports = portsFor(
+      byLinkedin,
+      endpointUrl('people/match', { linkedin_url: linkedin }),
+      { body: fixture('person.json') },
+    )
+    expect((await run(jobs.enrichPerson, ports))._tag).toBe('Success')
+    expect(ports.http.calls).toHaveLength(1)
   })
 
   it('records no identity call for a match that returns only a role email', async () => {

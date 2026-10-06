@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   DropdownMenu,
@@ -188,6 +188,27 @@ export function ValueEditor({
           onSave={onSave}
           variant={variant}
           multi
+        />
+      )
+    case 'email':
+    case 'domain':
+      // A person's emails, a company's domains: a list, one claim each.
+      if (def.options?.multi)
+        return (
+          <MultiTextPicker
+            def={def}
+            value={value}
+            onSave={onSave}
+            variant={variant}
+          />
+        )
+      return (
+        <TextLikeEditor
+          def={def}
+          value={value}
+          onSave={onSave}
+          variant={variant}
+          autoFocus={autoFocus}
         />
       )
     case 'checkbox':
@@ -513,6 +534,88 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
             Clear
           </DropdownMenuItem>
         ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/**
+ * A multi-valued `email` / `domain`: the values as chips, a box to add one
+ * (↵), and each value a menu item that removes it. The write path cleans,
+ * de-duplicates and — on an identity attribute — claims every element.
+ */
+function MultiTextPicker({ def, value, onSave, variant }: Props) {
+  const selected: Array<string> = Array.isArray(value) ? value.map(String) : []
+  const [draft, setDraft] = useState('')
+
+  function add() {
+    const next = draft.trim()
+    if (next === '') return
+    setDraft('')
+    if (!selected.includes(next)) onSave([...selected, next])
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={def.name}
+        className={cn(
+          'group/pick flex min-w-0 items-center gap-1 text-left',
+          variant !== 'cell'
+            ? cn(boxChrome(variant), 'w-full data-[state=open]:border-rule')
+            : 'focus-ring-inset h-full w-full rounded-md px-1',
+        )}
+      >
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+          {selected.length === 0 ? (
+            <span className="text-ui text-graphite">—</span>
+          ) : (
+            selected.map((v) => (
+              <span
+                key={v}
+                className="flex h-5 items-center truncate border border-rule bg-paper px-1.5 mono text-label"
+              >
+                {v}
+              </span>
+            ))
+          )}
+        </span>
+        <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <div className="p-1.5">
+          <Input
+            value={draft}
+            autoFocus
+            type={def.type === 'email' ? 'email' : 'text'}
+            aria-label={`Add to ${def.name}`}
+            placeholder={
+              def.type === 'email' ? 'name@company.com ↵' : 'company.com ↵'
+            }
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                add()
+              }
+            }}
+            className="h-7 mono text-label"
+          />
+        </div>
+        {selected.map((v) => (
+          <DropdownMenuItem
+            key={v}
+            aria-label={`Remove ${v}`}
+            onSelect={() => {
+              const next = selected.filter((s) => s !== v)
+              onSave(next.length === 0 ? null : next)
+            }}
+          >
+            <X className="size-3 text-graphite" strokeWidth={2} />
+            <span className="truncate mono text-label">{v}</span>
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   )

@@ -370,7 +370,7 @@ export function readColumns(
   return mapping.map((target, i) => {
     const values = rows.map((r) => r.cells.at(i) ?? '')
     const spec = specFor(target, registry)
-    const reference = spec?.kind === 'typed' && isReferenceType(spec.type)
+    const reference = spec !== null && isReferenceType(spec.type)
     return {
       values,
       spec,

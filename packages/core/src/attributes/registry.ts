@@ -6,7 +6,13 @@ import type {
 } from '@spaces/db/schema/attributes'
 import type { IdentityKey } from '@spaces/db/schema/objects'
 import type { CoreIdentityKey } from '@spaces/db/schema/entities'
-import { normalizeDomain, normalizeLinkedin } from '../entities/normalize'
+import {
+  domainHost,
+  isRoleEmail,
+  normalizeDomain,
+  normalizeEmail,
+  normalizeLinkedin,
+} from '../entities/normalize'
 import type { BadgeColor } from './colors'
 
 /**
@@ -95,23 +101,34 @@ export const IDENTITY_KEY_ATTRIBUTES: Record<
 }
 
 /**
- * The core four: the keys that identify a person or a company, and the alias
- * kinds that carry `is_identity` (`CoreIdentityKey` is derived from the
- * `alias_kind` enum). `resolveEntity`'s normalizer table is keyed by this
- * type, so the two cannot disagree about what identifies a record.
+ * Every alias kind that carries `is_identity` (`CoreIdentityKey` is derived
+ * from the `alias_kind` enum). `resolveEntity`'s normalizer table is keyed by
+ * this type, so the two cannot disagree about what identifies a record.
  */
 export const CORE_IDENTITY_KEYS: Array<CoreIdentityKey> = [
   'domain',
   'email',
   'linkedin',
-  'cin',
 ]
 
 /**
- * Keys that identify people and companies and nothing else — the core four
- * less the two a custom object may declare. Refused rather than offered: the
- * free-mail and role-prefix rules behind them are core doctrine and mean
- * nothing on an attribute bag.
+ * What identifies a person or a company, and the multi-valued system
+ * attribute that holds it (D75): a person's `emails`, a company's `domains`.
+ * `setValues` mirrors each value into an identity alias; LinkedIn is a plain
+ * attribute on both and identifies neither.
+ */
+export const CORE_IDENTITY: Record<
+  'company' | 'person',
+  { key: CoreIdentityKey; slug: string }
+> = {
+  company: { key: 'domain', slug: 'domains' },
+  person: { key: 'email', slug: 'emails' },
+}
+
+/**
+ * Keys that identify people and nothing else — refused on a custom object
+ * rather than offered: the role-prefix rule behind them is core doctrine and
+ * means nothing on an attribute bag.
  */
 export const CORE_ONLY_IDENTITY_KEYS: Array<string> = CORE_IDENTITY_KEYS.filter(
   (k) => !IDENTITY_KEYS.some((declarable) => declarable === k),
@@ -127,9 +144,10 @@ export function coreKindOf(object: {
 }
 
 /**
- * The one answer to "what identifies a record of this object?" (SPA-165).
- * Company and person carry the core four; a deal carries none; a custom
- * object carries exactly what it declared in `object.identity_keys`.
+ * The one answer to "what identifies a record of this object?". A company
+ * carries its domains, a person their emails (`CORE_IDENTITY`), a deal
+ * nothing, and a custom object exactly what it declared in
+ * `object.identity_keys`.
  */
 export function identityKeysOf(object: {
   slug: string
@@ -137,13 +155,13 @@ export function identityKeysOf(object: {
   identityKeys: ReadonlyArray<IdentityKey>
 }): Array<CoreIdentityKey> {
   const kind = coreKindOf(object)
-  if (kind === 'company' || kind === 'person') return [...CORE_IDENTITY_KEYS]
+  if (kind === 'company' || kind === 'person') return [CORE_IDENTITY[kind].key]
   if (kind === 'deal') return []
   return [...object.identityKeys]
 }
 
 export const CORE_ONLY_IDENTITY_MESSAGE =
-  'email and cin identify people and companies, not custom records'
+  'email identifies people, not custom records'
 
 export type AttributeType =
   | 'text'
@@ -179,15 +197,54 @@ const dateString = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
 
 /**
- * The normalizer each identity key is matched by — the same two functions
- * `resolveEntity` and `addIdentityAlias` use, so the validator and the alias
- * agree on what the value means by construction (CONTEXT.md, "Entity
- * resolution & merge": these are the ONLY place normalization happens).
+ * The normalizer each identity key is matched by — the same functions
+ * `resolveEntity` and the alias writer use, so the validator and the alias
+ * agree on what the value means by construction. An email that only a role
+ * sends from (`info@`) identifies no person, so it normalizes to nothing.
  */
 const IDENTITY_NORMALIZERS: Record<
-  IdentityKey,
+  CoreIdentityKey,
   (raw: string) => string | null
-> = { domain: normalizeDomain, linkedin: normalizeLinkedin }
+> = {
+  domain: normalizeDomain,
+  email: (raw) => {
+    const norm = normalizeEmail(raw)
+    return norm === null || isRoleEmail(norm) ? null : norm
+  },
+  linkedin: normalizeLinkedin,
+}
+
+/**
+ * One element of a multi-valued identity attribute as it is stored: a
+ * domain as the host a record shows (`domainHost`), anything else trimmed.
+ * Elements are compared on the identity normal form, never on this.
+ */
+export function identityElement(key: CoreIdentityKey, raw: string): string {
+  return key === 'domain' ? (domainHost(raw) ?? raw.trim()) : raw.trim()
+}
+
+/**
+ * Whether `raw` can be stored as one element of a core kind's identity
+ * attribute — what `setValues` would accept — so a birth never claims a key
+ * its own value write would refuse.
+ */
+export function storableIdentity(
+  kind: 'company' | 'person',
+  raw: string,
+): boolean {
+  const { slug } = CORE_IDENTITY[kind]
+  const def = SYSTEM_ATTRIBUTES[kind].find((d) => d.slug === slug)
+  if (!def) return false
+  return valueValidator({
+    type: def.type,
+    options: def.options ?? {},
+  }).safeParse([raw]).success
+}
+
+/** The identity normal form of one element, or null when it identifies nothing. */
+export function identityNorm(key: CoreIdentityKey, raw: string): string | null {
+  return IDENTITY_NORMALIZERS[key](raw)
+}
 
 /**
  * An identity-backed value has to survive normalization, because the claim
@@ -200,9 +257,9 @@ const IDENTITY_NORMALIZERS: Record<
  * identifies nobody.
  */
 const identityValue = (
-  base: z.ZodType<string>,
-  key: IdentityKey,
-): z.ZodType<string> =>
+  base: z.ZodType<string, string>,
+  key: CoreIdentityKey,
+): z.ZodType<string, string> =>
   base.superRefine((raw, ctx) => {
     if (IDENTITY_NORMALIZERS[key](raw) !== null) return
     ctx.addIssue({
@@ -210,6 +267,36 @@ const identityValue = (
       message: `${raw.trim().toLowerCase()} never identifies a record`,
     })
   })
+
+/** Elements a multi-valued `email` or `domain` attribute may hold. */
+const MAX_MULTI_TEXT = 50
+
+/**
+ * A multi-valued `email` / `domain` value: an array of elements, each
+ * cleaned by `identityElement` and de-duplicated — on the identity normal
+ * form when the attribute backs an identity key, on the cleaned text
+ * otherwise. The first spelling wins.
+ */
+const multiText = (
+  element: z.ZodType<string, string>,
+  key: CoreIdentityKey | undefined,
+  type: 'email' | 'domain',
+) =>
+  z
+    .array(z.string().trim().pipe(element))
+    .max(MAX_MULTI_TEXT)
+    .transform((items) => {
+      const seen = new Set<string>()
+      const out: Array<string> = []
+      for (const raw of items) {
+        const value = identityElement(type, raw)
+        const norm = key ? (identityNorm(key, value) ?? value) : value
+        if (seen.has(norm)) continue
+        seen.add(norm)
+        out.push(value)
+      }
+      return out
+    })
 
 /**
  * Validator for one attribute's value (null clears — always allowed).
@@ -248,12 +335,16 @@ export function valueValidator(
       return z.string().max(2000)
     case 'domain': {
       const base = z.string().max(255)
-      return identityKey ? identityValue(base, identityKey) : base
+      const one = identityKey ? identityValue(base, identityKey) : base
+      return def.options.multi ? multiText(one, identityKey, 'domain') : one
     }
     case 'phone':
       return z.string().max(40)
-    case 'email':
-      return z.string().email().max(255)
+    case 'email': {
+      const base = z.string().email().max(255)
+      const one = identityKey ? identityValue(base, identityKey) : base
+      return def.options.multi ? multiText(one, identityKey, 'email') : one
+    }
     case 'url': {
       const base = z.string().url().max(500)
       return identityKey ? identityValue(base, identityKey) : base
@@ -328,9 +419,9 @@ const opt = (
  * document — the two things sensitivity most needs to cover. It is the
  * `entity.sensitive` column instead, resolved by `resolveSensitivity`.
  *
- * No identity key is here either: a person's or a company's domain, email,
- * LinkedIn and CIN are `entity_alias` rows, written through `resolveEntity`
- * and `addIdentityAlias`, never `entity.values`.
+ * A person's `emails` and a company's `domains` are identity (D75):
+ * multi-valued, carrying `options.identityKey`, mirrored into `entity_alias`
+ * by `setValues`. LinkedIn is a plain `url` on both.
  */
 export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
   company: [
@@ -368,6 +459,7 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
     },
     { slug: 'location', name: 'Location', type: 'text' },
     { slug: 'founded_year', name: 'Founded', type: 'number' },
+    { slug: 'linkedin', name: 'LinkedIn', type: 'url' },
     {
       // The people who started it (SPA-160). A company deck names its
       // founders, and without a person reference on the company registry
@@ -385,11 +477,21 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       type: 'record_reference',
       options: { targetKind: 'person', multi: true },
     },
+    {
+      // Identity (D75): every value is an `entity_alias` claim, so a domain
+      // another company holds is refused at that element. Appended, never
+      // slotted — the seeder derives sortOrder from the array index.
+      slug: 'domains',
+      name: 'Domains',
+      type: 'domain',
+      options: { multi: true, identityKey: 'domain' },
+    },
   ],
   person: [
     { slug: 'job_title', name: 'Job title', type: 'text' },
     { slug: 'description', name: 'Description', type: 'text' },
     { slug: 'location', name: 'Location', type: 'text' },
+    { slug: 'linkedin', name: 'LinkedIn', type: 'url' },
     { slug: 'twitter', name: 'Twitter', type: 'url' },
     { slug: 'phone', name: 'Phone', type: 'phone' },
     {
@@ -402,6 +504,13 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       name: 'Companies',
       type: 'record_reference',
       options: { targetKind: 'company', multi: true },
+    },
+    {
+      // Identity (D75), like a company's domains. Appended, never slotted.
+      slug: 'emails',
+      name: 'Emails',
+      type: 'email',
+      options: { multi: true, identityKey: 'email' },
     },
   ],
   deal: [

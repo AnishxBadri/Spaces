@@ -10,7 +10,6 @@ exports[`the researcher research job, on the test Layers > reads, searches, and 
     "output": {
       "id": "entity-0",
       "keys": {
-        "cin": [],
         "domain": [],
         "email": [],
         "linkedin": [],

@@ -112,7 +112,8 @@ query. Record-reference attributes materialize `references` links in the same
 transaction, so rails, backlinks, and merge all live on one graph.
 
 **Entity resolution** (`resolveEntity()`, the single choke point every creator calls):
-deterministic keys auto-attach (domain, email, LinkedIn, CIN — normalized: eTLD+1,
+deterministic keys auto-attach (a company's domain, a person's email — identity
+attributes whose values `entity_alias` indexes, D75 — normalized: eTLD+1,
 free-mail domains never make companies); fuzzy names only _suggest_ into a dedupe
 inbox. **Merge** repoints at write with a full snapshot (unmerge-able), never resolves
 at read.

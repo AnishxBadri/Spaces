@@ -297,7 +297,9 @@ trigger) speaks claims through Identity/Facts/Content; a **dialect importer
 hands core a grid** through `Import` (D39 as amended 2026-10-06, §5.2).
 
 The claims (sdk-4a): `IdentityClaim { kind: company | person, keys:
-{ domain?, email?, linkedin?, cin? }, name? }` and `AliasClaim`;
+{ domain?, email?, linkedin? }, name? }` and `AliasClaim` — a company is
+identified by its domain and a person by their email (D75); a LinkedIn URL
+identifies neither and only fills a new record's LinkedIn;
 `FactClaim { entityId, values, receiptId? }` — `receiptId` is evidence (it
 becomes the attribute events' `refs`), not provenance; `ReceiptClaim
 { entityId, raw, creditsUsed? }`; the three Content claims tagged by `_tag`

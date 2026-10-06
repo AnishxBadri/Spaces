@@ -26,9 +26,8 @@ import type { Json } from '../json'
 export type NoteBody = Array<Json>
 
 /**
- * Per-kind side tables. Identity values (domain, email, linkedin, cin) live
- * ONLY in entity_alias — side tables carry attributes, never identity, so
- * there is exactly one source of truth for resolution.
+ * Per-kind side tables. Kind markers only: identity lives in `entity.values`
+ * with `entity_alias` as its index (D75), never on a side table.
  */
 
 // ---------- company / person ----------

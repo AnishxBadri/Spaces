@@ -10,10 +10,7 @@ import {
   space,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
-import {
-  addIdentityAlias,
-  resolveEntity,
-} from '@spaces/core/writes/entities/resolve'
+import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { jsonString } from '@spaces/core/json'
 import { requireUser } from './shared'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
@@ -270,29 +267,6 @@ export const updateRecord = createServerFn({ method: 'POST' })
       }
     }
     return { ok: true, identity, identityValues }
-  })
-
-/** Surfaces the dedupe tripwire in the UI. */
-export const addCompanyDomain = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid(), domain: z.string().max(255) }))
-  .handler(async ({ data }) => {
-    await requireUser()
-    const result = await addIdentityAlias(data.id, 'domain', data.domain, {
-      class: 'manual',
-    })
-    return result
-  })
-
-/** A company's LinkedIn page, with the same tripwire as its domains. */
-export const addCompanyLinkedin = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({ id: z.string().uuid(), value: z.string().trim().max(255) }),
-  )
-  .handler(async ({ data }) => {
-    await requireUser()
-    return addIdentityAlias(data.id, 'linkedin', data.value, {
-      class: 'manual',
-    })
   })
 
 export const tagIntoSpace = createServerFn({ method: 'POST' })

@@ -45,7 +45,7 @@ const RECORD_KINDS: ReadonlyArray<RecordKind> = ['company', 'person', 'deal']
 const isRecordKind = (kind: string): kind is RecordKind =>
   RECORD_KINDS.some((k) => k === kind)
 
-const KEY_KINDS = ['domain', 'email', 'linkedin', 'cin'] as const
+const KEY_KINDS = ['domain', 'email', 'linkedin'] as const
 
 const failed = (what: string) => (cause: unknown) =>
   new JobRetryable({
@@ -97,7 +97,6 @@ export const ReadLive = (
           domain: keysOf('domain'),
           email: keysOf('email'),
           linkedin: keysOf('linkedin'),
-          cin: keysOf('cin'),
         },
         values,
       }

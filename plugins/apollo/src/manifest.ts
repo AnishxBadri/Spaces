@@ -19,7 +19,7 @@ export const manifest = defineManifest({
   sdk: '^1.0',
   name: 'Apollo',
   description:
-    'Fills blank company and person fields from Apollo.io (description, location, founding year, job title, Twitter) and adds the domains, emails and LinkedIn pages it returns; every value cites the raw response.',
+    'Fills blank company and person fields from Apollo.io (description, location, founding year, LinkedIn, job title, Twitter) and adds the domains and emails it returns; every value cites the raw response.',
   requires: { credential: { kind: 'enrichment', scope: 'workspace' } },
   settings: z.object({
     cacheDays: z.int().min(0).max(3650).default(90),

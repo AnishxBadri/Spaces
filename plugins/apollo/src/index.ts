@@ -132,12 +132,16 @@ const mapped = (
 
 const first = (keys: ReadonlyArray<string>) => keys.at(0)
 
-/** Ask by email, else by LinkedIn — the keys `people/match` matches on. */
+/**
+ * Ask by email, else by the LinkedIn URL the record holds — what
+ * `people/match` matches on. LinkedIn is a value, never a key. (D75)
+ */
 const personQuery = (person: ReadEntity) => {
   const email = first(person.keys.email)
   if (email !== undefined) return { email }
-  const linkedin = first(person.keys.linkedin)
-  if (linkedin !== undefined) return { linkedin_url: `https://${linkedin}` }
+  const linkedin = person.values.linkedin
+  if (typeof linkedin === 'string' && linkedin !== '')
+    return { linkedin_url: linkedin }
   return null
 }
 

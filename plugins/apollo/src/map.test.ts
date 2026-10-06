@@ -15,7 +15,6 @@ describe('the organization mapping', () => {
       entityId: 'e',
       keys: {
         domain: 'northwind-robotics.example',
-        linkedin: 'http://www.linkedin.com/company/northwind-robotics',
       },
     })
     expect(claims.facts('r')?.values).toEqual({
@@ -23,6 +22,7 @@ describe('the organization mapping', () => {
         'Warehouse picking robots that learn a new SKU from one demonstration.',
       founded_year: 2019,
       location: 'Pune, India',
+      linkedin: 'http://www.linkedin.com/company/northwind-robotics',
     })
     expect(claims.receipt.raw).toEqual(fixture('organization.json'))
   })
@@ -50,15 +50,15 @@ describe('the organization mapping', () => {
 })
 
 describe('the person mapping', () => {
-  it('claims the email and LinkedIn as keys and the seeded person slugs as values', () => {
+  it('claims the email as a key and the seeded person slugs, LinkedIn among them, as values', () => {
     const claims = personEnrichment('e', fixture('person.json'))
     expect(claims.alias?.keys).toEqual({
       email: 'meera@northwind-robotics.example',
-      linkedin: 'http://www.linkedin.com/in/meera-kulkarni-robots',
     })
     expect(claims.facts('r')?.values).toEqual({
       job_title: 'Co-founder & CTO',
       location: 'Pune, India',
+      linkedin: 'http://www.linkedin.com/in/meera-kulkarni-robots',
       twitter: 'https://twitter.com/meerak',
     })
   })

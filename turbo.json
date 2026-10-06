@@ -105,9 +105,9 @@
     },
 
     // apps/web's suite also reads the worker's and the plugins' sources: the
-    // retired-`contact_at` and `values.linkedin` scans prove no package writes
-    // one, and neither is a dependency whose files turbo would fold into this
-    // hash on its own.
+    // retired-`contact_at` scan and the identity-alias writer scan prove no
+    // package writes one, and neither is a dependency whose files turbo would
+    // fold into this hash on its own.
     "@spaces/web#test": {
       "dependsOn": ["^build"],
       "inputs": [

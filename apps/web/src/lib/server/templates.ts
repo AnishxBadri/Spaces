@@ -134,9 +134,16 @@ export const saveRecordAsTemplate = createServerFn({ method: 'POST' })
     const core = toObjectKind(row.kind)
     if (!core) throw new Error('Record not found')
     const registry = await getRegistry(core)
+    // Identity (a person's emails, a company's domains) belongs to one
+    // record; a template carrying it would only mint duplicates. (D75)
     const templatable = new Map(
       registry
-        .filter((d) => !NON_TEMPLATABLE_TYPES.has(d.type) && !d.archived)
+        .filter(
+          (d) =>
+            !NON_TEMPLATABLE_TYPES.has(d.type) &&
+            !d.archived &&
+            d.options.identityKey === undefined,
+        )
         .map((d) => [d.slug, d]),
     )
     const values = Object.fromEntries(

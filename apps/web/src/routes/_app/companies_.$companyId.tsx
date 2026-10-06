@@ -5,14 +5,12 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { Globe, Layers, Linkedin, X } from 'lucide-react'
-import { useState } from 'react'
+import { Layers, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
 import { Button } from '#/components/ui/button'
-import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
@@ -42,9 +40,9 @@ import { WaitingRail } from '#/components/record/waiting-rail'
 import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
 import { PluginActions } from '#/components/record/plugin-actions'
 import { CreateDealDialog } from '#/routes/_app/deals'
+import { collisionToast } from '#/lib/attributes/collision-toast'
+import { jsonStrings } from '@spaces/core/json'
 import {
-  addCompanyDomain,
-  addCompanyLinkedin,
   countOpenSuggestions,
   createNote,
   getCompany,
@@ -131,7 +129,8 @@ function CompanyRecordPage() {
   const router = useRouter()
   const navigate = useNavigate()
 
-  const domains = company.aliases.filter((a) => a.kind === 'domain')
+  // Identity is an attribute (D75): the first domain names the record.
+  const firstDomain = jsonStrings(company.values.domains).at(0)
   const nameAliases = company.aliases.filter(
     (a) => a.kind === 'name' && a.value !== company.name,
   )
@@ -162,7 +161,7 @@ function CompanyRecordPage() {
             </Link>
             {' / '}
             {company.id.slice(0, 8)}
-            {domains[0] ? ` / ${domains[0].valueNorm}` : ''}
+            {firstDomain ? ` / ${firstDomain}` : ''}
           </>
         }
         actions={
@@ -357,18 +356,19 @@ function CompanyRecordPage() {
                 onAttributeSaved={() => router.invalidate()}
                 value={company.values[def.slug] ?? null}
                 onSave={async (v) => {
-                  await updateRecord({
+                  const result = await updateRecord({
                     data: { id: company.id, patch: { [def.slug]: v } },
                   })
+                  // A domain another company holds was refused; say so.
+                  const collision = collisionToast(result, 'company')
+                  if (collision)
+                    toast(collision.title, {
+                      description: collision.description,
+                    })
                   void router.invalidate()
                 }}
               />
             ))}
-            <DomainsField companyId={company.id} domains={domains} />
-            <LinkedinField
-              companyId={company.id}
-              linkedins={company.aliases.filter((a) => a.kind === 'linkedin')}
-            />
             <PropertyCell label="">
               <AttributeCreateDialog
                 objectKind="company"
@@ -415,142 +415,5 @@ function CompanyRecordPage() {
         <RecordContext entityId={company.id} />
       </RecordBody>
     </div>
-  )
-}
-
-function DomainsField({
-  companyId,
-  domains,
-}: {
-  companyId: string
-  domains: Array<{ id: string; valueNorm: string }>
-}) {
-  const router = useRouter()
-  const [adding, setAdding] = useState(false)
-  const [draft, setDraft] = useState('')
-
-  async function add() {
-    const domain = draft.trim()
-    if (!domain) return setAdding(false)
-    try {
-      const result = await addCompanyDomain({
-        data: { id: companyId, domain },
-      })
-      if (result.outcome === 'suggested_duplicate') {
-        toast(`Another company already owns ${domain}`, {
-          description:
-            'Flagged as a possible duplicate — the pair is waiting in Review.',
-        })
-      } else if (result.outcome === 'already_own') {
-        toast(`${domain} is already on this company`)
-      }
-      setDraft('')
-      setAdding(false)
-      void router.invalidate()
-    } catch {
-      toast.error('Not a valid domain')
-    }
-  }
-
-  return (
-    <PropertyCell label="Domains">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        {domains.map((d) => (
-          <span key={d.id} className="flex items-center gap-1 mono text-label">
-            <Globe className="size-3 text-graphite" strokeWidth={1.75} />
-            {d.valueNorm}
-          </span>
-        ))}
-        {adding ? (
-          <Input
-            autoFocus
-            value={draft}
-            placeholder="acme.com"
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={add}
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-            className="h-6 w-40 mono text-label"
-          />
-        ) : (
-          <button
-            onClick={() => setAdding(true)}
-            className="focus-ring mono text-micro text-graphite hover:text-foreground"
-          >
-            + domain
-          </button>
-        )}
-      </div>
-    </PropertyCell>
-  )
-}
-
-/** The company's LinkedIn page: an identity alias, like its domains. */
-function LinkedinField({
-  companyId,
-  linkedins,
-}: {
-  companyId: string
-  linkedins: Array<{ id: string; valueNorm: string }>
-}) {
-  const router = useRouter()
-  const [adding, setAdding] = useState(false)
-  const [draft, setDraft] = useState('')
-
-  async function add() {
-    const value = draft.trim()
-    if (!value) return setAdding(false)
-    try {
-      const result = await addCompanyLinkedin({
-        data: { id: companyId, value },
-      })
-      if (result.outcome === 'suggested_duplicate') {
-        toast('Another company already owns that LinkedIn page', {
-          description:
-            'Flagged as a possible duplicate — the pair is waiting in Review.',
-        })
-      }
-      setDraft('')
-      setAdding(false)
-      void router.invalidate()
-    } catch {
-      toast.error('Not a LinkedIn URL')
-    }
-  }
-
-  return (
-    <PropertyCell label="LinkedIn">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        {linkedins.map((l) => (
-          <span
-            key={l.id}
-            className="flex min-w-0 items-center gap-1 mono text-label"
-          >
-            <Linkedin
-              className="size-3 shrink-0 text-graphite"
-              strokeWidth={1.75}
-            />
-            <span className="truncate">{l.valueNorm}</span>
-          </span>
-        ))}
-        {adding ? (
-          <Input
-            autoFocus
-            value={draft}
-            placeholder="linkedin.com/company/…"
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={add}
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-            className="h-6 w-44 mono text-label"
-          />
-        ) : (
-          <button
-            onClick={() => setAdding(true)}
-            className="focus-ring mono text-micro text-graphite hover:text-foreground"
-          >
-            + add
-          </button>
-        )}
-      </div>
-    </PropertyCell>
   )
 }

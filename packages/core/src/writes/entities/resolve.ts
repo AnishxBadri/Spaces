@@ -8,6 +8,7 @@ import {
   person,
 } from '@spaces/db/schema'
 import type { SourceClass } from '@spaces/db/schema'
+import { CORE_IDENTITY, storableIdentity } from '../../attributes/registry'
 import type { CoreIdentityKey } from '../../attributes/registry'
 import type { Actor, EventSource } from '../attributes/values'
 import type { EmbedSource } from '../ai/chunk-sources'
@@ -17,11 +18,11 @@ import { canonicalId, suggestDuplicate, sweepNameSimilarity } from './sweep'
 import {
   domainHost,
   isRoleEmail,
-  normalizeCin,
   normalizeDomain,
   normalizeEmail,
   normalizeLinkedin,
   normalizeName,
+  normalizeUrl,
 } from '../../entities/normalize'
 
 /**
@@ -34,8 +35,9 @@ import {
  * row.)
  *
  * Doctrine: deterministic auto, probabilistic suggest.
- * - Exact identity-key match (domain/email/linkedin/cin) on a record of the
- *   kind asked for → attach.
+ * - Exact identity-key match on a record of the kind asked for → attach: a
+ *   company's domain, a person's email (`CORE_IDENTITY`, D75). A LinkedIn
+ *   URL identifies neither; a birth keeps it as the `linkedin` value.
  * - No match → create, then fuzzy-sweep names into duplicate_candidate.
  * - Fuzzy NEVER merges or attaches.
  *
@@ -92,8 +94,8 @@ export type ResolveInput = {
     | {
         domain?: string | undefined
         email?: string | undefined
+        /** Never matched on; a birth keeps it as the `linkedin` value. */
         linkedin?: string | undefined
-        cin?: string | undefined
       }
     | undefined
   source: ResolveSource
@@ -168,16 +170,18 @@ export type NormalizedKey = {
 }
 
 /**
- * The keys a resolve compares on, in the order it tries them — shared by
- * `resolveEntity` and `previewResolve`, so the preview matches on exactly
- * what the write will (a person's role email dropped, a blank key skipped).
+ * The keys a resolve compares on — shared by `resolveEntity` and
+ * `previewResolve`, so the preview matches on exactly what the write will.
+ * Only the kind's own key counts (`CORE_IDENTITY`): a company's domain, a
+ * person's email, with a role email dropped and a blank key skipped.
  */
 export function normalizeKeys(
   input: Pick<ResolveInput, 'kind' | 'keys'>,
 ): Array<NormalizedKey> {
   const out: Array<NormalizedKey> = []
   const k = input.keys ?? {}
-  if (k.domain) {
+  const own = CORE_IDENTITY[input.kind].key
+  if (k.domain && own === 'domain') {
     const norm = normalizeDomain(k.domain)
     // The alias a resolve writes shows the host it matches on — a sheet's
     // `https://www.Example.com/` is stored as `example.com` beside the
@@ -189,7 +193,7 @@ export function normalizeKeys(
         valueNorm: norm,
       })
   }
-  if (k.email) {
+  if (k.email && own === 'email') {
     const norm = normalizeEmail(k.email)
     // Role emails (info@, careers@…) never identify a person — anyone can
     // send from them, so matching on one would weld strangers together.
@@ -197,14 +201,57 @@ export function normalizeKeys(
       out.push({ kind: 'email', value: k.email.trim(), valueNorm: norm })
     }
   }
-  if (k.linkedin) {
-    const norm = normalizeLinkedin(k.linkedin)
-    if (norm)
-      out.push({ kind: 'linkedin', value: k.linkedin.trim(), valueNorm: norm })
-  }
-  if (k.cin) {
-    const norm = normalizeCin(k.cin)
-    if (norm) out.push({ kind: 'cin', value: k.cin.trim(), valueNorm: norm })
+  return out
+}
+
+/**
+ * The values a birth writes: the caller's, with a LinkedIn key kept as the
+ * `linkedin` attribute when the caller supplied none, it reads as a URL and
+ * the kind's registry still carries a live `linkedin`.
+ */
+async function birthSupplied(
+  input: Pick<ResolveInput, 'kind' | 'keys' | 'values'>,
+): Promise<Record<string, unknown> | undefined> {
+  const raw = input.keys?.linkedin
+  const url = raw ? normalizeUrl(raw) : null
+  if (url === null || input.values?.linkedin != null) return input.values
+  // Imported here: values.ts imports this module.
+  const { getRegistry } = await import('../attributes/values')
+  const live = (await getRegistry(input.kind)).some(
+    (d) => d.slug === 'linkedin' && d.type === 'url',
+  )
+  return live ? { ...input.values, linkedin: url } : input.values
+}
+
+/** The caller's values less the kind's identity slug, which the birth claims first. */
+function withoutIdentity(
+  kind: EntityKindResolvable,
+  values: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (values === undefined) return undefined
+  const { slug } = CORE_IDENTITY[kind]
+  return Object.fromEntries(Object.entries(values).filter(([k]) => k !== slug))
+}
+
+/** The identity elements a birth claims: the keys first, then supplied values. */
+function birthIdentity(
+  input: Pick<ResolveInput, 'kind' | 'values'>,
+  keys: Array<NormalizedKey>,
+): Array<string> {
+  const { key, slug } = CORE_IDENTITY[input.kind]
+  const supplied = input.values?.[slug]
+  const more = Array.isArray(supplied)
+    ? supplied.filter((v): v is string => typeof v === 'string')
+    : typeof supplied === 'string'
+      ? [supplied]
+      : []
+  const out: Array<string> = []
+  for (const raw of [
+    ...keys.filter((k) => k.kind === key).map((k) => k.value),
+    ...more,
+  ]) {
+    if (storableIdentity(input.kind, raw)) out.push(raw)
+    else console.warn(`[resolve] ${key} ${raw} cannot be stored; not claimed`)
   }
   return out
 }
@@ -350,7 +397,7 @@ export async function resolveEntity(
   const { reembed } = await birthValues({
     entityId: created.id,
     actor: birthActor(input.source, input.createdBy),
-    supplied: input.values,
+    supplied: withoutIdentity(input.kind, await birthSupplied(input)),
   })
 
   // 3. Probabilistic: fuzzy name sweep → suggestions only, never merges.
@@ -370,13 +417,14 @@ export async function resolveEntity(
 
 /**
  * Step 2's writes, inside whichever transaction the caller opened: the
- * entity, every identity key as a claim, the birth name alias and the side
- * table row. Shared by `resolveEntity` and `resolveEntityInTx`, so the two
- * cannot birth a record differently.
+ * entity, the birth name alias, the side table row and the identity
+ * attribute, each element a claim through the one write path. Shared by
+ * `resolveEntity` and `resolveEntityInTx`, so the two cannot birth a record
+ * differently.
  */
 async function insertResolved(
   tx: Tx,
-  input: ResolveInput,
+  input: ResolveInTxInput,
   keys: Array<NormalizedKey>,
   name: string | undefined,
   canonicalName: string,
@@ -396,14 +444,6 @@ async function insertResolved(
   ).at(0)
   if (!ent) throw new Error('Entity insert returned no row')
 
-  // Every identity key is a claim, and a claim someone else holds is a
-  // duplicate_candidate — the key held by another kind of record (1b
-  // found no prior loser) and the key a concurrent writer committed a
-  // moment ago alike. The savepoint inside keeps either from taking this
-  // transaction down.
-  for (const key of keys) {
-    await claimIdentityAlias(tx, ent.id, key.kind, key.value, input.source)
-  }
   if (name) {
     await tx.insert(entityAlias).values({
       entityId: ent.id,
@@ -422,6 +462,23 @@ async function insertResolved(
     await tx.insert(company).values({ entityId: ent.id })
   } else {
     await tx.insert(person).values({ entityId: ent.id })
+  }
+
+  // Every element is a claim, and one someone else holds — another kind of
+  // record (1b found no prior loser), or a concurrent writer a moment ago —
+  // is refused at that element as a duplicate_candidate, never an error.
+  const identity = birthIdentity(input, keys)
+  if (identity.length > 0) {
+    // Imported here: values.ts imports this module.
+    const { setValuesInTx } = await import('../attributes/values')
+    await setValuesInTx(tx, {
+      entityId: ent.id,
+      patch: { [CORE_IDENTITY[input.kind].slug]: identity },
+      actor: birthActor(input.source, input.createdBy),
+      ...(input.valuesSource ? { source: input.valuesSource } : {}),
+      ...(input.batchId !== undefined ? { batchId: input.batchId } : {}),
+      identitySource: input.source,
+    })
   }
   return ent
 }
@@ -493,9 +550,9 @@ export async function resolveEntityInTx(
   // `resolveEntity` avoids the same way (values.ts imports this module).
   const { setValuesInTx } = await import('../attributes/values')
   const values = Object.fromEntries(
-    Object.entries(input.values ?? {}).filter(
-      ([, v]) => v !== undefined && v !== null && v !== '',
-    ),
+    Object.entries(
+      withoutIdentity(input.kind, await birthSupplied(input)) ?? {},
+    ).filter(([, v]) => v !== undefined && v !== null && v !== ''),
   )
   const { reembed } = await setValuesInTx(tx, {
     entityId: created.id,
@@ -623,7 +680,6 @@ const IDENTITY_NORMALIZERS: Record<
   domain: normalizeDomain,
   email: normalizeEmail,
   linkedin: normalizeLinkedin,
-  cin: normalizeCin,
 }
 
 export type AliasIdentityKind = keyof typeof IDENTITY_NORMALIZERS
@@ -655,21 +711,16 @@ export type IdentityOutcome =
 /**
  * Add an identity alias to an existing entity. The unique index is the
  * dedupe tripwire: a collision means another entity already owns this key,
- * and that's a duplicate_candidate, not an error. Enrichment finds your
- * duplicates as a side effect.
- *
- * `on` is the executor, the same fourth-parameter shape `recordNameAlias`
- * carries: `db` by default, a transaction (or a savepoint inside one) when
- * the caller needs the alias to land or fail with the write it belongs to —
- * which is exactly the attribute write path, where the value and the claim
- * it makes are one transaction (`claimIdentityAlias` below).
+ * and that's a duplicate_candidate, not an error.
+ * - Module-private: the one door is `claimIdentityAlias`, which `setValues`
+ *   calls, so an identity alias never exists without the value it mirrors.
  */
-export async function addIdentityAlias(
+async function addIdentityAlias(
   entityId: string,
   kind: AliasIdentityKind,
   rawValue: string,
   source: ResolveSource,
-  on: Executor = db,
+  on: Executor,
 ): Promise<{ outcome: 'added' | 'already_own' | 'suggested_duplicate' }> {
   // Callers may hold a stale (merged-away) id — follow the redirect.
   entityId = await canonicalId(entityId, on)

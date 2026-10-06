@@ -67,7 +67,7 @@ describe('object identity keys', () => {
 
   it('leaves no object row behind when a key is refused', async () => {
     const { Effect } = await import('effect')
-    const { createObjectProgram, ObjectRejected } =
+    const { createObjectProgram } =
       await import('@spaces/core/writes/attributes/object-registry')
     const { db } = await import('@spaces/db')
     const { objectDef } = await import('@spaces/db/schema')
@@ -76,7 +76,7 @@ describe('object identity keys', () => {
     const [actor] = await db.select({ id: user.id }).from(user).limit(1)
     const { singular, plural, tag } = nouns()
 
-    // email and cin are person/company doctrine — the refusal says so.
+    // email is person doctrine — the refusal says so.
     await expect(
       Effect.runPromise(
         createObjectProgram({
@@ -86,19 +86,7 @@ describe('object identity keys', () => {
           createdBy: actor.id,
         }),
       ),
-    ).rejects.toThrow(
-      'email and cin identify people and companies, not custom records',
-    )
-    await expect(
-      Effect.runPromise(
-        createObjectProgram({
-          singular,
-          plural,
-          identityKeys: ['cin'],
-          createdBy: actor.id,
-        }),
-      ),
-    ).rejects.toThrow(ObjectRejected)
+    ).rejects.toThrow('email identifies people, not custom records')
     // Anything else is not a key at all.
     await expect(
       Effect.runPromise(

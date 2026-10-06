@@ -8,9 +8,8 @@ import type { IdentityOutcome } from '@spaces/core/writes/entities/resolve'
  * nobody was looking at. This is the other half — "a conflict is never
  * silent" (CONTEXT.md, Machine-write design).
  *
- * It copies the precedent exactly rather than inventing an interaction:
- * `addCompanyDomain`'s toast on the company rail is title plus
- * `description`, prose only. **No action button** — `DESIGN.md` §5's
+ * It copies the precedent exactly rather than inventing an interaction: a
+ * toast is title plus `description`, prose only. **No action button** — `DESIGN.md` §5's
  * Micro-interactions sheet carries four proposals and a toast action is not
  * among them, so the conservative reading is the shipped one: the inbox is
  * named in the sentence and reached the way every other surface reaches it.

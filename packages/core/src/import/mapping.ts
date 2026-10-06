@@ -8,7 +8,6 @@ import type {
   AttributeType,
   CoreIdentityKey,
 } from '../attributes/registry'
-import { normalizeCin } from '../entities/normalize'
 import { coerce, summarizeColumn } from './coerce'
 import type { CoerceOptions, ColumnSummary, Coercion } from './coerce'
 import type {
@@ -51,7 +50,6 @@ export const IDENTITY_KEY_LABELS: Record<CoreIdentityKey, string> = {
   domain: 'Domain',
   email: 'Email',
   linkedin: 'LinkedIn',
-  cin: 'CIN',
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +202,8 @@ export function fitMapping(mapping: Mapping, columnCount: number): Mapping {
  */
 const ALIASES: Record<string, ReadonlyArray<string>> = {
   website: ['domain'],
+  domains: ['domain'],
+  emails: ['email'],
   company: ['companies', 'name'],
   company_name: ['name'],
   deal_name: ['name'],
@@ -290,12 +290,13 @@ export function autoMap(
 
 /**
  * How a mapped column's cells are read: a registry type with its options
- * (the name reads as text), or a CIN, which is an identity key with no
- * attribute type behind it and reads through its own normalizer.
+ * (the name reads as text).
  */
-export type ColumnSpec =
-  | { kind: 'typed'; type: AttributeType; options: CoerceOptions }
-  | { kind: 'cin' }
+export type ColumnSpec = {
+  kind: 'typed'
+  type: AttributeType
+  options: CoerceOptions
+}
 
 const withOrder = (
   options: AttributeOptions,
@@ -311,7 +312,7 @@ function draftOptions(labels: ReadonlyArray<string>): AttributeOptions {
 /**
  * An identity key read the way its write path will read it: `domain` and
  * `linkedin` through the identity-backed validators (free mail refused),
- * `email` as an address, `cin` through its normalizer.
+ * `email` as an address.
  */
 function identitySpec(key: CoreIdentityKey): ColumnSpec {
   switch (key) {
@@ -321,8 +322,6 @@ function identitySpec(key: CoreIdentityKey): ColumnSpec {
       return { kind: 'typed', type: 'url', options: { identityKey: key } }
     case 'email':
       return { kind: 'typed', type: 'email', options: {} }
-    case 'cin':
-      return { kind: 'cin' }
   }
 }
 
@@ -380,7 +379,6 @@ const SHORT_REFUSAL: Partial<Record<AttributeType, string>> = {
 }
 
 export function shortRefusal(spec: ColumnSpec): string {
-  if (spec.kind === 'cin') return 'not a cin'
   return SHORT_REFUSAL[spec.type] ?? 'not read'
 }
 
@@ -400,12 +398,7 @@ export function cellReason(spec: ColumnSpec, reason: string): string {
 
 /** One cell through a column's spec. */
 export function readCell(spec: ColumnSpec, raw: string | null): Coercion {
-  if (spec.kind === 'typed') return coerce(spec.type, spec.options, raw)
-  if (raw === null || raw.trim() === '') return { ok: true, value: null }
-  const s = raw.trim()
-  return normalizeCin(s)
-    ? { ok: true, value: s }
-    : { ok: false, reason: `"${s}" is not a CIN` }
+  return coerce(spec.type, spec.options, raw)
 }
 
 /** `summarizeColumn` for a mapped column — the count its head shows. */
@@ -413,17 +406,7 @@ export function summarizeSpec(
   spec: ColumnSpec,
   rawValues: ReadonlyArray<string | null>,
 ): ColumnSummary {
-  if (spec.kind === 'typed')
-    return summarizeColumn(spec.type, spec.options, rawValues)
-  const summary: ColumnSummary = { parsed: 0, total: 0, failures: [] }
-  rawValues.forEach((raw, row) => {
-    if (raw === null || raw.trim() === '') return
-    summary.total += 1
-    const out = readCell(spec, raw)
-    if (out.ok) summary.parsed += 1
-    else summary.failures.push({ row, raw, reason: out.reason })
-  })
-  return summary
+  return summarizeColumn(spec.type, spec.options, rawValues)
 }
 
 const OPTION_TYPES: ReadonlySet<AttributeType> = new Set([
@@ -448,9 +431,7 @@ export function columnStatus(
 ): ColumnStatus | null {
   if (spec === null || target.target === 'ignore') return null
   if (summary.failures.length > 0)
-    return spec.kind === 'typed' && OPTION_TYPES.has(spec.type)
-      ? 'warn'
-      : 'fail'
+    return OPTION_TYPES.has(spec.type) ? 'warn' : 'fail'
   if (target.target === 'identity' && blanks > 0) return 'warn'
   return 'ok'
 }

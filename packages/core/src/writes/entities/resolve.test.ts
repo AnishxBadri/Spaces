@@ -55,8 +55,9 @@ describe('resolveEntity', () => {
     expect(a.entityId).not.toBe(b.entityId)
   })
 
-  it('identity collision on addIdentityAlias becomes a suggestion, not an error', async () => {
-    const { resolveEntity, addIdentityAlias } = await import('./resolve')
+  it('identity collision on addIdentityValue becomes a suggestion, not an error', async () => {
+    const { resolveEntity } = await import('./resolve')
+    const { addIdentityValue } = await import('../attributes/identity-values')
     const { db } = await import('@spaces/db')
     const { duplicateCandidate } = await import('@spaces/db/schema')
     const { and, eq } = await import('drizzle-orm')
@@ -74,12 +75,13 @@ describe('resolveEntity', () => {
       source: { class: 'manual' },
     })
 
-    const res = await addIdentityAlias(
-      claimant.entityId,
-      'domain',
-      `holder-${tag}.com`,
-      { class: 'import' },
-    )
+    const res = await addIdentityValue({
+      entityId: claimant.entityId,
+      key: 'domain',
+      value: `holder-${tag}.com`,
+      actor: { type: 'system' },
+      source: 'import',
+    })
     expect(res.outcome).toBe('suggested_duplicate')
 
     const [a, b] =
@@ -197,7 +199,8 @@ describe('resolveEntity', () => {
   })
 
   it('an integration source names its integration on the entity and the aliases', async () => {
-    const { resolveEntity, addIdentityAlias } = await import('./resolve')
+    const { resolveEntity } = await import('./resolve')
+    const { addIdentityValue } = await import('../attributes/identity-values')
     const { db } = await import('@spaces/db')
     const { entity, entityAlias, integration } =
       await import('@spaces/db/schema')
@@ -237,19 +240,20 @@ describe('resolveEntity', () => {
 
     // The later enrichment path stamps it too — an alias added after birth
     // is the same kind of claim as one written at birth.
-    const added = await addIdentityAlias(
-      written.entityId,
-      'linkedin',
-      `https://www.linkedin.com/company/pluginco-${tag}`,
-      { class: 'integration', ref: inst.id },
-    )
+    const added = await addIdentityValue({
+      entityId: written.entityId,
+      key: 'domain',
+      value: `pluginco-${tag}.io`,
+      actor: { type: 'integration', id: inst.id },
+      identitySource: { class: 'integration', ref: inst.id },
+    })
     expect(added.outcome).toBe('added')
-    const [li] = await db
+    const [second] = await db
       .select({ cls: entityAlias.sourceClass, ref: entityAlias.sourceRef })
       .from(entityAlias)
-      .where(eq(entityAlias.kind, 'linkedin'))
-    expect(li.cls).toBe('integration')
-    expect(li.ref).toBe(inst.id)
+      .where(eq(entityAlias.valueNorm, `pluginco-${tag}.io`))
+    expect(second.cls).toBe('integration')
+    expect(second.ref).toBe(inst.id)
   })
 
   it('a key held by another kind of record is a duplicate_candidate, not an attach — and asked again, the same record', async () => {

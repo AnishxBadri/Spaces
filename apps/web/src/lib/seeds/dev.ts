@@ -225,8 +225,6 @@ const SPACES: Array<SpaceNode> = [
 type CompanySpec = {
   name: string
   domain: string
-  /** Identity, like the domain: an alias, never a value. */
-  linkedin?: string
   space: string
   added: number
   values: Record<string, unknown>
@@ -236,7 +234,6 @@ const COMPANIES: Array<CompanySpec> = [
   {
     name: 'Vayu Orbital',
     domain: 'vayuorbital.com',
-    linkedin: 'https://linkedin.com/company/vayu-orbital',
     space: 'aerospace.launch',
     added: 760,
     values: {
@@ -246,6 +243,7 @@ const COMPANIES: Array<CompanySpec> = [
       location: 'Chennai',
       founded_year: 2019,
       business_model: ['b2b', 'deep_tech', 'hardware'],
+      linkedin: 'https://linkedin.com/company/vayu-orbital',
     },
   },
   {
@@ -657,8 +655,6 @@ const INVESTORS = [
 type PersonSpec = {
   name: string
   email: string
-  /** Identity, like the email: an alias, never a value. */
-  linkedin?: string
   at?: string
   added: number
   values: Record<string, unknown>
@@ -668,12 +664,12 @@ const PEOPLE: Array<PersonSpec> = [
   {
     name: 'Ishaan Mehra',
     email: 'ishaan@vayuorbital.com',
-    linkedin: 'https://linkedin.com/in/ishaanmehra',
     at: 'Vayu Orbital',
     added: 758,
     values: {
       job_title: 'Co-founder & CEO',
       location: 'Chennai',
+      linkedin: 'https://linkedin.com/in/ishaanmehra',
     },
   },
   {
@@ -2551,7 +2547,7 @@ async function seedCompanies(spaces: Ids, userId: string): Promise<Ids> {
     const res = await resolveEntity({
       kind: 'company',
       name: c.name,
-      keys: { domain: c.domain, linkedin: c.linkedin },
+      keys: { domain: c.domain },
       source: { class: 'import' },
       createdBy: userId,
       values: await known('company', {
@@ -2605,7 +2601,7 @@ async function seedPeople(companies: Ids, userId: string): Promise<Ids> {
     const res = await resolveEntity({
       kind: 'person',
       name: p.name,
-      keys: { email: p.email, linkedin: p.linkedin },
+      keys: { email: p.email },
       source: { class: 'import' },
       createdBy: userId,
       values: await known('person', {

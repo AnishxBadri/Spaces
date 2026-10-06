@@ -19,10 +19,14 @@ import {
   isEmbeddableAttribute,
 } from '../ai/chunk-sources'
 import type { EmbedSource } from '../ai/chunk-sources'
-import { toObjectKind, valueValidator } from '../../attributes/registry'
+import {
+  identityNorm,
+  toObjectKind,
+  valueValidator,
+} from '../../attributes/registry'
 import type {
   AttributeDef,
-  IdentityKey,
+  CoreIdentityKey,
   ObjectKind,
 } from '../../attributes/registry'
 
@@ -184,8 +188,7 @@ async function checkReferences(tx: Tx, change: Change) {
  * the alias columns want. Only `integration` is a different answer — a
  * plugin's alias names its own row, never whoever's session carried it —
  * and `import`/`merge`/`seed` are the three doors both enums spell the same
- * way. Everything else is a person at a keyboard: `manual`, which is what
- * `addCompanyDomain` stamps for the same edit made from the company rail.
+ * way. Everything else is a person at a keyboard: `manual`.
  */
 const aliasSource = (actor: Actor, source: EventSource): ResolveSource =>
   actor.type === 'integration'
@@ -197,7 +200,7 @@ const aliasSource = (actor: Actor, source: EventSource): ResolveSource =>
 /** One identity-backed slug's before and after, as the mirror needs them. */
 type IdentityWork = {
   slug: string
-  key: IdentityKey
+  key: CoreIdentityKey
   /** the claim standing before this write, if any */
   held: string | null
   /** the claim after it; null is the clear */
@@ -225,7 +228,8 @@ function planIdentity(
   const work: Array<IdentityWork> = []
   for (const def of registry) {
     const key = def.options.identityKey
-    if (!key) continue
+    // A multi-valued key is claimed element by element, before the write.
+    if (!key || def.options.multi) continue
     const change = changed.get(def.slug)
     if (change) {
       work.push({
@@ -240,6 +244,81 @@ function planIdentity(
     }
   }
   return work
+}
+
+const identityList = (v: Json): Array<string> =>
+  Array.isArray(v)
+    ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+    : []
+
+/**
+ * A multi-valued identity slug, claimed element by element before its value
+ * is written (D75), so the stored array and the aliases cannot disagree.
+ * - A removed element retires its alias; every remaining one is claimed.
+ * - An element another record holds is refused: dropped from the value and
+ *   raised as a `duplicate_candidate`; the rest of the patch still writes.
+ * - A slug the patch named without changing it is reconciled the same way.
+ */
+async function claimIdentityElements(
+  tx: Tx,
+  entityId: string,
+  registry: Array<AttributeDef>,
+  current: EntityValues,
+  patch: Record<string, unknown>,
+  changes: Array<Change>,
+  source: ResolveSource,
+): Promise<{
+  changes: Array<Change>
+  claims: Record<string, Array<IdentityClaim>>
+}> {
+  const claims: Record<string, Array<IdentityClaim>> = {}
+  let out = changes
+  for (const def of registry) {
+    const key = def.options.identityKey
+    if (!key || !def.options.multi) continue
+    const change = out.find((c) => c.slug === def.slug)
+    if (!change && !(def.slug in patch)) continue
+    const before = identityList(current[def.slug] ?? null)
+    const after = change ? identityList(change.value) : before
+    const afterNorms = new Set(after.map((v) => identityNorm(key, v)))
+
+    const results: Array<IdentityClaim> = []
+    for (const held of before) {
+      const norm = identityNorm(key, held)
+      if (norm === null || afterNorms.has(norm)) continue
+      await releaseIdentityAlias(tx, entityId, key, held)
+      results.push({ value: norm, outcome: 'released' })
+    }
+    const kept: Array<string> = []
+    for (const value of after) {
+      const norm = identityNorm(key, value)
+      if (norm === null) continue
+      const outcome = await claimIdentityAlias(tx, entityId, key, value, source)
+      results.push({ value: norm, outcome })
+      if (outcome !== 'suggested_duplicate') kept.push(value)
+    }
+    claims[def.slug] = results
+
+    const held = current[def.slug] ?? null
+    const value: Json = kept.length === 0 ? null : kept
+    out = out.filter((c) => c.slug !== def.slug)
+    if (JSON.stringify(held) !== JSON.stringify(value))
+      out.push({ slug: def.slug, def, before: held, value })
+  }
+  return { changes: out, claims }
+}
+
+/** One outcome for a multi-valued slug: a refusal first, then what it did. */
+function summarize(claims: Array<IdentityClaim>): IdentityClaim | null {
+  for (const outcome of [
+    'suggested_duplicate',
+    'added',
+    'already_own',
+  ] as const) {
+    const hit = claims.find((c) => c.outcome === outcome)
+    if (hit) return hit
+  }
+  return claims.find((c) => c.outcome === 'released') ?? null
 }
 
 /**
@@ -288,7 +367,16 @@ export type SetValuesInput = {
    * empty value is the same refused clear it is for a person.
    */
   fillBlanks?: true
+  /**
+   * The provenance the identity aliases this write claims are stamped with.
+   * Omitted, it follows the actor and the door (`aliasSource`); a record's
+   * birth passes the source it was resolved from.
+   */
+  identitySource?: ResolveSource
 }
+
+/** One element of a multi-valued identity slug, and what its claim did. */
+export type IdentityClaim = { value: string; outcome: IdentityOutcome }
 
 /** A value fill-blanks mode refused: someone else's value is already there. */
 export type ValueConflict = {
@@ -315,6 +403,15 @@ export type SetValuesResult = {
   defaulted: Array<string>
   identity: Record<string, IdentityOutcome>
   identityValues: Record<string, string>
+  /**
+   * A multi-valued identity slug's outcome per element, keyed by slug, each
+   * element in its normal form. An element another record holds is
+   * `suggested_duplicate`: it was refused — left out of the stored value —
+   * and a `duplicate_candidate` raised, while the rest of the patch wrote.
+   * `identity[slug]` is the summary: `suggested_duplicate` when any element
+   * was refused.
+   */
+  identityClaims: Record<string, Array<IdentityClaim>>
   /**
    * The embeddable values this write set (SPA-132), to be chunked once it
    * has committed. The caller queues them — apps/web's `enqueueSourceEmbed`
@@ -402,7 +499,9 @@ export async function setValuesInTx(
     batchId,
     fillDefaults,
     fillBlanks,
+    identitySource,
   } = opts
+  const claimSource = identitySource ?? aliasSource(actor, source)
   const actorId = actor.type === 'user' ? actor.id : null
   // The other half of the typed actor: set iff type = 'integration', which
   // the column's check constraint enforces rather than trusts.
@@ -496,6 +595,25 @@ export async function setValuesInTx(
       changes.push({ ...c, door: 'default' })
   }
 
+  const elements = await claimIdentityElements(
+    tx,
+    entityId,
+    registry,
+    current,
+    effectivePatch,
+    changes,
+    claimSource,
+  )
+  changes = elements.changes
+  const identity: Record<string, IdentityOutcome> = {}
+  const identityValues: Record<string, string> = {}
+  for (const [slug, claims] of Object.entries(elements.claims)) {
+    const summary = summarize(claims)
+    if (summary === null) continue
+    identity[slug] = summary.outcome
+    if (summary.outcome !== 'released') identityValues[slug] = summary.value
+  }
+
   const next = { ...current }
   for (const change of changes) {
     await checkReferences(tx, change)
@@ -564,8 +682,6 @@ export async function setValuesInTx(
   // and a clear retires it and asserts nothing — clearing the value
   // releases the claim (CONTEXT.md, 2026-09-19), so another record may
   // take the domain.
-  const identity: Record<string, IdentityOutcome> = {}
-  const identityValues: Record<string, string> = {}
   for (const work of planIdentity(registry, current, effectivePatch, changes)) {
     if (work.held !== null && work.held !== work.value) {
       await releaseIdentityAlias(tx, entityId, work.key, work.held)
@@ -579,7 +695,7 @@ export async function setValuesInTx(
       entityId,
       work.key,
       work.value,
-      aliasSource(actor, source),
+      claimSource,
     )
     // The normal form the claim was actually compared in — the same
     // function the alias row was written through, so whoever reports
@@ -607,6 +723,7 @@ export async function setValuesInTx(
     defaulted: changes.filter((c) => c.door === 'default').map((c) => c.slug),
     identity,
     identityValues,
+    identityClaims: elements.claims,
     conflicts,
   }
 }

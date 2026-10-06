@@ -31,7 +31,7 @@ import, and `src/fence.test.ts` proves it.
 
 `normalizeDomain`, `registrableDomain`, `isFreeMailDomain`,
 `FREE_MAIL_DOMAINS`, `normalizeEmail`, `isRoleEmail`, `ROLE_PREFIXES`,
-`normalizeName`, `normalizeLinkedin`, `normalizeCin`, `normalizeUrl`,
+`normalizeName`, `normalizeLinkedin`, `normalizeUrl`,
 `domainHost`, `normalizePhone` — the only copy. `@spaces/core/entities/normalize`
 re-exports this module and `resolveEntity` runs it, so a plugin normalizes a
 claim's keys exactly as the choke point will (`app.stripe.co.uk` →

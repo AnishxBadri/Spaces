@@ -297,56 +297,81 @@ describe('listPeopleTable — paged, counted and filtered in SQL', () => {
   })
 })
 
-describe('the LinkedIn column on /people and /companies', () => {
-  it('reads the linkedin aliases, oldest first, and narrows the text box on them', async () => {
+describe('Email, Domains and LinkedIn on /people and /companies', () => {
+  it('are values like any attribute: sorted and filtered by the views compiler', async () => {
     const { Effect } = await import('effect')
     const { listCompaniesPageProgram, listPeoplePageProgram } =
       await import('./directory')
-    const { addIdentityAlias, resolveEntity } =
+    const { resolveEntity } =
       await import('@spaces/core/writes/entities/resolve')
     const tag = randomUUID().slice(0, 8)
 
-    const person = await resolveEntity({
-      kind: 'person',
-      name: `Linus ${tag}`,
-      keys: { linkedin: `https://www.linkedin.com/in/linus-${tag}/` },
-      source: { class: 'manual' },
-    })
-    await addIdentityAlias(
-      person.entityId,
-      'linkedin',
-      `linkedin.com/in/linus-second-${tag}`,
-      { class: 'manual' },
+    // Born from keys: the email becomes `values.emails`, the LinkedIn URL a
+    // plain `values.linkedin`, and no LinkedIn alias is written.
+    const born = async (first: string, linkedin?: string) =>
+      (
+        await resolveEntity({
+          kind: 'person',
+          name: `${first} ${tag}`,
+          keys: {
+            email: `${first.toLowerCase()}-${tag}@example.com`,
+            ...(linkedin ? { linkedin } : {}),
+          },
+          source: { class: 'manual' },
+        })
+      ).entityId
+    const carol = await born('Carol')
+    const alice = await born(
+      'Alice',
+      `https://www.linkedin.com/in/alice-${tag}/`,
     )
-    const company = await resolveEntity({
-      kind: 'company',
-      name: `Orbit ${tag}`,
-      keys: {
-        domain: `orbit-${tag}.example`,
-        linkedin: `linkedin.com/company/orbit-${tag}`,
-      },
-      source: { class: 'manual' },
-    })
+    const bob = await born('Bob')
 
-    const peoplePage = await Effect.runPromise(
-      listPeoplePageProgram([], { q: `linus-${tag}`, limit: 50 }),
+    const byEmail = await Effect.runPromise(
+      listPeoplePageProgram([], {
+        q: tag,
+        limit: 50,
+        sort: { id: 'attr:emails', desc: false },
+      }),
     )
-    expect(peoplePage.rows.map((r) => r.id)).toEqual([person.entityId])
-    expect(peoplePage.rows[0].linkedins).toEqual([
-      `linkedin.com/in/linus-${tag}`,
-      `linkedin.com/in/linus-second-${tag}`,
-    ])
-    expect(peoplePage.rows[0].values).not.toHaveProperty('linkedin')
+    expect(byEmail.rows.map((r) => r.id)).toEqual([alice, bob, carol])
+    expect(byEmail.rows[0].values.emails).toEqual([`alice-${tag}@example.com`])
+    expect(byEmail.rows[0].values.linkedin).toBe(
+      `https://www.linkedin.com/in/alice-${tag}/`,
+    )
+    // The API's `records.list` keeps its identity list beside the values.
+    expect(byEmail.rows[0].emails).toEqual([`alice-${tag}@example.com`])
 
-    const companiesPage = await Effect.runPromise(
-      listCompaniesPageProgram([], {
-        q: `linkedin.com/company/orbit-${tag}`,
+    const filtered = await Effect.runPromise(
+      listPeoplePageProgram(
+        [{ slug: 'emails', op: 'contains', value: `bob-${tag}` }],
+        { limit: 50 },
+      ),
+    )
+    expect(filtered.rows.map((r) => r.id)).toEqual([bob])
+    const withLinkedin = await Effect.runPromise(
+      listPeoplePageProgram([{ slug: 'linkedin', op: 'not_empty' }], {
+        q: tag,
         limit: 50,
       }),
     )
-    expect(companiesPage.rows.map((r) => r.id)).toEqual([company.entityId])
-    expect(companiesPage.rows[0].linkedins).toEqual([
-      `linkedin.com/company/orbit-${tag}`,
-    ])
+    expect(withLinkedin.rows.map((r) => r.id)).toEqual([alice])
+
+    const company = (
+      await resolveEntity({
+        kind: 'company',
+        name: `Orbit ${tag}`,
+        keys: { domain: `https://www.orbit-${tag}.example/about` },
+        source: { class: 'manual' },
+      })
+    ).entityId
+    const companyPage = await Effect.runPromise(
+      listCompaniesPageProgram(
+        [{ slug: 'domains', op: 'is', value: `orbit-${tag}.example` }],
+        { limit: 50, sort: { id: 'attr:domains', desc: true } },
+      ),
+    )
+    expect(companyPage.rows.map((r) => r.id)).toEqual([company])
+    expect(companyPage.rows[0].values.domains).toEqual([`orbit-${tag}.example`])
   })
 })

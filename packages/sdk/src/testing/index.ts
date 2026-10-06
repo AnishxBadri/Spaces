@@ -1,11 +1,6 @@
 import { Effect, Layer, Redacted } from 'effect'
 import { JobPermanent, JobRateLimited } from '../contract.ts'
-import {
-  normalizeCin,
-  normalizeDomain,
-  normalizeEmail,
-  normalizeLinkedin,
-} from '../identity/normalize.ts'
+import { normalizeDomain, normalizeEmail } from '../identity/normalize.ts'
 import type {
   EntityId,
   IdentityKeys,
@@ -110,18 +105,17 @@ const counter = (prefix: string) => {
  * The key forms the fake treats as equal — the choke point's own
  * normalizers (`@spaces/sdk/identity`, sdk-4b), key for key as
  * `resolveEntity` maps them. A key that normalizes to nothing (a free-mail
- * domain, a malformed email) identifies nothing, here as there.
+ * domain, a malformed email) identifies nothing, here as there, and neither
+ * does a LinkedIn URL.
  */
+const KEY_KINDS = ['domain', 'email'] as const
+
 const NORMALIZERS: {
-  readonly [K in keyof IdentityKeys]-?: (raw: string) => string | null
+  readonly [K in (typeof KEY_KINDS)[number]]: (raw: string) => string | null
 } = {
   domain: normalizeDomain,
   email: normalizeEmail,
-  linkedin: normalizeLinkedin,
-  cin: normalizeCin,
 }
-
-const KEY_KINDS = ['domain', 'email', 'linkedin', 'cin'] as const
 
 /**
  * `resolve` attaches to the entity any of the claim's keys already names in
@@ -310,7 +304,6 @@ export const readEntity = (
     domain: [],
     email: [],
     linkedin: [],
-    cin: [],
     ...entity.keys,
   },
 })

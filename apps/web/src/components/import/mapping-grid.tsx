@@ -779,9 +779,9 @@ function ParseCount({
 function SampleCell({ spec, raw }: { spec: ColumnSpec | null; raw: string }) {
   if (spec === null || raw.trim() === '') return <>{raw}</>
   // A reference is looked up, not read — its head carries the count.
-  if (spec.kind === 'typed' && isReferenceType(spec.type)) return <>{raw}</>
+  if (isReferenceType(spec.type)) return <>{raw}</>
   const out = readCell(spec, raw)
-  if (spec.kind === 'typed' && OPTION_TYPES.has(spec.type)) {
+  if (OPTION_TYPES.has(spec.type)) {
     const options = spec.options.options ?? []
     if (!out.ok)
       return (

@@ -19,10 +19,11 @@ async function setup() {
   ).at(0)
   if (!accepter) throw new Error('the test seed has no user')
   const tag = randomUUID().slice(0, 8)
+  // Name only: a domain would be a birth value with an event of its own
+  // (D75), and these tests count the events an accept writes.
   const company = await resolveEntity({
     kind: 'company',
     name: `Proposed ${tag}`,
-    keys: { domain: `proposed-${tag}.example` },
     source: { class: 'manual' },
   })
   return { accepter, entityId: company.entityId }

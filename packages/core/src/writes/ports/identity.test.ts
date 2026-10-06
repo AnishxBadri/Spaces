@@ -186,15 +186,15 @@ describe('Identity.resolve, bound to an integration row', () => {
     expect(await db.select().from(duplicateCandidate)).toEqual([])
   })
 
-  it('a key another entity holds becomes a duplicate_candidate, and the existing id comes back', async () => {
+  it('a LinkedIn URL identifies nobody: the domain attaches, the LinkedIn claims nothing', async () => {
     const row = await boundRow()
-    // Two records a human made: one holds the domain, the other the LinkedIn.
     const byDomain = await resolveEntity({
       kind: 'company',
       name: 'Stripe',
       keys: { domain: 'stripe.example' },
       source: { class: 'manual' },
     })
+    // Born from a LinkedIn key alone: a plain value, no alias.
     const byLinkedin = await resolveEntity({
       kind: 'company',
       name: 'Stripe Payments',
@@ -218,7 +218,22 @@ describe('Identity.resolve, bound to an integration row', () => {
     expect((await db.select().from(entity)).length).toBe(before)
     expect(
       await candidatesBetween(byDomain.entityId, byLinkedin.entityId),
-    ).toHaveLength(1)
+    ).toHaveLength(0)
+    expect(
+      await db
+        .select()
+        .from(entityAlias)
+        .where(eq(entityAlias.kind, 'linkedin')),
+    ).toEqual([])
+    const plain = (
+      await db
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, byLinkedin.entityId))
+    ).at(0)
+    expect(plain?.values.linkedin).toBe(
+      'https://linkedin.com/company/stripe-example',
+    )
   })
 
   it('addAlias reports each key: added, already its own, or a candidate', async () => {
@@ -226,50 +241,64 @@ describe('Identity.resolve, bound to an integration row', () => {
     const held = await resolveEntity({
       kind: 'company',
       name: 'Holder',
-      keys: { cin: 'U72900KA2015PTC082988' },
+      keys: { domain: 'held.example' },
       source: { class: 'manual' },
     })
     const { entityId } = await run(
       row,
       resolve({ kind: 'company', keys: { domain: 'alias.example' } }),
     )
-    const result = await run(
-      row,
-      Effect.gen(function* () {
-        return yield* (yield* Identity).addAlias({
-          entityId,
-          keys: {
-            domain: 'alias.example',
-            linkedin: 'linkedin.com/company/alias-example',
-            cin: 'U72900KA2015PTC082988',
-          },
+    const addAlias = (keys: { domain: string; linkedin?: string }) =>
+      run(
+        row,
+        Effect.gen(function* () {
+          return yield* (yield* Identity).addAlias({ entityId, keys })
+        }),
+      )
+
+    expect(
+      (
+        await addAlias({
+          domain: 'alias.example',
+          linkedin: 'linkedin.com/company/alias-example',
         })
-      }),
-    )
-    expect(result.keys).toEqual([
-      { key: 'domain', outcome: 'already_own' },
-      { key: 'linkedin', outcome: 'added' },
-      { key: 'cin', outcome: 'suggested_duplicate' },
+      ).keys,
+    ).toEqual([{ key: 'domain', outcome: 'already_own' }])
+    expect((await addAlias({ domain: 'held.example' })).keys).toEqual([
+      { key: 'domain', outcome: 'suggested_duplicate' },
     ])
     expect(await candidatesBetween(entityId, held.entityId)).toHaveLength(1)
-    const linkedin = (
+    expect((await addAlias({ domain: 'second.example' })).keys).toEqual([
+      { key: 'domain', outcome: 'added' },
+    ])
+
+    // The refused domain never reached the value; the added one did, with
+    // its alias stamped by the integration.
+    const record = (
+      await db
+        .select({ values: entity.values })
+        .from(entity)
+        .where(eq(entity.id, entityId))
+    ).at(0)
+    expect(record?.values.domains).toEqual(['alias.example', 'second.example'])
+    const second = (
       await db
         .select()
         .from(entityAlias)
         .where(
           and(
             eq(entityAlias.entityId, entityId),
-            eq(entityAlias.kind, 'linkedin'),
+            eq(entityAlias.valueNorm, 'second.example'),
           ),
         )
     ).at(0)
-    expect(linkedin).toMatchObject({
+    expect(second).toMatchObject({
+      isIdentity: true,
       sourceClass: 'integration',
       sourceRef: row.id,
     })
   })
 })
-
 describe('Receipts.store', () => {
   it('writes one enrichment_record per call, raw intact, credits when given', async () => {
     const row = await boundRow()

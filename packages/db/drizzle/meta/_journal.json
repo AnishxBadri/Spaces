@@ -449,6 +449,13 @@
       "when": 1791284349585,
       "tag": "0063_linkedin_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1791287953687,
+      "tag": "0064_identity_values",
+      "breakpoints": true
     }
   ]
 }

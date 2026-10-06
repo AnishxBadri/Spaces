@@ -18,6 +18,13 @@ export function jsonString(v: Json | undefined): string | null {
   return typeof v === 'string' ? v : null
 }
 
+/** A stored value read as a list of strings — non-strings dropped, anything else empty. */
+export function jsonStrings(v: Json | undefined): Array<string> {
+  return Array.isArray(v)
+    ? v.filter((x): x is string => typeof x === 'string')
+    : []
+}
+
 /** A stored value read as a JSON object — anything else reads as empty. */
 export function jsonRecord(v: Json | undefined): { [k: string]: Json } {
   return v !== null && typeof v === 'object' && !Array.isArray(v) ? v : {}

@@ -10,17 +10,17 @@ import { enqueueEmbeds } from '../ai/enqueue-embed'
 import { dispatchDomainEvent } from '../events/dispatch'
 import {
   RESOLVE_NEEDS_NAME_OR_KEY,
-  addIdentityAlias,
   normalizeKeys,
   resolveEntity,
 } from '../entities/resolve'
+import { addIdentityValue } from '../attributes/identity-values'
 import { canonicalId } from '../entities/sweep'
 import type { ResolveSource } from '../entities/resolve'
 import type { BoundIntegration } from './binding'
 
 /**
  * IdentityLive (sdk-7a): the Identity port over core's choke point,
- * `resolveEntity` and `addIdentityAlias`, with the provenance supplied **by
+ * `resolveEntity` and `addIdentityValue`, with the provenance supplied **by
  * the port** — `{ class: 'integration', ref: <bound row id> }` — and never by
  * the plugin: the claim types carry no source field (D52), and this module
  * builds the source from the row it was given, so nothing a job passes can
@@ -32,7 +32,9 @@ import type { BoundIntegration } from './binding'
  * (`ResolveOutcome`): a key another entity already holds is still `attached`
  * to the one that matched, and the collision becomes a `duplicate_candidate`
  * for a human — never an error, never a second entity. Enrichment finds
- * your duplicates as a side effect.
+ * your duplicates as a side effect. A key is a value of the record's
+ * identity attribute (D75), so every claim goes through `setValues`; a
+ * LinkedIn URL identifies neither kind and is not claimed.
  *
  * A birth writes one `activity` row (`<kind>.created`) with no `actor_id`
  * and the integration named in `meta`, which the record timeline reads; its
@@ -77,7 +79,14 @@ export const IdentityLive = (
       ) =>
         Effect.forEach(normalizeKeys(claim), (key) =>
           Effect.tryPromise({
-            try: () => addIdentityAlias(entityId, key.kind, key.value, source),
+            try: () =>
+              addIdentityValue({
+                entityId,
+                key: key.kind,
+                value: key.value,
+                actor: { type: 'integration', id: row.id },
+                identitySource: source,
+              }),
             catch: failure('claim'),
           }).pipe(Effect.map(({ outcome }) => ({ key: key.kind, outcome }))),
         )

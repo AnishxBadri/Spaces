@@ -5,6 +5,7 @@ import { db } from '@spaces/db'
 import { ENTITY_REFS } from '@spaces/db/entity-refs'
 import type { EntityRef } from '@spaces/db/entity-refs'
 import {
+  attribute,
   attributeEvent,
   chunk,
   duplicateCandidate,
@@ -19,6 +20,8 @@ import type {
 } from '@spaces/db/schema/entities'
 import type { Json } from '@spaces/db/json'
 import { activity } from '@spaces/db/schema/activity'
+import { identityNorm } from '../../attributes/registry'
+import type { CoreIdentityKey } from '../../attributes/registry'
 import {
   distribution,
   holding,
@@ -84,6 +87,28 @@ async function logMergeEvent(
     pk: { id: ev.id },
     old: {},
   })
+}
+
+/**
+ * The winner's identity elements, then each of the loser's the winner does
+ * not already hold — compared on the identity normal form, as the aliases are.
+ */
+function unionElements(
+  key: CoreIdentityKey,
+  winnerVal: Json | undefined,
+  loserVal: Json,
+): Json {
+  const list = (v: Json | undefined): Array<string> =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  const out = list(winnerVal)
+  const seen = new Set(out.map((v) => identityNorm(key, v) ?? v))
+  for (const v of list(loserVal)) {
+    const norm = identityNorm(key, v) ?? v
+    if (seen.has(norm)) continue
+    seen.add(norm)
+    out.push(v)
+  }
+  return out.length === 0 ? null : out
 }
 
 /**
@@ -352,6 +377,19 @@ export async function mergeEntities(opts: {
     }
 
     // --- attribute values: winner keeps, loser fills the gaps -------------
+    // A multi-valued identity attribute (a person's emails, a company's
+    // domains) is the exception: the loser's aliases moved above, so its
+    // elements join the winner's and the value keeps matching the index.
+    const unioned = new Map<string, CoreIdentityKey>()
+    if (winner.objectId !== null) {
+      const defs = await tx
+        .select({ slug: attribute.slug, options: attribute.options })
+        .from(attribute)
+        .where(eq(attribute.objectId, winner.objectId))
+      for (const d of defs)
+        if (d.options.identityKey && d.options.multi)
+          unioned.set(d.slug, d.options.identityKey)
+    }
     {
       const w = (
         await tx
@@ -371,7 +409,23 @@ export async function mergeEntities(opts: {
       for (const [key, loserVal] of Object.entries(lv)) {
         if (loserVal == null) continue
         const winnerVal = wv[key]
-        if (
+        const identityKey = unioned.get(key)
+        if (identityKey !== undefined) {
+          const union = unionElements(identityKey, winnerVal, loserVal)
+          if (JSON.stringify(union) === JSON.stringify(winnerVal ?? null))
+            continue
+          fill[key] = union
+          snapshot.push({
+            table: 'entity.values',
+            action: 'field_unioned',
+            pk: { entityId: winnerId },
+            old: {
+              field: key,
+              winnerHad: winnerVal ?? null,
+              loserHad: loserVal,
+            },
+          })
+        } else if (
           winnerVal == null ||
           (Array.isArray(winnerVal) && winnerVal.length === 0)
         ) {

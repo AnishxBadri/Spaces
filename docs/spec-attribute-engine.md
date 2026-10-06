@@ -298,8 +298,8 @@ object(id, slug, singular, plural, icon?, archived, created_by, created_at)
     the object has no records, frozen after — the slug rule). A declared
     key makes the matching attribute identity-backed: writes go through
     `addIdentityAlias`, the unique partial index applies, collisions become
-    `duplicate_candidate` rows. Email/cin stay core-only (person/company
-    doctrine — free-mail and role-prefix rules have no meaning on a bag).
+    `duplicate_candidate` rows. Email stays core-only (person doctrine —
+    the role-prefix rule has no meaning on a bag).
   - **Still excluded:** enrichment (the Enricher port is company/person-
     shaped; lifts only when an enricher manifest declares a custom shape),
     interactions, seeded attributes.
@@ -365,5 +365,5 @@ Non-goals restated: unique constraint, formula, list engine, per-attribute
 permissions, and — ~~all core machinery on custom objects (identity, dedupe,
 merge, enrichment, interactions)~~ **narrowed 2026-09-13, see §9** — the
 machinery that stays core-only: enrichment, interactions, seeded attributes,
-and email/cin identity keys. Fuzzy dedupe, merge-as-target, and opt-in
+and the email identity key. Fuzzy dedupe, merge-as-target, and opt-in
 `domain`/`linkedin` identity keys now reach every object.

@@ -139,9 +139,9 @@ const asFailure = (cause: unknown): CreateObjectFailure =>
     : new ObjectQueryFailed({ cause })
 
 /**
- * The declared keys, narrowed. `email` and `cin` are refused by name rather
- * than ignored: a user who ticked them asked for person/company doctrine on
- * a bag, and the reason is the answer.
+ * The declared keys, narrowed. `email` is refused by name rather than
+ * ignored: a user who ticked it asked for person doctrine on a bag, and the
+ * reason is the answer.
  */
 const readIdentityKeys = Effect.fn('readIdentityKeys')(function* (
   declared: ReadonlyArray<string> | undefined,

@@ -6,11 +6,9 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { AtSign, Layers, Linkedin, X } from 'lucide-react'
-import { useState } from 'react'
+import { Layers, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
-import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
@@ -37,8 +35,9 @@ import { WaitingRail } from '#/components/record/waiting-rail'
 import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
 import { PluginActions } from '#/components/record/plugin-actions'
 import { recordPath } from '#/lib/record-path'
+import { collisionToast } from '#/lib/attributes/collision-toast'
+import { jsonStrings } from '@spaces/core/json'
 import {
-  addPersonContact,
   countOpenSuggestions,
   createNote,
   getEntitySensitivity,
@@ -113,6 +112,8 @@ function PersonRecordPage() {
   const router = useRouter()
   const navigate = useNavigate()
 
+  // Identity is an attribute (D75): the first email names the record.
+  const firstEmail = jsonStrings(person.values.emails).at(0)
   const untaggedSpaces = allSpaces.filter(
     (s) => !person.spaces.some((ps) => ps.id === s.id),
   )
@@ -140,7 +141,7 @@ function PersonRecordPage() {
             </Link>
             {' / '}
             {person.id.slice(0, 8)}
-            {person.emails[0] ? ` / ${person.emails[0].valueNorm}` : ''}
+            {firstEmail ? ` / ${firstEmail}` : ''}
           </>
         }
         actions={
@@ -266,29 +267,19 @@ function PersonRecordPage() {
                 value={person.values[def.slug] ?? null}
                 refNames={person.refNames}
                 onSave={async (v) => {
-                  await updateRecord({
+                  const result = await updateRecord({
                     data: { id: person.id, patch: { [def.slug]: v } },
                   })
+                  // An email another person holds was refused; say so.
+                  const collision = collisionToast(result, 'person')
+                  if (collision)
+                    toast(collision.title, {
+                      description: collision.description,
+                    })
                   void router.invalidate()
                 }}
               />
             ))}
-            <ContactField
-              personId={person.id}
-              label="Emails"
-              kind="email"
-              icon={AtSign}
-              values={person.emails.map((e) => e.valueNorm)}
-              placeholder="name@company.com"
-            />
-            <ContactField
-              personId={person.id}
-              label="LinkedIn"
-              kind="linkedin"
-              icon={Linkedin}
-              values={person.linkedins.map((l) => l.valueNorm)}
-              placeholder="linkedin.com/in/…"
-            />
             <PropertyCell label="">
               <AttributeCreateDialog
                 objectKind="person"
@@ -384,83 +375,5 @@ function PersonRecordPage() {
         <RecordContext entityId={person.id} />
       </RecordBody>
     </div>
-  )
-}
-
-function ContactField({
-  personId,
-  label,
-  kind,
-  icon: Icon,
-  values,
-  placeholder,
-}: {
-  personId: string
-  label: string
-  kind: 'email' | 'linkedin'
-  icon: typeof AtSign
-  values: Array<string>
-  placeholder: string
-}) {
-  const router = useRouter()
-  const [adding, setAdding] = useState(false)
-  const [draft, setDraft] = useState('')
-
-  async function add() {
-    const value = draft.trim()
-    if (!value) return setAdding(false)
-    try {
-      const result = await addPersonContact({
-        data: { id: personId, kind, value },
-      })
-      if (result.outcome === 'suggested_duplicate') {
-        toast(`Another person already owns that ${kind}`, {
-          description:
-            'Flagged as a possible duplicate — the pair is waiting in Review.',
-        })
-      }
-      setDraft('')
-      setAdding(false)
-      void router.invalidate()
-    } catch {
-      toast.error(`Not a valid ${kind}`)
-    }
-  }
-
-  return (
-    <PropertyCell label={label}>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        {values.map((v) => (
-          <span
-            key={v}
-            className="flex min-w-0 items-center gap-1 mono text-label"
-          >
-            <Icon
-              className="size-3 shrink-0 text-graphite"
-              strokeWidth={1.75}
-            />
-            <span className="truncate">{v}</span>
-          </span>
-        ))}
-        {adding ? (
-          <Input
-            autoFocus
-            value={draft}
-            placeholder={placeholder}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={add}
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-            className="h-6 w-44 mono text-label"
-          />
-        ) : (
-          <button
-            onClick={() => setAdding(true)}
-            className="focus-ring mono text-micro text-graphite hover:text-foreground"
-          >
-            + add
-          </button>
-        )}
-      </div>
-    </PropertyCell>
   )
 }
