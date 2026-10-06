@@ -44,9 +44,9 @@ one and say which you left and why.
 - New entity-referencing column → `ENTITY_REFS` entry in
   `packages/db/src/entity-refs.ts`; the test will name the column if you
   forget. Schema and the drizzle journal live in `packages/db`; the app is
-  `apps/web`; gates run from the root through turbo (`pnpm typecheck`,
-  `pnpm test`, `pnpm lint`; `pnpm exec turbo run <task> --force` to bypass
-  the cache).
+  `apps/web`; gates run from the root through turbo, filtered as below.
+  The turbo cache is honest, so a cache hit is a real pass and needs no
+  `--force`.
 - Types are claims the compiler checked: no `as Type` on data you could
   have typed at the source, no `any`, no `?? undefined` hedges.
 - Instrument vocabulary only in tsx: `text-graphite`, `border-rule`,
@@ -55,37 +55,62 @@ one and say which you left and why.
 - Money is a string from drizzle; parse with `Number()` at the server
   boundary. Never `Intl.NumberFormat` compact — use `fmtMoney`.
 
-## Before reporting — the gates, all five, in order
+## Running tests and gates — lean, because the operator uses this machine
+
+The operator works on this laptop while you run. Up to two agents run at once,
+each with its own Postgres-backed suites. So every test and gate command is
+light by default:
+
+- **Your test database is the slot the dispatch prompt names** —
+  `spaces_agent_a_test` or `spaces_agent_b_test` — exported before any test
+  command, every time, core included:
+  `export DATABASE_URL_TEST=postgresql://spaces:spaces@localhost:5432/spaces_agent_<a|b>_test`
+  (match the credentials to `.env.local`'s `DATABASE_URL`). The slots are
+  reused across issues, so they are already migrated and only new migrations
+  apply. Never invent a per-issue name, and never run a test without the
+  variable: the default is the shared `spaces_test`.
+- **`nice -n 10`** in front of test and gate commands. If the sandbox refuses
+  it inline, put the command in a script in your scratchpad named for your
+  issue (`spa<NN>-run.sh`) and run that.
+- **Vitest runs two workers:** `--maxWorkers=2` (through turbo:
+  `… run test … -- --maxWorkers=2`).
+- **While iterating, run only the test files you touched or that cover the
+  code you changed**, from inside the package
+  (`corepack pnpm exec vitest run <files> --maxWorkers=2`).
+
+## Before reporting — the gates, once, on what you affected
+
+`--affected` limits turbo to the packages your uncommitted and committed
+changes touch, plus their dependents, compared with `main`. That is exactly
+the set that can break.
 
 ```
-pnpm exec tsc --noEmit
-pnpm exec vitest run
-pnpm exec prettier --check <touched files>
-pnpm lint
+corepack pnpm exec turbo run typecheck typecheck:root lint lint:root --affected --concurrency=2
+corepack pnpm exec turbo run test --affected --concurrency=2 -- --maxWorkers=2
+corepack pnpm exec prettier --check <touched files>
 ```
 
 Gate 5 (Instrument vocabulary only) is the `instrument/vocabulary` eslint
-rule and runs inside `pnpm lint`; CLAUDE.md is the authority if the two
-disagree.
+rule and runs inside lint; CLAUDE.md is the authority if the two disagree.
+A **migration** also runs `apps/web`'s `src/db/boot.test.ts` alone. A change
+to **`packages/sdk` or a plugin** also runs
+`corepack pnpm exec turbo run build --affected --concurrency=2`, because
+plugins build against `packages/sdk/dist`. Never run root `pnpm test` or an
+un-filtered `turbo run test`.
 
 **Gate 6, when you touched anything under `apps/web/src/lib/server/`,
 `apps/web/src/routes/` or `apps/web/src/lib/server-fns.ts`:**
-`corepack pnpm exec turbo run build --filter=@spaces/web --force`. The five
+`corepack pnpm exec turbo run build --filter=@spaces/web --concurrency=2`. The five
 gates cannot see a server-only import leaking into the client bundle; the
 build can, and CI runs it. A plain `export function` from a `lib/server/*.ts`
 module ships to the browser — helpers a test needs live outside `lib/server/`.
+After the build, run `bash scripts/check-client-bundle.sh`.
+
 Vitest runs against harness-created `*_test` databases, never the dev
-`spaces` database. **Always set a per-issue test database** so your journal
-cannot collide with another worktree's:
-
-```
-export DATABASE_URL_TEST=postgresql://spaces:spaces@localhost:5432/spaces_spa<NN>_test
-```
-
-before any `pnpm test` / `turbo run test` (turbo passes it through). A
-migration-bearing slice that runs the suite against the shared
-`spaces_test` moves it ahead of main's journal and makes every other
-checkout's tests refuse. Say in the report which database name you used.
+`spaces` database. A migration-bearing slice that runs the suite against
+the shared `spaces_test` moves it ahead of main's journal and makes every
+other checkout's tests refuse. That is why the slot is mandatory. Say in the
+report which slot you used.
 
 Never `git commit`, never `git push`, never `git stash`. Leave the tree for
 the orchestrator to review.
