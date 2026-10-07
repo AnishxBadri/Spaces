@@ -274,6 +274,40 @@ plugin code, so the link is resolved on the worker:
   whose folder the connection cannot see, gets null; the row's "from …" line
   renders only when it is set.
 
+**As built — entry 7, pick (2026-10-07, SPA-246).** "Attach from Drive" sits
+at the end of the Files tab's paste row, outlined. Web still imports no
+plugin code and bundles no provider SDK (`scripts/check-client-bundle.sh`
+fails a client chunk naming `apis.google.com` or `google.picker`):
+
+- **Readiness, before any click.** `pickerReadiness({ provider, returnTo })`
+  draws the button: Connect with no Drive connection; "Attach from Drive…"
+  linking to the incremental re-consent (`connectHref(…, ['drive.file'])`)
+  when the row lacks `drive.file`; "Picker not set up" when the
+  `google-drive` row has no `pickerApiKey`/`pickerAppId` (an admin's links to
+  `/settings/integrations/<id>`, a member's is a tooltip); a refusal in a
+  tooltip otherwise. The row is found by `storageSourceSettingsFor`, which
+  reads the row's stored `manifest` and `config` and never the plugins
+  directory.
+- **The mint.** `mintPickerToken` (POST) runs the same checks, then refuses —
+  `PickerScopeTooBroad`, no token — when the connection holds anything past
+  the picker set (`drive.file`, plus `openid`/`email`): a `drive.readonly`
+  token in a browser is a whole-drive read credential, so the picker
+  refuses rather than downgrades, and pasting a link still works. Otherwise
+  `accessTokenFor` mints for this one call and the answer carries the token,
+  the row's key and app id, the script URL and the views. The host keeps it
+  in state for one picker and drops it on close.
+- **The host** adds the script tag at click time, `gapi.load('picker')`, and
+  builds a multiselect picker over My Drive and shared drives. Google's
+  picker draws its own overlay; nothing of ours is styled inside it.
+- **Picking n files** calls `attachFromPicker` once; it sends one
+  `document.fetch-storage` per file on Drive's own `/file/d/<id>/view` link,
+  each with its own `singletonKey`, so the tab shows n "Fetching from Drive…"
+  rows. The job is the paste path's, so a file this connection already holds
+  is filed and not downloaded again. Cancel sends nothing.
+- **`SPACES_FAKE_PROVIDERS=1`.** The mint answers the fake Drive's seed
+  files instead of a token, and the host draws them as an in-app pick list
+  (checkboxes, Attach n, Cancel); the worker's fake API serves the fetches.
+
 ### 3.2 Surfaces — where you see them
 
 | surface               | shows                                                                                 | status              |
@@ -727,6 +761,10 @@ above the port.
 - Files tab: "Upload", "Attach from Drive", "Link a Drive folder", per
   document "Follow this file" / "Open in Drive"; for bound folders a line
   "Synced from Drive · 14 files · 2m ago".
+  - "Attach from Drive" is built (§3.1, entry 7 pick): outlined, at the end
+    of the paste row; it reads Connect Drive, "Attach from Drive…" (a
+    re-consent, explained in a tooltip) or "Picker not set up" in the states
+    that cannot open the picker yet.
 - Space page Sources: same two links; bound folder shown as a source.
 - `/documents`: `source` column, filter by provider; unfiled filter.
 - Settings → Connections (per user): connections, their bindings, status,

@@ -32,11 +32,17 @@ import type { StorageSources } from '../jobs/storage-sources'
 import { JobContext } from '../run-job'
 import type { JobFailure } from '../run-job'
 import { ExtractionStore, extractDocument } from '../jobs/extract-document'
-import { FETCH_REFUSALS, fetchStorageFile } from '../jobs/fetch-storage-file'
+import { attachFromPickerProgram } from '#web/lib/documents/attach-link'
+import {
+  FETCH_REFUSALS,
+  fetchStorageFile,
+  fetchStorageFileData,
+} from '../jobs/fetch-storage-file'
 import type { FetchStorageFileData } from '../jobs/fetch-storage-file'
 
 /**
- * A pasted Drive link, end to end on the real google-drive bundle against
+ * A pasted Drive link, or files picked in the picker (each sent as Drive's
+ * own link by `attachFromPickerProgram`), end to end on the real google-drive bundle against
  * the fake Drive API: resolve, the held-file check, the streamed fetch
  * through intake, and the extraction that makes a phrase findable.
  * - `fakes` stands the API in, as `SPACES_FAKE_PROVIDERS=1` does.
@@ -309,6 +315,61 @@ describe('document.fetch-storage on the google-drive bundle', () => {
     expect(extracted?.hit).toBe(true)
 
     if (row.blobSha !== null) await storage().delete(row.blobSha)
+  })
+
+  it('files three picked files as three documents with distinct external ids, and a re-pick downloads nothing', async () => {
+    const api = makeFakeDriveApi()
+    const { layer } = await wiredDrive(api, { fakesOn: true })
+    // Earlier cases left the user other connections: this one is the active one.
+    await db
+      .update(accountConnection)
+      .set({ status: 'revoked' })
+      .where(eq(accountConnection.userId, FIXTURE_ACTOR.id))
+    const connectionId = await aConnection('unused-under-fakes')
+    const deal = await aCompany(`Picked ${randomUUID().slice(0, 6)}`)
+    const pick = async (ids: Array<string>) => {
+      const { enqueued } = await import('#web/test/queue-stub')
+      enqueued.length = 0
+      const outcome = await Effect.runPromise(
+        attachFromPickerProgram(FIXTURE_ACTOR.id, {
+          provider: 'google',
+          attachTo: deal,
+          files: ids.map((id) => ({ id, name: id })),
+          returnTo: '/',
+        }),
+      )
+      if (outcome._tag !== 'queued') throw new Error(outcome._tag)
+      const jobs = enqueued.filter((e) => e.name === QUEUES.fetchStorageFile)
+      expect(jobs).toHaveLength(ids.length)
+      for (const job of jobs) {
+        const data = fetchStorageFileData.parse(job.data)
+        expect(data.connectionId).toBe(connectionId)
+        const exit = await run(data, layer)
+        expect(Exit.isSuccess(exit)).toBe(true)
+      }
+    }
+
+    await pick(['deck', 'captable', 'spa'])
+    const rows = await documentsFor(connectionId)
+    expect(rows.map((r) => r.externalId).sort()).toEqual([
+      'captable',
+      'deck',
+      'spa',
+    ])
+    expect(rows.map((r) => [r.externalId, r.sourcePath]).sort()).toEqual([
+      ['captable', 'My Drive / Acme Data Room'],
+      ['deck', 'My Drive / Acme Data Room'],
+      ['spa', 'My Drive / Acme Data Room / 01 Legal'],
+    ])
+    for (const row of rows) expect(await filedOn(row.id, deal)).toBe(1)
+    expect(downloads(api)).toBe(3)
+
+    await pick(['deck'])
+    expect(await documentsFor(connectionId)).toHaveLength(3)
+    expect(downloads(api)).toBe(3)
+
+    for (const row of rows)
+      if (row.blobSha !== null) await storage().delete(row.blobSha)
   })
 
   it('refuses a file past MAX_UPLOAD_BYTES on the stream, storing nothing', async () => {

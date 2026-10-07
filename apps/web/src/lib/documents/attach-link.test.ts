@@ -9,6 +9,7 @@ import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import {
   NOT_FETCHABLE,
   attachFromLinkProgram,
+  attachFromPickerProgram,
   attachLinkMessage,
   linkFetchStatusOf,
 } from './attach-link'
@@ -136,6 +137,45 @@ describe('attachFromLinkProgram', () => {
         }),
       ).catch((e: unknown) => Promise.reject(new Error(attachLinkMessage(e)))),
     ).rejects.toThrow(NOT_FETCHABLE)
+  })
+})
+
+describe('attachFromPickerProgram', () => {
+  const pick = (attachTo: string, ids: Array<string>) =>
+    Effect.runPromise(
+      attachFromPickerProgram(FIXTURE_ACTOR.id, {
+        provider: 'google',
+        attachTo,
+        files: ids.map((id) => ({ id, name: `${id}.pdf` })),
+        returnTo: `/companies/${attachTo}`,
+      }),
+    )
+
+  it('queues one fetch per picked file, each on Drive’s own link and its own key', async () => {
+    const record = await aCompany()
+    const active = await aConnection()
+    const outcome = await pick(record, ['deck', 'captable', 'spa', 'deck'])
+    if (outcome._tag !== 'queued') throw new Error(outcome._tag)
+    expect(outcome.files.map((f) => f.id)).toEqual(['deck', 'captable', 'spa'])
+    const { enqueued } = await import('#/test/queue-stub')
+    expect(enqueued.map((e) => e.data)).toEqual(
+      ['deck', 'captable', 'spa'].map((id) => ({
+        url: `https://drive.google.com/file/d/${id}/view`,
+        connectionId: active,
+        attachTo: record,
+        actorUserId: FIXTURE_ACTOR.id,
+      })),
+    )
+    const keys = enqueued.map((e) => e.options?.singletonKey)
+    expect(keys).toEqual(outcome.files.map((f) => f.fetchId))
+    expect(new Set(keys).size).toBe(3)
+  })
+
+  it('offers Connect and queues nothing when the user holds no Drive connection', async () => {
+    const record = await aCompany()
+    expect(await pick(record, ['deck'])).toMatchObject({ _tag: 'connect' })
+    const { enqueued } = await import('#/test/queue-stub')
+    expect(enqueued).toEqual([])
   })
 })
 

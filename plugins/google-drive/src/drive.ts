@@ -1,7 +1,8 @@
-import { Effect, Redacted } from 'effect'
+import { Effect, Option, Predicate, Redacted } from 'effect'
 import { z } from 'zod'
 import {
   AuthExpired,
+  Config,
   CursorExpired,
   Http,
   NotFound,
@@ -285,6 +286,8 @@ const DRIVE_ID = /^[\w-]+$/
 export const driveSource = Effect.gen(function* () {
   const http = yield* Http
   const secrets = yield* Secrets
+  // Read for the picker only; a provider built without it still reads Drive.
+  const settings = yield* Effect.serviceOption(Config)
 
   const bearer = secrets.accessToken().pipe(
     Effect.map((token) => `Bearer ${Redacted.value(token)}`),
@@ -597,6 +600,8 @@ export const driveSource = Effect.gen(function* () {
    * What web's picker host loads Google's picker with; never a token or a
    * secret. Only for a connection Drive still accepts: a refused token is
    * `AuthExpired`, and anything short of a refusal (a 429, a 5xx) is not.
+   * - `developerKey` and `appId` come from the row's `pickerApiKey` and
+   *   `pickerAppId`, and are left out while unset.
    */
   const pickerConfig = Effect.fn('googleDrive.pickerConfig')(function* () {
     const url = driveUrl('/about', { fields: 'kind' })
@@ -607,6 +612,13 @@ export const driveSource = Effect.gen(function* () {
       return yield* new AuthExpired({
         reason: reasonOf(response.body).message || 'Drive refused the token',
       })
+    const row = Option.isSome(settings) ? yield* settings.value.get() : {}
+    const filled = (key: string) => {
+      const value = row[key]
+      return Predicate.isString(value) && value !== '' ? value : null
+    }
+    const developerKey = filled('pickerApiKey')
+    const appId = filled('pickerAppId')
     const config: PickerConfig = {
       provider: 'google-drive',
       scriptUrl: 'https://apis.google.com/js/api.js',
@@ -614,6 +626,8 @@ export const driveSource = Effect.gen(function* () {
       views: ['DOCS', 'FOLDERS'],
       supportsSharedDrives: true,
       multiselect: true,
+      ...(developerKey === null ? {} : { developerKey }),
+      ...(appId === null ? {} : { appId }),
     }
     return config
   })

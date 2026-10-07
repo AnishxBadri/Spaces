@@ -24,8 +24,9 @@ import { JobPermanent, JobRateLimited, JobRetryable } from '../run-job'
 import type { JobDef, JobFailure } from '../run-job'
 
 /**
- * document.fetch-storage — a pasted storage-source link, fetched with the
- * pasting user's grant and filed on the record it was pasted on.
+ * document.fetch-storage — a pasted storage-source link, or one file picked
+ * in the provider's picker (as the provider's own link for it), fetched with
+ * that user's grant and filed on the record it was attached on.
  * - A file this connection already brought in (`connection_id`,
  *   `external_id`) is filed again and never downloaded again.
  * - The bytes go through intake, so `MAX_UPLOAD_BYTES` is metered on the

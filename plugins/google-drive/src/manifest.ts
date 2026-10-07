@@ -12,6 +12,9 @@ export const DRIVE_ID = /^[\w-]+$/
  *   picker. `drive.readonly` is asked for when a whole folder is bound,
  *   never at install. (D66)
  * - `list` is the demo job: one row is one folder, walked and logged.
+ * - `pickerApiKey` and `pickerAppId` are what Google's picker needs from the
+ *   same Cloud project as the OAuth client; without them the Files tab
+ *   says the picker is not set up.
  * - `sdk: '^1.1'` so this host loads it today; the storage-source members
  *   and `Http.stream` arrive in the next SDK minor.
  */
@@ -30,6 +33,15 @@ export const manifest = defineManifest({
       title: 'Folder id',
       description:
         'The Drive folder the list job walks — the id at the end of its link.',
+    }),
+    pickerApiKey: z.string().min(1).optional().meta({
+      title: 'Picker API key',
+      description:
+        'An API key from the Cloud project that holds the Google OAuth client, restricted to the Picker API.',
+    }),
+    pickerAppId: z.string().regex(/^\d+$/).optional().meta({
+      title: 'Picker app id',
+      description: 'That Cloud project’s project number.',
     }),
   }),
   jobs: {

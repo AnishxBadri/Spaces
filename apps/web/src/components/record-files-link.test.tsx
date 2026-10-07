@@ -48,7 +48,7 @@ describe('LinkFetchRow', () => {
   const render = (state: LinkFetch['state']) =>
     renderToStaticMarkup(
       <LinkFetchRow
-        fetch={{ key: 'k', url: LINK, label: 'Drive', state }}
+        fetch={{ key: 'k', name: LINK, label: 'Drive', state }}
         onDismiss={() => undefined}
       />,
     )

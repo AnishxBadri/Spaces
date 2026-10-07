@@ -26,6 +26,7 @@ import {
 import { DocumentTile } from './document-tile'
 import { LinkFetchRow, LinkPasteRow, useLinkFetches } from './record-files-link'
 import { RecordSection } from './record/record-parts'
+import { StoragePicker } from './storage-picker'
 import { KIND_ICONS } from './editor/mention'
 import { SummarizeRowButton, useSummarizer } from './summarize'
 import type { Summarizer } from './summarize'
@@ -321,7 +322,14 @@ export function RecordFiles({
             Release to attach
           </div>
         ) : null}
-        <LinkPasteRow onLink={(url) => void handleLink(url)} />
+        <LinkPasteRow
+          onLink={(url) => void handleLink(url)}
+          action={
+            <StoragePicker
+              onPicked={(files) => void links.attachPicked(files)}
+            />
+          }
+        />
       </RecordSection>
 
       <DocumentPreview

@@ -310,6 +310,38 @@ describe('typed failures', () => {
   })
 })
 
+describe('pickerConfig', () => {
+  it('names the script, the picker scope and the views, and the row’s picker key and app id only when set', async () => {
+    const api = makeFakeDriveApi()
+    const bare = await run(subject(api).source.pickerConfig())
+    expect(bare).toEqual({
+      provider: 'google-drive',
+      scriptUrl: 'https://apis.google.com/js/api.js',
+      scopes: ['drive.file'],
+      views: ['DOCS', 'FOLDERS'],
+      supportsSharedDrives: true,
+      multiselect: true,
+    })
+    const configured = Effect.runSync(
+      Effect.provide(
+        driveSource,
+        Layer.mergeAll(
+          portsFor(api),
+          ConfigTest({
+            folderId: 'dataroom',
+            pickerApiKey: 'AIza-picker',
+            pickerAppId: '123456789012',
+          }).layer,
+        ),
+      ),
+    )
+    expect(await run(configured.pickerConfig())).toMatchObject({
+      developerKey: 'AIza-picker',
+      appId: '123456789012',
+    })
+  })
+})
+
 describe('the list job', () => {
   it('walks the configured folder and logs every entry with its path', async () => {
     const api = makeFakeDriveApi()

@@ -1,8 +1,14 @@
 import { useRouter } from '@tanstack/react-router'
 import { File as FileIcon, Link2, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Button } from './ui/button'
-import { attachFromLink, linkFetchStatus } from '#/lib/server-fns'
+import {
+  attachFromLink,
+  attachFromPicker,
+  linkFetchStatus,
+} from '#/lib/server-fns'
+import type { PickedFile } from '#/lib/server-fns'
 import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { cn } from '#/lib/utils'
 
@@ -17,7 +23,8 @@ import { cn } from '#/lib/utils'
 
 export type LinkFetch = {
   readonly key: string
-  readonly url: string
+  /** The row's name: the link without its scheme, or the picked file's name. */
+  readonly name: string
   readonly label: string
   readonly state:
     | { readonly kind: 'sending' }
@@ -32,10 +39,12 @@ export type LinkFetch = {
 
 const POLL_MS = 2000
 
+const QUEUE_REFUSED = 'The worker queue is unreachable; try again'
+
 /** The link without its scheme, for a row's name. */
 const shown = (url: string) => url.replace(/^https?:\/\//, '')
 
-/** Pasted links on one record, polled while any is fetching. */
+/** Pasted links and picked files on one record, polled while any is fetching. */
 export function useLinkFetches(entityId: string) {
   const router = useRouter()
   const [fetches, setFetches] = useState<Array<LinkFetch>>([])
@@ -50,7 +59,7 @@ export function useLinkFetches(entityId: string) {
       ...all,
       {
         key,
-        url,
+        name: shown(url),
         label: provider?.label ?? 'the link',
         state: { kind: 'sending' },
       },
@@ -73,6 +82,56 @@ export function useLinkFetches(entityId: string) {
         kind: 'refused',
         reason:
           err instanceof Error ? err.message : 'Could not attach this link',
+      })
+    }
+  }
+
+  /** Files picked in the provider's picker: one pending row each, one fetch each. */
+  async function attachPicked(picked: ReadonlyArray<PickedFile>) {
+    const files = [
+      ...new Map(picked.map((f): [string, PickedFile] => [f.id, f])).values(),
+    ]
+    if (files.length === 0) return
+    const batch = Math.random()
+    const keyOf = (id: string) => `picked-${id}-${batch}`
+    setFetches((all) => [
+      ...all,
+      ...files.map((f): LinkFetch => ({
+        key: keyOf(f.id),
+        name: f.name,
+        label: 'Drive',
+        state: { kind: 'sending' },
+      })),
+    ])
+    const settle = (state: LinkFetch['state']) => {
+      for (const f of files) update(keyOf(f.id), state)
+    }
+    try {
+      const outcome = await attachFromPicker({
+        data: {
+          provider: 'google',
+          attachTo: entityId,
+          files,
+          returnTo: window.location.pathname,
+        },
+      })
+      if (outcome._tag === 'connect')
+        settle({ kind: 'connect', href: outcome.href, action: outcome.label })
+      else if (outcome._tag === 'refused')
+        settle({ kind: 'refused', reason: outcome.reason })
+      else
+        for (const f of outcome.files)
+          update(
+            keyOf(f.id),
+            f.fetchId === null
+              ? { kind: 'refused', reason: QUEUE_REFUSED }
+              : { kind: 'fetching', fetchId: f.fetchId },
+          )
+    } catch (err) {
+      settle({
+        kind: 'refused',
+        reason:
+          err instanceof Error ? err.message : 'Could not attach these files',
       })
     }
   }
@@ -119,7 +178,7 @@ export function useLinkFetches(entityId: string) {
     }
   }, [polling, router])
 
-  return { fetches, attach, dismiss }
+  return { fetches, attach, attachPicked, dismiss }
 }
 
 /** One pasted link that has not become a row yet. */
@@ -151,7 +210,7 @@ export function LinkFetchRow({
           />
         )}
       </span>
-      <span className="min-w-0 flex-1 truncate">{shown(fetch.url)}</span>
+      <span className="min-w-0 flex-1 truncate">{fetch.name}</span>
       {state.kind === 'connect' ? (
         <a
           href={state.href}
@@ -176,7 +235,7 @@ export function LinkFetchRow({
         <Button
           size="icon-xs"
           variant="ghost"
-          aria-label={`Dismiss ${shown(fetch.url)}`}
+          aria-label={`Dismiss ${fetch.name}`}
           onClick={onDismiss}
           className="text-graphite"
         >
@@ -189,9 +248,16 @@ export function LinkFetchRow({
 
 /**
  * The paste row under the list: a Drive link pasted or entered here is
- * fetched; any other link is saved as a page, as a dropped one is.
+ * fetched; any other link is saved as a page, as a dropped one is. `action`
+ * sits at its end: "Attach from Drive".
  */
-export function LinkPasteRow({ onLink }: { onLink: (url: string) => void }) {
+export function LinkPasteRow({
+  onLink,
+  action = null,
+}: {
+  onLink: (url: string) => void
+  action?: ReactNode
+}) {
   const [value, setValue] = useState('')
 
   const submit = (raw: string) => {
@@ -202,28 +268,31 @@ export function LinkPasteRow({ onLink }: { onLink: (url: string) => void }) {
   }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        submit(value)
-      }}
-      className="flex h-9 items-center gap-2.5 border-b border-rule px-3"
-    >
-      <Link2 className="size-3 shrink-0 text-graphite" strokeWidth={2} />
-      <input
-        type="url"
-        value={value}
-        aria-label="Paste a Drive link"
-        placeholder="…or paste a Drive link"
-        onChange={(e) => setValue(e.target.value)}
-        onPaste={(e) => {
-          const pasted = e.clipboardData.getData('text').trim()
-          if (!URL.canParse(pasted)) return
+    <div className="flex h-9 items-center gap-2.5 border-b border-rule px-3">
+      <form
+        onSubmit={(e) => {
           e.preventDefault()
-          submit(pasted)
+          submit(value)
         }}
-        className="focus-ring-inset h-7 min-w-0 flex-1 bg-transparent text-ui placeholder:text-graphite"
-      />
-    </form>
+        className="flex min-w-0 flex-1 items-center gap-2.5"
+      >
+        <Link2 className="size-3 shrink-0 text-graphite" strokeWidth={2} />
+        <input
+          type="url"
+          value={value}
+          aria-label="Paste a Drive link"
+          placeholder="…or paste a Drive link"
+          onChange={(e) => setValue(e.target.value)}
+          onPaste={(e) => {
+            const pasted = e.clipboardData.getData('text').trim()
+            if (!URL.canParse(pasted)) return
+            e.preventDefault()
+            submit(pasted)
+          }}
+          className="focus-ring-inset h-7 min-w-0 flex-1 bg-transparent text-ui placeholder:text-graphite"
+        />
+      </form>
+      {action}
+    </div>
   )
 }

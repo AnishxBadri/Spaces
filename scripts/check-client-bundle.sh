@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The client bundle carries no drizzle schema. Run after the web build:
+# The client bundle carries no drizzle schema and no provider SDK. Run after the web build:
 #
 #   scripts/check-client-bundle.sh [assets dir]   (default apps/web/.output/public/assets)
 #
@@ -25,4 +25,11 @@ if grep -lE 'drizzle:|pending_blob|entity_alias|fx_rate' "$DIR"/*.js >&2; then
   exit 1
 fi
 
-echo "Client bundle: no drizzle schema in $(find "$DIR" -maxdepth 1 -name '*.js' | wc -l | tr -d ' ') chunks."
+# No provider SDK: a storage source's picker script is loaded at click time
+# from the URL the server's mint answers with, never bundled or named here.
+if grep -lF -e 'apis.google.com' -e 'google.picker' "$DIR"/*.js >&2; then
+  echo "The chunks above carry a provider's picker script or its URL. The picker host loads the script the mint names (mintPickerToken); keep the URL in server code." >&2
+  exit 1
+fi
+
+echo "Client bundle: no drizzle schema and no provider SDK in $(find "$DIR" -maxdepth 1 -name '*.js' | wc -l | tr -d ' ') chunks."

@@ -6,10 +6,14 @@ import { entity } from '@spaces/db/schema'
 import { documentFilingRefusal } from '@spaces/core/documents/filing'
 import { QUEUES } from '@spaces/core/queue/names'
 import { listConnectionsFor } from '@spaces/core/writes/connections/list'
+import type { ConnectionListing } from '@spaces/core/writes/connections/list'
+import { canonicalFileUrl } from '@spaces/core/writes/connections/sources'
+import type { ProviderId } from '@spaces/core/providers/registry'
 import type { QueuedJob } from '@spaces/core/queue/sender'
 import { connectHref } from '#/lib/connections/products'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import { storageLinkProvider } from './storage-link'
+import type { StorageLinkProvider } from './storage-link'
 
 /**
  * Attach from a link: a pasted storage-source URL becomes a fetch job on the
@@ -87,50 +91,150 @@ export const attachFromLinkProgram = Effect.fn('attachFromLinkProgram')(
       return yield* new LinkNotAttachable({ reason: NOT_FETCHABLE })
     yield* checkRecord(input.attachTo)
 
-    const held = (yield* query(() => listConnectionsFor(userId))).filter(
-      (c) => c.provider === target.provider && c.product === target.product,
+    const connection = yield* activeConnectionFor(
+      userId,
+      target,
+      input.returnTo,
     )
-    const active = held.find((c) => c.status === 'active')
-    if (active === undefined) {
-      const stuck = held.at(0)
-      if (stuck === undefined)
-        return {
-          _tag: 'connect',
-          href: connectHref(
-            target.provider,
-            target.product,
-            undefined,
-            input.returnTo,
-          ),
-          label: `Connect ${target.label}`,
-        }
-      return {
-        _tag: 'refused',
-        reason:
-          stuck.errorReason ??
-          `The ${target.label} connection was revoked; connect again`,
-      }
-    }
+    if (connection._tag !== 'active') return connection
 
-    const fetchId = randomUUID()
-    const jobId = yield* Effect.promise(() =>
-      enqueue(
-        QUEUES.fetchStorageFile,
-        {
-          url: input.url,
-          connectionId: active.id,
-          attachTo: input.attachTo,
-          actorUserId: userId,
-        },
-        { singletonKey: fetchId },
-      ),
-    )
-    if (jobId === null)
-      return {
-        _tag: 'refused',
-        reason: 'The worker queue is unreachable; try again',
-      }
+    const fetchId = yield* enqueueFetch({
+      url: input.url,
+      connectionId: connection.connection.id,
+      attachTo: input.attachTo,
+      actorUserId: userId,
+    })
+    if (fetchId === null) return { _tag: 'refused', reason: QUEUE_UNREACHABLE }
     return { _tag: 'queued', fetchId }
+  },
+)
+
+/** What a storage action says when the user cannot use the product yet. */
+export type NoConnection = Exclude<
+  AttachFromLinkOutcome,
+  { readonly _tag: 'queued' }
+>
+
+/**
+ * The user's own active connection for the product (D66), or what to say
+ * instead: none held offers Connect back to `returnTo`, one in error says
+ * the provider's reason.
+ */
+export const activeConnectionFor = Effect.fn('activeConnectionFor')(function* (
+  userId: string,
+  target: StorageLinkProvider,
+  returnTo: string,
+): Effect.fn.Return<
+  | { readonly _tag: 'active'; readonly connection: ConnectionListing }
+  | NoConnection,
+  AttachLinkFailed
+> {
+  const held = (yield* query(() => listConnectionsFor(userId))).filter(
+    (c) => c.provider === target.provider && c.product === target.product,
+  )
+  const active = held.find((c) => c.status === 'active')
+  if (active !== undefined) return { _tag: 'active', connection: active }
+  const stuck = held.at(0)
+  if (stuck === undefined)
+    return {
+      _tag: 'connect',
+      href: connectHref(target.provider, target.product, undefined, returnTo),
+      label: `Connect ${target.label}`,
+    }
+  return {
+    _tag: 'refused',
+    reason:
+      stuck.errorReason ??
+      `The ${target.label} connection was revoked; connect again`,
+  }
+})
+
+const QUEUE_UNREACHABLE = 'The worker queue is unreachable; try again'
+
+/** One `document.fetch-storage`, keyed for the poll; null when the queue refused it. */
+const enqueueFetch = Effect.fn('enqueueFetch')(function* (data: {
+  readonly url: string
+  readonly connectionId: string
+  readonly attachTo: string
+  readonly actorUserId: string
+}): Effect.fn.Return<string | null> {
+  const fetchId = randomUUID()
+  const jobId = yield* Effect.promise(() =>
+    enqueue(QUEUES.fetchStorageFile, data, { singletonKey: fetchId }),
+  )
+  return jobId === null ? null : fetchId
+})
+
+export type PickedFile = { readonly id: string; readonly name: string }
+
+export type AttachFromPickerInput = {
+  readonly provider: ProviderId
+  readonly attachTo: string
+  readonly files: ReadonlyArray<PickedFile>
+  readonly returnTo: string
+}
+
+/** One fetch per picked file; `fetchId` null when the queue refused that one. */
+export type AttachFromPickerOutcome =
+  | {
+      readonly _tag: 'queued'
+      readonly files: ReadonlyArray<
+        PickedFile & { readonly fetchId: string | null }
+      >
+    }
+  | NoConnection
+
+/**
+ * Files picked in the provider's picker: one `document.fetch-storage` per
+ * file, on the provider's own link for it, exactly as a pasted link goes.
+ * - A file picked twice in one pick is fetched once.
+ * - A file the connection already holds is filed, never downloaded again:
+ *   the job's (`connection_id`, `external_id`) check.
+ */
+export const attachFromPickerProgram = Effect.fn('attachFromPickerProgram')(
+  function* (
+    userId: string,
+    input: AttachFromPickerInput,
+  ): Effect.fn.Return<
+    AttachFromPickerOutcome,
+    LinkNotAttachable | AttachLinkFailed
+  > {
+    const files = [
+      ...new Map(
+        input.files.map((f): [string, PickedFile] => [f.id, f]),
+      ).values(),
+    ]
+    const links: Array<{ file: PickedFile; url: string }> = []
+    for (const file of files) {
+      const url = canonicalFileUrl(input.provider, file.id)
+      if (url === null)
+        return yield* new LinkNotAttachable({ reason: NOT_FETCHABLE })
+      links.push({ file, url })
+    }
+    // The provider's own link names its product: drive.google.com is Drive.
+    const target = storageLinkProvider(links.at(0)?.url ?? '')
+    if (target === null)
+      return yield* new LinkNotAttachable({ reason: NOT_FETCHABLE })
+    yield* checkRecord(input.attachTo)
+
+    const connection = yield* activeConnectionFor(
+      userId,
+      target,
+      input.returnTo,
+    )
+    if (connection._tag !== 'active') return connection
+
+    const queued: Array<PickedFile & { readonly fetchId: string | null }> = []
+    for (const { file, url } of links) {
+      const fetchId = yield* enqueueFetch({
+        url,
+        connectionId: connection.connection.id,
+        attachTo: input.attachTo,
+        actorUserId: userId,
+      })
+      queued.push({ id: file.id, name: file.name, fetchId })
+    }
+    return { _tag: 'queued', files: queued }
   },
 )
 

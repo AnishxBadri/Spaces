@@ -6,7 +6,11 @@ import { isNotNull } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
-import { canonicalFileUrl, storageSourceIntegrationFor } from './sources'
+import {
+  canonicalFileUrl,
+  storageSourceIntegrationFor,
+  storageSourceSettingsFor,
+} from './sources'
 
 /**
  * The storage-source lookup reads each enabled row's manifest from the
@@ -79,6 +83,38 @@ describe('storageSourceIntegrationFor', () => {
     await insert('drive-like', { status: 'disabled' })
     await insert('not-on-disk')
     expect(await lookup('google')).toBeNull()
+  })
+})
+
+describe('storageSourceSettingsFor', () => {
+  const settingsFor = (provider: string) =>
+    Effect.runPromise(storageSourceSettingsFor(provider))
+
+  it('answers from the row’s stored manifest, with its config, and never from disk', async () => {
+    await insert('mailer', {
+      manifest: {
+        id: 'mailer',
+        requires: { connection: { provider: 'google', scopes: [] } },
+      },
+    })
+    const id = await insert('drive-like', {
+      manifest: drive,
+      config: { pickerApiKey: 'key', pickerAppId: '123' },
+    })
+    expect(await settingsFor('google')).toEqual({
+      integrationId: id,
+      pluginId: 'drive-like',
+      config: { pickerApiKey: 'key', pickerAppId: '123' },
+    })
+    expect(await settingsFor('box')).toBeNull()
+  })
+
+  it('never answers a row that is off, removed or tripped, or was never validated', async () => {
+    await insert('drive-like', { manifest: drive, enabled: false })
+    await insert('drive-like', { manifest: drive, removedAt: new Date() })
+    await insert('drive-like', { manifest: drive, status: 'disabled' })
+    await insert('drive-like', { manifest: null })
+    expect(await settingsFor('google')).toBeNull()
   })
 })
 
