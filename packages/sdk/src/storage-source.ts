@@ -110,6 +110,11 @@ export type StorageFile = {
   readonly mime: string
   readonly name: string
   readonly changeToken: string
+  /**
+   * The folder the file sits in, for `getFolder` to name its path; null for a
+   * file at a drive root, absent from a provider that cannot say.
+   */
+  readonly parentId?: string | null
 }
 
 /** One change since a cursor: the entry as it now is, or its removal. */

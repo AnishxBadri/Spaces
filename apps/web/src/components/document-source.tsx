@@ -1,5 +1,6 @@
 import { ExternalLink } from 'lucide-react'
 import { Button } from './ui/button'
+import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { cn } from '#/lib/utils'
 
 /**
@@ -55,6 +56,8 @@ export function OpenInSourceButton({
   filename: string
   className?: string
 }) {
+  // Named for the provider where the link says which: "Open in Drive".
+  const where = storageLinkProvider(url)?.label ?? 'source'
   return (
     <Button
       size="icon-xs"
@@ -66,8 +69,8 @@ export function OpenInSourceButton({
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        title={`Open ${filename} in source`}
-        aria-label={`Open ${filename} in source`}
+        title={`Open in ${where}`}
+        aria-label={`Open ${filename} in ${where}`}
         onClick={(e) => e.stopPropagation()}
       >
         <ExternalLink />

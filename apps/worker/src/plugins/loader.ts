@@ -80,6 +80,8 @@ export type LoadedPlugin = {
   readonly jobs: { readonly [name: string]: unknown }
   readonly onEnable?: LoadedHook
   readonly onDisable?: LoadedHook
+  /** A `provides: 'storage-source'` bundle's provider, unbuilt; `storageSourceFor` builds it. */
+  readonly storageSource?: BundleEffect
   /** The bundle imported and the row bound; a wired plugin whose fingerprint changed is reloaded. */
   readonly fingerprint: string
 }
@@ -113,6 +115,11 @@ const jsonRecord = z.record(z.string(), z.json())
 
 const hook = z.custom<LoadedHook>((value) => typeof value === 'function')
 
+/** An Effect from a bundle: its `R` did not survive the import, so what it reaches is what the host provides. */
+export type BundleEffect = Effect.Effect<unknown, unknown>
+
+const bundleEffect = z.custom<BundleEffect>((value) => Effect.isEffect(value))
+
 /**
  * What a bundle's default export must look like to be loaded at all. The
  * bundle's `zod` is the host's (`resolvePluginImportsToHost`), so its
@@ -127,6 +134,7 @@ const pluginExport = z.object({
     jobs: z.record(z.string(), z.unknown()),
     onEnable: hook.optional(),
     onDisable: hook.optional(),
+    storageSource: bundleEffect.optional(),
   }),
 })
 
@@ -164,6 +172,7 @@ type Checked = {
   readonly jobs: { readonly [name: string]: unknown }
   readonly onEnable?: LoadedHook
   readonly onDisable?: LoadedHook
+  readonly storageSource?: BundleEffect
   readonly pinned: boolean
   /** The migration files step 5 applied on this load. */
   readonly migrated: ReadonlyArray<string>
@@ -285,7 +294,7 @@ const check = (
           'bundle.mjs has no definePlugin(…) default export with manifest, settings and jobs',
       })
     }
-    const { jobs, onEnable, onDisable } = exported.data.default
+    const { jobs, onEnable, onDisable, storageSource } = exported.data.default
     const declared = Object.keys(manifest.jobs).sort()
     if (!isDeepStrictEqual(Object.keys(jobs).sort(), declared)) {
       return yield* new Degraded({
@@ -324,6 +333,7 @@ const check = (
       jobs,
       ...(onEnable === undefined ? {} : { onEnable }),
       ...(onDisable === undefined ? {} : { onDisable }),
+      ...(storageSource === undefined ? {} : { storageSource }),
       pinned: entry !== undefined,
       migrated: migrated?.applied ?? [],
     } satisfies Checked
@@ -456,6 +466,9 @@ export const reconcilePlugins = Effect.fn('reconcilePlugins')(function* (
         jobs: ok.jobs,
         ...(ok.onEnable === undefined ? {} : { onEnable: ok.onEnable }),
         ...(ok.onDisable === undefined ? {} : { onDisable: ok.onDisable }),
+        ...(ok.storageSource === undefined
+          ? {}
+          : { storageSource: ok.storageSource }),
       })
       verdicts.push({
         integrationId: row.id,

@@ -137,6 +137,8 @@ export type PluginHost = {
     integrationId: string,
     jobName: string,
   ) => ReadonlyArray<string> | null
+  /** The plugin as loaded for a wired integration; null when it is not wired. */
+  readonly loaded: (integrationId: string) => LoadedPlugin | null
 }
 
 type JobRun = (input: JobInput) => unknown
@@ -150,6 +152,7 @@ type WiredJob = {
 
 type Wired = {
   readonly id: string
+  readonly plugin: LoadedPlugin
   readonly fingerprint: string
   readonly jobs: ReadonlyMap<string, WiredJob>
   /** The queues registered for it; empty when the host has no `queues`. */
@@ -345,6 +348,7 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     // Wired before its queues register: a job fetched at once finds it.
     wired.set(plugin.integrationId, {
       id: plugin.manifest.id,
+      plugin,
       fingerprint: plugin.fingerprint,
       jobs,
       queues: plans,
@@ -612,6 +616,9 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
       : [...job.context.mapUnsafe.keys()].map(portOfKey).sort()
   }
 
+  const loaded = (integrationId: string) =>
+    wired.get(integrationId)?.plugin ?? null
+
   return {
     wire,
     release,
@@ -620,5 +627,6 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
     shutdown,
     invoke,
     granted,
+    loaded,
   }
 }

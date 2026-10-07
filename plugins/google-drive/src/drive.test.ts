@@ -136,6 +136,13 @@ describe('getFile', () => {
     const file = await run(source.getFile('deck'))
     expect(file.mime).toBe('application/pdf')
     expect(file.name).toBe('Acme deck.pdf')
+    // The folder it sits in, from the metadata call: no extra request.
+    expect(file.parentId).toBe('dataroom')
+    expect(
+      requestsTo(api, '/files/deck').some((r) =>
+        (r.query.fields ?? '').split(',').includes('parents'),
+      ),
+    ).toBe(true)
     const text = new TextDecoder().decode(await run(bytesOf(file.stream)))
     expect(text).toBe('%PDF-1.7 Acme seed deck')
     const media = requestsTo(api, '/files/deck').filter(

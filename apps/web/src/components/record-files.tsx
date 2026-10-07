@@ -24,6 +24,7 @@ import {
   OpenSourceButton,
 } from './document-source'
 import { DocumentTile } from './document-tile'
+import { LinkFetchRow, LinkPasteRow, useLinkFetches } from './record-files-link'
 import { RecordSection } from './record/record-parts'
 import { KIND_ICONS } from './editor/mention'
 import { SummarizeRowButton, useSummarizer } from './summarize'
@@ -57,6 +58,7 @@ import {
 import type { listRecordDocuments } from '#/lib/server-fns'
 import { uploadDocument } from '#/lib/documents/upload'
 import { droppedUrl } from '#/lib/documents/uri-list'
+import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { offersReadDeck } from '#/lib/documents/read-deck-gate'
 import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
@@ -113,6 +115,7 @@ export function RecordFiles({
   const [dragging, setDragging] = useState(false)
   const [pending, setPending] = useState<Array<Pending>>([])
   const [previewing, setPreviewing] = useState<Documents[number] | null>(null)
+  const links = useLinkFetches(entityId)
 
   useExtractionPolling(documents, router)
   const deckReaderFor = useDeckReader(entityId, documents)
@@ -160,9 +163,14 @@ export function RecordFiles({
    * (SPA-117). The same gesture the dropzone already accepts, on a payload
    * that has no bytes: it files as a document with `document.url` set and the
    * worker fetches it. Same target as a file drop, because a drop here means
-   * this record either way.
+   * this record either way. A storage-source link (Drive) is fetched by the
+   * worker instead, as the file it names.
    */
   async function handleLink(url: string) {
+    if (storageLinkProvider(url) !== null) {
+      await links.attach(url)
+      return
+    }
     try {
       await clipUrl({
         data: { url, fileAgainst: [{ kind: 'record', entityId }] },
@@ -226,7 +234,9 @@ export function RecordFiles({
           }}
         />
 
-        {documents.length > 0 || pending.length > 0 ? (
+        {documents.length > 0 ||
+        pending.length > 0 ||
+        links.fetches.length > 0 ? (
           <ul className="flex flex-col border-b border-rule">
             {pending.map((p) => (
               <li
@@ -257,6 +267,13 @@ export function RecordFiles({
                 </span>
               </li>
             ))}
+            {links.fetches.map((f) => (
+              <LinkFetchRow
+                key={f.key}
+                fetch={f}
+                onDismiss={() => links.dismiss(f.key)}
+              />
+            ))}
             {documents.map((doc) => (
               <DocumentRow
                 key={doc.id}
@@ -279,7 +296,9 @@ export function RecordFiles({
           — once files exist the rows are the section and the whole of it
           is the drop target (2026-09-30: the box under a list, and the
           sentence under the box, were saying the same thing three times). */}
-        {documents.length === 0 && pending.length === 0 ? (
+        {documents.length === 0 &&
+        pending.length === 0 &&
+        links.fetches.length === 0 ? (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
@@ -302,6 +321,7 @@ export function RecordFiles({
             Release to attach
           </div>
         ) : null}
+        <LinkPasteRow onLink={(url) => void handleLink(url)} />
       </RecordSection>
 
       <DocumentPreview
@@ -310,6 +330,32 @@ export function RecordFiles({
       />
     </div>
   )
+}
+
+/** A filed row's mono line: kind, size, date, who, and where it came from. */
+export function fileMeta(
+  doc: Pick<
+    Documents[number],
+    | 'kind'
+    | 'sizeBytes'
+    | 'createdAt'
+    | 'uploadedByName'
+    | 'sourceCapability'
+    | 'sourcePath'
+  >,
+): string {
+  return [
+    DOCUMENT_KIND_LABELS[doc.kind].toLowerCase(),
+    formatBytes(doc.sizeBytes),
+    doc.createdAt.slice(5, 10),
+    doc.uploadedByName,
+    // Named, not classed: the plugin the reader installed, never "integration".
+    doc.sourceCapability ? `via ${doc.sourceCapability}` : null,
+    // The provider's own folder path, verbatim (§5.3).
+    doc.sourcePath ? `from ${doc.sourcePath}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 function DocumentRow({
@@ -371,21 +417,7 @@ function DocumentRow({
         </button>
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate mono text-field text-graphite">
-            {[
-              DOCUMENT_KIND_LABELS[doc.kind].toLowerCase(),
-              formatBytes(doc.sizeBytes),
-              doc.createdAt.slice(5, 10),
-              doc.uploadedByName,
-              // Named, not classed (SPA-137): the reader installed "gmail" and
-              // that is the word they know — "integration" would tell them
-              // nothing they could act on. A hand-uploaded file gets no suffix
-              // at all, because "via nobody" is noise on every row but the few
-              // a connector filed. The server resolved the ref to the
-              // capability id; this line only prints it.
-              doc.sourceCapability ? `via ${doc.sourceCapability}` : null,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+            {fileMeta(doc)}
           </span>
           {/* The provider deleted theirs; ours stayed (§8). A marker rather
               than a word in the line above, because it is a state and not

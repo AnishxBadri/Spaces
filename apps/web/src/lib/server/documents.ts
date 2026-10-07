@@ -205,6 +205,8 @@ export const listRecordDocuments = createServerFn()
         // renders nothing extra when they are.
         externalUrl: document.externalUrl,
         externalStatus: document.externalStatus,
+        // The provider's own folder path, verbatim: the row's "from …" line.
+        sourcePath: document.sourcePath,
         // Enough text to prove extraction worked, without hauling a
         // 2MB column into every Files-tab render.
         snippet: sql<string | null>`left(${document.extractedText}, 200)`,

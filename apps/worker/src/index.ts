@@ -7,6 +7,7 @@ import { startHeartbeat, workerIdentity } from './heartbeat'
 import { workerEnqueue } from './plugins/enqueue'
 import { FAKE_PROVIDERS_ENV, loadFakeProviders } from './plugins/fakes/switch'
 import { makePluginHost } from './plugins/host'
+import { storageSourcesLayer } from './plugins/storage-source'
 import {
   AUTOUPDATE_ENV,
   autoupdateModeOf,
@@ -17,6 +18,10 @@ import { makePluginReloader } from './plugins/reload'
 import { pgBossHost, runJob } from './run-job'
 import { ExtractionStore, extractDocument } from './jobs/extract-document'
 import { clipDocument } from './jobs/clip-document'
+import {
+  fetchStorageEnqueue,
+  fetchStorageFile,
+} from './jobs/fetch-storage-file'
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 import { pruneIngress } from './jobs/prune-ingress'
@@ -365,7 +370,13 @@ async function main() {
   // JobDef.retry is the queue's policy, not the wrapper's: JobRetryable just
   // fails the job and lets pg-boss count. updateQueue is how it reaches a
   // queue row that createQueue already created on an earlier boot.
-  for (const def of [extractDocument, embedDocument, clipDocument, readDeck]) {
+  for (const def of [
+    extractDocument,
+    embedDocument,
+    clipDocument,
+    readDeck,
+    fetchStorageFile,
+  ]) {
     const retry = def.retry
     if (retry) {
       await boss.updateQueue(def.name, {
@@ -406,6 +417,20 @@ async function main() {
     QUEUES.clipDocument,
     { batchSize: 1, includeMetadata: true },
     runJob(clipDocument, { host, layer: Layer.empty }),
+  )
+  // A pasted storage-source link: the plugin's provider is built per job from
+  // the wired host, bound to the pasting user's connection. Batch of one, for
+  // the clip's reason: each is one provider's latency.
+  await boss.work(
+    QUEUES.fetchStorageFile,
+    { batchSize: 1, includeMetadata: true },
+    runJob(fetchStorageFile, {
+      host,
+      layer: Layer.merge(
+        storageSourcesLayer(plugins, { fakes }),
+        fetchStorageEnqueue,
+      ),
+    }),
   )
   // The nightly sweep (SPA-81), second tenant of the wrapper and the queue
   // the 03:30 schedule below has been firing into a stub since it was

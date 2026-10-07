@@ -12,6 +12,7 @@ import { AuthExpired } from '../storage-source.ts'
 import type { StorageSource } from '../storage-source.ts'
 import {
   DOCX_MIME,
+  DRIVE_API,
   FAKE_DRIVE_CHAOS_FIXTURE,
   FAKE_DRIVE_CREDENTIALS,
   FAKE_DRIVE_FIXTURE,
@@ -21,6 +22,7 @@ import {
   LARGE_FILE_MEMORY_BOUND,
   fakeDriveLargeChunks,
   makeFakeDrive,
+  makeFakeDriveApi,
   makeSha256,
   sha256Hex,
   storageSourceChaos,
@@ -501,6 +503,21 @@ describe('the fake Drive', () => {
     await expect(
       Effect.runPromise(drive.source.changes(fresh.next)),
     ).resolves.toMatchObject({ changes: [] })
+  })
+
+  it('names the folder a file sits in, and the API answers its parents', async () => {
+    const drive = makeFakeDrive()
+    const file = await Effect.runPromise(drive.source.getFile('spa'))
+    expect(file.parentId).toBe('legal')
+    const api = makeFakeDriveApi()
+    const response = await api.fetch(
+      `${DRIVE_API}/files/spa?fields=id,parents`,
+      {
+        method: 'GET',
+        headers: { authorization: `Bearer ${api.accessToken}` },
+      },
+    )
+    expect(await response.json()).toEqual({ id: 'spa', parents: ['legal'] })
   })
 
   it('deletes a file between list and get when told to', async () => {

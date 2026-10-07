@@ -51,6 +51,13 @@ export const QUEUES = {
    */
   clipDocument: 'document.clip',
   /**
+   * A pasted storage-source link (Drive) → one document, fetched through the
+   * enabled storage-source plugin with the acting user's grant. Sent with a
+   * per-paste `singletonKey` the Files tab polls its state by; a file already
+   * held for that connection is re-filed, never downloaded again.
+   */
+  fetchStorageFile: 'document.fetch-storage',
+  /**
    * The deck reader (SPA-90): a `kind: deck` document → one `attribute_patch`
    * suggestion per record it is filed against. Created with the `exclusive`
    * policy and sent with `singletonKey = documentId`, so a second press while

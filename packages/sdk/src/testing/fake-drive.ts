@@ -540,6 +540,7 @@ export const makeFakeDrive = (
       mime: item.kind === 'native' ? DOCX_MIME : item.mime,
       name: item.kind === 'native' ? `${item.name}.docx` : item.name,
       changeToken: String(item.version),
+      parentId: item.parentId,
     }
     return result
   })

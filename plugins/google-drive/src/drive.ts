@@ -396,7 +396,7 @@ export const driveSource = Effect.gen(function* () {
   const getFile = Effect.fn('googleDrive.getFile')(function* (fileId: string) {
     const meta = yield* metadata(
       fileId,
-      'id,name,mimeType,version,modifiedTime',
+      'id,name,mimeType,version,modifiedTime,parents',
     )
     const target = Object.hasOwn(EXPORTS, meta.mimeType)
       ? EXPORTS[meta.mimeType]
@@ -424,6 +424,7 @@ export const driveSource = Effect.gen(function* () {
           ? meta.name
           : withExtension(meta.name, target.extension),
       changeToken: meta.version ?? meta.modifiedTime ?? '',
+      parentId: meta.parents?.at(0) ?? null,
     }
     return file
   })

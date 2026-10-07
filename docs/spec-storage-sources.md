@@ -241,6 +241,39 @@ or the binding, and "whose account" is one hop further on through
 `storage_binding.connection_id`. Nothing in this spec ever puts a vendor
 name in a shared enum, which is the whole reason the collapse exists.
 
+**As built — entry 7, paste a link (2026-10-07, SPA-238).** The Files tab
+takes a Drive URL dropped on it or pasted in its paste row ("…or paste a Drive
+link"); any other link is still saved as a page (entry 5). Web imports no
+plugin code, so the link is resolved on the worker:
+
+- `attachFromLink({ url, attachTo, returnTo })` picks the provider by host
+  (`drive.google.com`, `docs.google.com` → Google, product `drive`) and the
+  pasting user's own connection for it (D66): none → `connect` with the start
+  route back to the record; none active → `refused` with the stored
+  `error_reason`; else it enqueues `document.fetch-storage` with a per-paste
+  `singletonKey` and answers `queued`. The tab polls `linkFetchStatus` by that
+  key; the pending row reads "Fetching from Drive…" and, on a refusal, the
+  job's reason.
+- The job finds the enabled integration whose manifest on disk says
+  `provides: 'storage-source'` for the provider
+  (`storageSourceIntegrationFor`), builds its `storageSource` over the
+  ambient ports with Secrets bound to the pasting user's connection
+  (`storageSourceFor`), and calls `resolveLink`. A folder link, a non-file
+  link and `NotFound` are refusals in words; `AuthExpired` carries the
+  provider's reason; `RateLimited` reschedules.
+- A file already held for the connection (`connection_id`, `external_id`) is
+  filed on the record and never downloaded again. Otherwise `getFile` streams
+  into intake: `MAX_UPLOAD_BYTES` is metered on the stream, the row is born
+  `integration` with `source_ref` the integration, `external_id`,
+  `external_url` (Drive's `/file/d/<id>/view`) and `connection_id`, and
+  extraction is queued as for any arrival.
+- `source_path` is the file's folder path as Drive shows it, root first and
+  joined with " / " ("My Drive / Data room / Legal"): `StorageFile` carries
+  `parentId` (Drive's `parents`, asked on the metadata call `getFile`
+  already makes) and the job names it with `getFolder`. A file at a root, or
+  whose folder the connection cannot see, gets null; the row's "from …" line
+  renders only when it is set.
+
 ### 3.2 Surfaces — where you see them
 
 | surface               | shows                                                                                 | status              |
@@ -591,6 +624,12 @@ already separates bytes from text:
 on a deal you invested in. Flip `text → full` → backfill job. Blob GC
 (delete drops the blob when no other row shares the sha) reclaims space the
 other way.
+
+**As built (SPA-238):** a pasted file is copied in through intake like an
+upload — the bytes are ours, the pointer is `external_id` + `external_url` +
+`connection_id`. A second paste of the same file through the same connection
+re-files the held copy and reads no bytes; the retain policy above is the
+binding's and does not apply to a pasted file, which is always `full`.
 
 ## 8. Change semantics (decided 2026-09-14)
 
