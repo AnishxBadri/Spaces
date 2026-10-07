@@ -693,6 +693,26 @@ above the port.
 - Settings → Connections (per user): connections, their bindings, status,
   last sync, unlink; on the same page, for an admin only, the Google / Box
   OAuth apps (no separate Providers page).
+  - A band per provider; under it one row per (product, account), D66: the
+    product's mark, the account email, the product's granted scopes as mono
+    chips (registry `value`s; `openid` and `email` are left out), the
+    stored provider reason inline when the row is `error`, last sync
+    (`last_sync_at` — "never synced" until a sync writes it; there is no
+    "last used"), and the status word (`active` · `error` · `revoked`).
+    A product with no row keeps Connect.
+  - Actions: Refresh (a forced refresh) on an active row, Reconnect on an
+    error or revoked one, Disconnect on every row.
+  - A member sees only their own rows: `listConnectionsFor(userId)` takes
+    the session user and selects no `tokens_enc`.
+  - A provider with no OAuth client says "Ask an admin to configure
+    Google" in its band; an admin gets a link to the client group below.
+  - **Disconnect = revoke, then delete the row.** A 4xx at the provider is
+    `already-revoked` and logged; an outage is logged and the row is
+    deleted anyway — a provider that already forgot the grant cannot strand
+    it. In the same transaction `document.connection_id` and
+    `integration.connection_id` go null for that row (the files stay; the
+    plugin answers NotConnected until it is bound again), since neither
+    foreign key cascades.
 - Today: binding errors, files waiting for filing, files waiting for export.
 
 ## 13. Deferred, with the reason on record

@@ -1,31 +1,141 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { ConnectionListRow, ProviderAppRow } from '#/lib/server-fns'
 import { ConnectionsSection } from './connections-section'
 
 /**
- * The Connect control, rendered as the server renders it for a member: a
- * provider with an OAuth client gets one outlined link to the start route;
- * one without draws nothing to click.
+ * The section as the server renders it: a band per provider, the reader's
+ * rows under it, Connect for a product they hold none of, and the
+ * not-configured band for a provider with no OAuth client.
  */
+
+vi.mock('@tanstack/react-router', async () => ({
+  ...(await vi.importActual<object>('@tanstack/react-router')),
+  useRouter: () => ({ invalidate: async () => {} }),
+}))
+
+const row = (over: Partial<ConnectionListRow> = {}): ConnectionListRow => ({
+  connectionId: '7a3c1b52-0f7e-4f53-9d43-3c3a8f0d2e11',
+  provider: 'google',
+  product: 'drive',
+  externalEmail: 'anish@fund.example',
+  scopes: ['openid', 'email', 'drive.file', 'drive.readonly'],
+  status: 'active',
+  errorReason: null,
+  lastSyncAt: null,
+  ...over,
+})
+
+const googleApp: ProviderAppRow = {
+  provider: 'google',
+  label: 'Google',
+  configured: false,
+  clientId: null,
+  secretDisplay: null,
+  secretSetAt: null,
+  redirectUri: 'http://localhost:3000/api/connections/google/callback',
+}
 
 describe('ConnectionsSection', () => {
   it('offers Connect for a configured provider, leaving through the start route', () => {
     const html = renderToStaticMarkup(
-      <ConnectionsSection apps={null} configured={['google']} />,
+      <ConnectionsSection
+        apps={null}
+        configured={['google']}
+        connections={[]}
+      />,
     )
     expect(html).toContain('href="/api/connections/google/start?product=drive"')
     expect(html).toContain('aria-label="Connect Google Drive"')
     expect(html).toContain('>Connect</a>')
     expect(html).toContain('drive.file')
-    expect(html).not.toContain('No connections.')
     expect(html).not.toContain('/api/connections/box/')
   })
 
-  it('draws nothing clickable when no provider has a client', () => {
+  it('tells a member to ask an admin when a provider has no OAuth client', () => {
     const html = renderToStaticMarkup(
-      <ConnectionsSection apps={null} configured={[]} />,
+      <ConnectionsSection apps={null} configured={[]} connections={[]} />,
     )
-    expect(html).toContain('No connections.')
+    expect(html).toContain('Ask an admin to configure Google')
+    expect(html).toContain('Ask an admin to configure Box')
     expect(html).not.toContain('/api/connections/')
+    expect(html).not.toContain('href="#oauth-client-')
+  })
+
+  it('points an admin at the OAuth client group on the same page', () => {
+    const html = renderToStaticMarkup(
+      <ConnectionsSection
+        apps={[googleApp]}
+        configured={[]}
+        connections={[]}
+      />,
+    )
+    expect(html).toContain('href="#oauth-client-google"')
+    expect(html).toContain('Configure Google')
+    expect(html).toContain('id="oauth-client-google"')
+    expect(html).not.toContain('Ask an admin')
+  })
+
+  it('draws a held connection: account, product scopes as chips, last sync, status, actions', () => {
+    const html = renderToStaticMarkup(
+      <ConnectionsSection
+        apps={null}
+        configured={['google']}
+        connections={[row()]}
+      />,
+    )
+    expect(html).toContain('anish@fund.example')
+    expect(html).toContain('>drive.file</span>')
+    expect(html).toContain('>drive.readonly</span>')
+    expect(html).not.toContain('>openid</span>')
+    expect(html).toContain('never synced')
+    expect(html).toContain('>active</span>')
+    expect(html).toContain(
+      'aria-label="Refresh Google Drive anish@fund.example"',
+    )
+    expect(html).toContain(
+      'aria-label="Disconnect Google Drive anish@fund.example"',
+    )
+    expect(html).not.toContain('aria-label="Connect Google Drive"')
+  })
+
+  it("prints an error row's stored provider reason inline, and offers Reconnect", () => {
+    const html = renderToStaticMarkup(
+      <ConnectionsSection
+        apps={null}
+        configured={['google']}
+        connections={[
+          row({
+            status: 'error',
+            errorReason: 'invalid_grant: Token has been expired or revoked.',
+            lastSyncAt: '2026-09-29T08:00:00.000Z',
+          }),
+        ]}
+      />,
+    )
+    expect(html).toContain('invalid_grant: Token has been expired or revoked.')
+    expect(html).toContain('>error</span>')
+    expect(html).toContain('synced 09-29')
+    expect(html).toContain('href="/api/connections/google/start?product=drive"')
+    expect(html).toContain('>Reconnect</a>')
+    expect(html).not.toContain('>Refresh</button>')
+  })
+
+  it('draws one row per account under the same product', () => {
+    const html = renderToStaticMarkup(
+      <ConnectionsSection
+        apps={null}
+        configured={['google']}
+        connections={[
+          row(),
+          row({
+            connectionId: '9b1d7d0e-5a43-4a8e-8c71-0d5b2f4e6a90',
+            externalEmail: 'deals@fund.example',
+          }),
+        ]}
+      />,
+    )
+    expect(html).toContain('anish@fund.example')
+    expect(html).toContain('deals@fund.example')
   })
 })

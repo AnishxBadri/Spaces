@@ -1,0 +1,99 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { db } from '@spaces/db'
+import { accountConnection, user } from '@spaces/db/schema'
+import { encryptBundle } from '@spaces/core/writes/connections/bundle'
+import { FIXTURE_ACTOR } from '../../../vitest.seed'
+import { listConnectionsHandler } from './list'
+
+/**
+ * The list server fn's body, driven through its handler. Only the request is
+ * stubbed; the session check and the database are real.
+ */
+
+const session: { current: { id: string; role: string } | null } = {
+  current: null,
+}
+
+vi.mock('@tanstack/react-start/server', () => ({
+  getRequest: () => new Request('http://localhost/settings/connections'),
+}))
+
+vi.mock('#/lib/auth', () => ({
+  auth: {
+    api: {
+      getSession: async () =>
+        session.current ? { user: session.current } : null,
+    },
+  },
+}))
+
+const TEAMMATE = {
+  id: 'spa234-teammate',
+  name: 'Teammate',
+  email: 'spa234-teammate@spaces.test',
+}
+
+beforeAll(async () => {
+  await db.insert(user).values(TEAMMATE).onConflictDoNothing()
+})
+
+beforeEach(() => {
+  session.current = { id: FIXTURE_ACTOR.id, role: 'member' }
+})
+
+async function connectionOf(userId: string, externalEmail: string) {
+  const row = (
+    await db
+      .insert(accountConnection)
+      .values({
+        userId,
+        provider: 'google',
+        product: 'drive',
+        externalEmail,
+        tokensEnc: encryptBundle(
+          {
+            accessToken: 'secret-access',
+            refreshToken: 'secret-refresh',
+            tokenType: 'Bearer',
+          },
+          { userId, provider: 'google' },
+        ),
+        scopes: ['openid', 'email', 'drive.file'],
+      })
+      .returning()
+  ).at(0)
+  if (row === undefined) throw new Error('no connection row')
+  return row
+}
+
+describe('listMyConnections', () => {
+  it("returns the session user's rows and never another member's", async () => {
+    const mine = await connectionOf(FIXTURE_ACTOR.id, 'me@fund.example')
+    const theirs = await connectionOf(TEAMMATE.id, 'them@fund.example')
+
+    const rows = await listConnectionsHandler()
+    expect(rows).toEqual([
+      {
+        connectionId: mine.id,
+        provider: 'google',
+        product: 'drive',
+        externalEmail: 'me@fund.example',
+        scopes: ['openid', 'email', 'drive.file'],
+        status: 'active',
+        errorReason: null,
+        lastSyncAt: null,
+      },
+    ])
+    expect(JSON.stringify(rows)).not.toContain(theirs.id)
+    expect(JSON.stringify(rows)).not.toContain('secret')
+
+    session.current = { id: TEAMMATE.id, role: 'admin' }
+    const theirRows = await listConnectionsHandler()
+    expect(theirRows.map((r) => r.connectionId)).toEqual([theirs.id])
+  })
+
+  it('refuses without a session', async () => {
+    session.current = null
+    await expect(listConnectionsHandler()).rejects.toThrow('Unauthorized')
+  })
+})

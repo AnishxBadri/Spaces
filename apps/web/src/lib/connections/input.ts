@@ -47,3 +47,28 @@ export type ConnectionRevokeResult = {
   connectionId: string
   outcome: 'revoked' | 'already-revoked'
 }
+
+/** One of the session user's connections as Settings → Connections lists it. Never a token. */
+export type ConnectionListRow = {
+  connectionId: string
+  provider: ProviderId
+  /** The D66 product: `drive`, `calendar`, `gmail`, `box`. */
+  product: string
+  externalEmail: string
+  /** Registry `value`s, as granted. */
+  scopes: string[]
+  status: 'active' | 'error' | 'revoked'
+  /** The provider's reason when `status` is `error`. */
+  errorReason: string | null
+  /** ISO; null until a sync has run. */
+  lastSyncAt: string | null
+}
+
+/**
+ * What Disconnect did at the provider before the row was deleted:
+ * `unreachable` when the provider could not be asked and the row went anyway.
+ */
+export type ConnectionDisconnectResult = {
+  connectionId: string
+  revoke: 'revoked' | 'already-revoked' | 'unreachable'
+}

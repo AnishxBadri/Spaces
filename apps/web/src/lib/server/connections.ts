@@ -3,7 +3,9 @@ import { connectionIdInput, providerAppInput } from '../connections/input'
 
 export type {
   ConnectionCustodyRow,
+  ConnectionDisconnectResult,
   ConnectionIdInput,
+  ConnectionListRow,
   ConnectionRevokeResult,
   ProviderAppInput,
   ProviderAppRow,
@@ -45,6 +47,21 @@ export const refreshConnection = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { refreshConnectionHandler } = await import('../connections/custody')
     return refreshConnectionHandler(data)
+  })
+
+/** The session user's own connections, never another member's; no tokens. */
+export const listMyConnections = createServerFn().handler(async () => {
+  const { listConnectionsHandler } = await import('../connections/list')
+  return listConnectionsHandler()
+})
+
+/** Disconnect: revokes one of the session user's connections, then deletes it. */
+export const disconnectConnection = createServerFn({ method: 'POST' })
+  .validator(connectionIdInput)
+  .handler(async ({ data }) => {
+    const { disconnectConnectionHandler } =
+      await import('../connections/custody')
+    return disconnectConnectionHandler(data)
   })
 
 /** Revokes one of the session user's connections at the provider and marks it revoked. */
