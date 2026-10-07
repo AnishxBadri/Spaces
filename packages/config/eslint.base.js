@@ -189,7 +189,7 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 //     read-deck-summarize, run, sensitivity-for, suggest-spaces, summarize,
 //     vision}
 //   lib/arrival/{poll, schedule}
-//   lib/documents/{blob-refs, fetch-guard, on-extracted, vision-gate}
+//   lib/documents/{blob-refs, fetch-guard, on-extracted, refile, vision-gate}
 //   lib/glossary/link-terms · lib/import/commit · lib/queue · lib/server/env
 // and, from tests only:
 //   lib/ai/{embed-chunks, embedding-pin, propose, route, providers/embed/ids,

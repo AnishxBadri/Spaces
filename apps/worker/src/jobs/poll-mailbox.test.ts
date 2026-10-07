@@ -219,7 +219,9 @@ describe(
 
     it('a forwarded PDF reaches extraction done through the existing job, and Cmd-K finds a phrase inside it', async () => {
       await configure(PASSWORD)
-      const phrase = `Ohmium electrolyser stack ${randomUUID().slice(0, 8)}`
+      // Letters only: a tag starting with digits is split by the text parser and
+      // never matches the headline whole.
+      const phrase = `Ohmium electrolyser stack ${randomUUID().replace(/\d/g, 'q').slice(0, 8)}`
       const deck = minimalPdf(phrase)
       server.deliver(
         withParts({
