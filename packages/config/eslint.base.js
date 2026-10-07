@@ -195,7 +195,7 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 //   lib/ai/{embed-chunks, embedding-pin, propose, route, providers/embed/ids,
 //     providers/embed/settings}
 //   lib/arrival/{fixtures, settings}
-//   lib/documents/{clip, read-deck-gate, shelf, space-sources}
+//   lib/documents/{attach-link, clip, read-deck-gate, shelf, space-sources}
 //     · lib/import/{mapping, plan, stage} · lib/inbox/queue
 //     · lib/integrations/{job-status, status}
 //   lib/rpc/{api, versions} · lib/search/{query, query-embedding}
