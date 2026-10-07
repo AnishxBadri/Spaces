@@ -58,6 +58,11 @@ describe('assembleProgram', () => {
       source: { class: 'manual' },
     })
     ids.co = co.entityId
+    // Birth stamped the domains event with the clock; the snapshot needs a day.
+    await db
+      .update(attributeEvent)
+      .set({ at: new Date('2026-08-29T09:00:00Z') })
+      .where(eq(attributeEvent.entityId, co.entityId))
     await db
       .update(entity)
       .set({ values: { funding_stage: 'seed', location: 'Bengaluru' } })
