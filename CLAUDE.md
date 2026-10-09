@@ -183,7 +183,7 @@ test --filter=@spaces/web`. The cache is local only, no remote cache; the
   or point `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` at a Chromium you have.
 - If the Docker daemon is down: `open -a Docker` first.
 - Dev login: `anish@fund.example` (user knows the password). Login lands on
-  `/today`; first-run setup lands on `/spaces`.
+  `/today`; first-run setup lands on `/today` (Start empty) or `/spaces` (Load demo data).
 - The test suite needs Postgres up, and **since 2026-09-19 (SPA-143) it has
   its own databases on it — never the dev one.** A vitest `globalSetup` in
   each package derives `DATABASE_URL_TEST`, defaulting to `DATABASE_URL` with
