@@ -57,6 +57,7 @@ export type {
   ImportGrid,
   FactValues,
   FactClaim,
+  AnswerClaim,
   ReceiptClaim,
   DocumentKind,
   FilingTarget,
@@ -89,6 +90,18 @@ export type {
   FileJob,
   JobFor,
 } from './contract.ts'
+export {
+  ENRICHMENT_VOCABULARY,
+  VOCABULARY_KEYS,
+  VOCABULARY_TYPES,
+  isVocabularyKey,
+  vocabularyProblem,
+} from './vocabulary.ts'
+export type {
+  VocabularyEntry,
+  VocabularyKey,
+  VocabularyType,
+} from './vocabulary.ts'
 export {
   NotFound,
   CursorExpired,
@@ -137,6 +150,7 @@ export type {
   AliasResult,
   FactConflict,
   FillResult,
+  AnswerResult,
   AiLane,
   AiItem,
   RecordKind,

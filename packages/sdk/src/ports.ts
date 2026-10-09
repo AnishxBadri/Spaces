@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { JobPermanent } from './contract.ts'
 import type {
   AliasClaim,
+  AnswerClaim,
   DocumentClaim,
   EntityId,
   FactClaim,
@@ -108,10 +109,32 @@ export type FillResult = { readonly conflicts: ReadonlyArray<FactConflict> }
  * - A relationship (a record reference) fills only when empty; any held
  *   value that differs is returned and proposed, even this integration's.
  */
+/**
+ * What `Facts.answer` decided about each key, before any value is written:
+ * `linked` keys reach an attribute of the record's object, `unlinked` ones
+ * reach none and are only kept in the receipt.
+ */
+export type AnswerResult = {
+  readonly linked: ReadonlyArray<string>
+  readonly unlinked: ReadonlyArray<string>
+}
+
+/**
+ * - `fill`: by slug, for writers that are not enrichment sources.
+ * - `answer` (SDK 1.3): an enrichment source's answers, by vocabulary key
+ *   (D76). A key outside `ENRICHMENT_VOCABULARY`, or a value of the wrong
+ *   shape, fails the call permanently naming the key. The host applies the
+ *   enrichment rules: blanks fill, a person's value is never touched (a
+ *   disagreement becomes one Review card per record), another source's
+ *   value stands unless it is an older changing figure.
+ */
 export class Facts extends Context.Service<
   Facts,
   {
     readonly fill: (claim: FactClaim) => Effect.Effect<FillResult, JobError>
+    readonly answer: (
+      claim: AnswerClaim,
+    ) => Effect.Effect<AnswerResult, JobError>
   }
 >()('spaces/sdk/Facts') {}
 

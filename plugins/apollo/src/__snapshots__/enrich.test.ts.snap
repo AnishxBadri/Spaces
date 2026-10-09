@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`enrichCompany > stores the receipt, adds the aliases, then fills the mapped values citing it 1`] = `
+exports[`enrichCompany > stores the receipt, adds the aliases, then answers in the vocabulary citing it 1`] = `
 [
   {
     "call": "Read.entity",
@@ -146,19 +146,25 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
     },
   },
   {
-    "call": "Facts.fill",
+    "call": "Facts.answer",
     "input": {
+      "answers": {
+        "company.description": "Warehouse picking robots that learn a new SKU from one demonstration.",
+        "company.founded_year": 2019,
+        "company.linkedin": "http://www.linkedin.com/company/northwind-robotics",
+        "company.location": "Pune, India",
+      },
       "entityId": "entity-0",
       "receiptId": "receipt-1",
-      "values": {
-        "description": "Warehouse picking robots that learn a new SKU from one demonstration.",
-        "founded_year": 2019,
-        "linkedin": "http://www.linkedin.com/company/northwind-robotics",
-        "location": "Pune, India",
-      },
     },
     "output": {
-      "conflicts": [],
+      "linked": [
+        "company.description",
+        "company.founded_year",
+        "company.location",
+        "company.linkedin",
+      ],
+      "unlinked": [],
     },
   },
   {
@@ -190,13 +196,13 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
         "aliases": [
           "domain:already_own",
         ],
-        "conflicts": [],
         "endpoint": "organizations/enrich",
         "entityId": "entity-0",
         "receiptId": "receipt-1",
         "signals": [
           "signal-1",
         ],
+        "unlinked": [],
       },
       "message": "enriched",
     },
@@ -322,19 +328,25 @@ exports[`enrichPerson > matches by email and adds the email before filling, Link
     },
   },
   {
-    "call": "Facts.fill",
+    "call": "Facts.answer",
     "input": {
+      "answers": {
+        "person.linkedin": "http://www.linkedin.com/in/meera-kulkarni-robots",
+        "person.location": "Pune, India",
+        "person.title": "Co-founder & CTO",
+        "person.twitter": "https://twitter.com/meerak",
+      },
       "entityId": "entity-0",
       "receiptId": "receipt-1",
-      "values": {
-        "job_title": "Co-founder & CTO",
-        "linkedin": "http://www.linkedin.com/in/meera-kulkarni-robots",
-        "location": "Pune, India",
-        "twitter": "https://twitter.com/meerak",
-      },
     },
     "output": {
-      "conflicts": [],
+      "linked": [
+        "person.title",
+        "person.location",
+        "person.linkedin",
+        "person.twitter",
+      ],
+      "unlinked": [],
     },
   },
   {
@@ -344,11 +356,11 @@ exports[`enrichPerson > matches by email and adds the email before filling, Link
         "aliases": [
           "email:already_own",
         ],
-        "conflicts": [],
         "endpoint": "people/match",
         "entityId": "entity-0",
         "receiptId": "receipt-1",
         "signals": [],
+        "unlinked": [],
       },
       "message": "enriched",
     },

@@ -85,6 +85,12 @@ export const QUEUES = {
   /** On-demand enrichment, credit-capped in the worker. */
   enrichEntity: 'entity.enrich',
   /**
+   * An enrichment run (D76): the owner's sources asked in order for one
+   * record, every answer applied at once. Created `stately` and sent with
+   * `singletonKey = entityId`, so a burst of triggers is one queued run.
+   */
+  enrichmentRun: 'enrichment.run',
+  /**
    * Nightly reclaim of bytes a `prepare` promised and no `finalize` ever
    * named (SPA-54). `blob.` and not `document.`, because the rows it acts on
    * are precisely the ones that never became documents.

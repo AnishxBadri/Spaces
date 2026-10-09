@@ -90,7 +90,8 @@ const callApollo = Effect.fn('apollo.call')(function* (
 
 /**
  * D52's order: the receipt first, then the keys Apollo returned, then the
- * values, then the signals — each citing the receipt the store returned.
+ * answers in the host's vocabulary, then the signals — each citing the
+ * receipt the store returned.
  */
 const record = Effect.fn('apollo.record')(function* (
   endpoint: Endpoint,
@@ -106,9 +107,9 @@ const record = Effect.fn('apollo.record')(function* (
     claims.alias === null
       ? []
       : (yield* (yield* Identity).addAlias(claims.alias)).keys
-  const fill = claims.facts(receiptId)
-  const conflicts =
-    fill === null ? [] : (yield* (yield* Facts).fill(fill)).conflicts
+  const answer = claims.answer(receiptId)
+  const unlinked =
+    answer === null ? [] : (yield* (yield* Facts).answer(answer)).unlinked
   const content = yield* Content
   const signals: Array<string> = []
   for (const claim of claims.signals(receiptId))
@@ -118,7 +119,7 @@ const record = Effect.fn('apollo.record')(function* (
     entityId: claims.receipt.entityId,
     receiptId,
     aliases: aliases.map((a) => `${a.key}:${a.outcome}`),
-    conflicts: conflicts.map((c) => c.slug),
+    unlinked: [...unlinked],
     signals,
   })
 })

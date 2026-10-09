@@ -11,6 +11,7 @@ import type {
   PortName,
 } from '../contract.ts'
 import { landImportGrid } from '../import-grid.ts'
+import { vocabularyProblem } from '../vocabulary.ts'
 import type { LandedRow } from '../import-grid.ts'
 import {
   Ai,
@@ -193,18 +194,47 @@ export const IdentityTest = (
  * Fill-blanks, as the lane does it: a slug with a human's value (`human`)
  * is refused and returned as a conflict; anything else is written. `values`
  * is what the fake holds after the job — the test's view of the record.
+ *
+ * `answer` refuses a key outside the vocabulary, as the live port does, and
+ * holds every answer in `answers` by vocabulary key. `linked` names the keys
+ * the fake treats as linked to an attribute; absent, every key is.
  */
 export const FactsTest = (
   options: {
     readonly human?: { readonly [entityId: string]: JsonObject }
+    readonly linked?: ReadonlyArray<string>
     readonly recorder?: Recorder
   } = {},
 ): TestPort<Facts> & {
   readonly values: ReadonlyMap<EntityId, JsonObject>
+  readonly answers: ReadonlyMap<EntityId, JsonObject>
 } => {
   const { calls, record } = tap('Facts', options.recorder)
   const values = new Map<EntityId, JsonObject>()
+  const answers = new Map<EntityId, JsonObject>()
   const layer = Layer.succeed(Facts, {
+    answer: (claim) => {
+      const refused = Object.entries(claim.answers)
+        .map(([key, value]) => vocabularyProblem(key, value))
+        .find((problem) => problem !== null)
+      if (refused !== undefined)
+        return Effect.fail(
+          new JobPermanent({ reason: `Facts.answer: ${refused}` }),
+        )
+      return Effect.sync(() => {
+        answers.set(claim.entityId, {
+          ...answers.get(claim.entityId),
+          ...claim.answers,
+        })
+        const keys = Object.keys(claim.answers)
+        const isLinked = (key: string) =>
+          options.linked === undefined || options.linked.includes(key)
+        return record('answer', claim, {
+          linked: keys.filter(isLinked),
+          unlinked: keys.filter((key) => !isLinked(key)),
+        })
+      })
+    },
     fill: (claim) =>
       Effect.sync(() => {
         const human = options.human?.[claim.entityId] ?? {}
@@ -224,7 +254,7 @@ export const FactsTest = (
         return record('fill', claim, { conflicts })
       }),
   })
-  return { layer, calls, values }
+  return { layer, calls, values, answers }
 }
 
 // ---------------------------------------------------------------------------

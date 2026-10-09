@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute, objectDef } from '@spaces/db/schema'
 import {
@@ -79,4 +79,43 @@ export async function seedSystemAttributes() {
   }
   if (inserted > 0)
     console.log(`[attributes] seeded ${inserted} system attributes`)
+
+  const linked = await seedEnrichmentLinks(objectIds)
+  if (linked > 0)
+    console.log(`[attributes] linked ${linked} system attributes to enrichment`)
+}
+
+/**
+ * The default enrichment links (D76) for system attributes seeded before
+ * they existed: insert-if-absent on `options.enrichmentKey`. An attribute
+ * the owner unlinked holds `enrichmentKey: null` and is never re-linked.
+ */
+async function seedEnrichmentLinks(
+  objectIds: ReadonlyMap<ObjectKind, string>,
+): Promise<number> {
+  let linked = 0
+  for (const objectKind of OBJECT_KINDS) {
+    const objectId = objectIds.get(objectKind)
+    if (objectId === undefined) continue
+    for (const def of SYSTEM_ATTRIBUTES[objectKind]) {
+      const key = def.options?.enrichmentKey
+      if (key == null) continue
+      const rows = await db
+        .update(attribute)
+        .set({
+          options: sql`${attribute.options} || jsonb_build_object('enrichmentKey', ${key}::text)`,
+        })
+        .where(
+          and(
+            eq(attribute.objectId, objectId),
+            eq(attribute.slug, def.slug),
+            eq(attribute.isSystem, true),
+            sql`not (${attribute.options} ? 'enrichmentKey')`,
+          ),
+        )
+        .returning({ id: attribute.id })
+      linked += rows.length
+    }
+  }
+  return linked
 }

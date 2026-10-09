@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { isRoleEmail } from '@spaces/sdk/identity'
 import type {
   AliasClaim,
+  AnswerClaim,
   EntityId,
-  FactClaim,
   FactValues,
   IdentityKeys,
   JsonObject,
@@ -16,7 +16,9 @@ import type {
  * The pure half of the Apollo jobs: what to ask, and what Apollo's answer
  * claims. Provider JSON in, port arguments out — no Effect, no ports.
  * - Fields are parsed, never trusted: an absent or null field claims nothing.
- * - Values are keyed by the slugs `SYSTEM_ATTRIBUTES` seeds for the kind.
+ * - Values are keyed by the slugs `SYSTEM_ATTRIBUTES` seeds for the kind,
+ *   and answered in the vocabulary through `ANSWER_KEYS` — only the keys
+ *   those slugs are linked to by default.
  * - A domain or an email is an identity key; a LinkedIn URL is a value. (D75)
  * - A funding round and a change of title are signals, never values: dated
  *   evidence citing the receipt. (D72)
@@ -170,21 +172,53 @@ const personResponse = z.object({
     .nullish(),
 })
 
+/** The vocabulary key each mapped slug answers, by record kind. */
+export const ANSWER_KEYS: {
+  readonly [K in 'company' | 'person']: { readonly [slug: string]: string }
+} = {
+  company: {
+    description: 'company.description',
+    founded_year: 'company.founded_year',
+    location: 'company.location',
+    linkedin: 'company.linkedin',
+  },
+  person: {
+    job_title: 'person.title',
+    location: 'person.location',
+    linkedin: 'person.linkedin',
+    twitter: 'person.twitter',
+  },
+}
+
+/** Slug-keyed values as vocabulary answers; a slug with no key is dropped. */
+const answersOf = (
+  kind: 'company' | 'person',
+  values: FactValues,
+): { [key: string]: JsonValue } => {
+  const out: { [key: string]: JsonValue } = {}
+  for (const [slug, value] of Object.entries(values)) {
+    const keys = ANSWER_KEYS[kind]
+    if (Object.hasOwn(keys, slug)) out[keys[slug]] = value
+  }
+  return out
+}
+
 /**
  * What one Apollo answer claims about the record it was asked about.
- * `alias` is null when Apollo returned no key worth adding; `facts` is null
+ * `alias` is null when Apollo returned no key worth adding; `answer` is null
  * when it returned no value.
  */
 export type Enrichment = {
   readonly matched: boolean
   readonly receipt: ReceiptClaim
   readonly alias: AliasClaim | null
-  readonly facts: (receiptId: string) => FactClaim | null
+  readonly answer: (receiptId: string) => AnswerClaim | null
   /** What Apollo observed that is evidence, not a value, citing the receipt. */
   readonly signals: (receiptId: string) => ReadonlyArray<SignalClaim>
 }
 
 const enrichment = (
+  kind: 'company' | 'person',
   entityId: EntityId,
   raw: JsonValue,
   found: {
@@ -194,7 +228,7 @@ const enrichment = (
   } | null,
 ): Enrichment => {
   const keys = found?.keys ?? {}
-  const values = found?.values ?? {}
+  const answers = answersOf(kind, found?.values ?? {})
   return {
     signals: found?.signals ?? (() => []),
     matched: found !== null,
@@ -204,8 +238,10 @@ const enrichment = (
       creditsUsed: found === null ? 0 : CREDITS_PER_MATCH,
     },
     alias: Object.keys(keys).length === 0 ? null : { entityId, keys },
-    facts: (receiptId) =>
-      Object.keys(values).length === 0 ? null : { entityId, values, receiptId },
+    answer: (receiptId) =>
+      Object.keys(answers).length === 0
+        ? null
+        : { entityId, answers, receiptId },
   }
 }
 
@@ -215,11 +251,11 @@ export const organizationEnrichment = (
   raw: JsonValue,
 ): Enrichment => {
   const org = organizationResponse.parse(raw).organization
-  if (org == null) return enrichment(entityId, raw, null)
+  if (org == null) return enrichment('company', entityId, raw, null)
   const domain = org.primary_domain ?? org.website_url
   const location = place(org.city, org.country)
   const round = latestRound(org)
-  return enrichment(entityId, raw, {
+  return enrichment('company', entityId, raw, {
     signals: (receiptId) =>
       round === null ? [] : [fundingSignal(entityId, receiptId, round)],
     keys: domain ? { domain } : {},
@@ -250,7 +286,7 @@ export const personEnrichment = (
   heldTitle: string | null = null,
 ): Enrichment => {
   const person = personResponse.parse(raw).person
-  if (person == null) return enrichment(entityId, raw, null)
+  if (person == null) return enrichment('person', entityId, raw, null)
   const held = heldTitle?.trim() ?? ''
   const title = person.title
   const org = person.organization?.name ?? null
@@ -277,7 +313,7 @@ export const personEnrichment = (
       ? person.email
       : null
   const location = place(person.city, person.country)
-  return enrichment(entityId, raw, {
+  return enrichment('person', entityId, raw, {
     signals: hiring,
     keys: email ? { email } : {},
     values: {

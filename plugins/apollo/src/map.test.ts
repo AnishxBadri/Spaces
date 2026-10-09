@@ -8,7 +8,7 @@ import {
 import { fixture, fixtureNames, fixtureText } from './test-fixtures.ts'
 
 describe('the organization mapping', () => {
-  it('claims the keys and the seeded company slugs Apollo filled, and no others', () => {
+  it('claims the keys and answers the linked company keys Apollo filled, and no others', () => {
     const claims = organizationEnrichment('e', fixture('organization.json'))
     expect(claims.matched).toBe(true)
     expect(claims.alias).toEqual({
@@ -17,12 +17,12 @@ describe('the organization mapping', () => {
         domain: 'northwind-robotics.example',
       },
     })
-    expect(claims.facts('r')?.values).toEqual({
-      description:
+    expect(claims.answer('r')?.answers).toEqual({
+      'company.description':
         'Warehouse picking robots that learn a new SKU from one demonstration.',
-      founded_year: 2019,
-      location: 'Pune, India',
-      linkedin: 'http://www.linkedin.com/company/northwind-robotics',
+      'company.founded_year': 2019,
+      'company.location': 'Pune, India',
+      'company.linkedin': 'http://www.linkedin.com/company/northwind-robotics',
     })
     expect(claims.receipt.raw).toEqual(fixture('organization.json'))
   })
@@ -32,7 +32,7 @@ describe('the organization mapping', () => {
       organization: { name: 'Bare Co', founded_year: null, city: '  ' },
     })
     expect(claims.alias).toBeNull()
-    expect(claims.facts('r')).toBeNull()
+    expect(claims.answer('r')).toBeNull()
   })
 
   it('reads an empty answer as no match, costing nothing', () => {
@@ -50,16 +50,16 @@ describe('the organization mapping', () => {
 })
 
 describe('the person mapping', () => {
-  it('claims the email as a key and the seeded person slugs, LinkedIn among them, as values', () => {
+  it('claims the email as a key and answers the linked person keys, LinkedIn among them', () => {
     const claims = personEnrichment('e', fixture('person.json'))
     expect(claims.alias?.keys).toEqual({
       email: 'meera@northwind-robotics.example',
     })
-    expect(claims.facts('r')?.values).toEqual({
-      job_title: 'Co-founder & CTO',
-      location: 'Pune, India',
-      linkedin: 'http://www.linkedin.com/in/meera-kulkarni-robots',
-      twitter: 'https://twitter.com/meerak',
+    expect(claims.answer('r')?.answers).toEqual({
+      'person.title': 'Co-founder & CTO',
+      'person.location': 'Pune, India',
+      'person.linkedin': 'http://www.linkedin.com/in/meera-kulkarni-robots',
+      'person.twitter': 'https://twitter.com/meerak',
     })
   })
 

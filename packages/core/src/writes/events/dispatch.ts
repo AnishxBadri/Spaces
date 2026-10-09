@@ -16,6 +16,8 @@ import type {
   AutoEnrichScope,
   ScopeFacts,
 } from '@spaces/core/plugins/auto-enrich'
+import { workspace } from '@spaces/db/schema/workspace'
+import { enrichmentSettingsOf, scopeFor } from '../../enrichment/settings'
 import { Enqueue } from '../../queue/enqueue'
 import { pluginQueueName } from '../../queue/names'
 import type { PluginQueueName } from '../../queue/names'
@@ -27,7 +29,8 @@ import type { DealParty } from '../attributes/values'
  * process's own `Enqueue`. No outbox, no NOTIFY bus. (D65)
  * - Runnable means `enabled` and status `enabled`: one predicate skips a
  *   degraded, an operator-disabled and a breaker-tripped row alike.
- * - A row's auto-enrich scope (`autoEnrichScopeOf`) gates every event job
+ * - A row's auto-enrich scope (`scopeFor`: the workspace's enrichment
+ *   settings, else the row's config) gates every event job
  *   it declares: an event about a record outside the scope enqueues nothing.
  * - One enqueue per subscribed queue per event, never one per job match.
  * - Never fails: the write that emitted the event has already committed.
@@ -96,9 +99,11 @@ export type Subscription = {
 }
 
 /** Each row's queues subscribed to `event`; rows with none are left out. */
-export const subscriptions = (
+export const subscriptions = <TRow extends SubscriberRow>(
   event: DomainEvent,
-  rows: ReadonlyArray<SubscriberRow>,
+  rows: ReadonlyArray<TRow>,
+  scopeOf: (row: TRow) => AutoEnrichScope = (row) =>
+    autoEnrichScopeOf(row.config),
 ): ReadonlyArray<Subscription> => {
   const out: Array<Subscription> = []
   for (const row of rows) {
@@ -112,8 +117,7 @@ export const subscriptions = (
         pluginQueueName(parsed.data.id, job, declared.interactive === true),
       )
     }
-    if (queues.length > 0)
-      out.push({ scope: autoEnrichScopeOf(row.config), queues })
+    if (queues.length > 0) out.push({ scope: scopeOf(row), queues })
   }
   return out
 }
@@ -239,11 +243,24 @@ const eventData = (event: DomainEvent) => {
 /** The runnable integration rows. */
 const runnableRows = Effect.tryPromise(() =>
   db
-    .select({ config: integration.config, manifest: integration.manifest })
+    .select({
+      id: integration.id,
+      config: integration.config,
+      manifest: integration.manifest,
+    })
     .from(integration)
     .where(
       and(eq(integration.enabled, true), eq(integration.status, 'enabled')),
     ),
+)
+
+/** The workspace's enrichment settings, which hold the scopes once moved. */
+const enrichmentSettings = Effect.tryPromise(async () =>
+  enrichmentSettingsOf(
+    (
+      await db.select({ settings: workspace.settings }).from(workspace).limit(1)
+    ).at(0)?.settings ?? {},
+  ),
 )
 
 /**
@@ -257,7 +274,10 @@ export const dispatchDomainEvent: (
 )(
   function* (event: DomainEvent | null) {
     if (event === null) return []
-    const subs = subscriptions(event, yield* runnableRows)
+    const settings = yield* enrichmentSettings
+    const subs = subscriptions(event, yield* runnableRows, (row) =>
+      scopeFor(settings, row.id, row.config),
+    )
     if (subs.length === 0) return []
     const queues = queuesInScope(event, subs, yield* scopeFacts(event, subs))
     if (queues.length === 0) return []

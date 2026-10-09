@@ -3,6 +3,7 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { attribute, entity, objectDef } from '@spaces/db/schema'
 import { nextBadgeColor } from '../../attributes/colors'
+import { coreKindOf, enrichmentLinkProblem } from '../../attributes/registry'
 import { buildAiConfig } from '../../ai/attribute-ai'
 import type { AiConfigInput } from '../../ai/attribute-ai'
 import { validateDefault } from './defaults'
@@ -94,6 +95,11 @@ export type AttributeConfigPatch = {
    * loosening one.
    */
   ai?: AiConfigInput | null | undefined
+  /**
+   * Fill from enrichment (D76): a vocabulary key the attribute's type and
+   * object can hold; null is "from nothing", which the seeder respects.
+   */
+  enrichmentKey?: string | null | undefined
 }
 
 export type UpdateAttributePatch = {
@@ -289,6 +295,27 @@ const applyConfig = Effect.fn('applyConfig')(function* (
         return yield* new AttributeConfigRejected({ message: built.message })
       next = { ...next, ai: built.config }
     }
+  }
+  if (patch.enrichmentKey !== undefined) {
+    if (patch.enrichmentKey !== null) {
+      const owner = yield* query(() =>
+        db
+          .select({ slug: objectDef.slug, isSystem: objectDef.isSystem })
+          .from(objectDef)
+          .where(eq(objectDef.id, attr.objectId))
+          .then((rows) => rows.at(0)),
+      )
+      const problem = enrichmentLinkProblem(
+        attr.type,
+        owner === undefined ? null : coreKindOf(owner),
+        patch.enrichmentKey,
+      )
+      if (problem !== null)
+        return yield* new AttributeConfigRejected({
+          message: `Fill from: ${problem}`,
+        })
+    }
+    next = { ...next, enrichmentKey: patch.enrichmentKey }
   }
   return next
 })

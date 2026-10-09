@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { ENRICHMENT_VOCABULARY, isVocabularyKey } from '@spaces/sdk/vocabulary'
+import type { VocabularyType } from '@spaces/sdk/vocabulary'
 import type {
   AttributeOptions,
   ObjectKind,
@@ -378,6 +380,38 @@ export function valueValidator(
 }
 
 // ---------------------------------------------------------------------------
+// Fill from enrichment (D76)
+// ---------------------------------------------------------------------------
+
+/** The attribute types a vocabulary value type can be written into. */
+const LINKABLE_TYPES: {
+  readonly [T in VocabularyType]: ReadonlyArray<AttributeType>
+} = {
+  text: ['text'],
+  number: ['number', 'currency'],
+  url: ['url', 'text'],
+  phone: ['phone', 'text'],
+  list: ['text'],
+}
+
+/**
+ * Why an attribute of `type` on an object of `kind` cannot fill from `key`,
+ * or null when it can. A custom object has no vocabulary: its `kind` is null.
+ */
+export function enrichmentLinkProblem(
+  type: AttributeType,
+  kind: ObjectKind | null,
+  key: string,
+): string | null {
+  if (!isVocabularyKey(key)) return `${key} is not in the enrichment vocabulary`
+  const entry = ENRICHMENT_VOCABULARY[key]
+  if (kind !== entry.kind) return `${key} describes a ${entry.kind}`
+  return LINKABLE_TYPES[entry.type].includes(type)
+    ? null
+    : `a ${type} attribute cannot hold ${key}, a ${entry.type}`
+}
+
+// ---------------------------------------------------------------------------
 // Seeded system attributes (CONTEXT.md "Seeded system attributes").
 // Idempotent: seed inserts what's missing, never overwrites — options are
 // user-editable content after first boot.
@@ -422,10 +456,18 @@ const opt = (
  * A person's `emails` and a company's `domains` are identity (D75):
  * multi-valued, carrying `options.identityKey`, mirrored into `entity_alias`
  * by `setValues`. LinkedIn is a plain `url` on both.
+ *
+ * `options.enrichmentKey` is the default link to the enrichment vocabulary
+ * (D76); `seedEnrichmentLinks` adds it to installs seeded before it existed.
  */
 export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
   company: [
-    { slug: 'description', name: 'Description', type: 'text' },
+    {
+      slug: 'description',
+      name: 'Description',
+      type: 'text',
+      options: { enrichmentKey: 'company.description' },
+    },
     {
       slug: 'business_model',
       name: 'Business model',
@@ -457,9 +499,24 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
         ],
       },
     },
-    { slug: 'location', name: 'Location', type: 'text' },
-    { slug: 'founded_year', name: 'Founded', type: 'number' },
-    { slug: 'linkedin', name: 'LinkedIn', type: 'url' },
+    {
+      slug: 'location',
+      name: 'Location',
+      type: 'text',
+      options: { enrichmentKey: 'company.location' },
+    },
+    {
+      slug: 'founded_year',
+      name: 'Founded',
+      type: 'number',
+      options: { enrichmentKey: 'company.founded_year' },
+    },
+    {
+      slug: 'linkedin',
+      name: 'LinkedIn',
+      type: 'url',
+      options: { enrichmentKey: 'company.linkedin' },
+    },
     {
       // The people who started it (SPA-160). A company deck names its
       // founders, and without a person reference on the company registry
@@ -488,11 +545,37 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
     },
   ],
   person: [
-    { slug: 'job_title', name: 'Job title', type: 'text' },
-    { slug: 'description', name: 'Description', type: 'text' },
-    { slug: 'location', name: 'Location', type: 'text' },
-    { slug: 'linkedin', name: 'LinkedIn', type: 'url' },
-    { slug: 'twitter', name: 'Twitter', type: 'url' },
+    {
+      slug: 'job_title',
+      name: 'Job title',
+      type: 'text',
+      options: { enrichmentKey: 'person.title' },
+    },
+    {
+      slug: 'description',
+      name: 'Description',
+      type: 'text',
+      options: { enrichmentKey: 'person.description' },
+    },
+    {
+      slug: 'location',
+      name: 'Location',
+      type: 'text',
+      options: { enrichmentKey: 'person.location' },
+    },
+    {
+      slug: 'linkedin',
+      name: 'LinkedIn',
+      type: 'url',
+      options: { enrichmentKey: 'person.linkedin' },
+    },
+    {
+      slug: 'twitter',
+      name: 'Twitter',
+      type: 'url',
+      options: { enrichmentKey: 'person.twitter' },
+    },
+    // Unlinked by default: a phone costs extra credits and is opt-in. (D76)
     { slug: 'phone', name: 'Phone', type: 'phone' },
     {
       // The companies this person is at (D60): angels, advisors and

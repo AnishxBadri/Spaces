@@ -143,6 +143,22 @@ export type FactClaim = {
   readonly receiptId?: string
 }
 
+/**
+ * `Facts.answer(entityId, answers, receiptId)`: what an enrichment source
+ * knows, in the host's vocabulary (`ENRICHMENT_VOCABULARY`), never in
+ * attribute slugs (D76). The host maps each key through the attribute that
+ * links it; a key no attribute links is written nowhere and kept in the
+ * run's receipt. `receiptId` is the raw response the answers came from.
+ * `asOf` dates the figures when the source knows when they were true;
+ * absent, they are as of the call.
+ */
+export type AnswerClaim = {
+  readonly entityId: EntityId
+  readonly answers: { readonly [key: string]: JsonValue }
+  readonly receiptId: string
+  readonly asOf?: IsoTimestamp
+}
+
 /** `Receipts.store(…)`: the raw provider response, kept whole (the provenance anchor). */
 export type ReceiptClaim = {
   readonly entityId: EntityId
@@ -349,8 +365,16 @@ export type DomainEvent =
       readonly dealId: EntityId
     })
 
-/** `action` — the "Enrich" button; one record. */
-export type ActionInput = { readonly entityId: EntityId }
+/**
+ * `action` — the "Enrich" button; one record. `keys` (SDK 1.3) is what the
+ * host's enrichment run still wants from this source, in the vocabulary:
+ * absent when the button was pressed on the source itself, and then the
+ * source answers everything it knows.
+ */
+export type ActionInput = {
+  readonly entityId: EntityId
+  readonly keys?: ReadonlyArray<string>
+}
 export type ActionRun<TServices = unknown> = (
   input: ActionInput,
 ) => Effect.Effect<void, JobError, TServices>

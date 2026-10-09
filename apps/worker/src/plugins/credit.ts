@@ -131,6 +131,8 @@ export type CreditGuard = {
   readonly entityId: string
   readonly defaults: CreditPolicy
   readonly cost: CostHook | null
+  /** The workspace's reuse window, over the integration's `cacheDays`. (D76) */
+  readonly cacheDays?: number
 }
 
 const daysAgo = (days: number) => `${days} day${days === 1 ? '' : 's'} ago`
@@ -142,10 +144,14 @@ const daysAgo = (days: number) => `${days} day${days === 1 ? '' : 's'} ago`
 export const guardAction = Effect.fn('guardAction')(function* (
   guard: CreditGuard,
 ): Effect.fn.Return<void, JobSkipped | JobRetryable | JobPermanent> {
-  const policy = creditPolicy(
+  const configured = creditPolicy(
     yield* configOf(guard.integrationId),
     guard.defaults,
   )
+  const policy =
+    guard.cacheDays === undefined
+      ? configured
+      : { ...configured, cacheDays: guard.cacheDays }
 
   const last = yield* lastEnrichedAt(guard.integrationId, guard.entityId)
   if (last !== null) {

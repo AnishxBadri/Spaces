@@ -97,7 +97,7 @@ const failureOf = (exit: Exit.Exit<void, unknown>) =>
   Exit.isFailure(exit) ? JSON.parse(JSON.stringify(exit.cause)) : null
 
 describe('enrichCompany', () => {
-  it('stores the receipt, adds the aliases, then fills the mapped values citing it', async () => {
+  it('stores the receipt, adds the aliases, then answers in the vocabulary citing it', async () => {
     const ports = portsFor(company, ORG_URL, {
       body: fixture('organization.json'),
     })
@@ -110,7 +110,7 @@ describe('enrichCompany', () => {
       'Http.request',
       'Receipts.store',
       'Identity.addAlias',
-      'Facts.fill',
+      'Facts.answer',
       'Content.emitSignal',
       'Log.info',
     ])
@@ -121,12 +121,12 @@ describe('enrichCompany', () => {
       headers: { 'x-api-key': TEST_KEY },
     })
     expect(ports.receipts.calls[0]?.input).toMatchObject({ creditsUsed: 1 })
-    expect(ports.facts.values.get('entity-0')).toEqual({
-      description:
+    expect(ports.facts.answers.get('entity-0')).toEqual({
+      'company.description':
         'Warehouse picking robots that learn a new SKU from one demonstration.',
-      founded_year: 2019,
-      location: 'Pune, India',
-      linkedin: 'http://www.linkedin.com/company/northwind-robotics',
+      'company.founded_year': 2019,
+      'company.location': 'Pune, India',
+      'company.linkedin': 'http://www.linkedin.com/company/northwind-robotics',
     })
     expect(ports.facts.calls[0]?.input).toMatchObject({
       receiptId: 'receipt-1',
@@ -208,11 +208,11 @@ describe('enrichPerson', () => {
         email: 'meera@northwind-robotics.example',
       },
     })
-    expect(ports.facts.values.get('entity-0')).toEqual({
-      job_title: 'Co-founder & CTO',
-      location: 'Pune, India',
-      linkedin: 'http://www.linkedin.com/in/meera-kulkarni-robots',
-      twitter: 'https://twitter.com/meerak',
+    expect(ports.facts.answers.get('entity-0')).toEqual({
+      'person.title': 'Co-founder & CTO',
+      'person.location': 'Pune, India',
+      'person.linkedin': 'http://www.linkedin.com/in/meera-kulkarni-robots',
+      'person.twitter': 'https://twitter.com/meerak',
     })
   })
 
@@ -280,12 +280,12 @@ describe('signals', () => {
         receiptId: 'receipt-1',
       },
     ])
-    const filled = ports.facts.values.get('entity-0') ?? {}
-    expect(Object.keys(filled).sort()).toEqual([
-      'description',
-      'founded_year',
-      'linkedin',
-      'location',
+    const answered = ports.facts.answers.get('entity-0') ?? {}
+    expect(Object.keys(answered).sort()).toEqual([
+      'company.description',
+      'company.founded_year',
+      'company.linkedin',
+      'company.location',
     ])
   })
 
@@ -352,7 +352,7 @@ describe('autoEnrich', () => {
         'Http.request',
         'Receipts.store',
         'Identity.addAlias',
-        'Facts.fill',
+        'Facts.answer',
         'Content.emitSignal',
         'Log.info',
       ])
@@ -368,8 +368,8 @@ describe('autoEnrich', () => {
     )
     expect(exit._tag).toBe('Success')
     expect(ports.http.calls).toHaveLength(1)
-    expect(ports.facts.values.get('entity-0')).toMatchObject({
-      job_title: 'Co-founder & CTO',
+    expect(ports.facts.answers.get('entity-0')).toMatchObject({
+      'person.title': 'Co-founder & CTO',
     })
   })
 

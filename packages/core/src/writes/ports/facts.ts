@@ -1,10 +1,25 @@
 import { Effect, Layer } from 'effect'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { entity, entityAlias } from '@spaces/db/schema'
+import { enrichmentRecord, entity, entityAlias } from '@spaces/db/schema'
 import type { Json } from '@spaces/db/json'
-import { Facts, JobPermanent, JobRetryable } from '@spaces/sdk'
-import type { FactClaim, FillResult } from '@spaces/sdk'
+import {
+  Facts,
+  JobPermanent,
+  JobRetryable,
+  isVocabularyKey,
+  vocabularyProblem,
+} from '@spaces/sdk'
+import type {
+  AnswerClaim,
+  AnswerResult,
+  FactClaim,
+  FillResult,
+} from '@spaces/sdk'
+import { EnrichmentCollector } from '../../enrichment/collector'
+import type { Collector } from '../../enrichment/collector'
+import { jsonRecord, jsonValue } from '../../json'
+import { applyRun, linksForEntity } from '../enrichment/apply'
 import { ref } from '../../context/ref'
 import type { Enqueue } from '../../queue/enqueue'
 import { enqueueEmbeds } from '../ai/enqueue-embed'
@@ -55,6 +70,10 @@ import { integrationPatch } from './judgment'
  *
  * Embeddable values go out through core's `Enqueue` after the commit, as
  * `IdentityLive`'s birth values do.
+ *
+ * `Facts.answer` (D76) takes a source's answers in the vocabulary: inside an
+ * enrichment run they go to the run's `EnrichmentCollector`; outside one
+ * they are applied at once by `applyRun` as a run of this source alone.
  */
 
 const failure = (cause: unknown) =>
@@ -64,6 +83,15 @@ const failure = (cause: unknown) =>
     ? new JobPermanent({ reason: `Facts.fill: ${cause.message}` })
     : new JobRetryable({
         reason: `Facts.fill failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+      })
+
+const answerFailure = (cause: unknown) =>
+  cause instanceof AttributeValidationError ||
+  cause instanceof EntityNotFound ||
+  cause instanceof ReceiptNotOwned
+    ? new JobPermanent({ reason: `Facts.answer: ${cause.message}` })
+    : new JobRetryable({
+        reason: `Facts.answer failed: ${cause instanceof Error ? cause.message : String(cause)}`,
       })
 
 /** Shape check before any transaction: a malformed id is the job's bug, not a retry. */
@@ -208,8 +236,96 @@ export const FactsLive = (
         return result
       })
 
+      const answer = Effect.fn('Facts.answer')(function* (
+        claim: AnswerClaim,
+        collector: Collector | null,
+      ) {
+        if (!UUID.test(claim.entityId))
+          return yield* new JobPermanent({
+            reason: `Facts.answer: no record ${claim.entityId}`,
+          })
+        if (!UUID.test(claim.receiptId))
+          return yield* new JobPermanent({
+            reason: `Facts.answer: no receipt ${claim.receiptId}`,
+          })
+        const refused = Object.entries(claim.answers)
+          .map(([key, value]) => vocabularyProblem(key, value))
+          .find((problem) => problem !== null)
+        if (refused !== undefined)
+          return yield* new JobPermanent({ reason: `Facts.answer: ${refused}` })
+        const asOf =
+          claim.asOf === undefined ? new Date() : new Date(claim.asOf)
+        if (Number.isNaN(asOf.getTime()))
+          return yield* new JobPermanent({
+            reason: `Facts.answer: asOf ${claim.asOf ?? ''} is not a date`,
+          })
+        const answers = jsonValue.safeParse(claim.answers)
+        const decoded = answers.success ? jsonRecord(answers.data) : null
+        if (decoded === null)
+          return yield* new JobPermanent({
+            reason: 'Facts.answer: the answers are not JSON',
+          })
+
+        const { entityId, linked, credits } = yield* Effect.tryPromise({
+          try: async () => {
+            await db.transaction((tx) =>
+              checkReceipt(tx, row.id, claim.receiptId),
+            )
+            const survivor = await canonicalId(claim.entityId)
+            const { links } = await linksForEntity(survivor)
+            const receipt = (
+              await db
+                .select({ credits: enrichmentRecord.creditsUsed })
+                .from(enrichmentRecord)
+                .where(eq(enrichmentRecord.id, claim.receiptId))
+            ).at(0)
+            return {
+              entityId: survivor,
+              linked: new Set<string>(links.map((l) => l.key)),
+              credits: receipt?.credits ?? 0,
+            }
+          },
+          catch: answerFailure,
+        })
+        const keys = Object.keys(claim.answers)
+        const result: AnswerResult = {
+          linked: keys.filter((k) => isVocabularyKey(k) && linked.has(k)),
+          unlinked: keys.filter((k) => !(isVocabularyKey(k) && linked.has(k))),
+        }
+        const collected = {
+          receiptId: claim.receiptId,
+          asOf: asOf.toISOString(),
+          answers: decoded,
+        }
+        if (
+          collector !== null &&
+          collector.integrationId === row.id &&
+          collector.entityId === entityId
+        ) {
+          collector.answers.push(collected)
+          return result
+        }
+        const applied = yield* Effect.tryPromise({
+          try: () =>
+            applyRun({
+              entityId,
+              reason: 'answer',
+              sources: [{ integrationId: row.id, asked: null, credits }],
+              answers: [{ integrationId: row.id, ...collected }],
+            }),
+          catch: answerFailure,
+        })
+        yield* enqueueEmbeds(applied.reembed)
+        return result
+      })
+
       return Facts.of({
         fill: (claim) => fill(claim).pipe(Effect.provide(context)),
+        answer: (claim) =>
+          Effect.gen(function* () {
+            const collector = yield* EnrichmentCollector
+            return yield* answer(claim, collector).pipe(Effect.provide(context))
+          }),
       })
     }),
   )

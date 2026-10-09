@@ -10,6 +10,7 @@ import {
   space,
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
+import { workspace } from '@spaces/db/schema/workspace'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
 import type { DomainEvent } from '@spaces/sdk'
 import { z } from 'zod'
@@ -314,6 +315,32 @@ describe('dispatchDomainEvent', () => {
     await install({ config })
     await dispatch(event())
     expect(sent).toHaveLength(count)
+  })
+
+  it('takes the scope from the workspace’s enrichment settings over the row’s config', async () => {
+    await install({ config: { autoEnrichScopes: ['deal'] } })
+    const row = (
+      await db
+        .select({ id: integration.id })
+        .from(integration)
+        .where(eq(integration.capabilityId, 'apollo'))
+    ).at(0)
+    if (!row) throw new Error('no row')
+    const settings = {
+      enrichment: { scopes: { [row.id]: { scopes: ['space'], spaces: [] } } },
+    }
+    await db
+      .insert(workspace)
+      .values({ id: 1, name: 'Fund', settings })
+      .onConflictDoUpdate({ target: workspace.id, set: { settings } })
+    try {
+      expect(await dispatch(event())).toEqual([])
+    } finally {
+      await db
+        .update(workspace)
+        .set({ settings: {} })
+        .where(eq(workspace.id, 1))
+    }
   })
 
   it('with no subscribers, enqueues nothing and no job runs', async () => {

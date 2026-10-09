@@ -108,6 +108,12 @@ export type AttributeOptions = {
   default?: Json
   /** AI attribute config — the spec's `attribute.config.ai`; see `AiAttributeConfig`. */
   ai?: AiAttributeConfig
+  /**
+   * Fill from enrichment (D76): the vocabulary key whose answers this
+   * attribute takes, from every source. Null is the owner's "from nothing",
+   * which the boot seeder never re-links; absent is never decided.
+   */
+  enrichmentKey?: string | null
 }
 
 /**

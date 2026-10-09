@@ -15,6 +15,7 @@ import { Enqueue } from '@spaces/core/queue/enqueue'
 import { setValues } from '@spaces/core/writes/attributes/values'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { storeCredential } from '@spaces/core/writes/vault'
+import { ENRICHMENT_CAPABILITY } from '@spaces/core/writes/enrichment/apply'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { ENRICHERS, pluginsRootWith } from '../fakes/enrichers'
 import type { Enricher } from '../fakes/enrichers'
@@ -146,10 +147,16 @@ describe.each(ENRICHERS)('enricher $id', (enricher) => {
 
     expect((await enrich(companyId))._tag).toBe('Success')
 
-    const receipts = await receiptsOf(companyId)
+    // The provider's receipt, and beside it the host's receipt of the run
+    // its answers were applied in. (D76)
+    const all = await receiptsOf(companyId)
+    const receipts = all.filter((r) => r.provider !== ENRICHMENT_CAPABILITY)
     expect(receipts).toHaveLength(1)
     expect(receipts[0]).toMatchObject({ integrationId: row.id })
     expect(receipts[0]?.creditsUsed).toBeGreaterThan(0)
+    expect(
+      all.filter((r) => r.provider === ENRICHMENT_CAPABILITY),
+    ).toHaveLength(1)
     expect(await valuesOf(companyId)).toMatchObject(matched.values)
   })
 

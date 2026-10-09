@@ -95,10 +95,16 @@ describe('identity is a unique attribute (D75)', () => {
       type: 'domain',
       options: { multi: true, identityKey: 'domain' },
     })
+    // A plain url: linked to enrichment (D76), never an identity key.
     for (const kind of ['person', 'company'] as const)
       expect(
         SYSTEM_ATTRIBUTES[kind].find((a) => a.slug === 'linkedin'),
-      ).toEqual({ slug: 'linkedin', name: 'LinkedIn', type: 'url' })
+      ).toEqual({
+        slug: 'linkedin',
+        name: 'LinkedIn',
+        type: 'url',
+        options: { enrichmentKey: `${kind}.linkedin` },
+      })
   })
 
   it('keeps the alias writer private: only claimIdentityAlias reaches it', () => {

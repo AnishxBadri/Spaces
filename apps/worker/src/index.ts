@@ -30,6 +30,8 @@ import { summarize } from './jobs/summarize'
 import { embedDocument } from './jobs/embed-document'
 import { embedSource } from './jobs/embed-source'
 import { restampSensitivity } from './jobs/restamp-sensitivity'
+import { enrichmentEnqueue, enrichmentRun } from './jobs/enrichment-run'
+import { EnrichmentSourcesLive } from './plugins/enrichment-sources'
 import { embedBackfill, embedBackfillRetry } from './jobs/embed-backfill'
 import { classifyDocument } from './jobs/classify-document'
 import { suggestSpaces } from './jobs/suggest-spaces'
@@ -150,6 +152,27 @@ async function main() {
     QUEUES.restampSensitivity,
     { batchSize: 1, includeMetadata: true },
     runJob(restampSensitivity, { host, layer: Layer.empty }),
+  )
+  // An enrichment run (D76): `stately` with `singletonKey = entityId`, so a
+  // burst of triggers on one record is one queued run. Its sources run in
+  // process on the wired plugin host. Created before the plain create loop
+  // below; a queue's policy is fixed at create.
+  await boss
+    .createQueue(QUEUES.enrichmentRun, { policy: 'stately' })
+    .catch(() => {})
+  if (enrichmentRun.retry)
+    await boss.updateQueue(QUEUES.enrichmentRun, {
+      retryLimit: enrichmentRun.retry.limit,
+      retryDelay: enrichmentRun.retry.delaySeconds,
+      retryBackoff: enrichmentRun.retry.backoff,
+    })
+  await boss.work(
+    QUEUES.enrichmentRun,
+    { batchSize: 1, includeMetadata: true },
+    runJob(enrichmentRun, {
+      host,
+      layer: Layer.merge(EnrichmentSourcesLive(plugins), enrichmentEnqueue),
+    }),
   )
   // The corpus backfill (SPA-136): `exclusive` with one fixed singletonKey,
   // so one run is queued, active or paused for the AI cap at a time — and it
