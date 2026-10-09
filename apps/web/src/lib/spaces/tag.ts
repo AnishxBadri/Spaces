@@ -8,11 +8,11 @@ import type { DomainEvent } from '@spaces/sdk'
 import type { Tx } from '@spaces/core/writes/attributes/values'
 
 /**
- * The one insert that tags a record into a space (SPA-103). Two callers:
- * the `tagIntoSpace` server fn (a person picks the space, `source:
- * 'manual'`) and the `space_tag` accept branch in `lib/ai/propose.ts` (a
- * person accepts the classify lane's proposal, `source: 'ai'` with the
- * model's confidence). `created_by` is the person either way — a model never
+ * The one insert that tags a record into a space (SPA-103). Callers: the
+ * `tagIntoSpace` server fn (a person picks the space, `source: 'manual'`),
+ * the `space_tag` accept branch in `acceptProgram` (a person accepts the
+ * classify lane's proposal, `source: 'ai'` with the model's confidence) and
+ * its discovery-card accepts (`fileDiscovered`, D72). `created_by` is the person either way — a model never
  * tags anything; the accepter does.
  *
  * `(entity_id, space_id)` is the primary key, so a record already in the

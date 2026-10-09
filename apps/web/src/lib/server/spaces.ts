@@ -57,6 +57,26 @@ export const renameSpace = createServerFn({ method: 'POST' })
     return effectFn(renameRecordProgram)(u.id, data)
   })
 
+/**
+ * What belongs here, edited in place on the space page (D72). A blank save
+ * clears it; each change is one `space.criteria_changed` line.
+ */
+export const setSpaceCriteria = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({ id: z.string().uuid(), criteria: z.string().max(1000) }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { setSpaceCriteriaProgram, spaceWriteMessage } =
+      await import('@spaces/core/writes/entities/space')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(setSpaceCriteriaProgram)(u.id, data)
+    } catch (failure) {
+      throw new Error(spaceWriteMessage(failure))
+    }
+  })
+
 /** Archive asks nothing — Restore undoes it. (D73) */
 export const archiveSpace = createServerFn({ method: 'POST' })
   .validator(z.object({ id: z.string().uuid() }))

@@ -1,7 +1,12 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { entity, suggestion } from '@spaces/db/schema'
+import {
+  entity,
+  space,
+  spaceWatchDismissal,
+  suggestion,
+} from '@spaces/db/schema'
 import type { suggestionKind } from '@spaces/db/schema'
 import type { Json } from '../../json'
 import { proposalRefs, validateProposal } from '../../ai/schema'
@@ -12,6 +17,13 @@ import { notePayloadSchema } from '../../ai/note'
 import { spaceTagPayloadSchema } from '../../ai/space-tag'
 import { taskPayloadSchema } from '../../ai/task'
 import type { TaskPayload } from '../../ai/task'
+import {
+  addRecordPayloadSchema,
+  evidenceOf,
+  fileRecordPayloadSchema,
+} from '../../ai/discovery'
+import type { AddRecordPayload, FileRecordPayload } from '../../ai/discovery'
+import { normalizeDomain } from '../../entities/normalize'
 import { toObjectKind } from '../../attributes/registry'
 import type { AttributeDef } from '../../attributes/registry'
 import { objectIdForKindAsync } from '../attributes/objects'
@@ -50,6 +62,20 @@ import type { CaptureObject } from '../ai/capture-read'
  */
 
 export type SuggestionKind = (typeof suggestionKind.enumValues)[number]
+
+/** The two cards a space's watch hands back; proposed by `proposeDiscoveryWith`. */
+export type DiscoveryKind = 'add_record' | 'file_record'
+
+export const DISCOVERY_KINDS: ReadonlyArray<DiscoveryKind> = [
+  'add_record',
+  'file_record',
+]
+
+/** Every kind anchored on a record; proposed by `proposeWith`. */
+export type RecordKind = Exclude<SuggestionKind, DiscoveryKind>
+
+export const isDiscoveryKind = (kind: SuggestionKind): kind is DiscoveryKind =>
+  kind === 'add_record' || kind === 'file_record'
 
 export class SuggestionNotFound extends Schema.TaggedError<SuggestionNotFound>()(
   'SuggestionNotFound',
@@ -225,6 +251,32 @@ export function spaceTagOf(payload: Json) {
   )
 }
 
+/** An `add_record` payload, decoded — or the validator's refusal, by field. */
+export function addRecordOf(payload: Json): AddRecordPayload {
+  const parsed = addRecordPayloadSchema.safeParse(payload)
+  if (parsed.success)
+    return { ...parsed.data, evidence: evidenceOf(parsed.data.evidence) }
+  throw invalid(
+    parsed.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'add_record'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
+}
+
+/** A `file_record` payload, decoded — or the validator's refusal, by field. */
+export function fileRecordOf(payload: Json): FileRecordPayload {
+  const parsed = fileRecordPayloadSchema.safeParse(payload)
+  if (parsed.success)
+    return { ...parsed.data, evidence: evidenceOf(parsed.data.evidence) }
+  throw invalid(
+    parsed.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'file_record'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
+}
+
 /** A task payload, decoded — or the validator's refusal, by field. */
 export function taskOf(payload: Json): TaskPayload {
   const parsed = taskPayloadSchema.safeParse(payload)
@@ -239,7 +291,7 @@ export function taskOf(payload: Json): TaskPayload {
 
 export type ProposeInput = {
   entityId: string
-  kind: SuggestionKind
+  kind: RecordKind
   /** `attribute_patch`: the `Proposal` envelope `{[slug]: {value, refs, confidence}}` */
   payload: Json
   rationale?: string
@@ -350,3 +402,155 @@ export const proposeProgram = Effect.fn('proposeProgram')(function* (
     catch: asFailure,
   })
 })
+
+// ---------- discovery cards (D72) ----------
+
+export type DiscoveryProposeInput = {
+  kind: DiscoveryKind
+  /** `AddRecordPayload` or `FileRecordPayload`; the domain is normalized here. */
+  payload: Json
+  rationale?: string
+  refs?: Array<string>
+  runId?: string
+  proposedBy: Actor
+}
+
+/**
+ * What a discovery proposal came to.
+ * - `proposed`: a new open card.
+ * - `held`: an open card for this (space, domain) already stood; it is
+ *   handed back untouched.
+ * - `dismissed`: the domain is dismissed from the space; nothing was written.
+ */
+export type DiscoveryProposed =
+  | { outcome: 'proposed'; suggestion: Suggestion }
+  | { outcome: 'held'; suggestion: Suggestion }
+  | { outcome: 'dismissed' }
+
+/** The open discovery card for (space, domain), by the index's own terms. */
+async function heldDiscovery(
+  reader: Reader,
+  spaceId: string,
+  domain: string,
+): Promise<Suggestion | undefined> {
+  return (
+    await reader
+      .select()
+      .from(suggestion)
+      .where(
+        and(
+          eq(suggestion.status, 'open'),
+          inArray(suggestion.kind, [...DISCOVERY_KINDS]),
+          sql`${suggestion.payload} ->> 'spaceId' = ${spaceId}`,
+          sql`${suggestion.payload} ->> 'domain' = ${domain}`,
+        ),
+      )
+  ).at(0)
+}
+
+/** The payload decoded, its domain normalized, and the record it sits on. */
+function discoveryRow(input: DiscoveryProposeInput): {
+  spaceId: string
+  domain: string
+  entityId: string | null
+  payload: Json
+} {
+  const card =
+    input.kind === 'add_record'
+      ? { ...addRecordOf(input.payload), entityId: null }
+      : fileRecordOf(input.payload)
+  const domain = normalizeDomain(card.domain)
+  if (domain === null)
+    throw invalid([
+      { slug: 'domain', message: `domain: ${card.domain} names no company` },
+    ])
+  const payload: Json =
+    input.kind === 'add_record'
+      ? { ...addRecordOf(input.payload), domain }
+      : { ...fileRecordOf(input.payload), domain }
+  return { spaceId: card.spaceId, domain, entityId: card.entityId, payload }
+}
+
+/**
+ * Propose an `add_record` or `file_record` card for a space. (D72)
+ * - The dismissal read and the insert share one transaction: a domain
+ *   dismissed from the space writes nothing, ever.
+ * - `suggestion_open_discovery_unique` keeps one open card per (space,
+ *   domain); a refused insert hands back the card already held.
+ * - `add_record` has no record, so its `entity_id` is null; a `file_record`
+ *   row sits on the record it would file.
+ */
+export async function proposeDiscoveryWith(
+  reader: Reader,
+  input: DiscoveryProposeInput,
+): Promise<DiscoveryProposed> {
+  const { spaceId, domain, entityId, payload } = discoveryRow(input)
+  return reader.transaction(async (tx): Promise<DiscoveryProposed> => {
+    const target = (
+      await tx
+        .select({ id: space.entityId })
+        .from(space)
+        .where(eq(space.entityId, spaceId))
+    ).at(0)
+    if (!target)
+      throw new EntityNotFound({
+        entityId: spaceId,
+        message: 'That space no longer exists',
+      })
+    if (entityId !== null) {
+      const record = (
+        await tx
+          .select({ id: entity.id })
+          .from(entity)
+          .where(eq(entity.id, entityId))
+      ).at(0)
+      if (!record)
+        throw new EntityNotFound({ entityId, message: 'Record not found' })
+    }
+    const dismissed = (
+      await tx
+        .select({ domain: spaceWatchDismissal.domain })
+        .from(spaceWatchDismissal)
+        .where(
+          and(
+            eq(spaceWatchDismissal.spaceId, spaceId),
+            eq(spaceWatchDismissal.domain, domain),
+          ),
+        )
+    ).at(0)
+    if (dismissed) return { outcome: 'dismissed' }
+    const row = (
+      await tx
+        .insert(suggestion)
+        .values({
+          entityId,
+          kind: input.kind,
+          payload,
+          rationale: input.rationale ?? null,
+          refs: input.refs ?? [],
+          runId: input.runId ?? null,
+          proposedByType: input.proposedBy.type,
+          proposedById:
+            input.proposedBy.type === 'system' ? null : input.proposedBy.id,
+        })
+        .onConflictDoNothing()
+        .returning()
+    ).at(0)
+    if (row) return { outcome: 'proposed', suggestion: row }
+    const open = await heldDiscovery(tx, spaceId, domain)
+    // Decided between the refused insert and this read: the next try inserts.
+    if (!open) throw new Error('an open discovery card closed mid-insert')
+    return { outcome: 'held', suggestion: open }
+  })
+}
+
+export const proposeDiscoveryProgram = Effect.fn('proposeDiscoveryProgram')(
+  function* (
+    input: DiscoveryProposeInput,
+  ): Effect.fn.Return<DiscoveryProposed, SuggestionFailure> {
+    return yield* Effect.tryPromise({
+      try: () => proposeDiscoveryWith(db, input),
+      catch: asFailure,
+    })
+  },
+)

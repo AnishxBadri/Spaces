@@ -22,6 +22,8 @@ import {
   round,
   roundCoInvestor,
   signal,
+  spaceWatch,
+  spaceWatchDismissal,
   suggestion,
   taskEntity,
   term,
@@ -390,6 +392,25 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
         'a scoped term nulled to global would assert its definition in every other space — the collision the scoping exists to prevent',
     },
     context: { role: 'item', kind: 'glossary', hop: 'standing' },
+  },
+
+  // --- space watches (D72) ---------------------------------------------
+  {
+    key: 'space_watch.space',
+    table: spaceWatch,
+    column: spaceWatch.spaceId,
+    // A space merge unions a space's watches when it lands. (D73)
+    merge: { kind: 'none', why: 'space kind is not mergeable' },
+    del: { kind: 'cascade' }, // a lens on a deleted space looks at nothing
+    context: null, // host state for the scheduler, never AI-visible
+  },
+  {
+    key: 'space_watch_dismissal.space',
+    table: spaceWatchDismissal,
+    column: spaceWatchDismissal.spaceId,
+    merge: { kind: 'none', why: 'space kind is not mergeable' },
+    del: { kind: 'cascade' }, // "not here" means nothing once here is gone
+    context: null,
   },
 
   // --- resolution bookkeeping --------------------------------------------

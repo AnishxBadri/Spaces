@@ -51,7 +51,8 @@ describe('one entity_space insert for tagging', () => {
   it('accept() has exactly one space_tag branch, and it calls insertSpaceTag', () => {
     const src = read('lib/ai/propose.ts')
     expect(src.match(/row\.kind === 'space_tag'/g)).toHaveLength(1)
-    expect(src.match(/insertSpaceTag\(/g)).toHaveLength(1)
+    // The space tag's branch, and `fileDiscovered` for the discovery cards.
+    expect(src.match(/insertSpaceTag\(/g)).toHaveLength(2)
     expect(src).not.toMatch(INSERT)
   })
 

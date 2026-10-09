@@ -164,6 +164,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
         parentId: space.parentId,
         isSeeded: space.isSeeded,
         archivedAt: space.archivedAt,
+        criteria: space.criteria,
       })
       .from(space)
       .innerJoin(entity, eq(entity.id, space.entityId))
@@ -366,6 +367,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
     path: head.path,
     parentId: head.parentId,
     isSeeded: head.isSeeded,
+    criteria: head.criteria,
     archive,
     archivedUnder: archivedUnder
       ? { id: archivedUnder.id, name: archivedUnder.name }

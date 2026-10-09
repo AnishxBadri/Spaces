@@ -130,7 +130,7 @@ export const proposeSuggestionProgram = Effect.fn('proposeSuggestionProgram')(
     }).pipe(Effect.mapError(refusal))
     return {
       suggestionId: row.id,
-      entityId: row.entityId,
+      entityId,
       status: 'open',
       fields: Object.keys(jsonRecord(row.payload)).sort(),
       note: 'Queued in Review in Spaces. Nothing on the record changes until a person accepts it.',

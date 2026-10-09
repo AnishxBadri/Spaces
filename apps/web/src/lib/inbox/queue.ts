@@ -17,6 +17,11 @@ import { toObjectKind } from '@spaces/core/attributes/registry'
 import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { getRegistryByObjectId } from '@spaces/core/writes/attributes/values'
 import type { SuggestionKind } from '#/lib/ai/propose'
+import {
+  DISCOVERY_KINDS,
+  isDiscoveryKind,
+} from '@spaces/core/writes/suggestions/propose'
+import { discoverySpaceOf } from '@spaces/core/ai/discovery'
 import { isColumnRunTask } from '#/lib/ai/column-run'
 import { captureReadSlug } from '@spaces/core/writes/ai/capture-read'
 import { resolveRefsProgram } from '@spaces/core/writes/context/names'
@@ -302,13 +307,33 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       .where(
         scope.record === null
           ? isOpen
-          : and(isOpen, eq(suggestion.entityId, scope.record)),
+          : and(
+              isOpen,
+              or(
+                eq(suggestion.entityId, scope.record),
+                and(
+                  inArray(suggestion.kind, [...DISCOVERY_KINDS]),
+                  sql`${suggestion.payload} ->> 'spaceId' = ${scope.record}`,
+                ),
+              ),
+            ),
       )
       .orderBy(desc(suggestion.createdAt), desc(suggestion.id)),
   )
   if (open.length === 0) return []
 
-  const entityIds = [...new Set(open.map((s) => s.entityId))]
+  // A discovery card groups under its space, not the record it may name;
+  // an `add_record` names none. (D72)
+  const anchorOf = (s: (typeof open)[number]): string | null =>
+    isDiscoveryKind(s.kind) ? discoverySpaceOf(s.payload) : s.entityId
+  const entityIds = [
+    ...new Set(
+      open.flatMap((s) => {
+        const anchor = anchorOf(s)
+        return anchor === null ? [] : [anchor]
+      }),
+    ),
+  ]
   const heads = yield* query(() =>
     db
       .select({
@@ -458,7 +483,8 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   // newest and Map insertion order is already the queue's order.
   const cards = new Map<string, SuggestionRow>()
   for (const s of open) {
-    const head = headOf.get(s.entityId)
+    const anchor = anchorOf(s)
+    const head = anchor === null ? undefined : headOf.get(anchor)
     if (!head) continue
     const pageObjectId = head.kind === 'document' ? pageObjectOf(s) : null
     const registry = yield* registryOf(head, pageObjectId)
@@ -485,14 +511,14 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       pageObjectId === null
         ? null
         : { title: head.name, url: pageUrl.get(head.id) ?? null }
-    const card = into.get(s.entityId)
+    const card = into.get(head.id)
     if (card) {
       card.suggestions.push(item)
       card.page ??= page
     } else
-      into.set(s.entityId, {
+      into.set(head.id, {
         kind: 'suggestion',
-        id: s.entityId,
+        id: head.id,
         record: {
           id: head.id,
           name: head.name,

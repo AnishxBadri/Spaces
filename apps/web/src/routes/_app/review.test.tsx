@@ -94,7 +94,7 @@ describe('the suggestion card', () => {
 
   it('renders every suggestion_kind without throwing', async () => {
     const { suggestionKind } = await import('@spaces/db/schema')
-    const { SuggestionEntry, SUGGESTION_KIND_WORD } =
+    const { SuggestionEntry, SUGGESTION_KIND_WORD, decisionWords } =
       await import('#/components/inbox/suggestion-card')
     for (const kind of suggestionKind.enumValues) {
       const html = renderToStaticMarkup(
@@ -126,8 +126,9 @@ describe('the suggestion card', () => {
       )
       expect(html).toContain(`because ${kind}`)
       expect(html).toContain('deck.pdf · chunk 1')
-      expect(html).toContain('Accept')
-      expect(html).toContain('Reject')
+      // A discovery card's verbs are its own: "File here", "Dismiss".
+      expect(html).toContain(decisionWords(kind).accept)
+      expect(html).toContain(decisionWords(kind).reject)
       // No sub-renderer, or a patch whose fields could not be read: the
       // payload is what the row shows, under the kind's word.
       expect(html).toContain(`payload-of-${kind}`)

@@ -42,7 +42,24 @@ export const suggestionKind = pgEnum('suggestion_kind', [
   // An action item — from a recorder or from Ask. Accepting writes one task
   // through the task writer, by the accepter. (D68)
   'task',
+  // A company a space's watch found that nobody holds: accepting resolves
+  // it, files it in the space and fires `entity.created`. No record yet, so
+  // the row's `entity_id` is null. (D72)
+  'add_record',
+  // A company held elsewhere that a watch found for this space: accepting
+  // files it here. (D72)
+  'file_record',
 ])
+
+/**
+ * The kinds that existed before the discovery kinds, spelled as literals.
+ * An index predicate or CHECK cannot name an enum value added in the same
+ * transaction, so the two discovery kinds are reached as "none of these".
+ * Never extend this list.
+ */
+const RECORD_KINDS = sql.raw(
+  `('attribute_patch', 'note', 'ledger_event', 'identity', 'document_kind', 'space_tag', 'task')`,
+)
 
 export const suggestionStatus = pgEnum('suggestion_status', [
   'open',
@@ -54,9 +71,11 @@ export const suggestion = pgTable(
   'suggestion',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    entityId: uuid('entity_id')
-      .notNull()
-      .references(() => entity.id),
+    /**
+     * The record the proposal is about. Null only for a kind with no record
+     * yet (`add_record`), whose space is `payload.spaceId`.
+     */
+    entityId: uuid('entity_id').references(() => entity.id),
     kind: suggestionKind('kind').notNull(),
     /**
      * Per kind. `attribute_patch`: the `Proposal` of
@@ -118,6 +137,19 @@ export const suggestion = pgTable(
       .where(
         sql`${t.status} = 'open' AND ${t.kind} = 'attribute_patch' AND ${t.proposedByType} = 'integration'`,
       ),
+    /**
+     * One open discovery card per (space, domain): a later find appends its
+     * evidence to the open card instead of proposing again. (D77)
+     * - `NOT IN` the record kinds is the two discovery kinds; see `RECORD_KINDS`.
+     */
+    uniqueIndex('suggestion_open_discovery_unique')
+      .on(sql`(${t.payload} ->> 'spaceId')`, sql`(${t.payload} ->> 'domain')`)
+      .where(sql`${t.status} = 'open' AND ${t.kind} NOT IN ${RECORD_KINDS}`),
+    // A record kind always names its record.
+    check(
+      'suggestion_entity_present',
+      sql`${t.entityId} IS NOT NULL OR ${t.kind} NOT IN ${RECORD_KINDS}`,
+    ),
     // Decided ⇔ someone decided it, when. An open row carries neither.
     check(
       'suggestion_decision_invariant',

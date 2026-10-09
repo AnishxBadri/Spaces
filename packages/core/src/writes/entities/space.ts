@@ -7,7 +7,7 @@ import { raiseSensitivity, stampedSensitive } from '../ai/stamp-sensitivity'
 import type { StampScope } from '../ai/stamp-sensitivity'
 
 /**
- * Space structure writes: archive, restore and move (D73). Rename is
+ * Space writes: archive, restore and move (D73), and criteria (D72). Rename is
  * `renameRecordProgram` on the space entity.
  * - The ltree path is the only derived structure; every reader computes from
  *   it, so a move rewrites paths and nothing else but the sensitivity cache.
@@ -311,6 +311,51 @@ export const moveSpaceProgram = Effect.fn('moveSpaceProgram')(function* (
   )
   return { moved: true, from: head.path, to, restamp }
 })
+
+/**
+ * Set or clear what belongs in a space (D72). One `space.criteria_changed`
+ * line per save that changes it.
+ * - Blank clears to null; nothing else is ever stored in its place.
+ * - An unchanged value writes nothing and answers `changed: false`.
+ */
+export const setSpaceCriteriaProgram = Effect.fn('setSpaceCriteriaProgram')(
+  function* (
+    actorId: string,
+    input: { id: string; criteria: string },
+  ): Effect.fn.Return<
+    { criteria: string | null; changed: boolean },
+    SpaceNotFound | SpaceWriteFailed
+  > {
+    const trimmed = input.criteria.trim()
+    const next = trimmed === '' ? null : trimmed
+    const saved = yield* query(() =>
+      db.transaction(async (tx) => {
+        const held = (
+          await tx
+            .select({ criteria: space.criteria })
+            .from(space)
+            .where(eq(space.entityId, input.id))
+            .for('update')
+        ).at(0)
+        if (!held) return null
+        if (held.criteria === next) return { criteria: next, changed: false }
+        await tx
+          .update(space)
+          .set({ criteria: next })
+          .where(eq(space.entityId, input.id))
+        await tx.insert(activity).values({
+          actorId,
+          verb: 'space.criteria_changed',
+          subjectEntityId: input.id,
+          meta: { from: held.criteria, to: next },
+        })
+        return { criteria: next, changed: true }
+      }),
+    )
+    if (saved === null) return yield* notFound(input.id)
+    return saved
+  },
+)
 
 /**
  * What a refused space write tells the person. A refusal carries its own

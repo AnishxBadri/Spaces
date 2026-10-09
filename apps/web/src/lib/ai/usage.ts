@@ -323,8 +323,14 @@ export const runDetailProgram = Effect.fn('runDetail')(function* (
         )
   const bySuggestion = new Map([...produced, ...others].map((s) => [s.id, s]))
   const records = yield* recordsOf([
-    ...new Set([...bySuggestion.values()].map((s) => s.entityId)),
+    ...new Set(
+      [...bySuggestion.values()].flatMap((s) =>
+        s.entityId === null ? [] : [s.entityId],
+      ),
+    ),
   ])
+  const recordOf = (entityId: string | null) =>
+    entityId === null ? undefined : records.get(entityId)
 
   // Every input ref and every non-suggestion output, in one resolve.
   const contextRefs = row.steps.flatMap((s) => [
@@ -351,7 +357,7 @@ export const runDetailProgram = Effect.fn('runDetail')(function* (
       ref,
       suggestionKind: s.kind,
       status: s.status,
-      record: records.get(s.entityId)?.name ?? 'a record no longer here',
+      record: recordOf(s.entityId)?.name ?? 'a record no longer here',
     }
   }
 
@@ -377,7 +383,7 @@ export const runDetailProgram = Effect.fn('runDetail')(function* (
       output: outputOf(s.output_ref),
     })),
     suggestions: produced.flatMap((s) => {
-      const record = records.get(s.entityId)
+      const record = recordOf(s.entityId)
       return record
         ? [{ id: s.id, kind: s.kind, status: s.status, record }]
         : []

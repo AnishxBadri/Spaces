@@ -16,6 +16,11 @@ import { readNotePayload } from '@spaces/core/ai/note'
 import type { NotePayload } from '@spaces/core/ai/note'
 import { readSpaceTagPayload } from '@spaces/core/ai/space-tag'
 import type { SpaceTagPayload } from '@spaces/core/ai/space-tag'
+import {
+  readAddRecordPayload,
+  readFileRecordPayload,
+} from '@spaces/core/ai/discovery'
+import type { DiscoveryEvidence } from '@spaces/core/ai/discovery'
 import { readDocumentKindPayload } from '@spaces/core/ai/document-kind'
 import type { DocumentKindPayload } from '@spaces/core/ai/document-kind'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
@@ -63,6 +68,8 @@ export const SUGGESTION_KIND_WORD: Record<SuggestionKind, string> = {
   document_kind: 'Document type',
   space_tag: 'Space',
   task: 'Task',
+  add_record: 'New company',
+  file_record: 'File here',
 }
 
 /**
@@ -131,7 +138,70 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
       <PayloadBody item={item} actions={actions} />
     )
   },
+  add_record: ({ item, actions }) => {
+    const card = readAddRecordPayload(item.payload)
+    return card ? (
+      <DiscoveryBody
+        name={card.name}
+        domain={card.domain}
+        evidence={card.evidence}
+      />
+    ) : (
+      <PayloadBody item={item} actions={actions} />
+    )
+  },
+  file_record: ({ item, actions }) => {
+    const card = readFileRecordPayload(item.payload)
+    return card ? (
+      <DiscoveryBody
+        name={card.name}
+        domain={card.domain}
+        evidence={card.evidence}
+      />
+    ) : (
+      <PayloadBody item={item} actions={actions} />
+    )
+  },
 }
+
+/**
+ * The decision's words, per kind. A discovery card's reject is a dismissal,
+ * permanent for its space, so it says so. (D72)
+ */
+type DecisionWords = {
+  accept: string
+  reject: string
+  /** The reject button's tooltip; null for none. */
+  rejectTitle: string | null
+}
+
+const DECIDE: DecisionWords = {
+  accept: 'Accept',
+  reject: 'Reject',
+  rejectTitle: null,
+}
+
+const DISMISS_TITLE =
+  'Dismiss for good: this domain is never suggested in this space again'
+
+export function decisionWords(kind: SuggestionKind): DecisionWords {
+  if (kind === 'add_record')
+    return {
+      accept: 'Add and file here',
+      reject: 'Dismiss',
+      rejectTitle: DISMISS_TITLE,
+    }
+  if (kind === 'file_record')
+    return {
+      accept: 'File here',
+      reject: 'Dismiss',
+      rejectTitle: DISMISS_TITLE,
+    }
+  return DECIDE
+}
+
+const isDiscovery = (kind: SuggestionKind) =>
+  kind === 'add_record' || kind === 'file_record'
 
 export function suggestionBodyFor(kind: SuggestionKind): SuggestionBody {
   return SUGGESTION_BODIES[kind] ?? PayloadBody
@@ -257,6 +327,46 @@ function SpaceTagBody({ proposed }: { proposed: SpaceTagPayload }) {
         </div>
       )}
     </dl>
+  )
+}
+
+/**
+ * A company a watch found (D72): its name, its domain, and the pages that
+ * put it forward.
+ */
+function DiscoveryBody({
+  name,
+  domain,
+  evidence,
+}: {
+  name: string
+  domain: string
+  evidence: ReadonlyArray<DiscoveryEvidence>
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="min-w-0 truncate text-ui font-medium">{name}</span>
+      <span className="min-w-0 truncate mono text-label text-graphite">
+        {domain}
+      </span>
+      {evidence.length > 0 ? (
+        <ul className="flex min-w-0 flex-col gap-0.5" aria-label="Evidence">
+          {evidence.map((e) => (
+            <li key={e.url} className="min-w-0 truncate">
+              <a
+                href={e.url}
+                target="_blank"
+                rel="noreferrer"
+                title={e.url}
+                className="focus-ring mono text-micro text-graphite hover:text-foreground hover:underline"
+              >
+                {e.title ?? e.url}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   )
 }
 
@@ -419,6 +529,7 @@ export function SuggestionEntry({
   failure?: string | null
 }): React.ReactNode {
   const Body = suggestionBodyFor(item.kind)
+  const words = decisionWords(item.kind)
   return (
     <li className="flex flex-col gap-3 border-b border-rule px-5 py-3 last:border-b-0 sm:flex-row sm:items-start sm:gap-5">
       <div className="flex min-w-0 flex-col gap-1 sm:w-64 sm:shrink-0">
@@ -473,16 +584,17 @@ export function SuggestionEntry({
       <div className="flex shrink-0 items-center gap-2">
         <Button
           size="xs"
-          variant="outline"
+          variant={isDiscovery(item.kind) ? 'ghost' : 'outline'}
           disabled={pending}
           onClick={onReject}
+          {...(words.rejectTitle === null ? {} : { title: words.rejectTitle })}
         >
           <X className="size-3" strokeWidth={2} />
-          Reject
+          {words.reject}
         </Button>
         <Button size="xs" disabled={pending} onClick={onAccept}>
           <Check className="size-3" strokeWidth={2} />
-          Accept
+          {words.accept}
         </Button>
       </div>
     </li>
@@ -617,16 +729,19 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
         )}
         <span className="label-caps text-graphite">Suggestions</span>
         <span className="mono text-micro text-graphite">{n}</span>
-        <AcceptAllButton
-          pending={pending !== null}
-          onClick={() =>
-            void runBatch(() =>
-              acceptSuggestionsForRecord({
-                data: { entityId: card.record.id },
-              }),
-            )
-          }
-        />
+        {/* A space's discovery cards are decided one by one. */}
+        {card.suggestions.every((s) => isDiscovery(s.kind)) ? null : (
+          <AcceptAllButton
+            pending={pending !== null}
+            onClick={() =>
+              void runBatch(() =>
+                acceptSuggestionsForRecord({
+                  data: { entityId: card.record.id },
+                }),
+              )
+            }
+          />
+        )}
       </div>
       <ul className="flex flex-col">
         {card.suggestions.map((s) => (

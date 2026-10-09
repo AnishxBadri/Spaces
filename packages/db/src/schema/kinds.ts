@@ -66,6 +66,12 @@ export const space = pgTable(
      *   descendant; Restore clears exactly the rows carrying that instant.
      */
     archivedAt: timestamp('archived_at', { withTimezone: true }),
+    /**
+     * What belongs here, in one to three sentences — the membership rule a
+     * watch's engine and the classify lane read literally. The memo stays the
+     * thesis. Null when unwritten; never a placeholder. (D72)
+     */
+    criteria: text('criteria'),
   },
   // Slugs are unique per parent, not globally — one label recurs across
   // branches. `path` stays globally unique by construction.

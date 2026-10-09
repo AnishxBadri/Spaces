@@ -859,6 +859,7 @@ export const openCellProposalsProgram = Effect.fn('openCellProposals')(
     const seen = new Set<string>()
     const out: Array<OpenCellProposal> = []
     for (const r of rows) {
+      if (r.entityId === null) continue
       const slugs = [
         ...Object.keys(jsonRecord(r.payload)),
         ...readOptionProposals(r.rationale).map((p) => p.slug),
@@ -907,10 +908,15 @@ export const addProposedOptionProgram = Effect.fn('addProposedOption')(
     const proposal = readOptionProposals(row.rationale).find(
       (p) => p.label === label,
     )
-    if (row.kind !== 'attribute_patch' || proposal === undefined)
+    const { entityId } = row
+    if (
+      row.kind !== 'attribute_patch' ||
+      proposal === undefined ||
+      entityId === null
+    )
       return yield* refuse('This suggestion proposes no such option')
     const registry = yield* Effect.tryPromise({
-      try: () => registryFor(db, row.entityId),
+      try: () => registryFor(db, entityId),
       catch: () => refuse('This record has no attributes'),
     })
     const def = registry.find((d) => d.slug === proposal.slug)

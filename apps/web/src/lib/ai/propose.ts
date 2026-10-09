@@ -1,7 +1,15 @@
 import { Effect } from 'effect'
 import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { activity, document, entity, link, suggestion } from '@spaces/db/schema'
+import {
+  activity,
+  document,
+  entity,
+  link,
+  space,
+  spaceWatchDismissal,
+  suggestion,
+} from '@spaces/db/schema'
 import { jsonRecord } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { toPatch, validateProposal } from '@spaces/core/ai/schema'
@@ -10,7 +18,14 @@ import {
   setValuesInTx,
 } from '@spaces/core/writes/attributes/values'
 import type { SetValuesResult, Tx } from '@spaces/core/writes/attributes/values'
-import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import {
+  recordNameAlias,
+  resolveEntity,
+} from '@spaces/core/writes/entities/resolve'
+import {
+  readAddRecordPayload,
+  readFileRecordPayload,
+} from '@spaces/core/ai/discovery'
 import type { ResolveResult } from '@spaces/core/writes/entities/resolve'
 import { canonicalId } from '@spaces/core/writes/entities/sweep'
 import {
@@ -18,8 +33,10 @@ import {
   SuggestionNotFound,
   SuggestionNotOpen,
   UnsupportedSuggestionKind,
+  addRecordOf,
   asFailure,
   documentKindOf,
+  fileRecordOf,
   identityOf,
   invalid,
   noteOf,
@@ -38,6 +55,7 @@ import type { DomainEvent } from '@spaces/sdk'
 import { dealLinked } from '@spaces/core/writes/events/dispatch'
 import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
 import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'
+import { liveSpaceSql } from '#/lib/spaces/live'
 import { emitDomainEvent } from '#/lib/events/emit'
 import { setPersonCompanyInTx } from '#/lib/people/companies'
 import { insertTaskInTx } from '#/lib/tasks/create'
@@ -51,10 +69,14 @@ export {
   SuggestionNotOpen,
   SuggestionWriteFailed,
   UnsupportedSuggestionKind,
+  proposeDiscoveryProgram,
   proposeProgram,
   registryFor,
 } from '@spaces/core/writes/suggestions/propose'
 export type {
+  DiscoveryKind,
+  DiscoveryProposeInput,
+  DiscoveryProposed,
   ProposeInput,
   Reader,
   Suggestion,
@@ -88,7 +110,9 @@ export type {
  * them: `attribute_patch` (a value, through the one write path), `identity`
  * (a person, through `resolveEntity`; a company record joins the person's
  * `companies`, and the person is written into the reference field the claim
- * came from) and `task` (one task, through the task writer).
+ * came from) and `task` (one task, through the task writer). The discovery
+ * cards (`add_record`, `file_record`) sit on a space, not a record: accept
+ * resolves and files, reject dismisses the domain from the space. (D72)
  *
  * **A captured page is an anchor too (SPA-134).** A capture names somebody
  * we usually hold no record for, so its read is anchored on the captured
@@ -103,6 +127,17 @@ export type {
 /** Only a person accepts or rejects: the decision is what `decided_by` names. */
 export type Decider = { type: 'user'; id: string }
 
+/** A row of a record kind, its record known present. */
+type Anchored = Suggestion & { entityId: string }
+
+/** The record a record kind's row is about; only `add_record` has none. */
+function anchored(row: Suggestion): Anchored {
+  const { entityId } = row
+  if (entityId === null)
+    throw new EntityNotFound({ entityId: row.id, message: 'Record not found' })
+  return { ...row, entityId }
+}
+
 /** Read wider than `Decider` on purpose: the runtime half of that claim. */
 const isPerson = (actor: { type: string }): boolean => actor.type === 'user'
 
@@ -114,6 +149,8 @@ const KIND_LABEL: Record<SuggestionKind, string> = {
   document_kind: 'document type',
   space_tag: 'space tag',
   task: 'task',
+  add_record: 'new company',
+  file_record: 'filing',
 }
 
 const isKind = (k: string): k is SuggestionKind => k in KIND_LABEL
@@ -265,6 +302,23 @@ export type Accepted =
       /** The task the accept wrote. */
       taskId: string
     }
+  | {
+      kind: 'add_record'
+      suggestion: Suggestion
+      /** What `resolveEntity` did: created the company, or found it held. */
+      resolved: ResolveResult
+      /** The space it was filed in: the card's, or the hinted subspace. */
+      spaceId: string
+      /** False when the record was already filed there. */
+      tagged: boolean
+    }
+  | {
+      kind: 'file_record'
+      suggestion: Suggestion
+      entityId: string
+      spaceId: string
+      tagged: boolean
+    }
 
 /**
  * Accept an identity (SPA-105, spec §11): the person a document named walks
@@ -292,7 +346,7 @@ export type Accepted =
  */
 async function acceptIdentityInTx(
   tx: Tx,
-  row: Suggestion,
+  row: Anchored,
   actor: Decider,
   owed: Array<DomainEvent | null>,
 ): Promise<{
@@ -387,7 +441,7 @@ async function acceptIdentityInTx(
  */
 async function filePageOn(
   tx: Tx,
-  row: Suggestion,
+  row: Anchored,
   personId: string,
   actor: Decider,
 ): Promise<boolean> {
@@ -435,7 +489,7 @@ async function filePageOn(
 async function fileIntoReference(
   tx: Tx,
   input: {
-    row: Suggestion
+    row: Anchored
     recordId: string
     slug: string
     personId: string
@@ -496,7 +550,7 @@ async function fileIntoReference(
  */
 async function acceptDocumentKindInTx(
   tx: Tx,
-  row: Suggestion,
+  row: Anchored,
   actor: Decider,
 ): Promise<{ from: string; to: string }> {
   const { kind } = documentKindOf(row.payload)
@@ -538,7 +592,7 @@ async function acceptDocumentKindInTx(
  */
 async function acceptNoteInTx(
   tx: Tx,
-  row: Suggestion,
+  row: Anchored,
   actor: Decider,
 ): Promise<{ noteId: string }> {
   const payload = noteOf(row.payload)
@@ -585,7 +639,7 @@ async function acceptNoteInTx(
  */
 async function acceptSpaceTagInTx(
   tx: Tx,
-  row: Suggestion,
+  row: Anchored,
   actor: Decider,
 ): Promise<{ spaceId: string; tagged: boolean; emit: DomainEvent | null }> {
   const { spaceId, confidence } = spaceTagOf(row.payload)
@@ -623,7 +677,7 @@ async function acceptSpaceTagInTx(
  */
 async function acceptTaskInTx(
   tx: Tx,
-  row: Suggestion,
+  row: Anchored,
   actor: Decider,
 ): Promise<{ taskId: string }> {
   const payload = taskOf(row.payload)
@@ -647,6 +701,171 @@ async function acceptTaskInTx(
     entityIds: [recordId],
   })
   return { taskId: id }
+}
+
+// ---------- discovery cards (D72) ----------
+
+/**
+ * The live subspace under `spaceId` a hint names, by name or slug, nearest
+ * first; null when none does. A hint is advice, never a refusal.
+ */
+async function hintedSubspace(
+  tx: Tx,
+  spaceId: string,
+  hint: string | null,
+): Promise<string | null> {
+  if (hint === null) return null
+  const root = (
+    await tx
+      .select({ path: space.path })
+      .from(space)
+      .where(eq(space.entityId, spaceId))
+  ).at(0)
+  if (!root) return null
+  const match = (
+    await tx
+      .select({ id: space.entityId })
+      .from(space)
+      .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(
+        and(
+          sql`${space.path} <@ ${root.path}::ltree`,
+          sql`${space.entityId} <> ${spaceId}`,
+          isNull(entity.mergedIntoId),
+          liveSpaceSql,
+          or(
+            sql`lower(${entity.canonicalName}) = lower(${hint})`,
+            eq(space.slug, hint),
+          ),
+        ),
+      )
+      .orderBy(sql`nlevel(${space.path})`)
+      .limit(1)
+  ).at(0)
+  return match?.id ?? null
+}
+
+/** File a record in a space by the accepter, with the one `space.tagged` line. */
+async function fileDiscovered(
+  tx: Tx,
+  row: Suggestion,
+  recordId: string,
+  spaceId: string,
+  actor: Decider,
+): Promise<{ tagged: boolean; emit: DomainEvent | null }> {
+  const { tagged, emit } = await insertSpaceTag(tx, {
+    entityId: recordId,
+    spaceId,
+    source: 'ai',
+    confidence: null,
+    createdBy: actor.id,
+  })
+  if (tagged)
+    await tx.insert(activity).values({
+      actorId: actor.id,
+      verb: 'space.tagged',
+      subjectEntityId: recordId,
+      objectEntityId: spaceId,
+      meta: { suggestionId: row.id, source: 'ai' },
+    })
+  return { tagged, emit }
+}
+
+/**
+ * Accept "add X?": the company walks through `resolveEntity` — a domain
+ * already held attaches, else it is born — and is filed in the card's space,
+ * or the hinted subspace when one matches. The birth's `entity.created` is
+ * owed after the commit, so an auto-enrich scoped to the space sees the
+ * filing. (D72)
+ * - `resolveEntity` commits on its own connection, as the identity accept's
+ *   does: a failure after it leaves the company and the card open, and a
+ *   retry attaches by domain.
+ */
+async function acceptAddRecordInTx(
+  tx: Tx,
+  row: Suggestion,
+  actor: Decider,
+  owed: Array<DomainEvent | null>,
+): Promise<{ resolved: ResolveResult; spaceId: string; tagged: boolean }> {
+  const card = addRecordOf(row.payload)
+  if (!(await isLiveSpace(tx, card.spaceId)))
+    throw new EntityNotFound({
+      entityId: card.spaceId,
+      message: 'That space no longer exists',
+    })
+  const spaceId =
+    (await hintedSubspace(tx, card.spaceId, card.subspaceHint)) ?? card.spaceId
+  const resolved = await resolveEntity({
+    kind: 'company',
+    name: card.name,
+    keys: { domain: card.domain },
+    // A person decided this company exists; the card is the provenance.
+    source: { class: 'manual' },
+    createdBy: actor.id,
+  })
+  for (const alias of card.aliases)
+    await recordNameAlias(resolved.entityId, alias, { class: 'manual' }, tx)
+  const { tagged, emit } = await fileDiscovered(
+    tx,
+    row,
+    resolved.entityId,
+    spaceId,
+    actor,
+  )
+  owed.push(resolved.emit, emit)
+  return { resolved, spaceId, tagged }
+}
+
+/** Accept "also file X here?": the held record, followed through a merge. */
+async function acceptFileRecordInTx(
+  tx: Tx,
+  row: Suggestion,
+  actor: Decider,
+  owed: Array<DomainEvent | null>,
+): Promise<{ entityId: string; spaceId: string; tagged: boolean }> {
+  const card = fileRecordOf(row.payload)
+  if (!(await isLiveSpace(tx, card.spaceId)))
+    throw new EntityNotFound({
+      entityId: card.spaceId,
+      message: 'That space no longer exists',
+    })
+  const recordId = await canonicalId(card.entityId, tx)
+  const live = (
+    await tx
+      .select({ id: entity.id })
+      .from(entity)
+      .where(eq(entity.id, recordId))
+  ).at(0)
+  if (!live)
+    throw new EntityNotFound({
+      entityId: card.entityId,
+      message: 'Record not found',
+    })
+  const { tagged, emit } = await fileDiscovered(
+    tx,
+    row,
+    recordId,
+    card.spaceId,
+    actor,
+  )
+  owed.push(emit)
+  return { entityId: recordId, spaceId: card.spaceId, tagged }
+}
+
+/**
+ * The (space, domain) a discovery card's reject dismisses, or null for a
+ * row that is not one.
+ */
+function dismissalOf(
+  row: Suggestion,
+): { spaceId: string; domain: string } | null {
+  const card =
+    row.kind === 'add_record'
+      ? readAddRecordPayload(row.payload)
+      : row.kind === 'file_record'
+        ? readFileRecordPayload(row.payload)
+        : null
+  return card === null ? null : { spaceId: card.spaceId, domain: card.domain }
 }
 
 /**
@@ -729,7 +948,47 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
   const accepted = yield* Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
-        const row = await lockOpen(tx, id)
+        const locked = await lockOpen(tx, id)
+        if (locked.kind === 'add_record' || locked.kind === 'file_record') {
+          if (fields !== undefined)
+            throw invalid([
+              {
+                slug: 'fields',
+                message: 'fields: a discovery card is accepted whole',
+              },
+            ])
+          if (locked.kind === 'add_record') {
+            const { resolved, spaceId, tagged } = await acceptAddRecordInTx(
+              tx,
+              locked,
+              actor,
+              owed,
+            )
+            const decided = await close(tx, id, 'accepted', actor)
+            return {
+              kind: 'add_record',
+              suggestion: decided,
+              resolved,
+              spaceId,
+              tagged,
+            } satisfies Accepted
+          }
+          const { entityId, spaceId, tagged } = await acceptFileRecordInTx(
+            tx,
+            locked,
+            actor,
+            owed,
+          )
+          const decided = await close(tx, id, 'accepted', actor)
+          return {
+            kind: 'file_record',
+            suggestion: decided,
+            entityId,
+            spaceId,
+            tagged,
+          } satisfies Accepted
+        }
+        const row = anchored(locked)
         if (row.kind === 'identity') {
           if (fields !== undefined)
             throw invalid([
@@ -1028,12 +1287,27 @@ export const acceptColumnProgram = Effect.fn('acceptColumnProgram')(
   },
 )
 
+/**
+ * Reject a suggestion. A discovery card's reject is a dismissal too: the
+ * (space, domain) row, written in the same transaction, refuses every later
+ * card for the domain in that space. (D72)
+ */
 export const rejectProgram = Effect.fn('rejectProgram')(function* (
   id: string,
   actor: Decider,
 ): Effect.fn.Return<Suggestion, SuggestionFailure> {
   return yield* Effect.tryPromise({
-    try: () => db.transaction((tx) => close(tx, id, 'rejected', actor)),
+    try: () =>
+      db.transaction(async (tx) => {
+        const row = await close(tx, id, 'rejected', actor)
+        const dismissal = dismissalOf(row)
+        if (dismissal !== null)
+          await tx
+            .insert(spaceWatchDismissal)
+            .values({ ...dismissal, dismissedBy: actor.id })
+            .onConflictDoNothing()
+        return row
+      }),
     catch: asFailure,
   })
 })

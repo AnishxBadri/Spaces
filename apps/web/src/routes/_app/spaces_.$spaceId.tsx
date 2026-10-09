@@ -33,6 +33,7 @@ import {
   RecordHeader,
 } from '#/components/record/record-parts'
 import { SpaceContacts } from '#/components/space-contacts'
+import { SpaceCriteria } from '#/components/space-criteria'
 import { SpaceGlossary } from '#/components/space-glossary'
 import { SpaceMoveDialog } from '#/components/space-move-dialog'
 import { SpaceSources } from '#/components/space-sources'
@@ -425,6 +426,9 @@ function SpacePage() {
           </>
         }
       >
+        {/* What belongs here — the membership rule a watch reads. */}
+        <SpaceCriteria spaceId={spc.id} criteria={spc.criteria} />
+
         {/* What I think here — the prose filed against this space. */}
         <LedgerSection
           label="Filed here"
