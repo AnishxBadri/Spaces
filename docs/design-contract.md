@@ -189,28 +189,30 @@ architecture to a reviewer; the person at 8am needs the value.
 Compose these. A new component is a last resort and needs the same argument a modal
 needs.
 
-| primitive                                                                         | file                                                    | for                                                                                                 |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `PageHeader`, `KeyHint`, `ReadoutStrip`                                           | `apps/web/src/components/page-header.tsx`               | P1 — serif title or sentence, mono eyebrow/readout, actions right, hairline under                   |
-| `SectionHead`, `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`       | `apps/web/src/components/ledger-section.tsx`            | P2/P3 — bone head band (title + mono count), 40px rows on rules, a fixed mono lane, value-vs-median |
-| `RecordHeader`, `RecordBody`, `RecordSection`, `PropertyGrid`, `PropertyCell`     | `apps/web/src/components/record/record-parts.tsx`       | P7 — the record anatomy: crumb, readouts, property grid, sections                                   |
-| `RailSection`, `RailRow`, `RailItem`, `RailEmpty`, `StageStepper`                 | `apps/web/src/components/record/record-parts.tsx`       | the bone rail right of a record                                                                     |
-| `InitialsMark`, `DitherMark`, `initialsOf`                                        | `apps/web/src/components/record/record-parts.tsx`       | ink initials squares and 1-bit fallback marks                                                       |
-| `RecordTable`, `TableToolbar`, `AddColumnButton`                                  | `apps/web/src/components/table/record-table.tsx`        | the signature grid — sticky head, 36px rows, columns popover, `N OF M` foot                         |
-| `useTablePrefs`                                                                   | `apps/web/src/components/table/use-table-prefs.ts`      | per-surface column order / visibility / width, under a frozen key                                   |
-| `RecordLinkCell`, `IconBadge`, `InitialBadge`, `ChipLink`, `MetaCell`, `DateCell` | `apps/web/src/components/table/cells.tsx`               | the cell renderers a hand-declared column uses                                                      |
-| `ViewBar`, `useViewState`                                                         | `apps/web/src/components/views/`                        | saved views — **object surfaces only** (`/companies`, `/deals`, `/people`, `/o/$slug`)              |
-| `SettingsSection`, `SettingsRow`                                                  | `apps/web/src/components/settings/settings-section.tsx` | a section of the settings shell — serif title, sans sentence, mono crumb, 48px rows                 |
-| `SettingsNav`, `SETTINGS_SECTIONS`                                                | `apps/web/src/components/settings/settings-nav.tsx`     | the settings nav grammar — one row per section, groups derived, `admin` in the lane                 |
-| `EmptyState`                                                                      | `apps/web/src/components/empty-state.tsx`               | P5 — dither block, serif sentence, one sans line, the primary with its key                          |
-| `DitherBlock`, `DensityRamp`                                                      | `apps/web/src/components/dither.tsx`                    | the only texture; loading is a density ramp, never a shimmer                                        |
-| `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`                 | P8 — 44px serif head + mono context + `esc`, 20px body, 52px bone foot                              |
-| `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`         | the destructive confirm; it replaces `window.confirm` everywhere                                    |
-| `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                           | the atoms — reticle focus, 2px radius, key hints inside                                             |
-| `Badge`, `badgeClasses`, `badgeTint`                                              | `apps/web/src/components/ui/badge.tsx`                  | the square option badge — takes the option row + index, `archived` and `unselected`                 |
-| `Select`, `selectClasses`                                                         | `apps/web/src/components/ui/select.tsx`                 | the one picker — an Input-height trigger, a paper sheet, `width` and `inset` per caller             |
-| `Checkbox`, `checkboxClasses`                                                     | `apps/web/src/components/ui/checkbox.tsx`               | the 14px square that fills with pine; a button, never a native control                              |
-| `Switch`, `switchClasses`                                                         | `apps/web/src/components/ui/switch.tsx`                 | the 24×14 square track — graphite knob off, pine knob on, legible from one switch                   |
+| primitive                                                                         | file                                                    | for                                                                                                     |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `PageHeader`, `KeyHint`, `ReadoutStrip`                                           | `apps/web/src/components/page-header.tsx`               | P1 — serif title or sentence, mono eyebrow/readout, actions right, the double rule under                |
+| `SectionHead`, `LedgerSection`, `LedgerRow`, `LedgerFigure`, `ReferenceBar`       | `apps/web/src/components/ledger-section.tsx`            | P2/P3 — bone head band (title + mono count), 40px rows on rules, a fixed mono lane, value-vs-median     |
+| `RecordHeader`, `RecordBody`, `RecordSection`, `PropertyGrid`, `PropertyCell`     | `apps/web/src/components/record/record-parts.tsx`       | P7 — the record anatomy: one stamp beside the crumb, readouts, the double rule, property grid, sections |
+| `RailSection`, `RailRow`, `RailItem`, `RailEmpty`, `StageStepper`                 | `apps/web/src/components/record/record-parts.tsx`       | the bone rail right of a record                                                                         |
+| `InitialsMark`, `DitherMark`, `initialsOf`                                        | `apps/web/src/components/record/record-parts.tsx`       | ink initials squares and 1-bit fallback marks                                                           |
+| `RecordTable`, `TableToolbar`, `AddColumnButton`                                  | `apps/web/src/components/table/record-table.tsx`        | the signature grid — sticky head, 36px rows, columns popover, `N OF M` foot                             |
+| `useTablePrefs`                                                                   | `apps/web/src/components/table/use-table-prefs.ts`      | per-surface column order / visibility / width, under a frozen key                                       |
+| `RecordLinkCell`, `IconBadge`, `InitialBadge`, `ChipLink`, `MetaCell`, `DateCell` | `apps/web/src/components/table/cells.tsx`               | the cell renderers a hand-declared column uses                                                          |
+| `ViewBar`, `useViewState`                                                         | `apps/web/src/components/views/`                        | saved views — **object surfaces only** (`/companies`, `/deals`, `/people`, `/o/$slug`)                  |
+| `SettingsSection`, `SettingsRow`                                                  | `apps/web/src/components/settings/settings-section.tsx` | a section of the settings shell — serif title, sans sentence, mono crumb, 48px rows                     |
+| `SettingsNav`, `SETTINGS_SECTIONS`                                                | `apps/web/src/components/settings/settings-nav.tsx`     | the settings nav grammar — one row per section, groups derived, `admin` in the lane                     |
+| `EmptyState`                                                                      | `apps/web/src/components/empty-state.tsx`               | P5 — dither block, serif sentence, one sans line, the primary with its key                              |
+| `DitherBlock`, `DensityRamp`                                                      | `apps/web/src/components/dither.tsx`                    | the only texture; loading is a density ramp, never a shimmer                                            |
+| `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, …                      | `apps/web/src/components/ui/dialog.tsx`                 | P8 — 44px serif head + mono context + `esc`, 20px body, 52px bone foot                                  |
+| `useConfirm`, `ConfirmDialog`                                                     | `apps/web/src/components/ui/confirm-dialog.tsx`         | the destructive confirm; it replaces `window.confirm` everywhere                                        |
+| `Button`, `Input`, `Label`, `Popover`, `Tooltip`, `DropdownMenu`                  | `apps/web/src/components/ui/`                           | the atoms — reticle focus, 2px radius, key hints inside                                                 |
+| `Badge`, `badgeClasses`, `badgeTint`                                              | `apps/web/src/components/ui/badge.tsx`                  | the square option badge — takes the option row + index, `archived` and `unselected`                     |
+| `Select`, `selectClasses`                                                         | `apps/web/src/components/ui/select.tsx`                 | the one picker — an Input-height trigger, a paper sheet, `width` and `inset` per caller                 |
+| `Checkbox`, `checkboxClasses`                                                     | `apps/web/src/components/ui/checkbox.tsx`               | the 14px square that fills with pine; a button, never a native control                                  |
+| `Stamp`, `spaceStamp`                                                             | `apps/web/src/components/ui/stamp.tsx`                  | the ink stamp — kind and one fact in mono caps with cut ends; outline with the day when archived        |
+| `Tabs`, `nextTabIndex`                                                            | `apps/web/src/components/ui/tabs.tsx`                   | real tabs — bone bar, the open tab paper with cut shoulders joining the body, mono counts, ←→ Home End  |
+| `Switch`, `switchClasses`                                                         | `apps/web/src/components/ui/switch.tsx`                 | the 24×14 square track — graphite knob off, pine knob on, legible from one switch                       |
 
 ### Pickers and dates (SPA-38)
 
@@ -465,12 +467,10 @@ of these surfaces builds toward the decided shape, not the shipped one; a slice 
 not touch it leaves the shipped one alone. Each line names its decision and the work that
 carries it. Project 27 is "Instrument, printed — the decided design lands".
 
-**The printed details** (`DESIGN.md` §1, §5 "Printed details"; project 27, `print-*`)
+**The printed details** (`DESIGN.md` §1, §5 "Printed details"; project 27, `print-*`). The double rule, the
+stamp and real tabs are built (§2) as the `double-rule`, `stamp`, `stamp-outline` and
+`tab-open` utilities in `apps/web/src/styles.css`.
 
-- **Double rule** under page heads only: 2px ink, 2px gap, 1px ink.
-- **Ink stamp**, one per page, with cut ends (`COMPANY C-0231`); outline when archived.
-- **Real tabs** on tab bars only: the open tab is paper with cut shoulders joining the
-  body.
 - **Dither is data**: charts, readout history, 1-bit marks, popover elevation; one moment
   per region.
 - **Elevation split**: a popover casts a 4px dithered ink shadow; a window over the

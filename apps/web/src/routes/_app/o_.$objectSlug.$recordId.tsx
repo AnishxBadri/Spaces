@@ -136,6 +136,7 @@ function ObjectRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
+        stamp={{ kind: record.object.singular, fact: record.id.slice(0, 8) }}
         crumb={
           <>
             <Link

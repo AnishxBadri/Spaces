@@ -34,6 +34,7 @@ function TermPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
+        stamp={{ kind: 'Term' }}
         crumb={
           <>
             {'Terms / '}

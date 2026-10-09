@@ -7,8 +7,8 @@ import { cn } from '#/lib/utils'
  * P1 — Page header (Instrument, 2026-09-10). Serif title, or a sentence when
  * the page has a state to report; one mono line of what the instrument
  * measured (above as an eyebrow, or below as a readout); actions right,
- * each carrying its key hint inside the button. Hairline under, 32px
- * inset, 28px above — the header owns its own anatomy so every field
+ * each carrying its key hint inside the button. The double rule under,
+ * 32px inset, 28px above — the header owns its own anatomy so every field
  * starts on the same line.
  */
 export function PageHeader({
@@ -29,7 +29,7 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        'flex shrink-0 items-end justify-between gap-4 border-b border-hairline px-8 pt-7 pb-4',
+        'flex shrink-0 items-end justify-between gap-4 px-8 pt-7 pb-4 double-rule',
         className,
       )}
     >

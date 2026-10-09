@@ -61,6 +61,7 @@ function HoldingPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
+        stamp={{ kind: 'Holding', fact: h.id.slice(0, 8) }}
         crumb={
           <>
             <Link to="/portfolio" className="focus-ring hover:text-foreground">

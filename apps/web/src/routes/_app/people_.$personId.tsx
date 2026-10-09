@@ -134,6 +134,7 @@ function PersonRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
+        stamp={{ kind: 'Person', fact: person.id.slice(0, 8) }}
         crumb={
           <>
             <Link to="/people" className="focus-ring hover:text-foreground">

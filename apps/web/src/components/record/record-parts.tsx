@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react'
 import { SectionHead } from '#/components/ledger-section'
+import { Stamp } from '#/components/ui/stamp'
+import type { StampProps } from '#/components/ui/stamp'
 import { cn } from '#/lib/utils'
 
 /**
- * P7 — Record page anatomy (Instrument, 2026-09-10). Header: breadcrumb,
- * actions, serif name + badge, a readout strip of the numbers that matter.
+ * P7 — Record page anatomy (Instrument, 2026-09-10). Header: the stamp and
+ * breadcrumb, actions, serif name + badge, a readout strip of the numbers
+ * that matter, the double rule under.
  * Body left: property grid (two columns, hairline top and bottom, rules
  * inside), then the sections — notes, interactions, history, files. Rail right on bone:
  * stage stepper, readouts, people. Every part is markup only; the pages
@@ -24,6 +27,7 @@ export type RecordReadout = {
 }
 
 export function RecordHeader({
+  stamp,
   crumb,
   actions,
   mark,
@@ -31,6 +35,8 @@ export function RecordHeader({
   badges,
   readouts,
 }: {
+  /** The page's one stamp, drawn beside the crumb. */
+  stamp: StampProps
   crumb: ReactNode
   actions?: ReactNode
   mark?: ReactNode
@@ -39,10 +45,13 @@ export function RecordHeader({
   readouts?: Array<RecordReadout>
 }) {
   return (
-    <header className="flex shrink-0 flex-col gap-3.5 border-b border-hairline px-8 pt-5">
+    <header className="flex shrink-0 flex-col gap-3.5 px-8 pt-5 double-rule">
       <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 truncate mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
-          {crumb}
+        <div className="flex min-w-0 items-center gap-3">
+          <Stamp {...stamp} />
+          <div className="min-w-0 truncate mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
+            {crumb}
+          </div>
         </div>
         {actions ? (
           <div className="flex shrink-0 items-center gap-2">{actions}</div>

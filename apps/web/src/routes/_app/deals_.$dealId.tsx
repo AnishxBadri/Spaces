@@ -195,6 +195,7 @@ function DealRecordPage() {
       ) : null}
 
       <RecordHeader
+        stamp={{ kind: 'Deal', fact: deal.id.slice(0, 8) }}
         crumb={
           <>
             <Link to="/deals" className="focus-ring hover:text-foreground">

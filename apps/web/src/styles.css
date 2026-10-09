@@ -473,6 +473,127 @@
 }
 
 /**
+ * Printed details (DESIGN.md §5): the double rule, the ink stamp and the open
+ * tab. Each shape lives here once so no surface spells a clip-path or a
+ * border stack by hand.
+ */
+
+/**
+ * The double rule: 2px ink, 2px gap, 1px ink. Page and record heads only —
+ * a section still opens on the single hairline.
+ * - A real 5px bottom border painted by a gradient, so it takes layout like
+ *   the hairline it replaces and the gap shows the head's own ground.
+ */
+@utility double-rule {
+  border-bottom: 5px solid var(--hairline);
+  border-image: linear-gradient(
+      to top,
+      var(--hairline) 1px,
+      transparent 1px 3px,
+      var(--hairline) 3px
+    )
+    0 0 5 0 / 0 0 5px 0;
+}
+
+/**
+ * The ink stamp: mono caps in paper on an ink label with cut ends, naming
+ * what the page is (`COMPANY 3f2a9c1b`, `SPACE · depth 2`). One per page.
+ */
+@utility stamp {
+  --stamp-cut: 6px;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 1.25rem;
+  padding-inline: 0.625rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: var(--text-micro--line-height);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: var(--hairline);
+  color: var(--stamp-ink, var(--paper));
+  clip-path: polygon(
+    var(--stamp-cut) 0,
+    calc(100% - var(--stamp-cut)) 0,
+    100% 50%,
+    calc(100% - var(--stamp-cut)) 100%,
+    var(--stamp-cut) 100%,
+    0 50%
+  );
+}
+
+/**
+ * An archived thing's stamp: the same shape in outline. Used with `stamp`.
+ * - A border would be clipped off the cut ends, so the outline is the ink
+ *   label with a paper label 1px inside it, on `::before` under the text.
+ */
+@utility stamp-outline {
+  --stamp-ink: var(--foreground);
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    --stamp-inner-cut: calc(var(--stamp-cut) * 0.9);
+    content: '';
+    position: absolute;
+    inset: 1px;
+    z-index: -1;
+    background: var(--paper);
+    clip-path: polygon(
+      var(--stamp-inner-cut) 0,
+      calc(100% - var(--stamp-inner-cut)) 0,
+      100% 50%,
+      calc(100% - var(--stamp-inner-cut)) 100%,
+      var(--stamp-inner-cut) 100%,
+      0 50%
+    );
+  }
+}
+
+/**
+ * The open tab of a tab bar: paper with cut shoulders and a 1px ink edge,
+ * open at the foot so it joins the body under it with no rule between.
+ * - The caller pulls it 1px over the bar's foot rule (`-mb-px`); the paper
+ *   pane covers that rule and the ink sides meet it.
+ * - Same two layers as `stamp-outline`; `::after` stays free for the focus
+ *   reticle.
+ */
+@utility tab-open {
+  --tab-cut: 6px;
+  position: relative;
+  isolation: isolate;
+  background: var(--hairline);
+  clip-path: polygon(
+    0 var(--tab-cut),
+    var(--tab-cut) 0,
+    calc(100% - var(--tab-cut)) 0,
+    100% var(--tab-cut),
+    100% 100%,
+    0 100%
+  );
+
+  &::before {
+    --tab-inner-cut: calc(var(--tab-cut) - 0.6px);
+    content: '';
+    position: absolute;
+    inset: 1px 1px 0 1px;
+    z-index: -1;
+    background: var(--paper);
+    clip-path: polygon(
+      0 var(--tab-inner-cut),
+      var(--tab-inner-cut) 0,
+      calc(100% - var(--tab-inner-cut)) 0,
+      100% var(--tab-inner-cut),
+      100% 100%,
+      0 100%
+    );
+  }
+}
+
+/**
  * Composer wash (DESIGN.md §5, Micro-interactions — SPA-53). A row a composer
  * just created lands washed in bone, and the wash fades out over 250ms: the
  * eye is told where the new row went without the list moving a pixel.

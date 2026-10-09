@@ -30,6 +30,7 @@ import { SaveAsTemplateAction } from '#/components/templates'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { spaceStamp } from '#/components/ui/stamp'
 import {
   createNote,
   createSpace,
@@ -134,6 +135,7 @@ function SpacePage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
+        stamp={spaceStamp(spc.ancestors.length)}
         crumb={
           <nav aria-label="Breadcrumb" className="flex items-center gap-2">
             <Link

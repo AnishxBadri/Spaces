@@ -154,6 +154,7 @@ function CompanyRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
+        stamp={{ kind: 'Company', fact: company.id.slice(0, 8) }}
         crumb={
           <>
             <Link to="/companies" className="focus-ring hover:text-foreground">

@@ -7,6 +7,7 @@ import { DitherBlock } from '#/components/dither'
 import { KeyHint, PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
+import { Tabs } from '#/components/ui/tabs'
 import { columnLetter } from '@spaces/core/import/mapping'
 import { cn } from '#/lib/utils'
 
@@ -474,30 +475,13 @@ export function SheetTabs({
 }) {
   if (sheets.length < 2) return null
   return (
-    <div
-      role="tablist"
-      aria-label="Sheets"
-      className="flex items-end gap-0 border-b border-rule"
-    >
-      {sheets.map((sheet) => (
-        <button
-          key={sheet}
-          type="button"
-          role="tab"
-          aria-selected={sheet === current}
-          disabled={disabled}
-          onClick={() => onSelect(sheet)}
-          className={cn(
-            'focus-ring-inset -mb-px h-8 border-b-2 px-3 label-caps transition-colors duration-150 ease-out-quart disabled:opacity-50',
-            sheet === current
-              ? 'border-b-foreground text-foreground'
-              : 'border-b-transparent text-graphite hover:bg-bone',
-          )}
-        >
-          {sheet}
-        </button>
-      ))}
-    </div>
+    <Tabs
+      label="Sheets"
+      items={sheets.map((sheet) => ({ id: sheet, label: sheet }))}
+      value={current}
+      onValueChange={onSelect}
+      disabled={disabled}
+    />
   )
 }
 
