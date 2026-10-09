@@ -91,7 +91,7 @@ export type ReadoutCell = {
   /**
    * Search params for `to` (SPA-124). A counter whose destination is a
    * *filtered* list — Today's Unfiled cell pointing at
-   * `/documents?filed=unfiled` — has to carry the filter or the link lands on
+   * `/files?filed=unfiled` — has to carry the filter or the link lands on
    * a different number than the one it printed. Dropping the link instead
    * would make that cell the only dead one in the strip.
    */

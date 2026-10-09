@@ -28,7 +28,7 @@ import type { MailAttachment, SortedAttachments } from './attachments'
  * - **The target** is one company or none, decided by `file.ts` inside the
  *   interaction's transaction (`chooseFilingCompany`). None is an unfiled
  *   document: no `link`, no `entity_space`, exactly the state
- *   `/documents?filed=unfiled` and Today's Unfiled count already read.
+ *   `/files?filed=unfiled` and Today's Unfiled count already read.
  * - **`kind` stays `other`.** The classify lane (SPA-62,
  *   `onDocumentExtracted`) proposes "this looks like a deck" after
  *   extraction; proposing it here too would put two suggestions on one

@@ -60,7 +60,7 @@ export const Route = createFileRoute('/_app/today')({
       // `listInbox()` costs four queries per side per pair to produce it.
       countOpenInbox(),
       // Likewise: one number, from the same predicate the shelf filters
-      // with, so the cell and `/documents?filed=unfiled` cannot disagree.
+      // with, so the cell and `/files?filed=unfiled` cannot disagree.
       countUnfiledDocuments(),
       listStoppedPlugins(),
     ])
@@ -324,7 +324,7 @@ function TodayPage() {
           {
             label: 'Unfiled',
             value: unfiledCount,
-            to: '/documents',
+            to: '/files',
             search: { filed: 'unfiled' },
           },
         ]}

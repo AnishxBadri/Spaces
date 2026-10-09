@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react'
 /**
  * Whether the global upload dialog is open (SPA-108).
  *
- * §3.1 entry point 3 is three surfaces — the `/documents` header, the
+ * §3.1 entry point 3 is three surfaces — the `/files` header, the
  * chassis, and ⌘K — and one dialog. Threading an `onOpenUpload` prop through
  * them would mean three props, two `AppSidebar` mount sites and a palette
  * that has never taken a callback for anything; a store means a surface opens

@@ -215,13 +215,13 @@ const resolveTarget = Effect.fn('capture.resolveTarget')(function* (
 
 /**
  * The deep link: the record the capture was filed on, or the unfiled inbox
- * (`/documents?filed=unfiled`) it lands in otherwise. A document has no page
+ * (`/files?filed=unfiled`) it lands in otherwise. A document has no page
  * of its own by decision (spec §3.2), so these are the two places it shows.
  */
 function deepLink(target: Target | null): string {
   const { origin } = describeExternalOrigin(process.env.APP_URL)
-  if (target === null) return `${origin}/documents?filed=unfiled`
-  return `${origin}${recordPath(target) ?? '/documents'}`
+  if (target === null) return `${origin}/files?filed=unfiled`
+  return `${origin}${recordPath(target) ?? '/files'}`
 }
 
 /**

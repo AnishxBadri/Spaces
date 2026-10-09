@@ -43,7 +43,7 @@ import { cn } from '#/lib/utils'
  * defaulting to **nowhere** — an unfiled document is §3.2's inbox row, not an
  * orphan, and the writer has accepted an empty `fileAgainst` since SPA-113.
  *
- * Three entry points, one component: the `/documents` header, the chassis'
+ * Three entry points, one component: the `/files` header, the chassis'
  * Upload row, and ⌘K's "Upload a file…". None of them owns it — it is mounted
  * once in the app shell and opened through `lib/upload-dialog-store.ts`, so a
  * fourth surface costs one call and no prop.
@@ -135,7 +135,7 @@ export function UploadDialog() {
           u.map((x) => (x.key === key ? { ...x, done: true } : x)),
         )
         toast.success(`${file.name} · ${where}`)
-        // So `/documents`, a Files tab or a space's Sources shows it without
+        // So `/files`, a Files tab or a space's Sources shows it without
         // the reader reloading the page they uploaded from.
         void router.invalidate()
       } catch (err) {
@@ -326,7 +326,7 @@ function LinkField({ target }: { target: UploadTarget | null }) {
       toast.success(
         `Saved · ${target.kind === 'unfiled' ? 'Unfiled' : target.name}`,
       )
-      // Same invalidate the upload does: /documents, a Files tab or a space's
+      // Same invalidate the upload does: /files, a Files tab or a space's
       // Sources shows the pending row without a reload.
       void router.invalidate()
     } catch (err) {

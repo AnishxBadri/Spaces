@@ -4,8 +4,8 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { Boxes, FileText, Layers, Plus, X } from 'lucide-react'
-import { useState } from 'react'
+import { Boxes, FileText, Layers, Plus, Star, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import {
   LedgerFigure,
@@ -29,6 +29,12 @@ import { TasksRail } from '#/components/tasks-rail'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { Button } from '#/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { spaceStamp } from '#/components/ui/stamp'
 import {
@@ -41,6 +47,11 @@ import {
   tagIntoSpace,
   untagFromSpace,
 } from '#/lib/server-fns'
+import {
+  syncStarredSpaceName,
+  toggleStarredSpace,
+  useStarredSpaces,
+} from '#/lib/chassis-prefs'
 import { useHotkey } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
@@ -183,6 +194,7 @@ function SpacePage() {
               Note here
               <KeyHint>N</KeyHint>
             </Button>
+            <SpaceMenu id={spc.id} name={spc.name} />
           </>
         }
         mark={
@@ -516,6 +528,33 @@ function SpacePage() {
         <SpaceGlossary spaceId={spc.id} terms={terms} />
       </RecordBody>
     </div>
+  )
+}
+
+/**
+ * The head's `···`: the star, kept per browser, that puts this space under
+ * Spaces on the chassis. A star follows a rename here, the one place the
+ * name is read.
+ */
+function SpaceMenu({ id, name }: { id: string; name: string }) {
+  const starred = useStarredSpaces().some((s) => s.id === id)
+  useEffect(() => syncStarredSpaceName({ id, name }), [id, name])
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon" aria-label={`More for ${name}`}>
+          <span aria-hidden className="mono text-ui">
+            ···
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onSelect={() => toggleStarredSpace({ id, name })}>
+          <Star className="size-4" />
+          {starred ? 'Unstar' : 'Star'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

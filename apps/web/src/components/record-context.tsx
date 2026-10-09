@@ -33,7 +33,7 @@ const GROUPS: ReadonlyArray<{ kind: ContextKind; label: string }> = [
   { kind: 'attribute', label: 'Attributes' },
   { kind: 'memo', label: 'Memos' },
   { kind: 'note', label: 'Notes' },
-  { kind: 'doc_chunk', label: 'Documents' },
+  { kind: 'doc_chunk', label: 'Files' },
   { kind: 'event', label: 'History' },
   { kind: 'interaction', label: 'Interactions' },
   { kind: 'task', label: 'Tasks' },

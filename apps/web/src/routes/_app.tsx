@@ -56,10 +56,12 @@ function AppShell() {
   return (
     <div className="flex min-h-dvh bg-paper">
       {/* Desktop sidebar */}
-      {/* Width snaps, never animates: width is not a compositor property. */}
+      {/* Width snaps, never animates: width is not a compositor property.
+          The sidebar draws its own hairline edge, so the current row can
+          cross it. */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 hidden border-r border-hairline md:block',
+          'fixed inset-y-0 left-0 hidden md:block',
           collapsed ? 'w-12' : 'w-58',
         )}
       >
@@ -100,7 +102,7 @@ function AppShell() {
             onClick={() => setMobileNavOpen(false)}
             aria-hidden
           />
-          <div className="absolute inset-y-0 top-12 left-0 w-58 border-r border-hairline shadow-solid">
+          <div className="absolute inset-y-0 top-12 left-0 w-58 shadow-solid">
             <AppSidebar
               hideWordmark
               user={session.user}

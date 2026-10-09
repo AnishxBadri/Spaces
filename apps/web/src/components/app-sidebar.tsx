@@ -1,9 +1,8 @@
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   Briefcase,
   Building2,
   CheckSquare,
-  ChevronsUpDown,
   Compass,
   FileText,
   Kanban,
@@ -17,6 +16,7 @@ import {
   Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useId, useState } from 'react'
 import { Mark, Wordmark } from './wordmark'
 import {
   DropdownMenu,
@@ -28,38 +28,33 @@ import {
 } from './ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { authClient } from '#/lib/auth-client'
+import {
+  STARRED_SHOWN,
+  setGroupFolded,
+  useFoldedGroups,
+  useStarredSpaces,
+} from '#/lib/chassis-prefs'
+import type { FoldableGroup } from '#/lib/chassis-prefs'
 import { objectIcon } from '#/lib/object-icons'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 import { cn } from '#/lib/utils'
 
 /**
- * The chassis (Instrument, 2026-09-10). 232px of bone with a hairline right
- * edge. Three groups: the work (Today, Tasks, Spaces, Notes, Documents), the
- * objects (Companies, People, Deals, then customs), capital (Portfolio,
- * Mandate).
- * Rows are 30px with a 14px mark slot so every label sits on one lane.
- * Current page = paper + rule border + medium weight — never a pine bar
- * (the No-Bar Rule). Settings and the user are pinned to the foot.
+ * The chassis: 232px of bone with a hairline right edge (DESIGN.md §5,
+ * sidebar A). Work (Today, Tasks, Spaces with its starred spaces), then three
+ * groups that fold per browser — Library, Objects, Capital.
  *
- * The head row ends on a mono `«` that folds the chassis (⌘\); collapsed,
- * it is 48px of marks only — the current page a paper box, names as ink
- * tooltips, the mark at the top the way back out. The foot is the Upload row
- * and then one account row whose menu opens to the right and holds Settings
- * (G ,) and Sign out.
- *
- * **Upload is the chassis' one create affordance** (SPA-108) — there is no
- * "New note" row for it to sit beside, so it takes the foot above the
- * account, where a global action belongs and where no G-chord is spent on
- * it: it opens a dialog rather than going anywhere, so it is not a page and
- * not a row of `NAV_ITEMS`. Collapsed it is a mark with the same tooltip
- * every other collapsed row gets.
- *
- * Below is the nav grammar: one row per page, the group and the chord both
- * data on the row, and the three groups derived from it.
+ * - The current row is a tab cut into the page edge: paper, crossing the
+ *   hairline so it joins the page. Never a pine bar (the No-Bar Rule).
+ * - Every row has the same box, current or not, so nothing shifts.
+ * - Overflow expands inline as `▸ n more`, never a dropdown.
+ * - Upload and Settings are icon buttons on the account row; Upload is not a
+ *   page, so it is not a row of `NAV_ITEMS`.
+ * - Collapsed it is 48px of marks only, with no group headings.
  */
 
-/** The three groups of the chassis, in the order the nav draws them. */
-export const NAV_GROUP_IDS = ['work', 'objects', 'capital'] as const
+/** The four groups of the chassis, in the order the nav draws them. */
+export const NAV_GROUP_IDS = ['work', 'library', 'objects', 'capital'] as const
 export type NavGroupId = (typeof NAV_GROUP_IDS)[number]
 
 type NavItem = {
@@ -67,10 +62,9 @@ type NavItem = {
   readonly label: string
   readonly icon: LucideIcon
   /**
-   * The G-chord printed in the row's right lane — data in the row, not a
-   * decision the slice that adds the page makes by hand. The shell binds it
-   * (`useHotkeys` in `routes/_app.tsx`), the keyboard sheet lists it, and
-   * `nav-grammar.test.ts` names both pages if two rows claim one letter.
+   * The G-chord printed in the row's right lane. The shell binds it, the
+   * keyboard sheet lists it, and `nav-grammar.test.ts` names both pages if
+   * two rows claim one letter.
    */
   readonly key: string
   /** Which group the row joins. The groups are derived from this, not sliced. */
@@ -78,9 +72,7 @@ type NavItem = {
 }
 
 export const NAV_ITEMS = [
-  // Today first and login lands there (2026-08-08): the attention page is
-  // the notification channel in a self-hosted product. Portfolio takes F
-  // (fund) because People has P.
+  // Today first: login lands there, and it is the one attention page (D79).
   { to: '/today', label: 'Today', icon: Sunrise, key: 'G T', group: 'work' },
   {
     to: '/tasks',
@@ -90,17 +82,20 @@ export const NAV_ITEMS = [
     group: 'work',
   },
   { to: '/spaces', label: 'Spaces', icon: Layers, key: 'G S', group: 'work' },
-  { to: '/notes', label: 'Notes', icon: FileText, key: 'G N', group: 'work' },
-  // The shelf joins the work, last after Notes (SPA-82): it is research
-  // material like Notes and Spaces, not a core object and not capital. It
-  // takes L (library) because D is Deals — the only free letter that says
-  // what the page is.
   {
-    to: '/documents',
-    label: 'Documents',
+    to: '/notes',
+    label: 'Notes',
+    icon: FileText,
+    key: 'G N',
+    group: 'library',
+  },
+  // Files keeps Documents' L (library): D is Deals. (D68 amended)
+  {
+    to: '/files',
+    label: 'Files',
     icon: Paperclip,
     key: 'G L',
-    group: 'work',
+    group: 'library',
   },
   {
     to: '/companies',
@@ -111,6 +106,7 @@ export const NAV_ITEMS = [
   },
   { to: '/people', label: 'People', icon: Users, key: 'G P', group: 'objects' },
   { to: '/deals', label: 'Deals', icon: Kanban, key: 'G D', group: 'objects' },
+  // Portfolio takes F (fund) because People has P.
   {
     to: '/portfolio',
     label: 'Portfolio',
@@ -128,22 +124,31 @@ export const NAV_ITEMS = [
 ] as const satisfies readonly NavItem[]
 
 /**
- * The groups, derived (SPA-32). They used to be `slice(0, 4)` / `slice(4, 7)`
- * / `slice(7)`, so a row inserted anywhere but the end silently reshuffled
- * all three; now a row says which group it joins and the order of `NAV_ITEMS`
- * is free to mean only what it means elsewhere — the order of the ⌘K "Go to"
- * list and of the keyboard sheet's Go column.
+ * The groups, derived by filter: a row says which group it joins, so a row
+ * inserted anywhere reshuffles nothing, and `NAV_ITEMS` order means only the
+ * order of the ⌘K "Go to" list and the keyboard sheet's Go column.
  */
 export const NAV_GROUPS = {
   work: NAV_ITEMS.filter((item) => item.group === 'work'),
+  library: NAV_ITEMS.filter((item) => item.group === 'library'),
   objects: NAV_ITEMS.filter((item) => item.group === 'objects'),
   capital: NAV_ITEMS.filter((item) => item.group === 'capital'),
 } satisfies Record<NavGroupId, readonly NavItem[]>
 
-const { work: WORK, objects: OBJECTS, capital: CAPITAL } = NAV_GROUPS
+/** Custom objects shown before the inline `▸ n more`. */
+export const CUSTOM_OBJECTS_SHOWN = 3
+
+const {
+  work: WORK,
+  library: LIBRARY,
+  objects: OBJECTS,
+  capital: CAPITAL,
+} = NAV_GROUPS
 
 const isMac =
   typeof navigator !== 'undefined' && navigator.platform.startsWith('Mac')
+
+type CustomObject = { slug: string; plural: string; icon: string | null }
 
 export function AppSidebar({
   user,
@@ -160,7 +165,7 @@ export function AppSidebar({
   /** The workspace singleton's name — the deployment's identity. */
   workspaceName?: string | null | undefined
   /** Custom objects (spec §9) — they join the nav right after Deals. */
-  objects?: Array<{ slug: string; plural: string; icon: string | null }>
+  objects?: Array<CustomObject>
   onOpenCommand: () => void
   onNavigate?: (() => void) | undefined
   /** Drawer usage — the mobile top bar already shows the wordmark. */
@@ -173,6 +178,11 @@ export function AppSidebar({
   onOpenKeyboard?: () => void
 }) {
   const navigate = useNavigate()
+  const folded = useFoldedGroups()
+  const starred = useStarredSpaces()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const [starsOpen, setStarsOpen] = useState(false)
+  const [objectsOpen, setObjectsOpen] = useState(false)
 
   async function signOut() {
     await authClient.signOut()
@@ -193,161 +203,210 @@ export function AppSidebar({
     )
   }
 
+  const stars = overflow(
+    starred,
+    STARRED_SHOWN,
+    starsOpen,
+    (s) => pathname === `/spaces/${s.id}`,
+  )
+  const customs = overflow(
+    objects,
+    CUSTOM_OBJECTS_SHOWN,
+    objectsOpen,
+    (o) => pathname === `/o/${o.slug}` || pathname.startsWith(`/o/${o.slug}/`),
+  )
+  // On a starred space its own row is the tab, so Spaces stops matching it.
+  const onStarredSpace = stars.shown.some((s) => pathname === `/spaces/${s.id}`)
+
   return (
-    <div className="flex h-full flex-col justify-between bg-bone">
-      <div className="flex flex-col">
-        {hideWordmark ? (
-          <div className="h-2" />
-        ) : (
-          <div className="flex h-12 items-center justify-between border-b border-hairline px-4">
-            <Link
-              to="/spaces"
-              onClick={onNavigate}
-              className="focus-ring"
-              // Accessible name must contain the visible text (WCAG 2.5.3).
-              aria-label={
-                workspaceName ? `${workspaceName} home` : 'Spaces home'
-              }
-            >
-              <Wordmark />
-            </Link>
-            <span className="flex min-w-0 items-center gap-2">
-              {workspaceName ? (
-                <span className="truncate mono text-micro text-graphite">
-                  {workspaceName}
-                </span>
-              ) : null}
-              {onToggleCollapsed ? (
-                <IconTip label="Collapse sidebar · ⌘\\">
-                  <button
-                    type="button"
-                    onClick={onToggleCollapsed}
-                    aria-label="Collapse sidebar"
-                    className="focus-ring -mr-1 flex size-6 shrink-0 items-center justify-center rounded-md mono text-label text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
-                  >
-                    «
-                  </button>
-                </IconTip>
-              ) : null}
-            </span>
-          </div>
-        )}
-
-        <div className="px-3 pt-3 pb-1">
-          <button
-            type="button"
-            onClick={onOpenCommand}
-            className="focus-ring flex h-8 w-full items-center justify-between rounded-md border border-rule bg-paper px-2.5 text-ui text-graphite transition-colors hover:border-hairline"
+    <div className="relative flex h-full flex-col bg-bone">
+      {/* The chassis edge, drawn here rather than as a border so the current
+          row — positioned, later in the tree — paints over it. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-px bg-hairline"
+      />
+      {hideWordmark ? (
+        <div className="h-2 shrink-0" />
+      ) : (
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-hairline px-4">
+          <Link
+            to="/spaces"
+            onClick={onNavigate}
+            className="focus-ring"
+            // Accessible name must contain the visible text (WCAG 2.5.3).
+            aria-label={workspaceName ? `${workspaceName} home` : 'Spaces home'}
           >
-            <span>Search or jump to…</span>
-            <kbd className="mono text-micro text-graphite">
-              {isMac ? '⌘K' : 'Ctrl K'}
-            </kbd>
-          </button>
+            <Wordmark />
+          </Link>
+          <span className="flex min-w-0 items-center gap-2">
+            {workspaceName ? (
+              <span className="truncate mono text-micro text-graphite">
+                {workspaceName}
+              </span>
+            ) : null}
+            {onToggleCollapsed ? (
+              <IconTip label="Collapse sidebar · ⌘\\">
+                <button
+                  type="button"
+                  onClick={onToggleCollapsed}
+                  aria-label="Collapse sidebar"
+                  className="focus-ring -mr-1 flex size-6 shrink-0 items-center justify-center rounded-md mono text-label text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
+                >
+                  «
+                </button>
+              </IconTip>
+            ) : null}
+          </span>
         </div>
+      )}
 
-        <nav className="flex flex-col px-3 pt-2" aria-label="Primary">
-          <NavGroup>
-            {WORK.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                icon={item.icon}
-                hint={item.key}
-                onClick={onNavigate}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </NavGroup>
-
-          <NavGroup label="Objects">
-            {OBJECTS.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                icon={item.icon}
-                hint={item.key}
-                onClick={onNavigate}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-            {objects.map((o) => (
-              <NavLink
-                key={`o:${o.slug}`}
-                to="/o/$objectSlug"
-                params={{ objectSlug: o.slug }}
-                icon={objectIcon(o)}
-                onClick={onNavigate}
-              >
-                {o.plural}
-              </NavLink>
-            ))}
-          </NavGroup>
-
-          <NavGroup label="Capital">
-            {CAPITAL.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                icon={item.icon}
-                hint={item.key}
-                onClick={onNavigate}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </NavGroup>
-        </nav>
+      <div className="shrink-0 px-3 pt-3 pb-1">
+        <button
+          type="button"
+          onClick={onOpenCommand}
+          className="focus-ring flex h-8 w-full items-center justify-between rounded-md border border-rule bg-paper px-2.5 text-ui text-graphite transition-colors hover:border-hairline"
+        >
+          <span>Search or jump to…</span>
+          <kbd className="mono text-micro text-graphite">
+            {isMac ? '⌘K' : 'Ctrl K'}
+          </kbd>
+        </button>
       </div>
 
-      <div className="border-t border-rule">
-        {/* §3.1 entry point 3, on the chassis: the same dialog the
-            /documents header and ⌘K open, reached from wherever you are
-            when the deck lands in your inbox. */}
-        <div className="px-3 py-2">
-          <button
-            type="button"
-            onClick={() => {
-              onNavigate?.()
-              openUploadDialog()
-            }}
-            className={cn(
-              'flex h-[1.875rem] w-full items-center gap-2.5 rounded-md border border-transparent px-2.5 text-ui text-foreground transition-colors',
-              'hover:bg-bone-deep',
-              'focus-ring',
-            )}
-          >
-            <Upload className="size-3.5 shrink-0" strokeWidth={1.75} />
-            <span className="min-w-0 flex-1 truncate text-left">Upload</span>
-          </button>
-          {/* Settings is a page you cannot otherwise see exists — until
-              2026-09-30 it lived only in the account menu and behind G , */}
-          <Link
-            to="/settings"
-            onClick={onNavigate}
-            className={cn(
-              'flex h-[1.875rem] w-full items-center gap-2.5 rounded-md border border-transparent px-2.5 text-ui text-foreground transition-colors',
-              'hover:bg-bone-deep',
-              'focus-ring',
-            )}
-            activeProps={{
-              className: 'border-rule bg-paper font-medium hover:bg-paper',
-              'aria-current': 'page',
-            }}
-          >
-            <Settings className="size-3.5 shrink-0" strokeWidth={1.75} />
-            <span className="min-w-0 flex-1 truncate text-left">Settings</span>
-            <span className="mono text-micro font-normal text-graphite">
-              G ,
-            </span>
-          </Link>
+      <nav
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-2 pb-3 pl-3"
+        aria-label="Primary"
+      >
+        <div className="flex flex-col gap-0.5">
+          {WORK.map((item) => (
+            <div key={item.to} className="contents">
+              <NavLink
+                to={item.to}
+                icon={item.icon}
+                hint={item.key}
+                onClick={onNavigate}
+                exact={item.to === '/spaces' && onStarredSpace}
+              >
+                {item.label}
+              </NavLink>
+              {item.to === '/spaces' ? (
+                <>
+                  {stars.shown.map((s) => (
+                    <NavLink
+                      key={`s:${s.id}`}
+                      to="/spaces/$spaceId"
+                      params={{ spaceId: s.id }}
+                      onClick={onNavigate}
+                      indent
+                    >
+                      {s.name}
+                    </NavLink>
+                  ))}
+                  {(
+                    starsOpen
+                      ? starred.length > STARRED_SHOWN
+                      : stars.hidden > 0
+                  ) ? (
+                    <MoreRow
+                      open={starsOpen}
+                      hidden={stars.hidden}
+                      noun="starred spaces"
+                      onToggle={() => setStarsOpen((v) => !v)}
+                    />
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          ))}
         </div>
+
+        <FoldGroup
+          id="library"
+          label="Library"
+          count={LIBRARY.length}
+          folded={folded.includes('library')}
+        >
+          {LIBRARY.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              icon={item.icon}
+              hint={item.key}
+              onClick={onNavigate}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </FoldGroup>
+
+        <FoldGroup
+          id="objects"
+          label="Objects"
+          count={OBJECTS.length + objects.length}
+          folded={folded.includes('objects')}
+        >
+          {OBJECTS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              icon={item.icon}
+              hint={item.key}
+              onClick={onNavigate}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+          {customs.shown.map((o) => (
+            <NavLink
+              key={`o:${o.slug}`}
+              to="/o/$objectSlug"
+              params={{ objectSlug: o.slug }}
+              icon={objectIcon(o)}
+              onClick={onNavigate}
+            >
+              {o.plural}
+            </NavLink>
+          ))}
+          {(
+            objectsOpen
+              ? objects.length > CUSTOM_OBJECTS_SHOWN
+              : customs.hidden > 0
+          ) ? (
+            <MoreRow
+              open={objectsOpen}
+              hidden={customs.hidden}
+              noun="objects"
+              onToggle={() => setObjectsOpen((v) => !v)}
+            />
+          ) : null}
+        </FoldGroup>
+
+        <FoldGroup
+          id="capital"
+          label="Capital"
+          count={CAPITAL.length}
+          folded={folded.includes('capital')}
+        >
+          {CAPITAL.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              icon={item.icon}
+              hint={item.key}
+              onClick={onNavigate}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </FoldGroup>
+      </nav>
+
+      <div className="flex h-12 shrink-0 items-stretch border-t border-rule">
         <DropdownMenu>
           <DropdownMenuTrigger
             className={cn(
-              'flex h-12 w-full items-center gap-2.5 border-t border-rule px-4 text-left transition-colors',
+              'flex min-w-0 flex-1 items-center gap-2.5 pr-1 pl-4 text-left transition-colors',
               'hover:bg-bone-deep',
               'focus-ring-inset',
             )}
@@ -364,39 +423,72 @@ export function AppSidebar({
                 {user.email}
               </span>
             </span>
-            <ChevronsUpDown
-              className="size-3.5 shrink-0 text-graphite"
-              strokeWidth={1.75}
-            />
           </DropdownMenuTrigger>
           <AccountMenu
             email={user.email}
-            onNavigate={onNavigate}
             onKeyboard={onOpenKeyboard}
             onSignOut={signOut}
           />
         </DropdownMenu>
+        <span className="flex shrink-0 items-center gap-0.5 pr-3 pl-1">
+          <IconTip label="Upload" side="top">
+            <button
+              type="button"
+              aria-label="Upload"
+              onClick={() => {
+                onNavigate?.()
+                openUploadDialog()
+              }}
+              className="focus-ring flex size-7 items-center justify-center rounded-md text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
+            >
+              <Upload className="size-3.5" strokeWidth={1.75} />
+            </button>
+          </IconTip>
+          <IconTip label="Settings · G ," side="top">
+            <Link
+              to="/settings"
+              aria-label="Settings"
+              onClick={onNavigate}
+              className="focus-ring flex size-7 items-center justify-center rounded-md text-graphite transition-colors hover:bg-bone-deep hover:text-foreground aria-[current=page]:bg-paper aria-[current=page]:text-foreground"
+              activeProps={{ 'aria-current': 'page' }}
+            >
+              <Settings className="size-3.5" strokeWidth={1.75} />
+            </Link>
+          </IconTip>
+        </span>
       </div>
     </div>
   )
 }
 
 /**
+ * Which rows of an overflowing list stand: the first `limit`, all of them
+ * when opened, and the current page wherever it sits so the tab never hides.
+ */
+export function overflow<T>(
+  rows: ReadonlyArray<T>,
+  limit: number,
+  open: boolean,
+  isCurrent: (row: T) => boolean,
+): { shown: ReadonlyArray<T>; hidden: number } {
+  if (open) return { shown: rows, hidden: 0 }
+  const shown = rows.filter((row, i) => i < limit || isCurrent(row))
+  return { shown, hidden: rows.length - shown.length }
+}
+
+/**
  * The account menu opens to the right of the chassis, never up into the
- * screen corner. It holds everything about the session: Settings, sign out.
+ * screen corner. Settings is the icon beside it; the menu keeps the rest.
  */
 function AccountMenu({
   email,
-  onNavigate,
   onKeyboard,
   onSignOut,
 }: {
   email: string
-  onNavigate?: (() => void) | undefined
   onKeyboard?: (() => void) | undefined
   onSignOut: () => void
 }) {
-  const navigate = useNavigate()
   return (
     <DropdownMenuContent
       side="right"
@@ -408,16 +500,6 @@ function AccountMenu({
         Signed in as {email}
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
-      <DropdownMenuItem
-        onSelect={() => {
-          onNavigate?.()
-          void navigate({ to: '/settings' })
-        }}
-      >
-        <Settings className="size-4" />
-        Settings
-        <span className="ml-auto mono text-micro text-graphite">G ,</span>
-      </DropdownMenuItem>
       {onKeyboard ? (
         <DropdownMenuItem onSelect={onKeyboard}>
           <Keyboard className="size-4" />
@@ -434,10 +516,10 @@ function AccountMenu({
 }
 
 /**
- * The collapsed chassis (Rails sheet, "chassis · collapsed 48"): a 48px cell
- * with the mark on a hairline, ⌘K on a rule, 36px rows of 14px marks with a
- * 24px rule between groups, the current page in a 36×32 paper box; the foot
- * is Settings, `›`, and the ink initials square.
+ * The collapsed chassis: a 48px cell with the mark on a hairline, ⌘K on a
+ * rule, 36px rows of 14px marks with a 24px rule between groups and no
+ * headings, the current page in a 36×32 paper box; the foot is Upload,
+ * Settings and the ink initials square.
  */
 function CollapsedSidebar({
   user,
@@ -450,81 +532,92 @@ function CollapsedSidebar({
 }: {
   user: { name: string; email: string }
   workspaceName?: string | null | undefined
-  objects: Array<{ slug: string; plural: string; icon: string | null }>
+  objects: Array<CustomObject>
   onOpenCommand: () => void
   onExpand?: (() => void) | undefined
   onKeyboard?: (() => void) | undefined
   onSignOut: () => void
 }) {
   return (
-    <div className="flex h-full flex-col justify-between bg-bone">
-      <div className="flex flex-col items-center">
-        <IconTip
-          label={`Expand sidebar · ⌘\\${workspaceName ? ` · ${workspaceName}` : ''}`}
+    <div className="relative flex h-full flex-col bg-bone">
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-px bg-hairline"
+      />
+      <IconTip
+        label={`Expand sidebar · ⌘\\${workspaceName ? ` · ${workspaceName}` : ''}`}
+      >
+        <button
+          type="button"
+          onClick={onExpand}
+          aria-label="Expand sidebar"
+          className="focus-ring-inset flex h-12 w-12 shrink-0 items-center justify-center border-b border-hairline transition-colors hover:bg-bone-deep"
         >
-          <button
-            type="button"
-            onClick={onExpand}
-            aria-label="Expand sidebar"
-            className="focus-ring-inset flex h-12 w-12 items-center justify-center border-b border-hairline transition-colors hover:bg-bone-deep"
-          >
-            <Mark className="text-foreground" />
-          </button>
-        </IconTip>
-        <IconTip label="Search or jump to…">
-          <button
-            type="button"
-            onClick={onOpenCommand}
-            aria-label="Search or jump to"
-            className="focus-ring-inset flex h-10 w-12 items-center justify-center border-b border-rule mono text-micro text-graphite transition-colors hover:text-foreground"
-          >
-            {isMac ? '⌘K' : 'Ctrl K'}
-          </button>
-        </IconTip>
+          <Mark className="text-foreground" />
+        </button>
+      </IconTip>
+      <IconTip label="Search or jump to…">
+        <button
+          type="button"
+          onClick={onOpenCommand}
+          aria-label="Search or jump to"
+          className="focus-ring-inset flex h-10 w-12 shrink-0 items-center justify-center border-b border-rule mono text-micro text-graphite transition-colors hover:text-foreground"
+        >
+          {isMac ? '⌘K' : 'Ctrl K'}
+        </button>
+      </IconTip>
 
-        <nav className="flex flex-col items-center pt-1.5" aria-label="Primary">
-          {WORK.map((item) => (
-            <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
-              {item.label}
-            </CollapsedNavLink>
-          ))}
-          <GroupRule />
-          {OBJECTS.map((item) => (
-            <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
-              {item.label}
-            </CollapsedNavLink>
-          ))}
-          {objects.map((o) => (
-            <CollapsedNavLink
-              key={`o:${o.slug}`}
-              to="/o/$objectSlug"
-              params={{ objectSlug: o.slug }}
-              icon={objectIcon(o)}
-            >
-              {o.plural}
-            </CollapsedNavLink>
-          ))}
-          <GroupRule />
-          {CAPITAL.map((item) => (
-            <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
-              {item.label}
-            </CollapsedNavLink>
-          ))}
-        </nav>
-      </div>
+      <nav
+        className="flex min-h-0 w-12 flex-1 flex-col items-center overflow-y-auto pt-1.5"
+        aria-label="Primary"
+      >
+        {WORK.map((item) => (
+          <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+            {item.label}
+          </CollapsedNavLink>
+        ))}
+        <GroupRule />
+        {LIBRARY.map((item) => (
+          <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+            {item.label}
+          </CollapsedNavLink>
+        ))}
+        <GroupRule />
+        {OBJECTS.map((item) => (
+          <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+            {item.label}
+          </CollapsedNavLink>
+        ))}
+        {objects.map((o) => (
+          <CollapsedNavLink
+            key={`o:${o.slug}`}
+            to="/o/$objectSlug"
+            params={{ objectSlug: o.slug }}
+            icon={objectIcon(o)}
+          >
+            {o.plural}
+          </CollapsedNavLink>
+        ))}
+        <GroupRule />
+        {CAPITAL.map((item) => (
+          <CollapsedNavLink key={item.to} to={item.to} icon={item.icon}>
+            {item.label}
+          </CollapsedNavLink>
+        ))}
+      </nav>
 
-      <div className="flex flex-col items-center">
-        <IconTip label="Upload a file">
+      <div className="flex shrink-0 flex-col items-center">
+        <IconTip label="Upload">
           <button
             type="button"
             onClick={openUploadDialog}
-            aria-label="Upload a file"
+            aria-label="Upload"
             className="focus-ring-inset flex h-10 w-12 items-center justify-center border-t border-rule text-graphite transition-colors hover:bg-bone-deep hover:text-foreground"
           >
             <Upload className="size-3.5" strokeWidth={1.75} />
           </button>
         </IconTip>
-        <IconTip label="Settings">
+        <IconTip label="Settings · G ,">
           <Link
             to="/settings"
             aria-label="Settings"
@@ -562,21 +655,23 @@ function CollapsedSidebar({
 }
 
 function GroupRule() {
-  return <span aria-hidden className="my-0 block h-px w-6 bg-rule" />
+  return <span aria-hidden className="my-0 block h-px w-6 shrink-0 bg-rule" />
 }
 
-/** Name on hover, to the right, in ink — for the marks-only chassis. */
+/** Name on hover, in ink — for marks-only controls. */
 function IconTip({
   label,
+  side = 'right',
   children,
 }: {
   label: string
+  side?: 'right' | 'top'
   children: React.ReactNode
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
+      <TooltipContent side={side}>{label}</TooltipContent>
     </Tooltip>
   )
 }
@@ -598,7 +693,7 @@ function CollapsedNavLink({
         to={to}
         {...(params ? { params } : {})}
         aria-label={children}
-        className="group focus-ring-inset flex h-9 w-12 items-center justify-center"
+        className="group focus-ring-inset flex h-9 w-12 shrink-0 items-center justify-center"
         activeProps={{ 'aria-current': 'page' }}
       >
         {/* Current page = a paper box on a rule (No-Bar Rule), 36×32. */}
@@ -617,41 +712,97 @@ function initials(name: string) {
   return (first + last).toUpperCase()
 }
 
-function NavGroup({
+/**
+ * A group that folds: the heading is the toggle, `▾` open, `▸ n` folded with
+ * its row count. The state is per browser (`chassis-prefs`).
+ */
+function FoldGroup({
+  id,
   label,
+  count,
+  folded,
   children,
 }: {
-  label?: string
+  id: FoldableGroup
+  label: string
+  count: number
+  folded: boolean
   children: React.ReactNode
 }) {
+  const listId = useId()
   return (
-    <div className={cn('flex flex-col gap-0.5', label && 'pt-5')}>
-      {label ? (
-        <div className="flex h-6 items-center px-2.5">
-          <span className="field-label leading-4 font-medium text-graphite">
-            {label}
-          </span>
-        </div>
-      ) : null}
-      {children}
+    <div className="flex flex-col gap-0.5 pt-5">
+      <button
+        type="button"
+        aria-expanded={!folded}
+        aria-controls={listId}
+        onClick={() => setGroupFolded(id, !folded)}
+        className="focus-ring mr-3 flex h-6 items-center gap-1.5 rounded-md px-2.5 text-left text-graphite transition-colors hover:text-foreground"
+      >
+        <span className="field-label leading-4 font-medium">{label}</span>
+        <span aria-hidden className="mono text-micro">
+          {folded ? `▸ ${count}` : '▾'}
+        </span>
+        {folded ? <span className="sr-only">{`${count} pages`}</span> : null}
+      </button>
+      <div id={listId} hidden={folded} className="flex flex-col gap-0.5">
+        {children}
+      </div>
     </div>
   )
 }
 
+/** The inline overflow toggle: `▸ n more` expands in place, `▾ less` folds. */
+function MoreRow({
+  open,
+  hidden,
+  noun,
+  onToggle,
+}: {
+  open: boolean
+  hidden: number
+  noun: string
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={open ? `Show fewer ${noun}` : `Show ${hidden} more ${noun}`}
+      onClick={onToggle}
+      className="focus-ring mr-3 flex h-[1.875rem] items-center rounded-md pl-8.5 text-left mono text-micro text-graphite transition-colors hover:text-foreground"
+    >
+      {open ? '▾ less' : `▸ ${hidden} more`}
+    </button>
+  )
+}
+
+/**
+ * One row. Every row carries the same box — left, top and bottom border, no
+ * right one, reaching the chassis edge — so the current row changes colour
+ * only: paper on a hairline, positioned so it paints over the chassis edge
+ * and joins the page.
+ */
 function NavLink({
   to,
   params,
   icon: Icon,
   hint,
   onClick,
+  indent = false,
+  exact = false,
   children,
 }: {
   to: string
   params?: Record<string, string> | undefined
-  icon: LucideIcon
+  icon?: LucideIcon | undefined
   /** The chord printed in the right lane — graphite, ink on the current page. */
   hint?: string | undefined
   onClick?: (() => void) | undefined
+  /** A starred space under Spaces: no mark, its label on the labels' lane. */
+  indent?: boolean
+  /** Match the path exactly, so a child row can be the current one alone. */
+  exact?: boolean
   children: React.ReactNode
 }) {
   return (
@@ -659,17 +810,20 @@ function NavLink({
       to={to}
       {...(params ? { params } : {})}
       {...(onClick ? { onClick } : {})}
+      activeOptions={{ exact }}
       className={cn(
-        'flex h-[1.875rem] items-center gap-2.5 rounded-md border border-transparent px-2.5 text-ui text-foreground transition-colors',
+        'flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-l-md rounded-r-none border-y border-l border-transparent pr-5.5 text-ui text-foreground transition-colors',
+        indent ? 'pl-8.5' : 'pl-2.5',
         'hover:bg-bone-deep',
-        'focus-ring',
+        'focus-ring-inset',
       )}
       activeProps={{
-        className: 'border-rule bg-paper font-medium hover:bg-paper',
+        className:
+          'relative border-hairline bg-paper font-medium hover:bg-paper',
         'aria-current': 'page',
       }}
     >
-      <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
+      {Icon ? <Icon className="size-3.5 shrink-0" strokeWidth={1.75} /> : null}
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {hint ? (
         <span className="shrink-0 mono text-micro text-graphite [a[aria-current=page]_&]:text-foreground">

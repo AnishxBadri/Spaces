@@ -85,7 +85,7 @@ export function RecordTable<T>({
   label: string
   /**
    * What a click anywhere on the row does, when the row's own subject has no
-   * page to link to — `/documents`, whose rows open a preview modal (a
+   * page to link to — `/files`, whose rows open a preview modal (a
    * document has no route, by decision). Optional and off by default: every
    * other surface routes from an anchor in its sticky cell, which is the
    * keyboard and middle-click path a bare `onClick` does not give you.

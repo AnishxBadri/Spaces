@@ -3,7 +3,7 @@
  * something, else the extension.
  *
  * Shared rather than retyped because two surfaces draw it — the record Files
- * tab and the `/documents` shelf (SPA-58) — and a tile that reads `DCK` in one
+ * tab and the `/files` shelf (SPA-58) — and a tile that reads `DCK` in one
  * and `PDF` in the other for the same file is the drift this prevents.
  */
 const KIND_CODES: Record<string, string> = {

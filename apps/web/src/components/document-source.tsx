@@ -7,7 +7,7 @@ import { cn } from '#/lib/utils'
  * The two marks a document carries when it came from a storage source —
  * SPA-78, `docs/spec-storage-sources.md` §8 and §12.
  *
- * Both are shared by `/documents` and the Files tab because both rows answer
+ * Both are shared by `/files` and the Files tab because both rows answer
  * the same two questions about the same five columns, and a second spelling
  * of "gone" is how the two surfaces would come to disagree about what the
  * word means. Neither renders anything for a document nobody linked, which

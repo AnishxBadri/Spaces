@@ -120,7 +120,7 @@ export const deleteView = createServerFn({ method: 'POST' })
  * bar. `live` carries the conditions the page is showing for its active view
  * when they differ from the saved ones, so that chip moves with the table.
  *
- * **Object surfaces only.** `/documents` is excluded by this validator, not
+ * **Object surfaces only.** `/files` is excluded by this validator, not
  * by an oversight: its registry is synthetic (docsurf-12b,
  * `lib/documents/registry.ts`) — its fields are columns and edges projected
  * in the browser, there is no `entity.values` for `entityValuesResolver` to

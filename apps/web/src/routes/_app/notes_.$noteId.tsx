@@ -329,7 +329,7 @@ function useNoteFileDrop(
               label: UNFILED_SHELF_LABEL,
               onClick: () =>
                 void navigate({
-                  to: '/documents',
+                  to: '/files',
                   search: { filed: 'unfiled' },
                 }),
             },

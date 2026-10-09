@@ -169,7 +169,7 @@ describe('POST /api/v1/capture — unfiled', () => {
     const response = await post(body)
     expect(response.status).toBe(200)
     const answer = Captured.parse(await response.json())
-    expect(answer.url).toBe(`${APP}/documents?filed=unfiled`)
+    expect(answer.url).toBe(`${APP}/files?filed=unfiled`)
 
     const sha = sha256(body.text)
     expect(await documentsWithSha(sha)).toEqual([{ id: answer.documentId }])
@@ -243,7 +243,7 @@ describe('POST /api/v1/capture — unfiled', () => {
     const answer = await withClient((client) =>
       client.capture.capture({ payload: body }),
     )
-    expect(answer.url).toBe(`${APP}/documents?filed=unfiled`)
+    expect(answer.url).toBe(`${APP}/files?filed=unfiled`)
     expect(await documentsWithSha(sha256(body.text))).toEqual([
       { id: answer.documentId },
     ])

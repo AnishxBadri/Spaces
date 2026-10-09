@@ -103,7 +103,7 @@ afterEach(() => {
 
 describe('a chord against a page binding on its second key', () => {
   it.each([
-    ['l', '/documents'],
+    ['l', '/files'],
     ['m', '/mandate'],
   ])('g then %s navigates to %s and does not reach the page', (key, path) => {
     expect(chordTo(path)).toEqual(['g', key])
@@ -138,7 +138,7 @@ describe('a chord against a page binding on its second key', () => {
     press('g')
     press('l')
     press('l')
-    expect(navigate.mock.calls).toEqual([['/documents']])
+    expect(navigate.mock.calls).toEqual([['/files']])
     expect(pageKey.mock.calls).toEqual([['l']])
   })
 })
@@ -153,12 +153,12 @@ describe('the guards are unchanged', () => {
     press('g')
     now += CHORD_WINDOW_MS - 1
     press('l')
-    expect(navigate.mock.calls).toEqual([['/documents']])
+    expect(navigate.mock.calls).toEqual([['/files']])
 
     press('g')
     now += CHORD_WINDOW_MS
     press('l')
-    expect(navigate.mock.calls).toEqual([['/documents']])
+    expect(navigate.mock.calls).toEqual([['/files']])
     expect(pageKey.mock.calls).toEqual([['l']])
   })
 
@@ -209,11 +209,11 @@ describe('the guards are unchanged', () => {
     expect(pageKey).not.toHaveBeenCalled()
     press('g')
     press('l')
-    expect(navigate.mock.calls).toEqual([['/documents']])
+    expect(navigate.mock.calls).toEqual([['/files']])
 
     mount(null)
     press('g')
     press('l')
-    expect(navigate.mock.calls).toEqual([['/documents']])
+    expect(navigate.mock.calls).toEqual([['/files']])
   })
 })

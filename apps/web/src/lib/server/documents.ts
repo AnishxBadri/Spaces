@@ -305,7 +305,7 @@ export const listRecordDocuments = createServerFn()
   })
 
 /**
- * Every document in the workspace, one row each — the `/documents` shelf
+ * Every document in the workspace, one row each — the `/files` shelf
  * (SPA-58). `requireUser()` plus `effectFn(program)` and nothing else; the
  * query is `#/lib/documents/shelf`, outside `lib/server/` so a test can drive
  * it without a request and so it never reaches the client barrel.
@@ -313,7 +313,7 @@ export const listRecordDocuments = createServerFn()
  * One argument since SPA-124: `filed`. `'unfiled'` is the inbox — arrivals
  * carrying no filing edge (`docs/spec-storage-sources.md` §3.2) — and it is a
  * filter on this list rather than a route of its own, which is what makes
- * `/documents?filed=unfiled` the whole feature. It defaults to `'all'`, so
+ * `/files?filed=unfiled` the whole feature. It defaults to `'all'`, so
  * the route's `validateSearch` and this validator agree on the same default
  * and a call with no `data` still reads the shelf. Saved views are
  * docsurf-12a.
@@ -378,7 +378,7 @@ export const getDocumentText = createServerFn({ method: 'POST' })
  * literal truth about the row and the right answer to an id that names one —
  * an SDK caller, a stale tab, a hand-made request. What changed is that no
  * control can reach it any more: the Files tab, the space Sources lane,
- * `/documents` and `DocumentPreview` all read `blobSha` and render "Open
+ * `/files` and `DocumentPreview` all read `blobSha` and render "Open
  * source" against `document.url` where there is nothing to download. Softening
  * this into a null answer would have turned a wrong call into a silent one.
  */

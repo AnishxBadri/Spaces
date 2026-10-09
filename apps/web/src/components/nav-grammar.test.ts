@@ -3,14 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { NAV_GROUPS, NAV_GROUP_IDS, NAV_ITEMS } from './app-sidebar'
 
 /**
- * SPA-32: the nav grammar. `NAV_ITEMS` is the one place a page is declared —
- * the sidebar, the G-chord binding in `routes/_app.tsx`, the keyboard sheet
- * and the ⌘K palette all read this array and nothing else. Two pending
- * slices add a row each (Documents, /inbox), and both were drafted to pick a
- * free chord by hand; this file is what makes that a failing test instead of
- * a silent double binding. Documents landed 2026-09-22 (SPA-82) on `G L` in
- * the work group, and the label snapshot below is what keeps the row that
- * added it from moving any other row's lane.
+ * The nav grammar. `NAV_ITEMS` is the one place a page is declared — the
+ * sidebar, the G-chord binding in the shell, the keyboard sheet and the ⌘K
+ * palette all read this array and nothing else.
+ *
+ * - A chord claimed twice fails naming both pages.
+ * - The label snapshot keeps a new row from moving any other row's lane.
  */
 
 /** Where a row sits in the group order, by its `group` field. */
@@ -40,9 +38,9 @@ describe('the nav grammar', () => {
     }
   })
 
-  it('puts every row in one of the three known groups', () => {
-    expect(NAV_GROUP_IDS).toEqual(['work', 'objects', 'capital'])
-    // Every declared group is also rendered: a fourth id with no entry in
+  it('puts every row in one of the four known groups', () => {
+    expect(NAV_GROUP_IDS).toEqual(['work', 'library', 'objects', 'capital'])
+    // Every declared group is also rendered: an id with no entry in
     // NAV_GROUPS would put its rows nowhere on the chassis.
     expect(Object.keys(NAV_GROUPS)).toEqual([...NAV_GROUP_IDS])
     const strays = NAV_ITEMS.filter(
@@ -51,11 +49,10 @@ describe('the nav grammar', () => {
     expect(strays.map((item) => `${item.label} — ${item.group}`)).toEqual([])
   })
 
-  it('keeps the groups contiguous and in the order work → objects → capital', () => {
-    // This is the invariant the old `slice(0, 4)` / `slice(4, 7)` / `slice(7)`
-    // assumed without checking. Hold it and derivation-by-filter renders
-    // exactly what the slices rendered, for any array that respects the
-    // grammar — so a new row is one row and no other edit.
+  it('keeps the groups contiguous and in the order work → library → objects → capital', () => {
+    // Hold it and derivation-by-filter draws the groups in array order, for
+    // any array that respects the grammar — so a new row is one row and no
+    // other edit.
     const misplaced: Array<string> = []
     let reached = 0
     for (const item of NAV_ITEMS) {
@@ -68,14 +65,26 @@ describe('the nav grammar', () => {
     expect(misplaced).toEqual([])
   })
 
-  it('puts Documents last in the work group on G L', () => {
-    // SPA-82. The shelf is research material like Notes and Spaces — not a
-    // core object, not capital — so it joins the work as the last row after
-    // Notes; `G D` is Deals, which is why the letter is L (library).
-    const documents = NAV_ITEMS.find((item) => item.to === '/documents')
-    expect(documents?.key).toBe('G L')
-    expect(documents?.group).toBe('work')
-    expect(NAV_GROUPS.work.at(-1)).toBe(documents)
+  it('puts Files in the Library on G L, the chord Documents had', () => {
+    // D68 amended: Documents is renamed Files and keeps L (library), since
+    // `G D` is Deals. No row is left on the old path.
+    const files = NAV_ITEMS.find((item) => item.to === '/files')
+    expect(files?.label).toBe('Files')
+    expect(files?.key).toBe('G L')
+    expect(files?.group).toBe('library')
+    expect(NAV_ITEMS.some((item) => String(item.to) === '/documents')).toBe(
+      false,
+    )
+  })
+
+  it('holds Notes and Files in the Library, between the work and the objects', () => {
+    expect(
+      NAV_GROUPS.library.map((item) => `${item.label} ${item.key}`),
+    ).toEqual(['Notes G N', 'Files G L'])
+    // The chords D68 kept clear of: Mandate and Portfolio stand.
+    const chord = (to: string) => NAV_ITEMS.find((item) => item.to === to)?.key
+    expect(chord('/mandate')).toBe('G M')
+    expect(chord('/portfolio')).toBe('G F')
   })
 
   it('keeps every row in the lane it shipped in', () => {
@@ -85,10 +94,12 @@ describe('the nav grammar', () => {
     // naming the group that changed.
     expect({
       work: NAV_GROUPS.work.map((item) => item.label),
+      library: NAV_GROUPS.library.map((item) => item.label),
       objects: NAV_GROUPS.objects.map((item) => item.label),
       capital: NAV_GROUPS.capital.map((item) => item.label),
     }).toEqual({
-      work: ['Today', 'Tasks', 'Spaces', 'Notes', 'Documents'],
+      work: ['Today', 'Tasks', 'Spaces'],
+      library: ['Notes', 'Files'],
       objects: ['Companies', 'People', 'Deals'],
       capital: ['Portfolio', 'Mandate'],
     })
@@ -96,16 +107,14 @@ describe('the nav grammar', () => {
 
   it('draws every row once, in NAV_ITEMS order', () => {
     // ⌘K's "Go to" list and the keyboard sheet's Go column read NAV_ITEMS
-    // straight through, so each group must keep that order and the three
+    // straight through, so each group must keep that order and the groups
     // together must be the whole array — no row dropped, none drawn twice.
     for (const id of NAV_GROUP_IDS) {
       const positions = NAV_GROUPS[id].map((item) => NAV_ITEMS.indexOf(item))
       expect(positions).toEqual([...positions].sort((a, b) => a - b))
     }
-    expect([
-      ...NAV_GROUPS.work,
-      ...NAV_GROUPS.objects,
-      ...NAV_GROUPS.capital,
-    ]).toEqual([...NAV_ITEMS])
+    const drawn: Array<(typeof NAV_ITEMS)[number]> = []
+    for (const id of NAV_GROUP_IDS) drawn.push(...NAV_GROUPS[id])
+    expect(drawn).toEqual([...NAV_ITEMS])
   })
 })

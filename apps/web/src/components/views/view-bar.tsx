@@ -72,7 +72,7 @@ export function ViewBar({
 }: {
   /**
    * The object row this list's records belong to, or null on a surface that
-   * has none (/documents). `viewTarget` turns it into the surface key the
+   * has none (/files). `viewTarget` turns it into the surface key the
    * three view server fns take — D2, 2026-09-23.
    */
   objectId: string | null
@@ -80,7 +80,7 @@ export function ViewBar({
   /**
    * Why this surface cannot build conditions yet, when it cannot: the Filter
    * control then renders disabled and titled with the reason rather than
-   * vanishing. **No surface passes it today** — /documents was the one, and
+   * vanishing. **No surface passes it today** — /files was the one, and
    * docsurf-12b (SPA-141) gave the shelf a registry of its own
    * (`lib/documents/registry.ts`), so the five lists all filter. It stays
    * because the next shelf admitted before its field list is declared wants
@@ -93,7 +93,7 @@ export function ViewBar({
    * Each saved view's record count, from `countViews` in the page's loader
    * (SPA-162) — SQL through `compileConditions`, so every chip has its
    * number on first paint, the inactive ones included. Omitted on
-   * /documents, which is the one surface that is not counted: its registry
+   * /files, which is the one surface that is not counted: its registry
    * is synthetic (docsurf-12b) and its conditions do not compile to SQL — see
    * `countViews` in `lib/server/views.ts`.
    */

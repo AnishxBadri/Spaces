@@ -86,7 +86,7 @@ const SHOTS: ReadonlyArray<Shot> = [
   },
   {
     file: 'documents.png',
-    path: () => '/documents',
+    path: () => '/files',
     ready: firstRow,
     list: true,
   },
@@ -231,7 +231,7 @@ test.beforeAll(async () => {
 async function open(page: Page, url: string, ready: Shot['ready']) {
   await page.goto(url, { waitUntil: 'networkidle' })
   // Signed in: a lost session would land on /login and capture that. The
-  // path only — a route may add its default search (/documents?filed=all).
+  // path only — a route may add its default search (/files?filed=all).
   expect(new URL(page.url()).pathname).toBe(new URL(url).pathname)
   await expect(ready(page)).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
@@ -513,7 +513,7 @@ const FRAGMENTS: ReadonlyArray<Fragment> = [
   },
   {
     name: 'documents-rows',
-    path: () => '/documents',
+    path: () => '/files',
     ready: firstRow,
     clip: (page) => tableSlice(page, 5, 'Space'),
   },

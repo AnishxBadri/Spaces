@@ -645,23 +645,28 @@ ones.
 
 ### Navigation — the chassis
 
-232px of bone with a hairline right edge. Three groups: the work (Today, Tasks, Spaces,
-Notes, Documents), the objects (Companies, People, Deals, then customs), capital
-(Portfolio, Mandate) — one list (`NAV_ITEMS`), read in the same order by the command
-palette and the keyboard sheet, so the chassis is where nav order is decided. Documents
-joins the work as the last row after Notes (SPA-82): the shelf is research material like
-Notes and Spaces, neither a core object nor capital. Rows are 30px with a 14px mark slot so every label sits on one lane. Current
-page = paper + rule border + medium weight — never a pine bar. The head row ends on a
+232px of bone with a hairline right edge. Four groups: the work (Today, Tasks, Spaces
+with up to five starred spaces under it, then `▸ n more`), the library (Notes, Files),
+the objects (Companies, People, Deals, then customs — three, then `▸ n more` inline),
+capital (Portfolio, Mandate) — one list (`NAV_ITEMS`), read in the same order by the
+command palette and the keyboard sheet, so the chassis is where nav order is decided.
+Library, Objects and Capital are headings that fold (`▾` / `▸ n`), per browser; a star
+is toggled from the space head's `···` and kept per browser too. Rows are 30px with a
+14px mark slot so every label sits on one lane. The current row is a tab cut into the
+page edge: paper on a hairline, crossing the chassis edge so it joins the page — never a
+pine bar — and every row carries the same box, so nothing shifts. The head row ends on a
 mono `«` that folds the chassis (`⌘\`). The foot is one account row (ink initials
-square, name, email); its menu opens to the right of the chassis — never up into the
-corner — and holds Settings (`G ,`) and Sign out. Collapsed, the chassis is 48px of
+square, name, email) with Upload and Settings (`G ,`) as icon buttons beside it; its
+menu opens to the right of the chassis — never up into the corner — and holds Keyboard
+and Sign out. Collapsed, the chassis is 48px of
 marks only: the mark on a hairline (which expands it again), `⌘K` on a rule, 36px rows
-with a 24px rule between groups, the current page in a 36×32 paper box, names on hover
-as ink tooltips. Width snaps (never animates) and the preference is per browser.
-Collapses to a drawer under a 48px top bar on mobile.
+with a 24px rule between groups and no headings, the current page in a 36×32 paper box,
+names on hover as ink tooltips. Width snaps (never animates) and the preference is per
+browser. Collapses to a drawer under a 48px top bar on mobile.
 
 **Sidebar A** (decided 2026-10-08, amended by D68 on 2026-10-09; port: project 27).
-The shipped chassis above stays until the port. The decided order:
+Ported by `shell-1` except the Ask and Meetings rows, which their slices add, and
+an object's pinned saved views and the count on Tasks. The decided order:
 
 - **Search** (`⌘K`), then an **Ask** row under it; chats live in Ask, never in the
   sidebar.
