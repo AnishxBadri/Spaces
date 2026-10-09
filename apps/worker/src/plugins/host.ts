@@ -31,6 +31,8 @@ import type {
   ScheduleInput,
   ScheduleOutput,
   Trigger,
+  WatchInput,
+  WatchOutput,
   WebhookInput,
 } from '@spaces/sdk'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
@@ -80,10 +82,15 @@ import type { PluginQueue, PluginQueuesOptions } from './queues'
 
 /** What a job is handed, by its trigger. */
 export type JobInput =
-  ActionInput | ScheduleInput | EventInput | WebhookInput | FileInput
+  | ActionInput
+  | ScheduleInput
+  | EventInput
+  | WebhookInput
+  | FileInput
+  | WatchInput
 
-/** What a job hands back: a schedule job's cursor, nothing for the rest. */
-export type JobOutput = ScheduleOutput | void
+/** What a job hands back: a schedule job's cursor, a watch's state, nothing for the rest. */
+export type JobOutput = ScheduleOutput | WatchOutput | void
 
 export type PluginHostOptions = {
   /** Built once, on the first job that hands work back; closed by `releaseAll` or `shutdown`. */
@@ -219,17 +226,26 @@ const notGranted = (defect: unknown): string | null => {
 }
 
 const scheduleOutput = z.object({ nextCursor: z.string().nullable() })
+const watchOutput = z.object({
+  state: z.record(z.string(), z.json()).nullable(),
+})
 
 /**
  * The entity an invocation runs on, which `Ai` resolves sensitivity from.
- * An action or event job always has one: a missing id binds `''`, which the
- * port refuses rather than reading as "no record".
+ * An action, event or watch job always has one — a watch's is its space: a
+ * missing id binds `''`, which the port refuses rather than reading as "no
+ * record".
  */
 const subjectOf = (trigger: Trigger, input: JobInput): string | null => {
   if (trigger === 'action')
     return Predicate.hasProperty(input, 'entityId') &&
       Predicate.isString(input.entityId)
       ? input.entityId
+      : ''
+  if (trigger === 'watch')
+    return Predicate.hasProperty(input, 'spaceId') &&
+      Predicate.isString(input.spaceId)
+      ? input.spaceId
       : ''
   if (trigger === 'event')
     return Predicate.hasProperty(input, 'event') &&
@@ -643,6 +659,16 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
               )
         }),
         Effect.flatMap((out): Effect.Effect<JobOutput, JobError> => {
+          if (job.trigger === 'watch') {
+            const parsed = watchOutput.safeParse(out)
+            return parsed.success
+              ? Effect.succeed(parsed.data)
+              : Effect.fail(
+                  new JobPermanent({
+                    reason: `${label} returned no { state } object or null`,
+                  }),
+                )
+          }
           if (job.trigger !== 'schedule') return Effect.void
           const parsed = scheduleOutput.safeParse(out)
           return parsed.success

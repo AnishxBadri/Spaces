@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   attribute,
@@ -41,6 +41,7 @@ import { ref } from '../../context/ref'
 import { SIMILAR_TOP_N, SimilarLane } from '../../context/similar-lane'
 import { renderAttribute, renderEvent, truncate } from '../../context/render'
 import type { ContextEdge } from '../../context/types'
+import { liveChainOf, memosTaggedIn, query, readableNote } from './spaces'
 
 /**
  * The assembler, fetch half (docs/spec-ai-substrate.md §1; Effect-first per
@@ -62,12 +63,6 @@ import type { ContextEdge } from '../../context/types'
  */
 
 export { ContextEntityNotFound, ContextLeak, ContextQueryFailed }
-
-const query = <T>(run: () => Promise<T>) =>
-  Effect.tryPromise({
-    try: run,
-    catch: (cause) => new ContextQueryFailed({ cause }),
-  })
 
 export type AssembleScope = { entityId: string }
 
@@ -120,7 +115,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
   SimilarLane
 > {
   const userId = opts.user.id
-  const readable = or(eq(note.visibility, 'shared'), eq(note.authorId, userId))
+  const readable = readableNote(userId)
 
   // ---------- seed (follow a merge redirect, one hop) ----------
   let seed = (yield* query(() =>
@@ -584,37 +579,12 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       .orderBy(asc(space.path)),
   )
   if (tags.length > 0) {
-    const chain = yield* query(() =>
-      db
-        .select({ id: space.entityId, path: space.path })
-        .from(space)
-        .where(
-          and(
-            or(...tags.map((t) => sql`${space.path} @> ${t.path}`)),
-            isNull(space.archivedAt),
-          ),
-        )
-        .orderBy(asc(space.path)),
-    )
+    const chain = yield* liveChainOf(tags.map((t) => t.path))
     const direct = new Set(tags.map((t) => t.spaceId))
-    const spaceIds = chain.map((s) => s.id)
-    const memos = spaceIds.length
-      ? yield* query(() =>
-          db
-            .select({ spaceId: link.toEntityId, n: note })
-            .from(link)
-            .innerJoin(note, eq(note.entityId, link.fromEntityId))
-            .where(
-              and(
-                inArray(link.toEntityId, spaceIds),
-                eq(link.relation, 'tagged_in'),
-                eq(note.kind, 'memo'),
-                readable,
-              ),
-            )
-            .orderBy(asc(link.toEntityId), asc(note.entityId)),
-        )
-      : []
+    const memos = yield* memosTaggedIn(
+      chain.map((s) => s.id),
+      userId,
+    )
     for (const m of memos) {
       noteRows.set(m.n.entityId, {
         visibility: m.n.visibility,

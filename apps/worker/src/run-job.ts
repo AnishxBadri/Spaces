@@ -117,12 +117,15 @@ export interface JobRetryPolicy {
 /**
  * Which rows an invocation is about, for the ledger. Declared, not written: a
  * JobDef says where in its own data the ids live, and `runJob` is what puts
- * them on the `job_run` row. Both are optional because both are genuinely
- * absent half the time — a core job has no integration, a sweep has no entity.
+ * them on the `job_run` row. Each is optional because each is genuinely
+ * absent much of the time — a core job has no integration, a sweep has no
+ * entity, and only a watch run has a watch.
  */
 export interface JobRunRefs {
   readonly entityId?: string | null
   readonly integrationId?: string | null
+  /** The `space_watch` row a watch run is for. */
+  readonly watchId?: string | null
 }
 
 /**
@@ -237,6 +240,7 @@ export interface JobRunStart {
   readonly attempt: number
   readonly entityId: string | null
   readonly integrationId: string | null
+  readonly watchId: string | null
   readonly startedAt: Date
 }
 
@@ -431,6 +435,7 @@ const postgresLedger: JobRunLedger = {
             attempt: row.attempt,
             entityId: row.entityId,
             integrationId: row.integrationId,
+            watchId: row.watchId,
             startedAt: row.startedAt,
             status: 'running',
           })
@@ -703,6 +708,7 @@ async function settle<TData, TServices>(
     startedAt,
     entityId: refs.entityId ?? null,
     integrationId: refs.integrationId ?? null,
+    watchId: refs.watchId ?? null,
   })
   // A holder, not a `let`: a variable only ever assigned inside a callback
   // narrows to its initial `null` at every later read.

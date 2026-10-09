@@ -128,3 +128,28 @@ export const moveSpace = createServerFn({ method: 'POST' })
       throw new Error(spaceWriteMessage(failure))
     }
   })
+
+/**
+ * "Run now" on a watch: send its run at once, cadence or not. The next
+ * cadence tick still fires; an archived space or a stopped plugin is
+ * refused, never queued. (D72)
+ */
+export const runWatchNow = createServerFn({ method: 'POST' })
+  .validator(z.object({ watchId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { runWatchNowProgram, WatchRunRefused } =
+      await import('@spaces/core/writes/watches/run')
+    const { webEnqueue } = await import('../enqueue-live')
+    try {
+      return await Effect.runPromise(
+        runWatchNowProgram(data.watchId).pipe(Effect.provide(webEnqueue)),
+      )
+    } catch (failure) {
+      throw new Error(
+        failure instanceof WatchRunRefused
+          ? failure.message
+          : 'Could not run the watch',
+      )
+    }
+  })

@@ -17,6 +17,7 @@ import { JudgmentLive } from '@spaces/core/writes/ports/judgment'
 import type { LogSink } from '@spaces/core/writes/ports/log'
 import { ReadLive } from '@spaces/core/writes/ports/read'
 import { ReceiptsLive } from '@spaces/core/writes/ports/receipts'
+import { SpacesLive } from '@spaces/core/writes/ports/spaces'
 import { standInFor } from './fakes/switch'
 import type { FakeProviders, StandIn } from './fakes/switch'
 import { PluginDbLive } from './plugin-db'
@@ -151,6 +152,13 @@ export const grantLayer = (
         break
       case 'PluginDb':
         standalone.push(PluginDbLive(row))
+        break
+      case 'Spaces':
+        standalone.push(SpacesLive(row))
+        break
+      // The host provides no Discover: declared, it builds nothing, and a job
+      // that reaches for it fails "service not found".
+      case 'Discover':
         break
       case 'Ai':
         standalone.push(

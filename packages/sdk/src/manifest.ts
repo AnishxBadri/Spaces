@@ -20,13 +20,17 @@ import { isVersion, parseSdkRange } from './range.ts'
  * 'storage-source'` is a provider interface core calls into, not a job.
  */
 
-/** The five triggers (D51). Closed and semver-frozen: a new one is a minor. */
+/**
+ * The six triggers (D51; `watch` since SDK 1.5, D72). Closed and
+ * semver-frozen: a new one is a minor.
+ */
 export const TRIGGERS = [
   'action',
   'schedule',
   'event',
   'webhook',
   'file',
+  'watch',
 ] as const
 export type Trigger = (typeof TRIGGERS)[number]
 
@@ -116,6 +120,9 @@ const jobSchema = z.strictObject({
       }),
     })
     .optional(),
+  // A watch job's own settings — what one `space_watch` row holds — as JSON
+  // Schema, rendered as the watch form like the plugin's settings. (SDK 1.5)
+  settings: z.record(z.string(), z.unknown()).optional(),
 })
 
 /**
@@ -246,6 +253,16 @@ export const manifestSchema = z
               : `on is only for an event job, and ${name} is ${job.trigger}`,
         })
       }
+      if ((job.trigger === 'watch') !== (job.settings !== undefined)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['jobs', name, 'settings'],
+          message:
+            job.trigger === 'watch'
+              ? 'a watch job needs settings — the schema of what one watch holds, rendered as its form'
+              : `settings on a job is only for a watch job, and ${name} is ${job.trigger}`,
+        })
+      }
       if (m.provides === 'storage-source') {
         job.uses.forEach((port, i) => {
           if (STORAGE_SOURCE_WITHHELD.some((withheld) => withheld === port)) {
@@ -257,6 +274,15 @@ export const manifestSchema = z
           }
         })
       }
+    }
+    // A `space_watch` row names its integration, not a job.
+    const watches = jobs.filter(([, j]) => j.trigger === 'watch')
+    if (watches.length > 1) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['jobs', watches[1][0]],
+        message: `a plugin declares at most one watch job — a watch names its plugin, not a job — and this one declares ${watches.map(([n]) => n).join(', ')}`,
+      })
     }
     const hasWebhook = jobs.some(([, j]) => j.trigger === 'webhook')
     if (hasWebhook !== (m.ingress !== undefined)) {
@@ -302,10 +328,12 @@ export type AuthoredManifest = Omit<Manifest, 'settings' | 'jobs'> & {
  * A job as authored. `uses` and `on` are readonly so a `const` literal keeps
  * them as tuples — `['Identity']` stays `'Identity'`, not `PortName` — which
  * is what lets `definePlugin` bound the job's `R` by exactly what it declared.
+ * A watch job's `settings` is the zod schema `watchSettingsOf` parses by.
  */
-export type AuthoredJob = Omit<JobDeclaration, 'uses' | 'on'> & {
+export type AuthoredJob = Omit<JobDeclaration, 'uses' | 'on' | 'settings'> & {
   readonly uses: ReadonlyArray<JobDeclaration['uses'][number]>
   readonly on?: ReadonlyArray<NonNullable<JobDeclaration['on']>[number]>
+  readonly settings?: z.ZodType
 }
 
 /**
@@ -325,12 +353,21 @@ export const settingsJsonSchema = (settings: z.ZodType) =>
   z.toJSONSchema(settings, { io: 'input' })
 
 /**
- * The authored manifest as it goes on disk: settings through
- * `settingsJsonSchema`, then validated by `manifestSchema` — a build that
- * would write a manifest the loader refuses fails here instead.
+ * The authored manifest as it goes on disk: settings — the plugin's and a
+ * watch job's — through `settingsJsonSchema`, then validated by
+ * `manifestSchema`: a build that would write a manifest the loader refuses
+ * fails here instead.
  */
 export const toManifestJson = (manifest: AuthoredManifest): Manifest =>
   manifestSchema.parse({
     ...manifest,
     settings: settingsJsonSchema(manifest.settings),
+    jobs: Object.fromEntries(
+      Object.entries(manifest.jobs).map(([name, job]) => [
+        name,
+        job.settings === undefined
+          ? job
+          : { ...job, settings: settingsJsonSchema(job.settings) },
+      ]),
+    ),
   })

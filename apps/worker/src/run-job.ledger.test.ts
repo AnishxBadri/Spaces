@@ -140,6 +140,8 @@ describe('runJob — the job_run ledger', () => {
       'status',
       // SPA-56: a successful handler's own one line (the mail poll's counts).
       'summary',
+      // A watch run's `space_watch` row (D72).
+      'watch_id',
     ])
   })
 

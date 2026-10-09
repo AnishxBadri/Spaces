@@ -6,7 +6,7 @@ import type { Effect } from 'effect'
  * amended 2026-09-30 by D51–D53). Everything a plugin's code is typed
  * against lives in this one file so it can be read, and reviewed, as one:
  * the port names, the claims (the typed arguments of the write-port
- * methods), the five trigger shapes, the cost hook and the job errors.
+ * methods), the six trigger shapes, the cost hook and the job errors.
  * Once published it moves only on a major — a new trigger, port, claim
  * variant or optional field is a minor; any changed shape is a major.
  *
@@ -68,7 +68,8 @@ export type Ref =
  * (Effect ships one; plugin code reads time through it). The manifest
  * validates `uses` against this list, each name has a service tag, and the
  * loader builds a job's Layer from exactly the names it lists.
- * - Appended only: `Import` arrived in SDK 1.1.0, a minor.
+ * - Appended only: `Import` arrived in SDK 1.1.0, `Spaces` and `Discover`
+ *   in 1.5.0 — each a minor.
  */
 export const PORT_NAMES = [
   'Identity',
@@ -84,6 +85,8 @@ export const PORT_NAMES = [
   'Http',
   'Log',
   'Import',
+  'Spaces',
+  'Discover',
 ] as const
 export type PortName = (typeof PORT_NAMES)[number]
 
@@ -276,6 +279,30 @@ export type JudgmentClaim = {
   readonly refs: ReadonlyArray<Ref>
 }
 
+/** A page a candidate was found on: the evidence a reviewer opens. */
+export type DiscoveryEvidence = {
+  readonly url: string
+  readonly title?: string
+}
+
+/**
+ * `Discover.candidate(claim)`: a company a watch found for a space. The host
+ * decides what it becomes — nothing for a member or a dismissed domain, a
+ * "file here" card for a known company, an "add" card for an unknown one —
+ * and never creates a record or a deal from it. (D72)
+ */
+export type DiscoverClaim = {
+  readonly spaceId: EntityId
+  readonly name: string
+  readonly domain: string
+  readonly aliases?: ReadonlyArray<string>
+  readonly evidence: ReadonlyArray<DiscoveryEvidence>
+  /** Signals the job emitted about it (`event:<signalId>`). */
+  readonly refs?: ReadonlyArray<Ref>
+  /** A subspace of `spaceId` the candidate belongs in, by name. */
+  readonly subspaceHint?: string
+}
+
 /**
  * One cell of an import grid: text, or a list — a multi-select's labels,
  * several linked names, several URLs. The plugin splits a dialect's joined
@@ -441,6 +468,27 @@ export type FileJob<TServices = unknown> = (
   input: FileInput,
 ) => Effect.Effect<void, JobError, TServices>
 
+/**
+ * `watch` — a saved research lens on a space, run once per `space_watch` row
+ * (D72): on its cadence, or on "Run now".
+ * - `settings` is the row's, as the job's own `settings` schema took them —
+ *   `watchSettingsOf` is the typed read.
+ * - `state` is the cursor the last successful run handed back; null before
+ *   the first. A run that fails leaves it as it was.
+ * - The brief is not handed over: a job asks `Spaces.brief(spaceId)`.
+ */
+export type WatchInput = {
+  readonly watchId: string
+  readonly spaceId: EntityId
+  readonly settings: JsonObject
+  readonly state: JsonObject | null
+}
+/** The plugin's cursor for the next run — its own, and nothing of the host's. */
+export type WatchOutput = { readonly state: JsonObject | null }
+export type WatchJob<TServices = unknown> = (
+  input: WatchInput,
+) => Effect.Effect<WatchOutput, JobError, TServices>
+
 /** A job's function (or object), by its trigger. */
 export type JobFor<TTrigger, TServices = unknown> = TTrigger extends 'action'
   ? ActionJob<TServices>
@@ -452,4 +500,6 @@ export type JobFor<TTrigger, TServices = unknown> = TTrigger extends 'action'
         ? WebhookJob<TServices>
         : TTrigger extends 'file'
           ? FileJob<TServices>
-          : never
+          : TTrigger extends 'watch'
+            ? WatchJob<TServices>
+            : never

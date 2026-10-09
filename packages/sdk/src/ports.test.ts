@@ -21,6 +21,7 @@ describe('the port tags', () => {
         "Ai": "spaces/sdk/Ai",
         "Config": "spaces/sdk/Config",
         "Content": "spaces/sdk/Content",
+        "Discover": "spaces/sdk/Discover",
         "Facts": "spaces/sdk/Facts",
         "Http": "spaces/sdk/Http",
         "Identity": "spaces/sdk/Identity",
@@ -31,6 +32,7 @@ describe('the port tags', () => {
         "Read": "spaces/sdk/Read",
         "Receipts": "spaces/sdk/Receipts",
         "Secrets": "spaces/sdk/Secrets",
+        "Spaces": "spaces/sdk/Spaces",
       }
     `)
   })

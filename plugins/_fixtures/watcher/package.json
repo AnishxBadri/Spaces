@@ -1,0 +1,28 @@
+{
+  "//": "A loader fixture, not a product: one `watch` job granted Spaces and Log. Each run asks for its space's brief, logs it whole, and hands back a state counting its runs; a watch whose settings say `fail` throws after the brief, so the state must stay as it was. apps/worker's watch test runs it through the loader.",
+  "name": "@spaces/plugin-watcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "zod": "^4.3.6"
+  }
+}

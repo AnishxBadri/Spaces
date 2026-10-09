@@ -160,6 +160,8 @@ one `integration` row. The plugin never links against core.
 | `Judgment`     | `suggest(claim)`                                  | review inbox; never a silent write                                                                   |
 | `Receipts`     | `store(entityId, raw)`                            | `enrichment_record` — the provenance anchor                                                          |
 | `Import`       | `stage({ columns, rows })`                        | lands a grid in the waiting `import_batch`; mapping, preview and commit stay core's (SDK 1.1)        |
+| `Spaces`       | `brief(spaceId)`                                  | read-only, as actor `integration`; the space as data (D71/D72); sensitive or archived refuses (1.5)  |
+| `Discover`     | `candidate(claim)`                                | a watch's found company → a card, never a record or a deal (D72); declared in 1.5, no live port yet  |
 | `Ai`           | `complete(lane, items, schema?)`                  | AI substrate: lane routing, sensitivity gate, cost attributed to this integration                    |
 | `Read`         | `entity(id)`, `search(q)`, later `context(id, …)` | `canRead` as actor `integration` — private notes never visible; `search` lexical + fuzzy in v1 (D56) |
 | `Secrets`      | `get()`, `accessToken()`                          | vault decrypt in the worker only; scoped to this row's credential / connection                       |
@@ -263,6 +265,7 @@ schedule: (input: { cursor: string | null }) → Effect<{ nextCursor: string | n
 event:    (input: { event: DomainEvent }) → Effect<void, JobError, R>  // on: ['entity.created'] — enrich-on-create
 webhook:  (input: { payload, receivedAt }) → Effect<void, JobError, R>  // call recorders; §11 ingress
 file:     (input: { stream: ReadableStream<Uint8Array>, filename, mime }) → Effect<void, JobError, R>   // an importer
+watch:    (input: { watchId, spaceId, settings, state }) → Effect<{ state }, JobError, R>   // once per space_watch row (D72, SDK 1.5)
 ```
 
 The types are `packages/sdk/src/contract.ts` (sdk-4a), one file: `JobError`
@@ -433,6 +436,13 @@ Import.stage(grid: {
 - **SDK 1.1.0.** `Import`, its claim types and `accepts` are additive: a
   minor. A plugin that uses them declares `sdk: '^1.1'`, so a 1.0 host
   degrades it by range before it parses the manifest.
+
+### 5.3 The `watch` trigger (SDK 1.5, D72)
+
+- A watch job declares its own `settings` (zod, emitted as JSON Schema like the plugin's; `watchSettingsOf` is the typed read). The manifest refuses a watch job without one, `settings` on any other job, and a second watch job: a `space_watch` row names its integration, not a job.
+- The worker registers the job's queue `stately` and keys every run by watch id, so one run of a watch waits at a time; beside it, `plugin.<id>.<job>.tick` on a one-minute cron sends each due watch. A watch is due once per slot of `cadence_minutes` counted from the epoch, so "Run now" (`runWatchNow`, sent at once) never moves or eats the next tick; a null cadence is never due. An archived space, or an archived ancestor, pauses both paths.
+- The run hands the job `{ watchId, spaceId, settings, state }` and writes the returned `state` in the transaction closing the `job_run` row — a failed run leaves it as it was. `job_run.watch_id` names the watch and `entity_id` the space.
+- `Spaces.brief` is `spaceBriefProgram` read as the integration: path, criteria, memos (shared only) and terms on the path, members with their key values and domains (capped, with `memberCount`), the subtree with direct counts. Sensitive or archived subspaces leave the tree with their branch; a member sensitive by any input is left out; a space sensitive anywhere in its path — or by the workspace floor — refuses the call, which fails the run with the reason.
 
 ## 6. `definePlugin()` and the testing kit
 

@@ -3,13 +3,21 @@ import { eq, sql } from 'drizzle-orm'
 import type { PgBoss } from 'pg-boss'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { importBatch, integration } from '@spaces/db/schema'
+import { importBatch, integration, spaceWatch } from '@spaces/db/schema'
 import { runLinePrefix } from '@spaces/core/import/commit'
 import { fileJobData } from '@spaces/core/import/dialect'
 import type { FileJobData } from '@spaces/core/import/dialect'
+import { jsonValue } from '@spaces/core/json'
 import { pluginQueueName } from '@spaces/core/queue/names'
 import type { PluginQueueName } from '@spaces/core/queue/names'
+import {
+  WATCH_TICK_CRON,
+  watchRunData,
+  watchTickQueue,
+} from '@spaces/core/queue/watch'
+import type { WatchRunData } from '@spaces/core/queue/watch'
 import { ImportRun } from '@spaces/core/writes/ports/import'
+import { dueWatchesProgram, liveSpaceOf } from '@spaces/core/writes/watches/run'
 import { storage } from '@spaces/core/writes/storage'
 import {
   ACTION_TARGETS,
@@ -24,7 +32,7 @@ import type {
   JobError,
   Manifest,
 } from '@spaces/sdk'
-import { runJob } from '../run-job'
+import { JobSkipped, runJob } from '../run-job'
 import type {
   JobBreaker,
   JobClose,
@@ -45,6 +53,8 @@ import { messageOf } from './loader'
  *
  * - Queue names encode ownership: `plugin.<id>.<job>`, and an interactive
  *   job its own `plugin.<id>.<job>.interactive`.
+ * - A watch job's queue is `stately`, keyed by watch, with a `.tick` queue
+ *   beside it on a one-minute cron that sends each due watch (D72).
  * - Unregistering stops the work and the schedule but never deletes the
  *   queue, so a job sent while the plugin is off waits for it to come back.
  */
@@ -59,6 +69,7 @@ export type PluginBoss = Pick<
   | 'schedule'
   | 'unschedule'
   | 'getSchedules'
+  | 'send'
 >
 
 export type PluginQueuesOptions = {
@@ -158,11 +169,19 @@ const cronOf = (plan: PluginQueue): string | null =>
     ? plan.declared.schedule
     : null
 
-/** The schedule queues of these plans: what reconciliation keeps. */
+/** A watch job's tick queue; null for any other job. */
+const tickOf = (plan: PluginQueue): PluginQueueName | null =>
+  plan.declared.trigger === 'watch' ? watchTickQueue(plan.queue) : null
+
+/** The scheduled queues of these plans: what reconciliation keeps. */
 export const scheduledQueues = (
   plans: ReadonlyArray<PluginQueue>,
 ): ReadonlyArray<PluginQueueName> =>
-  plans.flatMap((plan) => (cronOf(plan) === null ? [] : [plan.queue]))
+  plans.flatMap((plan) => {
+    const tick = tickOf(plan)
+    if (tick !== null) return [tick]
+    return cronOf(plan) === null ? [] : [plan.queue]
+  })
 
 const retryOf = (declared: JobDeclaration): JobRetryPolicy => ({
   limit: declared.retry ?? DEFAULT_RETRY_LIMIT,
@@ -341,6 +360,137 @@ export const runFileJob = (
     return `${prefix}${rows} rows staged by ${plan.queue}`
   })
 
+// ---------------------------------------------------------------------------
+// A watch run, and the tick that sends them
+// ---------------------------------------------------------------------------
+
+const tickData = z.object({})
+
+/** What a watch job hands back, decoded once for the column. */
+const watchState = z.object({
+  state: z.record(z.string(), jsonValue).nullable(),
+})
+
+const watchFailed = (what: string) => (cause: unknown) =>
+  new JobRetryable({ reason: `could not ${what}: ${messageOf(cause)}` })
+
+const markWatch = (
+  watchId: string,
+  set: Partial<typeof spaceWatch.$inferInsert>,
+  what: string,
+) =>
+  Effect.tryPromise({
+    try: () => db.update(spaceWatch).set(set).where(eq(spaceWatch.id, watchId)),
+    catch: watchFailed(what),
+  })
+
+/**
+ * One watch run: re-read the row, hand the job its space, settings and
+ * state, and write back the state it returns in the transaction closing the
+ * `job_run` row — so a run that fails leaves `state` as it was.
+ * - A gone watch or an archived space is skipped, never run.
+ * - `last_run_at` is stamped as the run starts: that is what keeps the tick
+ *   from sending it again in the same slot.
+ */
+export const runWatchJob = (
+  integrationId: string,
+  plan: PluginQueue,
+  invoke: Invoke,
+  data: WatchRunData,
+) =>
+  Effect.gen(function* () {
+    const row = (yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({
+            integrationId: spaceWatch.integrationId,
+            spaceId: spaceWatch.spaceId,
+            settings: spaceWatch.settings,
+            state: spaceWatch.state,
+            live: sql<boolean>`${liveSpaceOf(spaceWatch.spaceId)}`,
+          })
+          .from(spaceWatch)
+          .where(eq(spaceWatch.id, data.watchId)),
+      catch: watchFailed(`read watch ${data.watchId}`),
+    })).at(0)
+    if (row === undefined)
+      return yield* new JobSkipped({ reason: `watch ${data.watchId} is gone` })
+    if (row.integrationId !== integrationId)
+      return yield* new JobPermanent({
+        reason: `watch ${data.watchId} belongs to another integration`,
+      })
+    if (!row.live)
+      return yield* new JobSkipped({
+        reason: `watch ${data.watchId} is paused: its space is archived`,
+      })
+    yield* markWatch(
+      data.watchId,
+      { lastRunAt: new Date(), lastStatus: 'running', lastError: null },
+      `stamp watch ${data.watchId}`,
+    )
+    const out = yield* invoke(integrationId, plan.job, {
+      watchId: data.watchId,
+      spaceId: row.spaceId,
+      settings: row.settings,
+      state: row.state,
+    }).pipe(
+      Effect.tapError((error) =>
+        markWatch(
+          data.watchId,
+          { lastStatus: 'failed', lastError: error.reason.slice(0, 1000) },
+          `mark watch ${data.watchId} failed`,
+        ).pipe(Effect.ignore),
+      ),
+    )
+    const parsed = watchState.safeParse(out)
+    if (!parsed.success)
+      return yield* new JobPermanent({
+        reason: `${plan.queue} returned no { state } object or null`,
+      })
+    const state = parsed.data.state
+    const result: JobClose = {
+      summary: `watch ${data.watchId} · state ${state === null ? 'cleared' : 'kept'}`,
+      close: async (tx) => {
+        await tx
+          .update(spaceWatch)
+          .set({ state, lastStatus: 'succeeded', lastError: null })
+          .where(eq(spaceWatch.id, data.watchId))
+      },
+    }
+    return result
+  })
+
+/**
+ * One tick: send each of this integration's due watches onto its queue,
+ * keyed by watch, so one already waiting is not sent twice.
+ */
+export const tickWatches = (
+  options: Pick<PluginQueuesOptions, 'boss'>,
+  integrationId: string,
+  queue: PluginQueueName,
+  now: Date,
+) =>
+  Effect.gen(function* () {
+    const due = yield* dueWatchesProgram(integrationId, now).pipe(
+      Effect.mapError(
+        (e) =>
+          new JobRetryable({
+            reason: `could not read due watches: ${messageOf(e.cause)}`,
+          }),
+      ),
+    )
+    let sent = 0
+    for (const data of due) {
+      const id = yield* Effect.tryPromise({
+        try: () =>
+          options.boss.send(queue, data, { singletonKey: data.watchId }),
+        catch: watchFailed(`send watch ${data.watchId}`),
+      })
+      if (id !== null) sent += 1
+    }
+    return sent === 0 ? undefined : `sent ${sent} of ${due.length} due`
+  })
+
 /** What every plugin JobDef shares: name, retry, timeout, concurrency. */
 const common = (plan: PluginQueue) => ({
   name: plan.queue,
@@ -424,7 +574,7 @@ const workPlan = (
             Effect.gen(function* () {
               const cursor = yield* readCursor(integrationId, plan.job)
               const out = yield* invoke(integrationId, plan.job, { cursor })
-              if (out === undefined) {
+              if (out === undefined || !('nextCursor' in out)) {
                 return yield* new JobPermanent({
                   reason: `${plan.queue} returned no { nextCursor }`,
                 })
@@ -481,8 +631,61 @@ const workPlan = (
         concurrency,
         breaker,
       )
+    case 'watch':
+      return work(
+        options,
+        {
+          ...common(plan),
+          schema: watchRunData,
+          run: (data) => runWatchJob(integrationId, plan, invoke, data),
+          // The space is the entity, so its status stream reaches the space.
+          refs: (data) => ({
+            integrationId,
+            entityId: data.spaceId,
+            watchId: data.watchId,
+          }),
+        },
+        concurrency,
+        breaker,
+      )
   }
 }
+
+/**
+ * Works a watch job's tick queue. No breaker: a tick is the host's
+ * scheduling, never the plugin's work.
+ */
+const workTick = (
+  options: PluginQueuesOptions,
+  integrationId: string,
+  plan: PluginQueue,
+  tick: PluginQueueName,
+): Promise<string> =>
+  options.boss.work(
+    tick,
+    {
+      batchSize: 1,
+      includeMetadata: true,
+      ...(options.pollingIntervalSeconds === undefined
+        ? {}
+        : { pollingIntervalSeconds: options.pollingIntervalSeconds }),
+    },
+    runJob(
+      {
+        name: tick,
+        schema: tickData,
+        run: () =>
+          Effect.suspend(() =>
+            tickWatches(options, integrationId, plan.queue, new Date()),
+          ),
+      },
+      {
+        host: options.host,
+        layer: Layer.empty,
+        ...(options.ledger === undefined ? {} : { ledger: options.ledger }),
+      },
+    ),
+  )
 
 // ---------------------------------------------------------------------------
 // Register, unregister, reconcile
@@ -504,11 +707,17 @@ export const registerQueues = Effect.fn('registerQueues')(function* (
   const { boss } = options
   for (const plan of plans) {
     const cron = cronOf(plan)
+    const tick = tickOf(plan)
     const queue = queueOptions(plan.declared)
     yield* Effect.promise(() =>
       boss
         .createQueue(plan.queue, {
-          policy: cron === null ? 'standard' : 'singleton',
+          policy:
+            cron !== null
+              ? 'singleton'
+              : tick !== null
+                ? 'stately'
+                : 'standard',
           ...queue,
         })
         .catch(() => undefined),
@@ -520,6 +729,19 @@ export const registerQueues = Effect.fn('registerQueues')(function* (
     if (cron !== null) {
       yield* Effect.tryPromise(() =>
         boss.schedule(plan.queue, cron, {}, { tz: SCHEDULE_TZ }),
+      )
+    }
+    if (tick !== null) {
+      yield* Effect.promise(() =>
+        boss
+          .createQueue(tick, { policy: 'singleton', retryLimit: 0 })
+          .catch(() => undefined),
+      )
+      yield* Effect.tryPromise(() =>
+        workTick(options, integrationId, plan, tick),
+      )
+      yield* Effect.tryPromise(() =>
+        boss.schedule(tick, WATCH_TICK_CRON, {}, { tz: SCHEDULE_TZ }),
       )
     }
   }
@@ -534,6 +756,11 @@ export const unregisterQueues = Effect.fn('unregisterQueues')(function* (
     yield* Effect.tryPromise(() => options.boss.offWork(plan.queue))
     if (cronOf(plan) !== null)
       yield* Effect.tryPromise(() => options.boss.unschedule(plan.queue))
+    const tick = tickOf(plan)
+    if (tick !== null) {
+      yield* Effect.tryPromise(() => options.boss.offWork(tick))
+      yield* Effect.tryPromise(() => options.boss.unschedule(tick))
+    }
   }
 })
 

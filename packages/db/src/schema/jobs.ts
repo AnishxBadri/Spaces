@@ -9,6 +9,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { entity } from './entities'
 import { integration } from './integrations'
+import { spaceWatch } from './watches'
 
 /**
  * The attempt ledger (docs/spec-plugin-sdk.md §11): one row per pg-boss
@@ -17,7 +18,8 @@ import { integration } from './integrations'
  * - Written by `runJob` and by nothing else — only the wrapper knows when an
  *   attempt started, which attempt it was and how it ended; a handler logging
  *   its own run would miss a defect and a job whose data never parsed.
- * - Both refs are nullable: a core job has no integration, a sweep no entity.
+ * - Every ref is nullable: a core job has no integration, a sweep no entity,
+ *   and only a watch run has a watch.
  * - Deliberately **no `tokens` column**; token accounting is `ai_usage` with
  *   `ai_run` as its rollup.
  */
@@ -47,6 +49,14 @@ export const jobRun = pgTable(
     integrationId: uuid('integration_id').references(() => integration.id),
     /** The record the job is about; null for a sweep or a cron job. */
     entityId: uuid('entity_id').references(() => entity.id),
+    /**
+     * The `space_watch` row a watch run ran for; its space is `entity_id`, so
+     * the per-entity status stream reaches the space page too. (D72)
+     * - Set null when the watch is deleted: the ledger outlives it.
+     */
+    watchId: uuid('watch_id').references(() => spaceWatch.id, {
+      onDelete: 'set null',
+    }),
     status: jobRunStatus('status').notNull().default('running'),
     /** 1-based, as pg-boss counts: retry_count + 1. */
     attempt: integer('attempt').notNull(),
@@ -74,5 +84,6 @@ export const jobRun = pgTable(
   (t) => [
     index('job_run_entity_idx').on(t.entityId, t.startedAt),
     index('job_run_queue_idx').on(t.queue, t.startedAt),
+    index('job_run_watch_idx').on(t.watchId, t.startedAt),
   ],
 )

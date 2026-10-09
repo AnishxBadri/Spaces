@@ -6,6 +6,7 @@ import type {
   AliasClaim,
   AttributeProposal,
   ContentClaim,
+  DiscoverClaim,
   DocumentBytes,
   DocumentClaim,
   FactClaim,
@@ -16,6 +17,7 @@ import type {
   ImportGrid,
   ImportRow,
   InteractionClaim,
+  JsonObject,
   JudgmentClaim,
   NoteProposal,
   ReceiptClaim,
@@ -76,6 +78,9 @@ describe('claims carry no provenance (D52)', () => {
     >().toEqualTypeOf<never>()
     expectTypeOf<
       Extract<KeysOf<ImportGrid>, Provenance>
+    >().toEqualTypeOf<never>()
+    expectTypeOf<
+      Extract<KeysOf<DiscoverClaim>, Provenance>
     >().toEqualTypeOf<never>()
     expectTypeOf<
       Extract<KeysOf<ImportRow>, Provenance>
@@ -146,7 +151,7 @@ describe('refs are the D4 grammar', () => {
 
 describe('PORT_NAMES', () => {
   // Appended only: a reordered or removed name is an SDK major.
-  it('is the spec §4 table minus Clock, Import appended by SDK 1.1', () => {
+  it('is the spec §4 table minus Clock, Import appended by SDK 1.1, Spaces and Discover by 1.5', () => {
     expect(PORT_NAMES).toEqual([
       'Identity',
       'Facts',
@@ -161,6 +166,8 @@ describe('PORT_NAMES', () => {
       'Http',
       'Log',
       'Import',
+      'Spaces',
+      'Discover',
     ])
   })
 })
@@ -182,6 +189,11 @@ describe('definePlugin types each job by its trigger', () => {
       onCreate: { trigger: 'event', uses: ['Facts'], on: ['entity.created'] },
       push: { trigger: 'webhook', uses: ['Content'] },
       importCsv: { trigger: 'file', uses: ['Identity'] },
+      lens: {
+        trigger: 'watch',
+        uses: ['Spaces'],
+        settings: z.object({ cap: z.int() }),
+      },
     },
     ingress: { signature: 'hmac-sha256' },
   })
@@ -204,6 +216,8 @@ describe('definePlugin types each job by its trigger', () => {
       payload === null ? Effect.void : Effect.void,
     importCsv: ({ filename }: { filename: string }) =>
       filename ? Effect.void : Effect.void,
+    lens: ({ state }: { state: JsonObject | null }) =>
+      Effect.succeed({ state }),
   }
 
   it('accepts one well-shaped job per trigger', () => {
@@ -211,6 +225,7 @@ describe('definePlugin types each job by its trigger', () => {
     expect(Object.keys(plugin.jobs).sort()).toEqual([
       'enrich',
       'importCsv',
+      'lens',
       'onCreate',
       'push',
       'sync',
@@ -225,6 +240,19 @@ describe('definePlugin types each job by its trigger', () => {
           ...good,
           // @ts-expect-error — a schedule job hands back { nextCursor }
           sync: () => Effect.void,
+        },
+      })
+    expect(typeof bad).toBe('function')
+  })
+
+  it('refuses a watch job that hands back no state', () => {
+    const bad = () =>
+      definePlugin({
+        manifest,
+        jobs: {
+          ...good,
+          // @ts-expect-error — a watch job hands back { state }
+          lens: () => Effect.void,
         },
       })
     expect(typeof bad).toBe('function')

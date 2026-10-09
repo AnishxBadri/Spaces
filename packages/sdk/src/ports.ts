@@ -5,11 +5,13 @@ import { JobPermanent } from './contract.ts'
 import type {
   AliasClaim,
   AnswerClaim,
+  DiscoverClaim,
   DocumentClaim,
   EntityId,
   FactClaim,
   IdentityClaim,
   ImportGrid,
+  IsoTimestamp,
   InteractionClaim,
   JobError,
   JsonObject,
@@ -19,6 +21,7 @@ import type {
   ReceiptClaim,
   Ref,
   SignalClaim,
+  WatchInput,
 } from './contract.ts'
 import type { AuthoredManifest } from './manifest.ts'
 
@@ -463,6 +466,124 @@ export class Import extends Context.Service<
 >()('spaces/sdk/Import') {}
 
 // ---------------------------------------------------------------------------
+// Spaces, Discover — a watch's subject and its hand-back (D72)
+// ---------------------------------------------------------------------------
+
+/** One space on the way to the brief's subject, root first. */
+export type SpaceBriefStep = {
+  readonly id: EntityId
+  readonly name: string
+}
+
+/** A memo filed on the space or an ancestor, shared notes only. */
+export type SpaceBriefMemo = {
+  readonly ref: Ref
+  /** The space it is filed on: the subject's, or an ancestor's. */
+  readonly spaceId: EntityId
+  readonly title: string
+  /** Markdown, clipped. */
+  readonly body: string
+  readonly updatedAt: IsoTimestamp
+}
+
+/** A glossary term scoped to the space or an ancestor. */
+export type SpaceBriefTerm = {
+  readonly ref: Ref
+  readonly spaceId: EntityId
+  readonly name: string
+  readonly aliases: ReadonlyArray<string>
+  readonly definition: string
+}
+
+/** A company filed in the space or a subspace, with its key values. */
+export type SpaceBriefMember = {
+  readonly entityId: EntityId
+  readonly name: string
+  /** The space it is filed in: the subject or one of its subspaces. */
+  readonly spaceId: EntityId
+  /** Normalized identity domains. */
+  readonly domains: ReadonlyArray<string>
+  /** Key attribute values by slug, as stored; an unset one is absent. */
+  readonly values: JsonObject
+}
+
+/** The subtree under the subject, each node with what is filed on it. */
+export type SpaceBriefNode = {
+  readonly id: EntityId
+  readonly name: string
+  /** Companies filed on this node itself. */
+  readonly companies: number
+  readonly children: ReadonlyArray<SpaceBriefNode>
+}
+
+/**
+ * What a space is, as data an engine turns into its own query — never a
+ * rendered prompt. (D71, D72)
+ * - `members` is capped; `memberCount` is the whole.
+ * - Sensitive members and sensitive subspaces are left out.
+ */
+export type SpaceBrief = {
+  readonly space: {
+    readonly id: EntityId
+    readonly name: string
+    /** What belongs here, as the owner wrote it; null when unwritten. */
+    readonly criteria: string | null
+  }
+  /** Root first, ending with the subject. */
+  readonly path: ReadonlyArray<SpaceBriefStep>
+  readonly memos: ReadonlyArray<SpaceBriefMemo>
+  readonly terms: ReadonlyArray<SpaceBriefTerm>
+  readonly members: ReadonlyArray<SpaceBriefMember>
+  readonly memberCount: number
+  readonly tree: SpaceBriefNode
+}
+
+/**
+ * The space as a watch's subject. Read-only, as the bound integration
+ * (`canRead`): a space that does not exist, is archived, or is sensitive
+ * anywhere in its path fails the call permanently — which fails the run.
+ */
+export class Spaces extends Context.Service<
+  Spaces,
+  {
+    readonly brief: (spaceId: EntityId) => Effect.Effect<SpaceBrief, JobError>
+  }
+>()('spaces/sdk/Spaces') {}
+
+/**
+ * A watch's hand-back: one candidate company for a space. `suggestionId` is
+ * the card it made or joined; null when the host dropped it — already a
+ * member, or dismissed for this space.
+ */
+export class Discover extends Context.Service<
+  Discover,
+  {
+    readonly candidate: (
+      claim: DiscoverClaim,
+    ) => Effect.Effect<{ readonly suggestionId: string | null }, JobError>
+  }
+>()('spaces/sdk/Discover') {}
+
+/**
+ * A watch run's settings, parsed by the job's own `settings` schema —
+ * defaults applied, typed as authored. Settings that do not parse are a
+ * permanent failure: retrying reads the same row.
+ */
+export const watchSettingsOf = <TSettings extends z.ZodType>(
+  job: { readonly settings: TSettings },
+  input: Pick<WatchInput, 'watchId' | 'settings'>,
+): Effect.Effect<z.output<TSettings>, JobPermanent> => {
+  const parsed = z.safeParse(job.settings, input.settings)
+  return parsed.success
+    ? Effect.succeed(parsed.data)
+    : Effect.fail(
+        new JobPermanent({
+          reason: `watch ${input.watchId}'s settings do not match its job: ${parsed.error.message}`,
+        }),
+      )
+}
+
+// ---------------------------------------------------------------------------
 // The name → tag map (D51's grant)
 // ---------------------------------------------------------------------------
 
@@ -481,6 +602,8 @@ export const PORTS = {
   Http,
   Log,
   Import,
+  Spaces,
+  Discover,
 } as const satisfies { readonly [K in PortName]: unknown }
 
 /**
@@ -503,6 +626,8 @@ export type PortServices = {
   readonly Http: Http
   readonly Log: Log
   readonly Import: Import
+  readonly Spaces: Spaces
+  readonly Discover: Discover
 }
 
 export type PortService<TName extends PortName> = PortServices[TName]

@@ -90,6 +90,11 @@ export type {
   WebhookJob,
   FileInput,
   FileJob,
+  WatchInput,
+  WatchOutput,
+  WatchJob,
+  DiscoveryEvidence,
+  DiscoverClaim,
   JobFor,
 } from './contract.ts'
 export {
@@ -138,9 +143,12 @@ export {
   Http,
   Log,
   Import,
+  Spaces,
+  Discover,
   PORTS,
   NotConnected,
   configOf,
+  watchSettingsOf,
   responseJson,
 } from './ports.ts'
 export type {
@@ -166,4 +174,10 @@ export type {
   LogFields,
   ImportRefusal,
   StageResult,
+  SpaceBrief,
+  SpaceBriefStep,
+  SpaceBriefMemo,
+  SpaceBriefTerm,
+  SpaceBriefMember,
+  SpaceBriefNode,
 } from './ports.ts'

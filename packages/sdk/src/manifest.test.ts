@@ -120,7 +120,7 @@ describe('manifestSchema', () => {
   })
 
   describe('jobs', () => {
-    it('requires a trigger from the five', () => {
+    it('requires a trigger from the six', () => {
       const m = base()
       m.jobs.enrich = { trigger: 'enricher', uses: ['Facts'] }
       expect(issues(m)[0]).toMatch(/^jobs\.enrich\.trigger: /)
@@ -233,6 +233,38 @@ describe('manifestSchema', () => {
       }
       expect(issues(m)).toEqual([
         'jobs.enrich.on: on is only for an event job, and enrich is action',
+      ])
+    })
+
+    it('requires settings iff the trigger is watch (SDK 1.5)', () => {
+      const m = base()
+      m.jobs.lens = {
+        trigger: 'watch',
+        uses: ['Spaces', 'Discover', 'Log'],
+        settings: { type: 'object', properties: { cap: { type: 'integer' } } },
+      }
+      expect(issues(m)).toEqual([])
+      m.jobs.lens = { trigger: 'watch', uses: ['Spaces'] }
+      expect(issues(m)).toEqual([
+        'jobs.lens.settings: a watch job needs settings — the schema of what one watch holds, rendered as its form',
+      ])
+      m.jobs.lens = {
+        trigger: 'action',
+        uses: ['Spaces'],
+        settings: { type: 'object' },
+      }
+      expect(issues(m)).toEqual([
+        'jobs.lens.settings: settings on a job is only for a watch job, and lens is action',
+      ])
+    })
+
+    it('takes one watch job per plugin — a watch names its plugin, not a job', () => {
+      const m = base()
+      const watch = { trigger: 'watch', uses: ['Spaces'], settings: {} }
+      m.jobs.lens = watch
+      m.jobs.other = watch
+      expect(issues(m)).toEqual([
+        'jobs.other: a plugin declares at most one watch job — a watch names its plugin, not a job — and this one declares lens, other',
       ])
     })
 
@@ -387,6 +419,21 @@ describe('toManifestJson', () => {
     // A field with a default is not required on the form.
     expect(json.settings).not.toHaveProperty('required')
     expect(JSON.parse(JSON.stringify(json))).toEqual(json)
+  })
+
+  it("serialises a watch job's settings the same way", () => {
+    const watchSettings = z.object({
+      criteria: z.string(),
+      cap: z.int().default(25),
+    })
+    const json = toManifestJson({
+      ...authored,
+      jobs: {
+        lens: { trigger: 'watch', uses: ['Spaces'], settings: watchSettings },
+      },
+    })
+    expect(json.jobs.lens.settings).toEqual(settingsJsonSchema(watchSettings))
+    expect(json.jobs.lens.settings).toMatchObject({ required: ['criteria'] })
   })
 
   it('refuses to emit a manifest the loader would refuse', () => {

@@ -27,6 +27,7 @@ import {
   Read,
   Receipts,
   Secrets,
+  Spaces,
 } from '../ports.ts'
 import type {
   AiItem,
@@ -37,6 +38,7 @@ import type {
   HttpResponse,
   LogFields,
   ReadEntity,
+  SpaceBrief,
   StageResult,
 } from '../ports.ts'
 
@@ -54,7 +56,8 @@ import type {
  *
  * Not here: `PluginDb`, whose behaviour is Postgres's own — a plugin's SQL is tested against a real
  * database, as the worker's PluginDb test does. A DryRun Layer (this recorder in production, over core's
- * `previewResolve`) is the later answer to an importer preview.
+ * `previewResolve`) is the later answer to an importer preview. Nor
+ * `Discover`: the host has no live port for a fake to mirror.
  */
 
 export type RecordedCall = {
@@ -671,6 +674,37 @@ export const ImportTest = (
 }
 
 // ---------------------------------------------------------------------------
+// Spaces
+// ---------------------------------------------------------------------------
+
+/**
+ * `brief` answers the brief seeded for that space id; any other id fails
+ * permanently, as the live port does for a space it cannot hand over.
+ */
+export const SpacesTest = (
+  options: {
+    readonly briefs?: ReadonlyArray<SpaceBrief>
+    readonly recorder?: Recorder
+  } = {},
+): TestPort<Spaces> => {
+  const { calls, record } = tap('Spaces', options.recorder)
+  const briefs = new Map((options.briefs ?? []).map((b) => [b.space.id, b]))
+  const layer = Layer.succeed(Spaces, {
+    brief: (spaceId) =>
+      Effect.suspend(() => {
+        const brief = briefs.get(spaceId)
+        if (brief !== undefined)
+          return Effect.succeed(record('brief', spaceId, brief))
+        record('brief', spaceId, '<refused: no such space>')
+        return Effect.fail(
+          new JobPermanent({ reason: `Spaces.brief: no space ${spaceId}` }),
+        )
+      }),
+  })
+  return { layer, calls }
+}
+
+// ---------------------------------------------------------------------------
 // All of them
 // ---------------------------------------------------------------------------
 
@@ -683,12 +717,14 @@ export type TestPortsOptions = {
   readonly config?: JsonObject
   readonly http?: ReadonlyArray<HttpScript>
   readonly ai?: { readonly [L in AiLane]?: AiAnswer }
+  readonly briefs?: ReadonlyArray<SpaceBrief>
 }
 
 /**
- * Every test port over one recorder: `layer` provides all twelve, `calls` is
- * every port call in the order the job made it, and each port's own handle
- * is there for its extra state (`facts.values`, `log.lines`).
+ * Every test port over one recorder: `layer` provides each but PluginDb and
+ * Discover, `calls` is every port call in the order the job made it, and
+ * each port's own handle is there for its extra state (`facts.values`,
+ * `log.lines`).
  */
 export const testPorts = (options: TestPortsOptions = {}) => {
   const recorder = makeRecorder()
@@ -722,9 +758,14 @@ export const testPorts = (options: TestPortsOptions = {}) => {
     ...(options.ai === undefined ? {} : { answers: options.ai }),
     recorder,
   })
+  const spaces = SpacesTest({
+    ...(options.briefs === undefined ? {} : { briefs: options.briefs }),
+    recorder,
+  })
   return {
     layer: Layer.mergeAll(
       ai.layer,
+      spaces.layer,
       importer.layer,
       identity.layer,
       facts.layer,
@@ -750,6 +791,7 @@ export const testPorts = (options: TestPortsOptions = {}) => {
     log,
     import: importer,
     ai,
+    spaces,
   }
 }
 

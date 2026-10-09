@@ -12,8 +12,10 @@ import {
   Log,
   Read,
   Secrets,
+  Spaces,
+  watchSettingsOf,
 } from '../ports.ts'
-import type { PortServices } from '../ports.ts'
+import type { PortServices, SpaceBrief } from '../ports.ts'
 import {
   AiTest,
   ContentTest,
@@ -23,6 +25,7 @@ import {
   ImportTest,
   ReadTest,
   SecretsTest,
+  SpacesTest,
   readEntity,
   testPorts,
 } from './index.ts'
@@ -366,6 +369,55 @@ describe('AiTest', () => {
       }).pipe(Effect.provide(ai.layer)),
     )
     expect(failureOf(refused)._tag).toBe('JobPermanent')
+  })
+})
+
+describe('SpacesTest', () => {
+  const brief: SpaceBrief = {
+    space: { id: 'space-1', name: 'Launch', criteria: 'Small-lift launch.' },
+    path: [
+      { id: 'space-0', name: 'Spacetech' },
+      { id: 'space-1', name: 'Launch' },
+    ],
+    memos: [],
+    terms: [],
+    members: [],
+    memberCount: 0,
+    tree: { id: 'space-1', name: 'Launch', companies: 0, children: [] },
+  }
+
+  it('answers the seeded brief and refuses any other space', () => {
+    const spaces = SpacesTest({ briefs: [brief] })
+    const got = Effect.runSync(
+      Effect.gen(function* () {
+        return yield* (yield* Spaces).brief('space-1')
+      }).pipe(Effect.provide(spaces.layer)),
+    )
+    expect(got).toBe(brief)
+    const refused = Effect.runSyncExit(
+      Effect.gen(function* () {
+        return yield* (yield* Spaces).brief('space-9')
+      }).pipe(Effect.provide(spaces.layer)),
+    )
+    expect(failureOf(refused)._tag).toBe('JobPermanent')
+    expect(spaces.calls.map((c) => c.input)).toEqual(['space-1', 'space-9'])
+  })
+})
+
+describe('watchSettingsOf', () => {
+  const job = { settings: z.object({ cap: z.int().default(25) }) }
+
+  it("parses a watch's settings by the job's schema, defaults applied", () => {
+    expect(
+      Effect.runSync(watchSettingsOf(job, { watchId: 'w-1', settings: {} })),
+    ).toEqual({ cap: 25 })
+  })
+
+  it('fails permanently on settings that do not parse', () => {
+    const exit = Effect.runSyncExit(
+      watchSettingsOf(job, { watchId: 'w-1', settings: { cap: 'many' } }),
+    )
+    expect(failureOf(exit)._tag).toBe('JobPermanent')
   })
 })
 
