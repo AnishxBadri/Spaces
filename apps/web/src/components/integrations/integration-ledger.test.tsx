@@ -5,9 +5,11 @@ import type { IntegrationRow } from '#/lib/server-fns'
 import { IntegrationLedger } from './integration-ledger'
 
 /**
- * The Installed ledger, rendered the way the server renders it: degraded,
- * tripped and operator-off read as three different rows, a missing key reads
- * as not yet rather than as an error, and each state offers its own action.
+ * The Installed ledger, rendered the way the server renders it: each row its
+ * switch, mark, name and version, jobs, state over the one number, and
+ * `Open ›`; degraded, tripped and operator-off read as three different rows,
+ * a missing key reads as not yet rather than as an error, and each state
+ * offers its own action.
  */
 
 vi.mock('@tanstack/react-router', () => ({
@@ -25,12 +27,14 @@ const base: IntegrationRow = {
   pluginId: 'apollo',
   name: 'Apollo',
   version: '0.1.0',
+  roles: ['enrichment'],
   enabled: true,
   state: 'enabled',
   reason: null,
   summary: '6 fields filled on Ohmium',
   lastRun: { ago: '4m ago', failed: false },
   credits: { used: 12, cap: 100 },
+  figure: '12 / 100 credits',
   autoEnrich: 'deal · space',
   errorCount: 0,
   update: null,
@@ -99,23 +103,40 @@ const rowFor = (html: string, state: string): string => {
 }
 
 describe('IntegrationLedger', () => {
-  it('lists every row with version, last run, credits and state', () => {
+  it('lists every row with its mark, version, jobs, state, one number and Open', () => {
     const html = render()
     expect(html).toContain('Installed')
     expect(html.match(/<li/g)).toHaveLength(5)
     const apollo = rowFor(html, 'enabled')
+    expect(apollo).toContain('>A</span>')
     expect(apollo).toContain('Apollo')
-    expect(apollo).toContain('0.1.0')
-    expect(apollo).toContain('6 fields filled on Ohmium')
-    expect(apollo).toContain('12 / 100 cr')
-    expect(apollo).toContain('auto deal · space')
-    expect(apollo).toContain('ran 4m ago')
+    expect(apollo).toContain('v0.1.0')
+    expect(apollo).toContain('>Enrichment<')
+    expect(apollo).toContain('>12 / 100 credits<')
     expect(apollo).toContain('>enabled<')
-    expect(apollo).toContain('Configure')
+    expect(apollo).toContain('Open ›')
   })
 
-  it('names no scope on a row with no event job', () => {
-    expect(rowFor(render(), 'degraded')).not.toContain('auto ')
+  it('names its jobs in manifest order, else what it last did', () => {
+    const line = (row: IntegrationRow) =>
+      rowFor(
+        renderToStaticMarkup(
+          <IntegrationLedger
+            rows={[row]}
+            actions={{
+              onToggle: () => undefined,
+              onReset: () => undefined,
+              onUpdate: () => undefined,
+              pending: null,
+            }}
+          />,
+        ),
+        'enabled',
+      )
+    expect(
+      line({ ...base, roles: ['research', 'enrichment'], figure: '5 signals' }),
+    ).toContain('>Research · Enrichment<')
+    expect(line({ ...base, roles: [] })).toContain('6 fields filled on Ohmium')
   })
 
   it('reads degraded, tripped and off as three different rows', () => {
@@ -129,7 +150,6 @@ describe('IntegrationLedger', () => {
     expect(degraded).toContain('requires sdk ^2.0, host provides 1.1.0')
     expect(degraded).toContain('>degraded<')
     expect(degraded).toContain('>Fix<')
-    expect(degraded).toContain('never ran')
 
     // Tripped: rose, the breaker's reason and count, Reset.
     expect(tripped).toContain('bg-[var(--badge-rose)]')
@@ -204,7 +224,7 @@ describe('IntegrationLedger', () => {
     const row = rowFor(html, 'enabled')
     expect(row).toContain('→ 0.2.0')
     expect(row).toContain('>Update</button>')
-    expect(row).not.toContain('Configure')
+    expect(row).not.toContain('Open ›')
   })
 
   it('names no badge when the newest version needs more than this host, and says why', () => {

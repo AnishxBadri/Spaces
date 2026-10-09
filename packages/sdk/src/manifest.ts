@@ -31,6 +31,22 @@ export const TRIGGERS = [
 export type Trigger = (typeof TRIGGERS)[number]
 
 /**
+ * The jobs a plugin does for the operator, as the Plugins catalogue groups
+ * them (D81). Optional on the manifest and on the registry entry, so the
+ * catalogue can group a plugin before it is installed. A new role is a minor.
+ */
+export const ROLES = [
+  'enrichment',
+  'research',
+  'email-calendar',
+  'files',
+  'meeting-notes',
+  'import',
+  'feeds',
+] as const
+export type PluginRole = (typeof ROLES)[number]
+
+/**
  * The plugin id: the `source_ref` slug, the `plugin_<id>` schema name and the
  * `plugin.<id>.<job>` queue prefix, frozen after first publish. Lowercase
  * letters, digits and single hyphens. Dots are reserved — first-party channel
@@ -139,6 +155,19 @@ export const manifestSchema = z
       name: z.string().min(1),
       description: z.string().min(1),
       icon: z.string().min(1).optional(),
+      // What the catalogue groups it under (SDK 1.4). Absent → "Other".
+      roles: z
+        .array(
+          z.enum(ROLES, {
+            error: (issue) =>
+              `unknown role ${JSON.stringify(issue.input)} — roles name jobs from ROLES (${ROLES.join(', ')})`,
+          }),
+        )
+        .min(1)
+        .refine((roles) => new Set(roles).size === roles.length, {
+          error: 'roles names each role once',
+        })
+        .optional(),
       requires: z
         .strictObject({
           credential: z

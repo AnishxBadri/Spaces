@@ -155,6 +155,24 @@ describe('packPlugin', () => {
     ).rejects.toThrow(/bundle\.mjs is missing/)
   })
 
+  it('carries the manifest roles onto the registry entry, and none when absent', async () => {
+    const { privateKey } = generateKeyPairSync('ed25519')
+    const pack = (m: object) =>
+      packPlugin({
+        distDir: distWith({
+          'manifest.json': JSON.stringify(m),
+          'bundle.mjs': '',
+        }),
+        outDir: mkdtempSync(join(tmpdir(), 'spaces-pack-out-')),
+        privateKey,
+      })
+    const roled = await pack({ ...manifest, roles: ['import', 'feeds'] })
+    expect(roled.entry?.roles).toEqual(['import', 'feeds'])
+    expect(registrySchema.parse([roled.entry])).toEqual([roled.entry])
+    const plain = await pack(manifest)
+    expect(plain.entry).not.toHaveProperty('roles')
+  })
+
   it('refuses a manifest the loader would refuse', async () => {
     const dist = distWith({
       'manifest.json': JSON.stringify({ ...manifest, kind: 'enricher' }),

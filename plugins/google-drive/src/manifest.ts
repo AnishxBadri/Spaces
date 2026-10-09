@@ -15,15 +15,15 @@ export const DRIVE_ID = /^[\w-]+$/
  * - `pickerApiKey` and `pickerAppId` are what Google's picker needs from the
  *   same Cloud project as the OAuth client; without them the Files tab
  *   says the picker is not set up.
- * - `sdk: '^1.1'` so this host loads it today; the storage-source members
- *   and `Http.stream` arrive in the next SDK minor.
+ * - `sdk: '^1.4'`: `roles` arrived in SDK 1.4.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'google-drive',
   version: '0.1.0',
-  sdk: '^1.1',
+  sdk: '^1.4',
   name: 'Google Drive',
+  roles: ['files'],
   description:
     'Reads Google Drive: resolves pasted links, lists folders and fetches files, exporting native Docs, Sheets and Slides; reports what changed by Drive’s own version, never by a hash of the export.',
   requires: { connection: { provider: 'google', scopes: ['drive.file'] } },

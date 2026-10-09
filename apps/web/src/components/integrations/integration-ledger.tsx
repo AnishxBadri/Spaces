@@ -2,23 +2,23 @@ import { Link } from '@tanstack/react-router'
 import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Switch } from '#/components/ui/switch'
+import { roleWords } from '#/lib/integrations/catalogue'
 import type { IntegrationRow, IntegrationState } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
  * The Installed ledger: one 40px row per plugin — the operator's switch,
- * name and version, what it last did or why it is not running, its
- * auto-enrich scope, today's credits, the last run, the state, and the one
- * action the state calls for.
+ * its mark, name and version, the jobs it does, its state over the one
+ * number that matters (credits, signals, people connected), and `Open ›`,
+ * or `Update` when the registry has a newer version it can run. (D81)
  * The three ways of not running read apart:
  * - degraded — amber row, the worker's reason, Fix;
  * - tripped — rose row, the breaker's reason, Reset;
  * - off — the switch off and the row in graphite, nothing wrong.
  * A missing key or a required setting with no value is `not yet`: no tint,
- * Add key or Set up. The newest satisfying registry version shows beside
- * the version, and a running row offers Update; a newer version this host
- * cannot run says why instead. After an upgrade the row says whether going
- * back is a swap or a restore.
+ * Add key or Set up. A newer version this host cannot run says why beside
+ * the jobs; after an upgrade the row says whether going back is a swap or a
+ * restore.
  */
 
 /** The word in the status lane. */
@@ -53,7 +53,7 @@ const DOT: Record<IntegrationState, string> = {
   off: 'bg-rule',
 }
 
-/** The middle lane: what it last did, or why it is not doing it. */
+/** The middle lane: the jobs it does, or why it is not doing them. */
 export function middleOf(row: IntegrationRow): string {
   switch (row.state) {
     case 'needs-key':
@@ -65,7 +65,7 @@ export function middleOf(row: IntegrationRow): string {
     case 'tripped':
       return `${row.reason ?? 'stopped by the breaker'} · ${row.errorCount} failed`
     default:
-      return row.summary ?? ''
+      return row.roles.length > 0 ? roleWords(row.roles) : (row.summary ?? '')
   }
 }
 
@@ -93,6 +93,27 @@ export function creditsOf(row: IntegrationRow): string {
   const { used, cap } = row.credits
   if (cap !== null) return `${used} / ${cap} cr`
   return used > 0 ? `${used} cr` : '—'
+}
+
+/** A plugin's mark: its initial on a square, ink when installed, rule when offered. */
+export function PluginMark({
+  name,
+  offered = false,
+}: {
+  name: string
+  offered?: boolean
+}) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'flex size-5 shrink-0 items-center justify-center mono text-micro font-medium',
+        offered ? 'bg-rule text-graphite' : 'bg-foreground text-background',
+      )}
+    >
+      {name.trim().charAt(0).toUpperCase()}
+    </span>
+  )
 }
 
 export type LedgerActions = {
@@ -169,7 +190,7 @@ function ActionLane({
         </Button>
       ) : (
         <Link to={to} params={params} className={LINK}>
-          Configure
+          Open ›
         </Link>
       )
   }
@@ -203,6 +224,7 @@ function LedgerLine({
           onCheckedChange={(next) => actions.onToggle(row, next)}
         />
       </span>
+      <PluginMark name={row.name} />
       <span className="flex w-48 shrink-0 items-baseline gap-2">
         <span
           className={cn(
@@ -213,7 +235,7 @@ function LedgerLine({
           {row.name}
         </span>
         <span className="shrink-0 mono text-micro text-graphite">
-          {row.version}
+          v{row.version}
         </span>
         {row.update !== null ? (
           <span
@@ -227,8 +249,10 @@ function LedgerLine({
       <span className="flex min-w-0 flex-1 items-baseline gap-3">
         <span
           className={cn(
-            'min-w-0 flex-1 truncate text-ui',
-            MIDDLE_INK[row.state] ?? 'text-graphite',
+            'min-w-0 flex-1 truncate',
+            MIDDLE_INK[row.state] === undefined
+              ? 'mono text-micro text-graphite'
+              : cn('text-ui', MIDDLE_INK[row.state]),
           )}
           title={middleOf(row)}
         >
@@ -252,35 +276,29 @@ function LedgerLine({
           </span>
         ) : null}
       </span>
-      <span
-        className="w-28 shrink-0 truncate mono text-micro text-graphite"
-        title={
-          row.autoEnrich === null ? undefined : `Auto-enrich: ${row.autoEnrich}`
-        }
-      >
-        {row.autoEnrich === null ? '' : `auto ${row.autoEnrich}`}
-      </span>
-      <span className="w-24 shrink-0 numeric text-micro text-graphite">
-        {creditsOf(row)}
-      </span>
-      <span className="w-24 shrink-0 mono text-micro text-graphite">
-        {row.lastRun ? `ran ${row.lastRun.ago}` : 'never ran'}
-      </span>
-      <span className="flex w-24 shrink-0 items-center gap-2">
-        <span aria-hidden className={cn('size-1.5 shrink-0', DOT[row.state])} />
-        <span
-          className={cn(
-            'mono text-micro',
-            row.state === 'tripped'
-              ? 'text-destructive'
-              : row.state === 'degraded'
-                ? 'text-[var(--badge-amber-ink)]'
-                : row.state === 'enabled'
-                  ? 'text-foreground'
-                  : 'text-graphite',
-          )}
-        >
-          {STATE_WORD[row.state]}
+      <span className="flex w-36 shrink-0 flex-col justify-center">
+        <span className="flex items-center gap-2">
+          <span
+            aria-hidden
+            className={cn('size-1.5 shrink-0', DOT[row.state])}
+          />
+          <span
+            className={cn(
+              'mono text-micro',
+              row.state === 'tripped'
+                ? 'text-destructive'
+                : row.state === 'degraded'
+                  ? 'text-[var(--badge-amber-ink)]'
+                  : row.state === 'enabled'
+                    ? 'text-foreground'
+                    : 'text-graphite',
+            )}
+          >
+            {STATE_WORD[row.state]}
+          </span>
+        </span>
+        <span className="truncate numeric text-micro text-graphite">
+          {row.figure}
         </span>
       </span>
       <span className="flex w-18 shrink-0 justify-end">

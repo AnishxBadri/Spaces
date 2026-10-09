@@ -50,6 +50,7 @@ describe('the rss manifest.json', () => {
   it('declares one schedule job with a cron — a poller', () => {
     const parsed = manifestSchema.parse(emitted)
     expect(parsed.id).toBe('rss')
+    expect(parsed.roles).toEqual(['feeds'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
     expect(parsed.jobs).toEqual({
       poll: {

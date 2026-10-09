@@ -36,7 +36,8 @@ describe('the airtable manifest.json', () => {
   it('parses under manifestSchema: one file job, granted Import and Log, accepting an export name', () => {
     const parsed = manifestSchema.parse(emitted)
     expect(parsed.id).toBe('airtable')
-    expect(parsed.sdk).toBe('^1.1')
+    expect(parsed.sdk).toBe('^1.4')
+    expect(parsed.roles).toEqual(['import'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
     expect(parsed.jobs).toEqual({
       stage: {

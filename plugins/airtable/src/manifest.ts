@@ -8,14 +8,15 @@ import { defineManifest } from '@spaces/sdk'
  *   built-in view's name ends in "view" (`Grid view`, `Kanban view`); a
  *   browser's ` (1)` on a second download still matches. A renamed view's
  *   export takes the plain CSV path and its mapping step.
- * - `sdk: '^1.1'`: Import and `accepts` arrived in SDK 1.1.
+ * - `sdk: '^1.4'`: Import and `accepts` arrived in SDK 1.1, `roles` in 1.4.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'airtable',
   version: '0.1.0',
-  sdk: '^1.1',
+  sdk: '^1.4',
   name: 'Airtable',
+  roles: ['import'],
   description:
     'Reads an Airtable CSV export dropped on Import: multi-select and linked-record cells become lists, attachments their URLs. You map, preview and commit it like any spreadsheet.',
   settings: z.object({}),

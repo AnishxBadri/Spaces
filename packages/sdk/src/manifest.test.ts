@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { DOMAIN_EVENTS, PORT_NAMES } from './contract.ts'
 import {
+  ROLES,
   STORAGE_SOURCE_WITHHELD,
   manifestSchema,
   settingsJsonSchema,
@@ -67,6 +68,40 @@ describe('manifestSchema', () => {
       reason: 'requires sdk ^2.0, host provides 1.0.0',
     })
     if (!check.ok) console.info(`[sdk] ${manifest.id}: ${check.reason}`)
+  })
+
+  describe('roles', () => {
+    it('is optional: a manifest without it loads', () => {
+      expect(manifestSchema.parse(base())).not.toHaveProperty('roles')
+    })
+
+    it('takes any of the seven jobs the catalogue groups by (D81)', () => {
+      expect(ROLES).toEqual([
+        'enrichment',
+        'research',
+        'email-calendar',
+        'files',
+        'meeting-notes',
+        'import',
+        'feeds',
+      ])
+      expect(issues({ ...base(), roles: ['research', 'enrichment'] })).toEqual(
+        [],
+      )
+    })
+
+    it('refuses an unknown role, naming it', () => {
+      expect(issues({ ...base(), roles: ['crm'] })).toEqual([
+        `roles.0: unknown role "crm" — roles name jobs from ROLES (${ROLES.join(', ')})`,
+      ])
+    })
+
+    it('refuses an empty list and a repeated role', () => {
+      expect(issues({ ...base(), roles: [] })).toHaveLength(1)
+      expect(issues({ ...base(), roles: ['feeds', 'feeds'] })).toEqual([
+        'roles: roles names each role once',
+      ])
+    })
   })
 
   describe('id', () => {

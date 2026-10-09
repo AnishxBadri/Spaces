@@ -11,6 +11,7 @@ export { satisfiesSdk, parseSdkRange, isVersion } from './range.ts'
 export type { SdkCheck } from './range.ts'
 export {
   TRIGGERS,
+  ROLES,
   ACTION_TARGETS,
   STORAGE_SOURCE_WITHHELD,
   manifestSchema,
@@ -20,6 +21,7 @@ export {
 } from './manifest.ts'
 export type {
   Trigger,
+  PluginRole,
   Manifest,
   JobDeclaration,
   AuthoredJob,

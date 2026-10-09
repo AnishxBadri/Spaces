@@ -14,11 +14,13 @@ import {
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
+  accountConnection,
   credential,
   enrichmentRecord,
   entity,
   integration,
   jobRun,
+  signal,
   space,
 } from '@spaces/db/schema'
 import type { credentialKind } from '@spaces/db/schema'
@@ -32,8 +34,17 @@ import { updateFor } from '@spaces/core/plugins/registry'
 import { webhookSecretProvider } from '@spaces/core/writes/ingress/receive'
 import { MISSING_SETTINGS } from '@spaces/core/writes/ports/config'
 import { manifestSchema, satisfiesSdk } from '@spaces/sdk'
-import type { Manifest } from '@spaces/sdk'
+import type { Manifest, PluginRole } from '@spaces/sdk'
+import { PRODUCTS } from '#/lib/connections/products'
 import { describeExternalOrigin } from '#/lib/server/external-origin'
+import {
+  capabilitiesOf,
+  durationOf,
+  figureOf,
+  jobOfQueue,
+  sendsOf,
+} from './catalogue'
+import type { Capability } from './catalogue'
 import { registryEntriesProgram } from './registry'
 import type { RegistrySource } from './registry'
 import { formValuesOf, settingsFormOf } from './settings-form'
@@ -83,6 +94,8 @@ export type IntegrationRow = {
   readonly pluginId: string
   readonly name: string
   readonly version: string
+  /** The jobs it does, from the manifest's `roles`; empty for none. */
+  readonly roles: ReadonlyArray<PluginRole>
   readonly enabled: boolean
   readonly state: IntegrationState
   /** `last_error`: the degraded or tripped reason. */
@@ -93,6 +106,8 @@ export type IntegrationRow = {
   readonly lastRun: { readonly ago: string; readonly failed: boolean } | null
   /** Credits spent since UTC midnight, against the cap when one is set. */
   readonly credits: { readonly used: number; readonly cap: number | null }
+  /** The ledger's one number: `12 / 100 credits`, `5 signals`, `3 people`, or a dash. */
+  readonly figure: string
   /** The auto-enrich scope in words (`deal · space`, `off`); null with no event job. */
   readonly autoEnrich: string | null
   /** Runs failed in a row, as the breaker counts them. */
@@ -195,8 +210,26 @@ export type AutoEnrichView = {
   readonly options: ReadonlyArray<SpaceOption>
 }
 
+/** One `job_run` of the plugin, as the page's Recent runs reads it. */
+export type RunLine = {
+  readonly id: string
+  /** The job's name, the last segment of its queue. */
+  readonly job: string
+  readonly status: (typeof jobRun.$inferSelect)['status']
+  readonly ago: string
+  readonly duration: string | null
+  /** A failed run's stored error, verbatim; else its one-line summary. */
+  readonly line: string | null
+}
+
 export type IntegrationDetail = IntegrationRow & {
   readonly description: string | null
+  /** What it sends out of the box, from `requires`; empty until the manifest is read. */
+  readonly sends: ReadonlyArray<string>
+  /** What it switches on elsewhere, each owned by another page. */
+  readonly capabilities: ReadonlyArray<Capability>
+  /** The latest runs, newest first. */
+  readonly runs: ReadonlyArray<RunLine>
   /** For a degraded row whose sdk range this host cannot meet: what would fix it. */
   readonly fix: string | null
   readonly form: SettingsForm
@@ -349,6 +382,38 @@ export const latestRunOf = (
   }
 }
 
+/** The (provider, product) pairs whose connections a plugin reads. */
+const productsOf = (pluginId: string) =>
+  Object.entries(PRODUCTS).flatMap(([provider, products]) =>
+    Object.entries(products)
+      .filter(([, entry]) => entry.plugin === pluginId)
+      .map(([product]) => ({ provider, product })),
+  )
+
+/** How many people hold a live connection to a product the plugin reads. */
+const peopleOf = (
+  connected: ReadonlyArray<{
+    readonly userId: string
+    readonly provider: string
+    readonly product: string
+  }>,
+  pluginId: string,
+): number => {
+  const products = productsOf(pluginId)
+  return new Set(
+    connected
+      .filter((c) =>
+        products.some(
+          (p) => p.provider === c.provider && p.product === c.product,
+        ),
+      )
+      .map((c) => c.userId),
+  ).size
+}
+
+/** How many runs the plugin page lists. */
+const RECENT_RUNS = 20
+
 const utcMidnight = sql`(date_trunc('day', now() at time zone 'UTC') at time zone 'UTC')`
 
 const displaySchema = z.object({ display: z.string() })
@@ -392,6 +457,23 @@ const readRows = Effect.fn('readRows')(function* (
       )
       .groupBy(enrichmentRecord.integrationId),
   )
+  const signals = yield* query(() =>
+    db
+      .select({ integrationId: signal.sourceRef, n: count() })
+      .from(signal)
+      .where(inArray(signal.sourceRef, ids))
+      .groupBy(signal.sourceRef),
+  )
+  const connected = yield* query(() =>
+    db
+      .selectDistinct({
+        userId: accountConnection.userId,
+        provider: accountConnection.provider,
+        product: accountConnection.product,
+      })
+      .from(accountConnection)
+      .where(eq(accountConnection.status, 'active')),
+  )
   const entries = yield* registryEntriesProgram(source)
   const now = yield* Clock.currentTimeMillis
   return rows.map((row) => {
@@ -403,6 +485,11 @@ const readRows = Effect.fn('readRows')(function* (
     )
     const name = manifest?.name ?? row.capabilityId
     const offer = updateFor(entries, row.capabilityId, row.version)
+    const roles = manifest?.roles ?? []
+    const credits = {
+      used: spend.find((s) => s.integrationId === row.id)?.used ?? 0,
+      cap: capOf(row.config, manifest),
+    }
     return {
       row,
       manifest,
@@ -411,15 +498,20 @@ const readRows = Effect.fn('readRows')(function* (
         pluginId: row.capabilityId,
         name,
         version: row.version,
+        roles,
         enabled: row.enabled,
         state: stateOf(row, manifest),
         reason: row.lastError,
         summary: latest.summary ?? manifest?.description ?? null,
         lastRun: latest.lastRun,
-        credits: {
-          used: spend.find((s) => s.integrationId === row.id)?.used ?? 0,
-          cap: capOf(row.config, manifest),
-        },
+        credits,
+        figure: figureOf({
+          roles,
+          requires: manifest?.requires,
+          credits,
+          signals: signals.find((s) => s.integrationId === row.id)?.n ?? 0,
+          people: peopleOf(connected, row.capabilityId),
+        }),
         autoEnrich: hasEventJob(manifest)
           ? scopeWords(autoEnrichScopeOf(row.config))
           : null,
@@ -529,9 +621,39 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
         ? { ok: true, fields: drawn.fields.filter((f) => f.key !== LEGACY_KEY) }
         : drawn
     const scope = autoEnrichScopeOf(row.config)
+    const runs = yield* query(() =>
+      db
+        .select({
+          id: jobRun.id,
+          queue: jobRun.queue,
+          status: jobRun.status,
+          startedAt: jobRun.startedAt,
+          durationMs: jobRun.durationMs,
+          error: jobRun.error,
+          summary: jobRun.summary,
+        })
+        .from(jobRun)
+        .where(eq(jobRun.integrationId, row.id))
+        .orderBy(desc(jobRun.startedAt), desc(jobRun.id))
+        .limit(RECENT_RUNS),
+    )
+    const now = yield* Clock.currentTimeMillis
     return {
       ...view,
       description: manifest?.description ?? null,
+      sends: sendsOf(manifest),
+      capabilities: capabilitiesOf(manifest),
+      runs: runs.map((r) => ({
+        id: r.id,
+        job: jobOfQueue(r.queue),
+        status: r.status,
+        ago: agoOf(now - r.startedAt.getTime()),
+        duration: durationOf(r.durationMs),
+        line:
+          r.status === 'failed'
+            ? (r.error ?? 'failed')
+            : (r.summary ?? r.error),
+      })),
       fix: fixOf(row, manifest),
       form,
       values: form.ok ? formValuesOf(form.fields, row.config) : {},

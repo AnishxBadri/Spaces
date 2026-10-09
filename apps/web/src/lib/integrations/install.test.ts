@@ -29,6 +29,7 @@ import { setValues } from '@spaces/core/writes/attributes/values'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { fixturePlugin, fixtureSigner } from '@spaces/core/plugins/fixtures'
 import type { FixturePlugin } from '@spaces/core/plugins/fixtures'
+import type { PluginRole } from '@spaces/sdk'
 import { PLUGIN_CHANGED } from '@spaces/core/writes/plugins/install'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { recordTimelineProgram } from '../timeline/record'
@@ -162,6 +163,7 @@ describe('the Available pane', () => {
           name: 'Echo',
           description: 'The echo fixture.',
           version: '1.2.0',
+          roles: [],
           needs: 'Echo key',
         },
         {
@@ -169,6 +171,7 @@ describe('the Available pane', () => {
           name: 'Rss',
           description: 'The rss fixture.',
           version: '0.1.0',
+          roles: [],
           needs: 'no key',
         },
       ],
@@ -179,6 +182,35 @@ describe('the Available pane', () => {
     expect(
       (await run(availableProgram(source))).available.map((a) => a.pluginId),
     ).toEqual(['echo'])
+  })
+
+  it('carries each entry roles for the tabs, none for an entry without them', async () => {
+    const roled = (id: string, roles: Array<PluginRole>): FixturePlugin => {
+      const plugin = fixturePlugin({
+        id,
+        version: '0.1.0',
+        signer,
+        manifest: { roles },
+      })
+      return { ...plugin, entry: { ...plugin.entry, roles } }
+    }
+    serve(
+      roled('airtable', ['import']),
+      roled('rss', ['feeds']),
+      fixturePlugin({ id: 'legacy', version: '0.1.0', signer }),
+    )
+    const view = await run(availableProgram(source))
+    expect(view.available.map((a) => [a.pluginId, a.roles])).toEqual([
+      ['airtable', ['import']],
+      ['rss', ['feeds']],
+      ['legacy', []],
+    ])
+
+    // Install runs the existing installer; the plugin leaves Available.
+    await run(installFromRegistryProgram(FIXTURE_ACTOR.id, 'airtable', source))
+    expect(
+      (await run(availableProgram(source))).available.map((a) => a.pluginId),
+    ).toEqual(['rss', 'legacy'])
   })
 
   it('says why when the registry cannot be read', async () => {

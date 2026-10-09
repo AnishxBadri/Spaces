@@ -46,6 +46,7 @@ describe('the apollo manifest.json', () => {
   it('parses under manifestSchema, requiring a workspace enrichment key', () => {
     const parsed = manifestSchema.parse(emitted)
     expect(parsed.id).toBe('apollo')
+    expect(parsed.roles).toEqual(['enrichment'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
     expect(parsed.requires).toEqual({
       credential: { kind: 'enrichment', scope: 'workspace' },

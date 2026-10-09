@@ -77,6 +77,7 @@ describe('the google-drive manifest.json', () => {
   it('provides a storage source over a drive.file connection, with one schedule job', () => {
     const parsed = manifestSchema.parse(emitted)
     expect(parsed.id).toBe('google-drive')
+    expect(parsed.roles).toEqual(['files'])
     expect(satisfiesSdk(parsed.sdk)).toEqual({ ok: true })
     expect(parsed.provides).toBe('storage-source')
     expect(parsed.requires).toEqual({

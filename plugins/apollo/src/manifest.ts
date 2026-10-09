@@ -16,8 +16,9 @@ export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'apollo',
   version: '0.1.0',
-  sdk: '^1.3',
+  sdk: '^1.4',
   name: 'Apollo',
+  roles: ['enrichment'],
   description:
     'Fills blank company and person fields from Apollo.io (description, location, founding year, LinkedIn, job title, Twitter), adds the domains and emails it returns, and logs a funding round or a change of title as a signal; every value and signal cites the raw response.',
   requires: { credential: { kind: 'enrichment', scope: 'workspace' } },

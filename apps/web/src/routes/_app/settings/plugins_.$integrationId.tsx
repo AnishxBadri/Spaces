@@ -9,16 +9,10 @@ import {
   SettingsFields,
   WebhookUrlRow,
 } from '#/components/integrations/integration-settings'
-import {
-  ROLLBACK_WORD,
-  STATE_WORD,
-  creditsOf,
-} from '#/components/integrations/integration-ledger'
-import { SectionHead } from '#/components/ledger-section'
+import { PluginTemplate } from '#/components/integrations/plugin-template'
 import { useSettingsDraft } from '#/components/settings/settings-form'
 import { SettingsSection } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
-import { Switch } from '#/components/ui/switch'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   getIntegration,
@@ -38,13 +32,14 @@ import type {
   SecretField,
   SettingsField,
 } from '#/lib/server-fns'
-import { cn } from '#/lib/utils'
 
 /**
- * One plugin's card: its state, its key and its settings, generated from the
- * manifest the worker stored. Inside the settings shell, so Plugins stays
- * lit; the `_` keeps it out of the ledger's component. A member reads it
- * too, keys redacted and every control disabled. (D81)
+ * One plugin's page, on the one template every plugin shares
+ * (`PluginTemplate`): status, key, what it sends, its manifest settings,
+ * what it switches on, recent runs, Disable / Uninstall. Inside the settings
+ * shell, so Plugins stays lit; the `_` keeps it out of the ledger's
+ * component. A member reads it too, keys redacted and every control
+ * disabled. (D81)
  */
 export const Route = createFileRoute('/_app/settings/plugins_/$integrationId')({
   loader: async ({ params }) => ({
@@ -56,41 +51,6 @@ export const Route = createFileRoute('/_app/settings/plugins_/$integrationId')({
 function IntegrationPage() {
   const { detail } = Route.useLoaderData()
   return <IntegrationCard key={detail.id} detail={detail} />
-}
-
-/** The mono meta line under the title: version, state, last run, credits. */
-function metaOf(detail: IntegrationDetail): string {
-  return [
-    detail.pluginId,
-    detail.version,
-    STATE_WORD[detail.state],
-    detail.lastRun ? `ran ${detail.lastRun.ago}` : 'never ran',
-    `${creditsOf(detail)} today`,
-  ].join(' · ')
-}
-
-/** Under the meta line: the last upgrade's rollback answer, and why no update is offered. */
-function VersionLines({ detail }: { detail: IntegrationDetail }) {
-  const { rollback, held } = detail
-  if (rollback === null && held === null) return null
-  return (
-    <div className="flex flex-col gap-1 px-3 pt-1 mono text-micro">
-      {rollback !== null ? (
-        <span
-          className={
-            rollback.answer === 'unsafe'
-              ? 'text-[var(--badge-amber-ink)]'
-              : 'text-graphite'
-          }
-        >
-          Upgraded from {rollback.from} · {ROLLBACK_WORD[rollback.answer]}
-        </span>
-      ) : null}
-      {held !== null ? (
-        <span className="text-graphite">No update offered: {held}</span>
-      ) : null}
-    </div>
-  )
 }
 
 function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
@@ -244,6 +204,18 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
   }
 
   const tripped = detail.state === 'tripped'
+  const keyRows = SECRET_GROUPS.flatMap(({ slot }) => {
+    const fields = detail.secrets.filter((f) => f.slot === slot)
+    const url = slot === 'webhook' ? detail.webhookUrl : null
+    return [
+      ...(url === null ? [] : [<WebhookUrlRow key="webhook-url" url={url} />]),
+      ...fields.map(secretRow),
+    ]
+  })
+  const hasSettings =
+    !detail.form.ok ||
+    detail.form.fields.length > 0 ||
+    detail.autoEnrichForm !== null
   return (
     <SettingsSection
       title={detail.name}
@@ -280,108 +252,54 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
               Update to {detail.update}
             </Button>
           ) : null}
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={pending}
-            onClick={() => void uninstall()}
-          >
-            Uninstall
-          </Button>
-          <Switch
-            checked={detail.enabled}
-            disabled={pending}
-            onCheckedChange={(enabled) =>
-              void act(
-                () =>
-                  setIntegrationEnabled({ data: { id: detail.id, enabled } }),
-                enabled ? `${detail.name} on` : `${detail.name} off · key kept`,
-              )
-            }
-          >
-            {detail.enabled ? 'On' : 'Off'}
-          </Switch>
         </>
       }
     >
-      <p className="px-3 pt-3 mono text-micro text-graphite">
-        {metaOf(detail)}
-      </p>
-      <VersionLines detail={detail} />
-      {detail.state === 'degraded' || tripped ? (
-        <div
-          role="status"
-          className={cn(
-            'mt-3 flex flex-col gap-1 border-y border-rule px-3 py-2',
-            tripped ? 'bg-[var(--badge-rose)]' : 'bg-[var(--badge-amber)]',
-          )}
-        >
-          <span
-            className={cn(
-              'text-ui',
-              tripped ? 'text-destructive' : 'text-[var(--badge-amber-ink)]',
-            )}
-          >
-            {tripped
-              ? `${detail.reason ?? 'Stopped by the breaker'} · ${detail.errorCount} failed`
-              : (detail.reason ?? 'The worker could not load it')}
-          </span>
-          {detail.fix !== null ? (
-            <span className="text-label text-foreground">{detail.fix}</span>
-          ) : null}
-        </div>
-      ) : null}
-
-      {SECRET_GROUPS.map(({ slot, title }) => {
-        const fields = detail.secrets.filter((s) => s.slot === slot)
-        const url = slot === 'webhook' ? detail.webhookUrl : null
-        if (fields.length === 0 && url === null) return null
-        return (
-          <div key={slot} className="flex flex-col pt-8">
-            <SectionHead
-              as="h3"
-              title={fields.length === 0 ? 'Webhook' : title}
-              count={
-                fields.length === 0
-                  ? null
-                  : fields.every((s) => s.display !== null)
-                    ? 'saved'
-                    : 'not yet'
-              }
-            />
-            {url !== null ? <WebhookUrlRow url={url} /> : null}
-            {fields.map(secretRow)}
-          </div>
-        )
-      })}
-
-      <SettingsFields
-        form={detail.form}
-        values={{ ...detail.values, ...settings.draft }}
-        errors={errors}
-        disabled={pending}
-        notYet={detail.state === 'needs-setup'}
-        onChange={change}
+      <PluginTemplate
+        detail={detail}
+        keyBlock={keyRows.length === 0 ? null : keyRows}
+        settingsBlock={
+          hasSettings ? (
+            <>
+              <SettingsFields
+                form={detail.form}
+                values={{ ...detail.values, ...settings.draft }}
+                errors={errors}
+                disabled={pending}
+                notYet={detail.state === 'needs-setup'}
+                onChange={change}
+              />
+              {detail.autoEnrichForm !== null ? (
+                <AutoEnrichFields
+                  key={[
+                    ...detail.autoEnrichForm.scopes,
+                    ...detail.autoEnrichForm.spaces,
+                  ].join()}
+                  view={detail.autoEnrichForm}
+                  disabled={pending}
+                  onSave={(scope) =>
+                    void act(
+                      () =>
+                        saveIntegrationAutoEnrich({
+                          data: { id: detail.id, ...scope },
+                        }),
+                      `${detail.name} auto-enrich saved`,
+                    )
+                  }
+                />
+              ) : null}
+            </>
+          ) : null
+        }
+        pending={pending}
+        onToggle={(enabled) =>
+          void act(
+            () => setIntegrationEnabled({ data: { id: detail.id, enabled } }),
+            enabled ? `${detail.name} on` : `${detail.name} off · key kept`,
+          )
+        }
+        onUninstall={() => void uninstall()}
       />
-      {detail.autoEnrichForm !== null ? (
-        <AutoEnrichFields
-          key={[
-            ...detail.autoEnrichForm.scopes,
-            ...detail.autoEnrichForm.spaces,
-          ].join()}
-          view={detail.autoEnrichForm}
-          disabled={pending}
-          onSave={(scope) =>
-            void act(
-              () =>
-                saveIntegrationAutoEnrich({
-                  data: { id: detail.id, ...scope },
-                }),
-              `${detail.name} auto-enrich saved`,
-            )
-          }
-        />
-      ) : null}
       {confirmDialog}
     </SettingsSection>
   )

@@ -6,7 +6,10 @@ import {
   RegistryPane,
   UploadPlugin,
 } from '#/components/integrations/registry-pane'
-import { SettingsSection } from '#/components/settings/settings-section'
+import {
+  SettingsSection,
+  useSettingsPage,
+} from '#/components/settings/settings-section'
 import {
   installIntegration,
   listAvailableIntegrations,
@@ -19,11 +22,13 @@ import {
 import type { InstallOutcome, IntegrationRow } from '#/lib/server-fns'
 
 /**
- * Settings → Integrations → Plugins: the installed plugins as a ledger, each with its
- * switch, state and the one action its state calls for, then what the
- * registry offers, each with Install; Upload in the head takes a tarball
- * from disk for a box with no outbound HTTPS. A member reads the same
- * catalogue with every control disabled; the writes are the admin's. (D81)
+ * Settings → Integrations → Plugins, a catalogue: the installed plugins as a
+ * ledger, each with its switch, jobs, state and one number, and `Open ›`;
+ * then Available from the registry in tabs by job, each with Install. Upload
+ * in the head takes a tarball from disk for a box with no outbound HTTPS.
+ * A member reads the same catalogue with every write disabled. (D81)
+ * - Available sits outside the section's disabled fieldset so a member can
+ *   still switch its tabs; its Install takes `disabled` instead.
  */
 export const Route = createFileRoute('/_app/settings/plugins')({
   loader: async () => {
@@ -42,6 +47,7 @@ const UPLOAD = ':upload'
 function IntegrationsRoute() {
   const { rows, registry } = Route.useLoaderData()
   const router = useRouter()
+  const page = useSettingsPage()
   const [pending, setPending] = useState<string | null>(null)
 
   async function act(
@@ -96,48 +102,51 @@ function IntegrationsRoute() {
   }
 
   return (
-    <SettingsSection
-      title="Plugins"
-      crumb="Integrations"
-      action={
-        <UploadPlugin
-          pending={pending === UPLOAD}
-          disabled={pending !== null}
-          onUpload={(files) => void upload(files)}
+    <>
+      <SettingsSection
+        title="Plugins"
+        crumb="Integrations"
+        action={
+          <UploadPlugin
+            pending={pending === UPLOAD}
+            disabled={pending !== null}
+            onUpload={(files) => void upload(files)}
+          />
+        }
+      >
+        <IntegrationLedger
+          rows={rows}
+          actions={{
+            pending,
+            onToggle: (row, enabled) =>
+              void act(
+                row,
+                () => setIntegrationEnabled({ data: { id: row.id, enabled } }),
+                enabled ? `${row.name} on` : `${row.name} off · key kept`,
+              ),
+            onReset: (row) =>
+              void act(
+                row,
+                () => resetIntegration({ data: { id: row.id } }),
+                `${row.name} reset · reloading`,
+              ),
+            onUpdate: (row) =>
+              void act(
+                row,
+                async () => {
+                  await updateIntegration({ data: { id: row.id } })
+                },
+                `${row.name} updated to ${row.update ?? 'the newest version'} · reloading`,
+              ),
+          }}
         />
-      }
-    >
-      <IntegrationLedger
-        rows={rows}
-        actions={{
-          pending,
-          onToggle: (row, enabled) =>
-            void act(
-              row,
-              () => setIntegrationEnabled({ data: { id: row.id, enabled } }),
-              enabled ? `${row.name} on` : `${row.name} off · key kept`,
-            ),
-          onReset: (row) =>
-            void act(
-              row,
-              () => resetIntegration({ data: { id: row.id } }),
-              `${row.name} reset · reloading`,
-            ),
-          onUpdate: (row) =>
-            void act(
-              row,
-              async () => {
-                await updateIntegration({ data: { id: row.id } })
-              },
-              `${row.name} updated to ${row.update ?? 'the newest version'} · reloading`,
-            ),
-        }}
-      />
+      </SettingsSection>
       <RegistryPane
         view={registry}
         pending={pending}
+        disabled={!page.isAdmin}
         onInstall={(plugin) => void install(plugin.pluginId)}
       />
-    </SettingsSection>
+    </>
   )
 }

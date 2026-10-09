@@ -18,6 +18,7 @@ import {
 import type { InstallerError } from '@spaces/core/writes/plugins/install'
 import { registryEntrySchema } from '@spaces/sdk/pack'
 import type { RegistryEntry } from '@spaces/sdk/pack'
+import type { PluginRole } from '@spaces/sdk'
 import { requireAdmin, requireUser } from '#/lib/server/shared'
 import { IntegrationRefused, run } from './admin'
 import { manifestOf } from './ledger'
@@ -42,6 +43,8 @@ export type AvailablePlugin = {
   readonly name: string
   readonly description: string
   readonly version: string
+  /** The jobs its registry entry names, which Available's tabs group by; empty for none. */
+  readonly roles: ReadonlyArray<PluginRole>
   /** What it will ask for once installed: `Apollo key`, `connect your own`, `no key`. */
   readonly needs: string
 }
@@ -105,6 +108,7 @@ export const availableProgram = Effect.fn('availableProgram')(function* (
         name: e.name,
         description: e.description,
         version: e.version,
+        roles: e.roles ?? [],
         needs: needsOf(e),
       })),
     error: null,

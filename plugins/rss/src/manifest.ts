@@ -18,8 +18,9 @@ export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'rss',
   version: '0.1.0',
-  sdk: '^1.0',
+  sdk: '^1.4',
   name: 'RSS',
+  roles: ['feeds'],
   description:
     "Polls one RSS or Atom feed and adds each new item to a record's timeline as a signal; an item is added once, however often the feed repeats it.",
   settings: z.object({

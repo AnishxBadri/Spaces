@@ -70,6 +70,8 @@ export const registryEntrySchema = z.strictObject({
   name: z.string().min(1),
   description: z.string().min(1),
   requires: manifestSchema.shape.requires,
+  // The manifest's roles, so the catalogue groups a plugin before install.
+  roles: manifestSchema.shape.roles,
   tarball: z.url(),
   sha256: z.string().regex(SHA256),
   sig: z.string().regex(BASE64),
@@ -163,6 +165,7 @@ export const packPlugin = async (options: PackOptions): Promise<PackResult> => {
     name: manifest.name,
     description: manifest.description,
     ...(manifest.requires ? { requires: manifest.requires } : {}),
+    ...(manifest.roles ? { roles: manifest.roles } : {}),
     tarball: `${(options.tarballBaseUrl ?? 'https://example.invalid/plugins').replace(/\/$/, '')}/${base}`,
     sha256,
     sig,

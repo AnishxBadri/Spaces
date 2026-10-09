@@ -115,6 +115,8 @@ bundle.
   version: '1.2.0',
   sdk: '^1.0',                           // semver range against SDK_VERSION
   name, description, icon?,
+  roles?: ['enrichment' | 'research' | 'email-calendar' | 'files'
+           | 'meeting-notes' | 'import' | 'feeds'],   // catalogue grouping (D81, SDK 1.4)
   requires: {
     credential?: { kind: 'enrichment' | 'search' | 'llm', scope: 'workspace' },
     connection?: { provider: 'google', scopes: ['drive.readonly'] },   // §12
@@ -533,7 +535,7 @@ in lexical order, journaled in `plugin_<id>.spaces_migrations`. CONTEXT.md
 ## 9. Registry, signing, install from the running deployment
 
 ```
-registry.json  [{ id, version, sdk, name, description, requires?,
+registry.json  [{ id, version, sdk, name, description, requires?, roles?,
                   tarball: url, sha256, sig, keyId, minCore? }]     // no kind (D51)
 ```
 
