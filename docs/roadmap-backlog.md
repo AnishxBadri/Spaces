@@ -2589,6 +2589,8 @@ _Jump to, Actions with printed keys and the record's own verbs first, Records le
 
 _Amended 2026-10-09 (D70 amended 10-08): with nothing typed the palette shows only the page's own actions — no recent items; an action that needs one more answer (File in a space…) asks it in the same palette, the input's mode label naming the action and ⌫ on an empty input returning to Find; Tab hands the typed text to Ask docked (`ask-5`), never to an answer inside the palette._
 
+_Amended 2026-10-10 (pre-check against main `3397486`): no page publishes its own verbs today — the palette has one static action, Upload. This slice adds the mechanism: a `usePageActions(actions)` registration each record route and Today call with their verbs and keys, which the Actions group reads. "Write email" does not exist (email-7) and is left out until then. Confirmed present: `fusedStatement` in `@spaces/core/writes/read/search`, the semantic wave in `lib/search/waves.ts`._
+
 **What to build**
 
 The palette as **K1** draws it. Four groups in order: **Jump to** (objects, saved views, settings pages), **Actions** (verbs with their printed keys — only our bindings, `L`, `G T`, never `esc` or `↵` — contextual: on a record its own verbs first, Log interaction, Write email, Move stage), **Records** (the lexical fused search statement from `@spaces/core` only, fuzzy on `canonical_name` and aliases, so a typed name puts that record first), **Passages** (SPA-129's semantic lane, second wave after typing pauses, places to go and never answers). A result row is 36px with the kind glyph, the name in ink, the path or object in graphite, and the printed key right. The foot is one mono line: navigate · actions on this result · open · **Tab → Ask**; Tab hands the typed text to Ask (`ask-5`), which until then opens the existing `/ask`-less state as "Ask is coming" — no, until `ask-5` lands the foot omits Tab, so nothing is printed that does not work. Empty: "Nothing found" with the one pine "Ask it" once `ask-5` exists. Passages loading shows the group head with a running mark, never a spinner row.
@@ -2867,6 +2869,8 @@ _Synced mail private to its mailbox owner, forwarded mail shared, a per-record o
 
 **Blocked by:** `interaction-1`. **Label:** `migration` — runs alone on the migration lane.
 
+_Amended 2026-10-10 (pre-check against main `3397486`): the `ENTITY_REFS` vocabulary is `repoint` | `repoint-or-drop` | `custom` | `none` for merge plus a `del` kind and `context: null` — the recompute-from-both-sides is `custom` with its section and snapshot in `merge.ts`, delete is `del: 'cascade'`. The `any` kind is not in `interaction_kind`: store `kind` as a text column on `interaction_stat` (the enum values plus `'any'`). Runs before enrich-5, which edits the same table and list files._
+
 **What to build**
 
 A derived table, `interaction_stat(entity_id, kind, first_id, first_at, last_id, last_at, next_id, next_at)`, one row per entity per kind plus `any`, with an `ENTITY_REFS` entry (`cascade` on merge — the winner's stats are recomputed from both sides — and `none` for context). The interaction writer (`packages/core/src/writes/interactions/write.ts`) updates it in the same transaction as every interaction insert, update and cancellation; a meeting with `status: cancelled` leaves `next`. `next` is the earliest future meeting and fills once calendar sync lands. The views compiler learns the columns as read-only — sortable and filterable, never editable, not in `entity.values` — and the people and companies tables offer them as columns (Last contact, Last email, Next meeting), which is also what the readout strip on **O2** reads.
@@ -2983,6 +2987,8 @@ One variable grammar for email and AI prompts: `{{name.first}}`, `{{company.name
 #### `email-9` · afk · S · migration — Name parts and `canonical_name` as their join; `phone` as E.164 with `multi` (D67)
 
 **Blocked by:** `graph-1`. **Label:** `migration` — runs alone on the migration lane.
+
+_Amended 2026-10-10 (pre-check against main `3397486`): there is no `name` attribute — `canonical_name` is an entity column outside the attribute engine. So "`name` becomes two attributes" means: `first_name` and `last_name` are new system attributes on person, and `setValues` keeps the `canonical_name` column equal to their join (a rename through `renameRecordProgram` splits back into them). `phone` is `z.string().max(40)` today with no `multi`; this slice adds E.164 validation and `multi` support to the engine._
 
 **What to build**
 
@@ -3262,6 +3268,8 @@ _The sidebar reads Today, Tasks, Spaces, then Library ▾ (Notes, Files), Object
 
 **Blocked by:** `shell-1`
 
+_Amended 2026-10-10 (pre-check against main `3397486`): `ViewBar` has no view menu — Rename and Delete are inline ghost buttons shown only when `canEdit`. This slice adds a small `···` on the view bar carrying Pin/Unpin for every readable view, with Rename and Delete moving into it when `canEdit`. The sidebar has no read of views per object; add one server read (id, name, object, visibility) for the pinned ids so pruning can run._
+
 **What to build**
 
 A saved view (`view` table, `packages/db/src/schema/views.ts`) can be pinned from the `ViewBar`'s view menu; pinned views list under their object's row in the sidebar, indented one step, at most three per object then `▸ n more`. The pin is per browser in localStorage keyed by view id, like starred spaces, so no schema; a pinned id whose view was deleted or became unreadable drops silently on the next render. The row links to the object list with the view selected (`?view=`), the same URL `useViewState` already reads.
@@ -3306,6 +3314,8 @@ _Settings takes over the sidebar with You, Workspace, AI and Integrations; a tog
 
 **Blocked by:** `settings-1`
 
+_Amended 2026-10-10 (pre-check against main `3397486`): the per-block Save buttons to remove are more than the three named — also `integration-settings.tsx` (Save settings, Save auto-enrich, Save key), `embeddings-section.tsx`, `currency.tsx` and `workspace.tsx` (General after settings-1). Confirmed present: `SettingsSection`/`SettingsRow`, `useConfirm`, `lib/members/suspend.ts`, the nav `admin` lane, the member-empty loader in `ai.tsx`._
+
 **What to build**
 
 Four page behaviours D81 makes uniform, built into `SettingsSection` and `SettingsRow` (`apps/web/src/components/settings/settings-section.tsx`) so a page cannot opt out. **Saving**: a switch, checkbox or select writes at once with a toast; typed fields (names, hosts, ports, keys) register with a section-level form context, and one Save bar at the page foot — mono "n changes", Discard, pine Save `⌘↵` — appears only while one is dirty. The per-block Save buttons in `arrival-section.tsx`, `connections-section.tsx` (OAuth client) and the AI key editors go. **Confirms** through `useConfirm` on four acts that break something outside the page, each naming the consequence: revoking an API token, suspending a member, archiving an object, unticking an identity key. **Members read admin pages**: the loaders that return empty for a member (`settings/ai.tsx` and its siblings) call member-safe reads that return the same shapes with every secret redacted (`●●●● 7Hq2` becomes `set`), and the page renders with controls disabled under one line in the head, "Only admins can change this · ask <admin names>"; the nav drops the `admin` lane lock. Write server fns keep `requireAdmin()` unchanged. **No footer caption strips**: the grey paragraphs at the foot of settings pages are removed; a line survives only for cost, privacy or irreversibility, beside its control.
@@ -3327,6 +3337,8 @@ Four page behaviours D81 makes uniform, built into `SettingsSection` and `Settin
 
 **Blocked by:** `settings-2`
 
+_Amended 2026-10-10 (pre-check against main `3397486`): `registry.json` is empty and no `gmail`, `calendar` or `box` plugin exists, so **Install ›** renders only when the registry has an entry for the provider; otherwise the row reads "Not available yet" to everyone. The manifest has no per-connection settings field — the account page renders the per-product choices block only when the plugin declares one (a later SDK minor); until then it is omitted. Disconnect revokes every time today (`lib/connections/custody.ts`), so the last-job rule is new work._
+
 **What to build**
 
 Connections becomes three pages under You, grouped by what an account does. The model underneath stays D66's: one `account_connection` row per (user, provider, product, account) with its own consent (`apps/web/src/lib/connections/products.ts`). That already makes "disconnect stops one job" true; what is new is the grouping and the last-job rule — disconnecting a product deletes its row, and the provider's revoke endpoint is called only when it was that account's last product row. **Email & calendar** (`/settings/email-calendar`): one row per provider account holding a `gmail` or `calendar` product, its products as words ("Mail · Calendar"), a Default mark on the account new email sends from (the earliest-connected mail account; choosing another needs a stored preference and is `email-7`'s, which is the first sender), sync state, `Options ›`; Connect Google / Connect Microsoft below; the workspace's Bcc address read-only with Copy and "Email forwarding ›". **Files** (`/settings/files`): storage accounts (`drive`, `box`, more than one allowed), each with its sync state and `Options ›`. **Meeting notes** (`/settings/meeting-notes`): recorder connections; the page renders empty until `arrival-6` lands Granola's key-based row. A provider whose plugin is not installed shows **Install ›** to an admin and "Ask an admin" to a member. **The account page** (`Options ›`): which products this account is used for (ticking one runs the incremental consent `storage-2b` already built), per-product choices that exist (calendars to sync, labels to skip — rendered from the plugin's per-connection settings when it declares them, else omitted), last sync, Sync now, Disconnect. `/settings/connections` redirects to Email & calendar.
@@ -3347,6 +3359,8 @@ Connections becomes three pages under You, grouped by what an account does. The 
 #### `settings-4` · afk · M — Plugins as a catalogue, and one page per plugin
 
 **Blocked by:** `settings-2`
+
+_Amended 2026-10-10 (pre-check against main `3397486`): `registry.json` is `[]`, so Available is empty in dev and the demo's "Airtable and RSS under Available" needs a registry entry the owner publishes; the slice proves Available with a test registry fixture. `registryEntrySchema` in `packages/sdk/src/pack/index.ts` is a strict object and must gain `roles` beside the manifest. A per-plugin page already exists at `settings/integrations_.$integrationId.tsx` (→ `plugins/$integrationId` after settings-1); rebuild it on the template rather than adding a second route._
 
 **What to build**
 
@@ -3387,6 +3401,8 @@ Three D81 lines on two AI pages. **Sensitivity**: a group at the top of Models �
 
 **Blocked by:** `settings-1`
 
+_Amended 2026-10-10 (pre-check against main `3397486`): blob GC counts only `document` and `import_batch` references (`lib/documents/blob-refs.ts`), and the orphan sweep reclaims an unreferenced upload after 24 hours — so `blobIsReferenced` must learn `workspace.settings.logo`. The sidebar head is `Wordmark` in `app-sidebar.tsx`. No migration: `WorkspaceSettings` has an index signature._
+
 **What to build**
 
 General gains a Logo row: Upload and Remove beside a 48px preview, the monogram (the workspace name's initial in an ink square) when none. The file goes through the existing blob storage (`packages/core/src/writes/storage/`) and its sha is stored at `workspace.settings.logo` — the settings jsonb already admits extra keys (`WorkspaceSettings`), so no migration. The sidebar head shows the logo or monogram beside the workspace name instead of the wordmark alone, collapsed too. Images only, 1 MB cap, refused with the reason.
@@ -3410,6 +3426,8 @@ _Today opens on a plain title, the day strip, four derived readouts and one Need
 
 **Blocked by:** `print-1`
 
+_Amended 2026-10-10 (pre-check against main `3397486`): companies have no owner attribute and there is no follow concept, so What's moving lists signals from the last 7 days on companies the user has **touched** — created, logged an interaction on, or filed — newest first. Today's idle-deal rule is a fixed 21 days; `medianDaysInStage` in `lib/deals/funnel.ts` is what "past stage median" uses. Today has no Meetings section yet (arrival-11 unbuilt): the day strip draws hours only and the `meeting` lane is absent. Confirmed present: `listStoppedPlugins`, `PluginStatusSection`, `GettingStarted`, `PortfolioHeadlineRail`._
+
 **What to build**
 
 `apps/web/src/routes/_app/today.tsx` rewritten to the Today sheet. **Head**: a plain "Today" title with the date (`Thu 10-09 · W41`); the sentence title and the `GettingStarted` banner go. **Day strip**: a thin band of today's hours — elapsed hours dithered, meetings as ink blocks with their names, now as a pine dot — drawn from the day's meeting interactions; with no calendar it draws the hours only. **Readouts**, derived only: Overdue, Deals past stage median, Oldest mark, Unfiled files (the section counts Due today, Review and Missing FX leave the strip). **Notices band**, one line each with its fix link, for what stops the machine: a stopped plugin (`listStoppedPlugins`, replacing `PluginStatusSection`), a connection in `error`, and — when D76's enrichment slices land — the enrichment cap. **Needs you**: one ledger sorted by urgency with a 48px mono kind lane — `task`, `deal` (idle past median), `mark` (stale), `review` (open suggestions grouped by source and space: "Proptech / Property ops · via Exa · 3 to add"), `meeting` (no write-up, with **Write**) — tabs in the head filter by kind, the list folds at eight with "show all ›", and its last row is the task composer. A kind whose source does not exist yet is simply absent: `meeting` until `arrival-5`/`arrival-11`, `review` grouping by watch until `watch-3`. **Meetings**: `arrival-11`'s section moves here unchanged with "all meetings ›" to `arrival-12`'s page when that exists. **Rail**: Portfolio (`PortfolioHeadlineRail`) and What's moving — `signal` rows on the user's companies from the last 7 days, cited; the 24-hour team activity folds behind "team activity ›" in place.
@@ -3432,6 +3450,8 @@ _Today opens on a plain title, the day strip, four derived readouts and one Need
 #### `first-run-1` · afk · M — The first run without a checklist (D80)
 
 **Blocked by:** `today-1`, `settings-1`
+
+_Amended 2026-10-10 (pre-check against main `3397486`): "Enrich on a record showing the website source" needs enrich-3, now a blocker. Today has no Meetings section (arrival-11 unbuilt), so the Meetings `NeedsSetup` line is wired by arrival-11 when it lands; this slice wires `NeedsSetup` on Enrich only and ships the primitive. `seedDemoData` reuses the starter-taxonomy spaces it finds — those ids must not be recorded as demo ids._
 
 **What to build**
 
@@ -3460,11 +3480,13 @@ The space becomes a page you can reshape and a set the web keeps filling: rename
 
 _Rename a space from its head, move a subtree under another parent and watch visibility, sensitivity and context follow at once, archive one and keep its filings, carve a child and move companies into it — nothing filed moves on its own (D73). Precedes every watch._
 
-#### `spaces-1` · afk · S — Rename and archive from the space head — `renameRecordProgram` wired, archive hides and pauses
+#### `spaces-1` · afk · S · migration — Rename and archive from the space head — `renameRecordProgram` wired, archive hides and pauses
 
 **Blocked by:** none
 
 _Amended 2026-10-09 (D73, owner verdict on the space page 10-08): archive asks nothing — **Restore** undoes it, so there is no confirm; rename edits the title in place; the `···` menu is **Rename · New subspace · Move to… · Save as template… · Archive**. "Save as template…" has no slice yet and is left out of the menu until it has one. The body and criteria below are edited to match._
+
+_Amended 2026-10-10 (pre-check against main `3397486`): there is no archive flag on `space` or `entity` and no `archiveRecordProgram` — only objects, attributes and templates carry `archived`. This slice therefore carries **one migration**: `space.archived_at timestamptz` nullable (space-only; archiving a record is not decided). The readers filter on `archived_at is null`; Restore clears it. Label `migration` added._
 
 **What to build**
 
@@ -3487,6 +3509,8 @@ The space head (Spaces — printed, sheet 03) carries a `···` menu — Rename
 #### `spaces-2` · afk · M — Move a space — one subtree path rewrite, refused under its own descendant, one event
 
 **Blocked by:** `spaces-1`
+
+_Amended 2026-10-10 (pre-check against main `3397486`): `chunk.sensitive` is a cached value, so "nothing else is rewritten" is wrong for sensitivity — a move under a sensitive ancestor calls `raiseSensitivity` in the transaction and a move out of one queues `sensitivity.restamp`, the pair SPA-221 uses. The acceptance line on "the assembler's position item" is dropped (D71's item is not built; ask-7 carries it); assert ancestor visibility and sensitivity only. A move to the root must also satisfy `space_slug_root_unique`._
 
 **What to build**
 
@@ -3511,6 +3535,8 @@ Because every consumer computes from the path at read time — ancestor visibili
 
 **Blocked by:** `spaces-2`
 
+_Amended 2026-10-10 (pre-check against main `3397486`): no row selection exists anywhere, so this slice adds the row checkbox and the 44px action bar on the space's Companies tab — a space-page-only multi-select, not a table primitive (enrich-5 adds the table one). "New subspace" is already wired by spaces-1. Untag is the `untagFromSpace` server fn in `lib/server/companies.ts`. Blocked by spaces-4 for the Companies tab._
+
 **What to build**
 
 Not a primitive: Split is "New subspace" in the space head's `···` menu (Spaces — printed, sheet 04): it creates a child space with `createSpace` and lands on the parent's Companies tab (`spaces-4`) in multi-select mode and one action, "Move here", over the existing tag and untag writers (`lib/spaces/tag.ts`). Each chosen company gains the child filing and loses the parent's, as two explicit writes on an explicit choice — the invariant D73 states, filings never move on their own. The multi-select is the ledger's existing row checkbox with a 44px bone action bar that appears when one is checked ("3 selected · Move here"), on Spaces — printed, sheet 04. Inherited rows (via a subspace) are not offered: they are already in a child.
@@ -3530,6 +3556,8 @@ Not a primitive: Split is "New subspace" in the space head's `···` menu (Spac
 #### `spaces-4` · afk · M — The space page in the record anatomy — three readouts, a details column, five tabs (D73, D74)
 
 **Blocked by:** `spaces-1`
+
+_Amended 2026-10-10 (pre-check against main `3397486`): records have no tabbed body and no `?tab=` yet, so this slice builds the tab head on `ui/tabs.tsx` (print-1) for the space page and introduces `?tab=` there. "Last tab remembered per user" is per browser in localStorage beside `chassis-prefs.ts` — no per-user prefs column, no migration. `funding_stage` is a `select`; order the bar by its options order, bootstrapped last. The Companies **Watching** filter renders only once `space_watch` exists (watch-1), else the filter row is All · In pipeline._
 
 **What to build**
 
@@ -3586,6 +3614,8 @@ Every port gets a live slice — sdk-6a, sdk-6b, sdk-7a, sdk-7b, sdk-8, sdk-9, s
 
 **Blocked by:** `backfill-11`, `sdk-10`, `sdk-12b`, `sdk-6b`, `sdk-7b`
 
+_Amended 2026-10-10 (pre-check against main `3397486`): D51 removed `kind` and the manifest rejects it — "declares kind researcher" means a job whose `uses` is `Config | Secrets | Http | Read | Content | Ai | Judgment` (add `Secrets`). Refs are `event:<id>` strings, never URLs: the brief's refs are the signal ids and the hit URLs sit in the signal payloads. `/inbox` redirects to `/review`._
+
 **What to build**
 
 The researcher kind has a semver-frozen interface (sdk-4a) and no tenant, and CONTEXT banks Exa as the second Enricher alongside Apollo. The SDK spec's own worked example is Exa, so the shape is already written: Read the entity for name and domain, Http the search, one signal per hit through Content, then Ai synthesize into a brief that lands as a Judgment suggestion with the hit URLs as refs. No Facts, no Identity — research never fills fields, and the Layer refuses them. Credential kind 'search' already exists in the enum, so nothing schema-level is needed. This is sdk-15's Apollo shape on a different kind and inherits its cassette pattern rather than inventing one. Joins project 12 (Plugins run unattended, Apollo enriches).
@@ -3614,6 +3644,8 @@ _A space carries a criteria sentence; a watch row names an engine, a cadence or 
 
 _Amended 2026-10-09 (D77): the same migration adds a partial unique index on open `add_record` and `file_record` suggestions over `(payload->>'space_id', payload->>'domain')`, so `watch-3` can keep one open card per (space, domain) and append evidence to it. Criteria now sits at the top of the space page's details column (`spaces-4`)._
 
+_Amended 2026-10-10 (pre-check against main `3397486`): the `ENTITY_REFS` vocabulary is `repoint` | `repoint-or-drop` | `custom` | `none` for merge, a `del` kind, and `context: null` — a space merge is `{kind: 'none'}`. `settings_hash` must be a column (text, the sha of the settings jsonb). `suggestion.entity_id` is NOT NULL, but an `add_record` card has no record: the same migration makes it nullable, and `canRead`/Review read the space from the payload for that kind. Criteria sits at the top of the details column. Accept and reject live in `apps/web/src/lib/ai/propose.ts`._
+
 **What to build**
 
 The host state D72 names, in one migration. `space` gains `criteria` text, nullable, one to three sentences of "what belongs here"; the space page's details column shows it at the top as the in-place editable Criteria field (Enrichment + Exa — printed, sheet 03), written through a server fn that logs an activity event. `space_watch(id, space_id, integration_id, settings jsonb, cadence_minutes int null, state jsonb, last_run_at, last_status, last_error, created_by, created_at)` with `unique(space_id, integration_id, settings_hash)` so the same lens is not saved twice, and `space_watch_dismissal(space_id, domain, dismissed_by, created_at)` keyed on the pair. `suggestion_kind` gains `add_record` (payload: name, domain, aliases, evidence refs, subspace hint) and `file_record` (payload: entity id, the space, evidence) — the two cards R1 draws. `ENTITY_REFS` gains `space_watch.space` and `space_watch_dismissal.space`, both `cascade` on merge (a space merge is deferred by D73 and unions them when it lands) and `none` for context. An archived space (`spaces-1`) pauses its watches: the scheduler in `watch-2` reads the flag, so no column is needed here.
@@ -3631,9 +3663,11 @@ The host state D72 names, in one migration. `space` gains `criteria` text, nulla
 
 **Sheets** — Enrichment + Exa — printed, sheet 03 (criteria; the two cards in Review). **Spec** — D72 (`space_watch` is host state; criteria; dismissals permanent per space)
 
-#### `watch-2` · afk · M — The `watch` trigger and the `Spaces` port — a job runs per watch row with the D71 brief as its subject
+#### `watch-2` · afk · M · migration — The `watch` trigger and the `Spaces` port — a job runs per watch row with the D71 brief as its subject
 
 **Blocked by:** `watch-1`, `sdk-12b`
+
+_Amended 2026-10-10 (pre-check against main `3397486`): **label `migration` added** — `job_run` has no watch column, so this slice adds `job_run.watch_id` (nullable uuid, FK to `space_watch`) and writes the space id to `job_run.entity_id` so sdk-18's per-entity status stream reaches the Watching lane. Per-job `settings` does not exist (`jobSchema` is strict) and `PORT_NAMES` has no `Spaces`: both are this slice's SDK minor. "The material D71 builds" is not built — this slice builds `Spaces.brief` itself from the assembler's builders._
 
 **What to build**
 
@@ -3660,6 +3694,8 @@ The `Spaces` port is read-only and has one call, `brief(spaceId)`: the material 
 **Blocked by:** `watch-2`, `sdk-7b`
 
 _Amended 2026-10-09 (D77): consolidation is by result, not by watch — **one open `add_record` or `file_record` card per (space, domain)**. A later find of the same domain, from another watch or from Find in Ask (`ask-8a`), appends its evidence to the open card ("found by 2 watches") instead of proposing again. Every candidate passes the same three checks in order: member, dismissed, open card. No new table._
+
+_Amended 2026-10-10 (pre-check against main `3397486`): the signal method is `Content.emitSignal`, not `logSignal`. Refs are `event:<id>` strings, so the evidence URLs live in the card payload (`evidence: [{url, title}]`) and `suggestion.refs` carries signal ids when there are any. `proposeProgram` only does ON CONFLICT DO NOTHING today; the merge-into-open-card path is new work here._
 
 **What to build**
 
@@ -3689,6 +3725,8 @@ Review (**R1**) groups the cards under a bone space head — path, `via <plugin 
 
 _Amended 2026-10-09 (D73/D74 space page, D77, D79): the space page is `spaces-4`'s record anatomy, so Criteria, **Watching** and **What's moving** sit at the top of its details column above Map, Glossary and Tasks — there is no rail. **Add watch** is a window (engine, name, Look for, How often, At most per run) and its cadence defaults to **Manual** here; Ask's Save as watch defaults to Weekly (`ask-8b`). The head's **Find companies** button is `ask-8a`'s. Today counts open cards in its one Needs-you ledger as a review row grouped by source (D79), not in a separate attention section._
 
+_Amended 2026-10-10 (pre-check against main `3397486`): blocked by today-1 for the Needs-you row and watch-2 for Run now and the `job_run.watch_id`/`entity_id` it writes; the status stream is keyed by entity, which is why watch-2 writes the space id there. Confirmed present: `lib/integrations/settings-form.ts`, `job-status-stream.ts`._
+
 **What to build**
 
 The watching half of the space page `spaces-4` builds. Head: **Add watch** joins Note here; it opens a window in the dialog grammar — **Engine** (the enabled integrations that declare a `watch` job), **Name**, **Look for** (the engine's settings schema, rendered by `sdk-20b`'s renderer; Exa's is the criteria override, blank when it equals the space's criteria), **How often** (a select whose first value and default is **Manual**), **At most** per run — and **Save watch**. Details column, top: **Criteria** (`watch-1`), then **Watching**, one 32px row per watch — engine mark, name, cadence or "manual", last run, a live status cell over D64's stream ("running · 7 found · 6 cards"), Run now — with the empty lane naming which installed plugins can watch and a degraded row showing the mark at reduced opacity and the reason ("Exa key removed"), Run now absent; then **What's moving**, signals on members newest first, each with its record, the subspace it came via and its source, folding at three behind "+n more". Map, Glossary and Tasks follow. Today counts the space's open cards as one review row in its Needs-you ledger ("Proptech / Property ops · via Exa · 3 to add · 1 to file", D79) linking to Review filtered by the space.
@@ -3712,6 +3750,8 @@ The watching half of the space page `spaces-4` builds. Head: **Add watch** joins
 #### `watch-5` · afk · M — plugins/exa — the watch job: webset from the brief, cursor in `state`, candidates and signals
 
 **Blocked by:** `watch-3`, `backfill-12`
+
+_Amended 2026-10-10 (pre-check against main `3397486`): `uses` must include `Secrets` (the key, as Apollo reads it). `plugins/exa` does not exist until backfill-12 lands; the cassettes this slice adds sit beside the ones 247 creates._
 
 **What to build**
 
@@ -3775,6 +3815,8 @@ The Integrations ledger (I1) shows the scope words in the Apollo row and the cre
 #### `enrich-2` · afk · M — The enrichment vocabulary, the attribute link, and sources in order — first answer wins (D76)
 
 **Blocked by:** `enrich-1`
+
+_Amended 2026-10-10 (pre-check against main `3397486`): Apollo's jobs are `enrichCompany`/`enrichPerson` with actions `enrich-company`/`enrich-person` — "its `enrich` action" means those; a source's manifest names which action answers which kind. Scopes already live on `integration.config` as `autoEnrichScopes`/`autoEnrichSpaces` (enrich-1) and reuse is Apollo's `cacheDays`: moving them to `workspace.settings.enrichment` is a data move. Default links on `SYSTEM_ATTRIBUTES` reach no existing workspace because the seeder never overwrites rows: add an insert-if-absent pass for `options.enrichmentKey`. Companies have no `twitter` attribute. No schema change._
 
 **What to build**
 
@@ -3843,9 +3885,11 @@ The rest of D76's auto-enrich. **Two triggers** join `enrich-1`'s three: **appea
 
 **Sheets** — Enrichment + Exa — printed, sheet 00 (limit reached); Today — printed, sheet 00 (the notices band). **Spec** — D76 (the host checks, in order; the cap parks; no periodic refresh); D53; D65
 
-#### `enrich-5` · afk · S — Bulk enrich from a list, behind an estimate (D76)
+#### `enrich-5` · afk · M — Bulk enrich from a list, behind an estimate (D76)
 
 **Blocked by:** `enrich-4`
+
+_Amended 2026-10-10 (pre-check against main `3397486`): neither surface exists — `record-table.tsx` has no row selection and no list has a `···` menu. This slice adds both as table primitives: a row checkbox with a 44px bone selection bar on `RecordTable`, and a `···` on the list head; Enrich… is their first verb. Size S → M. Runs after email-4, which edits the same table and list files._
 
 **What to build**
 
@@ -3865,6 +3909,8 @@ Seed and import births emit no events (D65), so they are enriched by choice: **E
 #### `enrich-6` · afk · M — Apollo answers the full vocabulary — company and person fields, the latest round, a person's company, dated changes (D76)
 
 **Blocked by:** `enrich-2`
+
+_Amended 2026-10-10 (pre-check against main `3397486`): the "Add X?" card is an `add_record` suggestion, whose enum value is watch-1 and whose proposal path through `Discover.candidate` is watch-3 — both now blockers; Judgment proposals today are only `note` or `attribute`. Confirmed present: `isRoleEmail`, `plugins/apollo/src/map.ts`._
 
 **What to build**
 
@@ -3896,6 +3942,8 @@ The source page says what Apollo is sent: "domain only" for companies, "email an
 
 **Blocked by:** `enrich-3`. **Label:** `migration` — runs alone on the migration lane.
 
+_Amended 2026-10-10 (pre-check against main `3397486`): there is no blob refcount — `blobIsReferenced` in `lib/documents/blob-refs.ts` must learn `entity.picture_sha` (and runs after settings-6 adds the logo there). "A cleared picture is user-held" has no storage, since `lastWriters` reads `attribute_event` per slug: the same migration adds `entity.picture_held boolean not null default false`, set when a person uploads or clears by hand; the host fills only when `picture_sha is null and not picture_held`._
+
 **What to build**
 
 A company or a person can carry a picture, new and small. It needs schema: `entity.picture_sha` (nullable text), a blob sha in the blob backend. The picture is **fetched once and stored**, never hotlinked, because a remote image loads from a third party on every view (the same reason the email viewer blocks remote images, D67). The source answers a URL (`company.logo`, `person.photo` from the Website source or Apollo); the host fetches it under the snapshot rules (image types only, a size cap), stores it as a blob, and sets `picture_sha` **only when empty**. A person can set or clear it by hand, and a cleared picture is user-held like any cleared value. Where a record shows its mark today — the record head, table rows, the board card, Cmd-K — the picture replaces the 1-bit mark or the initials square when present, cropped square at the mark's size. The blob's refcount counts it so GC never takes a picture in use.
@@ -3916,6 +3964,8 @@ A company or a person can carry a picture, new and small. It needs schema: `enti
 #### `enrich-8` · afk · M — The Enrichment page, the source page, "Fill from", and where a value came from (D76)
 
 **Blocked by:** `enrich-2`, `enrich-4`
+
+_Amended 2026-10-10 (pre-check against main `3397486`): blocked by settings-1, settings-2 and settings-4 (the Integrations group, the Save bar with member read-only, the plugin page template), enrich-3 (Website built in) and enrich-6 (Apollo's phone opt-in). The stored scopes are `deal`, `space` and `meeting`; "the five triggers as checkboxes" renders the five trigger words grouped under those three scopes._
 
 **What to build**
 
