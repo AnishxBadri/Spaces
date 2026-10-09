@@ -104,8 +104,8 @@ this file is right._
 
 ## 1. Overview
 
-**Creative North Star: "Instrument" — a measuring instrument for capital, printed
-output.**
+**Creative North Star: "Instrument, printed" — a measuring instrument for capital,
+and the sheet it prints.**
 
 The interface is a bench instrument that measures a fund and prints what it found:
 paper for the data field, bone for the chassis, one ink for structure, one LED for the
@@ -123,18 +123,25 @@ focus became a reticle, and dither became the only texture. There is no predeces
 still running and no flag to flip: the old look survives only in the commit
 history.
 
+**Printed** (adopted by the owner 2026-10-08; port: project 27) adds four details of
+printed matter, each with a budget so none becomes wallpaper. They are specified under
+"Printed details" in §5:
+
+- **Double rule** — 2px ink, 2px gap, 1px ink. Page heads only.
+- **Ink stamp** — an ink label with cut ends naming what the page is (`COMPANY C-0231`,
+  `SPACE depth 2`). One per page; outline when the thing is archived.
+- **Real tabs** — the open tab is paper with cut shoulders that join the body below it.
+  Tab bars only.
+- **Dither is data** — charts, readout history, 1-bit fallback marks and popover
+  elevation. One moment per region.
+
 The Paper canvas is the drafting table; this repo is truth. File `spaces`
-(id `01M19X8AY9DZD3PZMJK7RWVMTB`), whose pages are named `v2 · Foundations`,
-`v2 · Components`, `v2 · Patterns` and `v2 · Surfaces` — the canvas's own page names,
-not a version of this design. Open a page with `open_file(fileId, pageId)`, then
-`get_tree_summary` to find nodes, then `get_jsx(nodeId, "inline-styles")` for exact
-values; never read a value off a screenshot, and use screenshots only to compare a
-result. Foundations (page `8-0`) carries the Foundations sheet `40Q-0` and Texture
-`211-0`; Components (`9-0`) carries Atoms `2GW-0`, Overlays `2GX-0`, Chassis + Ledger
-`4GV-0`, Ledger · Editing `4RI-0`, Overlays · Flows `56M-0` and Rails · Settings ·
-Ledgers `5LB-0`; Patterns (`A-0`) carries `45Y-0`, the eight patterns P1–P8; Surfaces
-(`B-0`) carries Today `385-0`, Companies `1N8-0`, Deal `210-0`, Deals — Board `3H2-0`
-and Tasks `3H3-0`.
+(id `01M19X8AY9DZD3PZMJK7RWVMTB`). The decided drafts are its printed pages: Files,
+Email, Cmd-K, Spaces, Shell, Ask, Settings, Enrichment + Exa, Meetings + Granola and
+Today. Foundations, Components, Patterns and Surfaces hold the shipped Instrument
+sheets. Open a page with `open_file(fileId, pageId)`, then `get_tree_summary` to find
+nodes, then `get_jsx(nodeId, "inline-styles")` for exact values; never read a value
+off a screenshot, and use screenshots only to compare a result.
 
 This system explicitly rejects enterprise CRM chrome, the generic SaaS template look
 (shadcn defaults, gradient heroes, purple accents, identical card grids), and the dark
@@ -145,7 +152,9 @@ terminal aesthetic. Mono here is a voice for readings, not a costume for the who
 - Paper data field, bone chassis, ink structure, one pine LED
 - Three type voices — serif where a human wrote it, sans for the interface, mono for
   everything measured
-- Keyboard-first; every key that works is printed inside the control it triggers
+- Keyboard-first; every key that is ours to know is printed inside the control it
+  triggers
+- Printed: one double rule, one stamp, real tabs, dither only for data
 - Nothing blurs, nothing rounds past 2px, nothing is a pill
 - WCAG AA is a floor, not a target: body text ≥ 4.5:1, always
 
@@ -227,6 +236,13 @@ privacy product.
 | mono  | field label · 400 | 10 / 12 caps   | labels inside cells and readouts — `field-label` |
 | mono  | key hint · 400    | 11 / 14        | `⌘K G T ↵ ⇧↵ M esc` — inside the control         |
 
+**Who wrote it decides the voice** (owner 2026-10-08; D78):
+
+- A note a person filed from a tool (a Granola note in a ticked folder) is serif, with a
+  mono `via <tool>` mark: the person chose to file it.
+- Text a model wrote that nobody chose is sans: an Ask answer, Exa's brief, an unfiled
+  summary. Ask answers are sans in the panel and on `/ask`.
+
 Utilities: `title-serif`, `label-caps` (the 11/14 500 label step whole), `field-label`
 (the 10/12 400 field-label step whole — mono, caps, .08em), `mono`, `numeric` (tabular +
 right-aligned in one class), `tabular` (figures inline in a sentence). The scale steps
@@ -263,6 +279,13 @@ Structure is 1px ink. Inner rules are 1px rule. Nothing blurs.
 - **Depth.** Card · 0 (rule border). Popover · 2 (`shadow-[2px_2px_0_0_var(--hairline)]`).
   Dialog · 3 (`shadow-[3px_3px_0_0_var(--hairline)]`). Toast · ink. Every lifted sheet is
   paper with a 1px ink edge and a hard offset shadow. No blur, ever.
+- **Elevation, printed** (decided 2026-10-08; port: project 27). Two kinds of lift, told
+  apart by what sits behind them:
+  - A **popover** (menu, picker, the palette's pop-outs) has no scrim, so it casts a 4px
+    dithered ink shadow (Bayer, 1-bit).
+  - A **window** (dialog, viewer, confirm) sits over the bone-deep scrim, where dither
+    vanishes, so it keeps a solid ink offset shadow.
+  - Until the port, the code draws the 2px and 3px hard shadows above.
 - **Spacing.** 4 8 12 16 24 32; the page gutter is 32.
 - **Heights.** Table row 36 · ledger row 40 · section head 44 · control 32 · small 26 ·
   badge 20 · nav row 30 · header row 48 · readout strip 56–64 · dialog head 48 · dialog
@@ -289,7 +312,9 @@ ring. Replaces the Focus Rule.
 
 **The Dither Rule.** Dither is 1-bit, pine or ink, Bayer 4×4 at 2px cells. Never under
 text, never animated, never a third colour. It lives in empty states, chart fills,
-fallback marks, thumbnails and loading. New, 2026-09-10.
+fallback marks, thumbnails and loading. New, 2026-09-10. Amended 2026-10-08 (printed):
+**dither is data** — a chart, a readout's history, a 1-bit mark, and the elevation of a
+popover. One dither moment per region; a page that already has one adds no second.
 
 **The Contrast Floor.** Body ≥ 4.5:1, graphite 5.9:1, no sub-100% opacity text. Kept.
 Key hints on pine are the one exception, at 85% and still ≥ 4.5:1.
@@ -487,6 +512,24 @@ load-bearing rules promoted here:
   name/value pair for a native input to contribute. The caller owns the label and the
   hit area around it.
 
+### Printed details (decided 2026-10-08; port: project 27)
+
+Four details from printed matter, each with a budget. A surface that spends a detail
+outside its budget is wrong even when it looks good.
+
+- **Double rule.** 2px ink, 2px gap, 1px ink, under a page head (P1, a record head, a
+  settings page head). Nowhere else: a section opens on the single hairline as before.
+- **Ink stamp.** An ink label with cut (angled) ends, mono caps inside, naming the kind
+  and one identifying fact: `COMPANY C-0231`, `SPACE depth 2`. One per page, above the
+  title. An archived thing's stamp turns to outline (`ARCHIVED 10-08`).
+- **Real tabs.** A tab bar's open tab is paper with cut shoulders, joined to the body
+  under it with no rule between; the others sit on bone. Tab bars only (a record's
+  Notes · Interactions · Files · History head, a space's tabs, `/ask`). Filter rows under
+  a tab stay the underline grammar.
+- **Dither is data.** See the Dither Rule. A space's funding-stage mix bar, a readout's
+  history, a portfolio chart and a popover's shadow are dither; a section head, a
+  button or a page background never is.
+
 ### The Separation Rule — sections and separation (2026-10-05)
 
 A page reads as stacked sections, and each section separates itself from its neighbours
@@ -522,6 +565,14 @@ things need you. Two are late."), a mono eyebrow above or a mono readout line be
 actions right with key hints inside the buttons, hairline under, 32px inset, 28px above.
 `ReadoutStrip`: cells split by rules on a hairline, caps mono label, mono 20/500 value,
 colour only when nonzero and bad.
+
+Decided 2026-10-08/09 (port: project 27):
+
+- **Sticky head.** On scroll the head collapses to a 40px bar (stamp, title, actions);
+  the readout strip scrolls away under it.
+- **Today takes a plain title** with the date (D79). The sentence title stays available
+  to a page with a state to report, but Today no longer uses it.
+- **Double rule** under the head instead of the single hairline (Printed details).
 
 ### Ledger section + attention row (P2 · P3)
 
@@ -604,6 +655,24 @@ with a 24px rule between groups, the current page in a 36×32 paper box, names o
 as ink tooltips. Width snaps (never animates) and the preference is per browser.
 Collapses to a drawer under a 48px top bar on mobile.
 
+**Sidebar A** (decided 2026-10-08, amended by D68 on 2026-10-09; port: project 27).
+The shipped chassis above stays until the port. The decided order:
+
+- **Search** (`⌘K`), then an **Ask** row under it; chats live in Ask, never in the
+  sidebar.
+- **Today, Tasks, Spaces** at the top. Spaces lists starred spaces under it (five, then
+  `▸ n more`).
+- **Library ▾**, a collapsible group: Notes (`G N`), Meetings (`G E`), Files (`G L`).
+  Documents is renamed Files and keeps its chord. Collapsed, it reads `Library ▸ 3`.
+- **Objects ▾**: the objects, then customs, overflowing inline as `▸ n more` (never a
+  dropdown); an object's pinned saved views sit under it.
+- **Capital ▸**: Portfolio, Mandate.
+- **Counts only on Tasks.** No other row carries a number.
+- **Review is not a row**; Today's Needs-you ledger reaches it (D79).
+- **Upload and Settings leave the list** for icon buttons on the account row.
+- **The current row is a tab cut into the page edge**: paper, joined to the page with
+  no rule between, replacing the paper + rule box. Still never a pine bar.
+
 ### Record Pages (P7)
 
 `RecordHeader`: mono caps breadcrumb (`DEALS / 7C335C4A / OPENED 2026-07-29`), actions
@@ -626,6 +695,17 @@ share the parts.
   the next), RECORDS, GLOSSARY. Rail: MAP (`↑` parent, subspaces with their telling
   count, `+ Subspace` inline), REFERENCED (mentions filed elsewhere), Tasks. Tracking is
   not evaluating — a company can sit here in no pipeline at all, and the lane says so.
+  **Decided 2026-10-08** (D73, D74; port: project 27): a space reads like a record.
+  - Head: the `SPACE depth n` stamp, the serif name with its crumb, Note here (`N`), and
+    a `···` menu holding Rename, New subspace, Move to…, Save as template… and Archive.
+  - Three readouts only: in pipeline, last filed, and the funding-stage mix as a dither
+    bar (the page's one dither moment). Counts live on the tabs.
+  - Details column: Map (parent, subspaces, `+ Subspace`), Glossary, Tasks.
+  - Tabs: Companies · Notes · Files · People · Records, Notes by default; Referenced
+    folds into Notes as a filter (Filed · Mentions); an empty tab stays grey at 0.
+  - Archive asks nothing, because Restore undoes it; the archived page shows the outline
+    stamp and one notice of what still holds. Move to… is a window that greys the space
+    and its descendants.
 
 - **The Ledger.** Three lanes on rules — mono `MM-DD HH:MM`, mono caps type
   (`CALL · STAGE · FILE · EDIT · BORN · INVEST · MARK`), sans body. Attribute bursts
@@ -663,9 +743,10 @@ Stage` box appears while dragging over a column.
   required on one line), the bone foot saying where it lands. In edit mode the pane
   stays, greyed — the type is the record of what this is.
 - **Dialogs:** paper sheet, 1px ink, 3px hard shadow, 0 radius. 48px head on bone —
-  serif title 18/600, mono context beside it, `esc` in the right lane, hairline under
-  (bone since 2026-10-05). 20px body on paper. 52px bone foot — mono note left ("what will happen · counts"), buttons right,
-  the primary carrying ⌘↵. The first field takes the reticle on open. Wide (560px)
+  serif title 18/600, mono context beside it, hairline under (bone since
+  2026-10-05); no `esc` and no cross in the head (2026-10-06). 20px body on paper.
+  52px bone foot — Cancel beside the primary, the primary carrying ⌘↵; one close per
+  dialog. The first field takes the reticle on open. Wide (560px)
   for forms, 420–480 otherwise; the quick task has no title bar — the input is the
   title. A modal must be argued for.
 - **The options editor** (inside the attribute sheet): a rule-bordered box of 30px rows
@@ -692,12 +773,27 @@ Stage` box appears while dragging over a column.
   the last keystroke and replaces the list — no spinner, no entrance, and never once
   the selection has moved or ↵ is pressed (SPA-129). A row found by meaning alone
   reads `· meaning` in its mono lane, and its snippet is a plain cut with nothing set.
+  Decided 2026-10-08 (D70 amended; port: project 24/27): the palette **finds only**.
+  It has no answer stage; Tab hands the typed query to Ask. Nothing typed shows the
+  page's own actions, a highlighted passage previews its page, and an action that needs
+  one more answer asks it in the same palette.
+- **Ask** (decided 2026-10-08, D70 amended; port: project 24). A docked 408px third
+  column beside the page, and a full `/ask` page with the thread list, both over one
+  thread store. Answers are sans with ref chips; action cards propose and the person
+  applies; the context in scope is shown as chips and frozen per turn.
+  - The panel closes completely (⌘J or ×, no rail) and resizes from its left edge,
+    360–560px, remembered per browser.
+  - `/ask` reads in a 760px column with a collapsible thread list; tables break out to
+    the full content width (in the panel they scroll inside their card).
+  - Your turn is a right-aligned bone block with a hairline, at most three quarters of
+    the column; the answer has no box and sits left at full measure; a scope change is
+    a centred mono divider.
 - **The keyboard sheet:** `?` opens it (the account menu lists it). Two columns of 26px
   rows on rules — Go, Create, On a deal, In a sheet — with 18px keycaps (hairline, 2px
   foot, mono 10). Only keys that work are printed. Every nav row prints its G-chord in
   its right lane; chords wait 800ms and every key is off while typing. Documents takes
   `G L` (library, the shelf) because `G D` is Deals and L was the one free letter that
-  says what the page is.
+  says what the page is; it keeps `G L` as Files.
 - **Tooltips:** inverted (ink background, paper text), `text-label`, 120/80ms.
 - **Toasts:** sonner, bottom-right, ink.
 
@@ -715,13 +811,56 @@ Centered, max 24rem: a 160×120 dither block (a pine density ramp with a paper s
 set in), a serif sentence 20/600, one sans line in graphite, the primary action with
 its key. A table should almost never be empty at all (demo seed exists for that).
 
+Decided 2026-10-09 (D80; port: `first-run-1`):
+
+- **Today's empty state is the onboarding.** An empty workspace's Today offers three
+  ways in: Import a file, Drop a deck, Add a company. It goes away once data exists.
+  There is no checklist and nothing to dismiss.
+- **A missing setup is named where it is used.** A feature whose key or connection is
+  absent says so in place with one link (`Ask needs a model to answer · Add a model ›`,
+  `No calendar connected · Connect Google ›`). A member sees who to ask instead of the
+  link.
+- **The whole picture is passive:** Settings → General → What's set up, never shown
+  unprompted.
+
 ### Settings
 
 The section pattern: serif title 18, one sans sentence, a mono crumb (`SETTINGS /
 CAPITAL`) right, hairline under; then 48px rows on rules with the control on the right.
 Tables inside settings use the ledger primitives unchanged — the FX rates ledger is the
-example, and its foot says what the model does: rates are append-only, a new date
-supersedes, nothing edits.
+example.
+
+**Settings by whose it is** (D81, decided 2026-10-08/09; port: project 27). Until the
+port, the shipped nav and pages stand; build toward this:
+
+- **Settings takes over the sidebar**, with `‹` back. Four groups, by whose it is:
+  - **You:** Email & calendar, Files, Meeting notes, API tokens. Accounts are grouped by
+    the job they do, never by provider.
+  - **Workspace:** General (logo, name, base currency, What's set up), Members, Objects,
+    Templates, Currency & FX.
+  - **AI:** Models (the sensitivity floor at the top, providers, who does what),
+    Search (embeddings; reuses the Models key), Usage & limits.
+  - **Integrations:** Plugins, Enrichment (D76), Email forwarding, Connection apps.
+- **One way to save.** Toggles and selects apply at once with a toast. Typed fields
+  collect into one Save bar at the foot of the page, shown only while something changed.
+  No per-section Save.
+- **Confirms on four acts** that break something outside the page: revoking an API
+  token, suspending a member, archiving an object, unticking an identity key. Reversible
+  toggles stay instant.
+- **A member sees admin pages read-only**: the page with its controls disabled, keys
+  redacted, and one line naming who can change it. No "Admins only" page.
+- **No footer caption strips.** A line survives only for cost, privacy or
+  irreversibility, beside its control.
+- **Every plugin and every account has its own page.**
+  - A plugin page is one template: status and version, the workspace key, what it
+    sends, its manifest settings, what it switches on (linking to the page that owns
+    each capability, never repeating its settings), recent runs and errors, Disable /
+    Uninstall.
+  - An account page (Options ›) holds the person's choices for that account, last sync
+    and Disconnect.
+- **Plugins is a catalogue:** Installed as a ledger, then Available from the registry
+  under tabs by job (Enrichment, Research, Email & calendar, Files, Meeting notes,
+  Import, Feeds).
 
 An object's attributes are a settings ledger too (2026-09-11): a caps column head on a
 hairline — ATTRIBUTE · TYPE · CONSTRAINTS · ORIGIN · ORDER · EDIT — with the lanes shared
@@ -730,7 +869,7 @@ with its description under it, the raw type slug in mono, a mono constraints lan
 (option count, target, currency, out of n, required, default), a caps origin tag (system
 on bone, custom on the selection wash), and always-visible `↑ ↓ ✎ archive` marks in
 graphite. Select rows carry their square option badges beneath, archived options struck
-on bone. The foot says what the order feeds. Archived attributes fold into a collapsed
+on bone. Archived attributes fold into a collapsed
 ARCHIVED section with a Restore button and no grip. `A` opens New attribute.
 
 ## 6. Do's and Don'ts
@@ -741,9 +880,14 @@ ARCHIVED section with a Restore button and no grip. `A` opens New attribute.
   all character.
 - **Do** set every measured thing in mono, and every comparable figure `.numeric`.
 - **Do** hold body text at ≥ 4.5:1 — graphite is the only second text colour.
-- **Do** print every working key inside the control it triggers.
+- **Do** print a working key inside the control it triggers when the binding is ours
+  and not guessable (`⌘↵` from a field, `L`, `G T`); `esc` and `↵` are never printed.
 - **Do** use density confidently in the ledger; calm comes from rules and rhythm, not
   sparseness.
+- **Do** print a hint only where a wrong choice costs credits, privacy or something
+  that cannot be undone. Everything else is a tooltip or the docs.
+- **Do** spend each printed detail inside its budget: one double rule, one stamp, one
+  dither moment per region.
 
 ### Don't:
 

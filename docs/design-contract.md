@@ -9,9 +9,9 @@ here sends you to.
 every statement traces to a `DESIGN.md` section or to a file that shipped. Where the
 two disagree, `DESIGN.md` is right and this file is a bug — fix it here, not there.
 
-Four parts: the vocabulary you may spell, the primitives that already exist, the
-precedent every new surface copies, and the line between what lint enforces and what a
-reviewer judges.
+Five parts: the vocabulary you may spell, the primitives that already exist, the
+precedent every new surface copies, the line between what lint enforces and what a
+reviewer judges, and what is decided but not yet built.
 
 ---
 
@@ -41,7 +41,8 @@ bad; a zero reads graphite.
 **Material and scale** (`DESIGN.md` §4). Radius is `rounded-md` (2px) on controls and
 inputs, `rounded-none` everywhere else — no 4, 6, 8 or 12, no pills, no circles.
 Shadows are hard offsets: popover `shadow-[2px_2px_0_0_var(--hairline)]`, dialog
-`shadow-[3px_3px_0_0_var(--hairline)]`. Nothing blurs. Spacing is 4 8 12 16 24 32 and
+`shadow-[3px_3px_0_0_var(--hairline)]`, until project 27 ports the printed elevation
+(a dithered popover, a solid window; §5). Nothing blurs. Spacing is 4 8 12 16 24 32 and
 the page gutter is 32 (`px-8`). Heights: table row 36 (`h-row`), ledger row 40 (`h-ledger-row`),
 section head 44, control 32, small 26, badge 20, nav row 30, readout strip 56–64, dialog head
 48, dialog foot 52.
@@ -123,6 +124,11 @@ explained, or in the docs. If it varies — a count, a date, a provenance mark, 
 state word — it is data and stays. Foot notes under ledgers, subtitles under dialog
 titles that restate scope, and "what happens next" sentences in dialog feet all fail the
 test. The canvas is checked against it sheet by sheet; the reviewer checks the PR.
+
+**A hint earns its place by cost (owner, 2026-10-08).** A visible hint appears only where
+a wrong choice costs credits, privacy or something that cannot be undone: `pay as you
+go`, `notes elsewhere never fetched`, a confirm's consequence. Everything else is a
+tooltip on the control or the docs, and page blurbs go too.
 
 **One close per dialog, and `esc` is never printed (2026-10-06).** A dialog closes from
 its foot: `Cancel`, unmarked, beside the primary with its key (`⌘↵`). The head carries
@@ -276,8 +282,8 @@ row is a decision, not a cell.
 says what the section decides, the one action right, hairline under; 48px rows on
 rules with the control right. The nav left is the chassis grammar one level in: bone,
 caps group labels, 30px rows, counts in the right lane. A ledger inside the section takes a `field-label` head on
-`border-y-hairline` with lanes shared by head and rows, and its foot says what the
-model does.
+`border-y-hairline` with lanes shared by head and rows. It carries no foot caption: a
+line under a settings ledger survives only for cost, privacy or irreversibility (D81).
 
 **A settings section is a child route under the settings shell** (SPA-26). `/settings`
 is a layout — `apps/web/src/routes/_app/settings.tsx` — and every section is one file
@@ -289,7 +295,8 @@ OAuth, Connections, Binding health, and the two embeddings slices) all take this
 answer. The row carries the path, the label, the `group` it joins — `general` (the
 workspace and its people), `data` (printed `Data & AI`: AI keys and runs, and the doors
 data comes in and out by), then `objects` and `capital` as the chassis has them — and
-`admin`. The group is also
+`admin`. Those are the shipped groups until project 27 ports D81's four (`you`,
+`workspace`, `ai`, `integrations`; §5); a new section is placed by D81's map. The group is also
 the eyebrow the section prints, so `SETTINGS · CAPITAL` cannot name a place the nav does
 not have; `admin: true` draws the row graphite for a member with `admin` in the right
 lane rather than a link into a page that refuses, and changes no guard. Below `md` the
@@ -332,7 +339,8 @@ on the canvas and have it approved before it is coded. Do not derive it from
 A page reaches the chassis as **one row of data** in `NAV_ITEMS`
 (`apps/web/src/components/app-sidebar.tsx`), and the row decides everything about
 its place there. It joins one of the three groups — `work`, `objects`, `capital`
-(`DESIGN.md` §5, "Navigation — the chassis") — by naming it in the row's `group`
+(`DESIGN.md` §5, "Navigation — the chassis"); sidebar A adds a collapsible `library`
+group between `work` and `objects` when project 27 ports it (§5) — by naming it in the row's `group`
 field; the groups are derived by filter, so a row may be appended or inserted
 anywhere without reshuffling them. Its G-chord is the row's `key` field: **data, not
 a decision the slice that adds the page makes by hand.**
@@ -447,3 +455,70 @@ with their files. None of it is open. Do not re-open it, and do not ask about it
 - a rule in the checklist has to be broken for the surface to work.
 
 Say which of the four it is and ask. Never invent the missing half.
+
+---
+
+## 5. Decided, not yet built
+
+Approved on the canvas and recorded, but not in the code yet. A slice that touches one
+of these surfaces builds toward the decided shape, not the shipped one; a slice that does
+not touch it leaves the shipped one alone. Each line names its decision and the work that
+carries it. Project 27 is "Instrument, printed — the decided design lands".
+
+**The printed details** (`DESIGN.md` §1, §5 "Printed details"; project 27, `print-*`)
+
+- **Double rule** under page heads only: 2px ink, 2px gap, 1px ink.
+- **Ink stamp**, one per page, with cut ends (`COMPANY C-0231`); outline when archived.
+- **Real tabs** on tab bars only: the open tab is paper with cut shoulders joining the
+  body.
+- **Dither is data**: charts, readout history, 1-bit marks, popover elevation; one moment
+  per region.
+- **Elevation split**: a popover casts a 4px dithered ink shadow; a window over the
+  scrim keeps a solid ink offset shadow.
+- **Sticky head**: the page head collapses to a 40px bar on scroll.
+
+**The frame** (project 27, `shell-*`; D68 amended, D70 amended)
+
+- **Sidebar A** with the collapsible Library group: `DESIGN.md` §5 "Navigation — the
+  chassis". `NAV_ITEMS` gains the `library` group and the nav-grammar test with it;
+  Documents becomes Files (keeping `G L`), Meetings is new (`G E`).
+- **Cmd-K finds only**; Tab hands the query to Ask. **Ask** is a docked 408px column
+  plus `/ask`, one thread store, answers in sans (D70 amended; project 24).
+
+**Settings** (D81; project 27, `settings-*`)
+
+- `SETTINGS_SECTIONS` regroups into `you`, `workspace`, `ai`, `integrations`, and
+  `settings-nav.test.ts` follows. You is Email & calendar, Files, Meeting notes, API
+  tokens.
+- Toggles apply at once; typed fields share one Save bar shown only while dirty.
+- Confirms on revoking a token, suspending a member, archiving an object, unticking an
+  identity key.
+- A member sees an admin page read-only, with who can change it; no "Admins only" page.
+- No footer caption strips.
+- **The plugin page template** and **the account page** (`DESIGN.md` §5 "Settings");
+  Plugins is a catalogue, Installed then Available by job.
+- The sensitivity floor sits at the top of AI → Models; Search reuses the Models key;
+  the Models grid has no Embed row.
+
+**Pages** (project 27 unless named)
+
+- **Today** (D79, `today-1`): plain title with the date, the day strip, derived readouts
+  only, one notices band, one Needs-you ledger with a kind lane (task, meeting, review,
+  deal, mark), Today's meetings, and a rail of Portfolio and What's moving.
+- **First run** (D80, `first-run-1`): Today's empty state with three ways in; each
+  missing setup named in place with one link; Settings → General → What's set up; demo
+  data offered with Start empty as the primary.
+- **Meetings page** (D68 amended): Upcoming by day with Prep, Past with no-write-up rows
+  first and Write, filters All · Upcoming · Past · No write-up · Mine.
+- **The space page in the record anatomy** (D73, D74): tabs Companies · Notes · Files ·
+  People · Records with Notes by default; three readouts (in pipeline, last filed, the
+  funding-stage mix); details column Map, Glossary, Tasks; a `···` menu with Rename,
+  New subspace, Move to…, Save as template…, Archive; archive asks nothing and Restore
+  undoes it.
+- **The Enrichment page** (D76): sources in order with what each sends, auto-enrich
+  scopes, What fills what per object, recent runs; the where-from popover on a filled
+  value; Fill from on an attribute.
+- **The Find table** (D77, project 24): results as rows with Add / File here / Dismiss
+  checked against what is held, and the Save as watch window.
+- **Notes filed from a tool** (D78): serif with a `via <tool>` mark; the Notes tab gains
+  a From meetings filter.

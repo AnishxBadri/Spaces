@@ -1,6 +1,6 @@
-# Backlog bodies — projects 14 to 26
+# Backlog bodies — projects 14 to 29
 
-_The slice bodies of projects 14–26. Projects 19–26 and Corrections were published to Linear on 2026-10-06 (`SPA-215`…`SPA-299`), each issue carrying its body verbatim with a footer naming the slice key; this file stays the source — amend both together. Projects 14–18 shipped from Linear before that; their sections here are history._
+_The slice bodies of projects 14–29. Project 27 (the printed design port), the split of project 23 into 23, 28 and 29, and the 2026-10-09 amendments to 23–25 were written after the 10-08 canvas verdicts. Projects 19–26 and Corrections were published to Linear on 2026-10-06 (`SPA-215`…`SPA-299`), each issue carrying its body verbatim with a footer naming the slice key; this file stays the source — amend both together. Projects 14–18 shipped from Linear before that; their sections here are history._
 
 _Siblings: `docs/roadmap-2026-09.md` (all 23 projects and the audit), `docs/decisions-2026-09.md` (the 48 closed decisions), and the four `docs/spec-*.md` contracts these slices implement. Ordered exactly as the roadmap orders them. Published at the same time as the rest of the plan (2026-09-15, reconciled) and unchanged since, except where a decision in `docs/decisions-2026-09.md` amends a slice — those amendments are noted inline and the decision is authoritative._
 
@@ -2186,61 +2186,142 @@ The write half and the proof. plugins/box implements ensureFolder, putFile, move
 
 ---
 
-## 23. The researcher lane, syncers, recorders and watches
+## 23. Meetings and recorders
 
-_Extensibility · 17 slices · amended 2026-10-06_
+_Extensibility · 9 live slices and two struck · amended 2026-10-06, 2026-10-09 · split 2026-10-09_
 
-_Amended 2026-10-06: `arrival-8` and `arrival-9` are struck (D33 superseded by D72 — a feed is a watch plugin) and kept at the end of the section. `arrival-5`–`arrival-7` carry D68 amendments inline. The new slices `interaction-1`/`2`, `arrival-11`, `spaces-1`–`3`, `watch-1`–`5` and `enrich-1`, and projects 24–26, have their bodies below, written after the canvas pass (`docs/design-brief-first-ship.md`); each cites its Surfaces sheet by name._
+_Split 2026-10-09: project 23 held four themes in one; its spaces, research and watch slices are now project 28 and its enrichment slices project 29. What stays is meetings: the interaction row learns D68's shape, Google Calendar syncs, recorders land (Granola first, D78), Today and the Meetings page show them, and Gmail syncs. Earlier amendments (D68, D78, D68 amended) are inline on each slice._
 
-The last unimplemented port goes live and every kind interface the SDK froze finally gets a tenant: a researcher, a syncer, an ingress, a poller. Placed last because each needs OAuth, the loader and the fakes — but every one of them is a channel CONTEXT names, and none of them may be dropped silently.
+A meeting becomes one row that every source fills: the calendar event, the recorder's notes and transcript, the write-up. Placed after storage because each lane needs OAuth, the loader and the fakes.
 
-### ▸ The last unimplemented port
+### ▸ One meeting, one row
 
-_The Ai port's live layer with the sensitivity gate and the spend ceiling enforced by core rather than trusted to the plugin, tokens attributed to the integration and not to a user; then Exa as the researcher kind's first tenant — five web signals on a record and a one-paragraph brief in /inbox citing the five URLs._
+_Before any recorder lands, the interaction row learns what D68 needs: a per-kind `meta` jsonb, the artifact join with a `role` that replaces the planned `interaction.document_id`, the task `suggestion_kind`, and the writer's attach-or-create rule keyed on the calendar event. Then Today's Meetings section, the meeting dialog and Prep._
 
-#### `backfill-11` · afk · M — Ai port live — the researcher lane, budgeted and attributed to the integration
+#### `interaction-1` · afk · M · migration — `interaction.meta`, the artifact join with `role`, the task suggestion kind — one migration (D68)
 
-**Blocked by:** `ai-26`, `ai-4a`, `backfill-4`, `sdk-12a`
-
-**What to build**
-
-Every port gets a live slice — sdk-6a, sdk-6b, sdk-7a, sdk-7b, sdk-8, sdk-9, sdk-10, sdk-24a — except Ai, while sdk-12a's Layer table already names AiLive and the kind→ports table grants Ai to `researcher` and classify-only Ai to `poller`. AiLive wraps core's complete(): the lane is whatever the plugin names, sensitivity is resolved by core from the entity the job runs on through ai-26's resolver and is never accepted from the plugin (that is the whole point of the gate), the ceiling is backfill-4's predicate, and every call writes an ai_usage row with caller {type:'integration', id: row.id} so the operator can see which plugin spent what. The poller restriction is enforced in the Layer rather than documented in a table. Joins project 12 (Plugins run unattended, Apollo enriches).
-
-**Acceptance criteria**
-
-- [ ] A researcher fixture invoked through the loader gets Ai and writes ai_usage rows carrying caller_type 'integration' and the integration id; an enricher fixture that yields Ai fails service-not-found with no provider call
-- [ ] A poller fixture calling ai.complete('synthesize') fails at the port, not at the provider; classify runs
-- [ ] A plugin cannot influence the gate: AiLive resolves sensitivity from the entity and ignores anything the plugin passes, asserted by a fixture that tries
-- [ ] A sensitive record with the lane routed to a cloud provider refuses with SensitiveRouteRefused and the job fails without writing
-- [ ] Crossing backfill-4's per-day ceiling refuses the plugin's call with CapExceeded and closes job_run with the reason, so a runaway researcher cannot outspend a human
-- [ ] The Layer is built per (integration, job) like the rest — two invocations of one job construct one AiLive, asserted by the counter sdk-12a already uses
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
-
-**Demo** — Enable the researcher fixture and invoke its job: the claim lands, Settings → AI · Usage attributes the tokens to the plugin rather than to a user, and the same job on a record under a sensitive space refuses by name.
-
-**Spec** — docs/spec-plugin-sdk.md §4 — port table, kind→ports, the Layer the loader provides (AiLive); docs/spec-ai-substrate.md §11 — the only plugin kind that calls Ai is researcher
-
-#### `backfill-12` · afk · M — plugins/exa — the first researcher, its signals and its brief
-
-**Blocked by:** `backfill-11`, `sdk-10`, `sdk-12b`, `sdk-6b`, `sdk-7b`
+**Blocked by:** `arrival-2`, `notes-5`. **Label:** `migration` — runs alone on the migration lane.
 
 **What to build**
 
-The researcher kind has a semver-frozen interface (sdk-4a) and no tenant, and CONTEXT banks Exa as the second Enricher alongside Apollo. The SDK spec's own worked example is Exa, so the shape is already written: Read the entity for name and domain, Http the search, one signal per hit through Content, then Ai synthesize into a brief that lands as a Judgment suggestion with the hit URLs as refs. No Facts, no Identity — research never fills fields, and the Layer refuses them. Credential kind 'search' already exists in the enum, so nothing schema-level is needed. This is sdk-15's Apollo shape on a different kind and inherits its cassette pattern rather than inventing one. Joins project 12 (Plugins run unattended, Apollo enriches).
+Three schema changes D67 and D68 both lean on, in one migration so the journal takes one hit. `interaction` gains `meta` jsonb, `$type`d per kind through a discriminated union in `packages/db/src/schema/interactions.ts` and read through `@spaces/core/json`: the email shape is D67's headers (`from`, `to`, `cc`, `date`, and the MIME blob sha `email-1` fills); the meeting shape is `ends_at`, `status` (`scheduled` | `cancelled`), `conference_url`, `organizer`, `recurring_instance_id` and `rsvp` as a map from participant email to `accepted` | `declined` | `tentative` | `needs_action`; the call shape is `provider_event_id` and `duration_seconds`. A new table `interaction_document(interaction_id, document_id, role)` with `role` an enum `attachment` | `transcript` | `recording_link`, primary key on the pair, carries every artifact of an interaction — `arrival-6`'s planned `interaction.document_id` is never created, and its text is amended in this slice's PR to say so. `suggestion_kind` gains `task`, whose payload is `{title, due, entity_id}` and whose accept creates a task through the existing task writer, so action items from a recorder (`interaction-2`) and from Ask (`ask-6`) share one kind.
+
+`ENTITY_REFS` gains `interaction_document.document` with an explicit merge strategy (`repoint`, the document is the entity side) and context role (`item`, hop 1 through the interaction's participants). Nothing reads `meta` yet beyond the writer's tests; the readers arrive with `arrival-5`'s rewrite, `email-1` and `arrival-11`.
 
 **Acceptance criteria**
 
-- [ ] plugins/exa declares kind researcher, requires.credential {kind:'search', scope:'workspace'}, and manifest settings maxResults and lookbackDays; grep shows no Exa special case anywhere in core
-- [ ] The job's R type is Config | Http | Read | Content | Ai | Judgment, the loader hands it nothing else, and a deliberate Facts reach fails service-not-found
-- [ ] Against a recorded cassette with no network, one run produces one signal per hit and exactly one note suggestion whose refs are the hit URLs
-- [ ] The brief lands in /inbox and accepting it creates a note through the existing createNote path with the accepter as author
-- [ ] Exa's own error text surfaces on failure rather than a generic message, the way CONTEXT requires of Apollo
-- [ ] With no key configured the action is absent rather than failing at call time
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+- [ ] Migration `pnpm db:generate --name interaction_meta_artifacts`, SQL hand-inspected: `interaction.meta` jsonb nullable, `interaction_document` with its enum and pair primary key, `task` appended to `suggestion_kind`
+- [ ] `interaction.meta` is `$type`d as a discriminated union keyed by `kind`; a reader in `@spaces/core/json` decodes it and refuses a meeting shape on an email row at the boundary
+- [ ] `ENTITY_REFS` carries `interaction_document.document`; deleting the entry fails `entity-refs.test.ts` naming the column
+- [ ] Merging two documents repoints `interaction_document` rows to the winner, asserted through the merge snapshot
+- [ ] A `task` suggestion accepts into one task row with the accepter as creator and the suggestion closed; rejecting writes nothing
+- [ ] `arrival-6`'s body in `docs/roadmap-backlog.md` and `docs/spec-storage-sources.md` §3.1 say the transcript edge is the artifact join, not a column, in the same PR
+- [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — Paste an Exa key, press Research on a company: five web signals land on the record and a one-paragraph brief waits in /inbox citing the five URLs.
+**Demo** — Insert a meeting interaction with a cancelled status and two RSVPs through the writer's test, attach a transcript document with `role: transcript`, and read both back typed; merge the document into another and the join follows.
 
-**Spec** — docs/spec-plugin-sdk.md §4 — worked example (Exa, researcher) and the Layer the loader provides; docs/spec-plugin-sdk.md §5 — kinds, interfaces, claims; CONTEXT.md — Enrichment (Exa alongside as a second Enricher)
+**Spec** — `docs/decisions-2026-09.md` D68 (events change, the row follows; one meeting, many artifacts; action items are task suggestions) and D67 (store the email; attachments are documents); `packages/db/src/entity-refs.ts`
+
+#### `interaction-2` · afk · M — The writer attaches a recorder's payload to the calendar meeting, or births a `call` (D68)
+
+**Blocked by:** `interaction-1`, `arrival-5`
+
+_Amended 2026-10-09 (D78 amends D68): the per-integration `notesAreMine` switch and the `ai: true` manifest flag are dropped. Whether a recorder's note is shared is the member's folder choice (`arrival-6`), and what a note becomes — write-up, second note, task suggestions — is `arrival-7`'s; a provider summary is no longer a `note` suggestion. This slice keeps the match-or-birth rule, the artifacts and `Receipts`._
+
+**What to build**
+
+The one rule that makes "one meeting, one row" true, in the one writer every lane already calls: `packages/core/src/writes/interactions/write.ts`. `Content.logInteraction` gains optional match keys — `calendar_event_id`, `ical_uid`, else `starts_at` plus participant emails — and the writer decides. A key that matches an existing `meeting` row attaches: participants through the participants module are unioned onto `interaction_entity`, artifacts are added on `interaction_document` with their role, `meta` is merged, and no second row is born. A key that matches nothing births a `call` with the provider event id as `message_id`, so a webhook delivered twice is still one row through `interaction_message_id_unique`. The time-plus-participants fallback matches within a 30-minute window on `occurred_at` and requires every payload email to be among the meeting's participants; a looser match attaches a transcript to the wrong call, which is worse than a duplicate.
+
+Two D68 lines land here too. A recording is an artifact `recording_link` pointing at a document whose blob is absent and whose `external_url` is the provider's — never copied. The raw payload goes to `Receipts`. The writer does not decide what a recorder's notes become: it returns the matched (or born) interaction id and `arrival-7` applies D78's landing rules.
+
+**Acceptance criteria**
+
+- [ ] `logInteraction` with an `ical_uid` that matches a synced meeting adds participants and artifacts to that row; `select count(*) from interaction` is unchanged
+- [ ] The same payload with no match births one `call`; delivered twice, the second write conflicts on `message_id` and the job succeeds idempotently
+- [ ] The time-and-participants fallback matches inside 30 minutes with every payload email present, and refuses when one is missing — both asserted
+- [ ] A `recording_link` artifact creates a document row with no blob and an `external_url`; the Files tab lists it with the provider's mark and "Open in <provider>", and storage-6a's single-writer grep test still passes
+- [ ] The writer writes no note and proposes no `note` suggestion for a payload's summary; it returns the interaction id for `arrival-7`
+- [ ] Every payload is written to `Receipts` before any claim is applied
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Sync a calendar meeting, then post a recorder fixture naming its iCalUID: the meeting's row gains the transcript and the attendees' names resolve to the same people. Post one with no calendar match: a call appears instead. Replay both: nothing doubles.
+
+**Spec** — D68 (recorders are plugins; the interaction writer decides); D78 (the folder is the share decision); `packages/core/src/writes/interactions/write.ts`; `packages/core/src/writes/ports/content.ts`
+
+#### `arrival-11` · afk · M — Today's Meetings section with day navigation, the meeting dialog, and Prep on demand (D68)
+
+**Blocked by:** `interaction-2`, `ai-15`
+
+_Amended 2026-10-09 (D68 amended, D79, D80): the section is Today's Meetings section as D79 places it — one day with `‹ today ›` and a now-rule, **Prep** on upcoming rows — and its head gains **"all meetings ›"**, which opens the Meetings page (`arrival-12`). With no calendar connected the section is one line, "No calendar connected · Connect Google ›" (D80; a member sees who to ask instead of the link). Where the section sits among Today's parts is the Today slice's (project 27); this slice builds the section and the window._
+
+**What to build**
+
+The surface for meetings, on two sheets: **T1** (Surfaces › Today) for the section and **M2** (Surfaces › the meeting dialog) for the dialog. Today gains a Meetings section at the top of the spine: a 44px bone head "Meetings" with the mono count, day navigation as `‹ today ›` in the head's right lane, and one 40px row per external meeting that day — time, title, participants' names with the RSVP mark, the linked records as chips, and the artifact marks when a transcript or recording is on the row. Internal meetings are not stored, so nothing filters them here. The section is empty-state grey when no calendar is connected, with the one line C1 uses ("Connect Google Calendar").
+
+The dialog opens from the row and from `?modal=meeting&id=` (D74): 48px bone head with the title and time, the conference link as the one action; the body in the dialog's section grammar — participants with RSVP shown and never editable, linked records with D49's pin to add one, the write-up (open the note, or "Write up" when `note_id` is null), artifacts by role, pending suggestions for this interaction with accept and reject inline, and **Prep**. Prep runs the assembler over the linked records through the synthesize lane on demand, streams into the dialog, is never stored, and offers "Save as note" which files it against the same records through `ai-15`'s writer. The sensitivity gate applies per call: a linked record under a sensitive space routes local or refuses, and the dialog says which in the same words Ask uses (Components › "Ask · states and cards", refused state).
+
+**Acceptance criteria**
+
+- [ ] Today shows a Meetings section for the chosen day, external meetings only, with day navigation that never leaves the route; the count in the head is the day's count and no readout repeats it
+- [ ] The head carries "all meetings ›" to `/meetings` (`arrival-12`); with no calendar connected the section is the one D80 line, and a member's line names an admin instead of linking
+- [ ] A row shows RSVP per participant from `meta.rsvp` and never offers to change it; "Open in Google" is the only write path
+- [ ] The dialog opens from the row and from `?modal=meeting&id=`, with one close in the foot and no `esc` or `↵` printed
+- [ ] Artifacts list by role; a `recording_link` opens the provider, a transcript opens the Files preview
+- [ ] Prep streams on demand, is not persisted, and "Save as note" creates one note filed `tagged_in` on the linked records with the user as author; opening the dialog again shows no Prep until asked
+- [ ] A linked record under a sensitive space makes Prep route local or refuse, and the dialog states which
+- [ ] Gate 5 passes; the section and dialog follow T1 and M2 and the Separation Rule heights (44 head, 40 rows, 48 dialog head)
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — With a calendar synced against the fake, Today lists tomorrow's two external meetings; open one, see who accepted, press Prep, read the brief, save it as a note, and find it on the company's Notes tab.
+
+**Sheets** — Meetings + Granola — printed, sheet 01 (Today's Meetings section); Today — printed, sheets 00 and 01 (placement, the no-calendar line); Surfaces M2 (the meeting dialog, with Prep); Components "Ask · states and cards" (refused state). **Spec** — D68 and its 2026-10-09 amendment; D79; D80; D74 (deep links); `docs/design-contract.md` — a record, a ledger of a stream
+
+#### `arrival-12` · afk · M — The Meetings page — upcoming by day with Prep, past with the unwritten first (D68 amended)
+
+**Blocked by:** `arrival-11`
+
+**What to build**
+
+A list route, `/meetings`, for the two questions Today's one-day section cannot answer: what is coming this week and next, and which meetings nobody wrote up. A meeting stays an activity, never a record: the page is a read over `interaction` rows of kind `meeting` the reader can see, with no schema. It joins the chassis as one `NAV_ITEMS` row (Meetings, `G E` — `G M` is Mandate) in the work group; the collapsible **Library ▾** group that holds Notes, Meetings and Files is project 27's sidebar slice, and the row moves into it there with no edit here.
+
+- **Head:** the plain title "Meetings", no readout strip, and the filter row **All · Upcoming · Past · No write-up · Mine** (Mine = meetings you attended).
+- **Upcoming:** this week and next, grouped by day under a day head. A row: time, title, people with their RSVP mark, linked records as chips, and **Prep**, which opens the meeting window with Prep running (`arrival-11`).
+- **Past:** newest first. Meetings with **no write-up** sort first and carry a **Write** button that opens the write-up through `notes-6`'s program; the rest show the write-up state (written, via Granola). A cancelled meeting stays, struck out.
+- A row opens the same meeting window (`?modal=meeting&id=`). No count on the nav row: counts are on Tasks only.
+
+**Acceptance criteria**
+
+- [ ] `/meetings` lists the reader's visible meetings and nothing else; no migration, and the read goes through the shared statement in `@spaces/core/writes/read` with `canRead`
+- [ ] Upcoming groups this week and next by day; Past sorts no-write-up rows first, then newest first; a cancelled meeting renders struck and stays in place
+- [ ] Each filter narrows the list; "No write-up" shows past meetings with `note_id` null only; "Mine" shows meetings with the reader among the participants
+- [ ] Write on a past row opens the write-up; Prep on an upcoming row opens the window with Prep streaming
+- [ ] The nav row has `G E`, no count, and `nav-grammar.test.ts` passes with the new row
+- [ ] Gate 5 passes; rows are 40px ledger rows, day heads follow the Separation Rule
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Open Meetings: next Tuesday's two founder calls sit under their day with Prep; filter No write-up and last week's three unwritten calls are first, each with Write.
+
+**Sheets** — Meetings + Granola — printed, sheet 02 (the Meetings page, with the Library group). **Spec** — D68 amended 2026-10-09 (a Meetings list page; no schema); D74 (deep links); `docs/design-contract.md` — the nav grammar
+
+#### `arrival-13` · afk · S — Notes filed from a tool are set in serif with "via"; the Notes tab gains "From meetings" (D78)
+
+**Blocked by:** `arrival-7`
+
+**What to build**
+
+Two small surfaces D78 adds. **The typeface rule:** a note a person filed from their tool — a recorder note that landed through a ticked folder (`arrival-7`) — renders in serif like a hand-written note, with a mono **"via <tool>"** mark after the author ("via Granola · Anish"); an unchosen AI text stays sans (Exa's brief, an Ask answer, a summary nobody filed). The mark reads the note's provenance (`source_ref` to the integration), so no column is added. **The filter:** a record's Notes tab (D74) gains a filter row — **All · Filed here · From meetings · Mentions** — where "From meetings" lists the notes attached to the record's meetings (write-ups and `interaction_note` rows), "Filed here" the notes tagged on the record, and "Mentions" the notes that only mention it. The meeting stays the note's home in Interactions; the filter is a second door.
+
+**Acceptance criteria**
+
+- [ ] A recorder note renders in serif with "via Granola · <member>" in mono; a hand-written note shows no via mark; an Ask answer saved as a note keeps its own provenance and is unchanged
+- [ ] The Notes tab's filter row narrows to the three sets; "From meetings" includes a meeting's write-up and its second notes, and a private typed note only for its author
+- [ ] The tab head's count follows the filter
+- [ ] Gate 5 passes; the filter row is the 36px second row the Interactions tab already uses
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — On Flent's Notes tab, choose From meetings: two Granola notes in serif marked "via Granola · Anish" and "via Granola · Maya", and one write-up typed by hand.
+
+**Sheets** — Meetings + Granola — printed, sheet 01 (the Notes tab filter). **Spec** — D78 (typeface; "From meetings"); D74 (the tabbed body)
 
 ### ▸ The first syncer
 
@@ -2280,140 +2361,74 @@ Attendees run through arrival-2's participant module so a calendar attendee and 
 
 ### ▸ The first ingress
 
-_A signed Fathom payload lands a call with its attendees, files the transcript on everyone in the room and links it back to the call; replay it and nothing doubles. The recorder's summary arrives as a suggestion you accept into a real editable note with the transcript cited — sdk-23's ingress stops having a fixture for a customer._
+_A member pastes a Granola key, ticks two folders, and the notes in them arrive on the right meetings within fifteen minutes: the enhanced note becomes the write-up, action items wait in Review as tasks, and a note in an unticked folder never reaches the box. A webhook recorder (Fathom, tl;dv) lands the same way through sdk-23's ingress (D78)._
 
-#### `arrival-6` · afk · M — plugins/recorder — a webhook lands the transcript on the call
+#### `arrival-6` · afk · M · migration — The recorder contract — Granola on a `schedule`, a member's own key, the folders they tick (D78)
 
-**Blocked by:** `arrival-2`, `interaction-2`, `notes-5`, `sdk-23`, `sdk-8`
+**Blocked by:** `arrival-2`, `interaction-2`, `notes-5`, `sdk-23`, `sdk-8`. **Label:** `migration` — runs alone on the migration lane.
 
-_Amended 2026-10-06 (D68): the transcript edge is the artifact join `interaction_document(interaction_id, document_id, role)` that `interaction-1` creates, never a column, so this slice carries no migration; the recorder passes its match keys to `Content.logInteraction` and the writer (`interaction-2`) attaches to the calendar meeting or births a `call`. The two paragraphs and criteria below are read with that substitution; `plugins/recorder` is one contract for Fathom, tl;dv and Granola._
-
-**What to build**
-
-The first real tenant of sdk-23's ingress, which ships with a fixture payload and no customer. Fathom, tl;dv and Granola all POST a completed-meeting payload carrying participants, a transcript (body or URL) and a summary. The plugin's `verify` defers to the manifest-declared HMAC sdk-23 already checks generically in web, and `handle(payload)` returns claims: one interaction (`kind: 'call'`, `message_id` = the provider event id, so a webhook delivered twice is one call — the chaos case sdk-25 already lists), participants through arrival-2's module, and the transcript as a document filed on the matched records through sdk-8's `Content.fileDocument`.
-
-One reconciliation the spec forces. spec-storage-sources §3.1 and the integration map both describe the transcript as `derived_from → interaction`, and `link_relation` does carry `derived_from` — but `link` is entity-to-entity (src/db/schema/entities.ts) and an interaction is not an entity: it is its own table with its own id, deliberately outside the entity graph, which is why `interaction_entity` exists at all. So the edge is a column, exactly as notes-5 solved the same problem for the body: `interaction.document_id`, nullable, FK to `document.entity_id`, unique so two interactions cannot claim one transcript, with an ENTITY_REFS entry declaring both the merge strategy and the context role or entity-refs.test.ts fails naming the column. The summary is deliberately not written here — arrival-7 turns it into a suggestion.
-
-**Acceptance criteria**
-
-- [ ] No migration: the transcript is an `interaction_document` row with `role: transcript` (`interaction-1`), and a payload naming a synced meeting's iCalUID attaches to that row rather than birthing a second one
-- [ ] plugins/recorder builds to bundle.mjs + manifest.json, declares kind `ingress` with hmac-sha256, and imports @spaces/sdk only
-- [ ] The same webhook delivered twice produces one interaction and one document — dedupe is the existing `interaction_message_id_unique` index on the provider event id, not an application pre-check
-- [ ] The transcript is filed through `Content.fileDocument`, appears on every matched participant's Files tab, and storage-6a's single-writer grep test still passes
-- [ ] Participants resolve through `src/lib/arrival/participants.ts`: a recorder payload for an unknown company creates exactly what a forwarded thread would
-- [ ] A payload naming zero resolvable participants still lands the interaction and files the transcript unfiled rather than dropping the call
-- [ ] The timeline row links to the transcript in the same treatment notes-5 introduced for its note link, so no new visual vocabulary appears and this stays mergeable unattended
-- [ ] Fixture payloads for all three vendors live in plugins/recorder/fixtures and are snapshot-tested through the SDK testing kit with no database and no network
-- [ ] CONTEXT.md and docs/spec-storage-sources.md §3.1 are corrected in the same PR: the transcript edge is a column on interaction, not a `derived_from` link, because an interaction is not an entity
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
-
-**Demo** — curl a signed Fathom fixture at the plugin's webhook URL: a call appears on the company's timeline with its attendees, the transcript is on their Files tab and searchable in Cmd-K, and the transcript row links back to the call. Replay the identical payload: nothing doubles.
-
-**Spec** — CONTEXT.md — The integration map #3 (transcript as document on participant-matched people; summary as suggestion); docs/spec-plugin-sdk.md §5 (ingress kind) and §11 (Ingress); docs/spec-storage-sources.md §3.1 (derived layers / derived_from); src/db/schema/entities.ts (link is entity↔entity; link_relation carries derived_from); src/db/schema/interactions.ts (interaction is not an entity)
-
-#### `arrival-7` · afk · S — The recorder's summary is a suggestion — accept it and the call has a write-up
-
-**Blocked by:** `ai-15`, `arrival-6`, `notes-6`, `sdk-10`
-
-_Amended 2026-10-06 (D68): action items in the payload land as `task` suggestions (`interaction-1`) beside the `note` suggestion; a provider whose notes are the user's own (`notesAreMine`) fills an empty write-up directly through `interaction-2` and never reaches this path._
+_Amended 2026-10-09 (D78): rewritten. The 2026-10-06 body was a webhook-only `plugins/recorder` for Fathom, tl;dv and Granola; Granola has no webhooks and a read-only API with a key per member, so the contract gains a `schedule` transport and a share decision by folder. Webhook recorders keep sdk-23's ingress under the same contract. The transcript edge stays `interaction-1`'s artifact join, never a column._
 
 **What to build**
 
-The integration map's third item ends "summary as a suggestion that becomes the note body", and every piece of that already has an owner: ai-5 is the suggestion table with propose/accept, ai-15 owns the only server-side path that writes a note body (the markdown→BlockNote renderer it builds because `createNote` makes an empty Untitled note and `bodyMd` is produced client-side), ai-8a renders the queue, and notes-5/notes-6 own `interaction.note_id` and the lazy write-up. So this slice is wiring and nothing else: the recorder's summary becomes `suggestion(kind: 'note')` carrying the transcript in its refs, and `accept` reuses ai-15's writer, then sets `interaction.note_id` through notes-6's program so the accepted note is the call's write-up rather than a loose note in /notes.
+One recorder contract with two transports. A recorder plugin hands the host a **recorded note** — provider note id, title, start time, attendee emails, the provider's `calendar_event_id` when it has one, the enhanced summary, the raw typed notes, the transcript, a `web_url`, the folder ids it sits in, and a `deleted_at` — and the host does the rest through `Content.logInteraction` and `interaction-2`'s match: `calendar_event_id`, else start time plus attendee emails inside the 30-minute window, else it births a `call`. Fathom and tl;dv deliver it by webhook through sdk-23's ingress (HMAC verified in web, `message_id` = the provider event id); **`plugins/granola`** delivers it from a `schedule` job about every 15 minutes, paging Granola's read-only notes endpoint from a cursor in the job's state. Notes still processing are not returned by Granola and are picked up on a later run.
 
-The one case ai-15 does not have is a note suggestion whose subject is an interaction rather than a record or a document. Accept files the note `tagged_in` against the same participant set the interaction carries, links it `derived_from` the transcript document, and takes notes-6's conflict path when someone already wrote the call up by hand — the unique index on note_id is what makes that safe, and the suggestion closes as superseded rather than forking a second body.
+**A recorder is a personal connection, keyed rather than granted.** The admin installs the plugin once; each member pastes their own Granola key on You → Meeting notes (D81). The key is an `account_connection` row — `provider: 'granola'`, `product: 'notes'`, the member's Granola email — whose `tokens_enc` bundle holds `{type: 'api_key', key}` under the same connection AAD, with no expiry and no refresh, so `accessTokenFor` returns it unchanged and the row lists beside the OAuth accounts. The migration carries the three columns and the one table D78 needs, so `arrival-7` runs without one:
 
-**Acceptance criteria**
+- `account_connection.settings` jsonb, nullable: the per-connection choices a person makes — here the ticked folder ids and the two opt-ins (typed notes, transcript); the Email & calendar account page (D81: which calendars, labels to skip) is its second reader.
+- `interaction_note(interaction_id, note_id, role)`, `role` an enum `recorder_note` | `typed_notes`, primary key on the pair: the notes a meeting carries beyond its one write-up (`interaction.note_id`). `ENTITY_REFS` gains `interaction_note.note` (`repoint` on merge, context role `item` through the interaction's participants).
+- `document.visibility` (the existing `visibility` enum, default `shared`) and `document.author_id`, nullable: a transcript is a document private to the member who opted in, read through `canRead` exactly as a private note is.
 
-- [ ] The summary lands as `suggestion(kind: 'note')` with the transcript document in `refs` and a rationale naming the recorder; no note, entity or link exists before acceptance
-- [ ] Accepting writes the note through ai-15's renderer — `bodyJson` opens populated in the editor and `bodyMd` round-trips — with the accepter as author, `derived_from` to the transcript and `tagged_in` to exactly the interaction's participants
-- [ ] Accepting sets `interaction.note_id` through notes-6's program, so the timeline row stops offering "write up" and starts offering "open note"
-- [ ] An interaction that already carries a note_id makes the suggestion close without writing: the hand-written body wins, the outcome is legible in the review inbox, and exactly one note row exists afterwards
-- [ ] Rejecting writes nothing — no note, no entity, no link, no activity
-- [ ] No AI provider is required: the summary arrives from the recorder payload and this lane never calls `complete()`, asserted by a test with no provider configured
-- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+Whether one member's key can read team-shared notes is not assumed: the job reads only what that key returns.
 
-**Demo** — After a recorded call lands, the review inbox offers the recorder's summary; accept it and the call's timeline row opens a real editable note with the transcript cited, filed on everyone who was in the room.
-
-**Spec** — CONTEXT.md — The integration map #3; docs/spec-plugin-sdk.md §4 (Judgment lane: machine writes are suggestions); CONTEXT.md — The note model (interaction.note_id, lazily filled); CONTEXT.md — AI writes are suggestions, never silent
-
-### ▸ One meeting, one row
-
-_Before any recorder lands, the interaction row learns what D68 needs: a per-kind `meta` jsonb, the artifact join with a `role` that replaces the planned `interaction.document_id`, the task `suggestion_kind`, and the writer's attach-or-create rule keyed on the calendar event. Then Today's Meetings section, the meeting dialog and Prep._
-
-#### `interaction-1` · afk · M · migration — `interaction.meta`, the artifact join with `role`, the task suggestion kind — one migration (D68)
-
-**Blocked by:** `arrival-2`, `notes-5`. **Label:** `migration` — runs alone on the migration lane.
-
-**What to build**
-
-Three schema changes D67 and D68 both lean on, in one migration so the journal takes one hit. `interaction` gains `meta` jsonb, `$type`d per kind through a discriminated union in `packages/db/src/schema/interactions.ts` and read through `@spaces/core/json`: the email shape is D67's headers (`from`, `to`, `cc`, `date`, and the MIME blob sha `email-1` fills); the meeting shape is `ends_at`, `status` (`scheduled` | `cancelled`), `conference_url`, `organizer`, `recurring_instance_id` and `rsvp` as a map from participant email to `accepted` | `declined` | `tentative` | `needs_action`; the call shape is `provider_event_id` and `duration_seconds`. A new table `interaction_document(interaction_id, document_id, role)` with `role` an enum `attachment` | `transcript` | `recording_link`, primary key on the pair, carries every artifact of an interaction — `arrival-6`'s planned `interaction.document_id` is never created, and its text is amended in this slice's PR to say so. `suggestion_kind` gains `task`, whose payload is `{title, due, entity_id}` and whose accept creates a task through the existing task writer, so action items from a recorder (`interaction-2`) and from Ask (`ask-6`) share one kind.
-
-`ENTITY_REFS` gains `interaction_document.document` with an explicit merge strategy (`repoint`, the document is the entity side) and context role (`item`, hop 1 through the interaction's participants). Nothing reads `meta` yet beyond the writer's tests; the readers arrive with `arrival-5`'s rewrite, `email-1` and `arrival-11`.
+**The folder is the share decision.** The connection lists the member's Granola folders with a tick each. A note in a ticked folder is fetched and is shared with the workspace, like forwarded mail (D67); **a note outside every ticked folder is never fetched** — it does not exist in Spaces, privately or otherwise. A note that leaves every ticked folder, or comes back with `deleted_at`, removes Spaces' copy: the shared write-up or second note it became, its pending task suggestions, and its private artifacts. Unticking a folder does the same for the notes it held. What a fetched note becomes is `arrival-7`.
 
 **Acceptance criteria**
 
-- [ ] Migration `pnpm db:generate --name interaction_meta_artifacts`, SQL hand-inspected: `interaction.meta` jsonb nullable, `interaction_document` with its enum and pair primary key, `task` appended to `suggestion_kind`
-- [ ] `interaction.meta` is `$type`d as a discriminated union keyed by `kind`; a reader in `@spaces/core/json` decodes it and refuses a meeting shape on an email row at the boundary
-- [ ] `ENTITY_REFS` carries `interaction_document.document`; deleting the entry fails `entity-refs.test.ts` naming the column
-- [ ] Merging two documents repoints `interaction_document` rows to the winner, asserted through the merge snapshot
-- [ ] A `task` suggestion accepts into one task row with the accepter as creator and the suggestion closed; rejecting writes nothing
-- [ ] `arrival-6`'s body in `docs/roadmap-backlog.md` and `docs/spec-storage-sources.md` §3.1 say the transcript edge is the artifact join, not a column, in the same PR
+- [ ] Migration `pnpm db:generate --name recorder_contract`, SQL hand-inspected: `account_connection.settings` jsonb `$type`d through `@spaces/core/json`; `interaction_note` with its enum and pair key; `document.visibility` defaulting to `shared` and `document.author_id`; `ENTITY_REFS` carries `interaction_note.note` and `document.author_id` is not an entity ref (it points at `user`)
+- [ ] A Granola key pasted on You → Meeting notes writes one `account_connection` row with an `api_key` bundle; `accessTokenFor` returns the key with no refresh call, and Disconnect deletes the row and its synced copies
+- [ ] The connection lists the member's folders from the fake; ticking two writes their ids to `settings`, and the next run fetches notes from those folders only — a note in an unticked folder is never requested, asserted by the fake's request log
+- [ ] A note moved out of every ticked folder, or returned with `deleted_at`, removes the write-up or second note it filled, its open task suggestions and its private artifacts on the next run
+- [ ] A note with `calendar_event_id` attaches to the synced meeting; without it, start time plus attendee emails attach inside 30 minutes; with no match, a `call` is born — three fixtures through `interaction-2`'s writer
+- [ ] The same recorded note delivered twice (two runs, or a webhook replayed) is one interaction and one set of artifacts — dedupe on the provider note id
+- [ ] A webhook fixture for Fathom and one for tl;dv land through sdk-23's ingress under the same contract and the same assertions; `plugins/granola` declares a `schedule` job and imports `@spaces/sdk` only
+- [ ] Fixture notes for all three providers are snapshot-tested through the SDK testing kit with no database and no network; `SPACES_FAKE_PROVIDERS=1` is the only switch for Granola's fake
 - [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — Insert a meeting interaction with a cancelled status and two RSVPs through the writer's test, attach a transcript document with `role: transcript`, and read both back typed; merge the document into another and the join follows.
+**Demo** — Paste a Granola key against the fake, tick "Deals" and "Portfolio": within one run, yesterday's two meetings in those folders gain their notes, the 1:1 in "Personal" never appears, and moving one note to "Personal" at the fake removes it on the next run.
 
-**Spec** — `docs/decisions-2026-09.md` D68 (events change, the row follows; one meeting, many artifacts; action items are task suggestions) and D67 (store the email; attachments are documents); `packages/db/src/entity-refs.ts`
+**Sheets** — Meetings + Granola — printed, sheet 00 (the Granola connection); Settings — printed, sheet 05 (You → Meeting notes). **Spec** — D78 (recorders by folder; a recorder is a personal connection); D68 (one meeting, one row); D81 (You → Meeting notes); `docs/spec-plugin-sdk.md` §5 (`schedule` trigger) and §11 (ingress)
 
-#### `interaction-2` · afk · M — The writer attaches a recorder's payload to the calendar meeting, or births a `call` (D68)
+#### `arrival-7` · afk · M — What a recorded note becomes — the write-up or a second shared note, tasks from its action items, private extras (D78)
 
-**Blocked by:** `interaction-1`, `arrival-5`
+**Blocked by:** `arrival-6`, `ai-15`, `notes-6`
 
-**What to build**
-
-The one rule that makes "one meeting, one row" true, in the one writer every lane already calls: `packages/core/src/writes/interactions/write.ts`. `Content.logInteraction` gains optional match keys — `calendar_event_id`, `ical_uid`, else `starts_at` plus participant emails — and the writer decides. A key that matches an existing `meeting` row attaches: participants through the participants module are unioned onto `interaction_entity`, artifacts are added on `interaction_document` with their role, `meta` is merged, and no second row is born. A key that matches nothing births a `call` with the provider event id as `message_id`, so a webhook delivered twice is still one row through `interaction_message_id_unique`. The time-plus-participants fallback matches within a 30-minute window on `occurred_at` and requires every payload email to be among the meeting's participants; a looser match attaches a transcript to the wrong call, which is worse than a duplicate.
-
-Three D68 lines land here too. A recording is an artifact `recording_link` pointing at a document whose blob is absent and whose `external_url` is the provider's — never copied. A provider's summary is a `note` suggestion citing the transcript (`arrival-7` owns accept). A per-integration "these notes are mine" setting, read from `integration.config`, lets user-authored notes fill an empty `interaction.note_id` through `notes-6`'s program, and makes them a suggestion when a write-up exists; an AI summary never takes that path, asserted by the manifest flag the plugin must declare. The raw payload goes to `Receipts`.
-
-**Acceptance criteria**
-
-- [ ] `logInteraction` with an `ical_uid` that matches a synced meeting adds participants and artifacts to that row; `select count(*) from interaction` is unchanged
-- [ ] The same payload with no match births one `call`; delivered twice, the second write conflicts on `message_id` and the job succeeds idempotently
-- [ ] The time-and-participants fallback matches inside 30 minutes with every payload email present, and refuses when one is missing — both asserted
-- [ ] A `recording_link` artifact creates a document row with no blob and an `external_url`; the Files tab lists it with the provider's mark and "Open in <provider>", and storage-6a's single-writer grep test still passes
-- [ ] With `notesAreMine: true` in the integration config, a payload's notes fill an empty write-up as a note authored by the connection's user; with a write-up present they land as a `note` suggestion instead
-- [ ] A plugin whose manifest marks its notes `ai: true` cannot fill the write-up — the writer refuses and files a suggestion
-- [ ] Every payload is written to `Receipts` before any claim is applied
-- [ ] Full gate pass: typecheck, test, lint, prettier
-
-**Demo** — Sync a calendar meeting, then post a recorder fixture naming its iCalUID: the meeting's row gains the transcript and the attendees' names resolve to the same people. Post one with no calendar match: a call appears instead. Replay both: nothing doubles.
-
-**Spec** — D68 (recorders are plugins; the interaction writer decides); `packages/core/src/writes/interactions/write.ts`; `packages/core/src/writes/ports/content.ts`
-
-#### `arrival-11` · afk · M — Today's Meetings section with day navigation, the meeting dialog, and Prep on demand (D68)
-
-**Blocked by:** `interaction-2`, `ai-15`
+_Amended 2026-10-09 (D78): rewritten. The 2026-10-06 body made a recorder's summary a `note` suggestion to accept; D78 drops that (a card for every meeting is noise) — a note the member filed by folder lands directly, and only its action items wait in Review. Size grows S → M because the private transcript now goes through `canRead` on the document read paths._
 
 **What to build**
 
-The surface for meetings, on two sheets: **T1** (Surfaces › Today) for the section and **M2** (Surfaces › the meeting dialog) for the dialog. Today gains a Meetings section at the top of the spine: a 44px bone head "Meetings" with the mono count, day navigation as `‹ today ›` in the head's right lane, and one 40px row per external meeting that day — time, title, participants' names with the RSVP mark, the linked records as chips, and the artifact marks when a transcript or recording is on the row. Internal meetings are not stored, so nothing filters them here. The section is empty-state grey when no calendar is connected, with the one line C1 uses ("Connect Google Calendar").
+The landing rules every recorder shares, in core beside `interaction-2`'s writer, run for each recorded note `arrival-6` fetches:
 
-The dialog opens from the row and from `?modal=meeting&id=` (D74): 48px bone head with the title and time, the conference link as the one action; the body in the dialog's section grammar — participants with RSVP shown and never editable, linked records with D49's pin to add one, the write-up (open the note, or "Write up" when `note_id` is null), artifacts by role, pending suggestions for this interaction with accept and reject inline, and **Prep**. Prep runs the assembler over the linked records through the synthesize lane on demand, streams into the dialog, is never stored, and offers "Save as note" which files it against the same records through `ai-15`'s writer. The sensitivity gate applies per call: a linked record under a sensitive space routes local or refuses, and the dialog says which in the same words Ask uses (Components › "Ask · states and cards", refused state).
+- **The enhanced note becomes the meeting's write-up** when `interaction.note_id` is empty: one shared note authored by the connection's member, rendered through `ai-15`'s markdown→BlockNote writer and set through `notes-6`'s program, so the row stops offering "Write up" and offers "Open note". When a write-up exists — written by hand or by another member's recorder — it lands as **a second shared note** on the meeting (`interaction_note`, role `recorder_note`) titled "Granola notes · <member>". It is never a Review suggestion, and a hand-written write-up is never overwritten.
+- **Action items become `task` suggestions** (`interaction-1`'s kind). Granola sends them only inside the summary, so the Extract lane reads the summary and proposes one suggestion per item with the note as its ref; under the sensitivity gate a sensitive meeting extracts locally or proposes nothing.
+- **The raw typed notes and the transcript are opt-in per connection** (`account_connection.settings`), both off by default and both **private to the member**: the typed notes as a private note (`visibility: private`, `interaction_note` role `typed_notes`), the transcript as a document on `interaction_document` with `role: transcript`, `visibility: private` and `author_id` the member. The document read paths — the Files tab, the preview route, chunk search and the context assembler — learn `canRead` for documents in this slice, so a private transcript is invisible to everyone else everywhere a private note already is. The transcript is still a document under the sensitivity gate. A recording stays a link (`recording_link`, D68).
+- **`web_url` becomes "Open in Granola"** on the meeting window and the note's head.
+- **Linked records** follow the attendees through the participants module, plus the matched company's open deal (D49).
+
+The notes filed this way are set in serif with a "via Granola" mark (`arrival-13`).
 
 **Acceptance criteria**
 
-- [ ] Today shows a Meetings section for the chosen day, external meetings only, with day navigation that never leaves the route; the count in the head is the day's count and no readout repeats it
-- [ ] A row shows RSVP per participant from `meta.rsvp` and never offers to change it; "Open in Google" is the only write path
-- [ ] The dialog opens from the row and from `?modal=meeting&id=`, with one close in the foot and no `esc` or `↵` printed
-- [ ] Artifacts list by role; a `recording_link` opens the provider, a transcript opens the Files preview
-- [ ] Prep streams on demand, is not persisted, and "Save as note" creates one note filed `tagged_in` on the linked records with the user as author; opening the dialog again shows no Prep until asked
-- [ ] A linked record under a sensitive space makes Prep route local or refuse, and the dialog states which
-- [ ] Gate 5 passes; the section and dialog follow T1 and M2 and the Separation Rule heights (44 head, 40 rows, 48 dialog head)
+- [ ] A recorded note for a meeting with no write-up fills it: one note authored by the member, `interaction.note_id` set, `bodyJson` populated and `bodyMd` round-tripping
+- [ ] A second recorded note (another member's, or after a hand-written write-up) lands as an `interaction_note` with role `recorder_note`; the write-up is unchanged and no suggestion row exists
+- [ ] Two action items in a summary propose two `task` suggestions citing the note; a sensitive meeting with no local route proposes none — both asserted with the lane faked
+- [ ] With both opt-ins off, no typed notes and no transcript are stored; with them on, the typed notes are a private note and the transcript a private document, and a second user is refused both on the Files tab, the preview route, Cmd-K and the assembler — each path asserted separately
+- [ ] "Open in Granola" opens the note's `web_url`; linked records are the attendees' records plus the company's open deal
 - [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — With a calendar synced against the fake, Today lists tomorrow's two external meetings; open one, see who accepted, press Prep, read the brief, save it as a note, and find it on the company's Notes tab.
+**Demo** — After a Granola sync, open yesterday's founder call: the write-up is Granola's enhanced note with "Open in Granola", two task cards wait in Review, and the transcript you opted into is on the Files tab for you and absent for your partner.
 
-**Sheets** — Surfaces T1 (Today — Meetings), M2 (the meeting dialog, with Prep); Components "Ask · states and cards" (refused state). **Spec** — D68; D74 (deep links); `docs/design-contract.md` — a record, a ledger of a stream
+**Sheets** — Meetings + Granola — printed, sheet 00 (the meeting window: write-up via Granola, a second note, two task cards, the private transcript). **Spec** — D78 (what a synced note becomes); D68 (one meeting, many artifacts; recordings stay links); D49; `packages/core/src/read-policy.ts` (`canRead`)
 
 ### ▸ A mailbox that syncs itself
 
@@ -2451,214 +2466,6 @@ L, and it cannot split: the redaction layer cannot merge before the sync that ma
 **Demo** — Connect a mailbox against the fake and let the schedule fire: threads from after the connect time appear on the right companies with their participants and attachments, nothing older does, and a second user opening the same record sees exactly what the recorded privacy default says they should — no more, no less.
 
 **Spec** — CONTEXT.md — Email / calendar ingestion (forward-only, BYO GCP client, Google verification avoidable); CONTEXT.md — Privacy default (metadata shared, bodies restricted, per-connection exclude list, settings toggle); docs/survey-twenty-email-sync.md §5 (visibility enforced at read time) and §7.3, §7.5; docs/spec-plugin-sdk.md §14 build order step 5 (Calendar, then Gmail forward-only); docs/ARCHITECTURE.md §12
-
-### ▸ Spaces can be reshaped
-
-_Rename a space from its head, move a subtree under another parent and watch visibility, sensitivity and context follow at once, archive one and keep its filings, carve a child and move companies into it — nothing filed moves on its own (D73). Precedes every watch._
-
-#### `spaces-1` · afk · S — Rename and archive from the space head — `renameRecordProgram` wired, archive hides and pauses
-
-**Blocked by:** none
-
-**What to build**
-
-The space head on **SP1** (Surfaces › Space) carries a `···` menu — Rename · Move under… · Split into subspace… · Archive — and this slice wires the first and last. Rename calls `renameRecordProgram` (`packages/core/src/writes/entities/rename.ts`) on the space entity exactly as a record's head does; `slug` and `path` are untouched and the path is never shown. Archive is the entity's existing archive flag — `archiveRecordProgram` on the space entity, never a delete — and the readers learn it: the space picker (`lib/spaces/read.ts`), the tree on `/spaces`, the ancestor-visibility climb and the assembler's space edge all exclude an archived space, while `entity_space` filings stay and the record's rail still names the space, dimmed, so nothing filed loses its history. Watches and dismissals (`watch-1`) will read the same flag to pause. The confirm is one dialog in the dialog grammar: 48px bone head "Archive In-space manufacturing?", a body that prints the counts (filings kept, subspaces archived with it), Cancel and the pine "Archive".
-
-**Acceptance criteria**
-
-- [ ] Rename from the space head changes the name everywhere it is read and leaves `space.slug` and `space.path` as they were
-- [ ] Archiving sets the flag on the space and every descendant in one transaction; `entity_space` rows are untouched, and the archived spaces vanish from the picker, the tree and the assembler's climb
-- [ ] A record filed in an archived space still lists it in its details column, dimmed, with no action
-- [ ] The confirm prints the counts it will affect and offers one close; no `esc` printed
-- [ ] Archive is refused on the root a seeded taxonomy marks `is_seeded` only when it still holds unarchived children — the test names the case
-- [ ] Full gate pass: typecheck, test, lint, prettier
-
-**Demo** — Rename "In space mfg" to "In-space manufacturing" from its head; the breadcrumb, the picker and every filed company's rail agree at once. Archive a dead subspace: its three companies keep the filing in their history and the picker no longer offers it.
-
-**Sheets** — Surfaces SP1 (head menu). **Spec** — D73 (rename, archive, never delete)
-
-#### `spaces-2` · afk · M — Move a space — one subtree path rewrite, refused under its own descendant, one event
-
-**Blocked by:** `spaces-1`
-
-**What to build**
-
-"Move under…" in the SP1 head menu opens the space picker with the current space and its descendants excluded. The move is one program in `packages/core/src/writes/entities/` beside rename: a single `UPDATE space SET path = new_parent.path || subpath(path, nlevel(old_parent.path)), parent_id = … WHERE path <@ old_path` inside one transaction, with a unique-slug check against the new parent (`space_slug_per_parent_unique`) that refuses with a typed error naming the collision rather than renaming silently. Moving under itself or a descendant is refused before the update. One activity event on the moved space records the old and new paths.
-
-Because every consumer computes from the path at read time — ancestor visibility, sensitivity inheritance, the assembler's climb, glossary scope — nothing else is rewritten, and the test proves it: a company filed in the moved space inherits the new ancestor's sensitivity in the same request, and its context items name the new path.
-
-**Acceptance criteria**
-
-- [ ] Moving a subtree rewrites every descendant's `path` and the root's `parent_id` in one statement and one transaction; `entity_space` is untouched
-- [ ] Moving under itself or any descendant is refused with a typed error; a slug collision under the new parent is refused naming the sibling
-- [ ] Sensitivity, ancestor visibility and the assembler's position item follow the new path with no second write — each asserted on a filed record after the move
-- [ ] Exactly one activity event is written, naming both paths
-- [ ] The picker in "Move under…" excludes the space and its descendants
-- [ ] Full gate pass: typecheck, test, lint, prettier
-
-**Demo** — Move "Small-lift" from under "Launch" to under "Launch › Reusable": the breadcrumb changes, the companies filed there are now visible from the new ancestor, and flagging the new parent sensitive makes their context calls sensitive at once.
-
-**Sheets** — Surfaces SP1. **Spec** — D73 (move: one UPDATE, one event, refused under its own descendant; the path is the only derived structure)
-
-#### `spaces-3` · afk · S — Split by hand — create a child and multi-select "move here" over tag and untag
-
-**Blocked by:** `spaces-2`
-
-**What to build**
-
-Not a primitive: "Split into subspace…" in the SP1 head menu creates a child space with `createSpace` and lands on it with the parent's Companies section in multi-select mode and one action, "Move here", over the existing tag and untag writers (`lib/spaces/tag.ts`). Each chosen company gains the child filing and loses the parent's, as two explicit writes on an explicit choice — the invariant D73 states, filings never move on their own. The multi-select is the ledger's existing row checkbox with a 44px bone action bar that appears when one is checked ("3 selected · Move here"), on **SP1**. Inherited rows (via a subspace) are not offered: they are already in a child.
-
-**Acceptance criteria**
-
-- [ ] "Split into subspace…" creates the child under the current space and opens it with the parent's direct members selectable
-- [ ] "Move here" untags each chosen company from the parent and tags it in the child, one event each, through the existing writers and no new SQL
-- [ ] Rows inherited from a subspace are not selectable; the test asserts the parent's direct filings only
-- [ ] The action bar is the one bone bar at 44px with the count and the single pine verb; it disappears when nothing is selected
-- [ ] Full gate pass: typecheck, test, lint, prettier
-
-**Demo** — On "In-space manufacturing", split "Materials" out: pick Varda and Space Forge, press Move here, and both now file under Materials with their history showing the untag and the tag.
-
-**Sheets** — Surfaces SP1. **Spec** — D73 (split is create + move here; only split and merge touch filings)
-
-### ▸ A space watches
-
-_A space carries a criteria sentence; a watch row names an engine, a cadence or none, and a cursor; Run now fires the job and the Watching lane shows it live; candidates come back through `Discover` and land in Review as add-record and file-record cards under the space's head, dismissals permanent per space; signals on members fill "What's moving" (D72). Exa is the first tenant; Harmonic rides the same contract later._
-
-#### `watch-1` · afk · M · migration — `space.criteria`, `space_watch`, the two suggestion kinds — one migration (D72)
-
-**Blocked by:** `spaces-2`, `review-1`. **Label:** `migration` — runs alone on the migration lane.
-
-**What to build**
-
-The host state D72 names, in one migration. `space` gains `criteria` text, nullable, one to three sentences of "what belongs here"; the space head on **SP1** shows it as the in-place editable Criteria field (Components › "Research · Ask · Watches", criteria field) above the memo, written through a server fn that logs an activity event. `space_watch(id, space_id, integration_id, settings jsonb, cadence_minutes int null, state jsonb, last_run_at, last_status, last_error, created_by, created_at)` with `unique(space_id, integration_id, settings_hash)` so the same lens is not saved twice, and `space_watch_dismissal(space_id, domain, dismissed_by, created_at)` keyed on the pair. `suggestion_kind` gains `add_record` (payload: name, domain, aliases, evidence refs, subspace hint) and `file_record` (payload: entity id, the space, evidence) — the two cards R1 draws. `ENTITY_REFS` gains `space_watch.space` and `space_watch_dismissal.space`, both `cascade` on merge (a space merge is deferred by D73 and unions them when it lands) and `none` for context. An archived space (`spaces-1`) pauses its watches: the scheduler in `watch-2` reads the flag, so no column is needed here.
-
-**Acceptance criteria**
-
-- [ ] Migration `pnpm db:generate --name space_watch`, SQL hand-inspected: `space.criteria`, `space_watch` with its unique index, `space_watch_dismissal`, and the two enum values
-- [ ] Criteria edits in place on the space head and writes one activity event per save; empty stays empty, never a placeholder sentence stored
-- [ ] `ENTITY_REFS` carries both new columns; deleting either fails `entity-refs.test.ts` naming it
-- [ ] An `add_record` suggestion accepts through `resolveEntity`, files the new record in the space (or the hinted subspace when it exists), and fires `entity.created`; a `file_record` suggestion accepts by filing an existing record; both reject by writing the dismissal row for the domain
-- [ ] A dismissal for `(space, domain)` makes a later proposal for the same domain a database no-op, asserted with two proposals
-- [ ] Full gate pass: typecheck, test, lint, prettier
-
-**Demo** — Write a criteria sentence on a space, insert a watch row by hand, propose an add-record card for a domain, dismiss it, propose again: the second one never appears.
-
-**Sheets** — Surfaces SP1 (criteria), R1 (the two cards). **Spec** — D72 (`space_watch` is host state; criteria; dismissals permanent per space)
-
-#### `watch-2` · afk · M — The `watch` trigger and the `Spaces` port — a job runs per watch row with the D71 brief as its subject
-
-**Blocked by:** `watch-1`, `sdk-12b`
-
-**What to build**
-
-The sixth trigger. `TRIGGERS` in `packages/sdk/src/manifest.ts` gains `watch`; a watch job declares `settings` of its own (a zod schema the host renders as the watch form, the same way the plugin's settings form is generated) and `uses` that may include the new `Spaces` port and `Discover` (`watch-3`). The worker's scheduler (`apps/worker/src/plugins/`) registers one queue per watch job and enqueues per `space_watch` row: on cadence when `cadence_minutes` is set, and on "Run now" always, which is a server fn that enqueues the same job with the row id — the space's archive flag pauses both. `state` jsonb is handed to the job and written back from its return, the plugin's cursor and nothing of the host's. `job_run` rows carry the watch id so the Watching lane (`watch-4`) and the Integrations ledger can read a run log per watch.
-
-The `Spaces` port is read-only and has one call, `brief(spaceId)`: the material D71 builds for the assembler — the full path, memo, criteria, terms, the filed companies with their key values, the subspace tree with counts — rendered through `packages/core/src/writes/context/` and handed as data, never as prompt text, so an engine turns it into its own query. `canRead` applies as the integration's actor; a sensitive space anywhere in the path refuses the call, which refuses the run.
-
-**Acceptance criteria**
-
-- [ ] A manifest declaring a `watch` job with a settings schema validates; one without a settings schema is refused at manifest validation
-- [ ] The scheduler enqueues one job per `space_watch` row on its cadence; a row with `cadence_minutes = null` is never scheduled and runs only from "Run now"
-- [ ] "Run now" on a scheduled watch enqueues immediately and the next cadence tick still fires; an archived space enqueues nothing from either path
-- [ ] `state` round-trips: the job's return is written to the row and handed back on the next run; a job that throws leaves `state` as it was
-- [ ] `Spaces.brief` returns path, memo, criteria, terms, members with key values and the subspace tree, through the assembler's own builders; a fixture asserts the shape is data, not a rendered prompt
-- [ ] A sensitive space in the path refuses the brief and the run closes with the reason in `job_run`
-- [ ] Full gate pass: typecheck, test, lint, prettier
-
-**Demo** — Enable a watch fixture, add a watch on a space with no cadence, press Run now: `job_run` shows one run carrying the watch id, and the fixture's log shows the brief it received.
-
-**Sheets** — Components "Research · Ask · Watches" (watch row). **Spec** — D72 (`watch` trigger, `Spaces` port, nullable cadence, plugin-owned `state`); `docs/spec-plugin-sdk.md` §4–5
-
-#### `watch-3` · afk · M — The `Discover` port — `previewResolve`, add-record and file-record cards, permanent dismissals
-
-**Blocked by:** `watch-2`, `sdk-7b`
-
-**What to build**
-
-The hand-back. `Discover.candidate({name, domain, aliases, evidence, subspaceHint})` is the one call; the host does everything after it, in core beside the other live ports (`packages/core/src/writes/ports/`). The dismissal table is checked first — a dismissed `(space, domain)` returns without a row. Then `previewResolve` over the identity normalizers: known and already filed in this space or a descendant → dropped; known elsewhere → `file_record` card; unknown → `add_record` card with the evidence refs as the card's refs. Cards are suggestions through `proposeProgram` (`packages/core/src/writes/suggestions/propose.ts`), so migration 0057's partial unique index makes a repeated candidate a no-op. Signals a watch finds on existing members go through `Content.logSignal` as they do for Apollo, with `source_ref` from the integration row.
-
-Review (**R1**) groups the cards under a bone space head — path, `via <plugin mark>`, mono count — each card with the name, domain, the evidence refs as ref chips with their URLs, and the two verbs: pine "Add and file here" (or "File here") and ghost "Dismiss"; the tooltip on Dismiss says it is permanent for this space, which is where that sentence lives and nowhere else. Accept shows the after-state once: "Added · enriching" while `entity.created` fans out. No bulk accept.
-
-**Acceptance criteria**
-
-- [ ] A candidate already filed in the space or a descendant produces no suggestion; one filed elsewhere produces `file_record`; an unknown one produces `add_record` — three fixtures through `previewResolve`
-- [ ] A dismissed domain produces nothing and no `previewResolve` call, asserted by a spy
-- [ ] The same candidate from two runs is one open suggestion (the partial unique index), not two
-- [ ] Review groups the cards by space head with the plugin's mark and count; a card's refs open the evidence URLs
-- [ ] Accepting `add_record` creates the record through `resolveEntity`, files it (subspace hint honoured when it resolves), and emits `entity.created`; the card then shows the enrich state until the job settles
-- [ ] A `discover` fixture that tries `Facts` fails service-not-found — a watch never fills fields
-- [ ] Gate 5 passes on the card and the head
-- [ ] Full gate pass: typecheck, test, lint, prettier
-
-**Demo** — Run the watch fixture against a space holding Varda: it hands back Varda, Redwire and an unknown; Review shows one "also file Redwire here?" and one "add X?" under the space's head, and nothing for Varda. Dismiss the unknown and run again: it stays gone.
-
-**Sheets** — Surfaces R1 (Review grouped by space, the two cards); Patterns P9 (a queue grouped by head). **Spec** — D72 (`Discover`, `previewResolve`, dismissals); D61
-
-#### `watch-4` · afk · M — Space page: criteria, the Watching lane with Run now and live status, "What's moving", Today's count
-
-**Blocked by:** `watch-3`, `sdk-18`
-
-**What to build**
-
-The space page as **SP1** draws it. Head: **Add watch** as the one pine action beside the `···` menu; the watch form is generated from the watch job's settings schema in the dialog grammar (the same renderer as `sdk-20b`), with the engine chosen from the enabled integrations that declare a `watch` job, cadence as a select whose first value is "manual", and Save. Body: Criteria above the memo (`watch-1`), Companies grouped by stage with "via <subspace>" on inherited rows, the subspace tree with counts. Rail: **Watching**, one 32px row per watch — engine mark, name, cadence or "manual", last run, a live status cell over D64's stream ("running · 7 found · 6 cards"), Run now — with the empty lane naming which installed plugins can watch and the degraded row showing the mark at reduced opacity and the reason, Run now absent; **What's moving**, signals on members newest first, each cited; **Terms**. A Watching readout joins the strip only as a number (watches, open cards). Today's attention row counts the space's open cards ("6 to review in In-space manufacturing") and links to Review filtered by the space.
-
-**Acceptance criteria**
-
-- [ ] Add watch opens the generated form for the chosen engine; saving writes a `space_watch` row and the lane shows it at once
-- [ ] The Watching row streams the running job's status over the SSE channel `sdk-18` built and settles from `job_run` on reload — never from a missed notification
-- [ ] Run now enqueues the job and is present on scheduled and manual watches alike; it is absent on a degraded engine's row, which shows the reason
-- [ ] The empty lane lists installed engines that declare a `watch` job and says nothing else
-- [ ] What's moving lists signals on the space's members newest first with their refs; a signal on a record filed in a subspace appears here too
-- [ ] Today shows one attention line per space with open cards, counting only open `add_record` and `file_record` suggestions, linking to Review filtered by that space
-- [ ] Gate 5 passes; rail rows are 32px in the rail grammar and section heads 44px bone
-- [ ] Full gate pass: typecheck, test, lint, prettier
-
-**Demo** — Add an Exa watch to "In-space manufacturing" with no cadence, press Run now, watch the row go running → done with "7 found · 6 cards", see the six on Today's attention row, and read the two signals on Varda under What's moving.
-
-**Sheets** — Surfaces SP1, T1 (attention row), R1; Components "Research · Ask · Watches"; Patterns P11 (rail lanes that stream). **Spec** — D72; D64
-
-#### `watch-5` · afk · M — plugins/exa — the watch job: webset from the brief, cursor in `state`, candidates and signals
-
-**Blocked by:** `watch-3`, `backfill-12`
-
-**What to build**
-
-`plugins/exa` gains a second job, `watch`, beside `backfill-12`'s record action. Its settings schema is the criteria override (defaults to the space's) and a per-run cap. On first run it calls `Spaces.brief`, builds a webset query from the memo, criteria and the exemplar companies' domains, creates the webset through `Http` and stores its id in `state`; later runs page the webset from the stored cursor. Each result goes to `Discover.candidate` with the hit URLs as evidence; a result whose domain is already a member becomes a signal through `Content` instead. No `Facts`, no `Identity`: the Layer refuses them. Cassettes for the webset create, page and empty-page calls live beside the plugin's existing ones; the suite runs with no network. Harmonic is explicitly not built: this slice proves the host contract is enough for a second engine by keeping Exa's code free of any space-table knowledge.
-
-**Acceptance criteria**
-
-- [ ] `plugins/exa` declares a `watch` job with a settings schema and `uses: ['Config','Http','Spaces','Discover','Content','Log','Receipts']`; grep shows no Exa special case in core or the worker
-- [ ] First run creates one webset from the brief and stores its id; the second run pages from the cursor and creates no second webset — asserted against cassettes
-- [ ] A result for a member domain writes one signal with the hit as its ref; a non-member goes to `Discover`; the cap stops the run at the configured count with the cursor saved
-- [ ] A `Facts` reach fails service-not-found; `Identity` likewise
-- [ ] The raw responses are written to `Receipts`; Exa's own error text surfaces on failure
-- [ ] Full gate pass: typecheck, test, lint, prettier
-
-**Demo** — Enable Exa, add a watch to a space, Run now against the cassettes: a webset is created, seven results come back, six become cards under the space's head and one becomes a signal on a member.
-
-**Spec** — D72 (Exa first tenant; Harmonic rides the same contract); `docs/spec-plugin-sdk.md` §4 worked example
-
-#### `enrich-1` · afk · M — Apollo gaps — a cleared value is user-held, `Content` for signals, relationships fill only when empty, targeted auto-enrich scope replaces `autoEnrich`
-
-**Blocked by:** `watch-3`, `graph-1`
-
-**What to build**
-
-Four gaps D72 recorded against the shipped Apollo path, none needing schema. First, `setValuesInTx` (`packages/core/src/writes/attributes/values.ts`) treats a cleared value as user-held: `lastWriters` records the clearing actor, and `Facts.fill` skips a slug whose last writer is a user even when the value is now empty — today it refills it. Second, `Content` joins Apollo's `uses`, and the enricher logs funding and hiring events as signals with the receipt as ref, which is what fills "What's moving" for a space that watches nothing yet. Third, a relationship value (`companies`, `founders`, the pairs `rel-1` makes) fills only when empty; when a value exists and differs, a card is proposed instead of a write. Fourth, the per-integration on/off `autoEnrich` becomes a scope — `deal` (a record with an open deal), `space` (filed in a chosen space), `meeting` (a participant of a synced meeting) — evaluated by the `entity.created` dispatcher (`sdk-19`) and by a `filed` event this slice adds to the emitter beside `entity.created`, so an accepted add-record card enriches when its space is in scope and a stray import does not. The Integrations ledger (**I1**) shows the scope words in the row and the credits used.
-
-**Acceptance criteria**
-
-- [ ] Clearing a value by hand then running Apollo leaves it empty; the test asserts `lastWriters` names the user and the fill skipped the slug
-- [ ] A funding event in a cassette writes one signal on the company with the receipt id as its ref and no attribute write
-- [ ] An empty `companies` on a person fills; a differing one proposes a card and writes nothing — both asserted
-- [ ] `autoEnrich: true|false` in existing integration configs is read as scope `deal` for `true` and none for `false`, so no config migration is needed; the settings form offers the three scopes as checkboxes
-- [ ] The emitter fires `filed` after an `entity_space` insert commits (skipped for `seed` and `import`), and the dispatcher enriches a record filed into an in-scope space once
-- [ ] I1 shows the scope and credits used on the Apollo row
-- [ ] Full gate pass: typecheck, test, lint, prettier
-
-**Demo** — Clear a company's headcount, re-run Enrich: it stays cleared. Accept an add-record card into a space in Apollo's scope: the record is enriched within the second and its funding round appears as a signal.
-
-**Sheets** — Surfaces I1 (Integrations row: scope, credits). **Spec** — D72 (Apollo gaps); D65 (the emitter); `packages/core/src/writes/attributes/values.ts`
 
 ### ▸ Struck 2026-10-06
 
@@ -2720,7 +2527,9 @@ The other half is the one that is easy to drop: unmatched items are the sourcing
 
 ## 24. Cmd-K finds, Ask answers
 
-_Spaces v1 · 8 slices · added 2026-10-06, bodies 2026-10-06_
+_Spaces v1 · 9 slices · added 2026-10-06, bodies 2026-10-06, amended 2026-10-09_
+
+_Amended 2026-10-09 (D70 amended 10-08, D77): the palette's answer stage is removed — ⌘K only finds, and Tab or ⌘J hands to **Ask docked** as a 408px third column, with `/ask` as the full page over one thread store (`ask-5`); the page you are on is the default scope and view and file chips join (`ask-7`); an undecided card waits in Review (`ask-6`); Cmd-K's empty state shows the page's own actions only, a passage previews its page, and an action that needs one more answer asks it in the palette (`ask-3`, `ask-4`). `ask-8` splits: **Find** in Ask (`ask-8a`) follows `watch-3`, **Save as watch** (`ask-8b`) follows `watch-4`. The canvas is now Cmd-K — printed and Ask — printed, sheets 00–06; K1 and A1 are superseded where they differ._
 
 The Attio-class chat layer, as D70 and D71 decided it: Cmd-K regrouped into a finder with a preview pane; Ask as a second, in-process client of the MCP tool surface, with `query_records` first so external agents gain from it before any chat UI exists; threads, citations, action cards, `@space` scoping over D71's position and peers, and a plugin's MCP server mounted when its manifest declares one (D72). Independent of 25; either may run first. The canvas: Surfaces **K1** (Cmd-K), **A1** (Ask, two stages), Components **"Ask · states and cards"**, Patterns **P10** (a palette with a preview pane).
 
@@ -2778,6 +2587,8 @@ _Jump to, Actions with printed keys and the record's own verbs first, Records le
 
 **Blocked by:** none
 
+_Amended 2026-10-09 (D70 amended 10-08): with nothing typed the palette shows only the page's own actions — no recent items; an action that needs one more answer (File in a space…) asks it in the same palette, the input's mode label naming the action and ⌫ on an empty input returning to Find; Tab hands the typed text to Ask docked (`ask-5`), never to an answer inside the palette._
+
 **What to build**
 
 The palette as **K1** draws it. Four groups in order: **Jump to** (objects, saved views, settings pages), **Actions** (verbs with their printed keys — only our bindings, `L`, `G T`, never `esc` or `↵` — contextual: on a record its own verbs first, Log interaction, Write email, Move stage), **Records** (the lexical fused search statement from `@spaces/core` only, fuzzy on `canonical_name` and aliases, so a typed name puts that record first), **Passages** (SPA-129's semantic lane, second wave after typing pauses, places to go and never answers). A result row is 36px with the kind glyph, the name in ink, the path or object in graphite, and the printed key right. The foot is one mono line: navigate · actions on this result · open · **Tab → Ask**; Tab hands the typed text to Ask (`ask-5`), which until then opens the existing `/ask`-less state as "Ask is coming" — no, until `ask-5` lands the foot omits Tab, so nothing is printed that does not work. Empty: "Nothing found" with the one pine "Ask it" once `ask-5` exists. Passages loading shows the group head with a running mark, never a spinner row.
@@ -2789,16 +2600,20 @@ The palette as **K1** draws it. Four groups in order: **Jump to** (objects, save
 - [ ] On a record route the Actions group lists the record's verbs first with their keys; on Today it lists the global verbs
 - [ ] Passages arrive as a second wave after the typing pause and appear under their own head; the head carries a running mark while pending
 - [ ] No `esc`, `↵` or ⌘K is printed anywhere in the palette; the foot lists only our bindings
+- [ ] With nothing typed on a record, the palette lists that record's actions only; on a page with no actions of its own it shows only the input until something is typed, and never recent items
+- [ ] File in a space… asks for the space in the same palette with the mode label `FILE IN ›`; ⌫ on the empty input returns to Find with the query restored
 - [ ] Gate 5 passes; rows are 36px, groups separated by bone heads at 44px
 - [ ] Full gate pass: typecheck, test, lint, prettier
 
 **Demo** — Press ⌘K on a deal, type "hal": Jump to offers Deals, Actions offers Move stage `M`, Records puts Halcyon Grid first, and a moment later Passages offers a deck page.
 
-**Sheets** — Surfaces K1 (stage B, full width); Patterns P10. **Spec** — D70 (Cmd-K is the finder)
+**Sheets** — Cmd-K — printed, sheets 00–03 (kit, opened on a record, typed, the action's second step); Patterns P10. **Spec** — D70 (Cmd-K is the finder) and its 2026-10-08 amendment
 
 #### `ask-4` · afk · S — The preview pane — a record's readout and key fields, an object's views and counts
 
 **Blocked by:** `ask-3`
+
+_Amended 2026-10-09 (D70 amended 10-08): a highlighted **passage** previews too — its page rendered with the matched text set off — and ↵ opens the file viewer at that page. The palette is a window over the scrim, so it carries the solid shadow, not the dithered one._
 
 **What to build**
 
@@ -2808,6 +2623,7 @@ K1's stage A: when a Records or Jump to result is highlighted, the palette widen
 
 - [ ] Highlighting a record shows its strip and six filled attributes; empty attributes are not listed
 - [ ] Highlighting an object shows its views and counts from the directory loader
+- [ ] Highlighting a passage shows its page with the matched text and ↵ opens the file viewer at that page
 - [ ] The pane does not open for settings pages and closes when the highlight leaves a previewable row
 - [ ] Preview data is fetched once per id per palette session, asserted by a request counter
 - [ ] Gate 5 passes; the scrim is bone-deep and the pane follows the readout variant B
@@ -2815,67 +2631,85 @@ K1's stage A: when a Records or Jump to result is highlighted, the palette widen
 
 **Demo** — ⌘K, type a company, arrow down to it: the strip and key fields appear right; arrow to Deals under Jump to: its three saved views and counts appear instead.
 
-**Sheets** — Surfaces K1 (stage A). **Spec** — D70 (preview pane)
+**Sheets** — Cmd-K — printed, sheets 02 and 03 (record preview, passage preview). **Spec** — D70 (preview pane) and its 2026-10-08 amendment
 
 ### ▸ Ask answers
 
-_The same palette after Tab, plus a thread view: every claim cited, "Save as note", action cards applied as the user, `@space` and `@record` scoping, the sensitivity gate per call, private threads._
+_Ask docked beside the page and the full `/ask`, one thread store: every claim cited, "Save as note", action cards applied as the user, the page as the default scope, the sensitivity gate per call, private threads; then Find in Ask over a plugin's tools, and Save as watch._
 
-#### `ask-5` · afk · M — Threads and the Ask surface — an in-process MCP client, citations, Save as note (D70)
+#### `ask-5` · afk · M · migration — Threads and Ask docked — an in-process MCP client, citations, `/ask`, Save as note (D70)
 
 **Blocked by:** `ask-1`, `ask-3`, `ai-15`
 
+_Amended 2026-10-09 (D70 amended 10-08, owner): Ask is **docked** — a 408px third column beside the page — plus the full `/ask` page, over one thread store. The palette's answer stage (A1 stage A) is removed: ⌘K only finds, and Tab or ⌘J opens the dock. Answers are in sans. The turn's context is frozen when it is asked; the turn states grow to stopped, refused (no local route), no provider, connection lost and empty; a scope change inside a thread leaves a line; an answer whose cited source the reader can no longer read is hidden and leaves a line. Undecided cards wait in Review (`ask-6`). Amended again 2026-10-09 (D70 layout): the dock closes completely and resizes 360–560px; `/ask` reads in a 760px column with a collapsible thread list and tables that break out; your turn is right-aligned, the answer left with no box._
+
 **What to build**
 
-Ask is a second client of the MCP tool surface, in process: the agent loop runs in web's server fns (Effect-first, through `effectFn()`), calls the registered tools (`search_records`, `get_record`, `get_context`, `query_records`, the portfolio tools, `propose`) through the same registry `apps/web/src/lib/mcp/server.ts` exposes externally — one tool set, one `canRead`, one sensitivity gate — and streams the turn over the SSE channel D64 opened. Tables: `ask_thread(id, user_id, title, created_at)` and `ask_turn(id, thread_id, role, body_md, refs jsonb, calls jsonb, ai_run_id, created_at)` — a migration, carried here because nothing else needs these rows. Threads are private to their author and are not entities: no mentions, no search hits, no `entity` row. Every turn is an `ai_run` under the daily cap; the gate per call comes from what was retrieved, routing local or refusing, and the turn says which.
+Ask is a second client of the MCP tool surface, in process: the agent loop runs in web's server fns (Effect-first, through `effectFn()`), calls the registered tools (`search_records`, `get_record`, `get_context`, `query_records`, the portfolio tools, `propose`) through the same registry `apps/web/src/lib/mcp/server.ts` exposes externally — one tool set, one `canRead`, one sensitivity gate — and streams the turn over the SSE channel D64 opened. Tables: `ask_thread(id, user_id, title, created_at)` and `ask_turn(id, thread_id, role, body_md, refs jsonb, calls jsonb, scope jsonb, ai_run_id, created_at)` — a migration, carried here because nothing else needs these rows. A turn stores the scope and the context it was asked with, **frozen**: reopening a thread shows what that turn saw, not what the page holds now. Threads are private to their author and are not entities: no mentions, no search hits, no `entity` row. Every turn is an `ai_run` under the daily cap; the gate per call comes from what was retrieved, routing local or refusing, and the turn says which.
 
-Surface, on **A1**: stage A is the palette after Tab (or ⌘J) — the query carried over, a scope chip row (`ask-7` fills it), the serif answer streaming with every claim cited as the existing ref chips (`doc:…#n`, `note:…`, `record:…`), the call strip under it naming each tool called with its state, the foot with **Save as note** (ghost) and **Open thread**; the answer ends in the `Sources n · pinned ›` footer (D74) that expands to the ranked ledger. Stage B is `/ask`: a 260px bone thread rail (private threads, newest first, rename in place, delete with a confirm that prints counts), the thread with day separators, the composer with ⌘↵ as the one printed key. Four doors: Tab from Cmd-K, ⌘J anywhere, the `Ask` nav row (`G A`), and "Ask about this" in a record's or a space's `···` menu. "Save as note" writes the answer through `ai-15`'s renderer with the user as author, filed `tagged_in` on the records the answer cited.
+**Ask docked** (Ask — printed, sheets 00–04 and 09): a column on the right of any page, the page still usable beside it — 408px by default, resized by dragging its left edge between 360 and 560px, and closed completely by ⌘J or its × (no rail; the sidebar row or ⌘J reopens it, the thread intact); width and open state are remembered per browser. **Alignment:** your turn is a bone block with a hairline, right-aligned, at most three quarters of the column, its time under it; the answer has no box and sits left at full measure, ending in a foot naming the model and the sources; a scope change is a centred mono divider. A table in an answer scrolls sideways inside its card, with "Open in /ask ›". Head: the thread title and the scope chips (`ask-7`); body: turns, the answer **in sans** streaming with every claim cited as ref chips (`doc:…#n`, `note:…`, `record:…`), the call strip under it naming each tool with its state, **Stop** while it streams; foot: the composer with ⌘↵ as the one printed key, **Save as note** (ghost) and **Open in /ask**. The answer ends in the `Sources n · pinned ›` footer (D74). **Turn states:** reading, computing, answered, stopped, sensitive (routed local), refused (no local route), capped, no provider (with "Add a model ›", D80), connection lost (retry), empty (nothing found, with what was searched).
+
+**`/ask`** (sheets 05–08): the thread reads in a 760px column centred in the space left, and tables (Find results, query rows) break out to the full content width; the thread list collapses from its head and "Threads" brings it back. The thread list is grouped by day, each row with its scope and its outcome (cards applied, saved as note), rename in place, delete with a confirm that prints counts; a thread opened full width with day separators; **Open beside <record>** hands the thread back to the dock on that record. A **scope-change line** marks where the scope moved inside a thread. When a turn cites a source the reader can no longer read, its answer is hidden and a line says so ("An answer here cited something you can no longer see"); nothing else of the thread changes.
+
+**Doors:** Tab from Cmd-K (the typed text carried), ⌘J anywhere, the **Ask** row under Search in the sidebar and `/ask`, and "Ask about this" in a record's or a space's `···` menu. "Save as note" writes the answer through `ai-15`'s renderer with the user as author, filed `tagged_in` on the records the answer cited.
 
 **Acceptance criteria**
 
 - [ ] Migration `pnpm db:generate --name ask_threads`, SQL hand-inspected; `ask_thread` and `ask_turn` reference `user` and `ai_run` and carry no entity row — a test asserts a thread is not found by search or mentions
 - [ ] A turn calls tools through the same registry the external MCP server uses, asserted by a spy on the registry; no second tool table exists
 - [ ] Every sentence of the answer that states a fact carries a ref; the renderer refuses an unreferenced claim block in a test fixture
-- [ ] The gate: a turn whose retrieval touched a sensitive record routes local or refuses, and the turn's call strip names which
+- [ ] A turn's scope and context are stored with it; changing the record's values after the turn does not change what the reopened turn shows
+- [ ] The gate: a turn whose retrieval touched a sensitive record routes local or refuses, and the call strip names which; with no provider the turn shows "Add a model ›"
+- [ ] Stop ends the stream and the turn reads "stopped" with what had arrived; a dropped connection reads "connection lost" with retry
 - [ ] Each turn writes one `ai_run`; the daily cap refuses the turn with the cap state shown
 - [ ] Save as note creates one note with the user as author, the cited records tagged, and the answer's refs preserved
-- [ ] All four doors open Ask: Tab carries the typed text, ⌘J opens empty, `G A` lands on `/ask`, and the record menu sets the scope chip
+- [ ] ⌘K never renders an answer; Tab opens the dock with the typed text, ⌘J opens it empty, the sidebar row and `/ask` land on the page, and the record menu sets the scope chip
+- [ ] A thread whose cited note became private to someone else hides that answer behind the line for the reader; the author of the note still sees it
+- [ ] `/ask` lists threads by day with scope and outcome; Open beside <record> opens the dock on that record with the thread
+- [ ] The dock resizes between 360 and 560px and closes with ⌘J or ×; width and open state survive a reload; closing keeps the thread
+- [ ] `/ask` keeps the thread at 760px and lets a table run the full content width; the thread list collapses and reopens
+- [ ] Your turns render right-aligned on bone with a hairline; answers render left with no box
 - [ ] Threads are listed only for their author; another user's request for the id is refused
-- [ ] Gate 5 passes; A1's two stages are followed, no `esc` or `↵` printed, Send is ⌘↵ only inside the field
+- [ ] Gate 5 passes; answers are sans, no `esc` or `↵` printed, Send is ⌘↵ only inside the field
 - [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — ⌘K, type "which Series A deals have gone quiet", Tab: the answer streams with each deal cited, the strip shows `query_records` and the stats call, Save as note files it; open `/ask` and the thread is there, and only there for you.
+**Demo** — On a deal, press ⌘J and ask "which Series A deals have gone quiet": the dock streams the answer in sans with each deal cited and `query_records` in the strip; Save as note files it; open `/ask`, find the thread under today, and Open beside the deal.
 
-**Sheets** — Surfaces A1 (stages A and B), K1 (Tab); Components "Ask · states and cards" (turn lifecycle, call strip, answer blocks, thread states, sources footer). **Spec** — D70 (Ask is the agent; one client of the tool surface; threads private); D74 (sources footer); `docs/spec-ai-substrate.md` §5–6
+**Sheets** — Ask — printed, sheets 00 (anatomy), 02 (turn states), 04 (ways in and out), 05 (`/ask`), 06 (`/ask` states: lost access, scope-change line), 07–08 (`/ask` layout: aligned turns, list open and collapsed, a table breaking out), 09 (the dock resized and closable); Shell — printed, sheet 01 (Ask docked). **Spec** — D70 (Ask is the agent; one client of the tool surface; threads private) and its 2026-10-08 amendment; D74 (sources footer); D80 (no provider); `docs/spec-ai-substrate.md` §5–6
 
 #### `ask-6` · afk · M — Action cards — propose create task, move stage, file into a space; applying writes as the user
 
 **Blocked by:** `ask-5`
 
+_Amended 2026-10-09 (D70 amended 10-08): a card left undecided when the thread is closed is not lost — it waits in **Review** as the suggestion it already is, grouped under its thread, and the outcomes are five: proposed, applied, skipped, left undecided → Review, conflict. "Save as watch" is `ask-8b`'s card._
+
 **What to build**
 
-The agent proposes; the user applies. A turn may return cards beside its answer, each a suggestion-shaped proposal rendered from the eight-card catalogue on the Components sheet: **create task** (`task` kind, `interaction-1`), **move stage**, **file into a space**, **log signal**, **note**, **draft email** (`email-6`, when it exists), **add record** and **save as watch** (`ask-8`). Each card shows the proposal, its evidence refs and one pine **Apply**; applying runs the same server fn a person would — the task writer, the stage move, the tag insert — as the user, so provenance is the user and the activity log says so. Three outcomes render once: applied, skipped, not applied on conflict (the stage already moved, the record already filed). A card is never applied by the agent, and the `propose` tool stays the path for attribute patches, which land in Review as today.
+The agent proposes; the user applies. A turn may return cards beside its answer, each a suggestion-shaped proposal rendered from the eight-card catalogue on the Components sheet: **create task** (`task` kind, `interaction-1`), **move stage**, **file into a space**, **log signal**, **note**, **draft email** (`email-6`, when it exists), **add record** and **save as watch** (`ask-8b`). Each card shows the proposal, its evidence refs and one pine **Apply**; applying runs the same server fn a person would — the task writer, the stage move, the tag insert — as the user, so provenance is the user and the activity log says so. Outcomes render once: applied, skipped, not applied on conflict (the stage already moved, the record already filed), and **left undecided**, which keeps the card open in Review under a head naming its thread. A card is never applied by the agent, and the `propose` tool stays the path for attribute patches, which land in Review as today.
 
 **Acceptance criteria**
 
 - [ ] A turn's cards render from the catalogue with evidence refs; a card without refs is refused by the renderer
 - [ ] Apply on create task makes a task through the existing writer with the user as creator; on move stage, one stage event by the user; on file into a space, one `entity_space` row with `source: 'ai'` and the user as actor — each asserted
 - [ ] A conflicting apply (stage already there, already filed) renders "not applied" and writes nothing
+- [ ] A card neither applied nor skipped when the thread closes appears in Review under its thread's head and applies from there with the same writer
 - [ ] Attribute proposals still go through `propose` to Review, never as a card — asserted
 - [ ] Gate 5 passes; cards follow the component sheet, one pine verb each
 - [ ] Full gate pass: typecheck, test, lint, prettier
 
 **Demo** — Ask "who have we not spoken to in sixty days in Climate": the answer lists four companies and offers a task card per company; apply two, skip two, and Tasks shows the two with you as creator.
 
-**Sheets** — Components "Ask · states and cards" (eight-card catalogue, three outcomes). **Spec** — D70 (action cards; AI still only proposes)
+**Sheets** — Ask — printed, sheet 03 (eight card kinds, five outcomes). **Spec** — D70 (action cards; AI still only proposes) and its 2026-10-08 amendment
 
 #### `ask-7` · afk · M — Scoping — `@space` and `@record`; the assembler's position, peers and space-as-seed (D71)
 
 **Blocked by:** `ask-5`
 
+_Amended 2026-10-09 (D70 amended 10-08): **the page you are on is the default scope** — Ask opened on a record, a space or a saved view starts scoped to it, and the chip is removable for the whole workspace. Two chips join `@space` and `@record`: a **view chip** (the rows of the saved view the page shows, through `query_records` with the view's conditions) and a **file chip** (one document, its chunks seeded first). A web chip appears when a plugin's tools are mounted (`ask-8a`). The body and criteria below are edited to match._
+
 **What to build**
 
-Two halves. The assembler half, in `packages/core/src/writes/context/` and the pure ranker: a **position** item per filed space naming its full path; a capped **peer set** — other companies filed in the same leaf space ranked by stage and recency, each with its key values — as candidates that compete for the budget; and **a space as the subject**: when the seed is a space, the assembler returns its subspace tree with counts, memos, companies grouped by stage, and terms. `canRead` applies, and a sensitive space anywhere in a path keeps the call sensitive, as the resolver already does. The Ask half: `@` in the prompt opens the mention popover (Components sheet) over spaces and records; a chosen scope becomes a chip in the row and narrows retrieval to the scope and the assembler's seed to it — `@space` makes `query_records` take the descendant-inclusive condition by default. Scope is optional and the default is the whole workspace; the chip reads as a narrowing, never as a mode.
+Two halves. The assembler half, in `packages/core/src/writes/context/` and the pure ranker: a **position** item per filed space naming its full path; a capped **peer set** — other companies filed in the same leaf space ranked by stage and recency, each with its key values — as candidates that compete for the budget; and **a space as the subject**: when the seed is a space, the assembler returns its subspace tree with counts, memos, companies grouped by stage, and terms. `canRead` applies, and a sensitive space anywhere in a path keeps the call sensitive, as the resolver already does. The Ask half: `@` in the prompt opens the mention popover (Components sheet) over spaces and records; a chosen scope becomes a chip in the row and narrows retrieval to the scope and the assembler's seed to it — `@space` makes `query_records` take the descendant-inclusive condition by default. Scope defaults to the page: on a record, a space, a saved view or a file the first chip is that page, already set; on Today or `/ask` there is none and the turn searches the whole workspace. A **view chip** passes the view's conditions to `query_records`; a **file chip** seeds the assembler with that document. Every chip is removable, and the chip reads as a narrowing, never as a mode.
 
 **Acceptance criteria**
 
@@ -2883,40 +2717,74 @@ Two halves. The assembler half, in `packages/core/src/writes/context/` and the p
 - [ ] Peers are capped and ranked, come only from the same leaf space, and lose to higher-ranked items under a tight budget — asserted with the ranker's test budget
 - [ ] A space seed returns tree, memos, members by stage and terms; a sensitive descendant makes the call sensitive
 - [ ] `@` opens the popover; a chosen space sets the chip and the turn's `query_records` calls carry the space condition with descendants
-- [ ] With no chip the turn searches the whole workspace; the chip is removable and the next turn is unscoped
+- [ ] Opened on a record, a space, a saved view or a file, the dock starts with that page's chip set; removing it makes the next turn workspace-wide, and on Today there is no default chip
+- [ ] A view chip runs `query_records` with the view's conditions; a file chip seeds the assembler with the document's chunks first
 - [ ] Full gate pass: typecheck, test, lint, prettier
 
 **Demo** — Ask "@Hydrogen what do we believe about this market, and who is thin": the answer names the thesis from the memos, lists the companies by stage, and points at the subspace with one member.
 
-**Sheets** — Surfaces A1 (scope chip); Components "Ask · states and cards" (@ mention popover). **Spec** — D71; D70 (scoping)
+**Sheets** — Ask — printed, sheet 01 (context chips: page, record, space, person, view, file, web); Components "Ask · states and cards" (@ mention popover). **Spec** — D71; D70 (scoping) and its 2026-10-08 amendment
 
-#### `ask-8` · afk · M — A plugin's MCP server in Ask — manifest `mcp`, vault key, throttle and cap, sensitivity unmount, Save as watch (D72)
+#### `ask-8a` · afk · M — Find in Ask — a plugin's MCP server mounted, Exa's results as a table, Add · File here · Dismiss (D72, D77)
 
-**Blocked by:** `ask-6`, `watch-4`
+**Blocked by:** `ask-6`, `ask-7`, `watch-3`, `backfill-12`
+
+_Added 2026-10-09 (D77): the first half of the old `ask-8`. Find needs only the two card kinds and `previewResolve`, so it follows `watch-3` and no longer waits for the Watching lane._
 
 **What to build**
 
-A manifest may declare `mcp: {url, auth}`; when the integration is enabled, Ask mounts that server's tools for the turn, keyed from the vault through `Secrets`, proxied through the Http throttle and D53's credit cap, and attributed to the integration in `ai_usage`. A turn whose context holds a sensitive space unmounts every plugin server before the first call and the call strip shows the cell as `unmounted`. Hits from a plugin tool are web results and are rendered as such — a URL chip, never a record chip — and the only crossing into the graph is a card: **add record** (through `watch-3`'s `Discover` path, so dismissals and `previewResolve` apply) and **save as watch**, which writes a `space_watch` from the turn's scope and the query with no cadence, as "Save as note" promotes an answer. Enabling Exa lights the watch, the record action and the Ask tools from one integration row (**I1** shows all three).
+**Mounting.** A manifest may declare `mcp: {url, auth}`; when the integration is enabled, Ask mounts that server's tools for the turn, keyed from the vault through `Secrets`, proxied through the Http throttle and D53's credit cap, and attributed to the integration in `ai_usage`. A turn whose scope holds a sensitive space unmounts every plugin server before the first call — **a sensitive scope never reaches Exa** — and the call strip shows the cell as `unmounted`. Ask uses Exa's fast search for a question (seconds, approximate); websets are for watches (`ask-8b`, `watch-5`).
+
+**Find.** A question that asks who matches a description ("rental software startups in India") answers as a **results table, not prose**: name, domain, one line, place, two or three source links, and a "via <plugin>" column. Each row is checked against what is held through `watch-3`'s `Discover` path: filed in the scoped space → greyed; held elsewhere → **File here**; unknown → **Add**, with **Add and file here** in its menu when a space is in scope; dismissed for this space → hidden. **Dismiss** is permanent per (space, domain). Adding runs `resolveEntity` and D76 enrichment follows ("added · enriching"); a result is a web result until it is added, and finding never creates a deal. The table folds past twelve rows ("+13 more · 2 hidden"). The same domain found by a watch and by a question is one open card (`watch-3`).
+
+**The door.** **Find companies** joins the space head (`spaces-4`): it opens Ask docked with the space and the web in scope, the question prefilled from the space's criteria. ⌘J asks from anywhere. Enabling Exa lights the watch, the record action and the Ask tools from one integration row.
 
 **Acceptance criteria**
 
 - [ ] A manifest with `mcp` validates; its tools appear in the turn's call strip with the provider's mark when the integration is enabled, and vanish when disabled or breaker-tripped
 - [ ] The key comes from the vault and is never sent to the browser; calls go through the throttle and the credit cap, and the cap refuses with the cap state
 - [ ] A sensitive scope unmounts plugin tools before any call; the strip cell reads `unmounted` and the fixture's spy sees zero calls
-- [ ] A plugin hit renders as a URL chip; an add-record card from it goes through `Discover` and respects dismissals
-- [ ] Save as watch writes one `space_watch` with `cadence_minutes = null` for the scoped space and the turn's query as settings; with no `@space` scope the card is absent
+- [ ] A find returns a table whose rows are classified through `Discover`: a filed row is greyed, a held one offers File here, an unknown one Add (and Add and file here with a space in scope), a dismissed one is hidden and counted
+- [ ] Add creates the record through `resolveEntity`, files it when chosen, and the row reads "added · enriching" until the job settles; no deal is created
+- [ ] Dismiss writes the (space, domain) dismissal; the same domain never appears in a later find or watch for that space
+- [ ] Find companies on a space head opens the dock with the space and web chips and the criteria prefilled
 - [ ] `ai_usage` attributes the turn's plugin calls to the integration
 - [ ] Full gate pass: typecheck, test, lint, prettier
 
-**Demo** — Enable Exa, ask "@In-space manufacturing who is new this month": the strip shows `exa.search`, three web hits appear as URL chips, two become add-record cards, and Save as watch leaves a manual watch on the space.
+**Demo** — On Property ops press Find companies: the dock opens scoped to the space and the web, the criteria prefilled; the table lists fourteen operators, Leasewise greyed, Keyhold offering File here; Add two, dismiss one, and the two are filed and enriching.
 
-**Sheets** — Surfaces A1, I1; Components "Ask · states and cards" (strip cell states, save-as-watch card). **Spec** — D72 (Ask mounts a plugin's MCP server); D53; D70
+**Sheets** — Enrichment + Exa — printed, sheet 04 (Find in Ask: the results table; the Find companies button); Ask — printed, sheet 01 (web chip). **Spec** — D77 (Find lives in Ask; results as a table; fast search for a question); D72 (Ask mounts a plugin's MCP server); D53; D70
+
+#### `ask-8b` · afk · M — Save as watch — a turn becomes a weekly watch on a space, and its untouched results become cards (D77)
+
+**Blocked by:** `ask-8a`, `watch-4`
+
+_Added 2026-10-09 (D77): the second half of the old `ask-8`, after the Watching lane exists._
+
+**What to build**
+
+**Save as watch** on a Find turn turns the question into a `space_watch`. **It needs a space:** the scope's space is preselected; from a turn with none, a picker asks which space and offers to create one named from the question. It opens a window prefilled from the turn — engine, name, **Look for** (the question; blank when it equals the space's criteria), **How often** (**Weekly** when saved from Ask; Manual stays first in the list), **At most** per run — and Save writes the row, creating the webset on its first run (`watch-5`). **The turn's results are carried, not repeated:** rows added are already members, rows dismissed are dismissals, and **rows left untouched become `add_record` cards** in Review under the space. The thread keeps a line linking to the watch ("Saved as a watch on Property ops"), which says so if the watch is later deleted. The same space, engine and settings is refused as **"Already watching this"** (D72's unique index) and opens the existing watch instead.
+
+**Acceptance criteria**
+
+- [ ] Save as watch from a scoped turn preselects the space; from an unscoped turn it asks for one and can create a space named from the question
+- [ ] The window is prefilled; How often defaults to Weekly here and Manual on the space page (`watch-4`)
+- [ ] Saving writes one `space_watch`; the turn's untouched rows become `add_record` cards under the space, added rows create nothing new, dismissed rows stay dismissed — asserted on a fixture turn with all three
+- [ ] The thread shows "Saved as a watch on <space>" linking to it, and "watch deleted" after it is removed
+- [ ] Saving the same space, engine and settings again opens the existing watch with "Already watching this" and writes nothing
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — After finding operators in Pune, Save as watch: the window reads Property ops, Weekly, at most 25; save, and the nine rows you did not touch wait in Review under Property ops while the thread links to the new watch.
+
+**Sheets** — Enrichment + Exa — printed, sheet 04 (the Save as watch window). **Spec** — D77 (Save as watch; consolidation by result); D72 (`space_watch`, the unique index)
 
 ---
 
 ## 25. Email — viewed, shared, tracked, composed
 
-_Spaces v1 · 9 slices · added 2026-10-06, bodies 2026-10-06_
+_Spaces v1 · 9 slices · added 2026-10-06, bodies 2026-10-06, amended 2026-10-09_
+
+_Amended 2026-10-09 (D67 amended 10-08): `email-1` renders inline `cid:` images; `email-6` carries Bcc, never linked to records. The canvas is Email — printed, sheets 00–05._
 
 D67's surface over `arrival-10`'s sync: the email stored rather than only its text, attachments as documents, the three privacy layers through `canRead`, interaction stats as read-only view columns, drafts, send through Gmail, variables and the `email` template kind. The canvas is Surfaces **E1–E8** (interactions ledger, viewer, inline draft, compose and review, drafts, templates, Team panel, person field editors), re-read 2026-10-06 against the Separation Rule; the Interactions tab lives in the D74 record body (**O1** shows it open).
 
@@ -2928,6 +2796,8 @@ _Headers, the raw MIME as a blob, a sanitized HTML viewer in a sandboxed iframe,
 
 **Blocked by:** `arrival-10`, `interaction-1`. **Label:** `migration` — runs alone on the migration lane.
 
+_Amended 2026-10-09 (D67 amended 10-08): **inline images carried inside the stored MIME (`cid:` parts) render** in the viewer — showing them loads nothing. Remote images still never load; the viewer counts them ("2 remote images not loaded") and keeps each at its size with a dithered placeholder. `meta` carries `bcc` on a sent email (`email-6`)._
+
 **What to build**
 
 Store the email, not only its text. The Gmail syncer and the forwarding lane both write the email shape of `interaction.meta` (`interaction-1`): `from`, `to`, `cc`, `date`, and `mime_sha`, the content-addressed blob of the raw MIME written through the blob backend (`packages/core/src/writes/storage/`) — the migration here is the `blob` reference the sha needs if the blob table's refcount is a column, else none; the slice carries the label so the journal is serialised either way. The viewer (**E2**) renders the HTML part sanitized (DOMPurify server-side, remote images blocked, links rewritten to open in a new tab) inside a sandboxed iframe with no scripts and no form submission; the plain-text part is the fallback; the body note stays the searchable, AI-readable text and is unchanged. The viewer opens from the Interactions tab row and from `?modal=email&id=` (D74), 48px bone head with subject and date, the participants row, the body, and the artifacts (`email-2`) below.
@@ -2936,6 +2806,7 @@ Store the email, not only its text. The Gmail syncer and the forwarding lane bot
 
 - [ ] Both lanes write `meta` with the four header fields and the MIME sha; the raw MIME is a blob keyed by its sha and shared when two mailboxes hold the same message
 - [ ] The viewer's iframe is `sandbox` with no scripts, no forms, no remote images; a fixture with a tracking pixel and a script renders neither — asserted on the sanitized output
+- [ ] A `cid:` image in the MIME renders inline from the stored parts; remote images are counted in one line and each keeps its size as a placeholder
 - [ ] Links open in a new tab with `rel="noopener"`; `mailto:` links open the composer (`email-6`) when it exists, else nothing
 - [ ] `?modal=email&id=` opens the viewer over the Interactions tab; one close in the foot, nothing printed
 - [ ] The body note is unchanged by this slice — search and the assembler read what they read before
@@ -2944,7 +2815,7 @@ Store the email, not only its text. The Gmail syncer and the forwarding lane bot
 
 **Demo** — Open a synced email from a company's Interactions tab: the HTML renders with its formatting, the tracking pixel never loads, and the raw MIME is one blob even though two partners' mailboxes hold the thread.
 
-**Sheets** — Surfaces E1 (ledger row), E2 (viewer). **Spec** — D67 (store the email); D74 (deep links)
+**Sheets** — Email — printed, sheets 01 (rows) and 02 (viewer window: inline chart, blocked signature logo); Surfaces E1, E2. **Spec** — D67 (store the email; inline images, amended 10-08); D74 (deep links)
 
 #### `email-2` · afk · M — Attachments are documents on the artifact join; the Files preview opens them; "has attachments"
 
@@ -3044,15 +2915,18 @@ _Drafts author-private and local, four modes with threading headers, recipients 
 
 **Blocked by:** `email-1`. **Label:** `migration` — runs alone on the migration lane.
 
+_Amended 2026-10-09 (D67 amended 10-08): a draft carries **To, Cc and Bcc**. Cc and Bcc open from the address block and stay closed when empty; a Bcc chip reads as hidden. Bcc recipients are never linked to records the way To and Cc are, so a Bcc stays hidden everywhere — on the sent interaction, in participants and in interaction stats._
+
 **What to build**
 
-`email_draft(id, user_id, mode, in_reply_to_id, to jsonb, cc jsonb, subject, body_md, attachments jsonb, updated_at)`: author-private, local only, never synced to Gmail drafts. Modes are new, reply, reply-all and forward; reply modes carry `in_reply_to_id` so send (`email-7`) sets `In-Reply-To` and `References` from the parent's `meta`. The composer (**E3** inline under a thread, **E4** full) is the dialog grammar: recipients as chips searched over people and their email aliases, the chip picking which alias, a new address accepted and passed through the participants module at send; subject; the body editor; attachments from the record's documents or an upload. Autosave on a debounce; the drafts count in the account menu (**E5**) opens the drafts list; Trash deletes the row. The one printed key is ⌘↵ inside the body to send.
+`email_draft(id, user_id, mode, in_reply_to_id, to jsonb, cc jsonb, bcc jsonb, subject, body_md, attachments jsonb, updated_at)`: author-private, local only, never synced to Gmail drafts. Modes are new, reply, reply-all and forward; reply modes carry `in_reply_to_id` so send (`email-7`) sets `In-Reply-To` and `References` from the parent's `meta`. The composer (**E3** inline under a thread, **E4** full) is the dialog grammar: recipients as chips searched over people and their email aliases, the chip picking which alias, a new address accepted and passed through the participants module at send; subject; the body editor; attachments from the record's documents or an upload. Autosave on a debounce; the drafts count in the account menu (**E5**) opens the drafts list; Trash deletes the row. The one printed key is ⌘↵ inside the body to send.
 
 **Acceptance criteria**
 
 - [ ] Migration `pnpm db:generate --name email_draft`, SQL hand-inspected; drafts are listed only for their author
 - [ ] Reply and reply-all prefill recipients from the parent's `meta` (reply-all minus the user's own aliases); forward prefills nothing but the quoted body and the attachments
 - [ ] Recipient search matches people by name and by alias; choosing a person with two aliases offers the pick on the chip
+- [ ] Cc and Bcc open from the address block and are closed when empty; a Bcc recipient is never written to `interaction_entity` or the stats when the email is sent, asserted through `email-7`'s writer fixture
 - [ ] Autosave writes after the debounce and never on every keystroke; closing and reopening restores the draft
 - [ ] Trash deletes the row; the account menu's count follows
 - [ ] Gate 5 passes; E3 and E4 are followed, ⌘↵ is the only printed key
@@ -3060,11 +2934,13 @@ _Drafts author-private and local, four modes with threading headers, recipients 
 
 **Demo** — Reply to a founder from the viewer: recipients are prefilled, type three lines, close the dialog, see "1 draft" in the account menu, reopen it and the text is there.
 
-**Sheets** — Surfaces E3 (inline draft), E4 (compose), E5 (drafts). **Spec** — D67 (drafts; recipients)
+**Sheets** — Email — printed, sheets 03 (reply all, forward), 04 (new email with Bcc open), 05 (drafts); Surfaces E3, E4, E5. **Spec** — D67 (drafts; recipients; Bcc, amended 10-08)
 
 #### `email-7` · afk · M — Send through the Gmail plugin with `gmail.send`; the outgoing interaction at once; Message-ID dedupe
 
 **Blocked by:** `email-6`, `arrival-10`
+
+_Amended 2026-10-09 (D67 amended 10-08): send puts the draft's Bcc on the outgoing message; the outgoing interaction keeps it in `meta.bcc`, shown only as hidden chips, and it never reaches the participants (`interaction_entity`) or the interaction stats — a Bcc recipient is linked to no record._
 
 **What to build**
 
@@ -3282,6 +3158,789 @@ The third writer, and the only probabilistic one. `suggestion_kind` gains `super
 **Sheets** — Surfaces R1 (card). **Spec** — D59 (suggested at intake; never written automatically)
 
 ---
+
+## 27. Instrument, printed — the decided design lands
+
+_Design port · 13 slices · written 2026-10-09_
+
+The canvas pass of 2026-10-07 → 10-09 closed with the owner's verdicts: "Instrument, printed" adopted whole (double rule, ink stamp, real tabs, dither as data and as popover elevation), sidebar A with a collapsible Library group (D68 amended), Settings grouped by whose it is (D81), Today as the one attention surface (D79) and a first run without a checklist (D80). None of it is code yet. This project ports it: the kit first, because every later surface draws with it; then the shell; then Settings, Today and the first run. No slice here runs `db:generate`. The Ask panel's placement is `ask-5`'s (amended) and the Meetings page is `arrival-12`'s; this project only leaves them their rows.
+
+### ▸ The printed kit
+
+_A page head prints its double rule and its stamp, a tab bar has real tabs, a menu lifts on a dithered shadow while a dialog lifts on a solid one, and a long page's head folds to a 40px bar as you scroll — on every shipped route at once, because the primitives draw it._
+
+#### `print-1` · afk · M — Printed primitives — the double rule, the ink stamp, real tabs
+
+**Blocked by:** none
+
+**What to build**
+
+Three details from the Foundations direction sheet, each a primitive so no route spells it by hand. **The double rule** (2px ink, 2px gap, 1px ink) replaces the single hairline under `PageHeader` and `RecordHeader` (`apps/web/src/components/page-header.tsx`, `apps/web/src/components/record/record-parts.tsx`) — page and record heads only, never a section. **The ink stamp**: an ink label with cut ends (`COMPANY C-0231`, `SPACE · depth 2`), mono caps on hairline, one per page, beside the crumb; an archived record's stamp is the same shape in outline with its date. **Real tabs**: a new `Tabs` primitive in `apps/web/src/components/ui/tabs.tsx` — the open tab is paper with cut shoulders joining the body below it, the others sit on the bone bar, each with its mono count, empty ones graphite at 0 — the tab head D74's record body and the space page both need; `import-wizard.tsx`'s hand-built tablist moves onto it. The shapes go in `apps/web/src/styles.css` as named utilities (`double-rule`, `stamp`, `stamp-outline`) so gate 5 keeps working; a raw `clip-path` or border stack spelled in a route is what the utility exists to prevent.
+
+**Acceptance criteria**
+
+- [ ] Every `PageHeader` and `RecordHeader` draws the double rule; no section head, dialog or rail does — a render test asserts both
+- [ ] `Stamp` renders the cut-end label; `archived` draws it in outline with the date; one per page, asserted on the record and the space head
+- [ ] `Tabs` is keyboard-complete (←→, Home/End, `role="tablist"`, `aria-selected`), the open tab joins the body with no rule under it, and an empty tab stays visible at 0
+- [ ] The import wizard's steps render through `Tabs` with no visual change beyond the tab shape
+- [ ] No new type step or colour; the utilities live in `styles.css` and `instrument/vocabulary` passes
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Open Flent: the double rule under its name, `COMPANY` stamped beside the crumb. Archive a custom record: the stamp turns to outline with the day.
+
+**Sheets** — Foundations "Instrument, printed — direction 10-07" (01 double rule, 02 stamp, 03 tabs); "Spaces — printed" 01. **Spec** — `DESIGN.md` §1, §4 (the printed details); `docs/design-contract.md` §1
+
+#### `print-2` · afk · S — Elevation by kind — dithered under a popover, solid under a window
+
+**Blocked by:** `print-1`
+
+**What to build**
+
+Today every lifted sheet takes a hard offset shadow: 2px for popovers (`apps/web/src/styles.css`, the BlockNote and picker rules), 3px for dialogs (`apps/web/src/components/ui/dialog.tsx`). The verdict splits them by what they are. **A popover, menu, picker or palette** (no scrim) lifts on a 4px 1-bit ink shadow at Bayer 8/16 — the same 4×4 matrix `apps/web/src/components/dither.tsx` already uses, exported as an SVG data-URI utility `shadow-dither` rather than a second generator. **A dialog or window** (over the scrim) keeps a solid ink offset, because dither under a scrim nearly vanishes. The rule lives in the primitives: `Popover`, `DropdownMenu`, `Select`, `command.tsx` and the BlockNote menus take `shadow-dither`; `DialogContent` and the confirm keep the solid shadow. No call site passes a shadow.
+
+**Acceptance criteria**
+
+- [ ] `shadow-dither` is one utility in `styles.css`, generated from the Bayer table in `dither.tsx`, never hand-drawn per site
+- [ ] A test lists the primitives and asserts which shadow each draws: popover-kind → dithered, window-kind → solid; a `shadow-[…]` in a route fails gate 5
+- [ ] The dither is never under text — the sheet's paper covers it, and the shadow sits outside the 1px ink edge
+- [ ] Reduced motion is unaffected (the shadow never animates)
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Open a row's `···` menu: it lifts on a dithered shadow. Open Record a mark: the dialog sits on a solid one over the scrim.
+
+**Sheets** — Foundations "Instrument, printed — direction 10-07" (04 dither is data); "Cmd-K — printed" K1. **Spec** — `DESIGN.md` §4 Depth, the Dither Rule; the elevation rule agreed 2026-10-08
+
+#### `print-3` · afk · S — The sticky head — a page or record head folds to a 40px bar on scroll
+
+**Blocked by:** `print-1`
+
+**What to build**
+
+On a page or record taller than the viewport, the head folds to one 40px bar once its title scrolls out: the title at the ui step in serif, the stamp, and the head's own actions with their key hints; the readout strip and the double rule leave with the rest. An `IntersectionObserver` on the title flips a data attribute; the bar is always mounted and enters on `transform`/`opacity` only (180/120ms), so nothing below it moves (the No-Shift Rule) and reduced motion simply shows or hides it. It sits on `z-sticky` and isolates like the record table's head. `PageHeader` and `RecordHeader` own it; no route opts in.
+
+**Acceptance criteria**
+
+- [ ] Scrolling past the title shows the 40px bar with title, stamp and actions; scrolling back hides it — no layout shift, asserted by a test that the body's offset never changes
+- [ ] The bar's actions are the head's own buttons (one hotkey binding, not two)
+- [ ] Transform and opacity only; `prefers-reduced-motion` drops the transition
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Scroll Flent's Interactions tab: the head folds to a thin bar with "Flent", the stamp and Log interaction · Task · Move stage.
+
+**Sheets** — "Shell — printed" 03 (list head and sticky record head). **Spec** — `DESIGN.md` §5 Interaction Engineering (No-Shift, Compositor); owner verdict 2026-10-08
+
+### ▸ The shell
+
+_The sidebar reads Today, Tasks, Spaces, then Library ▾ (Notes, Files), Objects ▾ with an inline "▸ 3 more", Capital ▸; five starred spaces under Spaces; Upload and Settings are icons on the account row; the active row is a tab cut into the page._
+
+#### `shell-1` · afk · M — Sidebar A — the Library group, Documents becomes Files, overflow, starred spaces, the account row
+
+**Blocked by:** `print-1`
+
+**Chords** (D68 amended, 2026-10-09): Notes `G N`, Meetings `G E`, Files keeps `G L`; `G M` stays Mandate and `G F` Portfolio.
+
+**What to build**
+
+`NAV_ITEMS` (`apps/web/src/components/app-sidebar.tsx`) gains a fourth group, `library`, between `work` and `objects`: `NAV_GROUP_IDS = ['work', 'library', 'objects', 'capital']`. Work is Today, Tasks, Spaces; Library is Notes and Files. **Documents becomes Files**: the row's label, the route (`/files`, with `/documents` answering one 301 the way `review-1`'s `toReview` does, query string kept — Today's Unfiled cell links `?filed=unfiled`), the page title and every user-facing "Documents" string; the `document` table and code names stay. Library, Objects and Capital are collapsible headings (▾/▸, with the row count when folded), state per browser like table prefs. Custom objects past the first three fold into an inline `▸ n more` that expands in place — never a dropdown. **Starred spaces**: up to five under Spaces, then `▸ more`; a star toggles from the space head's `···`, kept per browser in localStorage beside table prefs (no table; it does not follow the user across devices, and that is accepted for now). Counts only on Tasks. The foot: the Upload row and the account menu's Settings become two icon buttons on the account row (tooltips "Upload", "Settings · G ,"); the menu keeps Keyboard and Sign out. The active row is a tab cut into the page edge: paper, its right edge crossing the chassis hairline so it joins the page (the No-Bar Rule still holds). The collapsed 48px chassis keeps marks only; the collapsed rail shows no group headings. The Ask row (`ask-5`) and Meetings row (`arrival-12`) are added by those slices — one row each.
+
+**Acceptance criteria**
+
+- [ ] `nav-grammar.test.ts` holds the four groups in order, the Library contents, and one chord per page; the Documents-on-`G L` test is rewritten for Files
+- [ ] `/documents` and `/documents?filed=unfiled` redirect to `/files` with the query intact; no user-facing "Documents" string remains (grep in the PR)
+- [ ] Library, Objects and Capital fold and remember per browser; a folded group shows its count
+- [ ] Five starred spaces show under Spaces in star order, a sixth folds behind `▸ more`; unstarring from the head removes the row at once
+- [ ] Upload and Settings are icon buttons with `aria-label`s on the account row; `G ,` still opens Settings
+- [ ] The active row joins the page edge with no pine bar and no layout shift between rows
+- [ ] The ⌘K Go list and the keyboard sheet follow the new `NAV_ITEMS` order with no edit of their own
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Fold Library and Capital; star Property ops from its head and see it under Spaces; press `G L` and land on Files; open an old `/documents?filed=unfiled` link and land on the same filtered list.
+
+**Sheets** — "Shell — printed" 00 (sidebar A, with the owner's overflow notes), "Meetings + Granola — printed" 02 (Library ▾). **Spec** — D68 amended (Library group); `docs/design-contract.md` §3 "The nav grammar"; `apps/web/src/components/nav-grammar.test.ts`
+
+#### `shell-2` · afk · S — Pinned saved views under their object
+
+**Blocked by:** `shell-1`
+
+**What to build**
+
+A saved view (`view` table, `packages/db/src/schema/views.ts`) can be pinned from the `ViewBar`'s view menu; pinned views list under their object's row in the sidebar, indented one step, at most three per object then `▸ n more`. The pin is per browser in localStorage keyed by view id, like starred spaces, so no schema; a pinned id whose view was deleted or became unreadable drops silently on the next render. The row links to the object list with the view selected (`?view=`), the same URL `useViewState` already reads.
+
+**Acceptance criteria**
+
+- [ ] Pin/unpin from the view menu; the sidebar shows pinned views under their object in pin order, three then a fold
+- [ ] A deleted or private-to-someone-else view never renders and is pruned from storage
+- [ ] The row's link opens the list with that view applied, round-tripping through `useViewState`
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Pin "Seed, India" on Companies; it appears under Companies and opens the filtered list in one click.
+
+**Sheets** — "Shell — printed" 00. **Spec** — owner verdict 2026-10-08 (pinned views approved); `apps/web/src/components/views/`
+
+### ▸ Settings by whose it is
+
+_Settings takes over the sidebar with You, Workspace, AI and Integrations; a toggle saves itself, typed fields share one Save bar; a member opens Models and reads it instead of a locked page; your accounts are filed by what they do; Plugins is a catalogue._
+
+#### `settings-1` · afk · M — The settings IA — four groups, new paths, settings takes the sidebar
+
+**Blocked by:** `shell-1`
+
+**What to build**
+
+`SETTINGS_GROUP_IDS` (`apps/web/src/components/settings/settings-nav.tsx`) becomes `['you', 'workspace', 'ai', 'integrations']` with crumbs You · Workspace · AI · Integrations, and `SETTINGS_SECTIONS` takes D81's list. Paths follow the labels, because the path is what a person reads and pastes: `/settings/general` (was `workspace`, gains Base currency from `/settings/currency`), `/settings/models` (Providers and Routing from `ai.tsx`), `/settings/search` (was `embeddings`), `/settings/usage` (keeps its path; label "Usage & limits", Caps moves here from `ai.tsx`), `/settings/email-forwarding` (was `arrival`), `/settings/plugins` and `/settings/plugins/$integrationId` (was `integrations`), `/settings/connection-apps` (the OAuth clients, split out of `connections.tsx`). Every old path answers one redirect, as `review-1` did. You holds Connections and API tokens until `settings-3` replaces Connections. Settings takes over the sidebar: on `/settings/*` the chassis shows `‹ Settings` (back to the last app page, `esc` too) over the settings nav, instead of the two navs side by side; below `md` the strip behaviour stays. The Enrichment row arrives with the D76 enrichment-page slice, one row.
+
+**Acceptance criteria**
+
+- [ ] `settings-nav.test.ts` holds the four groups, their order and one path per row; every row's eyebrow is its group's crumb
+- [ ] Each old path (`workspace`, `ai`, `embeddings`, `arrival`, `integrations`, `integrations/$id`, `currency`'s base-currency block) lands on its new home, asserted per path
+- [ ] Models shows Providers and Routing; Usage & limits shows the run log and Caps; General shows Base currency; Currency & FX shows rates only
+- [ ] Connection apps lists the OAuth clients for an admin; Connections no longer draws them
+- [ ] On a settings route the chassis is the settings nav with `‹ Settings`; `esc` returns to the page settings was opened from
+- [ ] `pnpm generate-routes` run; full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Press `G ,`: the sidebar becomes You · Workspace · AI · Integrations. Open an old `/settings/embeddings` bookmark: you are on Search. `esc` returns you to Flent.
+
+**Sheets** — "Settings — printed" 00 (the map and the nav), 01 (General in the shell), 08 (Connection apps, Currency & FX). **Spec** — D81; `docs/design-contract.md` §3 "A settings section"; `apps/web/src/components/settings/settings-nav.test.ts`
+
+#### `settings-2` · afk · M — One way to save, confirms where it breaks something, members read admin pages
+
+**Blocked by:** `settings-1`
+
+**What to build**
+
+Four page behaviours D81 makes uniform, built into `SettingsSection` and `SettingsRow` (`apps/web/src/components/settings/settings-section.tsx`) so a page cannot opt out. **Saving**: a switch, checkbox or select writes at once with a toast; typed fields (names, hosts, ports, keys) register with a section-level form context, and one Save bar at the page foot — mono "n changes", Discard, pine Save `⌘↵` — appears only while one is dirty. The per-block Save buttons in `arrival-section.tsx`, `connections-section.tsx` (OAuth client) and the AI key editors go. **Confirms** through `useConfirm` on four acts that break something outside the page, each naming the consequence: revoking an API token, suspending a member, archiving an object, unticking an identity key. **Members read admin pages**: the loaders that return empty for a member (`settings/ai.tsx` and its siblings) call member-safe reads that return the same shapes with every secret redacted (`●●●● 7Hq2` becomes `set`), and the page renders with controls disabled under one line in the head, "Only admins can change this · ask <admin names>"; the nav drops the `admin` lane lock. Write server fns keep `requireAdmin()` unchanged. **No footer caption strips**: the grey paragraphs at the foot of settings pages are removed; a line survives only for cost, privacy or irreversibility, beside its control.
+
+**Acceptance criteria**
+
+- [ ] Toggling a switch saves without a button; editing a text field shows the Save bar with the count, and Discard restores the stored values
+- [ ] No settings page renders more than one Save control (a render test walks the routes)
+- [ ] Each of the four acts asks first and names its consequence; Keep takes focus
+- [ ] A member opens Models, Search, Plugins and Email forwarding and sees values with secrets redacted and every control disabled; a write attempt still refuses server-side
+- [ ] No settings page ends in a caption paragraph (grep for the removed strings in the PR)
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — As a member, open Models: the providers and routing read, nothing edits, the head says whom to ask. As admin, rename the workspace: the Save bar appears; toggle Secure on the mailbox: it saves alone.
+
+**Sheets** — "Settings — printed" 01 (Save bar), 09 (asks and the member's view). **Spec** — D81 (saving, confirms, read-only members, no footer strips); `docs/design-contract.md` §1 The Commentary Rule
+
+#### `settings-3` · afk · M — You, by job — Email & calendar, Files, Meeting notes, and an account page
+
+**Blocked by:** `settings-2`
+
+**What to build**
+
+Connections becomes three pages under You, grouped by what an account does. The model underneath stays D66's: one `account_connection` row per (user, provider, product, account) with its own consent (`apps/web/src/lib/connections/products.ts`). That already makes "disconnect stops one job" true; what is new is the grouping and the last-job rule — disconnecting a product deletes its row, and the provider's revoke endpoint is called only when it was that account's last product row. **Email & calendar** (`/settings/email-calendar`): one row per provider account holding a `gmail` or `calendar` product, its products as words ("Mail · Calendar"), a Default mark on the account new email sends from (the earliest-connected mail account; choosing another needs a stored preference and is `email-7`'s, which is the first sender), sync state, `Options ›`; Connect Google / Connect Microsoft below; the workspace's Bcc address read-only with Copy and "Email forwarding ›". **Files** (`/settings/files`): storage accounts (`drive`, `box`, more than one allowed), each with its sync state and `Options ›`. **Meeting notes** (`/settings/meeting-notes`): recorder connections; the page renders empty until `arrival-6` lands Granola's key-based row. A provider whose plugin is not installed shows **Install ›** to an admin and "Ask an admin" to a member. **The account page** (`Options ›`): which products this account is used for (ticking one runs the incremental consent `storage-2b` already built), per-product choices that exist (calendars to sync, labels to skip — rendered from the plugin's per-connection settings when it declares them, else omitted), last sync, Sync now, Disconnect. `/settings/connections` redirects to Email & calendar.
+
+**Acceptance criteria**
+
+- [ ] A Google account with Gmail and Calendar rows shows once on Email & calendar; its Drive row shows on Files under the same email
+- [ ] Disconnecting Drive deletes that row only and does not call Google's revoke while a Gmail or Calendar row for the account remains; disconnecting the last one revokes — both asserted against the fake IdP
+- [ ] Ticking Calendar on the account page runs the incremental consent and adds the product row without re-granting Drive
+- [ ] An uninstalled provider shows Install › to an admin and "Ask an admin" to a member
+- [ ] `/settings/connections` redirects; API tokens is unchanged
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Connect Google for Gmail, then from Files connect Drive on the same account: one consent screen asks only for Drive. Disconnect Drive: Gmail keeps syncing.
+
+**Sheets** — "Settings — printed" 05 (Email & calendar, Files, Meeting notes, the account page, API tokens). **Spec** — D81 (accounts by job; a connection per product underneath, Google's revoke when the account's last product goes); D66 (a connection per product); `apps/web/src/lib/connections/`
+
+#### `settings-4` · afk · M — Plugins as a catalogue, and one page per plugin
+
+**Blocked by:** `settings-2`
+
+**What to build**
+
+`/settings/plugins` becomes Installed (the existing ledger, `apps/web/src/components/integrations/integration-ledger.tsx`: toggle, mark, name and version, its jobs, status and the one number that matters — credits, signals, people connected — and `Open ›` or `Update`) then **Available** from `registry.json` through `apps/web/src/lib/integrations/registry.ts`, with tabs by job and a count each. Jobs need a field the manifest lacks: `@spaces/sdk` gains an optional `roles` array (`enrichment` · `research` · `email-calendar` · `files` · `meeting-notes` · `import` · `feeds`) — a minor, as D39's `Import` port was — and the registry entry carries it so Available groups before install. **The plugin page** (`/settings/plugins/$integrationId`) is one template: status and version, the workspace key, what it sends out of the box (from the manifest's `requires`), the manifest settings form (`integration-settings.tsx`, unchanged), what it switches on — each a link to the page that owns that capability (Enrichment, Search, a space's Watching lane, Ask), never a copy of its settings — recent runs and errors from `job_run`, Disable and Uninstall.
+
+**Acceptance criteria**
+
+- [ ] `roles` validates as optional; a manifest without it still loads and lands under an "Other" tab only when one exists
+- [ ] Available lists registry entries not installed, grouped by role tabs with counts; Install runs the existing installer
+- [ ] Every installed plugin's page renders the same seven blocks; a capability block links to its owning page and holds no setting of its own
+- [ ] Recent runs read `job_run` for that integration, newest first, with the provider's own error text
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Open Plugins: Apollo, Exa, Google installed; Airtable and RSS under Available's Import and Feeds tabs. Open Apollo: credits, what it sends ("domain only"), its settings, "Fills company fields — Enrichment ›".
+
+**Sheets** — "Settings — printed" 07 (the catalogue); "Enrichment + Exa — printed" 01 (Apollo's thin source page). **Spec** — D81 (every plugin has its own page; Plugins is a catalogue); D51; `packages/sdk/src/manifest.ts`
+
+#### `settings-5` · afk · S — Models carries the sensitivity floor, Search reuses its key, the Embed row leaves
+
+**Blocked by:** `settings-1`
+
+**What to build**
+
+Three D81 lines on two AI pages. **Sensitivity**: a group at the top of Models — "Treat every record as: Normal / Sensitive" — writing `workspace.settings.sensitivity_default` (already read by `resolveSensitivity` through `packages/core/src/writes/ai/sensitivity-for.ts`; nothing writes it today). It is a floor and can only raise a record's sensitivity; the head's mono meta says so. **Search reuses the Models key**: when no `embedding` credential is stored for the chosen provider and an `llm` credential exists for the same provider, the embed path uses it, and Search shows "using the OpenAI key from Models" with "Use a different key"; a provider with no embeddings (Anthropic) still asks. **The Embed row** leaves the Models routing grid (`AI_LANES` keeps `embed` for the router; the grid filters it), replaced by one line "Embeddings · <model> · set in Search ›".
+
+**Acceptance criteria**
+
+- [ ] Choosing Sensitive writes the floor; a record marked normal then routes as sensitive, asserted through the resolver
+- [ ] With only an OpenAI `llm` key, Test on Search succeeds and the page names the reused key; adding an embedding key takes precedence
+- [ ] The routing grid has no Embed row and shows the link line instead
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Set the floor to Sensitive and ask about Flent: the answer comes from Ollama. Clear the embedding key: Search keeps working on the Models key.
+
+**Sheets** — "Settings — printed" 03 (Models, Sensitivity group), 04 (Search). **Spec** — D81; `docs/spec-ai-substrate.md` §9; `packages/db/src/schema/workspace.ts` (`sensitivity_default`)
+
+#### `settings-6` · afk · S — The workspace logo
+
+**Blocked by:** `settings-1`
+
+**What to build**
+
+General gains a Logo row: Upload and Remove beside a 48px preview, the monogram (the workspace name's initial in an ink square) when none. The file goes through the existing blob storage (`packages/core/src/writes/storage/`) and its sha is stored at `workspace.settings.logo` — the settings jsonb already admits extra keys (`WorkspaceSettings`), so no migration. The sidebar head shows the logo or monogram beside the workspace name instead of the wordmark alone, collapsed too. Images only, 1 MB cap, refused with the reason.
+
+**Acceptance criteria**
+
+- [ ] Uploading a PNG or SVG stores the blob and the sha; Remove clears both; the head updates without reload
+- [ ] With no logo the sidebar shows the monogram; collapsed, the 24px mark
+- [ ] A 3 MB file or a PDF is refused with the reason
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Upload the fund's logo in General: it appears at the top of the sidebar.
+
+**Sheets** — "Settings — printed" 01. **Spec** — D81 (General); owner verdict 2026-10-08 (logo built with the settings port)
+
+### ▸ Today and the first run
+
+_Today opens on a plain title, the day strip, four derived readouts and one Needs-you list sorted by urgency; a fresh workspace instead offers Import a file, Drop a deck, Add a company, and every feature missing a key says so where you would use it._
+
+#### `today-1` · afk · M — Today, the one attention surface (D79)
+
+**Blocked by:** `print-1`
+
+**What to build**
+
+`apps/web/src/routes/_app/today.tsx` rewritten to the Today sheet. **Head**: a plain "Today" title with the date (`Thu 10-09 · W41`); the sentence title and the `GettingStarted` banner go. **Day strip**: a thin band of today's hours — elapsed hours dithered, meetings as ink blocks with their names, now as a pine dot — drawn from the day's meeting interactions; with no calendar it draws the hours only. **Readouts**, derived only: Overdue, Deals past stage median, Oldest mark, Unfiled files (the section counts Due today, Review and Missing FX leave the strip). **Notices band**, one line each with its fix link, for what stops the machine: a stopped plugin (`listStoppedPlugins`, replacing `PluginStatusSection`), a connection in `error`, and — when D76's enrichment slices land — the enrichment cap. **Needs you**: one ledger sorted by urgency with a 48px mono kind lane — `task`, `deal` (idle past median), `mark` (stale), `review` (open suggestions grouped by source and space: "Proptech / Property ops · via Exa · 3 to add"), `meeting` (no write-up, with **Write**) — tabs in the head filter by kind, the list folds at eight with "show all ›", and its last row is the task composer. A kind whose source does not exist yet is simply absent: `meeting` until `arrival-5`/`arrival-11`, `review` grouping by watch until `watch-3`. **Meetings**: `arrival-11`'s section moves here unchanged with "all meetings ›" to `arrival-12`'s page when that exists. **Rail**: Portfolio (`PortfolioHeadlineRail`) and What's moving — `signal` rows on the user's companies from the last 7 days, cited; the 24-hour team activity folds behind "team activity ›" in place.
+
+**Acceptance criteria**
+
+- [ ] The head is "Today" with the date; no sentence title, no getting-started card
+- [ ] The readout strip carries only the four derived figures; none repeats a section count
+- [ ] Needs you merges tasks, idle deals, stale marks and open suggestions in one urgency order; each tab filters to its kind; the fold is at eight
+- [ ] Review rows group by source and space with one count each and link to Review filtered the same way
+- [ ] A stopped plugin and an errored connection each show one notice line with its fix link; nothing else enters the band
+- [ ] With no meetings source the day strip draws hours only and the meeting lane is absent; the page renders no empty section
+- [ ] What's moving lists the last 7 days' signals on companies the user owns or follows, newest first, each with its ref
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Open Today on the dev seed: one list with two overdue tasks, an idle deal and three Exa cards grouped under Property ops; a notice says Gmail needs reconnecting; the rail shows the portfolio and two funding rounds this week.
+
+**Sheets** — "Today — printed (10-09)" 00. **Spec** — D79; D68 amended (Today's section and "all meetings ›"); `docs/design-contract.md` §1 (a readout is never a section count)
+
+#### `first-run-1` · afk · M — The first run without a checklist (D80)
+
+**Blocked by:** `today-1`, `settings-1`
+
+**What to build**
+
+**Setup** (`apps/web/src/routes/setup.tsx`): the demo step keeps its question but **Start empty** becomes the primary and "Load demo data" the outline beside it. Demo data becomes removable in one step: `seedDemoData` (`apps/web/src/lib/seeds/demo.ts`) records the entity ids it births at `workspace.settings.demo` (jsonb, no migration), and General gains "Remove demo data" — a confirm with the counts — that deletes them through the existing entity delete program and clears the key; the row is absent when the key is. **Today's empty state**: in a workspace with no companies, Today renders one P5 block — "Bring in what you already have." with Import a file (pine; "CSV or Airtable export"), Drop a deck, Add a company — and nothing else; it disappears once a record exists. **In-place prompts**: one primitive, `NeedsSetup` (one line, one link), that renders "<what it needs> · <Add/Connect …›>" to an admin and "Ask <admin names> to set up <thing>" to a member. This slice wires it where the surface exists: Today's Meetings with no calendar connection ("No calendar connected · Connect Google ›"), Enrich on a record showing the website source with "More sources ›". Ask without a model (`ask-5`) and Find without Exa (`ask-8a`) use the same primitive in their own slices. **What's set up**: a passive list at the foot of General — AI model, Team, Enrichment, Email forwarding, Google, Granola, Exa — each with set/not set, the one line it unlocks, and its link; never shown unprompted.
+
+**Acceptance criteria**
+
+- [ ] The setup demo step's primary is Start empty; loading demo data records its ids; Remove demo data deletes exactly those records and nothing created afterwards
+- [ ] A workspace with no companies shows the three ways in on Today and no other section; adding one company removes it
+- [ ] `NeedsSetup` renders the admin link for an admin and the ask-line with admin names for a member — one test, both roles
+- [ ] Today's Meetings and the record's Enrich use `NeedsSetup`; no setup checklist or banner exists anywhere (the `GettingStarted` component is deleted)
+- [ ] What's set up lists the seven items with live state from the vault, integrations and connections
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Run setup against an empty database, press Start empty: Today offers three ways in. Load demo data on a second run, then remove it from General: the demo companies are gone, a company added since is not.
+
+**Sheets** — "Today — printed (10-09)" 01 (empty Today, the in-place prompts, What's set up). **Spec** — D80; `docs/design-contract.md` §1 (an empty section is one short line; P5)
+
+## 28. Spaces, research and watches
+
+_Extensibility · 11 slices · split out of project 23 on 2026-10-09_
+
+The space becomes a page you can reshape and a set the web keeps filling: rename, move, archive and split (D73), the space page in the record anatomy (D74), the Ai port's researcher lane with Exa's record research, then watches that hand candidates back as cards (D72, D77). Find in Ask (`ask-8a`) and Save as watch (`ask-8b`) in project 24 build on it.
+
+### ▸ Spaces can be reshaped
+
+_Rename a space from its head, move a subtree under another parent and watch visibility, sensitivity and context follow at once, archive one and keep its filings, carve a child and move companies into it — nothing filed moves on its own (D73). Precedes every watch._
+
+#### `spaces-1` · afk · S — Rename and archive from the space head — `renameRecordProgram` wired, archive hides and pauses
+
+**Blocked by:** none
+
+_Amended 2026-10-09 (D73, owner verdict on the space page 10-08): archive asks nothing — **Restore** undoes it, so there is no confirm; rename edits the title in place; the `···` menu is **Rename · New subspace · Move to… · Save as template… · Archive**. "Save as template…" has no slice yet and is left out of the menu until it has one. The body and criteria below are edited to match._
+
+**What to build**
+
+The space head (Spaces — printed, sheet 03) carries a `···` menu — Rename · New subspace · Move to… · Archive — and this slice wires Rename, New subspace and Archive; Move to… is `spaces-2`. Rename calls `renameRecordProgram` (`packages/core/src/writes/entities/rename.ts`) on the space entity exactly as a record's head does; `slug` and `path` are untouched and the path is never shown. Archive is the entity's existing archive flag — `archiveRecordProgram` on the space entity, never a delete — and the readers learn it: the space picker (`lib/spaces/read.ts`), the tree on `/spaces`, the ancestor-visibility climb and the assembler's space edge all exclude an archived space, while `entity_space` filings stay and the record's rail still names the space, dimmed, so nothing filed loses its history. Watches and dismissals (`watch-1`) will read the same flag to pause. Archive asks nothing: the archived space's head shows the stamp in outline (`ARCHIVED 10-08`), the name and the double rule go graphite, and a double-framed notice under the head says what still holds — "Archived. Out of the tree and the space picker." with the counts (filings kept, watches paused) and one **Restore**, which clears the flag on the space and the descendants archived with it. Rename turns the title into its own field in place; ↵ saves, and links, filings and watches point at the space id, so nothing else changes. "New subspace" is `createSpace` under this space.
+
+**Acceptance criteria**
+
+- [ ] Rename from the space head changes the name everywhere it is read and leaves `space.slug` and `space.path` as they were
+- [ ] Archiving sets the flag on the space and every descendant in one transaction; `entity_space` rows are untouched, and the archived spaces vanish from the picker, the tree and the assembler's climb
+- [ ] A record filed in an archived space still lists it in its details column, dimmed, with no action
+- [ ] Archive writes at once with no confirm; the archived head shows the outline stamp and the notice with its counts, and Restore returns the space and the descendants archived with it
+- [ ] The `···` menu lists Rename, New subspace, Move to… and Archive; rename is in place on the title
+- [ ] Archive is refused on the root a seeded taxonomy marks `is_seeded` only when it still holds unarchived children — the test names the case
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Rename "In space mfg" to "In-space manufacturing" from its head; the breadcrumb, the picker and every filed company's rail agree at once. Archive a dead subspace: its three companies keep the filing in their history and the picker no longer offers it.
+
+**Sheets** — Spaces — printed, sheet 03 (the `···` menu, rename in place, archived). **Spec** — D73 (rename, archive, never delete)
+
+#### `spaces-2` · afk · M — Move a space — one subtree path rewrite, refused under its own descendant, one event
+
+**Blocked by:** `spaces-1`
+
+**What to build**
+
+"Move to…" in the space head's `···` menu opens the move window (Spaces — printed, sheet 03: a window over the scrim, the space and its descendants greyed with the reason, its parent marked "now here") with the current space and its descendants excluded. The move is one program in `packages/core/src/writes/entities/` beside rename: a single `UPDATE space SET path = new_parent.path || subpath(path, nlevel(old_parent.path)), parent_id = … WHERE path <@ old_path` inside one transaction, with a unique-slug check against the new parent (`space_slug_per_parent_unique`) that refuses with a typed error naming the collision rather than renaming silently. Moving under itself or a descendant is refused before the update. One activity event on the moved space records the old and new paths.
+
+Because every consumer computes from the path at read time — ancestor visibility, sensitivity inheritance, the assembler's climb, glossary scope — nothing else is rewritten, and the test proves it: a company filed in the moved space inherits the new ancestor's sensitivity in the same request, and its context items name the new path.
+
+**Acceptance criteria**
+
+- [ ] Moving a subtree rewrites every descendant's `path` and the root's `parent_id` in one statement and one transaction; `entity_space` is untouched
+- [ ] Moving under itself or any descendant is refused with a typed error; a slug collision under the new parent is refused naming the sibling
+- [ ] Sensitivity, ancestor visibility and the assembler's position item follow the new path with no second write — each asserted on a filed record after the move
+- [ ] Exactly one activity event is written, naming both paths
+- [ ] The move window greys the space and its descendants with the reason and marks the current parent "now here"
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Move "Small-lift" from under "Launch" to under "Launch › Reusable": the breadcrumb changes, the companies filed there are now visible from the new ancestor, and flagging the new parent sensitive makes their context calls sensitive at once.
+
+**Sheets** — Spaces — printed, sheet 03 (Move to…). **Spec** — D73 (move: one UPDATE, one event, refused under its own descendant; the path is the only derived structure)
+
+#### `spaces-3` · afk · S — Split by hand — create a child and multi-select "move here" over tag and untag
+
+**Blocked by:** `spaces-2`
+
+**What to build**
+
+Not a primitive: Split is "New subspace" in the space head's `···` menu (Spaces — printed, sheet 04): it creates a child space with `createSpace` and lands on the parent's Companies tab (`spaces-4`) in multi-select mode and one action, "Move here", over the existing tag and untag writers (`lib/spaces/tag.ts`). Each chosen company gains the child filing and loses the parent's, as two explicit writes on an explicit choice — the invariant D73 states, filings never move on their own. The multi-select is the ledger's existing row checkbox with a 44px bone action bar that appears when one is checked ("3 selected · Move here"), on Spaces — printed, sheet 04. Inherited rows (via a subspace) are not offered: they are already in a child.
+
+**Acceptance criteria**
+
+- [ ] "New subspace" creates the child under the current space and opens it with the parent's direct members selectable
+- [ ] "Move here" untags each chosen company from the parent and tags it in the child, one event each, through the existing writers and no new SQL
+- [ ] Rows inherited from a subspace are not selectable; the test asserts the parent's direct filings only
+- [ ] The action bar is the one bone bar at 44px with the count and the single pine verb; it disappears when nothing is selected
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — On "In-space manufacturing", split "Materials" out: pick Varda and Space Forge, press Move here, and both now file under Materials with their history showing the untag and the tag.
+
+**Sheets** — Spaces — printed, sheet 04 (split). **Spec** — D73 (split is create + move here; only split and merge touch filings)
+
+#### `spaces-4` · afk · M — The space page in the record anatomy — three readouts, a details column, five tabs (D73, D74)
+
+**Blocked by:** `spaces-1`
+
+**What to build**
+
+The space page as the owner approved it on 2026-10-08: a space reads like a record (D74), replacing the five stacked sections of 2026-09-16. Built from the record parts (`RecordHeader`, `RecordBody`, the tab head), not a second layout.
+
+- **Head:** the ink stamp `SPACE · depth n`, created date, the serif name with its icon, the crumb of ancestors (`Spaces / Proptech`), the double rule. One button, **Note here** `N`, beside the **Not sensitive** toggle and the `···` menu (`spaces-1`). Add watch (`watch-4`) and Find companies (`ask-8a`) join the head when they land.
+- **Readouts:** three, never section counts — **In pipeline** (`3 of 14`), **Last filed** (`10-06 · 2d`), and the **funding-stage mix** as a bar by stage with its labels. The bar is the page's one dither: density rises with stage, bootstrapped lightest at the end.
+- **Details column** (bone, 320px): **Map** (`↑` parent, subspaces with their telling count, `+ Subspace`), **Glossary** (terms, inherited ones marked "from <ancestor>", `+ Term`), **Tasks** (open tasks, `+ Add a task…` `T`). Criteria, Watching and What's moving join the top of the column with `watch-1` and `watch-4`.
+- **Tabs:** **Companies · Notes · Files · People · Records**, each with its mono count, empty ones grey; **Notes is the default**, the last tab remembered per user. **Referenced** stops being a section: it folds into Notes as a filter (**Filed · Mentions**). Companies carries a filter row (**All · In pipeline · Watching**) and a sort (Funding stage default), a composer row "Tag a company into <space>…", and rows with a 1-bit mark, name, stage badge, a pipeline lane (`watching`, `n deals`) and location; hovering a row shows its select box (for split, `spaces-3`) and `×` to untag with an Undo toast. People lists the people of the filed companies; Records the custom records filed here.
+- Deep link `?tab=companies` as on a record.
+
+**Acceptance criteria**
+
+- [ ] The space route renders through the record parts with the stamp, crumb, double rule and three readouts; no readout repeats a tab count
+- [ ] The funding-stage bar sums to the Companies count and orders stages as the status attribute orders them, bootstrapped last
+- [ ] The details column holds Map, Glossary and Tasks in that order; inherited terms show their source space
+- [ ] The five tabs show their counts, empty tabs grey with 0; Notes opens by default and the last tab is remembered per user; `?tab=` deep-links
+- [ ] Notes' filter row has Filed and Mentions, and "Referenced" exists nowhere else on the page
+- [ ] Companies' filter and sort work; hover shows the select box and `×`; untag writes one event and offers Undo
+- [ ] Gate 5 passes; the tab head is the record's 44px bone head; Note here is the head's only button until `watch-4` and `ask-8a`
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Open Property ops: three readouts with the stage bar, Map, Glossary and Tasks on the left, Notes open on the right; switch to Companies, filter Watching, hover Tenantry and untag it, then undo.
+
+**Sheets** — Spaces — printed, sheets 00 (index) and 01 (Companies tab), 02 (Notes tab), 03 (head menu), 04 (split). **Spec** — D73; D74 (the tabbed body, empty tabs grey, deep links); `docs/design-contract.md` — a record
+
+### ▸ The last unimplemented port
+
+_The Ai port's live layer with the sensitivity gate and the spend ceiling enforced by core rather than trusted to the plugin, tokens attributed to the integration and not to a user; then Exa as the researcher kind's first tenant — five web signals on a record and a one-paragraph brief in /inbox citing the five URLs._
+
+#### `backfill-11` · afk · M — Ai port live — the researcher lane, budgeted and attributed to the integration
+
+**Blocked by:** `ai-26`, `ai-4a`, `backfill-4`, `sdk-12a`
+
+**What to build**
+
+Every port gets a live slice — sdk-6a, sdk-6b, sdk-7a, sdk-7b, sdk-8, sdk-9, sdk-10, sdk-24a — except Ai, while sdk-12a's Layer table already names AiLive and the kind→ports table grants Ai to `researcher` and classify-only Ai to `poller`. AiLive wraps core's complete(): the lane is whatever the plugin names, sensitivity is resolved by core from the entity the job runs on through ai-26's resolver and is never accepted from the plugin (that is the whole point of the gate), the ceiling is backfill-4's predicate, and every call writes an ai_usage row with caller {type:'integration', id: row.id} so the operator can see which plugin spent what. The poller restriction is enforced in the Layer rather than documented in a table. Joins project 12 (Plugins run unattended, Apollo enriches).
+
+**Acceptance criteria**
+
+- [ ] A researcher fixture invoked through the loader gets Ai and writes ai_usage rows carrying caller_type 'integration' and the integration id; an enricher fixture that yields Ai fails service-not-found with no provider call
+- [ ] A poller fixture calling ai.complete('synthesize') fails at the port, not at the provider; classify runs
+- [ ] A plugin cannot influence the gate: AiLive resolves sensitivity from the entity and ignores anything the plugin passes, asserted by a fixture that tries
+- [ ] A sensitive record with the lane routed to a cloud provider refuses with SensitiveRouteRefused and the job fails without writing
+- [ ] Crossing backfill-4's per-day ceiling refuses the plugin's call with CapExceeded and closes job_run with the reason, so a runaway researcher cannot outspend a human
+- [ ] The Layer is built per (integration, job) like the rest — two invocations of one job construct one AiLive, asserted by the counter sdk-12a already uses
+- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+
+**Demo** — Enable the researcher fixture and invoke its job: the claim lands, Settings → AI · Usage attributes the tokens to the plugin rather than to a user, and the same job on a record under a sensitive space refuses by name.
+
+**Spec** — docs/spec-plugin-sdk.md §4 — port table, kind→ports, the Layer the loader provides (AiLive); docs/spec-ai-substrate.md §11 — the only plugin kind that calls Ai is researcher
+
+#### `backfill-12` · afk · M — plugins/exa — the first researcher, its signals and its brief
+
+**Blocked by:** `backfill-11`, `sdk-10`, `sdk-12b`, `sdk-6b`, `sdk-7b`
+
+**What to build**
+
+The researcher kind has a semver-frozen interface (sdk-4a) and no tenant, and CONTEXT banks Exa as the second Enricher alongside Apollo. The SDK spec's own worked example is Exa, so the shape is already written: Read the entity for name and domain, Http the search, one signal per hit through Content, then Ai synthesize into a brief that lands as a Judgment suggestion with the hit URLs as refs. No Facts, no Identity — research never fills fields, and the Layer refuses them. Credential kind 'search' already exists in the enum, so nothing schema-level is needed. This is sdk-15's Apollo shape on a different kind and inherits its cassette pattern rather than inventing one. Joins project 12 (Plugins run unattended, Apollo enriches).
+
+**Acceptance criteria**
+
+- [ ] plugins/exa declares kind researcher, requires.credential {kind:'search', scope:'workspace'}, and manifest settings maxResults and lookbackDays; grep shows no Exa special case anywhere in core
+- [ ] The job's R type is Config | Http | Read | Content | Ai | Judgment, the loader hands it nothing else, and a deliberate Facts reach fails service-not-found
+- [ ] Against a recorded cassette with no network, one run produces one signal per hit and exactly one note suggestion whose refs are the hit URLs
+- [ ] The brief lands in /inbox and accepting it creates a note through the existing createNote path with the accepter as author
+- [ ] Exa's own error text surfaces on failure rather than a generic message, the way CONTEXT requires of Apollo
+- [ ] With no key configured the action is absent rather than failing at call time
+- [ ] Full gate pass: tsc, vitest green, lint zero, prettier
+
+**Demo** — Paste an Exa key, press Research on a company: five web signals land on the record and a one-paragraph brief waits in /inbox citing the five URLs.
+
+**Spec** — docs/spec-plugin-sdk.md §4 — worked example (Exa, researcher) and the Layer the loader provides; docs/spec-plugin-sdk.md §5 — kinds, interfaces, claims; CONTEXT.md — Enrichment (Exa alongside as a second Enricher)
+
+### ▸ A space watches
+
+_A space carries a criteria sentence; a watch row names an engine, a cadence or none, and a cursor; Run now fires the job and the Watching lane shows it live; candidates come back through `Discover` and land in Review as add-record and file-record cards under the space's head, dismissals permanent per space; signals on members fill "What's moving" (D72). Exa is the first tenant; Harmonic rides the same contract later._
+
+#### `watch-1` · afk · M · migration — `space.criteria`, `space_watch`, the two suggestion kinds — one migration (D72)
+
+**Blocked by:** `spaces-2`, `review-1`. **Label:** `migration` — runs alone on the migration lane.
+
+_Amended 2026-10-09 (D77): the same migration adds a partial unique index on open `add_record` and `file_record` suggestions over `(payload->>'space_id', payload->>'domain')`, so `watch-3` can keep one open card per (space, domain) and append evidence to it. Criteria now sits at the top of the space page's details column (`spaces-4`)._
+
+**What to build**
+
+The host state D72 names, in one migration. `space` gains `criteria` text, nullable, one to three sentences of "what belongs here"; the space page's details column shows it at the top as the in-place editable Criteria field (Enrichment + Exa — printed, sheet 03), written through a server fn that logs an activity event. `space_watch(id, space_id, integration_id, settings jsonb, cadence_minutes int null, state jsonb, last_run_at, last_status, last_error, created_by, created_at)` with `unique(space_id, integration_id, settings_hash)` so the same lens is not saved twice, and `space_watch_dismissal(space_id, domain, dismissed_by, created_at)` keyed on the pair. `suggestion_kind` gains `add_record` (payload: name, domain, aliases, evidence refs, subspace hint) and `file_record` (payload: entity id, the space, evidence) — the two cards R1 draws. `ENTITY_REFS` gains `space_watch.space` and `space_watch_dismissal.space`, both `cascade` on merge (a space merge is deferred by D73 and unions them when it lands) and `none` for context. An archived space (`spaces-1`) pauses its watches: the scheduler in `watch-2` reads the flag, so no column is needed here.
+
+**Acceptance criteria**
+
+- [ ] Migration `pnpm db:generate --name space_watch`, SQL hand-inspected: `space.criteria`, `space_watch` with its unique index, `space_watch_dismissal`, the two enum values, and the partial unique index on open `add_record`/`file_record` cards by space and domain — two open cards for one (space, domain) are refused by the database
+- [ ] Criteria edits in place on the space head and writes one activity event per save; empty stays empty, never a placeholder sentence stored
+- [ ] `ENTITY_REFS` carries both new columns; deleting either fails `entity-refs.test.ts` naming it
+- [ ] An `add_record` suggestion accepts through `resolveEntity`, files the new record in the space (or the hinted subspace when it exists), and fires `entity.created`; a `file_record` suggestion accepts by filing an existing record; both reject by writing the dismissal row for the domain
+- [ ] A dismissal for `(space, domain)` makes a later proposal for the same domain a database no-op, asserted with two proposals
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Write a criteria sentence on a space, insert a watch row by hand, propose an add-record card for a domain, dismiss it, propose again: the second one never appears.
+
+**Sheets** — Enrichment + Exa — printed, sheet 03 (criteria; the two cards in Review). **Spec** — D72 (`space_watch` is host state; criteria; dismissals permanent per space)
+
+#### `watch-2` · afk · M — The `watch` trigger and the `Spaces` port — a job runs per watch row with the D71 brief as its subject
+
+**Blocked by:** `watch-1`, `sdk-12b`
+
+**What to build**
+
+The sixth trigger. `TRIGGERS` in `packages/sdk/src/manifest.ts` gains `watch`; a watch job declares `settings` of its own (a zod schema the host renders as the watch form, the same way the plugin's settings form is generated) and `uses` that may include the new `Spaces` port and `Discover` (`watch-3`). The worker's scheduler (`apps/worker/src/plugins/`) registers one queue per watch job and enqueues per `space_watch` row: on cadence when `cadence_minutes` is set, and on "Run now" always, which is a server fn that enqueues the same job with the row id — the space's archive flag pauses both. `state` jsonb is handed to the job and written back from its return, the plugin's cursor and nothing of the host's. `job_run` rows carry the watch id so the Watching lane (`watch-4`) and the Integrations ledger can read a run log per watch.
+
+The `Spaces` port is read-only and has one call, `brief(spaceId)`: the material D71 builds for the assembler — the full path, memo, criteria, terms, the filed companies with their key values, the subspace tree with counts — rendered through `packages/core/src/writes/context/` and handed as data, never as prompt text, so an engine turns it into its own query. `canRead` applies as the integration's actor; a sensitive space anywhere in the path refuses the call, which refuses the run.
+
+**Acceptance criteria**
+
+- [ ] A manifest declaring a `watch` job with a settings schema validates; one without a settings schema is refused at manifest validation
+- [ ] The scheduler enqueues one job per `space_watch` row on its cadence; a row with `cadence_minutes = null` is never scheduled and runs only from "Run now"
+- [ ] "Run now" on a scheduled watch enqueues immediately and the next cadence tick still fires; an archived space enqueues nothing from either path
+- [ ] `state` round-trips: the job's return is written to the row and handed back on the next run; a job that throws leaves `state` as it was
+- [ ] `Spaces.brief` returns path, memo, criteria, terms, members with key values and the subspace tree, through the assembler's own builders; a fixture asserts the shape is data, not a rendered prompt
+- [ ] A sensitive space in the path refuses the brief and the run closes with the reason in `job_run`
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Enable a watch fixture, add a watch on a space with no cadence, press Run now: `job_run` shows one run carrying the watch id, and the fixture's log shows the brief it received.
+
+**Sheets** — Components "Research · Ask · Watches" (watch row). **Spec** — D72 (`watch` trigger, `Spaces` port, nullable cadence, plugin-owned `state`); `docs/spec-plugin-sdk.md` §4–5
+
+#### `watch-3` · afk · M — The `Discover` port — `previewResolve`, add-record and file-record cards, permanent dismissals
+
+**Blocked by:** `watch-2`, `sdk-7b`
+
+_Amended 2026-10-09 (D77): consolidation is by result, not by watch — **one open `add_record` or `file_record` card per (space, domain)**. A later find of the same domain, from another watch or from Find in Ask (`ask-8a`), appends its evidence to the open card ("found by 2 watches") instead of proposing again. Every candidate passes the same three checks in order: member, dismissed, open card. No new table._
+
+**What to build**
+
+The hand-back. `Discover.candidate({name, domain, aliases, evidence, subspaceHint})` is the one call; the host does everything after it, in core beside the other live ports (`packages/core/src/writes/ports/`). The dismissal table is checked first — a dismissed `(space, domain)` returns without a row. Then `previewResolve` over the identity normalizers: known and already filed in this space or a descendant → dropped; known elsewhere → `file_record` card; unknown → `add_record` card with the evidence refs as the card's refs. Cards are suggestions through `proposeProgram` (`packages/core/src/writes/suggestions/propose.ts`). The open-card check keys on (space, domain), not on the payload: a candidate whose domain already has an open card in this space merges its evidence refs and the finding watch into that card's payload inside the same statement (an `ON CONFLICT … DO UPDATE` on the partial unique index `watch-1` creates over an open card's space and domain), and the card reads "found by n watches". Find in Ask (`ask-8a`) goes through the same call, so a company found by a watch and by a question is one card. Signals a watch finds on existing members go through `Content.logSignal` as they do for Apollo, with `source_ref` from the integration row.
+
+Review (**R1**) groups the cards under a bone space head — path, `via <plugin mark>`, mono count — each card with the name, domain, the evidence refs as ref chips with their URLs, and the two verbs: pine "Add and file here" (or "File here") and ghost "Dismiss"; the tooltip on Dismiss says it is permanent for this space, which is where that sentence lives and nowhere else. Accept shows the after-state once: "Added · enriching" while `entity.created` fans out. No bulk accept.
+
+**Acceptance criteria**
+
+- [ ] A candidate already filed in the space or a descendant produces no suggestion; one filed elsewhere produces `file_record`; an unknown one produces `add_record` — three fixtures through `previewResolve`
+- [ ] A dismissed domain produces nothing and no `previewResolve` call, asserted by a spy
+- [ ] The same domain from two runs, or from two different watches on the space, is one open card whose evidence holds both sets of refs and which reads "found by 2 watches"; after the card is accepted or dismissed, the member or dismissal check answers instead
+- [ ] The checks run in order — member, dismissed, open card — asserted with a spy that sees no `previewResolve` call for a dismissed domain
+- [ ] Review groups the cards by space head with the plugin's mark and count; a card's refs open the evidence URLs
+- [ ] Accepting `add_record` creates the record through `resolveEntity`, files it (subspace hint honoured when it resolves), and emits `entity.created`; the card then shows the enrich state until the job settles
+- [ ] A `discover` fixture that tries `Facts` fails service-not-found — a watch never fills fields
+- [ ] Gate 5 passes on the card and the head
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Run the watch fixture against a space holding Varda: it hands back Varda, Redwire and an unknown; Review shows one "also file Redwire here?" and one "add X?" under the space's head, and nothing for Varda. Dismiss the unknown and run again: it stays gone.
+
+**Sheets** — Enrichment + Exa — printed, sheet 03 (what a run leaves in Review); Surfaces R1; Patterns P9 (a queue grouped by head). **Spec** — D72 (`Discover`, `previewResolve`, dismissals); D77 (one open card per space and domain); D61
+
+#### `watch-4` · afk · M — Space page: criteria, the Watching lane with Run now and live status, "What's moving", Today's count
+
+**Blocked by:** `watch-3`, `sdk-18`, `spaces-4`
+
+_Amended 2026-10-09 (D73/D74 space page, D77, D79): the space page is `spaces-4`'s record anatomy, so Criteria, **Watching** and **What's moving** sit at the top of its details column above Map, Glossary and Tasks — there is no rail. **Add watch** is a window (engine, name, Look for, How often, At most per run) and its cadence defaults to **Manual** here; Ask's Save as watch defaults to Weekly (`ask-8b`). The head's **Find companies** button is `ask-8a`'s. Today counts open cards in its one Needs-you ledger as a review row grouped by source (D79), not in a separate attention section._
+
+**What to build**
+
+The watching half of the space page `spaces-4` builds. Head: **Add watch** joins Note here; it opens a window in the dialog grammar — **Engine** (the enabled integrations that declare a `watch` job), **Name**, **Look for** (the engine's settings schema, rendered by `sdk-20b`'s renderer; Exa's is the criteria override, blank when it equals the space's criteria), **How often** (a select whose first value and default is **Manual**), **At most** per run — and **Save watch**. Details column, top: **Criteria** (`watch-1`), then **Watching**, one 32px row per watch — engine mark, name, cadence or "manual", last run, a live status cell over D64's stream ("running · 7 found · 6 cards"), Run now — with the empty lane naming which installed plugins can watch and a degraded row showing the mark at reduced opacity and the reason ("Exa key removed"), Run now absent; then **What's moving**, signals on members newest first, each with its record, the subspace it came via and its source, folding at three behind "+n more". Map, Glossary and Tasks follow. Today counts the space's open cards as one review row in its Needs-you ledger ("Proptech / Property ops · via Exa · 3 to add · 1 to file", D79) linking to Review filtered by the space.
+
+**Acceptance criteria**
+
+- [ ] Add watch opens the window for the chosen engine with How often defaulting to Manual; saving writes a `space_watch` row with `cadence_minutes = null` and the lane shows it at once
+- [ ] Criteria, Watching and What's moving sit at the top of the details column, above Map, Glossary and Tasks
+- [ ] The Watching row streams the running job's status over the SSE channel `sdk-18` built and settles from `job_run` on reload — never from a missed notification
+- [ ] Run now enqueues the job and is present on scheduled and manual watches alike; it is absent on a degraded engine's row, which shows the reason
+- [ ] The empty lane lists installed engines that declare a `watch` job and says nothing else
+- [ ] What's moving lists signals on the space's members newest first with their refs; a signal on a record filed in a subspace appears here too
+- [ ] Today's Needs-you ledger shows one review row per space with open cards, counting only open `add_record` and `file_record` suggestions, linking to Review filtered by that space
+- [ ] Gate 5 passes; Watching rows are 32px in the details-column grammar and section heads 44px bone
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Add an Exa watch to "In-space manufacturing" (How often: Manual), press Run now, watch the row go running → done with "7 found · 6 cards", see the review row on Today, and read the two signals on Varda under What's moving.
+
+**Sheets** — Enrichment + Exa — printed, sheet 03 (the details column top, the Add watch window, a degraded engine); Today — printed, sheet 00 (the review row); Patterns P11 (lanes that stream). **Spec** — D72; D77 (Manual on the space page); D79; D64
+
+#### `watch-5` · afk · M — plugins/exa — the watch job: webset from the brief, cursor in `state`, candidates and signals
+
+**Blocked by:** `watch-3`, `backfill-12`
+
+**What to build**
+
+`plugins/exa` gains a second job, `watch`, beside `backfill-12`'s record action. Its settings schema is the criteria override (defaults to the space's) and a per-run cap. On first run it calls `Spaces.brief`, builds a webset query from the memo, criteria and the exemplar companies' domains, creates the webset through `Http` and stores its id in `state`; later runs page the webset from the stored cursor. Each result goes to `Discover.candidate` with the hit URLs as evidence; a result whose domain is already a member becomes a signal through `Content` instead. No `Facts`, no `Identity`: the Layer refuses them. Cassettes for the webset create, page and empty-page calls live beside the plugin's existing ones; the suite runs with no network. Harmonic is explicitly not built: this slice proves the host contract is enough for a second engine by keeping Exa's code free of any space-table knowledge.
+
+**Acceptance criteria**
+
+- [ ] `plugins/exa` declares a `watch` job with a settings schema and `uses: ['Config','Http','Spaces','Discover','Content','Log','Receipts']`; grep shows no Exa special case in core or the worker
+- [ ] First run creates one webset from the brief and stores its id; the second run pages from the cursor and creates no second webset — asserted against cassettes
+- [ ] A result for a member domain writes one signal with the hit as its ref; a non-member goes to `Discover`; the cap stops the run at the configured count with the cursor saved
+- [ ] A `Facts` reach fails service-not-found; `Identity` likewise
+- [ ] The raw responses are written to `Receipts`; Exa's own error text surfaces on failure
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Enable Exa, add a watch to a space, Run now against the cassettes: a webset is created, seven results come back, six become cards under the space's head and one becomes a signal on a member.
+
+**Spec** — D72 (Exa first tenant; Harmonic rides the same contract); `docs/spec-plugin-sdk.md` §4 worked example
+
+## 29. Enrichment is the host's
+
+_Extensibility · 8 slices · split out of project 23 on 2026-10-09_
+
+D76 as built: the Apollo gaps closed, an enrichment vocabulary every source answers in and an attribute link that names it, the free Website source first, auto-enrich with its checks and parking, bulk enrich behind an estimate, Apollo's full field list, a picture on every record, and the Enrichment page with "Fill from" and the where-from popover.
+
+### ▸ Sources, the vocabulary and auto-enrich
+
+_Added 2026-10-09 (D76): a source answers in the host's vocabulary, the link lives on the attribute, sources run in the owner's order with the free Website source first, auto-enrich is the Enrich button pressed for the owner and parks at the cap, records gain a picture, and the Enrichment page shows all of it. Apollo is the first paid source and Exa an optional later one._
+
+#### `enrich-1` · afk · M — Apollo gaps and the auto-enrich triggers — a cleared value is user-held, `Content` for signals, relationships fill only when empty, scopes replace `autoEnrich` (D76)
+
+**Blocked by:** `graph-1`, `sdk-19`
+
+_Amended 2026-10-09 (D76): rewritten. The four D72 gaps stay; the targeted scope becomes D76's auto-enrich — the Enrich button pressed for the owner — with three of its five triggers here (created, filed, joins a deal); appears-in-a-meeting and gains-an-identity, the host's ordered checks and parking at the cap are `enrich-4`. No longer blocked by `watch-3`: the `filed` event fires on any `entity_space` insert, and an accepted add-record card is one of them._
+
+**What to build**
+
+Four gaps D72 recorded against the shipped Apollo path, none needing schema, and the triggers D76 names.
+
+- **A cleared value is user-held.** `setValuesInTx` (`packages/core/src/writes/attributes/values.ts`) records the clearing actor in `lastWriters`, and `Facts.fill` skips a slug whose last writer is a user even when the value is now empty — today it refills it.
+- **Signals through `Content`.** `Content` joins Apollo's `uses`, and the enricher logs a funding round and a hiring change as signals with the receipt as ref (`enrich-6` widens what Apollo reads; this slice lands the lane).
+- **Relationships fill only when empty.** A relationship value (`companies`, `founders`, the pairs `rel-1` makes) fills only when empty; when one exists and differs, a card is proposed instead of a write.
+- **Scopes replace `autoEnrich`.** The per-integration on/off becomes the scopes D76 lets the owner choose — **deal** (the record joins a deal), **space** (it is filed into a chosen space), **meeting** (`enrich-4`) — and a record is auto-enriched when one of its triggers fires in scope. The triggers here: **record created** (the `entity.created` dispatcher, `sdk-19`), **filed into a space** (a `filed` event the emitter fires after an `entity_space` insert commits) and **joins a deal** (a `deal.linked` event when a company or person becomes a deal's party). `DOMAIN_EVENTS` gains `filed` and `deal.linked`: an additive SDK minor. Seed and import births emit nothing (D65); they are enriched in bulk behind an estimate (`enrich-5`). The defaults D76 sets apply on upgrade: a paid source starts with the **deal** scope only.
+
+The Integrations ledger (I1) shows the scope words in the Apollo row and the credits used; the Enrichment page that replaces it is `enrich-8`.
+
+**Acceptance criteria**
+
+- [ ] Clearing a value by hand then running Apollo leaves it empty; the test asserts `lastWriters` names the user and the fill skipped the slug
+- [ ] A funding event in a cassette writes one signal on the company with the receipt id as its ref and no attribute write
+- [ ] An empty `companies` on a person fills; a differing one proposes a card and writes nothing — both asserted
+- [ ] `autoEnrich: true|false` in existing integration configs reads as scope `deal` for `true` and none for `false`, so no config migration is needed; the settings form offers the scopes as checkboxes
+- [ ] The emitter fires `filed` after an `entity_space` insert commits and `deal.linked` after a party joins a deal, skipped for `seed` and `import`; the dispatcher enriches an in-scope record once per trigger and never for an out-of-scope one
+- [ ] `DOMAIN_EVENTS` lists the two new names, `SDK_VERSION` takes a minor bump, and an `event` job declaring `on: ['filed']` validates
+- [ ] I1 shows the scope and credits used on the Apollo row
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Clear a company's headcount, re-run Enrich: it stays cleared. Add a company as a deal's party with Apollo scoped to deals: it is enriched within the second and its funding round appears as a signal. File a different company into a space that is not in scope: nothing runs.
+
+**Sheets** — Surfaces I1 (Integrations row: scope, credits); Enrichment + Exa — printed, sheet 01 (auto-enrich checkboxes). **Spec** — D76 (auto-enrich; triggers; defaults); D72 (Apollo gaps); D65 (the emitter); `packages/core/src/writes/attributes/values.ts`
+
+#### `enrich-2` · afk · M — The enrichment vocabulary, the attribute link, and sources in order — first answer wins (D76)
+
+**Blocked by:** `enrich-1`
+
+**What to build**
+
+D76's core: enrichment is a host capability and providers are interchangeable sources. Three pieces, none needing schema.
+
+- **A host-owned vocabulary.** `ENRICHMENT_VOCABULARY` in `@spaces/sdk` names every key a source may answer — `company.description`, `company.headcount`, `company.founded_year`, `company.total_raised`, `person.title`, `person.seniority`… — each with its kind (company or person), value type and whether it is a changing figure. A source answers in these keys through a new `Facts.answer({entityId, answers, receiptId})`, never in attribute slugs. An additive SDK minor; `Facts.fill` stays for non-enrichment writers.
+- **The link lives on the attribute.** `AttributeOptions` gains `enrichmentKey`: "fill from enrichment: <key>". The system attributes are linked by default in `SYSTEM_ATTRIBUTES` (description, founded, location, LinkedIn, Twitter, job title…), and an owner links their own (Employees ← `company.headcount`). One link serves every source. No `Apollo …` fields. Stored in the existing `attribute.options` jsonb, validated by the registry like every other option, so no migration — the reason it is an option and not a column is that only the registry reads it.
+- **Sources run in the owner's order.** A core job `enrichment.run(entityId, reason)` reads the order from `workspace.settings.enrichment` (`sources: [integration ids]`, `reuseDays`, `scopes`), then for each source in turn invokes its `enrich` action with the identity it can look up and **only the linked keys still empty**, and maps each answer through the links: the first source with an answer for a key wins, a person's value is never touched (the fill-blanks rule, the cleared-value rule of `enrich-1`), and a disagreement with a person becomes one Review card per record listing every disagreeing field. **A disagreement between two sources is not a card**: the losing answer is kept in the where-from history (the receipt of the run, read back by `enrich-8`'s popover). A changing figure (headcount, revenue, total raised) is replaced by a newer answer when no person set it, and the old figure stays in the history with its date. One timeline line per run: "Enriched · Website, Apollo · 6 fields · 1 credit". No toast.
+
+**Acceptance criteria**
+
+- [ ] `ENRICHMENT_VOCABULARY` exports with kinds and types; `Facts.answer` refuses a key outside it naming the key; `SDK_VERSION` takes a minor bump
+- [ ] A custom attribute linked to `company.headcount` is filled from an answer; an unlinked answer writes nothing and is kept in the receipt
+- [ ] With two sources in order, the first answer for a key wins and the second source is asked only for keys still empty — asserted by the second fixture's request log
+- [ ] Two sources disagreeing produces no suggestion; a source disagreeing with a person's value produces exactly one card for the record listing every such field
+- [ ] A changing figure newer than the stored one replaces it when the last writer is an integration; when a person set it, it is a card
+- [ ] One timeline line per run names the sources, the field count and the credits
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Link a custom "Employees" attribute to headcount, put Website before Apollo, press Enrich on a company: the description comes from Website, headcount from Apollo, and the timeline reads "Enriched · Website, Apollo · 6 fields · 1 credit".
+
+**Sheets** — Enrichment + Exa — printed, sheet 01 (sources in order; the "Fill from" window). **Spec** — D76 (vocabulary; the link on the attribute; ordered sources; Review only against a person); `docs/spec-plugin-sdk.md` §4 (ports); `packages/core/src/attributes/registry.ts`
+
+#### `enrich-3` · afk · M — The built-in Website source — the domain read by the owner's own Extract lane, no key and no credit (D76)
+
+**Blocked by:** `enrich-2`
+
+**What to build**
+
+The free source that runs first. A core source (not a plugin, so no install) registered in the enrichment order ahead of every paid one: the server fetches the company's domain — the home page, and an about page when the home page links one — under the same fetch rules the deck-link snapshot uses (size cap, timeout, no JavaScript), strips it to text, and runs the owner's **Extract** lane over it with a fixed schema answering vocabulary keys: `company.description`, `company.links` (LinkedIn, Twitter, Crunchbase, blog), `company.location` when stated, and the logo URL for `enrich-7`. It needs no key and spends no credit; its model is whatever the owner routes Extract to. **A sensitive record reads only through a local route**: when Extract is cloud-routed for a sensitive record the source skips and says why in the run's timeline line. Persons have no website and are skipped. It is on for every new record from install (D76's default).
+
+**Acceptance criteria**
+
+- [ ] The Website source is first in the default order and needs no credential; `ai_usage` attributes its tokens to the Extract lane, and no credit is counted
+- [ ] Against a fixture site it answers description, links and location, which fill the linked attributes through `enrich-2`
+- [ ] A sensitive record with Extract cloud-routed skips the source and the timeline says "Website skipped · sensitive"; with a local route it runs
+- [ ] An unreachable domain, a 404 or a page over the size cap ends the source with its reason and the next source still runs
+- [ ] With no AI model set up the source is absent from the order rather than failing (D80's zero-key list)
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — With no Apollo key, add a company by domain: within seconds its description, LinkedIn and Twitter are filled, and the where-from says Website.
+
+**Sheets** — Enrichment + Exa — printed, sheet 00 (Enrich · Website), sheet 01 (Website built in). **Spec** — D76 (free sources run first; what leaves the box); D80 (what works with zero keys)
+
+#### `enrich-4` · afk · M — Auto-enrich checks and parking — the host's order, one job per record, the cap parks until reset; meetings and new identities trigger (D76)
+
+**Blocked by:** `enrich-2`, `interaction-2`
+
+**What to build**
+
+The rest of D76's auto-enrich. **Two triggers** join `enrich-1`'s three: **appears in a synced meeting** (an `interaction.logged` event from `interaction-2`'s writer for a meeting participant, in the **meeting** scope) and **gains an identity** (an `identity.added` event when `setValues` adds a domain or an email to a record after birth). Both are `DOMAIN_EVENTS` additions, an SDK minor.
+
+**The host checks, in order,** before a run is queued: in scope; not sensitive (else only local sources run); not enriched within `reuseDays`; has a key to look up (else it waits for `identity.added`); not already queued — **one job per record**, a singleton key on the record id; credits left today. At a source's daily cap (D53) the record is **parked**: the job is re-queued with `startAfter` at the next 00:00 UTC, never dropped. The host exposes one read for the Today notices band (the Today slice in project 27 renders it): "Auto-enrich paused · Apollo cap reached · 14 waiting · resumes 00:00 UTC". **No periodic refresh**: nothing re-enriches on a clock.
+
+**Acceptance criteria**
+
+- [ ] A participant of a synced meeting is enriched once when the meeting scope is on, and not when it is off
+- [ ] Adding a domain to a company born without one enriches it once; a record with no key never queues until then
+- [ ] The checks run in the order named, each asserted with a fixture that fails only that check; a record enriched within `reuseDays` is skipped
+- [ ] Two triggers for one record inside a run queue one job (the singleton key)
+- [ ] At the cap, further records are parked with `startAfter` at the next UTC midnight, the notices read returns the count and the source, and after the reset the parked records run and the count clears
+- [ ] No schedule re-enriches a record on a clock — asserted by the worker's schedule list
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Set Apollo's daily cap to 3 and import nothing; add five companies to a deal: three enrich, two park, Today's notice reads "2 waiting · resumes 00:00 UTC", and advancing the clock past midnight runs them.
+
+**Sheets** — Enrichment + Exa — printed, sheet 00 (limit reached); Today — printed, sheet 00 (the notices band). **Spec** — D76 (the host checks, in order; the cap parks; no periodic refresh); D53; D65
+
+#### `enrich-5` · afk · S — Bulk enrich from a list, behind an estimate (D76)
+
+**Blocked by:** `enrich-4`
+
+**What to build**
+
+Seed and import births emit no events (D65), so they are enriched by choice: **Enrich…** in a record table's selection bar and in a list's `···` menu runs `enrichment.run` over the chosen records. Before anything is queued a window shows the estimate per source — records that would be asked, records skipped (sensitive, enriched within `reuseDays`, no key to look up), and credits at each paid source's rate against what is left today — with one pine **Enrich n**. Over the cap, the window says how many will park until the reset, and they park through `enrich-4`'s path. The estimate is a read; nothing is spent until the button.
+
+**Acceptance criteria**
+
+- [ ] Selecting 40 imported companies shows the estimate with the skip reasons counted separately and credits per source; cancelling queues nothing
+- [ ] Confirming queues one job per record through the singleton key; records already queued are not doubled
+- [ ] Over the cap, the window states how many park and they run after the reset
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Import a CSV of 40 companies, select all, Enrich…: "34 to ask · 6 skipped · about 34 Apollo credits of 100 left today", confirm, and the list fills over the next minute.
+
+**Sheets** — Enrichment + Exa — printed, sheet 01. **Spec** — D76 (seed and import births are enriched in bulk from a list, behind an estimate); D53
+
+#### `enrich-6` · afk · M — Apollo answers the full vocabulary — company and person fields, the latest round, a person's company, dated changes (D76)
+
+**Blocked by:** `enrich-2`
+
+**What to build**
+
+`plugins/apollo/src/map.ts` moves from slugs to `ENRICHMENT_VOCABULARY` keys and reads everything D76 lists, through `Facts.answer`, `Identity` and `Content`.
+
+- **Company (by domain).** Built-in links: description (`short_description`, else `seo_description`), founded, location, LinkedIn. Identity: domains. **Funding stage** only when Apollo's wording matches one of the owner's options exactly; it never adds an option. The **latest round** with its date as a dated event, once per round (keyed on round and date). Vocabulary keys for the owner to link: total raised, headcount, revenue, industry, keywords, tech stack, Twitter, Facebook, AngelList, Crunchbase, blog, company phone, HQ address, ticker. The logo for `enrich-7`.
+- **Person (by email or LinkedIn).** Built-in: job title, description (from the headline, only when blank), location, LinkedIn, Twitter. Identity: the email, only when Apollo marks it verified and it is neither a role address (`isRoleEmail`) nor locked. **Company link** to an existing company only, filled only when empty; an unknown company is proposed as an "Add X?" card (`add_record`). Enriching a person never creates a company. Vocabulary keys: seniority, department, GitHub, Facebook. The photo for `enrich-7`. **Phone** is a manifest setting, off by default, and costs Apollo's extra credits when on. Employment history is not stored: a changed title or company on a later run is logged as a dated event ("Moved from Keyhold to Flent as COO").
+- **Changing figures** (headcount, revenue, total raised) carry their date into the where-from (`enrich-2`).
+- **Not used:** departmental head count, Alexa ranking, retail location count, Apollo's tag ids. Apollo's org and person ids stay in the receipt for an exact re-match and are never shown.
+
+The source page says what Apollo is sent: "domain only" for companies, "email and LinkedIn URL" for people.
+
+**Acceptance criteria**
+
+- [ ] Against cassettes, a company answer fills the built-in links and the linked keys, and every unlinked key is in the receipt and nowhere else
+- [ ] A funding stage "Series A" fills an option labelled "Series A"; "Series A1" with no such option fills nothing and adds no option
+- [ ] The latest round is one dated event; a second run with the same round writes nothing
+- [ ] A person whose company exists links to it only when the link is empty; an unknown company yields one "Add X?" card and no company row
+- [ ] An unverified, role or locked email is not claimed as identity — three fixtures
+- [ ] Phone is absent unless the setting is on; a changed title on a second run writes one dated event
+- [ ] `grep` shows no Apollo special case in core; the map stays pure and is tested with no database
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Enrich Flent: description, founded, headcount and total raised fill, the Series A round appears dated on the timeline; enrich its COO: title and LinkedIn fill, the company links to Flent, and a second COO whose company is unknown offers "Add Keyhold?".
+
+**Sheets** — Enrichment + Exa — printed, sheet 01 (Apollo's source page: sends, can fill n fields). **Spec** — D76 (what Apollo fills); D75 (identity is a unique attribute); `plugins/apollo/src/map.ts`
+
+#### `enrich-7` · afk · S · migration — Records gain a picture — a logo or a photo, filled only when empty (D76)
+
+**Blocked by:** `enrich-3`. **Label:** `migration` — runs alone on the migration lane.
+
+**What to build**
+
+A company or a person can carry a picture, new and small. It needs schema: `entity.picture_sha` (nullable text), a blob sha in the blob backend. The picture is **fetched once and stored**, never hotlinked, because a remote image loads from a third party on every view (the same reason the email viewer blocks remote images, D67). The source answers a URL (`company.logo`, `person.photo` from the Website source or Apollo); the host fetches it under the snapshot rules (image types only, a size cap), stores it as a blob, and sets `picture_sha` **only when empty**. A person can set or clear it by hand, and a cleared picture is user-held like any cleared value. Where a record shows its mark today — the record head, table rows, the board card, Cmd-K — the picture replaces the 1-bit mark or the initials square when present, cropped square at the mark's size. The blob's refcount counts it so GC never takes a picture in use.
+
+**Acceptance criteria**
+
+- [ ] Migration `pnpm db:generate --name entity_picture`, SQL hand-inspected; `entity.picture_sha` nullable, not an `ENTITY_REFS` entry (it references a blob, not an entity)
+- [ ] A logo answer fetches, stores one blob and sets the picture when empty; a second answer for a record with a picture changes nothing
+- [ ] A non-image or oversize response sets nothing and is noted in the run line
+- [ ] Clearing the picture by hand keeps it clear on the next enrichment
+- [ ] The head, rows, board and Cmd-K draw the picture at the mark's size and fall back to the mark without one; no remote URL is ever rendered
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Enrich Flent with the Website source: its logo replaces the dither mark in the head, the Companies table and the board; clear it, re-enrich, and it stays cleared.
+
+**Spec** — D76 (records gain a picture, filled only when empty); D67 (remote images never load)
+
+#### `enrich-8` · afk · M — The Enrichment page, the source page, "Fill from", and where a value came from (D76)
+
+**Blocked by:** `enrich-2`, `enrich-4`
+
+**What to build**
+
+The surfaces D76 draws, on Enrichment + Exa — printed, sheets 00 and 01.
+
+- **Settings → Integrations → Enrichment** (D81's map): **Sources in order** — Website (built in) first, then each installed source with its mark, what it sends ("domain only", "email and LinkedIn URL"), its state and a drag to reorder; **Auto-enrich** — the five triggers as checkboxes per scope with D76's defaults, and re-use days; **What fills what** — per object, a grid of linked attributes against sources, showing which source answers each; **Recent runs** — the last runs with record, sources, fields and credits.
+- **A source's own page** (Apollo first) is thin, on D81's plugin template: the key, what it sends, the daily limit, the phone opt-in, "can fill n fields" linking back to the grid, Uninstall. It never repeats the Enrichment page's settings.
+- **"Fill from"** on an attribute's edit window: the vocabulary key it is linked to, chosen from the keys of its object's kind and value type.
+- **On a record:** the **Enrich** action shows the sources it will ask (Website, then More sources › when only free sources are on, D80); a filled value's **where-from popover** names the source, the date and, for a changing figure, its earlier values with dates; the states D76 draws (running, done with counts, limit reached with the reset time, sensitive → local sources only).
+
+Exa as an optional enrichment source arrives later (D77: after Research, Find and the watch, off until enabled); it is one more row in the order, with no host change.
+
+**Acceptance criteria**
+
+- [ ] The Enrichment page lists sources in the stored order with what each sends; reordering writes `workspace.settings.enrichment.sources` and the next run follows it
+- [ ] Auto-enrich checkboxes and re-use days write the same settings and `enrich-4`'s checks read them
+- [ ] The grid shows, per linked attribute, the first source in order that can answer it; an unlinked attribute shows "not linked" and "Fill from…"
+- [ ] Apollo's page carries only the template's parts and links to the grid; a member sees the page read-only (D81)
+- [ ] The where-from popover on a filled headcount shows the source, the date and the earlier figure with its date
+- [ ] Gate 5 passes; the page follows the settings page behaviour (one Save bar for typed fields, toggles instant, D81)
+- [ ] Full gate pass: typecheck, test, lint, prettier
+
+**Demo** — Open Settings → Enrichment, drag Apollo above Website, link "Employees" in the grid, then open a company and hover its headcount: "Apollo · 10-04 · was 42 on 07-12".
+
+**Sheets** — Enrichment + Exa — printed, sheet 00 (Enrich on a record; the where-from popover), sheet 01 (the Enrichment page, Apollo's source page, the "Fill from" window). **Spec** — D76; D77 (Exa's order); D80 (More sources ›); D81 (Integrations → Enrichment; the plugin page template)
 
 ## Unplaced — slices added after the plan
 

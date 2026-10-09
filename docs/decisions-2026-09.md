@@ -382,6 +382,8 @@ _Carried by_ the storage slices when project 20 is reconciled: `storage-2b` and 
 - **Variables** become paths, one grammar shared with AI prompts: `{{name.first}}`, `{{company.name}}`, `{{last_interaction.when}}`. Review resolves them per recipient and flags blanks before sending.
 - **Templates** gain a fourth kind, `email`: `{subject, body, attachments}`, favouritable.
 - **Attribute shapes.** A person's name has first and last parts, and `canonical_name` is their join, kept in sync. `phone` validates as E.164 and takes `multi` as config. Location stays text. Email addresses are the identity aliases shown as one multi-value field.
+- **Bcc** (amended 2026-10-08): a draft carries To, Cc and Bcc. Cc and Bcc open from the address block and stay closed when empty; a Bcc chip reads as hidden. Bcc recipients are not linked to records the way To and Cc are, so a Bcc stays hidden everywhere.
+- **Inline images** (amended 2026-10-08): images carried inside the stored MIME (`cid:` parts) render in the viewer, since showing them loads nothing. Remote images still never load; the viewer counts them and keeps each at its size.
 - **Deferred:** outbox and scheduled sends, mass sending, sequences, signatures.
 
 _Rejected:_ SMTP with an app password (weaker threading; Google is retiring app passwords); syncing drafts to Gmail (needs `gmail.compose` and two-way reconciliation); parsing first names from `canonical_name`; HTML in the note body (a second rendering of the one text body); summaries as proposals (buries Review); new relationship, interaction or location attribute types (the menu of fifteen holds).
@@ -445,6 +447,11 @@ _Carried by_ no slice yet: the relationship pair and inverse resolver, the views
   - **Passages** is the existing semantic lane (SPA-129, second wave after typing pauses), kept only as a finder: places to go (a deck page, a note paragraph), never answers, never mixed into record ranking.
   - Highlighting a result opens a preview pane: a record's readout strip and key fields; an object's views and counts. Nothing highlighted, the list runs full width.
   - Foot: navigate · actions on this result · open · **Tab hands the typed query to Ask**.
+  - Amended 2026-10-08:
+    - **Nothing typed** shows only the page's own actions; no recent items.
+    - **A highlighted passage previews** its page and the matched text; ↵ opens the file viewer at that page.
+    - **An action that needs one more answer** (File in a space…) asks it in the same palette; the input's mode label names the action, and ⌫ on an empty input returns to Find.
+    - **Ask shows Stop** while it is answering.
 - **Ask is the agent.** The same palette after Tab (or ⌘J), plus a full thread view.
   - It is a **second, in-process client of the MCP tool surface** — `search_records`, `get_record`, `get_context`, propose — so external agents and the in-app chat share one set of tools, permissions and rules (spec-ai-substrate §5–6).
   - **New tools:** `query_records(object, conditions, sort, limit)` over the views compiler and D67's interaction stats, so filters and counts are computed, never generated; portfolio tools over the pure portfolio libraries, so money is computed too.
@@ -554,3 +561,327 @@ _Carried by_ SPA-172 (`plugins/airtable`).
 _Rejected:_ identity only in `entity_alias` (the shape until now: invisible to views, imports and the API, and drawn by hand on each page); identity as plain attributes with no index (uniqueness becomes check-then-write in application code, and two concurrent imports both pass); LinkedIn as a unique identity key (Attio does not; the owner chose the simpler field); CIN as a seeded identity field (India-only; the product is country-agnostic).
 
 _Carried by_ the Corrections slice that follows SPA-300. SPA-302 is cancelled, because the API's `values` now carry identity, and SPA-303 is rewritten so the deck reader fills the LinkedIn attribute again.
+
+## Addenda — 2026-10-08
+
+### D76-enrichment-is-a-host-capability
+
+**How do enrichment plugins (Apollo first; Clearbit, People Data Labs after) fit a self-hosted product?** Attio fills its own "Enriched" attributes from data it owns, so its Apollo app competes for the same fields and falls back to a parallel set of `Apollo …` fields. Spaces owns no data: every enriched value comes from a source the owner points it at. Answered (owner, 2026-10-08): **enrichment is a host capability; providers are interchangeable sources.** Builds on D72's `enrich` role.
+
+- **The host owns the experience:** the triggers, the rules (fill blanks only, a cleared value stays cleared, a disagreement with a person goes to Review), the where-from popover on a filled value, credits (an estimate before bulk, D53's cap per source, a cached result for N days) and what may leave the box.
+- **A source answers one question:** given a domain, an email or a LinkedIn URL, what it knows and what that cost. It answers in a **host-owned enrichment vocabulary** (`company.headcount`, `company.founded_year`, `person.seniority`…), not in attribute slugs.
+- **The link lives on the attribute.** An attribute carries "fill from enrichment: <key>". The system attributes are linked by default; an owner links their own attributes (e.g. "Employees" ← `company.headcount`). One link serves every source. **No `Apollo …` fields.**
+- **Several sources run in the owner's order.** For each field, the first source with an answer wins. A disagreement between two sources is kept in the where-from history and never becomes a card; Review is only for a source against a person.
+- **Free sources run first.** A built-in website source (the domain fetched by the server, read by the owner's own Extract lane) fills the description, links and logo with no key and no credit. Documents and email signatures already fill fields. A paid source is called only for the linked fields still empty.
+- **What leaves the box:** a sensitive record never reaches an outside source (only local sources run); auto-enrich covers only the scopes the owner chose; each source's page says plainly what it sends ("domain only", "email and LinkedIn URL").
+
+**Auto-enrich is the Enrich button pressed for the owner:**
+
+- **Triggers:** record created, filed into a space, joins a deal, appears in a synced meeting, gains an identity (a domain or email added after birth). Seed and import births emit nothing (D65); those are enriched in bulk from a list, behind an estimate.
+- **The host checks, in order:** in scope; not sensitive (else local sources only); not enriched within N days; has a key to look up (else it waits for the gains-an-identity event); not already queued (one job per record); credits left today.
+- **Defaults:** the website source is on for every new record from install; a paid source starts with the deal scope only.
+- **At the daily cap**, records are parked and run after the reset. Today shows one line ("Auto-enrich paused · Apollo cap reached · 14 waiting · resumes 00:00 UTC").
+- **No periodic refresh** for now; a scheduled re-enrich of the portfolio is a later opt-in.
+- **The writes are quiet:** one Review card per record listing every disagreeing field, a funding round logged as a dated event, and one timeline line ("Enriched · Website, Apollo · 6 fields · 1 credit"). No toast.
+
+**What Apollo fills.**
+
+- **Company (by domain):**
+  - Built-in: description (`short_description`, else `seo_description`), founded, location, LinkedIn.
+  - Identity: domains.
+  - Funding stage: only when Apollo's wording matches one of the owner's options; it never adds an option.
+  - Event: the latest round with its date, once per round.
+  - Vocabulary keys for the owner to link: total raised, headcount, revenue, industry, keywords, tech stack, Twitter, Facebook, AngelList, Crunchbase, blog, company phone, HQ address, ticker.
+  - Record picture: the logo, when empty.
+- **Person (by email or LinkedIn):**
+  - Built-in: job title, description (from the headline, only when blank), location, LinkedIn, Twitter.
+  - Identity: the email, only when Apollo marks it verified and it is neither a role address nor locked.
+  - Company link: an existing company, filled only when empty; an unknown company is proposed as an "Add X?" card. Enriching a person never creates a company.
+  - Vocabulary keys: seniority, department, GitHub, Facebook.
+  - Record picture: the photo, when empty.
+  - Phone: opt-in, off by default, at extra credits.
+  - Employment history: not stored. A changed title or company on a later enrichment is logged as a dated event ("Moved from Keyhold to Flent as COO").
+- **Changing figures** (headcount, revenue, total raised) are values whose where-from carries the date. A newer figure replaces one no person set, and the old figure stays in the where-from history.
+- **Not used:** departmental head count, Alexa ranking, retail location count, Apollo's internal tag ids. Apollo's own org and person ids stay in the raw response for an exact re-match and are never shown.
+- **Records gain a picture** (logo or photo), filled only when empty. New, small.
+
+_Rejected:_
+
+- Each provider as its own app with its own fields, triggers and settings (Attio's shape, which exists because Attio owns the data).
+- `Apollo …`-prefixed parallel fields: provenance per value makes them redundant.
+- Mapping inside each plugin's settings: one link per attribute serves every source.
+- Every source disagreement as a Review card.
+- Dropping capped records.
+- Periodic refresh by default.
+- Changing figures as events only: heavier, and a figure the owner filters on must be a value.
+- An enriched person silently creating its company.
+
+_Carried by_ a rewrite of `enrich-1` (still with its four gaps); new slices for the vocabulary and the attribute link, the website source, bulk enrich, the gains-an-identity trigger and the record picture; and the Enrichment page in Integrations on the canvas.
+
+### D77-exa-find-and-save-as-watch
+
+**Where does Exa sit, given that it can enrich, research, and find companies from a description ("rental software startups in India")?** Apollo is a directory (lookup by identity); Exa is a search engine (lookup by description). Answered (owner, 2026-10-08): **Exa is the open web turned into four host jobs, and finding is the one that matters most.**
+
+- **Four jobs, one integration.**
+  - **Find:** who matches a description. Lives in Ask.
+  - **Watch:** keep finding for a space (D72).
+  - **Research:** web signals plus one cited brief on a record (`backfill-12`).
+  - **Enrich:** a D76 source, after Apollo and off until enabled. It can come after first ship.
+  - The host owns each job's surface; a plugin declares which jobs it does. Nothing is Exa-specific: the watch form comes from the plugin's settings schema, the Find table carries a "via" column, and enrichment is one ordered source list.
+- **Find lives in Ask (D70), not on a search page.**
+  - A **Find companies** button on the space head opens Ask docked with the space and the web in scope, the question prefilled from the space's criteria; ⌘J asks from anywhere.
+  - Results arrive as a **table, not prose**: name, domain, one line, place, two or three source links.
+  - Each row is checked against what is held: filed here → greyed; held elsewhere → **File here**; unknown → **Add** or **Add and file here**; dismissed for this space → hidden. Dismiss is permanent per (space, domain) (D72).
+  - Adding runs `resolveEntity` and D76 enrichment follows. A result is a web result until it is added, and finding never creates a deal.
+  - A turn whose scope holds a sensitive space never reaches Exa.
+- **Fast search for a question, a webset for a watch.** Ask uses Exa's search (seconds, approximate). **Save as watch** creates a webset (slower, verified against the criteria, incremental from a stored cursor).
+- **Save as watch:**
+  - **Needs a space.** The scope's space is preselected. From a turn with none, a picker asks which space and offers to create one named from the question.
+  - **A window prefilled from the turn:** engine, a name, "Look for" (the question, blank when it equals the space's criteria), how often (**Weekly** when saved from Ask; "Manual" stays first in the list and stays the default on the space page's Add watch), "At most" per run.
+  - **The turn's results are carried, not repeated:** rows added are members, rows dismissed are dismissals, and **rows left untouched become `add_record` cards in Review** under the space.
+  - The thread keeps a line linking to the watch ("Saved as a watch on Property ops"), which says so if the watch is later deleted.
+  - The same space, engine and settings is refused as "Already watching this" (D72's unique index) and opens the existing watch.
+- **Consolidation is by result, not by watch.** Differently worded questions are separate watches. **One open `add_record` or `file_record` card per (space, domain)**: a later find appends its evidence to the open card ("found by 2 watches") instead of proposing again. Every candidate passes the same three checks: member, dismissed, open card. No new table.
+- **Ordering amends D72's.**
+  - `ask-8` splits. **Find** (Exa in Ask, the results table, Add / File here / Dismiss) follows `watch-3`, since it needs only the two card kinds and `previewResolve`. **Save as watch** stays after `watch-4`.
+  - Exa's order: Research (`backfill-12`), then Find, then the watch (`watch-5`), then the optional enrichment source.
+
+_Rejected:_
+
+- A separate search page for Find.
+- A one-shot "Research" action on a space beside the watch (D72's rejection stands; Find in Ask is the one-shot).
+- Dropping untouched results at save.
+- Merging watches.
+- One card per watch per company.
+- Watches without a space.
+- Shipping Find last, behind the Watching lane.
+
+_Carried by_ the split of `ask-8` (backlog and Linear), the per-(space, domain) open-card rule in `watch-3`, the save flow in `watch-4`, and the Find table and save window on the canvas.
+
+### D78-recorder-notes-by-folder
+
+**How does a note-taking recorder (Granola first) reach a meeting, and who sees what it sends?** Granola has a read-only REST API, launched February 2026, on Business and Enterprise plans only. Each member makes their own key. It has no webhooks. A note carries:
+
+- `private_notes` (what the person typed, visible only to them)
+- `summary` (the AI-enhanced notes)
+- `transcript`, `attendees`
+- `calendar_event.calendar_event_id`
+- `folder_membership`, `web_url`, `deleted_at`
+
+Notes still processing are not returned.
+
+In Attio, Granola pushes: the person shares a note (Share → Attio) or a whole folder, and nothing else reaches the CRM. A self-hosted Spaces cannot receive that push, so it pulls, and copies the intent. D68 also contradicted itself: notes the person wrote "fill the write-up when empty", yet a recorder's notes are "private to the person". The write-up is shared, so filling it would expose them.
+
+Answered (owner, 2026-10-08): **the folder is the share decision.**
+
+- **The meeting model is D68's, unchanged.** One `interaction` row per meeting, keyed to the calendar event, with no meeting page. A recorder note matches by `calendar_event_id`, else by start time plus attendee emails, else it births a `call`.
+- **A recorder is a personal connection.**
+  - Each member pastes their own key under You → Meeting notes (D81). This is the first key-based personal connection beside the OAuth ones.
+  - The plugin is installed once by an admin and runs a `schedule` job (about every 15 minutes), since Granola sends no events.
+  - Whether one member's key reads team-shared notes is not assumed.
+- **A ticked folder means shared.**
+  - The connection lists the member's Granola folders and they tick which to sync. A note in a ticked folder was deliberately sent, like forwarded mail (D67), and is shared with the workspace.
+  - **A note outside the ticked folders is never fetched.** It does not exist in Spaces, privately or otherwise.
+  - Moving a note out of a ticked folder, or deleting it in Granola (`deleted_at`), removes Spaces' copy.
+- **What a synced note becomes:**
+  - The enhanced note becomes **the meeting's write-up** when it has none. Otherwise it is added as a second shared note on the meeting ("Granola notes · <member>"). It is never a Review suggestion.
+  - Action items are extracted by the Extract lane into **`task` suggestions** (`interaction-1`). Granola sends them only inside the summary.
+  - The raw typed notes and the transcript are **opt-in per connection and private to the member**. The transcript is a document under the sensitivity gate. A recording, when a provider has one, stays a link (D68).
+  - `web_url` becomes "Open in Granola". The meeting's linked records follow the attendees, plus the matched company's open deal (D49).
+- **Typeface.** A note a person filed from their tool is set in **serif with a "via <tool>" mark**: the person reviewed it and chose to file it. An unchosen AI text stays sans: Exa's brief, an Ask answer, a summary nobody filed.
+- **Meeting notes also appear on the record's Notes tab** under a "From meetings" filter (D74). Their home is still the meeting in Interactions.
+- **One contract for every recorder.** Fathom, tl;dv and Google Meet's Gemini notes (through Drive) use the same folder-or-equivalent share choice and the same landing rules. They differ only in transport: webhook or schedule.
+- **Amends D68:**
+  - A provider summary is no longer a note suggestion.
+  - The `notesAreMine` switch becomes the folder choice.
+  - "Recorder notes are private to the person" now applies only to the opt-in raw notes and the transcript.
+
+_Rejected:_
+
+- Syncing every note privately and sharing per meeting inside Spaces (it fetches what the person never chose to send).
+- A provider summary as a Review card for every meeting (noise).
+- Auto-filling the shared write-up with private notes (D68's contradiction).
+- A workspace-level Granola connection (keys are per member).
+- Waiting for a push integration Granola has not built for self-hosted targets.
+
+_Carried by_ `arrival-6`/`arrival-7` rewritten as the recorder contract with a `schedule` transport and the folder list, the key-based personal connection in Connections, and the "From meetings" filter on the Notes tab.
+
+### D68-meetings — amended
+
+**Where does someone see next week's meetings, or the ones nobody wrote up?** D68 gave meetings no page: Today's section (one day at a time) and a record's Interactions tab. Answered (owner, 2026-10-09): **a Meetings list page, in a collapsible Library group.** A meeting is still an activity, never a record.
+
+- **Sidebar:** Today, Tasks and Spaces stay top-level.
+- **Library ▾ is a collapsible group** like Objects and Capital. It holds Notes (G N), Meetings (G E) and Files (G L, kept from Documents), each its own page, and collapses to "Library ▸ 3". `G M` (Mandate) and `G F` (Portfolio) are taken, so the keys first drawn were changed (2026-10-09).
+- **Documents is renamed Files** to match the record tab (D74).
+- **Email stays on records** and gets no sidebar row.
+- This amends sidebar A: rows are grouped, and none is removed.
+
+- **Upcoming:** this week and next, grouped by day. A row shows the time, the title, the people with their RSVP mark, the linked records, and **Prep**.
+- **Past:** newest first, with the write-up state on each row. Meetings with **no write-up** sort first and carry a **Write** button. A cancelled meeting stays, struck out.
+- **Filter row:** All · Upcoming · Past · No write-up · Mine.
+- A row opens the same meeting window.
+- No count on the sidebar row: counts appear only on Tasks.
+- No schema; the page is a read over `interaction` rows of kind `meeting`.
+- **Today's section** stays one day with ‹ › and gains an "all meetings ›" link.
+
+_Rejected:_
+
+- Separate top-level rows for Notes, Meetings and Documents (six rows in the Work group).
+- One merged Library page with tabs (the owner kept separate pages).
+- A week strip inside Today (no home for "no write-up").
+- A calendar grid (Spaces does not edit events; the list answers both questions).
+- A meeting record page (D68 stands).
+
+_Carried by_ the Today slice for meetings, extended with the list route, on the canvas as Meetings + Granola sheet 02.
+
+### D79-today-is-the-one-attention-surface
+
+**Where does "something needs you" live, now that tasks, deals, marks, Review cards (Exa, enrichment conflicts, Ask, recorder tasks), meetings with no write-up and broken connections all produce it?** Answered (owner, 2026-10-09): **Today is the one place that gathers them.** Each source keeps its own page; Today ranks them.
+
+- **Head:** a plain "Today" title with the date (`Thu 10-09 · W41`). The proposed serif headline sentence (T2, Q7) is **not** adopted.
+- **Day strip (T2, Q8, adopted):** a thin band of today's hours under the head. The past is dithered, meetings are ink blocks with their names, and now is a pine dot.
+- **Readouts:** derived figures only, never section counts (Overdue, Deals past stage median, Oldest mark, Unfiled files).
+- **Notices:** one band above the list, for things that stop the machine rather than the person: an enrichment limit reached (D76), a connection that needs reconnecting, a degraded plugin. One line each, with a link to fix it.
+- **Needs you (T2, Q9, adopted and widened):**
+  - One ledger sorted by urgency, with a kind lane: task, meeting, review, deal, mark.
+  - Review rows are grouped by source and space ("Proptech / Property ops · via Exa · 3 to add · 1 to file").
+  - A meeting with no write-up is a row with **Write** (D68 amended).
+  - Tabs in the head filter by kind; the list folds at eight with "show all ›" and ends in "Add a task…".
+- **Meetings:** today only, with ‹ today › and a now-rule, Prep on upcoming meetings, and "all meetings ›" to the Meetings page.
+- **Right column:**
+  - **Portfolio** (invested, value, MOIC, unpriced holdings).
+  - **What's moving:** dated events on your companies from the last 7 days (watches, Exa, enrichment, D72/D76/D77).
+  - The team's 24-hour activity ledger moves behind "team activity ›".
+
+_Rejected:_
+
+- The serif headline step.
+- Separate sections per kind.
+- Review apart from the list.
+- Portfolio with the 24h ledger in the rail.
+
+_Carried by_ the Today slice (`today.tsx`), rewritten from T2 and Today sheet 00 on the canvas.
+
+### D80-first-run-without-a-checklist
+
+**How does a self-hosted workspace learn to work, when most of the value sits behind keys the owner must bring (AI model, Google, Granola, Apollo, Exa)?** Answered (owner, 2026-10-09): **no setup checklist.** A missing piece shows only where it would be used, and the whole picture lives in one passive list.
+
+- **After the admin account**, demo data is offered with **Start empty** as the primary button. It can be removed later in one step.
+- **Today's empty state is the onboarding.** In an empty workspace Today offers three ways in: **Import a file** (CSV or Airtable export), **Drop a deck**, **Add a company**. It disappears once data exists. There is nothing to tick or dismiss.
+- **Each feature names what it needs, in place:**
+  - Ask with no model: "Ask needs a model to answer" with **Add a model ›** (a key, or Ollama on this machine).
+  - **Find companies** with no Exa: a popover with **Add an Exa key ›**.
+  - Today's Meetings with no calendar: **Connect Google ›**.
+  - Enrich works with the free Website source and shows **More sources ›**.
+  - A member sees who to ask instead of a setup link.
+- **Settings → General → What's set up:** one passive list (AI model, Team, Enrichment, Email forwarding, Google, Granola, Exa). Each item shows whether it is set up, the one line it unlocks, and a link. It is never shown unprompted.
+- **What works with zero keys:** records, spaces, deals, tasks, notes, portfolio, CSV and Airtable import, file upload and word search. The Website source reads a site's own description, logo and links without AI. Deck reading, Ask, Prep and meaning search need a model, and a local Ollama counts.
+
+_Rejected:_
+
+- A setup checklist on Today (it nags and front-loads setup before need).
+- A welcome page.
+- Setup only in Settings, with no in-place cue.
+- Demo data as the default.
+
+_Carried by_ a first-run slice (Today's empty state, the in-place prompts, the What's set up list), on the canvas as Today sheet 01.
+
+### D81-settings-by-whose-it-is
+
+**How is Settings organised, and how do its pages behave, now that it holds personal connections, workspace policy, AI routing and plugins side by side?** Answered (owner, 2026-10-08 for the map, 2026-10-09 for the behaviours): **Settings is grouped by whose it is, and every page behaves the same way.**
+
+- **The map (adopted as drawn):** Settings takes over the sidebar, with ‹ and esc to go back.
+  - **You:** Email & calendar, Files, Meeting notes, API tokens. Accounts are grouped by the job they do, not by provider (amended 2026-10-09).
+  - **Workspace:** General (with base currency, the workspace logo and What's set up, D80), Members, Objects, Templates, Currency & FX.
+  - **AI:** Models (providers and routing), Search (embeddings), Usage & limits (usage and caps).
+  - **Integrations:** Plugins, Enrichment (D76), Email forwarding (was Arrival), Connection apps (the OAuth clients, formerly part of Connections).
+- **Saving:** toggles and selects apply at once, with a toast. Typed fields (names, hosts, keys) collect into one Save bar at the foot of the page, shown only while something has changed. No per-section Save buttons.
+- **Default sensitivity:** `sensitivity_default` gets a control at the top of AI → Models ("Treat every record as: Normal / Sensitive"). It is a floor: it can only raise a record's sensitivity, never lower it. Set to Sensitive, every call routes to the local lanes.
+- **Search reuses the Models key:** when Models holds a key for the chosen embedding provider, Search uses it and says so, with "Use a different key" to override. A provider with no embeddings (Anthropic) still asks.
+- **Your accounts are grouped by job:**
+  - **Email & calendar:** connected Google and Microsoft accounts. Each has a Default mark (the one Spaces sends from), its sync state and **Options ›** (which calendars, which labels to skip). The workspace's Bcc forwarding address sits below, read-only, linking to Email forwarding.
+  - **Files:** storage accounts, several allowed (Google Drive, Box, Dropbox, OneDrive). Which folder belongs to which space stays on the space.
+  - **Meeting notes:** recorders such as Granola, with their folders and private extras (D78).
+  - Underneath, connections stay **one per provider product** (D66); a page groups them by account. Connecting Drive from Files after Gmail asks Google only for the extra scope, so the same Google account appears on both pages. Disconnect stops that product only; Google's revoke is called when the account's last product is disconnected.
+  - Providers mix freely: Box for files beside Google for mail and calendar.
+  - A provider whose plugin is not installed shows **Install ›** to an admin and "Ask an admin" to a member.
+- **Every plugin and every account has its own page.**
+  - A plugin page (Integrations → Plugins → <name>) follows one template: status and version, the workspace key, what it sends, its manifest settings, what it switches on (linking to the page that owns each capability, never repeating its settings), recent runs and errors, Disable / Uninstall.
+  - An account page (Options ›) holds the per-person choices, last sync and Disconnect.
+- **The Plugins page is a catalogue:** Installed as a ledger, then Available from the registry, grouped by job: Enrichment, Research, Email & calendar, Files, Meeting notes, Import, Feeds. It stays named "Plugins", the word the SDK uses.
+- **Confirms** on four actions that break something outside the page: revoking an API token, suspending a member, archiving an object and unticking an identity key. Each names the consequence. Reversible toggles stay instant.
+- **Members see admin pages read-only:** the same page with the controls disabled, keys redacted, and "Only admins can change this · ask <admin>". This replaces the five "Admins only" pages.
+- **No footer caption strips.** A line survives only where it concerns cost, privacy or irreversibility, and it sits next to its control (invariant-line test).
+- **Search owns the embed lane:** the Models routing grid drops its Embed row and shows one line, "Embeddings · <model> · set in Search ›".
+
+_Rejected:_
+
+- Keeping the old flat list.
+- One Save for everything, including toggles.
+- Per-section saves.
+- One Connections row per provider with a tick per product (it hid what each account is for).
+- Renaming Plugins to Apps.
+- An undo toast instead of confirms (a revoked token has already failed a call).
+- Hiding admin pages from members.
+- Keeping the Embed row in both places.
+
+_Carried by_ the settings slices (nav and IA, then each page), on the canvas as Settings sheets 00–09 (05 and 07 redrawn for the accounts and the catalogue).
+
+### D70-find-and-ask — amended (where Ask lives)
+
+**Where does Ask answer, now that the palette both finds and answers?** Answered (owner, 2026-10-08): **⌘K only finds; Ask is a docked panel and a page.**
+
+- **The palette's answer stage is removed.** ⌘K finds and goes. Tab, or ⌘J from anywhere, hands the typed query to Ask.
+- **Ask is a docked third column** (408px) beside the page, and a full **`/ask`** page. Both read one thread store.
+- **`/ask`** lists threads by day, each row with its scope and its outcome. A thread opened there offers **Open beside <record>** to continue it docked on that record.
+- **Context:**
+  - The page you are on is the default scope.
+  - Scope chips gain **views** and **files**, beside page, record, space, person and web.
+  - What a turn read is frozen with that turn; a later change of scope prints a line in the thread.
+- **Turn states** add stopped, refused (no local model for a sensitive scope), no provider, connection lost and empty.
+- **Action cards** left undecided wait in Review.
+- **Lost access:** when the asker can no longer read a source an answer cited, the answer is hidden and a line says so.
+- **Answers are set in sans.** Serif stays for what a person wrote or chose to file (D78).
+
+_Rejected:_
+
+- Answers inside the palette (two homes for one thread).
+- A thread store per surface.
+- Keeping an answer visible after its source was lost.
+
+- **Layout (owner, 2026-10-09):**
+  - **The docked panel closes and resizes.** ⌘J or its × closes it completely, leaving no rail; the sidebar's Ask row or ⌘J reopens it. The thread survives closing. Dragging its left edge sets the width between 360px and about 560px, and the width and open state are remembered per browser.
+  - **`/ask` is wider.** The thread reads in a 760px column, and the thread list collapses from its head ("Threads" brings it back). Tables, such as Find results or a query's rows, break out to the full content width. In the docked panel they scroll sideways inside their card, with "Open in /ask ›".
+  - **Your turn on the right, the answer on the left.** Your message is a bone block with a hairline, right-aligned, at most three quarters of the column, with its time under it. The answer has no box: it sits on paper at full measure, with a foot naming the model and the sources. A change of scope is a centred mono divider across the full width, not a message.
+
+_Rejected (layout):_
+
+- Chat bubbles on both sides (the answer is a printed reading, and tables and cards need the width).
+- A thin collapsed rail for the panel (a closed panel takes no room).
+- A fixed-width panel.
+
+_Carried by_ `ask-5` and `ask-7` amended, on the canvas as Ask — printed, sheets 00–09 (07–09 the layout), and Shell — printed, sheet 01.
+
+### D73-spaces-are-malleable and D74-record-body-is-tabbed — amended (the space page)
+
+**What does a space's own page look like, now that a record's body is tabbed?** Answered (owner, 2026-10-08): **a space reads like a record.**
+
+- **Head:** a `SPACE depth n` stamp, the serif name with its crumb, a **Not sensitive / Sensitive** toggle, **Note here** (`N`) as the one button, and `···` holding Rename, New subspace, Move to…, Save as template… and Archive.
+- **Readouts:** three, because the tabs carry the counts. In pipeline (`3 of 14`), last filed, and the funding-stage mix as a bar, which is the page's one dither.
+- **Details column:** Map (parent, subspaces with their counts, `+ Subspace`), Glossary, Tasks.
+- **Tabs:** Companies · Notes · Files · People · Records, each with its count; empty tabs grey; **Notes is the default**, as on a record.
+  - Referenced is no longer a section: it folds into Notes as a filter (Filed · Mentions).
+  - Companies filters All · In pipeline · Watching, sorts by funding stage, and shows a row's select box on hover (for split) and `×` to untag.
+- **Rename is in place** on the title. Links, filings and watches point at the space, so nothing else changes.
+- **Move to…** is a window over the scrim listing the tree, with the space and its descendants greyed and the parent marked "now here".
+- **Archive asks nothing**, because Restore undoes it. The archived head shows an outline stamp and a notice saying it is out of the tree and the picker, its filings stay, and its watches are paused.
+- **Save as template…** sits in the menu; what a space template holds is not yet decided.
+
+_Rejected:_
+
+- The five stacked sections of 2026-09-16.
+- Eight readouts that repeat the tab counts.
+- A confirm before archive.
+- A last-filed lane in the details column (skipped by the owner).
+
+_Carried by_ `spaces-1` amended and `spaces-4`, on the canvas as Spaces — printed, sheets 00–04.
