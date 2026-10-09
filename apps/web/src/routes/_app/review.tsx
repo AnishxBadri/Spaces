@@ -132,7 +132,7 @@ export function rendererFor(kind: string): InboxRenderer {
 /** What an unknown kind renders as: the row, legible, and nothing thrown. */
 export function PayloadFallback({ row }: { row: QueueRow }): React.ReactNode {
   return (
-    <li className="flex flex-col border border-hairline bg-paper shadow-[3px_3px_0_0_var(--hairline)]">
+    <li className="flex flex-col border border-hairline bg-paper shadow-solid">
       <div className="flex min-h-11 items-baseline gap-3 border-b border-hairline px-5 py-2.5">
         <h2 className="font-serif text-lg leading-5.5 font-semibold">
           Unrecognized item
@@ -425,7 +425,7 @@ function PairCard({
   ]
 
   return (
-    <li className="flex flex-col border border-hairline bg-paper shadow-[3px_3px_0_0_var(--hairline)]">
+    <li className="flex flex-col border border-hairline bg-paper shadow-solid">
       <div className="flex min-h-11 items-baseline gap-3 border-b border-hairline px-5 py-2.5">
         <h2 className="font-serif text-lg leading-5.5 font-semibold">
           {/* The noun is the object registry's `singular`, verbatim and

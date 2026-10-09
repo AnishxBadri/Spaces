@@ -100,7 +100,7 @@ function AppShell() {
             onClick={() => setMobileNavOpen(false)}
             aria-hidden
           />
-          <div className="absolute inset-y-0 top-12 left-0 w-58 border-r border-hairline shadow-[3px_0_0_0_var(--hairline)]">
+          <div className="absolute inset-y-0 top-12 left-0 w-58 border-r border-hairline shadow-solid">
             <AppSidebar
               hideWordmark
               user={session.user}

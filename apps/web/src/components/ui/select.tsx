@@ -13,8 +13,8 @@ import { cn } from '#/lib/utils.ts'
  * The one picker. A native `<select>` renders the operating system's list —
  * rounded on macOS, a different font, a blue system highlight, and on a
  * machine set to dark OS chrome a dark list dropping out of a paper form.
- * DESIGN.md §5 "Menus / pickers" says a picker is paper, 1px ink, a 2px hard
- * shadow, 28px rows, the highlighted row in bone, 150/100ms — which is the
+ * DESIGN.md §5 "Menus / pickers" says a picker is paper, 1px ink, a dithered
+ * popover shadow, 28px rows, the highlighted row in bone, 150/100ms — the
  * sheet the command palette and the attribute type pane already draw. This is
  * that sheet with a trigger in front of it (SPA-38), and it is what every
  * `<select>` in the app became.
@@ -89,10 +89,10 @@ export function selectClasses({
       inset ? 'focus-ring-inset' : 'focus-ring',
       className,
     ),
-    // The paper sheet: 1px ink edge, the 2px hard offset, no blur, no radius.
+    // The paper sheet: 1px ink edge, the dithered popover shadow, no radius.
     // Enter 150ms, exit 100ms, transform and opacity only (Compositor Rule).
     sheet: cn(
-      'z-dropdown flex max-h-72 flex-col overflow-hidden rounded-none border border-hairline bg-paper p-0 text-foreground shadow-[2px_2px_0_0_var(--hairline)] ease-out-quart outline-none',
+      'z-dropdown flex max-h-72 flex-col overflow-hidden rounded-none border border-hairline bg-paper p-0 text-foreground ease-out-quart outline-none shadow-dither',
       'data-[state=open]:animate-in data-[state=open]:duration-150 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
       'data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
       width === 'trigger'

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { HeadActions, HeadBar, useHeadFold } from '#/components/head-fold'
 import { SectionHead } from '#/components/ledger-section'
 import { Stamp } from '#/components/ui/stamp'
 import type { StampProps } from '#/components/ui/stamp'
@@ -7,7 +8,8 @@ import { cn } from '#/lib/utils'
 /**
  * P7 — Record page anatomy (Instrument, 2026-09-10). Header: the stamp and
  * breadcrumb, actions, serif name + badge, a readout strip of the numbers
- * that matter, the double rule under.
+ * that matter, the double rule under; scrolled past its name it folds to
+ * `HeadBar`.
  * Body left: property grid (two columns, hairline top and bottom, rules
  * inside), then the sections — notes, interactions, history, files. Rail right on bone:
  * stage stepper, readouts, people. Every part is markup only; the pages
@@ -44,60 +46,68 @@ export function RecordHeader({
   badges?: ReactNode
   readouts?: Array<RecordReadout>
 }) {
+  const { titleRef, actionsRef, fold } = useHeadFold()
   return (
-    <header className="flex shrink-0 flex-col gap-3.5 px-8 pt-5 double-rule">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <Stamp {...stamp} />
-          <div className="min-w-0 truncate mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
-            {crumb}
-          </div>
-        </div>
-        {actions ? (
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
-        ) : null}
-      </div>
-      <div className="flex min-w-0 items-center gap-3.5">
-        {mark}
-        <h1 className="min-w-0 truncate title-serif">{name}</h1>
-        {badges}
-      </div>
-      {readouts && readouts.length > 0 ? (
-        // Variant B: equal cells on rules under a hairline, the value in
-        // mono over a sentence-case label.
-        <div className="flex h-16 overflow-x-auto border-t border-hairline">
-          {readouts.map((r, i) => (
-            <div
-              key={i}
-              className="flex max-w-55 min-w-28 flex-1 basis-0 flex-col justify-center gap-0.5 border-r border-rule px-4 first:pl-0 last:border-r-0"
-            >
-              <span
-                className={cn(
-                  'truncate mono text-page leading-6.5',
-                  r.tone === 'bad'
-                    ? 'text-destructive'
-                    : r.tone === 'muted' || r.value === '—'
-                      ? 'text-graphite'
-                      : 'text-foreground',
-                )}
-              >
-                {r.value}
-              </span>
-              <span className="truncate text-label text-graphite">
-                {r.label}
-              </span>
+    <>
+      <HeadBar fold={fold} title={name} stamp={stamp} />
+      <header className="flex shrink-0 flex-col gap-3.5 px-8 pt-5 double-rule">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <Stamp {...stamp} />
+            <div className="min-w-0 truncate mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
+              {crumb}
             </div>
-          ))}
+          </div>
+          {actions ? (
+            <HeadActions fold={fold} slotRef={actionsRef}>
+              {actions}
+            </HeadActions>
+          ) : null}
         </div>
-      ) : (
-        <div className="h-1" />
-      )}
-    </header>
+        <div className="flex min-w-0 items-center gap-3.5">
+          {mark}
+          <h1 ref={titleRef} className="min-w-0 truncate title-serif">
+            {name}
+          </h1>
+          {badges}
+        </div>
+        {readouts && readouts.length > 0 ? (
+          // Variant B: equal cells on rules under a hairline, the value in
+          // mono over a sentence-case label.
+          <div className="flex h-16 overflow-x-auto border-t border-hairline">
+            {readouts.map((r, i) => (
+              <div
+                key={i}
+                className="flex max-w-55 min-w-28 flex-1 basis-0 flex-col justify-center gap-0.5 border-r border-rule px-4 first:pl-0 last:border-r-0"
+              >
+                <span
+                  className={cn(
+                    'truncate mono text-page leading-6.5',
+                    r.tone === 'bad'
+                      ? 'text-destructive'
+                      : r.tone === 'muted' || r.value === '—'
+                        ? 'text-graphite'
+                        : 'text-foreground',
+                  )}
+                >
+                  {r.value}
+                </span>
+                <span className="truncate text-label text-graphite">
+                  {r.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="h-1" />
+        )}
+      </header>
+    </>
   )
 }
 
 /** Body: the page left, the rail right on bone. The rail never scrolls
- *  with the body on wide screens. */
+ *  with the body on wide screens; it sticks under the folded head's bar. */
 export function RecordBody({
   children,
   rail,
@@ -111,7 +121,7 @@ export function RecordBody({
         {children}
       </div>
       {rail ? (
-        <aside className="flex w-full shrink-0 flex-col border-t border-hairline bg-bone xl:sticky xl:top-0 xl:max-h-dvh xl:w-90 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+        <aside className="flex w-full shrink-0 flex-col border-t border-hairline bg-bone xl:sticky xl:top-10 xl:max-h-[calc(100dvh-2.5rem)] xl:w-90 xl:overflow-y-auto xl:border-t-0 xl:border-l">
           {rail}
         </aside>
       ) : null}

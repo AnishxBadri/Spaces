@@ -445,7 +445,7 @@ function RecordPicker({
         onChange={(e) => setQuery(e.target.value)}
       />
       {results.length > 0 ? (
-        <ul className="mt-1 max-h-40 overflow-y-auto border border-hairline bg-paper shadow-[2px_2px_0_0_var(--hairline)]">
+        <ul className="mt-1 max-h-40 overflow-y-auto border border-hairline bg-paper shadow-dither">
           {results.map((r) => (
             <li key={r.id}>
               <button

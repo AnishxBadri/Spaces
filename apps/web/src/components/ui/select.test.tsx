@@ -30,12 +30,12 @@ import { opsFor } from '@spaces/core/views/filter'
 const OPS = opsFor('text')
 
 describe('selectClasses', () => {
-  it('draws the paper sheet — 1px ink edge, 2px hard offset, no blur', () => {
+  it('draws the paper sheet — 1px ink edge, dithered popover shadow, no blur', () => {
     const { sheet } = selectClasses({ width: 'trigger' })
     expect(sheet.split(' ')).toContain('border-hairline')
     expect(sheet.split(' ')).toContain('bg-paper')
     expect(sheet.split(' ')).toContain('rounded-none')
-    expect(sheet).toContain('shadow-[2px_2px_0_0_var(--hairline)]')
+    expect(sheet.split(' ')).toContain('shadow-dither')
     expect(sheet).not.toMatch(/blur|shadow-(xs|sm|md|lg)/)
   })
 

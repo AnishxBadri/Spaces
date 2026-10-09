@@ -37,6 +37,11 @@ function count(html: string, re: RegExp): number {
   return html.match(re)?.length ?? 0
 }
 
+/** The `<header>` itself, without the folded bar that hangs before it. */
+function headOf(html: string): string {
+  return html.slice(html.indexOf('<header'))
+}
+
 function tsxFiles(dir: string): Array<string> {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name)
@@ -61,7 +66,7 @@ describe('the double rule', () => {
     ]) {
       const head = classesOf(html, 'double-rule')
       expect(head).not.toContain('border-b')
-      expect(html.startsWith('<header')).toBe(true)
+      expect(html).toMatch(/<header class="[^"]*\bdouble-rule\b/)
     }
   })
 
@@ -138,9 +143,9 @@ describe('the ink stamp', () => {
         name="Flent"
       />,
     )
-    expect(count(html, /data-stamp=/g)).toBe(1)
+    expect(count(headOf(html), /data-stamp=/g)).toBe(1)
     // The stamp and the crumb share the head's first row.
-    expect(html).toMatch(/data-stamp="live"[^]*data-crumb[^]*<h1/)
+    expect(headOf(html)).toMatch(/data-stamp="live"[^]*data-crumb[^]*<h1/)
   })
 
   it('stamps a space head once with its depth', () => {
@@ -151,7 +156,7 @@ describe('the ink stamp', () => {
         name="Cross-border"
       />,
     )
-    expect(count(html, /data-stamp=/g)).toBe(1)
+    expect(count(headOf(html), /data-stamp=/g)).toBe(1)
     expect(html.replace(/<!-- -->/g, '')).toContain('Space · depth 2')
   })
 })

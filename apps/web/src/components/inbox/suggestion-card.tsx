@@ -607,7 +607,7 @@ export function SuggestionCard({ card }: { card: SuggestionRow }) {
   }
 
   return (
-    <li className="flex flex-col border border-hairline bg-paper shadow-[3px_3px_0_0_var(--hairline)]">
+    <li className="flex flex-col border border-hairline bg-paper shadow-solid">
       <div className="flex min-h-11 items-center gap-3 border-b border-hairline px-5 py-2.5">
         {/* SPA-134: a captured page's card is headed by the page. */}
         {card.page === null ? (

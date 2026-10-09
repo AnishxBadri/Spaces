@@ -40,9 +40,9 @@ bad; a zero reads graphite.
 
 **Material and scale** (`DESIGN.md` §4). Radius is `rounded-md` (2px) on controls and
 inputs, `rounded-none` everywhere else — no 4, 6, 8 or 12, no pills, no circles.
-Shadows are hard offsets: popover `shadow-[2px_2px_0_0_var(--hairline)]`, dialog
-`shadow-[3px_3px_0_0_var(--hairline)]`, until project 27 ports the printed elevation
-(a dithered popover, a solid window; §5). Nothing blurs. Spacing is 4 8 12 16 24 32 and
+Shadows are named by kind and chosen by the primitive: a popover `shadow-dither` (4px,
+Bayer 8/16), a window over the scrim `shadow-solid` (3px ink); a call site passes none
+and gate 5 refuses `shadow-[…]`. Nothing blurs. Spacing is 4 8 12 16 24 32 and
 the page gutter is 32 (`px-8`). Heights: table row 36 (`h-row`), ledger row 40 (`h-ledger-row`),
 section head 44, control 32, small 26, badge 20, nav row 30, readout strip 56–64, dialog head
 48, dialog foot 52.
@@ -217,7 +217,7 @@ needs.
 ### Pickers and dates (SPA-38)
 
 **A picker is a paper sheet, never the operating system's.** `DESIGN.md` §5
-"Menus / pickers" — paper, 1px ink, a 2px hard shadow, 28px rows, the highlighted row
+"Menus / pickers" — paper, 1px ink, the dithered shadow, 28px rows, the highlighted row
 in bone, 150/100ms — and `Select` (`apps/web/src/components/ui/select.tsx`) is that
 sheet with a trigger in front of it. A native `<select>` draws the OS list instead:
 rounded on macOS, a different font, a blue system highlight, and on a machine set to
@@ -469,13 +469,12 @@ carries it. Project 27 is "Instrument, printed — the decided design lands".
 
 **The printed details** (`DESIGN.md` §1, §5 "Printed details"; project 27, `print-*`). The double rule, the
 stamp and real tabs are built (§2) as the `double-rule`, `stamp`, `stamp-outline` and
-`tab-open` utilities in `apps/web/src/styles.css`.
+`tab-open` utilities in `apps/web/src/styles.css`. So are the elevation split
+(`shadow-dither` on a popover, `shadow-solid` on a window, chosen in the primitives) and
+the sticky head (`HeadBar`, inside `PageHeader` and `RecordHeader`).
 
 - **Dither is data**: charts, readout history, 1-bit marks, popover elevation; one moment
   per region.
-- **Elevation split**: a popover casts a 4px dithered ink shadow; a window over the
-  scrim keeps a solid ink offset shadow.
-- **Sticky head**: the page head collapses to a 40px bar on scroll.
 
 **The frame** (project 27, `shell-*`; D68 amended, D70 amended)
 

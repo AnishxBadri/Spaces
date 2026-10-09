@@ -279,7 +279,7 @@ function AttendeePicker({
         className="h-8 text-ui"
       />
       {results.length > 0 ? (
-        <ul className="max-h-40 overflow-y-auto border border-hairline bg-paper shadow-[2px_2px_0_0_var(--hairline)]">
+        <ul className="max-h-40 overflow-y-auto border border-hairline bg-paper shadow-dither">
           {results.map((r) => (
             <li key={r.id}>
               <button

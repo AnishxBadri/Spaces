@@ -38,6 +38,10 @@
  * property is the sanctioned arbitrary value: `bg-[var(--badge-amber)]` passes,
  * because the token is still the one place the value lives. The tree had zero
  * occurrences when the check landed, and this is what keeps it at zero.
+ *
+ * Elevation is two named utilities, `shadow-dither` and `shadow-solid`, and an
+ * arbitrary `shadow-[…]` / `shadow-(…)` anywhere in the app is an error naming
+ * both: which one a sheet casts is decided by its kind, in the primitive.
  */
 
 /**
@@ -81,10 +85,15 @@ const BANS = [
     use: 'rounded-md (2px) or rounded-none',
   },
 
-  // Elevation — Instrument draws depth as a hard ink offset, never a blur.
+  // Elevation — never a blur, and never spelled at a call site: the
+  // primitive picks one of two by what sits behind it (DESIGN.md §4).
   {
     re: /^shadow-xs$/,
-    use: 'shadow-[2px_2px_0_0_var(--hairline)], or no shadow at all',
+    use: 'shadow-dither (popover, menu, picker) or shadow-solid (a window over the scrim), or no shadow at all',
+  },
+  {
+    re: /^shadow-[[(]/,
+    use: 'shadow-dither (popover, menu, picker) or shadow-solid (a window over the scrim) — elevation is the primitive’s, so a surface built on Popover, DropdownMenu, Select or DialogContent passes none',
   },
 
   // Structure.

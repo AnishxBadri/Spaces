@@ -92,8 +92,28 @@ describe('instrument/vocabulary', () => {
     const ok =
       'flex items-center gap-2 rounded-md border border-rule bg-bone p-2 ' +
       'text-label text-graphite hover:bg-bone-deep focus-ring rounded-none ' +
-      'shadow-[2px_2px_0_0_var(--hairline)] data-[state=open]:bg-paper'
+      'shadow-dither shadow-solid data-[state=open]:bg-paper'
     expect(lint(`<div className="${ok}" />`)).toEqual([])
+  })
+
+  it('refuses an arbitrary shadow, naming the two by kind', () => {
+    for (const cls of [
+      'shadow-[2px_2px_0_0_var(--hairline)]',
+      'shadow-[3px_3px_0_0_var(--hairline)]',
+      'hover:shadow-[0_0_0_1px_var(--rule)]',
+      'shadow-(--my-shadow)',
+    ]) {
+      const messages = lint(`<div className="${cls}" />`)
+      expect(messages, cls).toHaveLength(1)
+      expect(messages[0]?.message).toContain('shadow-dither')
+      expect(messages[0]?.message).toContain('shadow-solid')
+    }
+    expect(
+      lint(
+        '<li className={cn("border bg-paper shadow-[3px_3px_0_0_var(--hairline)]")} />',
+        'src/routes/_app/review.tsx',
+      ),
+    ).toHaveLength(1)
   })
 
   it('sees through variants and opacity modifiers', () => {
@@ -188,7 +208,7 @@ describe('raw colour (SPA-52)', () => {
       'text-[#fff8]',
       'border-[#d6d4cd]',
       'bg-[#f4f3efcc]',
-      'shadow-[2px_2px_0_0_#1c1c1a]',
+      'outline-[#1c1c1a]',
     ]) {
       expect(lint(`<div className="${cls}" />`), cls).toHaveLength(1)
     }
@@ -217,7 +237,7 @@ describe('raw colour (SPA-52)', () => {
   it('allows an arbitrary value that reads a token', () => {
     const ok =
       'bg-[var(--badge-amber)] text-[var(--badge-amber-ink)] ' +
-      'shadow-[2px_2px_0_0_var(--hairline)] bg-[color-mix(in_oklch,var(--bone),var(--paper))]'
+      'bg-[color-mix(in_oklch,var(--bone),var(--paper))]'
     expect(lint(`<div className="${ok}" />`)).toEqual([])
   })
 

@@ -276,16 +276,18 @@ Structure is 1px ink. Inner rules are 1px rule. Nothing blurs.
 
 - **Rules.** Hairline for sections and the chassis edge; rule for rows, cells and
   inputs; 2px pine for the active tab underline; 2px ink for the reticle.
-- **Depth.** Card · 0 (rule border). Popover · 2 (`shadow-[2px_2px_0_0_var(--hairline)]`).
-  Dialog · 3 (`shadow-[3px_3px_0_0_var(--hairline)]`). Toast · ink. Every lifted sheet is
-  paper with a 1px ink edge and a hard offset shadow. No blur, ever.
-- **Elevation, printed** (decided 2026-10-08; port: project 27). Two kinds of lift, told
-  apart by what sits behind them:
+- **Depth.** Card · 0 (rule border). Popover · `shadow-dither`. Window · `shadow-solid`.
+  Toast · ink. Every lifted sheet is paper with a 1px ink edge and a hard shadow. No
+  blur, ever.
+- **Elevation, printed** (decided 2026-10-08). Two kinds of lift, told apart by what
+  sits behind them:
   - A **popover** (menu, picker, the palette's pop-outs) has no scrim, so it casts a 4px
-    dithered ink shadow (Bayer, 1-bit).
-  - A **window** (dialog, viewer, confirm) sits over the bone-deep scrim, where dither
-    vanishes, so it keeps a solid ink offset shadow.
-  - Until the port, the code draws the 2px and 3px hard shadows above.
+    dithered ink shadow (Bayer 8/16, 1-bit): `shadow-dither`, the sheet's own border
+    image, outside its 1px ink edge and never under its paper.
+  - A **window** (dialog, viewer, confirm, the palette) sits over the scrim, where
+    dither vanishes, so it keeps a solid 3px ink offset: `shadow-solid`.
+  - The primitives choose (`Popover`, `DropdownMenu`, `Select`, the BlockNote sheets;
+    `DialogContent`). No call site passes a shadow; gate 5 refuses `shadow-[…]`.
 - **Spacing.** 4 8 12 16 24 32; the page gutter is 32.
 - **Heights.** Table row 36 · ledger row 40 · section head 44 · control 32 · small 26 ·
   badge 20 · nav row 30 · header row 48 · readout strip 56–64 · dialog head 48 · dialog
@@ -569,7 +571,10 @@ colour only when nonzero and bad.
 Decided 2026-10-08/09 (port: project 27):
 
 - **Sticky head.** On scroll the head collapses to a 40px bar (stamp, title, actions);
-  the readout strip scrolls away under it.
+  the readout strip scrolls away under it. Built into `PageHeader` and `RecordHeader`
+  (`HeadBar`): the bar hangs from a zero-height sticky anchor on `z-sticky` and enters
+  on transform and opacity (180/120ms); the head's own actions are lifted into it, never
+  copied, so each hotkey stays bound once.
 - **Today takes a plain title** with the date (D79). The sentence title stays available
   to a page with a state to report, but Today no longer uses it.
 - **Double rule** under the head instead of the single hairline (Printed details).
@@ -742,7 +747,7 @@ Stage` box appears while dragging over a column.
   with its frozen mono slug beneath, description, the per-type slot, default and
   required on one line), the bone foot saying where it lands. In edit mode the pane
   stays, greyed — the type is the record of what this is.
-- **Dialogs:** paper sheet, 1px ink, 3px hard shadow, 0 radius. 48px head on bone —
+- **Dialogs:** paper sheet, 1px ink, 3px solid shadow, 0 radius. 48px head on bone —
   serif title 18/600, mono context beside it, hairline under (bone since
   2026-10-05); no `esc` and no cross in the head (2026-10-06). 20px body on paper.
   52px bone foot — Cancel beside the primary, the primary carrying ⌘↵; one close per
@@ -765,7 +770,7 @@ Stage` box appears while dragging over a column.
   ledger of what is affected (name left, mono meta right), then the bone foot: Keep
   takes focus, the destructive button carries ⌘↵. `useConfirm()` replaces
   `window.confirm` everywhere; a confirm exists to be read, never to be clicked through.
-- **Menus / pickers:** paper, 1px ink, 2px hard shadow, 28px rows, highlighted row in
+- **Menus / pickers:** paper, 1px ink, the dithered shadow, 28px rows, highlighted row in
   bone, 150/100ms.
 - **Command palette:** 640px; a pine `›` prompt, `↑↓ move · ↵ open` on the right, caps
   group labels, 32px rows, the `↵` hint on the highlighted row, a 32px bone foot.

@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
+import { HeadActions, HeadBar, useHeadFold } from './head-fold'
 import { keyHintClasses, useButtonPending } from './ui/button'
 import { cn } from '#/lib/utils'
 
@@ -9,7 +10,7 @@ import { cn } from '#/lib/utils'
  * measured (above as an eyebrow, or below as a readout); actions right,
  * each carrying its key hint inside the button. The double rule under,
  * 32px inset, 28px above — the header owns its own anatomy so every field
- * starts on the same line.
+ * starts on the same line. Scrolled past its title, it folds to `HeadBar`.
  */
 export function PageHeader({
   eyebrow,
@@ -26,30 +27,38 @@ export function PageHeader({
   action?: ReactNode
   className?: string
 }) {
+  const { titleRef, actionsRef, fold } = useHeadFold()
   return (
-    <header
-      className={cn(
-        'flex shrink-0 items-end justify-between gap-4 px-8 pt-7 pb-4 double-rule',
-        className,
-      )}
-    >
-      <div className="flex min-w-0 flex-col gap-1.5">
-        {eyebrow ? (
-          <div className="mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
-            {eyebrow}
-          </div>
+    <>
+      <HeadBar fold={fold} title={title} />
+      <header
+        className={cn(
+          'flex shrink-0 items-end justify-between gap-4 px-8 pt-7 pb-4 double-rule',
+          className,
+        )}
+      >
+        <div className="flex min-w-0 flex-col gap-1.5">
+          {eyebrow ? (
+            <div className="mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
+              {eyebrow}
+            </div>
+          ) : null}
+          <h1 ref={titleRef} className="title-serif">
+            {title}
+          </h1>
+          {description ? (
+            <div className="flex flex-wrap items-baseline gap-x-5 mono text-label text-graphite">
+              {description}
+            </div>
+          ) : null}
+        </div>
+        {action ? (
+          <HeadActions fold={fold} slotRef={actionsRef}>
+            {action}
+          </HeadActions>
         ) : null}
-        <h1 className="title-serif">{title}</h1>
-        {description ? (
-          <div className="flex flex-wrap items-baseline gap-x-5 mono text-label text-graphite">
-            {description}
-          </div>
-        ) : null}
-      </div>
-      {action ? (
-        <div className="flex shrink-0 items-center gap-2">{action}</div>
-      ) : null}
-    </header>
+      </header>
+    </>
   )
 }
 
