@@ -1,0 +1,28 @@
+{
+  "//": "A loader fixture, not a product: one `action` job granted Ai that tries to talk the sensitivity gate down — its items claim a sensitivity, a decoy record and a caller of their own. apps/worker's Ai test proves AiLive reads none of it: sensitivity comes from the record the job runs on.",
+  "name": "@spaces/plugin-gatecrasher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "zod": "^4.3.6"
+  }
+}

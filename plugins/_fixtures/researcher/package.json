@@ -1,5 +1,5 @@
 {
-  "//": "A fixture (SPA-200, sdk-7b), not a product: one research-shaped `action` job that reads a record, asks a stand-in search provider and emits each hit as a signal through Content.emitSignal. Its `uses` names no Facts — sdk-12a reuses it to prove a job that reaches for a port it did not declare fails. Tested on @spaces/sdk/testing's Layers with no database.",
+  "//": "A fixture (SPA-200, sdk-7b), not a product: one research-shaped `action` job that reads a record, asks a stand-in search provider, drafts a brief through Ai, emits each hit as a signal through Content.emitSignal and proposes the brief through Judgment. apps/worker's Ai test invokes it through the loader. Its `uses` names no Facts — sdk-12a reuses it to prove a job that reaches for a port it did not declare fails. Tested on @spaces/sdk/testing's Layers with no database.",
   "name": "@spaces/plugin-researcher",
   "version": "0.1.0",
   "private": true,

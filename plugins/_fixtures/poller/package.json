@@ -1,0 +1,28 @@
+{
+  "//": "A loader fixture, not a product: two `schedule` jobs (a poller) granted Ai. `classify` calls the classify lane, which a schedule job may; `brief` calls synthesize, which AiLive refuses at the port before any model is called. apps/worker's Ai test invokes both through the loader.",
+  "name": "@spaces/plugin-poller",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "zod": "^4.3.6"
+  }
+}

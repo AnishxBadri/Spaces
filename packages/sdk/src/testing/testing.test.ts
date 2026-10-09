@@ -1,7 +1,9 @@
 import { Effect, Exit, Redacted } from 'effect'
 import { describe, expect, expectTypeOf, it } from 'vitest'
+import { z } from 'zod'
 import type { PortName } from '../contract.ts'
 import {
+  Ai,
   Content,
   Facts,
   Http,
@@ -13,6 +15,7 @@ import {
 } from '../ports.ts'
 import type { PortServices } from '../ports.ts'
 import {
+  AiTest,
   ContentTest,
   FactsTest,
   HttpTest,
@@ -318,6 +321,51 @@ describe('ImportTest', () => {
       _tag: 'JobPermanent',
       reason: 'the grid has no row that could be placed',
     })
+  })
+})
+
+describe('AiTest', () => {
+  const items = [{ ref: 'event:signal-1', text: 'Raised a Series A' }] as const
+
+  it('answers a plain call with the scripted text, and a default without one', () => {
+    const ai = AiTest({ answers: { synthesize: { text: 'A brief.' } } })
+    const [brief, label] = Effect.runSync(
+      Effect.gen(function* () {
+        const port = yield* Ai
+        return [
+          yield* port.complete('synthesize', items),
+          yield* port.complete('extract', items),
+        ]
+      }).pipe(Effect.provide(ai.layer)),
+    )
+    expect(brief).toBe('A brief.')
+    expect(label).toBe('extract answer')
+    expect(ai.calls.at(0)).toEqual({
+      port: 'Ai',
+      method: 'complete',
+      input: { lane: 'synthesize', items },
+      output: 'A brief.',
+    })
+  })
+
+  it('parses a structured answer with the schema, and fails when it does not fit', () => {
+    const schema = z.object({ label: z.enum(['funding', 'other']) })
+    const ai = AiTest({
+      answers: { classify: { object: { label: 'funding' } } },
+    })
+    const answer = Effect.runSync(
+      Effect.gen(function* () {
+        return yield* (yield* Ai).complete('classify', items, schema)
+      }).pipe(Effect.provide(ai.layer)),
+    )
+    expect(answer).toEqual({ label: 'funding' })
+
+    const refused = Effect.runSyncExit(
+      Effect.gen(function* () {
+        return yield* (yield* Ai).complete('extract', items, schema)
+      }).pipe(Effect.provide(ai.layer)),
+    )
+    expect(failureOf(refused)._tag).toBe('JobPermanent')
   })
 })
 

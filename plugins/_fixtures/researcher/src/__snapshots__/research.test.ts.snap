@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`the researcher research job, on the test Layers > reads, searches, and emits one signal per hit 1`] = `
+exports[`the researcher research job, on the test Layers > reads, searches, drafts a brief, emits one signal per hit and proposes the brief 1`] = `
 [
   {
     "input": {
@@ -39,6 +39,32 @@ exports[`the researcher research job, on the test Layers > reads, searches, and 
       "status": 200,
     },
     "port": "Http",
+  },
+  {
+    "input": {
+      "items": [
+        {
+          "ref": "attr:entity-0:name",
+          "text": "Northwind Robotics",
+        },
+        {
+          "ref": "event:hit-1",
+          "text": "Northwind Robotics raises a $4M seed — https://news.example/2026/09/northwind-seed",
+        },
+        {
+          "ref": "event:hit-2",
+          "text": "Who is teaching warehouse robots new SKUs? — https://blog.example/warehouse-robots",
+        },
+        {
+          "ref": "event:hit-3",
+          "text": "https://jobs.example/northwind/ml-engineer",
+        },
+      ],
+      "lane": "synthesize",
+    },
+    "method": "complete",
+    "output": "Northwind raised a round [event:hit-1].",
+    "port": "Ai",
   },
   {
     "input": {
@@ -92,6 +118,26 @@ exports[`the researcher research job, on the test Layers > reads, searches, and 
   },
   {
     "input": {
+      "entityId": "entity-0",
+      "proposal": {
+        "body": "Northwind raised a round [event:signal-1].",
+        "kind": "note",
+      },
+      "rationale": "Web research (fixture)",
+      "refs": [
+        "event:signal-1",
+        "event:signal-2",
+        "event:signal-3",
+      ],
+    },
+    "method": "suggest",
+    "output": {
+      "suggestionId": "suggestion-1",
+    },
+    "port": "Judgment",
+  },
+  {
+    "input": {
       "fields": {
         "entityId": "entity-0",
         "refs": [
@@ -99,6 +145,7 @@ exports[`the researcher research job, on the test Layers > reads, searches, and 
           "event:signal-2",
           "event:signal-3",
         ],
+        "suggestionId": "suggestion-1",
       },
       "message": "researched",
     },

@@ -1,4 +1,5 @@
 import { Effect, Layer, Redacted } from 'effect'
+import type { z } from 'zod'
 import { JobPermanent, JobRateLimited } from '../contract.ts'
 import { normalizeDomain, normalizeEmail } from '../identity/normalize.ts'
 import type {
@@ -12,6 +13,7 @@ import type {
 import { landImportGrid } from '../import-grid.ts'
 import type { LandedRow } from '../import-grid.ts'
 import {
+  Ai,
   Config,
   Content,
   Facts,
@@ -26,6 +28,8 @@ import {
   Secrets,
 } from '../ports.ts'
 import type {
+  AiItem,
+  AiLane,
   FactConflict,
   HttpMethod,
   HttpRequest,
@@ -47,8 +51,7 @@ import type {
  * `testPorts(…)` builds them all over one shared recorder, which is what a
  * job test usually wants: one Layer, one ordered list of port calls.
  *
- * Not here: `Ai`, whose fake lands with its live port, and `PluginDb`, whose
- * behaviour is Postgres's own — a plugin's SQL is tested against a real
+ * Not here: `PluginDb`, whose behaviour is Postgres's own — a plugin's SQL is tested against a real
  * database, as the worker's PluginDb test does. A DryRun Layer (this recorder in production, over core's
  * `previewResolve`) is the later answer to an importer preview.
  */
@@ -288,6 +291,68 @@ export const ReceiptsTest = (
       Effect.sync(() => record('store', claim, { receiptId: next() })),
   })
   return { layer, calls }
+}
+
+// ---------------------------------------------------------------------------
+// Ai
+// ---------------------------------------------------------------------------
+
+/** What a lane answers: `text` for a plain call, `object` for one with a schema. */
+export type AiAnswer = {
+  readonly text?: string
+  readonly object?: JsonValue
+}
+
+/**
+ * `complete` answers from `answers` by lane: a plain call gets the scripted
+ * `text` (`<lane> answer` when none), a call with a schema gets the scripted
+ * `object` parsed by it — none, or one the schema refuses, fails permanently,
+ * as the live port does. Items are recorded as `{ ref, text }`.
+ */
+export const AiTest = (
+  options: {
+    readonly answers?: { readonly [L in AiLane]?: AiAnswer }
+    readonly recorder?: Recorder
+  } = {},
+): TestPort<Ai> => {
+  const { calls, record } = tap('Ai', options.recorder)
+  const input = (lane: AiLane, items: ReadonlyArray<AiItem>) => ({
+    lane,
+    items: items.map((item) => ({ ref: item.ref, text: item.text })),
+  })
+  function complete(
+    lane: AiLane,
+    items: ReadonlyArray<AiItem>,
+  ): Effect.Effect<string, JobError>
+  function complete<TResult>(
+    lane: AiLane,
+    items: ReadonlyArray<AiItem>,
+    schema: z.ZodType<TResult>,
+  ): Effect.Effect<TResult, JobError>
+  function complete<TResult>(
+    lane: AiLane,
+    items: ReadonlyArray<AiItem>,
+    schema?: z.ZodType<TResult>,
+  ): Effect.Effect<string | TResult, JobError> {
+    const answer = options.answers?.[lane]
+    if (schema === undefined)
+      return Effect.sync(() =>
+        record(
+          'complete',
+          input(lane, items),
+          answer?.text ?? `${lane} answer`,
+        ),
+      )
+    const parsed = schema.safeParse(answer?.object)
+    return parsed.success
+      ? Effect.sync(() => record('complete', input(lane, items), parsed.data))
+      : Effect.fail(
+          new JobPermanent({
+            reason: `Ai.complete: no ${lane} answer the schema accepts`,
+          }),
+        )
+  }
+  return { layer: Layer.succeed(Ai, Ai.of({ complete })), calls }
 }
 
 // ---------------------------------------------------------------------------
@@ -587,10 +652,11 @@ export type TestPortsOptions = {
   readonly accessToken?: string
   readonly config?: JsonObject
   readonly http?: ReadonlyArray<HttpScript>
+  readonly ai?: { readonly [L in AiLane]?: AiAnswer }
 }
 
 /**
- * Every test port over one recorder: `layer` provides all eleven, `calls` is
+ * Every test port over one recorder: `layer` provides all twelve, `calls` is
  * every port call in the order the job made it, and each port's own handle
  * is there for its extra state (`facts.values`, `log.lines`).
  */
@@ -622,8 +688,13 @@ export const testPorts = (options: TestPortsOptions = {}) => {
   const http = HttpTest(options.http ?? [], { recorder })
   const log = LogTest({ recorder })
   const importer = ImportTest({ recorder })
+  const ai = AiTest({
+    ...(options.ai === undefined ? {} : { answers: options.ai }),
+    recorder,
+  })
   return {
     layer: Layer.mergeAll(
+      ai.layer,
       importer.layer,
       identity.layer,
       facts.layer,
@@ -648,6 +719,7 @@ export const testPorts = (options: TestPortsOptions = {}) => {
     http,
     log,
     import: importer,
+    ai,
   }
 }
 

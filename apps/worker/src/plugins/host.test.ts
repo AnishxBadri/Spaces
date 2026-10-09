@@ -371,30 +371,6 @@ describe('a Layer per (integration, job)', () => {
   })
 })
 
-describe('ports this host does not provide', () => {
-  it.each(['Ai'] as const)(
-    'degrades a plugin whose job declares %s, naming the port, and builds nothing',
-    async (port) => {
-      const root = newPluginsRoot()
-      writeBundle(root, 'reacher', { uses: ['Log', port] })
-      const reacher = await row('reacher')
-      const { host, enqueue, reconciled } = await boot(root)
-
-      const reason = `job ping uses ${port}, which this host does not provide yet`
-      expect(reconciled.verdicts.map((v) => [v.status, v.reason])).toEqual([
-        ['degraded', reason],
-      ])
-      expect(reconciled.loaded).toEqual([])
-      expect(await rowById(reacher.id)).toMatchObject({
-        status: 'degraded',
-        lastError: reason,
-      })
-      expect(host.granted(reacher.id, 'ping')).toBeNull()
-      expect(enqueue.built).toBe(0)
-    },
-  )
-})
-
 describe('a config the settings schema refuses', () => {
   const settings =
     'z.object({ feedUrl: z.string(), maxItems: z.int().default(20) })'

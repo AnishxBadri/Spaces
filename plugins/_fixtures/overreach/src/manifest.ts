@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { defineManifest } from '@spaces/sdk'
 
-/** One action job granted Log and nothing else. */
+/** Two action jobs that reach past their grant: one for Facts, one (an enricher) for Ai. */
 export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'overreach',
@@ -9,9 +9,10 @@ export const manifest = defineManifest({
   sdk: '^1.0',
   name: 'overreach',
   description:
-    'A loader fixture: a job that declares only Log and reaches for Facts at runtime.',
+    'A loader fixture: jobs that reach at runtime for a port their manifest does not grant.',
   settings: z.object({}),
   jobs: {
     overreach: { trigger: 'action', uses: ['Log'] },
+    enrich: { trigger: 'action', uses: ['Read', 'Facts', 'Log'] },
   },
 })

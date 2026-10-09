@@ -16,7 +16,6 @@ import { SDK_VERSION, manifestSchema, satisfiesSdk } from '@spaces/sdk'
 import type { Manifest } from '@spaces/sdk'
 import { standInFor } from './fakes/switch'
 import type { FakeProviders } from './fakes/switch'
-import { unprovidedPort } from './grant'
 import { resolvePluginImportsToHost } from './host-resolve'
 import { migratePlugin } from './plugin-db'
 import type { PluginDbOptions } from './plugin-db'
@@ -31,8 +30,7 @@ import type { PluginDbOptions } from './plugin-db'
  *   (`removed_at`, kept for provenance). Rows are the intent: files with no
  *   row are ignored, a row with no files is degraded naming the path.
  * - Validates the manifest, the sdk range, the bundle sha against lock.json
- *   (no entry loads unpinned), what `requires` asks of the row, and that
- *   every port a job declares is one this host provides (`UNPROVIDED_PORTS`).
+ *   (no entry loads unpinned) and what `requires` asks of the row.
  * - Imports `bundle.mjs` with its bare imports resolved to the host's copies.
  * - Migrates a plugin that ships `migrations/` or uses `PluginDb` in its own
  *   schema, as the `plugin_runtime` role (`migratePlugin`), and answers an
@@ -238,14 +236,6 @@ const check = (
 
     const sdk = satisfiesSdk(manifest.sdk, SDK_VERSION)
     if (!sdk.ok) return yield* new Degraded({ reason: sdk.reason })
-
-    // 3. validate — every port a job declares is one this host provides
-    const unprovided = unprovidedPort(manifest)
-    if (unprovided !== null) {
-      return yield* new Degraded({
-        reason: `job ${unprovided.job} uses ${unprovided.port}, which this host does not provide yet`,
-      })
-    }
 
     // 3. validate — the bundle against lock.json
     if (lock instanceof Degraded) return yield* lock

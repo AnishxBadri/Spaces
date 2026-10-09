@@ -427,6 +427,9 @@ importers:
       '@spaces/plugin-echo':
         specifier: workspace:*
         version: link:../../plugins/_fixtures/echo
+      '@spaces/plugin-gatecrasher':
+        specifier: workspace:*
+        version: link:../../plugins/_fixtures/gatecrasher
       '@spaces/plugin-google-drive':
         specifier: workspace:*
         version: link:../../plugins/google-drive
@@ -445,6 +448,12 @@ importers:
       '@spaces/plugin-overreach':
         specifier: workspace:*
         version: link:../../plugins/_fixtures/overreach
+      '@spaces/plugin-poller':
+        specifier: workspace:*
+        version: link:../../plugins/_fixtures/poller
+      '@spaces/plugin-researcher':
+        specifier: workspace:*
+        version: link:../../plugins/_fixtures/researcher
       '@spaces/plugin-rss':
         specifier: workspace:*
         version: link:../../plugins/rss
@@ -693,6 +702,34 @@ importers:
         specifier: ^4.3.6
         version: 4.4.3
 
+  plugins/_fixtures/gatecrasher:
+    dependencies:
+      '@spaces/sdk':
+        specifier: workspace:*
+        version: link:../../../packages/sdk
+    devDependencies:
+      '@spaces/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
+      eslint:
+        specifier: ^9.20.0
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+      vite:
+        specifier: ^8.1.5
+        version: 8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.1)
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
+
   plugins/_fixtures/hooked:
     dependencies:
       '@spaces/sdk':
@@ -812,6 +849,34 @@ importers:
         version: 4.4.3
 
   plugins/_fixtures/overreach:
+    dependencies:
+      '@spaces/sdk':
+        specifier: workspace:*
+        version: link:../../../packages/sdk
+    devDependencies:
+      '@spaces/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
+      eslint:
+        specifier: ^9.20.0
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+      vite:
+        specifier: ^8.1.5
+        version: 8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.1)
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
+
+  plugins/_fixtures/poller:
     dependencies:
       '@spaces/sdk':
         specifier: workspace:*

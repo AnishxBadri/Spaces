@@ -25,9 +25,12 @@ const run = (ports: ReturnType<typeof testPorts>, entityId = 'entity-0') => {
 }
 
 describe('the researcher research job, on the test Layers', () => {
-  it('reads, searches, and emits one signal per hit', async () => {
+  it('reads, searches, drafts a brief, emits one signal per hit and proposes the brief', async () => {
     const ports = testPorts({
       entities: [northwind],
+      ai: {
+        synthesize: { text: 'Northwind raised a round [event:hit-1].' },
+      },
       http: [
         {
           method: 'POST',
@@ -41,11 +44,21 @@ describe('the researcher research job, on the test Layers', () => {
     expect(ports.calls.map((c) => `${c.port}.${c.method}`)).toEqual([
       'Read.entity',
       'Http.request',
+      'Ai.complete',
       'Content.emitSignal',
       'Content.emitSignal',
       'Content.emitSignal',
+      'Judgment.suggest',
       'Log.info',
     ])
+    // The prompt's place-holding ref is replaced by the signal it became.
+    expect(ports.judgment.calls.at(0)?.input).toMatchObject({
+      proposal: {
+        kind: 'note',
+        body: 'Northwind raised a round [event:signal-1].',
+      },
+      refs: ['event:signal-1', 'event:signal-2', 'event:signal-3'],
+    })
     expect(ports.calls).toMatchSnapshot()
   })
 
@@ -64,5 +77,6 @@ describe('the researcher research job, on the test Layers', () => {
     const exit = await run(ports)
     expect(JSON.stringify(exit)).toContain('JobRetryable')
     expect(ports.content.calls).toEqual([])
+    expect(ports.ai.calls).toEqual([])
   })
 })

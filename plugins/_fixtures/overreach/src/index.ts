@@ -1,11 +1,12 @@
 import { Context, Effect } from 'effect'
-import { Facts, Log, definePlugin } from '@spaces/sdk'
+import { Ai, Facts, Log, definePlugin } from '@spaces/sdk'
 import { manifest } from './manifest.ts'
 
 /**
  * A bundle that lies in its types: `yield* Facts` would fail typecheck
- * against `uses: ['Log']`, so the job reads Facts out of its context by hand.
- * At runtime that is the same lookup, and the host never handed Facts over.
+ * against `uses: ['Log']`, so a job reads the port out of its context by
+ * hand. At runtime that is the same lookup, and the host never handed it
+ * over. `overreach` reaches for Facts; `enrich`, an enricher, for Ai.
  */
 export default definePlugin({
   manifest,
@@ -19,6 +20,16 @@ export default definePlugin({
           entityId,
           values: { description: 'written by a job never granted Facts' },
         })
+      }),
+    enrich: ({ entityId }) =>
+      Effect.gen(function* () {
+        yield* (yield* Log).info('reaching for Ai', { entityId })
+        const context = yield* Effect.context<never>()
+        const ai = Context.getUnsafe(context, Ai)
+        const description = yield* ai.complete('synthesize', [
+          { ref: `attr:${entityId}:name`, text: entityId },
+        ])
+        yield* (yield* Facts).fill({ entityId, values: { description } })
       }),
   },
 })

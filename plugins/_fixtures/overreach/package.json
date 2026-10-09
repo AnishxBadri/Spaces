@@ -1,5 +1,5 @@
 {
-  "//": "A loader fixture, not a product: its one job declares only Log and its bundle reaches for Facts anyway, through a context read the type system cannot see. apps/worker's plugin host test proves the undeclared port is service-not-found, mapped to JobPermanent, with nothing written.",
+  "//": "A loader fixture, not a product: `overreach` declares only Log and reaches for Facts anyway, and `enrich`, an enricher, reaches for Ai, each through a context read the type system cannot see. apps/worker's plugin host and Ai tests prove the undeclared port is service-not-found, mapped to JobPermanent, with nothing written and no provider called.",
   "name": "@spaces/plugin-overreach",
   "version": "0.1.0",
   "private": true,

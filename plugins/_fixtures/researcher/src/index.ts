@@ -1,16 +1,18 @@
 import { Effect } from 'effect'
 import { z } from 'zod'
 import {
+  Ai,
   Content,
   Http,
   JobPermanent,
   JobRetryable,
+  Judgment,
   Log,
   Read,
   definePlugin,
   responseJson,
 } from '@spaces/sdk'
-import type { Ref, SignalClaim } from '@spaces/sdk'
+import type { AiItem, Ref, SignalClaim } from '@spaces/sdk'
 import { manifest } from './manifest.ts'
 
 /** A stand-in search provider; the test scripts its responses (HttpTest). */
@@ -50,11 +52,29 @@ export const toSignals = (
     },
   }))
 
+/** A hit's place-holding ref in the prompt, before its signal exists. */
+const hitRef = (index: number): Ref => `event:hit-${index + 1}`
+
+/** The record and each hit, as the context the brief is drafted from. */
+export const briefItems = (
+  record: { readonly id: string; readonly name: string },
+  claims: ReadonlyArray<SignalClaim>,
+): ReadonlyArray<AiItem> => [
+  { ref: `attr:${record.id}:name`, text: record.name },
+  ...claims.map((claim, index) => ({
+    ref: hitRef(index),
+    text: [claim.title, claim.url]
+      .filter((part) => part !== undefined)
+      .join(' — '),
+  })),
+]
+
 export default definePlugin({
   manifest,
   jobs: {
-    // D52: each emitSignal writes at once and hands back the signal's id,
-    // which is what a later suggestion would cite (`event:<id>`, D4).
+    // The brief is drafted before anything is written, so a refused call
+    // (a sensitive record, the day's cap) leaves no signal behind. D52: each
+    // emitSignal hands back the signal's id, which the suggestion cites (D4).
     research: ({ entityId }) =>
       Effect.gen(function* () {
         const record = yield* (yield* Read).entity(entityId)
@@ -82,13 +102,26 @@ export default definePlugin({
               reason: `${SEARCH_URL} did not return search results`,
             }),
         })
+        const draft = yield* (yield* Ai).complete(
+          'synthesize',
+          briefItems(record, claims),
+        )
         const content = yield* Content
         const refs: Array<Ref> = []
-        for (const claim of claims) {
+        let brief = draft
+        for (const [index, claim] of claims.entries()) {
           const { signalId } = yield* content.emitSignal(claim)
-          refs.push(`event:${signalId}`)
+          const ref: Ref = `event:${signalId}`
+          refs.push(ref)
+          brief = brief.replaceAll(`[${hitRef(index)}]`, `[${ref}]`)
         }
-        yield* (yield* Log).info('researched', { entityId, refs })
+        const { suggestionId } = yield* (yield* Judgment).suggest({
+          entityId: record.id,
+          proposal: { kind: 'note', body: brief },
+          rationale: 'Web research (fixture)',
+          refs,
+        })
+        yield* (yield* Log).info('researched', { entityId, refs, suggestionId })
       }),
   },
 })

@@ -30,6 +30,8 @@
     "@spaces/plugin-throws",
     "@spaces/plugin-syncer",
     "@spaces/plugin-tabled",
-    "@spaces/plugin-trespass"
+    "@spaces/plugin-trespass",
+    "@spaces/plugin-poller",
+    "@spaces/plugin-gatecrasher"
   ]
 }

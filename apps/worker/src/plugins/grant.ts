@@ -1,8 +1,10 @@
 import { Data, Effect, Layer, Redacted } from 'effect'
 import type { z } from 'zod'
 import { Secrets } from '@spaces/sdk'
-import type { Manifest, PortName } from '@spaces/sdk'
+import type { PortName, Trigger } from '@spaces/sdk'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
+import { AiLive } from '@spaces/core/writes/ports/ai'
+import type { ModelCall } from '@spaces/core/writes/ports/ai'
 import { AmbientPortsLive } from '@spaces/core/writes/ports/ambient'
 import type { BoundIntegration } from '@spaces/core/writes/ports/binding'
 import type { ConfigInvalid } from '@spaces/core/writes/ports/config'
@@ -30,21 +32,7 @@ import { PluginDbLive } from './plugin-db'
  *   of the job's services.
  */
 
-/** Ports this host has no live Layer for; a job declaring one degrades its plugin. */
-export const UNPROVIDED_PORTS: ReadonlyArray<PortName> = ['Ai']
-
-/** The first (job, port) in the manifest this host cannot provide. */
-export const unprovidedPort = (
-  manifest: Manifest,
-): { readonly job: string; readonly port: PortName } | null => {
-  for (const [job, declared] of Object.entries(manifest.jobs)) {
-    const port = declared.uses.find((p) => UNPROVIDED_PORTS.includes(p))
-    if (port !== undefined) return { job, port }
-  }
-  return null
-}
-
-/** A port the grant was asked for and has no Layer for. */
+/** A port the grant was asked for and cannot build. */
 export class PortUnprovided extends Data.TaggedError('PortUnprovided')<{
   readonly reason: string
 }> {}
@@ -63,6 +51,11 @@ export type GrantOptions = {
   readonly sink?: LogSink
   /** `SPACES_FAKE_PROVIDERS`: a fake standing in for this plugin's provider wins over `fetch`. */
   readonly fakes?: FakeProviders | null
+  /** What `Ai` needs: the job's trigger, which fixes its lanes, and the model call. */
+  readonly ai?: {
+    readonly trigger: Trigger
+    readonly modelCall: Layer.Layer<ModelCall>
+  }
 }
 
 /** The bound Secrets with a stand-in's access token, and its key when `secret` is given. */
@@ -161,13 +154,18 @@ export const grantLayer = (
         break
       case 'Ai':
         standalone.push(
-          Layer.effectDiscard(
-            Effect.fail(
-              new PortUnprovided({
-                reason: `${port} has no live implementation in this host yet`,
-              }),
-            ),
-          ),
+          options.ai === undefined
+            ? Layer.effectDiscard(
+                Effect.fail(
+                  new PortUnprovided({
+                    reason: 'Ai was granted without the job it runs for',
+                  }),
+                ),
+              )
+            : Layer.provide(
+                AiLive(row, { trigger: options.ai.trigger }),
+                options.ai.modelCall,
+              ),
         )
         break
       case 'Config':

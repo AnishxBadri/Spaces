@@ -6,6 +6,7 @@ import {
   Exit,
   Fiber,
   Layer,
+  Option,
   Predicate,
   Scope,
 } from 'effect'
@@ -15,6 +16,7 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import {
+  Ai,
   JobPermanent,
   JobRateLimited,
   JobRetryable,
@@ -32,6 +34,8 @@ import type {
   WebhookInput,
 } from '@spaces/sdk'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
+import { AiBinder } from '@spaces/core/writes/ports/ai'
+import type { ModelCall } from '@spaces/core/writes/ports/ai'
 import type { FetchLike } from '@spaces/core/writes/ports/http'
 import type { LogSink } from '@spaces/core/writes/ports/log'
 import { BREAKER_REASON } from '../run-job'
@@ -40,6 +44,7 @@ import type { FakeProviders } from './fakes/switch'
 import { grantLayer } from './grant'
 import { messageOf, truncate } from './loader'
 import type { LoadedHook, LoadedPlugin } from './loader'
+import { ModelCallLive } from './model-call'
 import {
   breakerGroup,
   pluginQueues,
@@ -61,6 +66,9 @@ import type { PluginQueue, PluginQueuesOptions } from './queues'
  *   `JobPermanent`.
  * - `onEnable` runs once when a plugin is wired, `onDisable` when it is
  *   released. A failing hook degrades that plugin and no other.
+ * - `Ai` is built once per (integration, job) and bound per invocation to
+ *   the entity the job runs on (`AiBinder`): sensitivity is resolved from
+ *   that entity, never from anything the plugin passes.
  * - One `Enqueue` serves every job, built in the host's own scope: closing a
  *   job's scope closes its ports and never the shared sender.
  * - A tripped breaker releases its plugin from a detached fiber, never from
@@ -86,6 +94,8 @@ export type PluginHostOptions = {
   readonly sink?: LogSink
   /** `SPACES_FAKE_PROVIDERS`: what the grant swaps in for a faked provider. */
   readonly fakes?: FakeProviders | null
+  /** The model call every `Ai` grant runs on; `complete()` when omitted. */
+  readonly modelCall?: LayerType.Layer<ModelCall>
 }
 
 /** One plugin's outcome from `wire` or `release`, and the line boot prints. */
@@ -148,6 +158,8 @@ type WiredJob = {
   readonly run: JobRun
   readonly scope: Scope.Closeable
   readonly context: Context.Context<never>
+  /** Binds `Ai` to one invocation's subject; null when the job has no Ai. */
+  readonly bindAi: AiBinder['Service']['bind'] | null
 }
 
 type Wired = {
@@ -208,6 +220,26 @@ const notGranted = (defect: unknown): string | null => {
 
 const scheduleOutput = z.object({ nextCursor: z.string().nullable() })
 
+/**
+ * The entity an invocation runs on, which `Ai` resolves sensitivity from.
+ * An action or event job always has one: a missing id binds `''`, which the
+ * port refuses rather than reading as "no record".
+ */
+const subjectOf = (trigger: Trigger, input: JobInput): string | null => {
+  if (trigger === 'action')
+    return Predicate.hasProperty(input, 'entityId') &&
+      Predicate.isString(input.entityId)
+      ? input.entityId
+      : ''
+  if (trigger === 'event')
+    return Predicate.hasProperty(input, 'event') &&
+      Predicate.hasProperty(input.event, 'entityId') &&
+      Predicate.isString(input.event.entityId)
+      ? input.event.entityId
+      : ''
+  return null
+}
+
 /** Run a lifecycle hook with no ports; the failure's message, or null. */
 const runHook = (hook: LoadedHook): Effect.Effect<string | null> =>
   Effect.suspend(() => {
@@ -236,6 +268,7 @@ const closeAll = (jobs: Iterable<WiredJob>) =>
   })
 
 export const makePluginHost = (options: PluginHostOptions): PluginHost => {
+  const modelCall = options.modelCall ?? ModelCallLive()
   const wired = new Map<string, Wired>()
   /** Queue name → the integration whose jobs it runs. */
   const owners = new Map<string, string>()
@@ -304,6 +337,7 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
           ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
           ...(options.sink === undefined ? {} : { sink: options.sink }),
           ...(options.fakes === undefined ? {} : { fakes: options.fakes }),
+          ai: { trigger: declared.trigger, modelCall },
         }),
         scope,
       ).pipe(Effect.exit)
@@ -321,6 +355,10 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
         context: Context.pick(...declared.uses.map((port) => PORTS[port]))(
           built.value,
         ),
+        bindAi: Option.match(Context.getOption(built.value, AiBinder), {
+          onNone: () => null,
+          onSome: (binder) => binder.bind,
+        }),
       })
     }
     const plans =
@@ -571,13 +609,22 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
         )
       }
       const label = `${plugin.id}.${jobName}`
+      // Ai is bound here, per invocation, to the entity the job runs on.
+      const context =
+        job.bindAi === null
+          ? job.context
+          : Context.add(
+              job.context,
+              Ai,
+              job.bindAi(subjectOf(job.trigger, input)),
+            )
       return Effect.suspend(() => {
         const out = job.run(input)
         return isBundleEffect(out)
           ? out
           : Effect.die(new Error(`${label} did not return an Effect`))
       }).pipe(
-        Effect.provideContext(job.context),
+        Effect.provideContext(context),
         Effect.mapError((error) =>
           isJobError(error)
             ? error
