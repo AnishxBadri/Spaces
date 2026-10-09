@@ -65,3 +65,18 @@ export type AiRouteInput = z.infer<typeof aiRouteInput>
 
 /** `isLaneRouted`'s input: the lane a trigger belongs to. */
 export const aiLaneInput = z.object({ lane: z.enum(AI_LANES) })
+
+/**
+ * The lanes the Models routing grid draws: every lane but `embed`, which
+ * Search owns. The router still routes `embed`. (D81)
+ */
+export const MODELS_GRID_LANES = AI_LANES.filter((lane) => lane !== 'embed')
+
+/**
+ * `setSensitivityDefault`'s input: the workspace floor, which can only raise
+ * a record's sensitivity, never lower it. (D81)
+ */
+export const sensitivityDefaultInput = z.object({
+  sensitivity: z.enum(AI_SENSITIVITIES),
+})
+export type SensitivityDefaultInput = z.infer<typeof sensitivityDefaultInput>

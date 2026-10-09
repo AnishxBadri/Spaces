@@ -16,7 +16,9 @@ import {
   Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { z } from 'zod'
 import { Mark, Wordmark } from './wordmark'
 import {
   DropdownMenu,
@@ -29,13 +31,18 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { authClient } from '#/lib/auth-client'
 import {
+  PINNED_SHOWN,
+  PINNED_VIEWS_QUERY,
   STARRED_SHOWN,
+  prunePinnedViews,
   setGroupFolded,
   useFoldedGroups,
+  usePinnedViews,
   useStarredSpaces,
 } from '#/lib/chassis-prefs'
 import type { FoldableGroup } from '#/lib/chassis-prefs'
 import { objectIcon } from '#/lib/object-icons'
+import { listPinnedViews } from '#/lib/server-fns'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 import { cn } from '#/lib/utils'
 
@@ -47,6 +54,8 @@ import { cn } from '#/lib/utils'
  * - The current row is a tab cut into the page edge: paper, crossing the
  *   hairline so it joins the page. Never a pine bar (the No-Bar Rule).
  * - Every row has the same box, current or not, so nothing shifts.
+ * - Pinned saved views stand under their object, indented, three then
+ *   `▸ n more`; a pin the server no longer answers is pruned.
  * - Overflow expands inline as `▸ n more`, never a dropdown.
  * - Upload and Settings are icon buttons on the account row; Upload is not a
  *   page, so it is not a row of `NAV_ITEMS`.
@@ -150,6 +159,42 @@ const isMac =
 
 type CustomObject = { slug: string; plural: string; icon: string | null }
 
+type PinnedView = Awaited<ReturnType<typeof listPinnedViews>>[number]
+
+/** The list's `?view=`, read without trusting the location's type. */
+const viewSearch = z.object({ view: z.string() })
+const viewOf = (search: unknown): string | null => {
+  const parsed = viewSearch.safeParse(search)
+  return parsed.success ? parsed.data.view : null
+}
+
+/**
+ * The pinned views this user may still open, in pin order. The pins the
+ * server was asked about and left out (deleted, or private to someone else)
+ * are dropped from storage once the answer lands.
+ */
+function usePinnedViewRows(): ReadonlyArray<PinnedView> {
+  const pins = usePinnedViews()
+  const asked = useMemo(() => pins.slice(0, 100), [pins])
+  // The last answer stands while a changed pin set is asked about, so the
+  // rows never blink; only an answer to these very pins may prune them.
+  const { data, isPlaceholderData } = useQuery({
+    queryKey: [PINNED_VIEWS_QUERY, asked],
+    queryFn: () => listPinnedViews({ data: { ids: [...asked] } }),
+    enabled: asked.length > 0,
+    placeholderData: keepPreviousData,
+  })
+  useEffect(() => {
+    if (data && !isPlaceholderData)
+      prunePinnedViews(asked, new Set(data.map((v) => v.id)))
+  }, [asked, data, isPlaceholderData])
+  return useMemo(() => {
+    if (!data || asked.length === 0) return []
+    const byId = new Map(data.map((v) => [v.id, v]))
+    return asked.flatMap((id) => byId.get(id) ?? [])
+  }, [asked, data])
+}
+
 export function AppSidebar({
   user,
   workspaceName,
@@ -183,6 +228,11 @@ export function AppSidebar({
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const [starsOpen, setStarsOpen] = useState(false)
   const [objectsOpen, setObjectsOpen] = useState(false)
+  const pinned = usePinnedViewRows()
+  const currentView = useRouterState({
+    select: (s) => viewOf(s.location.search),
+  })
+  const [pinsOpen, setPinsOpen] = useState<ReadonlyArray<string>>([])
 
   async function signOut() {
     await authClient.signOut()
@@ -217,6 +267,31 @@ export function AppSidebar({
   )
   // On a starred space its own row is the tab, so Spaces stops matching it.
   const onStarredSpace = stars.shown.some((s) => pathname === `/spaces/${s.id}`)
+
+  /** One object's pinned rows; on one of them, that row is the tab. */
+  function pinsUnder(slug: string, path: string) {
+    const open = pinsOpen.includes(slug)
+    const views = pinned.filter((v) => v.objectSlug === slug)
+    const { shown, hidden } = overflow(
+      views,
+      PINNED_SHOWN,
+      open,
+      (v) => pathname === path && currentView === v.id,
+    )
+    return {
+      views,
+      shown,
+      hidden,
+      open,
+      onPinnedView: shown.some(
+        (v) => pathname === path && currentView === v.id,
+      ),
+      toggle: () =>
+        setPinsOpen((o) =>
+          o.includes(slug) ? o.filter((x) => x !== slug) : [...o, slug],
+        ),
+    }
+  }
 
   return (
     <div className="relative flex h-full flex-col bg-bone">
@@ -346,28 +421,49 @@ export function AppSidebar({
           count={OBJECTS.length + objects.length}
           folded={folded.includes('objects')}
         >
-          {OBJECTS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              icon={item.icon}
-              hint={item.key}
-              onClick={onNavigate}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-          {customs.shown.map((o) => (
-            <NavLink
-              key={`o:${o.slug}`}
-              to="/o/$objectSlug"
-              params={{ objectSlug: o.slug }}
-              icon={objectIcon(o)}
-              onClick={onNavigate}
-            >
-              {o.plural}
-            </NavLink>
-          ))}
+          {OBJECTS.map((item) => {
+            const pins = pinsUnder(item.to.slice(1), item.to)
+            return (
+              <div key={item.to} className="contents">
+                <NavLink
+                  to={item.to}
+                  icon={item.icon}
+                  hint={item.key}
+                  onClick={onNavigate}
+                  search={pins.onPinnedView ? { view: undefined } : undefined}
+                >
+                  {item.label}
+                </NavLink>
+                <PinnedViewRows
+                  to={item.to}
+                  pins={pins}
+                  onNavigate={onNavigate}
+                />
+              </div>
+            )
+          })}
+          {customs.shown.map((o) => {
+            const pins = pinsUnder(o.slug, `/o/${o.slug}`)
+            return (
+              <div key={`o:${o.slug}`} className="contents">
+                <NavLink
+                  to="/o/$objectSlug"
+                  params={{ objectSlug: o.slug }}
+                  icon={objectIcon(o)}
+                  onClick={onNavigate}
+                  search={pins.onPinnedView ? { view: undefined } : undefined}
+                >
+                  {o.plural}
+                </NavLink>
+                <PinnedViewRows
+                  to="/o/$objectSlug"
+                  params={{ objectSlug: o.slug }}
+                  pins={pins}
+                  onNavigate={onNavigate}
+                />
+              </div>
+            )
+          })}
           {(
             objectsOpen
               ? objects.length > CUSTOM_OBJECTS_SHOWN
@@ -458,6 +554,54 @@ export function AppSidebar({
         </span>
       </div>
     </div>
+  )
+}
+
+/**
+ * An object's pinned views: indented rows linking to the list with that view
+ * applied (`?view=`), then `▸ n more` past `PINNED_SHOWN`.
+ */
+function PinnedViewRows({
+  to,
+  params,
+  pins,
+  onNavigate,
+}: {
+  to: string
+  params?: Record<string, string> | undefined
+  pins: {
+    views: ReadonlyArray<PinnedView>
+    shown: ReadonlyArray<PinnedView>
+    hidden: number
+    open: boolean
+    toggle: () => void
+  }
+  onNavigate?: (() => void) | undefined
+}) {
+  return (
+    <>
+      {pins.shown.map((v) => (
+        <NavLink
+          key={`v:${v.id}`}
+          to={to}
+          params={params}
+          search={{ view: v.id }}
+          onClick={onNavigate}
+          indent
+          exact
+        >
+          {v.name}
+        </NavLink>
+      ))}
+      {(pins.open ? pins.views.length > PINNED_SHOWN : pins.hidden > 0) ? (
+        <MoreRow
+          open={pins.open}
+          hidden={pins.hidden}
+          noun="pinned views"
+          onToggle={pins.toggle}
+        />
+      ) : null}
+    </>
   )
 }
 
@@ -786,6 +930,7 @@ function MoreRow({
 function NavLink({
   to,
   params,
+  search,
   icon: Icon,
   hint,
   onClick,
@@ -795,6 +940,12 @@ function NavLink({
 }: {
   to: string
   params?: Record<string, string> | undefined
+  /**
+   * Search the row is current on: a pinned view's `{ view: id }`, or
+   * `{ view: undefined }` for its object row while one of its views is the
+   * tab — an explicit undefined must be absent from the URL.
+   */
+  search?: Record<string, string | undefined> | undefined
   icon?: LucideIcon | undefined
   /** The chord printed in the right lane — graphite, ink on the current page. */
   hint?: string | undefined
@@ -809,8 +960,13 @@ function NavLink({
     <Link
       to={to}
       {...(params ? { params } : {})}
+      {...(search ? { search } : {})}
       {...(onClick ? { onClick } : {})}
-      activeOptions={{ exact }}
+      activeOptions={{
+        exact,
+        includeSearch: search !== undefined,
+        explicitUndefined: true,
+      }}
       className={cn(
         'flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-l-md rounded-r-none border-y border-l border-transparent pr-5.5 text-ui text-foreground transition-colors',
         indent ? 'pl-8.5' : 'pl-2.5',

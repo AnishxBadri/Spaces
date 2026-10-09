@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useSettingsDraft } from '#/components/settings/settings-form'
@@ -11,16 +11,19 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
 import type { SelectItem } from '#/components/ui/select'
-import { AI_LANES, AI_SENSITIVITIES } from '#/lib/ai/lanes'
+import { AI_SENSITIVITIES, MODELS_GRID_LANES } from '#/lib/ai/lanes'
 import type { AiLane, AiSensitivity } from '#/lib/ai/lanes'
 import { PROVIDERS } from '#/lib/ai/providers/ids'
 import type { LlmProvider } from '#/lib/ai/providers/ids'
 import { formatHeaderLines } from '#/lib/ai/providers/meta'
 import {
+  getEmbeddingSettings,
+  getSensitivityDefault,
   listAiProviders,
   listAiRoutes,
   saveAiKey,
   setAiRoute,
+  setSensitivityDefault,
   testAiProvider,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -28,37 +31,118 @@ import { cn } from '#/lib/utils'
 type ProviderRow = Awaited<ReturnType<typeof listAiProviders>>[number]
 type RouteRow = Awaited<ReturnType<typeof listAiRoutes>>[number]
 type TestResult = Awaited<ReturnType<typeof testAiProvider>>
+type EmbeddingPin = Awaited<ReturnType<typeof getEmbeddingSettings>>['pin']
 
 /**
- * Settings → AI → Models: the vault's LLM keys (Providers) and the lane ×
- * sensitivity table (Routing), admin-only. (D81)
+ * Settings → AI → Models: the workspace sensitivity floor, the vault's LLM
+ * keys (Providers) and the lane × sensitivity table (Routing), admin-only.
+ * (D81)
  * - One row and one set of fields per provider, both drawn from `PROVIDERS` —
  *   what differs between providers is data there, never a branch on the id.
- * - The typed fields join the page's Save bar; a routing cell saves alone.
+ * - The typed fields join the page's Save bar; a select saves alone.
+ * - The embed lane is Search's: the grid shows one line pointing there.
  * - A member reads the same page, keys redacted and every control disabled.
  */
 export const Route = createFileRoute('/_app/settings/models')({
   loader: async () => {
-    const [providers, routes] = await Promise.all([
-      listAiProviders(),
-      listAiRoutes(),
-    ])
-    return { providers, routes }
+    const [providers, routes, sensitivityDefault, embedding] =
+      await Promise.all([
+        listAiProviders(),
+        listAiRoutes(),
+        getSensitivityDefault(),
+        getEmbeddingSettings(),
+      ])
+    return {
+      providers,
+      routes,
+      sensitivityDefault,
+      embeddingPin: embedding.pin,
+    }
   },
   component: ModelsRoute,
 })
 
 function ModelsRoute() {
-  const { providers, routes } = Route.useLoaderData()
+  const { providers, routes, sensitivityDefault, embeddingPin } =
+    Route.useLoaderData()
   return (
     <SettingsSection
       title="Models"
       blurb="Which model providers this workspace calls, with whose key."
       crumb="AI"
     >
+      <SensitivityGroup stored={sensitivityDefault} />
       <ProvidersGroup providers={providers} />
-      <RoutingGroup providers={providers} routes={routes} />
+      <RoutingGroup
+        providers={providers}
+        routes={routes}
+        embeddingPin={embeddingPin}
+      />
     </SettingsSection>
+  )
+}
+
+const SENSITIVITY_LABEL: Record<AiSensitivity, string> = {
+  normal: 'Normal',
+  sensitive: 'Sensitive',
+}
+
+/**
+ * Sensitivity — the workspace floor (`sensitivity_default`). It can only
+ * raise a record's sensitivity: Sensitive sends every call to the local
+ * lanes; Normal leaves each record's own flag and its spaces to decide. The
+ * select saves at once.
+ */
+function SensitivityGroup({ stored }: { stored: AiSensitivity }) {
+  const router = useRouter()
+  const [pending, setPending] = useState(false)
+  const items: Array<SelectItem<AiSensitivity>> = AI_SENSITIVITIES.map((s) => ({
+    value: s,
+    label: SENSITIVITY_LABEL[s],
+  }))
+
+  async function choose(next: AiSensitivity) {
+    if (next === stored) return
+    setPending(true)
+    try {
+      await setSensitivityDefault({ data: { sensitivity: next } })
+      toast(`Every record treated as ${SENSITIVITY_LABEL[next].toLowerCase()}`)
+      void router.invalidate()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not save the sensitivity',
+      )
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col pt-8">
+      <SectionHead
+        as="h3"
+        title="Sensitivity"
+        count="a floor · raises a record, never lowers it"
+      />
+      <SettingsRow
+        label="Treat every record as"
+        hint={
+          stored === 'sensitive'
+            ? 'Every call goes to the local lanes.'
+            : undefined
+        }
+      >
+        <Select<AiSensitivity>
+          value={stored}
+          onChange={(v) => void choose(v)}
+          items={items}
+          width="trigger"
+          disabled={pending}
+          aria-label="Treat every record as"
+          className="w-40"
+        />
+      </SettingsRow>
+    </div>
   )
 }
 
@@ -324,9 +408,11 @@ type CellValue = LlmProvider | typeof UNSET
 function RoutingGroup({
   providers,
   routes,
+  embeddingPin,
 }: {
   providers: ProviderRow[]
   routes: RouteRow[]
+  embeddingPin: EmbeddingPin
 }) {
   const routable = providers.filter(
     (p) => p.configured && p.status === 'active',
@@ -334,8 +420,10 @@ function RoutingGroup({
   const cellOf = (lane: AiLane, sensitivity: AiSensitivity) =>
     routes.find((r) => r.lane === lane && r.sensitivity === sensitivity)
       ?.target ?? null
-  const routed = routes.filter((r) =>
-    routable.some((p) => p.provider === r.target?.provider),
+  const routed = routes.filter(
+    (r) =>
+      MODELS_GRID_LANES.some((lane) => lane === r.lane) &&
+      routable.some((p) => p.provider === r.target?.provider),
   ).length
 
   return (
@@ -343,7 +431,7 @@ function RoutingGroup({
       <SectionHead
         as="h3"
         title="Routing"
-        count={`${routed} of ${AI_LANES.length * AI_SENSITIVITIES.length} routed`}
+        count={`${routed} of ${MODELS_GRID_LANES.length * AI_SENSITIVITIES.length} routed`}
       />
       <p className="px-3 py-3 text-label text-graphite">
         A lane with no model routed hides the features that use it. Sensitive
@@ -361,7 +449,7 @@ function RoutingGroup({
         ))}
       </div>
       <ol>
-        {AI_LANES.map((lane) => (
+        {MODELS_GRID_LANES.map((lane) => (
           <LedgerRow key={lane}>
             <span className="w-24 shrink-0 text-body font-medium capitalize">
               {lane}
@@ -380,6 +468,17 @@ function RoutingGroup({
             ))}
           </LedgerRow>
         ))}
+        <LedgerRow>
+          <span className="min-w-0 flex-1 truncate mono text-micro text-graphite">
+            Embeddings · {embeddingPin?.model ?? 'none'} ·{' '}
+            <Link
+              to="/settings/search"
+              className="text-foreground underline-offset-2 hover:underline"
+            >
+              set in Search ›
+            </Link>
+          </span>
+        </LedgerRow>
       </ol>
     </div>
   )

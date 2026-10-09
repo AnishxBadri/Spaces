@@ -6,13 +6,11 @@ import type {
   EmbeddingPinSetting,
   EmbeddingSlotSetting,
 } from '@spaces/db/schema/workspace'
-import { readWorkspaceCredential } from '@spaces/core/writes/vault'
 import { readProviderMeta } from './providers/meta'
+import { readEmbeddingWorkspaceCredential } from './providers/embed'
 import {
   EMBEDDING_PROVIDER_INFO,
   PIN_DIMS,
-  embeddingCredentialKind,
-  embeddingCredentialProvider,
   findEmbeddingModel,
   isEmbeddingProvider,
   missingCredentialMessage,
@@ -190,16 +188,12 @@ const knownModel = Effect.fn('pinEmbedding.knownModel')(function* (
   return model
 })
 
-/** A pin names a provider whose embedding key is saved, or it is refused. */
+/** A pin names a provider with an embedding key, or a Models key it reuses, or it is refused. */
 const requireKey = Effect.fn('pinEmbedding.requireKey')(function* (
   target: EmbeddingTarget,
 ): Effect.fn.Return<void, PinRefused | EmbeddingPinReadFailed> {
   const key = yield* Effect.tryPromise({
-    try: () =>
-      readWorkspaceCredential(
-        embeddingCredentialProvider(target.provider),
-        embeddingCredentialKind(target.provider),
-      ),
+    try: () => readEmbeddingWorkspaceCredential(target.provider),
     catch: (cause) => new EmbeddingPinReadFailed({ cause }),
   })
   if (!key || key.status !== 'active')
@@ -319,11 +313,7 @@ const testedGreen = Effect.fn('sensitiveSlot.testedGreen')(function* (
   target: EmbeddingTarget,
 ): Effect.fn.Return<boolean | 'no-credential', EmbeddingPinReadFailed> {
   const row = yield* Effect.tryPromise({
-    try: () =>
-      readWorkspaceCredential(
-        embeddingCredentialProvider(target.provider),
-        embeddingCredentialKind(target.provider),
-      ),
+    try: () => readEmbeddingWorkspaceCredential(target.provider),
     catch: (cause) => new EmbeddingPinReadFailed({ cause }),
   })
   if (!row || row.status !== 'active') return 'no-credential'

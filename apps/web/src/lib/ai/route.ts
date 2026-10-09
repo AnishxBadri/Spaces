@@ -1,7 +1,8 @@
 import { Effect, Schema } from 'effect'
 import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { aiRoute, credential } from '@spaces/db/schema'
+import { aiRoute, credential, workspace } from '@spaces/db/schema'
+import { workspaceDefaultOf } from '@spaces/core/ai/sensitivity'
 import { effectFn } from '#/lib/server/effect'
 import { requireAdmin, requireUser } from '#/lib/server/shared'
 import { LLM_PROVIDERS } from './providers/ids'
@@ -12,6 +13,7 @@ import type {
   AiRouteInput,
   AiRouteSetInput,
   AiSensitivity,
+  SensitivityDefaultInput,
 } from './lanes'
 
 /**
@@ -267,4 +269,78 @@ export async function isLaneRoutedHandler(input: {
 export async function listAiRoutesHandler(): Promise<AiRouteCell[]> {
   await requireUser()
   return effectFn(listAiRoutesProgram)()
+}
+
+// The workspace floor (D81): `workspace.settings.sensitivity_default`, which
+// `sensitivityFor` ORs under every record's own inputs.
+
+/** The floor could not be saved; `message` is what Models shows. */
+export class SensitivityDefaultWriteFailed extends Schema.TaggedError<SensitivityDefaultWriteFailed>()(
+  'SensitivityDefaultWriteFailed',
+  { message: Schema.String, cause: Schema.Defect() },
+) {}
+
+/** The stored floor; absent reads as `normal`. */
+export const readSensitivityDefaultProgram = Effect.fn(
+  'readSensitivityDefault',
+)(function* (): Effect.fn.Return<AiSensitivity, RouteReadFailed> {
+  const row = (yield* read(() =>
+    db
+      .select({
+        value: sql<
+          string | null
+        >`${workspace.settings} ->> 'sensitivity_default'`,
+      })
+      .from(workspace)
+      .limit(1),
+  )).at(0)
+  return workspaceDefaultOf(row?.value ?? null)
+})
+
+/**
+ * Writes the floor, merged into `settings` in one statement so a concurrent
+ * write to another key is not lost. Refuses before first-run setup has made
+ * the workspace row.
+ */
+export const setSensitivityDefaultProgram = Effect.fn('setSensitivityDefault')(
+  function* (
+    input: SensitivityDefaultInput,
+  ): Effect.fn.Return<AiSensitivity, SensitivityDefaultWriteFailed> {
+    const written = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .update(workspace)
+          .set({
+            settings: sql`${workspace.settings} || jsonb_build_object('sensitivity_default', ${input.sensitivity}::text)`,
+            updatedAt: new Date(),
+          })
+          .where(eq(workspace.id, 1))
+          .returning({ id: workspace.id }),
+      catch: (cause) =>
+        new SensitivityDefaultWriteFailed({
+          message: 'Could not save the default sensitivity',
+          cause,
+        }),
+    })
+    if (written.length === 0)
+      return yield* new SensitivityDefaultWriteFailed({
+        message: 'The workspace is not set up yet',
+        cause: null,
+      })
+    return input.sensitivity
+  },
+)
+
+/** The `getSensitivityDefault` server fn's body. Any member reads it. (D81) */
+export async function getSensitivityDefaultHandler(): Promise<AiSensitivity> {
+  await requireUser()
+  return effectFn(readSensitivityDefaultProgram)()
+}
+
+/** The `setSensitivityDefault` server fn's body. `requireAdmin()` first. */
+export async function setSensitivityDefaultHandler(
+  input: SensitivityDefaultInput,
+): Promise<AiSensitivity> {
+  await requireAdmin()
+  return effectFn(setSensitivityDefaultProgram)(input)
 }

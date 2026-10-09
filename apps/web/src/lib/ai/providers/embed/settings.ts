@@ -1,7 +1,6 @@
 import { Effect, Schema } from 'effect'
 import {
   mergeCredentialMeta,
-  readWorkspaceCredential,
   redact,
   storeCredential,
 } from '@spaces/core/writes/vault'
@@ -17,10 +16,10 @@ import {
 } from '../../embedding-pin'
 import { readProviderMeta } from '../meta'
 import { providerFailure } from '../test-call'
+import { readEmbeddingWorkspaceCredential } from './index'
 import {
   EMBEDDING_PROVIDERS,
   EMBEDDING_PROVIDER_INFO,
-  embeddingCredentialKind,
   embeddingCredentialProvider,
   findEmbeddingModel,
   needsRepinNote,
@@ -28,6 +27,7 @@ import {
 } from './ids'
 import type {
   EmbeddingKeyInput,
+  EmbeddingKeySource,
   EmbeddingPinView,
   EmbeddingProvider,
   EmbeddingSlotView,
@@ -49,6 +49,8 @@ import type {
  * `display`. Ollama (SPA-83) has no key and no row of its own: its row here
  * is the LLM provider's keyless credential, read for its base URL, and the
  * embed Test writes only its own verdict keys onto it (`embedTest*`).
+ * A keyed provider with no embedding key reuses its Models key the same
+ * way (`reusableModelsKey`, D81) until one is saved.
  */
 
 /** A read or write behind the section failed; `message` is what it is shown. */
@@ -61,6 +63,8 @@ export type EmbeddingKeyRow = {
   provider: EmbeddingProvider
   label: string
   configured: boolean
+  /** `models` while Search embeds on the Models key; null with no row. */
+  source: EmbeddingKeySource | null
   display: string | null
   /** The saved base URL; for Ollama, the address the embed calls go to. */
   baseUrl: string | null
@@ -83,11 +87,7 @@ export type EmbeddingTestResult =
 
 const readKey = (provider: EmbeddingProvider) =>
   Effect.tryPromise({
-    try: () =>
-      readWorkspaceCredential(
-        embeddingCredentialProvider(provider),
-        embeddingCredentialKind(provider),
-      ),
+    try: () => readEmbeddingWorkspaceCredential(provider),
     catch: (cause) =>
       new EmbeddingSettingsFailed({
         message: 'Could not read the embedding keys',
@@ -117,6 +117,7 @@ export const getEmbeddingSettingsProgram = Effect.fn('getEmbeddingSettings')(
         provider,
         label: EMBEDDING_PROVIDER_INFO[provider].label,
         configured: row !== undefined && row.status === 'active',
+        source: row?.source ?? null,
         display: meta?.display ?? null,
         baseUrl: meta?.baseUrl ?? null,
         lastTestedAt: meta?.embedTestedAt ?? null,

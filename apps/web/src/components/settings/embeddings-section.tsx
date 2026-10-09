@@ -26,6 +26,7 @@ import {
   needsRepinNote,
   pinHeadline,
   pinSwapNote,
+  reusedKeyLine,
   sensitiveEstimateLine,
   slotHeadline,
   slotSearchNote,
@@ -250,6 +251,8 @@ export function EmbeddingsSection({
               </Button>
             )}
           </SettingsRow>
+        ) : keyRow?.source === 'models' && keyRow.configured ? (
+          <ReusedModelsKey key={provider} provider={provider} keyRow={keyRow} />
         ) : (
           <EmbeddingKeyField
             key={provider}
@@ -322,6 +325,34 @@ export function EmbeddingsSection({
       </div>
       {confirmDialog}
     </SettingsSection>
+  )
+}
+
+/**
+ * The Models key Search is embedding on (D81): the line naming it, and "Use
+ * a different key", which opens the provider's own key field. A key saved
+ * there takes precedence; until then nothing changes.
+ */
+function ReusedModelsKey({
+  provider,
+  keyRow,
+}: {
+  provider: EmbeddingProvider
+  keyRow: EmbeddingKeyRow
+}) {
+  const [different, setDifferent] = useState(false)
+  if (different)
+    return <EmbeddingKeyField provider={provider} keyRow={undefined} />
+  return (
+    <SettingsRow
+      label={`${EMBEDDING_PROVIDER_INFO[provider].label} key`}
+      hint={reusedKeyLine(provider)}
+    >
+      <span className="mono text-label">{keyRow.display ?? '••••'}</span>
+      <Button size="sm" variant="outline" onClick={() => setDifferent(true)}>
+        Use a different key
+      </Button>
+    </SettingsRow>
   )
 }
 

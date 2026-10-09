@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { aiKeyInput, aiProviderInput } from '../ai/providers/ids'
-import { aiLaneInput, aiRouteInput } from '../ai/lanes'
+import { aiLaneInput, aiRouteInput, sensitivityDefaultInput } from '../ai/lanes'
 import { aiCapsInput } from '../ai/caps-input'
 import {
   embeddingKeyInput,
@@ -74,6 +74,22 @@ export const isLaneRouted = createServerFn()
   .handler(async ({ data }) => {
     const { isLaneRoutedHandler } = await import('../ai/route')
     return isLaneRoutedHandler(data)
+  })
+
+/**
+ * The workspace sensitivity floor on Models (D81). Any member reads it; the
+ * write is admin-only and applies at once.
+ */
+export const getSensitivityDefault = createServerFn().handler(async () => {
+  const { getSensitivityDefaultHandler } = await import('../ai/route')
+  return getSensitivityDefaultHandler()
+})
+
+export const setSensitivityDefault = createServerFn({ method: 'POST' })
+  .validator(sensitivityDefaultInput)
+  .handler(async ({ data }) => {
+    const { setSensitivityDefaultHandler } = await import('../ai/route')
+    return setSensitivityDefaultHandler(data)
   })
 
 /**

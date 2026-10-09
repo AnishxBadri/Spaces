@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { formatNumber } from '@spaces/core/format'
-import { PROVIDERS } from '../ids'
+import { LLM_PROVIDERS, PROVIDERS } from '../ids'
+import type { LlmProvider } from '../ids'
 
 /**
  * Embedding providers, their models and the pin's copy, with nothing
@@ -239,6 +240,27 @@ export const embeddingCredentialKind = (
   provider: EmbeddingProvider,
 ): 'llm' | 'embedding' =>
   EMBEDDING_PROVIDER_INFO[provider].keyless ? 'llm' : 'embedding'
+
+/**
+ * The Models key an embedding provider falls back to when it has no
+ * embedding key of its own: the LLM provider of the same id. (D81)
+ * - Null for a keyless provider (it already reads the LLM row) and for one
+ *   Models has no provider for (Voyage), which always asks for its own key.
+ * - An embedding key, once saved, takes precedence over the reused one.
+ */
+export const reusableModelsKey = (
+  provider: EmbeddingProvider,
+): LlmProvider | null => {
+  if (EMBEDDING_PROVIDER_INFO[provider].keyless) return null
+  return LLM_PROVIDERS.find((p) => p === provider) ?? null
+}
+
+/** Where an embedding call's credential comes from. */
+export type EmbeddingKeySource = 'own' | 'models'
+
+/** What Search says while it embeds on the Models key. */
+export const reusedKeyLine = (provider: EmbeddingProvider): string =>
+  `using the ${EMBEDDING_PROVIDER_INFO[provider].label} key from Models`
 
 /**
  * Where to point an embedding provider's address, said once for the

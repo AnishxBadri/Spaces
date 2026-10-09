@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { eq, isNotNull } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
-import { aiRoute, credential } from '@spaces/db/schema'
+import { aiRoute, credential, entity, workspace } from '@spaces/db/schema'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { storeCredential } from '@spaces/core/writes/vault'
 import { aiRouteInput } from './lanes'
@@ -11,8 +11,11 @@ import {
   clearAiRouteProgram,
   isLaneRoutedProgram,
   listAiRoutesProgram,
+  readSensitivityDefaultProgram,
   setAiRouteProgram,
+  setSensitivityDefaultProgram,
 } from './route'
+import { sensitivityFor } from './sensitivity-for'
 
 /**
  * SPA-69. The Routing ledger's server half: a cell set and cleared reads back
@@ -267,5 +270,67 @@ describe('isLaneRouted', () => {
       sensitive: false,
     })
     expect(await run(listAiRoutesProgram())).toEqual([])
+  })
+})
+
+describe('the workspace sensitivity floor', () => {
+  beforeEach(async () => {
+    await db.delete(workspace).where(eq(workspace.id, 1))
+  })
+
+  const setFloor = (sensitivity: 'normal' | 'sensitive') =>
+    run(setSensitivityDefaultProgram({ sensitivity }))
+
+  it('refuses before the workspace exists', async () => {
+    const failure = await run(
+      Effect.flip(setSensitivityDefaultProgram({ sensitivity: 'sensitive' })),
+    )
+    expect(failure).toMatchObject({
+      _tag: 'SensitivityDefaultWriteFailed',
+      message: 'The workspace is not set up yet',
+    })
+  })
+
+  it('Sensitive writes the floor, and a record marked normal then resolves sensitive', async () => {
+    await db.insert(workspace).values({
+      id: 1,
+      name: 'Fund',
+      settings: { base_currency: 'EUR' },
+    })
+    const record = (
+      await db
+        .insert(entity)
+        .values({ kind: 'company', canonicalName: 'Flent', sensitive: false })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!record) throw new Error('insert returned nothing')
+
+    expect(await run(readSensitivityDefaultProgram())).toBe('normal')
+    expect(await run(sensitivityFor(record.id))).toEqual({
+      own: false,
+      sensitivity: 'normal',
+    })
+
+    await setFloor('sensitive')
+    expect(await run(readSensitivityDefaultProgram())).toBe('sensitive')
+    expect(await run(sensitivityFor(record.id))).toEqual({
+      own: false,
+      sensitivity: 'sensitive',
+      via: { kind: 'default' },
+    })
+    // Merged into settings, not written over them.
+    const row = (
+      await db
+        .select({ settings: workspace.settings })
+        .from(workspace)
+        .where(eq(workspace.id, 1))
+    ).at(0)
+    expect(row?.settings).toEqual({
+      base_currency: 'EUR',
+      sensitivity_default: 'sensitive',
+    })
+
+    await setFloor('normal')
+    expect((await run(sensitivityFor(record.id))).sensitivity).toBe('normal')
   })
 })

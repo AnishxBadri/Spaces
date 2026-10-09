@@ -18,6 +18,7 @@ import {
   needsRepinNote,
   pinHeadline,
   pinLockedMessage,
+  reusedKeyLine,
 } from './providers/embed/ids'
 import {
   getEmbeddingSettingsProgram,
@@ -471,5 +472,91 @@ describe('the Test call', () => {
       message: 'needs re-pin — emits 1536, this workspace stores 768',
     })
     expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('Search reuses the Models key', () => {
+  const llmKey = (provider: 'openai' | 'anthropic', secret: string) =>
+    storeCredential({
+      scope: 'workspace',
+      provider,
+      kind: 'llm',
+      secret,
+      meta: { display: `${secret.slice(0, 3)}…${secret.slice(-4)}` },
+      createdBy: FIXTURE_ACTOR.id,
+    })
+
+  /** Answers every embed call 768 wide and records the bearer it was sent. */
+  function stubEmbeddings() {
+    const auth: Array<string | null> = []
+    vi.stubGlobal('fetch', async (_url: unknown, init?: RequestInit) => {
+      auth.push(new Headers(init?.headers).get('authorization'))
+      return new Response(
+        JSON.stringify({
+          object: 'list',
+          data: [{ object: 'embedding', index: 0, embedding: vector(768) }],
+          model: 'text-embedding-3-small',
+          usage: { prompt_tokens: 1, total_tokens: 1 },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    })
+    return auth
+  }
+
+  const testOpenAi = () =>
+    Effect.runPromise(
+      testEmbeddingProgram(FIXTURE_ACTOR.id, {
+        provider: 'openai',
+        model: 'text-embedding-3-small',
+      }),
+    )
+
+  it('with only an OpenAI llm key, Test succeeds on it, the page names it, and it pins', async () => {
+    await llmKey('openai', 'sk-llm-reuse-0000')
+    const auth = stubEmbeddings()
+
+    expect((await testOpenAi()).ok).toBe(true)
+    expect(auth).toEqual(['Bearer sk-llm-reuse-0000'])
+
+    const view = await Effect.runPromise(getEmbeddingSettingsProgram())
+    expect(view.keys.find((k) => k.provider === 'openai')).toMatchObject({
+      configured: true,
+      source: 'models',
+      display: 'sk-…0000',
+      lastTestOk: true,
+      testedModel: 'text-embedding-3-small',
+    })
+    expect(reusedKeyLine('openai')).toBe('using the OpenAI key from Models')
+
+    expect((await pin('openai', 'text-embedding-3-small')).model).toBe(
+      'text-embedding-3-small',
+    )
+  })
+
+  it('an embedding key, once saved, takes precedence over the reused one', async () => {
+    await llmKey('openai', 'sk-llm-reuse-0000')
+    const saved = await saveKey('openai', 'sk-embed-own-1111')
+    const auth = stubEmbeddings()
+
+    expect((await testOpenAi()).ok).toBe(true)
+    expect(auth).toEqual(['Bearer sk-embed-own-1111'])
+
+    const view = await Effect.runPromise(getEmbeddingSettingsProgram())
+    expect(view.keys.find((k) => k.provider === 'openai')).toMatchObject({
+      configured: true,
+      source: 'own',
+      display: saved.display,
+    })
+  })
+
+  it('a provider Models has no key for still asks', async () => {
+    await llmKey('anthropic', 'sk-ant-reuse-0000')
+    const view = await Effect.runPromise(getEmbeddingSettingsProgram())
+    for (const provider of ['openai', 'google', 'voyage'] as const)
+      expect(view.keys.find((k) => k.provider === provider)).toMatchObject({
+        configured: false,
+        source: null,
+      })
   })
 })

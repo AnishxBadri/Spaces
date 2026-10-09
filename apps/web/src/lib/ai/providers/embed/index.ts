@@ -1,11 +1,18 @@
 import { Effect } from 'effect'
-import { resolveCredential } from '@spaces/core/writes/vault'
+import {
+  readWorkspaceCredential,
+  resolveCredential,
+} from '@spaces/core/writes/vault'
 import type { ResolvedCredential } from '@spaces/core/writes/vault'
 import { CredentialReadFailed, NoCredential } from '../index'
 import type { ResolveModelFailure } from '../index'
 import { readProviderMeta } from '../meta'
-import { embeddingCredentialKind, embeddingCredentialProvider } from './ids'
-import type { EmbeddingProvider } from './ids'
+import {
+  embeddingCredentialKind,
+  embeddingCredentialProvider,
+  reusableModelsKey,
+} from './ids'
+import type { EmbeddingKeySource, EmbeddingProvider } from './ids'
 import type { EmbedAdapterInput, EmbedCall } from './adapter'
 import { googleEmbedCall } from './google'
 import { ollamaEmbedCall } from './ollama'
@@ -28,6 +35,48 @@ const ADAPTERS: Record<
   google: googleEmbedCall,
   voyage: voyageEmbedCall,
   ollama: ollamaEmbedCall,
+}
+
+/**
+ * The credential an embedding call uses, in the vault's order (user key →
+ * workspace key): the provider's own embedding key, else the Models key it
+ * may reuse (`reusableModelsKey`). Null when neither is stored. (D81)
+ */
+export async function resolveEmbeddingCredential(
+  provider: EmbeddingProvider,
+  userId?: string,
+): Promise<(ResolvedCredential & { source: EmbeddingKeySource }) | null> {
+  const own = await resolveCredential(
+    embeddingCredentialProvider(provider),
+    embeddingCredentialKind(provider),
+    userId,
+  )
+  if (own) return { ...own, source: 'own' }
+  const models = reusableModelsKey(provider)
+  if (models === null) return null
+  const reused = await resolveCredential(models, 'llm', userId)
+  return reused ? { ...reused, source: 'models' } : null
+}
+
+/**
+ * The workspace row Search draws and records its Test on, without the
+ * secret: the active embedding row, else the active Models row it reuses,
+ * else whatever embedding row is stored (an invalid one still shows).
+ */
+export async function readEmbeddingWorkspaceCredential(
+  provider: EmbeddingProvider,
+) {
+  const own = await readWorkspaceCredential(
+    embeddingCredentialProvider(provider),
+    embeddingCredentialKind(provider),
+  )
+  const models = reusableModelsKey(provider)
+  if (own?.status !== 'active' && models !== null) {
+    const reused = await readWorkspaceCredential(models, 'llm')
+    if (reused?.status === 'active')
+      return { ...reused, source: 'models' as const }
+  }
+  return own ? { ...own, source: 'own' as const } : undefined
 }
 
 /** The adapter for one provider, from an already-resolved credential. */
@@ -54,8 +103,8 @@ export function embedCallFor(
 }
 
 /**
- * vault → adapter, in the vault's order (user key → workspace key). A
- * missing key fails `NoCredential` naming the provider, not the vault id.
+ * vault → adapter, through `resolveEmbeddingCredential`. A missing key fails
+ * `NoCredential` naming the provider, not the vault id.
  */
 export const resolveEmbedCall = Effect.fn('resolveEmbedCall')(function* (
   provider: EmbeddingProvider,
@@ -70,12 +119,7 @@ export const resolveEmbedCall = Effect.fn('resolveEmbedCall')(function* (
   ResolveModelFailure
 > {
   const credential = yield* Effect.tryPromise({
-    try: () =>
-      resolveCredential(
-        embeddingCredentialProvider(provider),
-        embeddingCredentialKind(provider),
-        opts.userId,
-      ),
+    try: () => resolveEmbeddingCredential(provider, opts.userId),
     catch: (cause) => new CredentialReadFailed({ cause }),
   })
   if (!credential) return yield* new NoCredential({ provider })

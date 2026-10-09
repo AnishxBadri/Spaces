@@ -34,6 +34,9 @@ import type { RouteComponent } from '@tanstack/react-router'
 const writes = vi.hoisted(() => ({
   saveWorkspace: vi.fn(async () => ({ ok: true })),
   saveMailbox: vi.fn(async () => ({ queued: true })),
+  setSensitivityDefault: vi.fn(
+    async ({ data }: { data: { sensitivity: string } }) => data.sensitivity,
+  ),
   revokeApiToken: vi.fn(async () => ({ ok: true })),
   updateObject: vi.fn(async () => ({ ok: true })),
   setMemberBanned: vi.fn(async () => ({ ok: true })),
@@ -309,6 +312,13 @@ const loaders: Record<string, () => object> = {
       },
     ],
     routes: [],
+    sensitivityDefault: 'normal',
+    embeddingPin: {
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      dims: 768,
+      pinnedAt: ISO,
+    },
   }),
   search: () => ({
     settings: { pin: null, slot: null, keys: [] },
@@ -744,6 +754,86 @@ describe('the accounts pages, by the job an account does', () => {
       )
     } finally {
       assign.mockRestore()
+    }
+  })
+})
+
+describe('the AI pages, as D81 splits them', () => {
+  it('Models opens on the sensitivity floor, and choosing Sensitive writes it at once', async () => {
+    await mount('/settings/models')
+    const heads = Array.from(document.querySelectorAll('h3')).map((h) =>
+      h.textContent.trim(),
+    )
+    expect(heads.at(0)).toBe('Sensitivity')
+    expect(document.body.textContent).toContain(
+      'a floor · raises a record, never lowers it',
+    )
+    await click(
+      document.querySelector('button[aria-label="Treat every record as"]'),
+    )
+    const sensitive = Array.from(document.querySelectorAll('[cmdk-item]')).find(
+      (el) => el.textContent.trim() === 'Sensitive',
+    )
+    await click(sensitive)
+    expect(writes.setSensitivityDefault).toHaveBeenCalledWith({
+      data: { sensitivity: 'sensitive' },
+    })
+    expect(bar()?.getAttribute('data-shown')).toBe('false')
+  })
+
+  it('the routing grid has no Embed row, and one line pointing to Search', async () => {
+    await mount('/settings/models')
+    const lanes = Array.from(
+      document.querySelectorAll('button[aria-label$=", normal"]'),
+    ).map((b) => b.getAttribute('aria-label'))
+    expect(lanes).toEqual([
+      'extract lane, normal',
+      'classify lane, normal',
+      'synthesize lane, normal',
+      'vision lane, normal',
+      'research lane, normal',
+    ])
+    const link = document.querySelector('section a[href="/settings/search"]')
+    expect(link?.textContent).toBe('set in Search ›')
+    expect(link?.closest('li')?.textContent).toBe(
+      'Embeddings · text-embedding-3-small · set in Search ›',
+    )
+  })
+
+  it('Search names the Models key it reuses, and "Use a different key" asks for its own', async () => {
+    const original = loaders.search
+    loaders.search = () => ({
+      settings: {
+        pin: null,
+        slot: null,
+        keys: [
+          {
+            provider: 'openai',
+            label: 'OpenAI',
+            configured: true,
+            source: 'models',
+            display: 'sk-…0000',
+            baseUrl: null,
+            lastTestedAt: null,
+            lastTestOk: null,
+            testedModel: null,
+          },
+        ],
+      },
+      backfill: { pin: null },
+    })
+    try {
+      await mount('/settings/search')
+      expect(document.body.textContent).toContain(
+        'using the OpenAI key from Models',
+      )
+      expect(
+        document.querySelector('input[aria-label="OpenAI embedding API key"]'),
+      ).toBeNull()
+      await click(byText('Use a different key'))
+      expect(input('OpenAI embedding API key').value).toBe('')
+    } finally {
+      loaders.search = original
     }
   })
 })

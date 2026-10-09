@@ -1,6 +1,10 @@
-import { Check, Filter, Plus, Save, Trash2, X } from 'lucide-react'
+import { Check, Filter, Plus, Save, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ValueEditor } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
@@ -14,6 +18,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '#/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import {
@@ -22,6 +33,11 @@ import {
   PopoverTrigger,
 } from '#/components/ui/popover'
 import { Select } from '#/components/ui/select'
+import {
+  PINNED_VIEWS_QUERY,
+  togglePinnedView,
+  usePinnedViews,
+} from '#/lib/chassis-prefs'
 import { countViews, deleteView, saveView } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 import {
@@ -47,6 +63,9 @@ import type { ViewCount } from '#/lib/views/counts'
  * view. The bar owns nothing but the chips — the page owns its table state
  * and hands the bar a snapshot to compare and to save. `?view=` in the URL
  * makes a view linkable.
+ * - The active view's `···` menu pins it to the sidebar (an object list's
+ *   views only — the sidebar lists them under their object) and, for a view
+ *   the user may edit, renames or deletes it.
  */
 
 export type ViewSnapshot = {
@@ -123,6 +142,11 @@ export function ViewBar({
       snapshot,
     )
   const [saving, setSaving] = useState<'new' | 'rename' | null>(null)
+  const pins = usePinnedViews()
+  const queryClient = useQueryClient()
+  /** A rename or a delete shows in the sidebar's pinned rows at once. */
+  const refreshPins = () =>
+    void queryClient.invalidateQueries({ queryKey: [PINNED_VIEWS_QUERY] })
 
   /**
    * The active chip moves with the table: while its conditions differ from
@@ -166,6 +190,7 @@ export function ViewBar({
     const saved = await saveView({
       data: { ...target, ...viewTarget(objectId), ...snapshot },
     })
+    if (target.id !== undefined && pins.includes(target.id)) refreshPins()
     onSaved()
     selectView(saved.id)
     return saved
@@ -238,33 +263,63 @@ export function ViewBar({
         <Plus className="size-3" strokeWidth={2} />
         Save view
       </Button>
-      {active && canEdit(active) ? (
-        <>
-          <Button size="xs" variant="ghost" onClick={() => setSaving('rename')}>
-            Rename
-          </Button>
-          <Button
-            size="xs"
-            variant="ghost"
-            aria-label={`Delete view ${active.name}`}
-            onClick={async () => {
-              try {
-                await deleteView({
-                  data: { id: active.id, ...viewTarget(objectId) },
-                })
-                toast(`${active.name} deleted`)
-                onApply(null)
-                onSaved()
-              } catch (err) {
-                toast.error(
-                  err instanceof Error ? err.message : 'Could not delete',
-                )
-              }
-            }}
-          >
-            <Trash2 className="size-3" strokeWidth={1.75} />
-          </Button>
-        </>
+      {active && (objectId !== null || canEdit(active)) ? (
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-label={`View menu for ${active.name}`}
+            >
+              ···
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            {objectId !== null ? (
+              <DropdownMenuItem
+                onSelect={() => {
+                  const pinned = pins.includes(active.id)
+                  togglePinnedView(active.id)
+                  toast(
+                    pinned
+                      ? `${active.name} unpinned`
+                      : `${active.name} pinned to the sidebar`,
+                  )
+                }}
+              >
+                {pins.includes(active.id) ? 'Unpin' : 'Pin to sidebar'}
+              </DropdownMenuItem>
+            ) : null}
+            {canEdit(active) ? (
+              <>
+                {objectId !== null ? <DropdownMenuSeparator /> : null}
+                <DropdownMenuItem onSelect={() => setSaving('rename')}>
+                  Rename…
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={async () => {
+                    try {
+                      await deleteView({
+                        data: { id: active.id, ...viewTarget(objectId) },
+                      })
+                      toast(`${active.name} deleted`)
+                      if (pins.includes(active.id)) refreshPins()
+                      onApply(null)
+                      onSaved()
+                    } catch (err) {
+                      toast.error(
+                        err instanceof Error ? err.message : 'Could not delete',
+                      )
+                    }
+                  }}
+                >
+                  Delete view
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
       ) : null}
 
       <SaveViewDialog

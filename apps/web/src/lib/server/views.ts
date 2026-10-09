@@ -116,6 +116,20 @@ export const deleteView = createServerFn({ method: 'POST' })
   })
 
 /**
+ * The sidebar's pinned views: of the ids this browser pinned, the ones the
+ * caller may read, each with its object's slug. A pin missing from the answer
+ * is pruned by the sidebar.
+ */
+export const listPinnedViews = createServerFn()
+  .validator(z.object({ ids: z.array(z.string().uuid()).max(100) }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { pinnedViewsProgram } = await import('../views/pinned')
+    const { effectFn } = await import('./effect')
+    return effectFn(pinnedViewsProgram)({ id: u.id }, data.ids)
+  })
+
+/**
  * The view chips' counts (SPA-162): one call per page for every chip on the
  * bar. `live` carries the conditions the page is showing for its active view
  * when they differ from the saved ones, so that chip moves with the table.
