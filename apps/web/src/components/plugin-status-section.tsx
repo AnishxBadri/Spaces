@@ -11,7 +11,7 @@ const NO_REASON = {
   degraded: 'the worker could not load it',
 }
 
-const reasonOf = (p: StoppedPlugin): string =>
+export const reasonOf = (p: StoppedPlugin): string =>
   p.state === 'capped' ? p.reason : (p.lastError ?? NO_REASON[p.state])
 
 const figureOf = (p: StoppedPlugin): string => {
