@@ -25,25 +25,16 @@ export const createTask = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    return db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(task)
-        .values({
-          content: data.content,
-          dueDate: data.dueDate ?? null,
-          assigneeId: data.assigneeId ?? u.id,
-          createdBy: u.id,
-        })
-        .returning({ id: task.id })
-      if (data.entityIds && data.entityIds.length > 0) {
-        await tx
-          .insert(taskEntity)
-          .values(
-            data.entityIds.map((entityId) => ({ taskId: row.id, entityId })),
-          )
-      }
-      return { id: row.id }
-    })
+    const { insertTaskInTx } = await import('#/lib/tasks/create')
+    return db.transaction((tx) =>
+      insertTaskInTx(tx, {
+        content: data.content,
+        dueDate: data.dueDate ?? null,
+        assigneeId: data.assigneeId ?? u.id,
+        createdBy: u.id,
+        entityIds: data.entityIds ?? [],
+      }),
+    )
   })
 
 /**

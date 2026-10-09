@@ -1,6 +1,8 @@
 import { eq } from 'drizzle-orm'
 import { entity, interaction, interactionEntity, note } from '@spaces/db/schema'
 import type { NoteBody } from '@spaces/db/schema/kinds'
+import type { InteractionMeta } from '@spaces/db/schema/interactions'
+import { readInteractionMeta } from '../../json'
 import type { Tx } from '../entities/resolve'
 
 /**
@@ -113,6 +115,8 @@ export type IntegrationInteraction = {
   threadId: string | null
   subject: string | null
   occurredAt: Date
+  /** Per-kind metadata; its `kind` must be this row's. Omitted writes null. */
+  meta?: InteractionMeta
   /** Null writes no note and leaves `note_id` null. */
   body: InteractionBody | null
   /** The entities to edge — given, or derived inside the transaction once the row exists. */
@@ -133,6 +137,8 @@ export async function writeIntegrationInteraction(
   tx: Tx,
   input: IntegrationInteraction,
 ): Promise<WrittenInteraction> {
+  const meta = readInteractionMeta(input.kind, input.meta ?? null)
+  if (!meta.ok) throw new Error(`interaction meta refused — ${meta.reason}`)
   const insert = tx.insert(interaction).values({
     kind: input.kind,
     sourceClass: 'integration',
@@ -140,6 +146,7 @@ export async function writeIntegrationInteraction(
     messageId: input.messageId,
     threadId: input.threadId,
     subject: input.subject,
+    meta: meta.meta,
     occurredAt: input.occurredAt,
   })
   const row = (

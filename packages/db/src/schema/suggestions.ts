@@ -39,6 +39,9 @@ export const suggestionKind = pgEnum('suggestion_kind', [
   // A space the record may belong in — accepting writes
   // `entity_space(source: 'ai')` through the one tag insert.
   'space_tag',
+  // An action item — from a recorder or from Ask. Accepting writes one task
+  // through the task writer, by the accepter. (D68)
+  'task',
 ])
 
 export const suggestionStatus = pgEnum('suggestion_status', [

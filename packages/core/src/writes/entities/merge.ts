@@ -193,6 +193,24 @@ async function repointGeneric(
   }
 }
 
+/**
+ * Every `repoint` and `repoint-or-drop` column in `ENTITY_REFS`, loser to
+ * winner, each move or drop pushed onto `snapshot`. The generic half of
+ * `mergeEntities`, which owns the kind gates; exported so a column whose
+ * kind no merge reaches yet (a document's) is still proven by its test.
+ */
+export async function repointRegistryInTx(
+  tx: Tx,
+  loserId: string,
+  winnerId: string,
+  snapshot: Array<SnapshotEntry>,
+): Promise<void> {
+  for (const ref of ENTITY_REFS) {
+    if (ref.merge.kind === 'repoint' || ref.merge.kind === 'repoint-or-drop')
+      await repointGeneric(tx, ref, loserId, winnerId, snapshot)
+  }
+}
+
 export async function mergeEntities(opts: {
   winnerId: string
   loserId: string
@@ -314,10 +332,7 @@ export async function mergeEntities(opts: {
     }
 
     // --- every generic edge column: one loop over the registry ------------
-    for (const ref of ENTITY_REFS) {
-      if (ref.merge.kind === 'repoint' || ref.merge.kind === 'repoint-or-drop')
-        await repointGeneric(tx, ref, loserId, winnerId, snapshot)
-    }
+    await repointRegistryInTx(tx, loserId, winnerId, snapshot)
 
     // --- chunks: follow the record; the winner's source wins -------------
     // Per source (source_kind, source_key), the values rule below said

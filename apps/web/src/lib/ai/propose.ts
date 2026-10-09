@@ -26,6 +26,7 @@ import {
   patchAnchor,
   registryFor,
   spaceTagOf,
+  taskOf,
 } from '@spaces/core/writes/suggestions/propose'
 import type {
   Suggestion,
@@ -36,6 +37,7 @@ import type { CaptureObject } from '@spaces/core/writes/ai/capture-read'
 import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
 import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'
 import { setPersonCompanyInTx } from '#/lib/people/companies'
+import { insertTaskInTx } from '#/lib/tasks/create'
 
 // The propose half moved into core (SPA-204): every name it exported is
 // re-exported here unchanged, so the AI lanes, MCP, capture and their tests
@@ -79,11 +81,11 @@ export type {
  * A partial accept (SPA-110) is the same transaction ending in a shrunk
  * payload rather than a flip; `acceptProgram` says the rule.
  *
- * Two kinds accept today: `attribute_patch` (a value, through the one write
- * path) and `identity` (SPA-105: a person, through `resolveEntity`; a company
- * record joins the person's `companies`, and — SPA-160 — the person is
- * written into the reference field the claim came from). Every other kind is
- * refused by name.
+ * Every kind accepts but `ledger_event`, which is refused by name. Among
+ * them: `attribute_patch` (a value, through the one write path), `identity`
+ * (a person, through `resolveEntity`; a company record joins the person's
+ * `companies`, and the person is written into the reference field the claim
+ * came from) and `task` (one task, through the task writer).
  *
  * **A captured page is an anchor too (SPA-134).** A capture names somebody
  * we usually hold no record for, so its read is anchored on the captured
@@ -108,6 +110,7 @@ const KIND_LABEL: Record<SuggestionKind, string> = {
   identity: 'identity',
   document_kind: 'document type',
   space_tag: 'space tag',
+  task: 'task',
 }
 
 const isKind = (k: string): k is SuggestionKind => k in KIND_LABEL
@@ -252,6 +255,12 @@ export type Accepted =
       spaceId: string
       /** False when the record was already in the space: its row stands. */
       tagged: boolean
+    }
+  | {
+      kind: 'task'
+      suggestion: Suggestion
+      /** The task the accept wrote. */
+      taskId: string
     }
 
 /**
@@ -596,6 +605,42 @@ async function acceptSpaceTagInTx(
   return { spaceId, tagged }
 }
 
+// ---------- task ----------
+
+/**
+ * Accept a task: one `task` row through the task writer, created by and
+ * assigned to the accepter, linked to the payload's record — its survivor
+ * when it was merged since. A record gone since refuses, and the row stays
+ * open.
+ */
+async function acceptTaskInTx(
+  tx: Tx,
+  row: Suggestion,
+  actor: Decider,
+): Promise<{ taskId: string }> {
+  const payload = taskOf(row.payload)
+  const recordId = await canonicalId(payload.entity_id, tx)
+  const live = (
+    await tx
+      .select({ id: entity.id })
+      .from(entity)
+      .where(eq(entity.id, recordId))
+  ).at(0)
+  if (!live)
+    throw new EntityNotFound({
+      entityId: payload.entity_id,
+      message: 'Record not found',
+    })
+  const { id } = await insertTaskInTx(tx, {
+    content: payload.title,
+    dueDate: payload.due,
+    assigneeId: actor.id,
+    createdBy: actor.id,
+    entityIds: [recordId],
+  })
+  return { taskId: id }
+}
+
 /**
  * Lock one row for its accept and refuse it unless it is still `open`. The
  * `for update` is what serializes two accepts on one row: the second waits
@@ -745,6 +790,22 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
             suggestion: decided,
             spaceId,
             tagged,
+          } satisfies Accepted
+        }
+        if (row.kind === 'task') {
+          if (fields !== undefined)
+            throw invalid([
+              {
+                slug: 'fields',
+                message: 'fields: a task is accepted whole, not by field',
+              },
+            ])
+          const { taskId } = await acceptTaskInTx(tx, row, actor)
+          const decided = await close(tx, id, 'accepted', actor)
+          return {
+            kind: 'task',
+            suggestion: decided,
+            taskId,
           } satisfies Accepted
         }
         if (row.kind !== 'attribute_patch')

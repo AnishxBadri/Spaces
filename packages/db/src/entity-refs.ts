@@ -12,6 +12,7 @@ import {
   holding,
   importRow,
   interaction,
+  interactionDocument,
   interactionEntity,
   investment,
   jobRun,
@@ -278,6 +279,21 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     // every attendee, which is how it lands under "Filed here"; an item entry
     // here would walk the same note a second time and double-count it.
     context: null,
+  },
+  {
+    // An interaction's artifact: attachment, transcript, recording link (D68).
+    key: 'interaction_document.document',
+    table: interactionDocument,
+    column: interactionDocument.documentId,
+    // The pair is the primary key: an interaction already holding the
+    // winner keeps its row and the loser's is dropped.
+    merge: {
+      kind: 'repoint-or-drop',
+      uniqueWith: [interactionDocument.interactionId],
+    },
+    del: { kind: 'cascade' }, // the interaction outlives its artifact
+    // The document reached through the interaction's participants.
+    context: { role: 'item', kind: 'doc_chunk', hop: 1 },
   },
   {
     key: 'task_entity.entity',

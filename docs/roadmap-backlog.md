@@ -2367,7 +2367,7 @@ _A member pastes a Granola key, ticks two folders, and the notes in them arrive 
 
 **Blocked by:** `arrival-2`, `interaction-2`, `notes-5`, `sdk-23`, `sdk-8`. **Label:** `migration` — runs alone on the migration lane.
 
-_Amended 2026-10-09 (D78): rewritten. The 2026-10-06 body was a webhook-only `plugins/recorder` for Fathom, tl;dv and Granola; Granola has no webhooks and a read-only API with a key per member, so the contract gains a `schedule` transport and a share decision by folder. Webhook recorders keep sdk-23's ingress under the same contract. The transcript edge stays `interaction-1`'s artifact join, never a column._
+_Amended 2026-10-09 (D78): rewritten. The 2026-10-06 body was a webhook-only `plugins/recorder` for Fathom, tl;dv and Granola; Granola has no webhooks and a read-only API with a key per member, so the contract gains a `schedule` transport and a share decision by folder. Webhook recorders keep sdk-23's ingress under the same contract. The transcript edge stays `interaction-1`'s artifact join — an `interaction_document` row with `role: transcript` (a recording is `role: recording_link`) — never a column: `interaction.document_id` is never created._
 
 **What to build**
 

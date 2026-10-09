@@ -62,6 +62,7 @@ export const SUGGESTION_KIND_WORD: Record<SuggestionKind, string> = {
   identity: 'Identity',
   document_kind: 'Document type',
   space_tag: 'Space',
+  task: 'Task',
 }
 
 /**

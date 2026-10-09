@@ -491,6 +491,13 @@
       "when": 1791321042511,
       "tag": "0069_account_connection_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1791566554291,
+      "tag": "0070_interaction_meta_artifacts",
+      "breakpoints": true
     }
   ]
 }

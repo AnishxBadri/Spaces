@@ -199,7 +199,8 @@ Same three axes as notes, plus two of its own:
 
 Edges a document participates in: `tagged_in → record` (filed, the act);
 `entity_space` (a _source_ for a space); `derived_from → note` (exported
-memo); `derived_from → interaction` (transcript); `note → document
+memo); `interaction_document → interaction` (an artifact: `role`
+attachment, transcript or recording link — a join row, not a link); `note → document
 (mentions)` (`[[Ohmium deck]]`); future `document → term (mentions,
 extracted)` (concept links). `document_chunk` carries embeddings (§9).
 
@@ -221,6 +222,15 @@ Three questions define it.
 | 7   | Drive / Box                   | pick · paste link · bound folder (§5)           | copy-in, pointer kept                                    | this spec   |
 | 8   | API / capture extension / MCP | `POST /api/documents`                           | as declared                                              | later       |
 | 9   | memo export                   | "Export PDF" on a memo                          | `derived_from → note`, filed where the memo is           | later       |
+
+**An interaction's artifacts are a join, never a column (D67, D68).** An
+email's attachments (entry 6), a recorder's transcript and a meeting's
+recording link are `document` rows hung off their interaction by
+`interaction_document(interaction_id, document_id, role)`, `role` one of
+`attachment`, `transcript`, `recording_link`, primary key on the pair. One
+meeting carries many artifacts, so `interaction.document_id` is never
+created; a transcript is filed like any arrival and reaches the meeting
+through that row.
 
 All nine converge on one server path: **hash → blob → `document` row →
 edges → enqueue extract.** Presigned PUT; bytes never stream through Node.

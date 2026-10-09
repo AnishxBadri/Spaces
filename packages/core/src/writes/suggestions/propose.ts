@@ -10,6 +10,8 @@ import { identityPayloadSchema } from '../../ai/identity'
 import { documentKindPayloadSchema } from '../../ai/document-kind'
 import { notePayloadSchema } from '../../ai/note'
 import { spaceTagPayloadSchema } from '../../ai/space-tag'
+import { taskPayloadSchema } from '../../ai/task'
+import type { TaskPayload } from '../../ai/task'
 import { toObjectKind } from '../../attributes/registry'
 import type { AttributeDef } from '../../attributes/registry'
 import { objectIdForKindAsync } from '../attributes/objects'
@@ -223,6 +225,18 @@ export function spaceTagOf(payload: Json) {
   )
 }
 
+/** A task payload, decoded — or the validator's refusal, by field. */
+export function taskOf(payload: Json): TaskPayload {
+  const parsed = taskPayloadSchema.safeParse(payload)
+  if (parsed.success) return parsed.data
+  throw invalid(
+    parsed.error.issues.map((i) => {
+      const slug = i.path.map(String).join('.') || 'task'
+      return { slug, message: `${slug}: ${i.message}` }
+    }),
+  )
+}
+
 export type ProposeInput = {
   entityId: string
   kind: SuggestionKind
@@ -300,6 +314,8 @@ export async function proposeWith(
   if (input.kind === 'note') noteOf(input.payload)
   // A space tag likewise (SPA-103): a space id and the path it was read as.
   if (input.kind === 'space_tag') spaceTagOf(input.payload)
+  // A task likewise: a title, a due date or none, and the record it is about.
+  if (input.kind === 'task') taskOf(input.payload)
   const row = (
     await reader
       .insert(suggestion)

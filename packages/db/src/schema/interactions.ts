@@ -14,7 +14,7 @@ import {
 import { sql } from 'drizzle-orm'
 import { entity, sourceClass } from './entities'
 import { integration } from './integrations'
-import { note } from './kinds'
+import { document, note } from './kinds'
 import type { Json } from '../json'
 
 /**
@@ -27,6 +27,57 @@ export const interactionKind = pgEnum('interaction_kind', [
   'meeting',
   'call',
 ])
+
+export type InteractionKind = (typeof interactionKind.enumValues)[number]
+
+/**
+ * `interaction.meta` for an email: its headers (D67). `mime_blob_sha` is the
+ * content address of the stored raw MIME, null until it is kept.
+ */
+export type EmailMeta = {
+  kind: 'email'
+  from: string
+  to: Array<string>
+  cc: Array<string>
+  /** The `Date` header, as an ISO instant. */
+  date: string
+  mime_blob_sha: string | null
+}
+
+export type MeetingStatus = 'scheduled' | 'cancelled'
+
+export type MeetingRsvp = 'accepted' | 'declined' | 'tentative' | 'needs_action'
+
+/**
+ * `interaction.meta` for a meeting (D68). Calendar sync rewrites it in place;
+ * a cancelled meeting is marked, never deleted.
+ */
+export type MeetingMeta = {
+  kind: 'meeting'
+  /** ISO instant; `occurred_at` is the start. */
+  ends_at: string
+  status: MeetingStatus
+  conference_url: string | null
+  /** The organizer's email. */
+  organizer: string | null
+  recurring_instance_id: string | null
+  /** Participant email → their answer. Shown, never edited. */
+  rsvp: { [email: string]: MeetingRsvp }
+}
+
+/** `interaction.meta` for a call a recorder births (D68). */
+export type CallMeta = {
+  kind: 'call'
+  provider_event_id: string
+  duration_seconds: number | null
+}
+
+/**
+ * Per-kind metadata, keyed by `kind`, which always equals the row's own
+ * `interaction.kind`. The decoder is `readInteractionMeta` in
+ * `@spaces/core/json`; it refuses a shape whose `kind` is not the row's.
+ */
+export type InteractionMeta = EmailMeta | MeetingMeta | CallMeta
 
 export const interaction = pgTable(
   'interaction',
@@ -55,6 +106,8 @@ export const interaction = pgTable(
      * - `interaction_note_unique` stops two interactions claiming one body.
      */
     noteId: uuid('note_id').references(() => note.entityId),
+    /** Per-kind metadata (D67, D68); null when the lane has none. */
+    meta: jsonb('meta').$type<InteractionMeta>(),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -93,6 +146,35 @@ export const interactionEntity = pgTable(
   (t) => [
     primaryKey({ columns: [t.interactionId, t.entityId] }),
     index('interaction_entity_entity_idx').on(t.entityId),
+  ],
+)
+
+/** What a document is to the interaction it hangs off (D68). */
+export const interactionDocumentRole = pgEnum('interaction_document_role', [
+  'attachment',
+  'transcript',
+  'recording_link',
+])
+
+/**
+ * Every artifact of an interaction: an email's attachments, a meeting's
+ * transcript and recording link. One meeting, many artifacts — never a
+ * `document_id` column on `interaction`. (D67, D68)
+ */
+export const interactionDocument = pgTable(
+  'interaction_document',
+  {
+    interactionId: uuid('interaction_id')
+      .notNull()
+      .references(() => interaction.id),
+    documentId: uuid('document_id')
+      .notNull()
+      .references(() => document.entityId),
+    role: interactionDocumentRole('role').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.interactionId, t.documentId] }),
+    index('interaction_document_document_idx').on(t.documentId),
   ],
 )
 
