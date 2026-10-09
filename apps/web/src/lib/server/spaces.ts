@@ -40,3 +40,71 @@ export const createSpace = createServerFn({ method: 'POST' })
     })
     return { id }
   })
+
+/** Rename in place: the name changes everywhere it is read; slug and path stay. */
+export const renameSpace = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      name: z.string().trim().min(1).max(120),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { renameRecordProgram } =
+      await import('@spaces/core/writes/entities/rename')
+    const { effectFn } = await import('./effect')
+    return effectFn(renameRecordProgram)(u.id, data)
+  })
+
+/** Archive asks nothing — Restore undoes it. (D73) */
+export const archiveSpace = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { archiveSpaceProgram, spaceWriteMessage } =
+      await import('@spaces/core/writes/entities/space')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(archiveSpaceProgram)(u.id, data.id)
+    } catch (failure) {
+      throw new Error(spaceWriteMessage(failure))
+    }
+  })
+
+export const restoreSpace = createServerFn({ method: 'POST' })
+  .validator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { restoreSpaceProgram, spaceWriteMessage } =
+      await import('@spaces/core/writes/entities/space')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(restoreSpaceProgram)(u.id, data.id)
+    } catch (failure) {
+      throw new Error(spaceWriteMessage(failure))
+    }
+  })
+
+/**
+ * Move a space under a new parent, or to the root (`parentId: null`). The
+ * lowering half of the sensitivity cache is queued after the commit.
+ */
+export const moveSpace = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({ id: z.string().uuid(), parentId: z.string().uuid().nullable() }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { moveSpaceProgram, spaceWriteMessage } =
+      await import('@spaces/core/writes/entities/space')
+    const { enqueueRestamp } = await import('../ai/enqueue-restamp')
+    const { effectFn } = await import('./effect')
+    try {
+      const moved = await effectFn(moveSpaceProgram)(u.id, data)
+      await enqueueRestamp(moved.restamp)
+      return { moved: moved.moved, from: moved.from, to: moved.to }
+    } catch (failure) {
+      throw new Error(spaceWriteMessage(failure))
+    }
+  })

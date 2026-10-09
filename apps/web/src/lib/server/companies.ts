@@ -2,13 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import {
-  company,
-  entity,
-  entityAlias,
-  entitySpace,
-  space,
-} from '@spaces/db/schema'
+import { company, entity, entityAlias, entitySpace } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { jsonString } from '@spaces/core/json'
@@ -18,6 +12,7 @@ import { emitDomainEvent } from '#/lib/events/emit'
 import { dealLinked } from '@spaces/core/writes/events/dispatch'
 import { pagedListInput, pageOptions } from '#/lib/views/page-input'
 import type { SetValuesResult } from '@spaces/core/writes/attributes/values'
+import { recordSpaces } from '#/lib/spaces/filed-in'
 
 export const listCompanies = createServerFn().handler(async () => {
   await requireUser()
@@ -158,16 +153,7 @@ export const getCompany = createServerFn()
       .from(entityAlias)
       .where(eq(entityAlias.entityId, data.id))
 
-    const spaces = await db
-      .select({
-        id: space.entityId,
-        name: entity.canonicalName,
-        source: entitySpace.source,
-      })
-      .from(entitySpace)
-      .innerJoin(space, eq(space.entityId, entitySpace.spaceId))
-      .innerJoin(entity, eq(entity.id, space.entityId))
-      .where(eq(entitySpace.entityId, data.id))
+    const spaces = await recordSpaces(data.id)
 
     // People: everyone whose `companies` names this company.
     const { companyPeopleProgram } = await import('../people/companies')

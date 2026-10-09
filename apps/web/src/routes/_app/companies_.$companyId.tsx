@@ -5,8 +5,8 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { Layers, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { SpaceRailRow } from '#/components/record/space-rail-row'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
@@ -271,25 +271,16 @@ function CompanyRecordPage() {
 
             <RailSection label="Spaces" meta={`${company.spaces.length}`}>
               {company.spaces.map((s) => (
-                <RailItem key={s.id} className="group">
-                  <Layers
-                    className="size-3.5 shrink-0 text-graphite"
-                    strokeWidth={1.75}
-                  />
-                  <span className="min-w-0 flex-1 truncate">{s.name}</span>
-                  <button
-                    aria-label={`Remove from ${s.name}`}
-                    onClick={async () => {
-                      await untagFromSpace({
-                        data: { entityId: company.id, spaceId: s.id },
-                      })
-                      void router.invalidate()
-                    }}
-                    className="focus-ring hidden size-5 items-center justify-center text-graphite group-hover:flex hover:text-foreground focus-visible:flex"
-                  >
-                    <X className="size-3" strokeWidth={2} />
-                  </button>
-                </RailItem>
+                <SpaceRailRow
+                  key={s.id}
+                  space={s}
+                  onRemove={async () => {
+                    await untagFromSpace({
+                      data: { entityId: company.id, spaceId: s.id },
+                    })
+                    void router.invalidate()
+                  }}
+                />
               ))}
               {untaggedSpaces.length > 0 ? (
                 <Select

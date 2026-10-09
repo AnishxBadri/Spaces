@@ -84,6 +84,11 @@ export type StampScope =
   | { kind: 'flagged'; entityId: string }
   /** One entity filed into, or out of, one space. */
   | { kind: 'filed'; entityId: string; spaceId: string }
+  /**
+   * A space moved: the reach of `flagged`, raised when the space or any
+   * ancestor at its current path is sensitive.
+   */
+  | { kind: 'moved'; spaceId: string }
 
 /** The entity ids a `flagged` scope reaches. */
 const flaggedReach = (entityId: string): SQL => sql`(
@@ -102,29 +107,40 @@ const flaggedReach = (entityId: string): SQL => sql`(
 )`
 
 /** True when the scope's input is sensitive now, so the raise may stamp. */
-const inputSensitive = (scope: StampScope): SQL =>
-  scope.kind === 'flagged'
-    ? sql`exists (
+const inputSensitive = (scope: StampScope): SQL => {
+  switch (scope.kind) {
+    case 'flagged':
+      return sql`exists (
         select 1 from entity e
         where e.id = ${scope.entityId}::uuid and e.sensitive
       )`
-    : sql`exists (
+    case 'filed':
+    case 'moved':
+      return sql`exists (
         select 1
         from space filed
         join space anc on anc.path @> filed.path
         join entity ae on ae.id = anc.entity_id
         where filed.entity_id = ${scope.spaceId}::uuid and ae.sensitive
       )`
+  }
+}
 
-const reach = (scope: StampScope): SQL =>
-  scope.kind === 'flagged'
-    ? sql`${chunk.entityId} in ${flaggedReach(scope.entityId)}`
-    : sql`${chunk.entityId} = ${scope.entityId}::uuid`
+const reach = (scope: StampScope): SQL => {
+  switch (scope.kind) {
+    case 'flagged':
+      return sql`${chunk.entityId} in ${flaggedReach(scope.entityId)}`
+    case 'moved':
+      return sql`${chunk.entityId} in ${flaggedReach(scope.spaceId)}`
+    case 'filed':
+      return sql`${chunk.entityId} = ${scope.entityId}::uuid`
+  }
+}
 
 /**
  * The set-based raise: every chunk in the scope goes `sensitive = true`, in
  * one statement, when the scope's input is sensitive — a record's own flag
- * for `flagged`, the space or one of its ancestors for `filed`. A no-op
+ * for `flagged`, the space or one of its ancestors for `filed` and `moved`. A no-op
  * otherwise, so a caller runs it after every flag-set and every filing.
  * Answers the rows it changed.
  */

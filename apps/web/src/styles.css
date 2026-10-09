@@ -480,19 +480,24 @@
 
 /**
  * The double rule: 2px ink, 2px gap, 1px ink. Page and record heads only —
- * a section still opens on the single hairline.
+ * a section still opens on the single hairline. `--rule-ink` recolours it.
  * - A real 5px bottom border painted by a gradient, so it takes layout like
  *   the hairline it replaces and the gap shows the head's own ground.
  */
 @utility double-rule {
-  border-bottom: 5px solid var(--hairline);
+  border-bottom: 5px solid var(--rule-ink, var(--hairline));
   border-image: linear-gradient(
       to top,
-      var(--hairline) 1px,
+      var(--rule-ink, var(--hairline)) 1px,
       transparent 1px 3px,
-      var(--hairline) 3px
+      var(--rule-ink, var(--hairline)) 3px
     )
     0 0 5 0 / 0 0 5px 0;
+}
+
+/** An archived head: the double rule in graphite. Used with `double-rule`. */
+@utility double-rule-archived {
+  --rule-ink: var(--graphite);
 }
 
 /**

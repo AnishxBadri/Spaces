@@ -46,7 +46,7 @@ export const person = pgTable('person', {
     .references(() => entity.id),
 })
 
-// ---------- space (taxonomy — stable, hierarchical, never dies) ----------
+// ---------- space (taxonomy — hierarchical, malleable, never dies) ----------
 
 export const space = pgTable(
   'space',
@@ -59,6 +59,13 @@ export const space = pgTable(
     // Materialized path for ancestor/descendant queries (ltree GiST index).
     path: ltree('path').notNull(),
     isSeeded: boolean('is_seeded').notNull().default(false),
+    /**
+     * Archived: out of the tree, the picker and the context climb; filings
+     * stay. Never a delete. (D73)
+     * - One archive stamps the same instant on the space and every live
+     *   descendant; Restore clears exactly the rows carrying that instant.
+     */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
   },
   // Slugs are unique per parent, not globally — one label recurs across
   // branches. `path` stays globally unique by construction.

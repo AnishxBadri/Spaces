@@ -4,8 +4,19 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { Boxes, FileText, Layers, Plus, Star, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import {
+  Archive,
+  ArchiveRestore,
+  Boxes,
+  CornerDownRight,
+  FileText,
+  Layers,
+  Pencil,
+  Plus,
+  Star,
+  X,
+} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   LedgerFigure,
@@ -23,6 +34,7 @@ import {
 } from '#/components/record/record-parts'
 import { SpaceContacts } from '#/components/space-contacts'
 import { SpaceGlossary } from '#/components/space-glossary'
+import { SpaceMoveDialog } from '#/components/space-move-dialog'
 import { SpaceSources } from '#/components/space-sources'
 import { TagCompanyRow } from '#/components/space-tag-row'
 import { TasksRail } from '#/components/tasks-rail'
@@ -33,16 +45,20 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
 import { spaceStamp } from '#/components/ui/stamp'
 import {
+  archiveSpace,
   createNote,
   createSpace,
   getEntitySensitivity,
   getSpace,
   listTerms,
+  renameSpace,
+  restoreSpace,
   saveSpaceAsTemplate,
   tagIntoSpace,
   untagFromSpace,
@@ -86,6 +102,29 @@ function SpacePage() {
   const router = useRouter()
   // Companies mid-untag: faded until the write lands and the row unmounts.
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
+  const [renaming, setRenaming] = useState(false)
+  const [moving, setMoving] = useState(false)
+  const [composing, setComposing] = useState(false)
+  const archived = spc.archive !== null || spc.archivedUnder !== null
+
+  /** Archive asks nothing: Restore, on the notice it leaves, undoes it. */
+  async function archive() {
+    try {
+      await archiveSpace({ data: { id: spc.id } })
+      void router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not archive')
+    }
+  }
+
+  async function restore() {
+    try {
+      await restoreSpace({ data: { id: spc.id } })
+      void router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not restore')
+    }
+  }
 
   async function newNote(kind?: 'memo') {
     try {
@@ -146,7 +185,19 @@ function SpacePage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={spaceStamp(spc.ancestors.length)}
+        stamp={spaceStamp(spc.ancestors.length, spc.archive?.on ?? null)}
+        archived={archived}
+        {...(renaming
+          ? {
+              nameField: (
+                <RenameField
+                  id={spc.id}
+                  name={spc.name}
+                  onDone={() => setRenaming(false)}
+                />
+              ),
+            }
+          : {})}
         crumb={
           <nav aria-label="Breadcrumb" className="flex items-center gap-2">
             <Link
@@ -194,7 +245,16 @@ function SpacePage() {
               Note here
               <KeyHint>N</KeyHint>
             </Button>
-            <SpaceMenu id={spc.id} name={spc.name} />
+            <SpaceMenu
+              id={spc.id}
+              name={spc.name}
+              archived={spc.archive !== null}
+              onRename={() => setRenaming(true)}
+              onSubspace={() => setComposing(true)}
+              onMove={() => setMoving(true)}
+              onArchive={() => void archive()}
+              onRestore={() => void restore()}
+            />
           </>
         }
         mark={
@@ -256,6 +316,25 @@ function SpacePage() {
         ]}
       />
 
+      {archived ? (
+        <ArchivedNotice
+          filings={spc.archive?.filings ?? 0}
+          under={spc.archivedUnder}
+          onRestore={() => void restore()}
+        />
+      ) : null}
+
+      <SpaceMoveDialog
+        open={moving}
+        onOpenChange={setMoving}
+        moving={{
+          id: spc.id,
+          name: spc.name,
+          path: spc.path,
+          parentId: spc.parentId,
+        }}
+      />
+
       <RecordBody
         rail={
           <>
@@ -302,6 +381,8 @@ function SpacePage() {
               <NewSubspace
                 parentId={spc.id}
                 first={spc.children.length === 0}
+                editing={composing}
+                onEditingChange={setComposing}
               />
             </RailSection>
 
@@ -532,13 +613,37 @@ function SpacePage() {
 }
 
 /**
- * The head's `···`: the star, kept per browser, that puts this space under
- * Spaces on the chassis. A star follows a rename here, the one place the
- * name is read.
+ * The head's `···`: Star (kept per browser, which puts this space under
+ * Spaces on the chassis), then Rename · New subspace · Move to… · Archive.
+ * A star follows a rename here, the one place the name is read.
  */
-function SpaceMenu({ id, name }: { id: string; name: string }) {
+function SpaceMenu({
+  id,
+  name,
+  archived,
+  onRename,
+  onSubspace,
+  onMove,
+  onArchive,
+  onRestore,
+}: {
+  id: string
+  name: string
+  archived: boolean
+  onRename: () => void
+  onSubspace: () => void
+  onMove: () => void
+  onArchive: () => void
+  onRestore: () => void
+}) {
   const starred = useStarredSpaces().some((s) => s.id === id)
   useEffect(() => syncStarredSpaceName({ id, name }), [id, name])
+  // Rename and New subspace open a field: focus goes there, not back to ···.
+  const keepFocus = useRef(false)
+  const opening = (open: () => void) => () => {
+    keepFocus.current = true
+    open()
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -548,13 +653,143 @@ function SpaceMenu({ id, name }: { id: string; name: string }) {
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent
+        align="end"
+        className="w-48"
+        onCloseAutoFocus={(e) => {
+          if (keepFocus.current) e.preventDefault()
+          keepFocus.current = false
+        }}
+      >
         <DropdownMenuItem onSelect={() => toggleStarredSpace({ id, name })}>
           <Star className="size-4" />
           {starred ? 'Unstar' : 'Star'}
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={opening(onRename)}>
+          <Pencil className="size-4" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={opening(onSubspace)}>
+          <Plus className="size-4" />
+          New subspace
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onMove}>
+          <CornerDownRight className="size-4" />
+          Move to…
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {archived ? (
+          <DropdownMenuItem onSelect={onRestore}>
+            <ArchiveRestore className="size-4" />
+            Restore
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem onSelect={onArchive}>
+            <Archive className="size-4" />
+            Archive
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+/**
+ * Rename in place: the title becomes its own field. ↵ saves, esc keeps the
+ * name. Links, filings and watches point at the space id, so nothing else
+ * changes. (D73)
+ */
+function RenameField({
+  id,
+  name,
+  onDone,
+}: {
+  id: string
+  name: string
+  onDone: () => void
+}) {
+  const router = useRouter()
+  const [draft, setDraft] = useState(name)
+  // ↵ and the blur that follows must not save twice.
+  const settled = useRef(false)
+
+  async function save() {
+    if (settled.current) return
+    settled.current = true
+    const next = draft.trim()
+    if (!next || next === name) return onDone()
+    try {
+      await renameSpace({ data: { id, name: next } })
+      void router.invalidate()
+    } catch {
+      toast.error('Could not rename the space')
+    } finally {
+      onDone()
+    }
+  }
+
+  return (
+    <input
+      autoFocus
+      value={draft}
+      aria-label="Space name"
+      maxLength={120}
+      onChange={(e) => setDraft(e.target.value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onBlur={() => void save()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') void save()
+        if (e.key === 'Escape') {
+          settled.current = true
+          onDone()
+        }
+      }}
+      className="focus-ring w-full min-w-0 border-b border-rule bg-transparent title-serif outline-none"
+    />
+  )
+}
+
+/**
+ * Under an archived head: what still holds, and the one way back. A space
+ * archived with an ancestor is restored from that ancestor.
+ * - Watches are not built yet, so only the filings are counted.
+ */
+function ArchivedNotice({
+  filings,
+  under,
+  onRestore,
+}: {
+  filings: number
+  under: { id: string; name: string } | null
+  onRestore: () => void
+}) {
+  return (
+    <div
+      role="status"
+      className="mx-8 mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-3 border-double border-hairline bg-paper px-4 py-2.5"
+    >
+      <p className="min-w-0 flex-1 text-ui">
+        <span className="font-medium">Archived.</span> Out of the tree and the
+        space picker.
+      </p>
+      <span className="shrink-0 mono text-micro text-graphite">
+        {filings} filing{filings === 1 ? '' : 's'} kept
+      </span>
+      {under ? (
+        <Link
+          to="/spaces/$spaceId"
+          params={{ spaceId: under.id }}
+          className="focus-ring shrink-0 text-label text-primary"
+        >
+          Archived with {under.name} ›
+        </Link>
+      ) : (
+        <Button variant="outline" size="sm" onClick={onRestore}>
+          Restore
+        </Button>
+      )}
+    </div>
   )
 }
 
@@ -562,12 +797,16 @@ function SpaceMenu({ id, name }: { id: string; name: string }) {
 function NewSubspace({
   parentId,
   first,
+  editing,
+  onEditingChange: setEditing,
 }: {
   parentId: string
   first: boolean
+  /** Open from the rail's row or the head's ··· New subspace. */
+  editing: boolean
+  onEditingChange: (editing: boolean) => void
 }) {
   const router = useRouter()
-  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
 
   async function create() {

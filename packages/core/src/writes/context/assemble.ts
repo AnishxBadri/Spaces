@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   attribute,
@@ -574,6 +574,7 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
   }
 
   // ---------- hop 1/2: spaces → memos up the tree ----------
+  // An archived space leaves the climb; the filing that reached it stays.
   const tags = yield* query(() =>
     db
       .select({ spaceId: entitySpace.spaceId, path: space.path })
@@ -587,7 +588,12 @@ export const assembleProgram = Effect.fn('assembleProgram')(function* (
       db
         .select({ id: space.entityId, path: space.path })
         .from(space)
-        .where(or(...tags.map((t) => sql`${space.path} @> ${t.path}`)))
+        .where(
+          and(
+            or(...tags.map((t) => sql`${space.path} @> ${t.path}`)),
+            isNull(space.archivedAt),
+          ),
+        )
         .orderBy(asc(space.path)),
     )
     const direct = new Set(tags.map((t) => t.spaceId))

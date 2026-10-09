@@ -17,8 +17,11 @@ export type StampProps = {
 }
 
 /** A space's stamp: its depth in the tree, a top-level space at 0. */
-export function spaceStamp(depth: number): StampProps {
-  return { kind: 'Space', fact: `· depth ${depth}` }
+export function spaceStamp(
+  depth: number,
+  archivedOn: string | null = null,
+): StampProps {
+  return { kind: 'Space', fact: `· depth ${depth}`, archivedOn }
 }
 
 export function Stamp({ kind, fact, archivedOn }: StampProps) {

@@ -10,6 +10,7 @@ import { JSON_SCHEMA_DRAFT } from '@spaces/core/ai/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
 import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue, jobsByKey } from '#/lib/queue'
+import { liveSpaceSql } from '#/lib/spaces/live'
 import type { QueuedJob } from '#/lib/queue'
 import { recordContextProgram } from '@spaces/core/writes/context/record'
 import { SimilarLaneLive } from './similar'
@@ -127,9 +128,10 @@ export function suggestSpacesMessage(failure: SuggestSpacesFailure): string {
 export type TreeSpace = { id: string; path: string; label: string }
 
 /**
- * Every live space, each labelled by its path of names ("Energy / Storage /
- * Grid batteries"): `space.path` is an ltree of slugs, so a label is the
- * names of the spaces at each of its prefixes.
+ * Every live space (not archived, nor under an archive), each labelled by
+ * its path of names ("Energy / Storage / Grid batteries"): `space.path` is an
+ * ltree of slugs, so a label is the names of the spaces at each of its
+ * prefixes.
  */
 const readTree = () =>
   query(async (): Promise<Array<TreeSpace>> => {
@@ -141,7 +143,7 @@ const readTree = () =>
       })
       .from(space)
       .innerJoin(entity, eq(entity.id, space.entityId))
-      .where(isNull(entity.mergedIntoId))
+      .where(and(isNull(entity.mergedIntoId), liveSpaceSql))
       .orderBy(asc(space.path))
     const nameAt = new Map(rows.map((r) => [r.path, r.name]))
     return rows.map((r) => {

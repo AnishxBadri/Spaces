@@ -2,14 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import {
-  entity,
-  entityAlias,
-  entitySpace,
-  link,
-  person,
-  space,
-} from '@spaces/db/schema'
+import { entity, entityAlias, link, person } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { jsonString } from '@spaces/core/json'
@@ -17,6 +10,7 @@ import { groupReferencedBy, referencedByRows, requireUser } from './shared'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { emitDomainEvent } from '#/lib/events/emit'
 import { pagedListInput, pageOptions } from '#/lib/views/page-input'
+import { recordSpaces } from '#/lib/spaces/filed-in'
 
 export const listPeople = createServerFn().handler(async () => {
   await requireUser()
@@ -181,16 +175,7 @@ export const getPerson = createServerFn()
     // record pages had a rail to write one — so the space page's Contacts
     // section had no writer and its direct lane could never fill. Same
     // query as `getCompany`'s, same two server fns on the rail.
-    const spaces = await db
-      .select({
-        id: space.entityId,
-        name: entity.canonicalName,
-        source: entitySpace.source,
-      })
-      .from(entitySpace)
-      .innerJoin(space, eq(space.entityId, entitySpace.spaceId))
-      .innerJoin(entity, eq(entity.id, space.entityId))
-      .where(eq(entitySpace.entityId, data.id))
+    const spaces = await recordSpaces(data.id)
 
     // Inbound record-references, grouped by the attribute that made them:
     // `deal.referred_by` (SPA-59) is the first, and any later attribute

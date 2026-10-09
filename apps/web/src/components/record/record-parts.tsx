@@ -34,6 +34,8 @@ export function RecordHeader({
   actions,
   mark,
   name,
+  nameField,
+  archived = false,
   badges,
   readouts,
 }: {
@@ -43,6 +45,10 @@ export function RecordHeader({
   actions?: ReactNode
   mark?: ReactNode
   name: ReactNode
+  /** Rename in place: drawn where the title is; the folded bar keeps `name`. */
+  nameField?: ReactNode
+  /** An archived record: the name and the double rule go graphite. */
+  archived?: boolean
   badges?: ReactNode
   readouts?: Array<RecordReadout>
 }) {
@@ -50,7 +56,12 @@ export function RecordHeader({
   return (
     <>
       <HeadBar fold={fold} title={name} stamp={stamp} />
-      <header className="flex shrink-0 flex-col gap-3.5 px-8 pt-5 double-rule">
+      <header
+        className={cn(
+          'flex shrink-0 flex-col gap-3.5 px-8 pt-5 double-rule',
+          archived && 'double-rule-archived',
+        )}
+      >
         <div className="flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <Stamp {...stamp} />
@@ -66,8 +77,15 @@ export function RecordHeader({
         </div>
         <div className="flex min-w-0 items-center gap-3.5">
           {mark}
-          <h1 ref={titleRef} className="min-w-0 truncate title-serif">
-            {name}
+          <h1
+            ref={titleRef}
+            className={cn(
+              'min-w-0 truncate title-serif',
+              nameField !== undefined && 'flex-1',
+              archived && 'text-graphite',
+            )}
+          >
+            {nameField ?? name}
           </h1>
           {badges}
         </div>

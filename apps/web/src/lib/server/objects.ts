@@ -8,6 +8,7 @@ import { user } from '@spaces/db/schema/auth'
 import { referencedByRows, requireUser } from './shared'
 import { pagedListShape, pageOptions } from '#/lib/views/page-input'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
+import { recordSpaces } from '#/lib/spaces/filed-in'
 
 /**
  * The object registry, read side (CONTEXT.md "Two-tier object model"). One
@@ -223,7 +224,6 @@ export const getObjectRecord = createServerFn()
   .validator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
     await requireUser()
-    const { entitySpace, space } = await import('@spaces/db/schema')
     const { and: andOp } = await import('drizzle-orm')
     const head = (
       await db
@@ -248,16 +248,7 @@ export const getObjectRecord = createServerFn()
     ).at(0)
     if (!head) throw new Error('Record not found')
 
-    const spaces = await db
-      .select({
-        id: space.entityId,
-        name: entity.canonicalName,
-        source: entitySpace.source,
-      })
-      .from(entitySpace)
-      .innerJoin(space, eq(space.entityId, entitySpace.spaceId))
-      .innerJoin(entity, eq(entity.id, space.entityId))
-      .where(eq(entitySpace.entityId, data.id))
+    const spaces = await recordSpaces(data.id)
 
     // Outgoing references (this record's reference attributes) → names.
     const outRefs = await db

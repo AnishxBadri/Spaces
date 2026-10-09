@@ -6,8 +6,8 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { Layers, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { SpaceRailRow } from '#/components/record/space-rail-row'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
@@ -18,7 +18,6 @@ import {
   InitialsMark,
   PropertyCell,
   PropertyGrid,
-  RailItem,
   RailSection,
   RecordBody,
   RecordHeader,
@@ -202,31 +201,16 @@ function PersonRecordPage() {
                 so the direct lane could never fill. */}
             <RailSection label="Spaces" meta={`${person.spaces.length}`}>
               {person.spaces.map((s) => (
-                <RailItem key={s.id} className="group">
-                  <Layers
-                    className="size-3.5 shrink-0 text-graphite"
-                    strokeWidth={1.75}
-                  />
-                  <Link
-                    to="/spaces/$spaceId"
-                    params={{ spaceId: s.id }}
-                    className="focus-ring min-w-0 flex-1 truncate hover:underline"
-                  >
-                    {s.name}
-                  </Link>
-                  <button
-                    aria-label={`Remove from ${s.name}`}
-                    onClick={async () => {
-                      await untagFromSpace({
-                        data: { entityId: person.id, spaceId: s.id },
-                      })
-                      void router.invalidate()
-                    }}
-                    className="focus-ring hidden size-5 items-center justify-center text-graphite group-hover:flex hover:text-foreground focus-visible:flex"
-                  >
-                    <X className="size-3" strokeWidth={2} />
-                  </button>
-                </RailItem>
+                <SpaceRailRow
+                  key={s.id}
+                  space={s}
+                  onRemove={async () => {
+                    await untagFromSpace({
+                      data: { entityId: person.id, spaceId: s.id },
+                    })
+                    void router.invalidate()
+                  }}
+                />
               ))}
               {untaggedSpaces.length > 0 ? (
                 <Select

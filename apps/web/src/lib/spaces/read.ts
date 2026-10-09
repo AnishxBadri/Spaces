@@ -26,7 +26,9 @@ import {
   spaceSourcesProgram,
 } from '#/lib/documents/space-sources'
 import { jsonString } from '@spaces/core/json'
+import { archiveCountsProgram } from '@spaces/core/writes/entities/space'
 import { filedNotesProgram } from '#/lib/notes/filed'
+import { liveSpaceSql } from '#/lib/spaces/live'
 import {
   spaceContactsProgram,
   spaceInheritedContactsProgram,
@@ -111,6 +113,7 @@ const termCountsBySpace = Effect.fn('termCountsBySpace')(function* () {
   return new Map(rows.map((r) => [r.spaceId, r.count]))
 })
 
+/** The tree and the space picker: live spaces only, in path order. */
 export const listSpacesProgram = Effect.fn('listSpacesProgram')(function* (
   userId: string,
 ) {
@@ -126,6 +129,7 @@ export const listSpacesProgram = Effect.fn('listSpacesProgram')(function* (
       })
       .from(space)
       .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(liveSpaceSql)
       .orderBy(asc(space.path)),
   )
   const [companies, memos, terms] = yield* Effect.all(
@@ -159,6 +163,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
         path: space.path,
         parentId: space.parentId,
         isSeeded: space.isSeeded,
+        archivedAt: space.archivedAt,
       })
       .from(space)
       .innerJoin(entity, eq(entity.id, space.entityId))
@@ -177,6 +182,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
               id: space.entityId,
               name: entity.canonicalName,
               path: space.path,
+              archived: sql<boolean>`${space.archivedAt} is not null`,
             })
             .from(space)
             .innerJoin(entity, eq(entity.id, space.entityId))
@@ -192,7 +198,7 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
       .select({ id: space.entityId, name: entity.canonicalName })
       .from(space)
       .innerJoin(entity, eq(entity.id, space.entityId))
-      .where(eq(space.parentId, id))
+      .where(and(eq(space.parentId, id), isNull(space.archivedAt)))
       .orderBy(asc(entity.canonicalName)),
   )
 
@@ -341,11 +347,29 @@ export const getSpaceProgram = Effect.fn('getSpaceProgram')(function* (
     { concurrency: 'unbounded' },
   )
 
+  // Archived: what still holds, for the notice under the head. An ancestor
+  // archived over it is named instead, since Restore belongs to that space.
+  const archivedUnder = ancestors.filter((a) => a.archived).at(-1) ?? null
+  const archive = head.archivedAt
+    ? {
+        on: head.archivedAt.toISOString(),
+        ...(yield* archiveCountsProgram(head.id, head.path).pipe(
+          Effect.mapError((e) => new SpaceQueryFailed({ cause: e })),
+        )),
+      }
+    : null
+
   return {
     id: head.id,
     name: head.name,
     slug: head.slug,
+    path: head.path,
+    parentId: head.parentId,
     isSeeded: head.isSeeded,
+    archive,
+    archivedUnder: archivedUnder
+      ? { id: archivedUnder.id, name: archivedUnder.name }
+      : null,
     ancestors: ancestors.map((a) => ({ id: a.id, name: a.name })),
     parent: ancestors.at(-1) ?? null,
     children: childRows.map((c) => ({

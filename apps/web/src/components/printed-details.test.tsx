@@ -159,6 +159,23 @@ describe('the ink stamp', () => {
     expect(count(headOf(html), /data-stamp=/g)).toBe(1)
     expect(html.replace(/<!-- -->/g, '')).toContain('Space · depth 2')
   })
+
+  it('draws an archived space head in outline, the name and the double rule graphite', () => {
+    const html = renderToStaticMarkup(
+      <RecordHeader
+        stamp={spaceStamp(1, '2026-10-08T09:00:00.000Z')}
+        archived
+        crumb="Spaces / Launch"
+        name="Small-lift"
+      />,
+    )
+    expect(html).toMatch(/<header class="[^"]*\bdouble-rule-archived\b/)
+    expect(headOf(html)).toContain('data-stamp="archived"')
+    expect(html.replace(/<!-- -->/g, '')).toContain('archived 10-08')
+    expect(html).toMatch(
+      /<h1[^>]*class="[^"]*\btext-graphite\b[^"]*"[^>]*>Small-lift/,
+    )
+  })
 })
 
 describe('real tabs', () => {
