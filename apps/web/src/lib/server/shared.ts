@@ -37,6 +37,16 @@ export async function requireAdmin() {
 }
 
 /**
+ * A settings page's read: any signed-in member may read an admin page, and
+ * `isAdmin` says whether its secrets are shown or redacted. Its writes keep
+ * `requireAdmin()`. (D81)
+ */
+export async function requireSettingsReader(): Promise<{ isAdmin: boolean }> {
+  const u = await requireUser()
+  return { isAdmin: u.role === 'admin' }
+}
+
+/**
  * `canRead` and `provenanceOf` take no request context, so they live outside
  * `lib/server/` where the helpers that need them can import them without
  * dragging `getRequest` into the client bundle (SPA-155). Re-exported here so

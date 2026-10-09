@@ -70,10 +70,9 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
-describe('both fns refuse a non-admin', () => {
-  it("answers a member 'Admins only' before reading or writing", async () => {
+describe('a member reads the clients redacted, and the write refuses them', () => {
+  it("answers a member's save 'Admins only' before writing", async () => {
     asMember()
-    await expect(getProviderAppsHandler()).rejects.toThrow('Admins only')
     await expect(
       setProviderAppHandler({
         provider: 'google',
@@ -82,6 +81,25 @@ describe('both fns refuse a non-admin', () => {
       }),
     ).rejects.toThrow('Admins only')
     expect(await clientRows('google')).toBe(0)
+  })
+
+  it("reads a member the client with the secret's display redacted", async () => {
+    asAdmin()
+    await setProviderAppHandler({
+      provider: 'google',
+      clientId: CLIENT_ID,
+      clientSecret: SECRET,
+    })
+    asMember()
+    const apps = await getProviderAppsHandler()
+    const google = apps.find((a) => a.provider === 'google')
+    expect(google?.configured).toBe(true)
+    expect(google?.clientId).toBe(CLIENT_ID)
+    expect(google?.secretDisplay).toBe('set')
+    expect(JSON.stringify(apps)).not.toContain('9f3c')
+    expect(apps.find((a) => a.provider === 'box')?.secretDisplay).toBeNull()
+    // The admin's tests below start from no client.
+    await db.delete(credential).where(eq(credential.kind, 'oauth_client'))
   })
 
   it('refuses a request with no session', async () => {

@@ -15,16 +15,13 @@ import {
   creditsOf,
 } from '#/components/integrations/integration-ledger'
 import { SectionHead } from '#/components/ledger-section'
-import {
-  SettingsRow,
-  SettingsSection,
-} from '#/components/settings/settings-section'
+import { useSettingsDraft } from '#/components/settings/settings-form'
+import { SettingsSection } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Switch } from '#/components/ui/switch'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   getIntegration,
-  getSession,
   removeIntegrationSecret,
   resetIntegration,
   saveIntegrationAutoEnrich,
@@ -36,39 +33,28 @@ import {
 } from '#/lib/server-fns'
 import type {
   FormValue,
+  FormValues,
   IntegrationDetail,
   SecretField,
+  SettingsField,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
  * One plugin's card: its state, its key and its settings, generated from the
  * manifest the worker stored. Inside the settings shell, so Plugins stays
- * lit; the `_` keeps it out of the ledger's component.
+ * lit; the `_` keeps it out of the ledger's component. A member reads it
+ * too, keys redacted and every control disabled. (D81)
  */
 export const Route = createFileRoute('/_app/settings/plugins_/$integrationId')({
-  loader: async ({ params }) => {
-    const session = await getSession()
-    if (session?.user.role !== 'admin') return { detail: null }
-    return {
-      detail: await getIntegration({ data: { id: params.integrationId } }),
-    }
-  },
+  loader: async ({ params }) => ({
+    detail: await getIntegration({ data: { id: params.integrationId } }),
+  }),
   component: IntegrationPage,
 })
 
 function IntegrationPage() {
   const { detail } = Route.useLoaderData()
-  if (detail === null)
-    return (
-      <SettingsSection title="Plugins" crumb="Integrations">
-        <SettingsRow
-          label="Admins only"
-          hint="Plugins and their keys belong to the workspace admin."
-        />
-      </SettingsSection>
-    )
-  // Keyed on the row so a reload after a save starts the form from the stored config.
   return <IntegrationCard key={detail.id} detail={detail} />
 }
 
@@ -113,10 +99,7 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
   const dropData = useRef(false)
   const { confirm, confirmDialog } = useConfirm()
   const [pending, setPending] = useState(false)
-  const [values, setValues] = useState(detail.values)
   const [errors, setErrors] = useState<{ readonly [key: string]: string }>({})
-  const [dirty, setDirty] = useState(false)
-  const [secrets, setSecrets] = useState<{ [slot: string]: string }>({})
 
   async function act(run: () => Promise<unknown>, done: string) {
     setPending(true)
@@ -131,31 +114,68 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
     }
   }
 
-  async function saveSettings() {
-    setPending(true)
-    try {
-      const saved = await saveIntegrationSettings({
-        data: { id: detail.id, values },
-      })
-      if (!saved.ok) {
-        setErrors(saved.errors)
-        return
-      }
-      setErrors({})
-      setDirty(false)
-      toast(`${detail.name} settings saved · reloading`)
-      await router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not save')
-    } finally {
-      setPending(false)
+  /** Writes the stored config with `changes` over it; a refusal marks its rows. */
+  async function writeSettings(changes: FormValues, done: string) {
+    const saved = await saveIntegrationSettings({
+      data: { id: detail.id, values: { ...detail.values, ...changes } },
+    })
+    if (!saved.ok) {
+      setErrors(saved.errors)
+      throw new Error(`${detail.name} settings not saved`)
     }
+    setErrors({})
+    toast(done)
+    await router.invalidate()
   }
 
-  function change(key: string, value: FormValue) {
-    setValues((v) => ({ ...v, [key]: value }))
-    setDirty(true)
+  // Typed settings (a string, a number) are one draft in the Save bar.
+  const typed = detail.form.ok
+    ? detail.form.fields.filter(
+        (f) => f.kind === 'string' || f.kind === 'number',
+      )
+    : []
+  const settings = useSettingsDraft(
+    Object.fromEntries(
+      typed.map((f) => {
+        const v = Object.hasOwn(detail.values, f.key)
+          ? detail.values[f.key]
+          : undefined
+        return [f.key, typeof v === 'string' ? v : '']
+      }),
+    ),
+    (next) => writeSettings(next, `${detail.name} settings saved · reloading`),
+  )
+
+  // A switch or a picker saves alone, against the stored config.
+  function change(field: SettingsField, value: FormValue) {
+    if (field.kind === 'string' || field.kind === 'number') {
+      if (typeof value === 'string') settings.set(field.key, value)
+      return
+    }
+    setPending(true)
+    writeSettings({ [field.key]: value }, `${field.label} saved`)
+      .catch((err: unknown) =>
+        toast.error(err instanceof Error ? err.message : 'Could not save'),
+      )
+      .finally(() => setPending(false))
   }
+
+  // Each secret slot's field is write-only; the draft settles empty.
+  const secrets = useSettingsDraft(
+    Object.fromEntries(detail.secrets.map((f) => [f.slot, ''])),
+    async (next) => {
+      for (const field of detail.secrets) {
+        const secret = Object.hasOwn(next, field.slot) ? next[field.slot] : ''
+        if (secret.trim() === '') continue
+        await saveIntegrationSecret({
+          data: { id: detail.id, slot: field.slot, secret },
+        })
+        toast(`${field.label} saved · reloading`)
+      }
+      await router.invalidate()
+      return Object.fromEntries(detail.secrets.map((f) => [f.slot, '']))
+    },
+  )
 
   async function uninstall() {
     dropData.current = false
@@ -193,22 +213,13 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
       <SecretFieldRow
         key={field.slot}
         field={field}
-        value={secrets[field.slot] ?? ''}
-        disabled={pending}
-        onChange={(v) => setSecrets((s) => ({ ...s, [field.slot]: v }))}
-        onSave={() =>
-          void act(async () => {
-            const { display } = await saveIntegrationSecret({
-              data: {
-                id: detail.id,
-                slot: field.slot,
-                secret: secrets[field.slot] ?? '',
-              },
-            })
-            setSecrets((s) => ({ ...s, [field.slot]: '' }))
-            return display
-          }, `${field.label} saved · reloading`)
+        value={
+          Object.hasOwn(secrets.draft, field.slot)
+            ? secrets.draft[field.slot]
+            : ''
         }
+        disabled={pending}
+        onChange={(v) => secrets.set(field.slot, v)}
         onRemove={() =>
           void confirm({
             title: `Remove the ${field.label}?`,
@@ -346,16 +357,18 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
 
       <SettingsFields
         form={detail.form}
-        values={values}
+        values={{ ...detail.values, ...settings.draft }}
         errors={errors}
         disabled={pending}
-        dirty={dirty}
         notYet={detail.state === 'needs-setup'}
         onChange={change}
-        onSave={() => void saveSettings()}
       />
       {detail.autoEnrichForm !== null ? (
         <AutoEnrichFields
+          key={[
+            ...detail.autoEnrichForm.scopes,
+            ...detail.autoEnrichForm.spaces,
+          ].join()}
           view={detail.autoEnrichForm}
           disabled={pending}
           onSave={(scope) =>

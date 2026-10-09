@@ -8,7 +8,7 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue, jobsByKey } from '#/lib/queue'
 import type { QueuedJob } from '#/lib/queue'
 import { effectFn } from '#/lib/server/effect'
-import { requireAdmin } from '#/lib/server/shared'
+import { requireAdmin, requireUser } from '#/lib/server/shared'
 import { capMessage, readAiCapsProgram } from './caps'
 import type { CapReadFailed } from './caps'
 import { embedMessage, embedProgram } from './embed'
@@ -556,10 +556,11 @@ export const embedBackfillStatusProgram = Effect.fn('embedBackfillStatus')(
   },
 )
 
-// The server fns' bodies. `requireAdmin()` first, always.
+// The server fns' bodies. `requireAdmin()` first on the write; the status is
+// counts and a queue read, so any member reads it (D81).
 
 export async function getEmbedBackfillHandler(): Promise<EmbedBackfillView> {
-  await requireAdmin()
+  await requireUser()
   return effectFn(embedBackfillStatusProgram)()
 }
 

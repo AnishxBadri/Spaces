@@ -14,13 +14,19 @@ import {
 } from '@spaces/core/writes/vault'
 import { effectFn } from '#/lib/server/effect'
 import { describeExternalOrigin } from '#/lib/server/external-origin'
-import { requireAdmin, requireUser } from '#/lib/server/shared'
+import {
+  requireAdmin,
+  requireSettingsReader,
+  requireUser,
+} from '#/lib/server/shared'
+import { redactProviderApp } from '#/lib/settings-redact'
 import type { ProviderAppInput, ProviderAppRow } from './input'
 
 /**
  * The operator half of a provider: one OAuth app per provider, a workspace
  * `oauth_client` credential — client id in `meta`, secret encrypted.
- * - Admin-only: each handler opens with `requireAdmin()`, before any read.
+ * - The write opens with `requireAdmin()`; the read is any member's, the
+ *   secret's display redacted for them (D81).
  * - The secret goes in and never comes back: rows carry `redact()` of it.
  * - Handlers live outside `lib/server/` so a test drives them without a
  *   request; the server fns are one-line delegations.
@@ -128,11 +134,13 @@ export const setProviderAppProgram = Effect.fn('setProviderApp')(function* (
   return yield* readRow(provider)
 })
 
-// The server fns' bodies. `requireAdmin()` first, always.
+// The server fns' bodies. `requireAdmin()` first on the write.
 
+/** Any member reads the clients; each secret's display is redacted for them. (D81) */
 export async function getProviderAppsHandler(): Promise<ProviderAppRow[]> {
-  await requireAdmin()
-  return effectFn(getProviderAppsProgram)()
+  const { isAdmin } = await requireSettingsReader()
+  const apps = await effectFn(getProviderAppsProgram)()
+  return isAdmin ? apps : apps.map(redactProviderApp)
 }
 
 /** Any signed-in member: connecting is theirs, the client is the admin's. */

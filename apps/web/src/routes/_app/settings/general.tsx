@@ -1,17 +1,20 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
-import { useState } from 'react'
 import { toast } from 'sonner'
+import { useSettingsDraft } from '#/components/settings/settings-form'
 import {
   SettingsRow,
   SettingsSection,
 } from '#/components/settings/settings-section'
-import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { saveWorkspace, setBaseCurrency } from '#/lib/server-fns'
 
 const shell = getRouteApi('/_app/settings')
 
-/** The workspace singleton: its name and the currency it prices in. (D81) */
+/**
+ * The workspace singleton: its name and the currency it prices in. (D81)
+ * - Both are typed fields: they collect into the page's Save bar.
+ * - Only an admin changes them; a member reads them disabled.
+ */
 export const Route = createFileRoute('/_app/settings/general')({
   component: GeneralRoute,
 })
@@ -19,127 +22,65 @@ export const Route = createFileRoute('/_app/settings/general')({
 function GeneralRoute() {
   const data = shell.useLoaderData()
   return (
-    <SettingsSection title="General" crumb="Workspace">
-      <WorkspaceNameRow
-        name={data.workspace?.name ?? ''}
-        isAdmin={data.isAdmin}
-      />
-      <BaseCurrencyRow
-        baseCurrency={data.fx.baseCurrency}
-        isAdmin={data.isAdmin}
-      />
+    <SettingsSection title="General" crumb="Workspace" adminOnly>
+      <WorkspaceNameRow name={data.workspace?.name ?? ''} />
+      <BaseCurrencyRow baseCurrency={data.fx.baseCurrency} />
     </SettingsSection>
   )
 }
 
-function WorkspaceNameRow({
-  name,
-  isAdmin,
-}: {
-  name: string
-  isAdmin: boolean
-}) {
+function WorkspaceNameRow({ name }: { name: string }) {
   const router = useRouter()
-  const [value, setValue] = useState(name)
-  const [pending, setPending] = useState(false)
-  const dirty = value.trim() !== name && value.trim().length > 0
-
-  async function save() {
-    setPending(true)
-    try {
-      await saveWorkspace({ data: { name: value.trim() } })
-      toast.success('Workspace renamed')
-      void router.invalidate()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not rename')
-    } finally {
-      setPending(false)
-    }
-  }
+  const { draft, set } = useSettingsDraft({ name }, async (next) => {
+    const trimmed = next.name.trim()
+    if (trimmed === '') throw new Error('The workspace needs a name.')
+    await saveWorkspace({ data: { name: trimmed } })
+    toast('Workspace renamed')
+    void router.invalidate()
+    return { name: trimmed }
+  })
 
   return (
-    <SettingsRow
-      label="Name"
-      hint={
-        isAdmin
-          ? 'Shown to every member.'
-          : 'Only admins can rename the workspace.'
-      }
-    >
+    <SettingsRow label="Name">
       <Input
         id="ws-name"
         aria-label="Workspace name"
-        value={value}
-        disabled={!isAdmin}
-        onChange={(e) => setValue(e.target.value)}
+        value={draft.name}
+        onChange={(e) => set('name', e.target.value)}
         placeholder="Your fund's name"
         className="w-56"
       />
-      {isAdmin ? (
-        <Button size="sm" disabled={!dirty || pending} onClick={save}>
-          {pending ? 'Saving…' : 'Save'}
-        </Button>
-      ) : null}
     </SettingsRow>
   )
 }
 
 /** The currency every holding is priced in; the rates live in Currency & FX. */
-function BaseCurrencyRow({
-  baseCurrency,
-  isAdmin,
-}: {
-  baseCurrency: string
-  isAdmin: boolean
-}) {
+function BaseCurrencyRow({ baseCurrency }: { baseCurrency: string }) {
   const router = useRouter()
-  const [base, setBase] = useState(baseCurrency)
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
-  const next = base.trim().toUpperCase()
-
-  async function save() {
-    if (next === baseCurrency) return
-    setPending(true)
-    setError(null)
-    try {
-      await setBaseCurrency({ data: { currency: next } })
+  const { draft, set } = useSettingsDraft(
+    { currency: baseCurrency },
+    async (next) => {
+      const currency = next.currency.trim().toUpperCase()
+      await setBaseCurrency({ data: { currency } })
       toast('Base currency saved')
       void router.invalidate()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save')
-    } finally {
-      setPending(false)
-    }
-  }
+      return { currency }
+    },
+  )
 
   return (
     <SettingsRow
       label="Base currency"
-      hint={
-        error ? (
-          <span role="alert" className="text-destructive">
-            {error}
-          </span>
-        ) : (
-          'Changing it re-prices the portfolio strip; ledgers keep their original currency.'
-        )
-      }
+      hint="Changing it re-prices the portfolio strip; ledgers keep their original currency."
     >
       <Input
         id="fx-base"
         aria-label="Base currency"
-        value={base}
-        onChange={(e) => setBase(e.target.value)}
+        value={draft.currency}
+        onChange={(e) => set('currency', e.target.value)}
         maxLength={3}
         className="w-24 mono uppercase"
-        disabled={!isAdmin}
       />
-      {isAdmin && next !== baseCurrency ? (
-        <Button size="sm" onClick={save} disabled={pending}>
-          Save
-        </Button>
-      ) : null}
     </SettingsRow>
   )
 }

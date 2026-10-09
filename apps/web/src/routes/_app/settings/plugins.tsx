@@ -6,12 +6,8 @@ import {
   RegistryPane,
   UploadPlugin,
 } from '#/components/integrations/registry-pane'
+import { SettingsSection } from '#/components/settings/settings-section'
 import {
-  SettingsRow,
-  SettingsSection,
-} from '#/components/settings/settings-section'
-import {
-  getSession,
   installIntegration,
   listAvailableIntegrations,
   listIntegrations,
@@ -26,15 +22,11 @@ import type { InstallOutcome, IntegrationRow } from '#/lib/server-fns'
  * Settings → Integrations → Plugins: the installed plugins as a ledger, each with its
  * switch, state and the one action its state calls for, then what the
  * registry offers, each with Install; Upload in the head takes a tarball
- * from disk for a box with no outbound HTTPS. Admin-only: the
- * loader asks for the rows only when the reader is an admin, since the
- * server fns refuse anyone else, and a member who types the URL reads a
- * sentence instead of an error.
+ * from disk for a box with no outbound HTTPS. A member reads the same
+ * catalogue with every control disabled; the writes are the admin's. (D81)
  */
 export const Route = createFileRoute('/_app/settings/plugins')({
   loader: async () => {
-    const session = await getSession()
-    if (session?.user.role !== 'admin') return { rows: null, registry: null }
     const [rows, registry] = await Promise.all([
       listIntegrations(),
       listAvailableIntegrations(),
@@ -102,16 +94,6 @@ function IntegrationsRoute() {
       setPending(null)
     }
   }
-
-  if (rows === null)
-    return (
-      <SettingsSection title="Plugins" crumb="Integrations">
-        <SettingsRow
-          label="Admins only"
-          hint="Plugins and their keys belong to the workspace admin."
-        />
-      </SettingsSection>
-    )
 
   return (
     <SettingsSection

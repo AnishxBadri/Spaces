@@ -418,11 +418,11 @@ describe('uninstall', () => {
 })
 
 describe('the handlers', () => {
-  it('refuse anyone but an admin before reading or writing', async () => {
+  it('refuse anyone but an admin every write; any member reads the catalogue', async () => {
     serve(echo('1.0.0'))
     session.current = { id: FIXTURE_ACTOR.id, role: 'member' }
     const id = '00000000-0000-4000-8000-000000000001'
-    await expect(listAvailableHandler()).rejects.toThrow('Admins only')
+    await expect(listAvailableHandler()).resolves.toBeDefined()
     await expect(
       installIntegrationHandler({ pluginId: 'echo' }),
     ).rejects.toThrow('Admins only')

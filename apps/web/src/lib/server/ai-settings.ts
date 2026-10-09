@@ -9,10 +9,10 @@ import {
 } from '../ai/providers/embed/ids'
 
 /**
- * Settings → AI (SPA-29). Admin-only, every one but `isLaneRouted` and the
- * Usage reads (SPA-100), which say why where they stand: the bodies live in
- * `lib/ai/providers/settings.ts`, whose handlers open with `requireAdmin()`,
- * and are imported inside the handler so the AI SDK and the vault never
+ * Settings → AI. Every write is admin-only (`requireAdmin()`); the reads are
+ * any member's, secrets redacted for them (D81). The bodies live in
+ * `lib/ai/providers/settings.ts` and its siblings, and are imported inside
+ * the handler so the AI SDK and the vault never
  * reach the client bundle — this module is re-exported by the client-imported
  * `server-fns` barrel.
  */
@@ -55,8 +55,8 @@ export const setAiRoute = createServerFn({ method: 'POST' })
   })
 
 /**
- * The Routing ledger's read (SPA-69): every stored cell. Admin-only, like the
- * rest of Settings → AI.
+ * The Routing ledger's read: every stored cell. Any member reads it; it holds
+ * no secret.
  */
 export const listAiRoutes = createServerFn().handler(async () => {
   const { listAiRoutesHandler } = await import('../ai/route')
@@ -77,9 +77,8 @@ export const isLaneRouted = createServerFn()
   })
 
 /**
- * Settings → AI · Caps (SPA-73): the workspace token caps, admin-only like
- * the rest of Settings → AI. The bodies live in `lib/ai/caps.ts`, whose
- * handlers open with `requireAdmin()`.
+ * Settings → AI · Caps: the workspace token caps. Any member reads them; the
+ * write is admin-only. The bodies live in `lib/ai/caps.ts`.
  */
 export const getAiCaps = createServerFn().handler(async () => {
   const { getAiCapsHandler } = await import('../ai/caps')
@@ -120,10 +119,9 @@ export const getAiRun = createServerFn()
   })
 
 /**
- * Settings → AI · Embeddings (SPA-51): the pin, the embedding keys, the Test
- * call. Admin-only like the rest of Settings → AI; the bodies live in
- * `lib/ai/providers/embed/settings.ts`, whose handlers open with
- * `requireAdmin()`.
+ * Settings → AI · Search: the pin, the embedding keys, the Test call. The
+ * read is any member's with the keys redacted; the rest are admin-only. The
+ * bodies live in `lib/ai/providers/embed/settings.ts`.
  */
 export const getEmbeddingSettings = createServerFn().handler(async () => {
   const { getEmbeddingSettingsHandler } =
@@ -166,8 +164,8 @@ export const pinEmbedding = createServerFn({ method: 'POST' })
 /**
  * Settings → Embeddings · Backfill (SPA-136): the pending count, the
  * pre-flight estimate and where the run stands — database reads and a queue
- * read, never a provider call. Admin-only; the body opens with
- * `requireAdmin()`.
+ * read, never a provider call. Any member reads it; starting a run is the
+ * admin's.
  */
 export const getEmbedBackfill = createServerFn().handler(async () => {
   const { getEmbedBackfillHandler } = await import('../ai/embed-backfill')

@@ -60,13 +60,12 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('every fn in the section refuses a non-admin', () => {
-  it('refuses a member before reading or writing anything', async () => {
+describe('a member reads the section redacted, and every write refuses them', () => {
+  it('refuses a member every write before writing anything', async () => {
     asMember()
     const wire = vi.fn()
     vi.stubGlobal('fetch', wire)
 
-    await expect(listAiProvidersHandler()).rejects.toThrow('Admins only')
     await expect(
       saveAiKeyHandler({
         provider: 'anthropic',
@@ -81,6 +80,27 @@ describe('every fn in the section refuses a non-admin', () => {
 
     expect(await credentialRows()).toBe(0)
     expect(wire).not.toHaveBeenCalled()
+  })
+
+  it('lists the providers to a member with the key and header values redacted', async () => {
+    asAdmin()
+    await saveAiKeyHandler({
+      provider: 'anthropic',
+      key: SECRET,
+      baseUrl: '',
+      headers: 'Helicone-Auth: Bearer hk-header-secret',
+    })
+
+    asMember()
+    const rows = await listAiProvidersHandler()
+    const anthropic = rows.find((r) => r.provider === 'anthropic')
+    expect(anthropic?.configured).toBe(true)
+    expect(anthropic?.display).toBe('set')
+    expect(anthropic?.headers).toEqual({ 'Helicone-Auth': 'set' })
+    expect(JSON.stringify(rows)).not.toContain('9f3c')
+    expect(JSON.stringify(rows)).not.toContain('hk-header-secret')
+    // A provider with nothing saved stays null, not `set`.
+    expect(rows.find((r) => r.provider === 'openai')?.display).toBeNull()
   })
 
   it('refuses a request with no session', async () => {

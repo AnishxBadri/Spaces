@@ -2,6 +2,7 @@ import { useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
+import { useSettingsDraft } from './settings-form'
 import { SettingsSection } from './settings-section'
 import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
@@ -38,51 +39,28 @@ export function ConnectionAppsSection({
 export const oauthClientAnchor = (provider: ProviderId) =>
   `oauth-client-${provider}`
 
+/**
+ * One provider's client: the client id and a write-only secret as one draft
+ * in the page's Save bar. The secret settles empty after a save; a stored one
+ * reads as its redacted display.
+ */
 function OAuthClientGroup({ app }: { app: ProviderAppRow }) {
   const router = useRouter()
-  const [editing, setEditing] = useState(false)
-  const [clientId, setClientId] = useState(app.clientId ?? '')
-  const [secret, setSecret] = useState('')
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const open = editing || !app.configured
-
-  function edit() {
-    setClientId(app.clientId ?? '')
-    setSecret('')
-    setError(null)
-    setEditing(true)
-  }
-
-  async function save() {
-    const missing =
-      clientId.trim() === ''
-        ? 'Paste the client ID.'
-        : !app.configured && secret.trim() === ''
-          ? 'Paste the client secret.'
-          : null
-    if (missing !== null) {
-      setError(missing)
-      return
-    }
-    setPending(true)
-    setError(null)
-    try {
+  const { draft, set } = useSettingsDraft(
+    { clientId: app.clientId ?? '', secret: '' },
+    async (next) => {
+      const clientId = next.clientId.trim()
+      if (clientId === '') throw new Error(`Paste the ${app.label} client ID.`)
+      if (!app.configured && next.secret.trim() === '')
+        throw new Error(`Paste the ${app.label} client secret.`)
       await setProviderApp({
-        data: { provider: app.provider, clientId, clientSecret: secret },
+        data: { provider: app.provider, clientId, clientSecret: next.secret },
       })
-      setSecret('')
-      setEditing(false)
       toast(`${app.label} OAuth client saved`)
-      await router.invalidate()
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Could not save the OAuth client',
-      )
-    } finally {
-      setPending(false)
-    }
-  }
+      void router.invalidate()
+      return { clientId, secret: '' }
+    },
+  )
 
   return (
     <div id={oauthClientAnchor(app.provider)} className="flex flex-col pt-8">
@@ -93,73 +71,31 @@ function OAuthClientGroup({ app }: { app: ProviderAppRow }) {
       />
       <RedirectUriRow uri={app.redirectUri} />
       <FieldRow label="Client ID">
-        {open ? (
-          <Input
-            aria-label={`${app.label} client ID`}
-            autoComplete="off"
-            spellCheck={false}
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            className="mono"
-          />
-        ) : (
-          <>
-            <Value>{app.clientId}</Value>
-            <Button size="sm" variant="outline" onClick={edit}>
-              Edit
-            </Button>
-          </>
-        )}
+        <Input
+          aria-label={`${app.label} client ID`}
+          autoComplete="off"
+          spellCheck={false}
+          value={draft.clientId}
+          onChange={(e) => set('clientId', e.target.value)}
+          className="mono"
+        />
       </FieldRow>
       <FieldRow label="Secret">
-        {open ? (
-          <Input
-            aria-label={`${app.label} client secret`}
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-            placeholder={app.secretDisplay ?? 'client secret'}
-            className="mono"
-          />
-        ) : (
-          <>
-            <Value>
-              {app.secretDisplay}
-              {app.secretSetAt ? ` · set ${app.secretSetAt.slice(5, 10)}` : ''}
-            </Value>
-            <Button size="sm" variant="outline" onClick={edit}>
-              Replace
-            </Button>
-          </>
-        )}
+        <Input
+          aria-label={`${app.label} client secret`}
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          value={draft.secret}
+          onChange={(e) => set('secret', e.target.value)}
+          placeholder={
+            app.secretDisplay === null
+              ? 'client secret'
+              : `${app.secretDisplay}${app.secretSetAt ? ` · set ${app.secretSetAt.slice(5, 10)}` : ''}`
+          }
+          className="mono"
+        />
       </FieldRow>
-      {open ? (
-        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule px-3 py-2">
-          {error ? (
-            <span
-              role="alert"
-              className="mr-auto mono text-micro text-destructive"
-            >
-              {error}
-            </span>
-          ) : null}
-          {app.configured ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setEditing(false)}
-              disabled={pending}
-            >
-              Cancel
-            </Button>
-          ) : null}
-          <Button size="sm" onClick={() => void save()} disabled={pending}>
-            {pending ? 'Saving' : 'Save'}
-          </Button>
-        </div>
-      ) : null}
     </div>
   )
 }

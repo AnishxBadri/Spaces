@@ -5,7 +5,12 @@ import { integration } from '@spaces/db/schema'
 import { releaseCredential } from '@spaces/core/writes/plugins/credential'
 import { PLUGIN_CHANGED } from '@spaces/core/writes/plugins/install'
 import { redact, storeCredential } from '@spaces/core/writes/vault'
-import { requireAdmin } from '#/lib/server/shared'
+import {
+  requireAdmin,
+  requireSettingsReader,
+  requireUser,
+} from '#/lib/server/shared'
+import { redactIntegrationDetail } from '#/lib/settings-redact'
 import { autoEnrichConfig } from '@spaces/core/plugins/auto-enrich'
 import type { AutoEnrichScope } from '@spaces/core/plugins/auto-enrich'
 import {
@@ -23,7 +28,8 @@ import type { FormValues } from './settings-form'
 
 /**
  * Settings → Integrations, the write half: on/off, breaker reset, settings
- * and the key. Admin only (`requireAdmin`, first line of every handler).
+ * and the key. Every write opens with `requireAdmin`; the reads are any
+ * member's, secrets redacted (D81).
  * - Every write NOTIFYs `plugin_changed` with the plugin id once it has
  *   committed; the worker reloads that one plugin and writes its status.
  * - The key goes into the vault and never comes back: only its redacted
@@ -285,23 +291,27 @@ export const run = async <T, TError>(
   }
 }
 
+// The reads are any member's, with a plugin's secrets redacted (D81); every
+// write below opens with `requireAdmin()`.
+
 export async function listIntegrationsHandler(): Promise<
   Array<IntegrationRow>
 > {
-  await requireAdmin()
+  await requireUser()
   return run(integrationLedgerProgram())
 }
 
 export async function countIntegrationsHandler(): Promise<number> {
-  await requireAdmin()
+  await requireUser()
   return run(integrationCountProgram())
 }
 
 export async function getIntegrationHandler(input: {
   readonly id: string
 }): Promise<IntegrationDetail> {
-  await requireAdmin()
-  return run(integrationDetailProgram(input.id))
+  const { isAdmin } = await requireSettingsReader()
+  const detail = await run(integrationDetailProgram(input.id))
+  return isAdmin ? detail : redactIntegrationDetail(detail)
 }
 
 export async function setIntegrationEnabledHandler(input: {

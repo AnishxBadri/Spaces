@@ -35,9 +35,7 @@ const fields = (errors: { [key: string]: string } = {}) => {
       values={formValuesOf(form.fields, { cacheDays: 30 })}
       errors={errors}
       disabled={false}
-      dirty={false}
       onChange={() => undefined}
-      onSave={() => undefined}
     />,
   )
 }
@@ -53,7 +51,7 @@ describe('SettingsFields', () => {
     expect(html).toContain('Region')
     expect(html).toContain('>us<')
     expect(html).toContain('Label')
-    expect(html).toContain('Save settings')
+    expect(html).not.toContain('Save')
   })
 
   it('heads the group not yet while a required setting has no value, else with its count', () => {
@@ -64,10 +62,8 @@ describe('SettingsFields', () => {
         values={{}}
         errors={{}}
         disabled={false}
-        dirty={false}
         notYet
         onChange={() => undefined}
-        onSave={() => undefined}
       />,
     )
     expect(html).toContain('not yet')
@@ -95,9 +91,7 @@ describe('SettingsFields', () => {
         values={{}}
         errors={{}}
         disabled={false}
-        dirty={false}
         onChange={() => undefined}
-        onSave={() => undefined}
       />,
     )
     expect(html).toContain('setting feeds is an array')
@@ -113,7 +107,6 @@ describe('SecretFieldRow', () => {
         value=""
         disabled={false}
         onChange={() => undefined}
-        onSave={() => undefined}
         onRemove={() => undefined}
       />,
     )
@@ -147,13 +140,12 @@ describe('the webhook group', () => {
         value=""
         disabled={false}
         onChange={() => undefined}
-        onSave={() => undefined}
         onRemove={() => undefined}
       />,
     )
     expect(html).toContain('Hooked webhook secret')
     expect(html).toContain('Paste the secret')
-    expect(html).toContain('Save secret')
+    expect(html).not.toContain('Save')
   })
 
   it('the webhook URL is a read-only line with Copy', () => {

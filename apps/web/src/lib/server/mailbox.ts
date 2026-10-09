@@ -2,9 +2,9 @@ import { createServerFn } from '@tanstack/react-start'
 import { mailboxInput, mailboxTestInput } from '../arrival/input'
 
 /**
- * Settings → Arrival (SPA-56): the forwarding mailbox. Admin-only, every one;
- * the bodies live in `lib/arrival/settings.ts`, whose handlers open with
- * `requireAdmin()`, and are imported inside the handler so the vault and
+ * Settings → Email forwarding: the forwarding mailbox. The writes are
+ * admin-only and the read is any member's, the password redacted (D81); the
+ * bodies live in `lib/arrival/settings.ts` and are imported inside the handler so the vault and
  * imapflow never reach the client bundle — this module is re-exported by the
  * client-imported `server-fns` barrel.
  */

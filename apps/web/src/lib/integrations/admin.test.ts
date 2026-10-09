@@ -196,19 +196,29 @@ beforeEach(async () => {
   await db.delete(credential).where(all)
 })
 
-describe('every handler refuses a non-admin', () => {
+describe('every write refuses a non-admin; the reads refuse only nobody', () => {
   it.each([
     ['a member', { id: FIXTURE_ACTOR.id, role: 'member' }],
     ['nobody', null],
-  ])('%s is refused before anything is read or written', async (_, who) => {
+  ])('%s is refused before anything is written', async (_, who) => {
     const apollo = await install({ manifest: APOLLO, credentialId: null })
     session.current = who
     const refused = who === null ? 'Unauthorized' : 'Admins only'
-    await expect(listIntegrationsHandler()).rejects.toThrow(refused)
-    await expect(countIntegrationsHandler()).rejects.toThrow(refused)
-    await expect(getIntegrationHandler({ id: apollo.id })).rejects.toThrow(
-      refused,
-    )
+    if (who === null) {
+      await expect(listIntegrationsHandler()).rejects.toThrow(refused)
+      await expect(countIntegrationsHandler()).rejects.toThrow(refused)
+      await expect(getIntegrationHandler({ id: apollo.id })).rejects.toThrow(
+        refused,
+      )
+    } else {
+      expect(await countIntegrationsHandler()).toBe(1)
+      expect((await listIntegrationsHandler()).map((r) => r.id)).toEqual([
+        apollo.id,
+      ])
+      expect((await getIntegrationHandler({ id: apollo.id })).id).toBe(
+        apollo.id,
+      )
+    }
     await expect(
       setIntegrationEnabledHandler({ id: apollo.id, enabled: false }),
     ).rejects.toThrow(refused)
@@ -694,6 +704,15 @@ describe('the webhook secret field', () => {
       ['webhook', true],
     ])
     expect(JSON.stringify(after)).not.toContain(WEBHOOK_SECRET)
+
+    // A member reads the same card with both secrets and the URL redacted.
+    session.current = { id: FIXTURE_ACTOR.id, role: 'member' }
+    const read = await getIntegrationHandler({ id: recorder.id })
+    expect(read.secrets.map((s) => [s.slot, s.display])).toEqual([
+      ['credential', 'set'],
+      ['webhook', 'set'],
+    ])
+    expect(read.webhookUrl).toBeNull()
   })
 
   it('removing it deletes only that secret and leaves the row running', async () => {

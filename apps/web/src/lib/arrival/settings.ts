@@ -7,7 +7,8 @@ import type { MailboxStatus } from '@spaces/db/schema/mail'
 import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue } from '#/lib/queue'
 import { effectFn } from '#/lib/server/effect'
-import { requireAdmin } from '#/lib/server/shared'
+import { requireAdmin, requireSettingsReader } from '#/lib/server/shared'
+import { redactMailboxSettings } from '#/lib/settings-redact'
 import {
   readWorkspaceCredential,
   redact,
@@ -19,8 +20,9 @@ import type { MailboxInput } from './input'
 
 /**
  * Settings → Arrival (SPA-56): the forwarding mailbox's four operations —
- * read, save, test, and the core integration row they hang off. Admin-only:
- * the handlers at the bottom open with `requireAdmin()`, and the programs
+ * read, save, test, and the core integration row they hang off. Save and
+ * test open with `requireAdmin()`; the read is any member's, the password
+ * redacted (D81). The programs
  * above them take no request so the suite can drive them. They live here,
  * not in `lib/server/mailbox.ts`, because that module is re-exported by the
  * client barrel and this one imports the vault and imapflow.
@@ -306,9 +308,11 @@ export const testMailboxProgram = Effect.fn('testMailbox')(function* (
 // Handlers — what the server fns in `lib/server/mailbox.ts` delegate to.
 // ---------------------------------------------------------------------------
 
+/** Any member reads the mailbox; the app password's display is redacted for them. (D81) */
 export async function getMailboxSettingsHandler(): Promise<MailboxSettingsView> {
-  await requireAdmin()
-  return effectFn(readMailboxSettingsProgram)()
+  const { isAdmin } = await requireSettingsReader()
+  const view = await effectFn(readMailboxSettingsProgram)()
+  return isAdmin ? view : redactMailboxSettings(view)
 }
 
 export async function saveMailboxHandler(

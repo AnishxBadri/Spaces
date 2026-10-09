@@ -11,6 +11,7 @@ import { SettingsSection } from '#/components/settings/settings-section'
 import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
+import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   IDENTITY_KEYS,
   IDENTITY_KEY_ATTRIBUTES,
@@ -47,15 +48,25 @@ function ObjectAttributesPage() {
   const live = registry.filter((a) => !a.archived).length
   const archivedCount = registry.length - live
   const [creating, setCreating] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
   useHotkey('a', () => setCreating(true))
 
   // The identity-key declaration is live while the object is empty and read
   // only once a record exists (§9 — the slug rule). Each tick is a save:
-  // ticking materializes the backing attribute, unticking deletes it, which
-  // is why the registry above is re-read after every one.
+  // ticking materializes the backing attribute, unticking deletes it — which
+  // is why an untick asks first, and the registry is re-read after every one.
   const [saving, setSaving] = useState<IdentityKey | null>(null)
   const editable = isAdmin && !object.isSystem && !object.hasRecords
   async function toggleKey(key: IdentityKey, next: boolean) {
+    if (!next) {
+      const backing = IDENTITY_KEY_ATTRIBUTES[key]
+      const ok = await confirm({
+        title: `Stop matching ${object.plural.toLowerCase()} on ${backing.name}?`,
+        body: `The ${backing.name} attribute is deleted from ${object.plural}, and new ${object.plural.toLowerCase()} are no longer matched to existing ones by it.`,
+        action: 'Untick',
+      })
+      if (!ok) return
+    }
     setSaving(key)
     try {
       await updateObject({
@@ -110,6 +121,14 @@ function ObjectAttributesPage() {
                 size="sm"
                 variant="outline"
                 onClick={async () => {
+                  if (!object.archived) {
+                    const ok = await confirm({
+                      title: `Archive ${object.plural}?`,
+                      body: `The ${object.plural} list and record pages are hidden and pickers skip it. Records and their values are kept; Restore brings everything back.`,
+                      action: 'Archive',
+                    })
+                    if (!ok) return
+                  }
                   try {
                     await updateObject({
                       data: { id: object.id, archived: !object.archived },
@@ -241,14 +260,10 @@ function ObjectAttributesPage() {
               Frozen: {object.plural} has records, and a key that justified a
               record&apos;s identity cannot be withdrawn under it.
             </p>
-          ) : (
-            <p className="flex h-8 items-center px-3 mono text-micro text-graphite">
-              revisable while empty · ticking one creates its attribute,
-              unticking one deletes it
-            </p>
-          )}
+          ) : null}
         </section>
       )}
+      {confirmDialog}
     </SettingsSection>
   )
 }

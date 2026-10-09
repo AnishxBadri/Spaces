@@ -25,22 +25,26 @@ export function useSettingsTakeover(): boolean {
 }
 
 /**
- * What the settings nav needs from the shell's loader: whether the reader is
- * an admin, and the counts its right lane prints.
+ * What the settings shell needs from its loader: whether the reader is an
+ * admin, the admins a member is told to ask, and the nav's right-lane counts.
  */
-export function useSettingsNav(): { isAdmin: boolean; counts: SettingsCounts } {
+export function useSettingsNav(): {
+  isAdmin: boolean
+  admins: ReadonlyArray<string>
+  counts: SettingsCounts
+} {
   const data = shell.useLoaderData()
   return {
     isAdmin: data.isAdmin,
+    admins: data.members
+      .filter((m) => m.role === 'admin' && !m.banned)
+      .map((m) => m.name),
     counts: {
       '/settings/members': data.members.length,
       '/settings/templates': data.templates.length,
       '/settings/objects': data.objects.length,
       '/settings/currency': data.fx.rates.length,
-      // Admin-only: a member's row is locked and prints no count.
-      ...(data.integrations === null
-        ? {}
-        : { '/settings/plugins': data.integrations }),
+      '/settings/plugins': data.integrations,
     },
   }
 }
@@ -70,7 +74,7 @@ export function isLeaveSettingsKey(e: KeyboardEvent): boolean {
  */
 export function SettingsChassis() {
   const navigate = useNavigate()
-  const { isAdmin, counts } = useSettingsNav()
+  const { counts } = useSettingsNav()
 
   useEffect(() => {
     const leave = (e: KeyboardEvent) => {
@@ -107,7 +111,7 @@ export function SettingsChassis() {
           </kbd>
         </button>
       </div>
-      <SettingsNav variant="chassis" isAdmin={isAdmin} counts={counts} />
+      <SettingsNav variant="chassis" counts={counts} />
     </div>
   )
 }

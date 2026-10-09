@@ -12,8 +12,9 @@ export type {
 } from '../connections/input'
 
 /**
- * Settings → Connections: the providers' OAuth apps, admin-only (the bodies
- * open with `requireAdmin()`), and which providers a member can connect to.
+ * Settings → Connection apps: the providers' OAuth apps — written by an
+ * admin, read by any member with the secret redacted (D81) — and which
+ * providers a member can connect to.
  * Bodies are imported inside the handler so the vault never reaches the
  * client bundle.
  */

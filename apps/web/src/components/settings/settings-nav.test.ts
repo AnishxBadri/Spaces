@@ -3,12 +3,12 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import {
-  FIRST_SETTINGS_SECTION,
   SETTINGS_CRUMBS,
   SETTINGS_GROUPS,
   SETTINGS_GROUP_IDS,
+  SETTINGS_LANDING,
   SETTINGS_SECTIONS,
-  sectionLocked,
+  sectionAt,
 } from './settings-nav'
 
 /**
@@ -158,23 +158,25 @@ describe('the settings nav grammar', () => {
     ).toEqual([...SETTINGS_SECTIONS])
   })
 
-  it('redirects /settings to the first row rather than to a literal path', () => {
-    expect(FIRST_SETTINGS_SECTION).toBe(SETTINGS_SECTIONS[0])
-    expect(FIRST_SETTINGS_SECTION.to).toBe('/settings/connections')
+  it('lands /settings on General, a row of the map', () => {
+    expect(SETTINGS_LANDING).toBe('/settings/general')
+    expect(SETTINGS_SECTIONS.map((row) => row.to)).toContain(SETTINGS_LANDING)
   })
 
-  it('locks a row for a member only when the section is admin-only', () => {
-    for (const row of SETTINGS_SECTIONS) {
-      // An admin is never shown a locked row.
-      expect(sectionLocked(row, true)).toBe(false)
-      expect(sectionLocked(row, false)).toBe(row.admin)
-    }
+  it('finds the row a page belongs to, a drill-in page included', () => {
+    expect(sectionAt('/settings/models')?.label).toBe('Models')
+    expect(sectionAt('/settings/plugins/0b5cbe3e')?.label).toBe('Plugins')
+    expect(sectionAt('/settings/objects/companies')?.label).toBe('Objects')
+    // A prefix of another path is not that row.
+    expect(sectionAt('/settings/pluginsx')).toBeUndefined()
+    expect(sectionAt('/deals')).toBeUndefined()
+  })
+
+  it('marks exactly the admin-only pages a member reads disabled', () => {
     // Usage & limits is not one: the run log is every member's provenance,
-    // and only its Caps load for an admin.
+    // and only its Caps section is the admin's.
     expect(
-      SETTINGS_SECTIONS.filter((row) => sectionLocked(row, false)).map(
-        (row) => row.label,
-      ),
+      SETTINGS_SECTIONS.filter((row) => row.admin).map((row) => row.label),
     ).toEqual([
       'Models',
       'Search',

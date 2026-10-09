@@ -10,7 +10,6 @@ import {
   getAiRun,
   getAiUsage,
   getAiUsageToday,
-  getSession,
 } from '#/lib/server-fns'
 import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
@@ -22,27 +21,25 @@ type RunDetail = NonNullable<Awaited<ReturnType<typeof getAiRun>>>
 type RunStep = RunDetail['steps'][number]
 
 /**
- * Settings → AI → Usage & limits: the run log, then Caps for an admin. (D81)
+ * Settings → AI → Usage & limits: the run log, then Caps. (D81)
  * - Every AI action is one `ai_run`, newest first; `?run=<id>` (which the
  *   inbox's "produced by this run" links to) opens its steps in order, refs
  *   resolved to names server-side. Calls no run owns list apart.
  * - Not admin-only: the log writes nothing and is every member's provenance.
- *   Caps load only for an admin, since their server fns refuse anyone else.
+ *   A member reads Caps disabled; only an admin changes them.
  */
 export const Route = createFileRoute('/_app/settings/usage')({
   validateSearch: z.object({ run: z.string().uuid().optional() }),
   loaderDeps: ({ search }) => ({ run: search.run ?? null }),
   loader: async ({ deps }) => {
-    const [session, usage, run] = await Promise.all([
-      getSession(),
+    const [usage, run, caps, today] = await Promise.all([
       getAiUsage(),
       deps.run === null
         ? Promise.resolve(null)
         : getAiRun({ data: { runId: deps.run } }),
+      getAiCaps(),
+      getAiUsageToday(),
     ])
-    if (session?.user.role !== 'admin')
-      return { usage, run, asked: deps.run, caps: null }
-    const [caps, today] = await Promise.all([getAiCaps(), getAiUsageToday()])
     return { usage, run, asked: deps.run, caps: { caps, today } }
   },
   component: UsageRoute,
@@ -65,7 +62,7 @@ function UsageRoute() {
   return (
     <div className="flex flex-col gap-8">
       <RunLog {...log} />
-      {caps ? <CapsSection caps={caps.caps} usage={caps.today} /> : null}
+      <CapsSection caps={caps.caps} usage={caps.today} />
     </div>
   )
 }

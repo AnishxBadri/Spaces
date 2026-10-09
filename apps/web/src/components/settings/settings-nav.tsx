@@ -6,7 +6,7 @@ import { cn } from '#/lib/utils'
  *
  * A settings section reaches the shell as **one row of data** in
  * `SETTINGS_SECTIONS`: the child route it links to, the label, the group it
- * joins, and whether it is admin-only. A new section is one row plus one file
+ * joins, and whether only an admin may change it. A new section is one row plus one file
  * under `routes/_app/settings/`, placed by D81's map.
  *
  * The groups are by whose it is (D81):
@@ -49,10 +49,9 @@ export type SettingsSectionRow = {
   /** Which group the row joins. The groups are derived from this, not sliced. */
   readonly group: SettingsGroupId
   /**
-   * Admin-only: the row still draws for a member — graphite, `admin` in the
-   * right lane, not a link — rather than a link into a page that refuses.
-   * The child route's own guard is unchanged either way, so a typed URL
-   * refuses exactly as it refused before.
+   * Admin-only writes. A member still opens the page and reads it, with every
+   * control disabled under the head's "Only admins can change this" line;
+   * the write server fns refuse a member regardless. (D81)
    */
   readonly admin: boolean
 }
@@ -131,8 +130,11 @@ export const SETTINGS_SECTIONS = [
   },
 ] as const satisfies readonly SettingsSectionRow[]
 
-/** Where `/settings` lands. The first row, not a literal second copy. */
-export const FIRST_SETTINGS_SECTION = SETTINGS_SECTIONS[0]
+/** Where `/settings` lands: General, the workspace's own page. (D81) */
+export const SETTINGS_LANDING = '/settings/general' satisfies SettingsPath
+
+/** A row's path; the type a landing or a lookup must be one of. */
+export type SettingsPath = (typeof SETTINGS_SECTIONS)[number]['to']
 
 /** The groups, derived by filter — a row may be inserted anywhere in its own run. */
 export const SETTINGS_GROUPS = {
@@ -143,14 +145,13 @@ export const SETTINGS_GROUPS = {
 } satisfies Record<SettingsGroupId, readonly SettingsSectionRow[]>
 
 /**
- * A row reads as locked exactly when it is admin-only and the reader is not
- * an admin. One expression, so the nav and the test agree by construction.
+ * The row a settings path belongs to: its own, or the row a drill-in page
+ * (`/settings/plugins/<id>`) sits under. `undefined` off the map.
  */
-export function sectionLocked(
-  row: SettingsSectionRow,
-  isAdmin: boolean,
-): boolean {
-  return row.admin && !isAdmin
+export function sectionAt(pathname: string): SettingsSectionRow | undefined {
+  return SETTINGS_SECTIONS.find(
+    (row) => pathname === row.to || pathname.startsWith(`${row.to}/`),
+  )
 }
 
 /** A count for the right lane, keyed by the row's path. */
@@ -169,11 +170,9 @@ const ROW =
  *   content, scrolling on x, with vertical hairlines between groups.
  */
 export function SettingsNav({
-  isAdmin,
   counts = {},
   variant,
 }: {
-  isAdmin: boolean
   counts?: SettingsCounts
   variant: 'chassis' | 'strip'
 }) {
@@ -206,18 +205,7 @@ export function SettingsNav({
           ) : null}
           {SETTINGS_GROUPS[id].map((row) => {
             const count = counts[row.to]
-            return sectionLocked(row, isAdmin) ? (
-              <span
-                key={row.to}
-                aria-disabled="true"
-                className={cn(ROW, 'text-graphite')}
-              >
-                <span className="min-w-0 flex-1 truncate">{row.label}</span>
-                <span className="shrink-0 mono text-micro text-graphite">
-                  admin
-                </span>
-              </span>
-            ) : (
+            return (
               <Link
                 key={row.to}
                 to={row.to}

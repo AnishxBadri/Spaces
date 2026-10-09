@@ -263,8 +263,8 @@ export async function isLaneRoutedHandler(input: {
   return effectFn(isLaneRoutedProgram)(input.lane, user.id)
 }
 
-/** The `listAiRoutes` server fn's body. `requireAdmin()` first. */
+/** The `listAiRoutes` server fn's body. Any member reads the grid; it holds no secret. (D81) */
 export async function listAiRoutesHandler(): Promise<AiRouteCell[]> {
-  await requireAdmin()
+  await requireUser()
   return effectFn(listAiRoutesProgram)()
 }

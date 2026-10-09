@@ -23,6 +23,8 @@ import { cn } from '#/lib/utils'
  * slot it asks for (its key, its webhook secret with the webhook URL), then
  * one row per setting — a switch for a boolean, a picker for an enum, a
  * field for a number or a string.
+ * - A switch, a picker or a checkbox saves when it changes; a typed field or
+ *   a key joins the page's Save bar (D81). The card draws no Save of its own.
  * - A field that failed its schema turns its row rose and says why under the
  *   label, with `not saved`; nothing is written until every field passes.
  * - A saved key is never shown: the row reads its redacted display.
@@ -142,19 +144,15 @@ export function SettingsFields({
   values,
   errors,
   disabled,
-  dirty,
   notYet = false,
   onChange,
-  onSave,
 }: {
   form: SettingsForm
   values: FormValues
   errors: { readonly [key: string]: string }
   disabled: boolean
-  dirty: boolean
   notYet?: boolean
-  onChange: (key: string, value: FormValue) => void
-  onSave: () => void
+  onChange: (field: SettingsField, value: FormValue) => void
 }) {
   if (!form.ok)
     return (
@@ -170,22 +168,11 @@ export function SettingsFields({
     )
   if (form.fields.length === 0) return null
   return (
-    <form
-      className="flex flex-col pt-8"
-      onSubmit={(e) => {
-        e.preventDefault()
-        onSave()
-      }}
-    >
+    <div className="flex flex-col pt-8">
       <SectionHead
         as="h3"
         title="Settings"
         count={notYet ? 'not yet' : String(form.fields.length)}
-        action={
-          <Button type="submit" size="sm" disabled={disabled || !dirty}>
-            Save settings
-          </Button>
-        }
       />
       {form.fields.map((field) => {
         const error = Object.hasOwn(errors, field.key)
@@ -206,12 +193,12 @@ export function SettingsFields({
               }
               invalid={error !== null}
               disabled={disabled}
-              onChange={(v) => onChange(field.key, v)}
+              onChange={(v) => onChange(field, v)}
             />
           </FieldRow>
         )
       })}
-    </form>
+    </div>
   )
 }
 
@@ -263,7 +250,8 @@ function CheckRow({
 
 /**
  * The Auto-enrich group: which triggers press Enrich for the owner. With
- * Spaces ticked, the spaces it covers; none chosen is every space.
+ * Spaces ticked, the spaces it covers; none chosen is every space. Each tick
+ * saves the whole scope at once.
  */
 export function AutoEnrichFields({
   view,
@@ -281,34 +269,29 @@ export function AutoEnrichFields({
     view.scopes,
   )
   const [spaces, setSpaces] = useState<ReadonlyArray<string>>(view.spaces)
-  const [dirty, setDirty] = useState(false)
   const toggle = <T,>(list: ReadonlyArray<T>, item: T, on: boolean) =>
     on
       ? [...list.filter((x) => x !== item), item]
       : list.filter((x) => x !== item)
+  const commit = (
+    nextScopes: ReadonlyArray<AutoEnrichScopeName>,
+    nextSpaces: ReadonlyArray<string>,
+  ) => {
+    setScopes(nextScopes)
+    setSpaces(nextSpaces)
+    onSave({
+      scopes: SCOPE_ROWS.map((r) => r.scope).filter((s) =>
+        nextScopes.includes(s),
+      ),
+      spaces: [...nextSpaces],
+    })
+  }
   return (
-    <form
-      className="flex flex-col pt-8"
-      onSubmit={(e) => {
-        e.preventDefault()
-        onSave({
-          scopes: SCOPE_ROWS.map((r) => r.scope).filter((s) =>
-            scopes.includes(s),
-          ),
-          spaces: [...spaces],
-        })
-        setDirty(false)
-      }}
-    >
+    <div className="flex flex-col pt-8">
       <SectionHead
         as="h3"
         title="Auto-enrich"
         count={scopes.length === 0 ? 'off' : String(scopes.length)}
-        action={
-          <Button type="submit" size="sm" disabled={disabled || !dirty}>
-            Save auto-enrich
-          </Button>
-        }
       />
       {SCOPE_ROWS.map((row) => (
         <div key={row.scope} className="flex flex-col">
@@ -317,10 +300,7 @@ export function AutoEnrichFields({
             label={row.label}
             checked={scopes.includes(row.scope)}
             disabled={disabled}
-            onChange={(on) => {
-              setScopes((list) => toggle(list, row.scope, on))
-              setDirty(true)
-            }}
+            onChange={(on) => commit(toggle(scopes, row.scope, on), spaces)}
           />
           {row.scope === 'space' && scopes.includes('space') ? (
             <>
@@ -337,17 +317,16 @@ export function AutoEnrichFields({
                   checked={spaces.includes(option.id)}
                   disabled={disabled}
                   indent
-                  onChange={(on) => {
-                    setSpaces((list) => toggle(list, option.id, on))
-                    setDirty(true)
-                  }}
+                  onChange={(on) =>
+                    commit(scopes, toggle(spaces, option.id, on))
+                  }
                 />
               ))}
             </>
           ) : null}
         </div>
       ))}
-    </form>
+    </div>
   )
 }
 
@@ -391,35 +370,28 @@ export function WebhookUrlRow({ url }: { url: string }) {
 }
 
 /**
- * One secret field. Write-only: the input starts empty every time; a saved
- * secret reads as its redacted display, and an empty save keeps it.
+ * One secret field, a typed field in the page's Save bar. Write-only: the
+ * input starts empty every time; a saved secret reads as its redacted
+ * display, and an empty field keeps it.
  */
 export function SecretFieldRow({
   field,
   value,
   disabled,
   onChange,
-  onSave,
   onRemove,
 }: {
   field: SecretField
   value: string
   disabled: boolean
   onChange: (value: string) => void
-  onSave: () => void
   onRemove: () => void
 }) {
   const saved = field.display !== null
   const noun = nounOf(field.slot)
   const id = `secret-${field.slot}`
   return (
-    <form
-      className="flex min-h-12 items-center justify-between gap-6 border-b border-rule px-3 py-2"
-      onSubmit={(e) => {
-        e.preventDefault()
-        onSave()
-      }}
-    >
+    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-rule px-3 py-2">
       <div className="flex min-w-0 flex-col">
         <label htmlFor={id} className="text-ui font-medium">
           {saved ? `Replace ${field.label}` : field.label}
@@ -442,13 +414,6 @@ export function SecretFieldRow({
           onChange={(e) => onChange(e.target.value)}
           className="w-72 mono"
         />
-        <Button
-          type="submit"
-          size="sm"
-          disabled={disabled || value.trim() === ''}
-        >
-          Save {noun}
-        </Button>
         {saved ? (
           <Button
             type="button"
@@ -461,7 +426,7 @@ export function SecretFieldRow({
           </Button>
         ) : null}
       </div>
-    </form>
+    </div>
   )
 }
 

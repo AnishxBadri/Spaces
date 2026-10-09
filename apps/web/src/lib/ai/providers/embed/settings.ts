@@ -6,7 +6,8 @@ import {
   storeCredential,
 } from '@spaces/core/writes/vault'
 import { effectFn } from '#/lib/server/effect'
-import { requireAdmin } from '#/lib/server/shared'
+import { requireAdmin, requireSettingsReader } from '#/lib/server/shared'
+import { redactEmbeddingSettings } from '#/lib/settings-redact'
 import { embedMessage, embedProgram } from '../../embed'
 import {
   clearSensitiveSlotProgram,
@@ -35,8 +36,8 @@ import type {
 
 /**
  * Settings → AI · Embeddings (SPA-51): the four operations behind the
- * section — read, save a key, test a model, pin. Admin-only, every one:
- * `requireAdmin()` is the first line of each handler below. They live here,
+ * section — read, save a key, test a model, pin. The writes open with
+ * `requireAdmin()`; the read is any member's, keys redacted (D81). They live here,
  * not in `lib/server/ai-settings.ts`, so a test can drive them without a
  * request and so the AI SDK never reaches the client bundle; the server fns
  * there are one-line delegations.
@@ -233,11 +234,13 @@ export const testEmbeddingProgram = Effect.fn('testEmbedding')(function* (
   return result
 })
 
-// The server fns' bodies. `requireAdmin()` first, always.
+// The server fns' bodies. `requireAdmin()` first on every write; the read is
+// a member's too, with the keys redacted (D81).
 
 export async function getEmbeddingSettingsHandler(): Promise<EmbeddingSettingsView> {
-  await requireAdmin()
-  return effectFn(getEmbeddingSettingsProgram)()
+  const { isAdmin } = await requireSettingsReader()
+  const view = await effectFn(getEmbeddingSettingsProgram)()
+  return isAdmin ? view : redactEmbeddingSettings(view)
 }
 
 export async function saveEmbeddingKeyHandler(

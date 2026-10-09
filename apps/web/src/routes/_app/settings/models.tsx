@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { useSettingsDraft } from '#/components/settings/settings-form'
 import {
   SettingsRow,
   SettingsSection,
@@ -16,7 +17,6 @@ import { PROVIDERS } from '#/lib/ai/providers/ids'
 import type { LlmProvider } from '#/lib/ai/providers/ids'
 import { formatHeaderLines } from '#/lib/ai/providers/meta'
 import {
-  getSession,
   listAiProviders,
   listAiRoutes,
   saveAiKey,
@@ -32,34 +32,33 @@ type TestResult = Awaited<ReturnType<typeof testAiProvider>>
 /**
  * Settings → AI → Models: the vault's LLM keys (Providers) and the lane ×
  * sensitivity table (Routing), admin-only. (D81)
- * - One row and one form per provider, both drawn from `PROVIDERS` — what
- *   differs between providers is data there, never a branch on the id here.
- * - The loader asks only when the reader is an admin; a member who types the
- *   URL reads a sentence instead of an error.
+ * - One row and one set of fields per provider, both drawn from `PROVIDERS` —
+ *   what differs between providers is data there, never a branch on the id.
+ * - The typed fields join the page's Save bar; a routing cell saves alone.
+ * - A member reads the same page, keys redacted and every control disabled.
  */
 export const Route = createFileRoute('/_app/settings/models')({
   loader: async () => {
-    const session = await getSession()
-    const isAdmin = session?.user.role === 'admin'
-    if (!isAdmin) return { isAdmin, providers: [], routes: [] }
     const [providers, routes] = await Promise.all([
       listAiProviders(),
       listAiRoutes(),
     ])
-    return { isAdmin, providers, routes }
+    return { providers, routes }
   },
   component: ModelsRoute,
 })
 
 function ModelsRoute() {
-  const { isAdmin, providers, routes } = Route.useLoaderData()
+  const { providers, routes } = Route.useLoaderData()
   return (
-    <div className="flex flex-col gap-8">
-      <ProvidersSection isAdmin={isAdmin} providers={providers} />
-      {isAdmin ? (
-        <RoutingSection providers={providers} routes={routes} />
-      ) : null}
-    </div>
+    <SettingsSection
+      title="Models"
+      blurb="Which model providers this workspace calls, with whose key."
+      crumb="AI"
+    >
+      <ProvidersGroup providers={providers} />
+      <RoutingGroup providers={providers} routes={routes} />
+    </SettingsSection>
   )
 }
 
@@ -78,71 +77,35 @@ function statusOf(row: ProviderRow): string {
 /**
  * Providers — a settings ledger in the FX-rates shape (design contract, "A
  * settings section"): a `field-label` head on hairlines, one 36px row per
- * provider with the Test action in its last lane, then the form that writes
- * the row. The key field is write-only: it starts empty every time and the
+ * provider with the Test action in its last lane, then each provider's typed
+ * fields. The key field is write-only: it starts empty every time and the
  * ledger shows only the redacted display.
  */
-function ProvidersSection({
-  isAdmin,
-  providers,
-}: {
-  isAdmin: boolean
-  providers: ProviderRow[]
-}) {
-  if (!isAdmin) {
-    return (
-      <SettingsSection
-        title="Models"
-        blurb="Which model providers this workspace calls, with whose key."
-        crumb="AI"
-      >
-        <SettingsRow
-          label="Admins only"
-          hint="Provider keys belong to the workspace admin."
-        />
-      </SettingsSection>
-    )
-  }
-
+function ProvidersGroup({ providers }: { providers: ProviderRow[] }) {
   return (
-    <SettingsSection
-      title="Models"
-      blurb="Which model providers this workspace calls, with whose key."
-      crumb="AI"
-    >
-      <div className="flex flex-col pt-8">
-        <SectionHead
-          as="h3"
-          title="Providers"
-          count={`${providers.filter((p) => p.configured).length} of ${providers.length} configured`}
-        />
+    <div className="flex flex-col pt-8">
+      <SectionHead
+        as="h3"
+        title="Providers"
+        count={`${providers.filter((p) => p.configured).length} of ${providers.length} configured`}
+      />
 
-        <div className="flex h-8 items-center border-b border-hairline px-3 field-label leading-4 text-graphite">
-          <span className="w-28 shrink-0">Provider</span>
-          <span className="w-24 shrink-0">Status</span>
-          <span className="w-28 shrink-0">Key</span>
-          <span className="w-40 shrink-0">Last used</span>
-          <span className="min-w-0 flex-1">Base URL</span>
-          <span className="w-16 shrink-0" />
-        </div>
-        {providers.map((row) => (
-          <ProviderLedgerRow key={row.provider} row={row} />
-        ))}
-
-        {providers.map((row) => (
-          <ProviderForm key={row.provider} row={row} />
-        ))}
-
-        <div className="flex h-8 items-center justify-between px-3">
-          <span className="label-caps font-normal text-graphite">
-            workspace keys · admin only
-          </span>
-          <span className="mono text-micro text-graphite">
-            a test sends one short prompt · its answer is not stored
-          </span>
-        </div>
+      <div className="flex h-8 items-center border-b border-hairline px-3 field-label leading-4 text-graphite">
+        <span className="w-28 shrink-0">Provider</span>
+        <span className="w-24 shrink-0">Status</span>
+        <span className="w-28 shrink-0">Key</span>
+        <span className="w-40 shrink-0">Last used</span>
+        <span className="min-w-0 flex-1">Base URL</span>
+        <span className="w-16 shrink-0" />
       </div>
-    </SettingsSection>
+      {providers.map((row) => (
+        <ProviderLedgerRow key={row.provider} row={row} />
+      ))}
+
+      {providers.map((row) => (
+        <ProviderFields key={row.provider} row={row} />
+      ))}
+    </div>
   )
 }
 
@@ -205,6 +168,7 @@ function ProviderLedgerRow({ row }: { row: ProviderRow }) {
             variant="outline"
             onClick={test}
             disabled={pending || !row.configured}
+            title="Sends one short prompt; its answer is not stored."
           >
             {pending ? 'Testing' : 'Test'}
           </Button>
@@ -236,49 +200,43 @@ function ProviderLedgerRow({ row }: { row: ProviderRow }) {
   )
 }
 
-function ProviderForm({ row }: { row: ProviderRow }) {
+/**
+ * One provider's typed fields — key, base URL, extra headers — as one draft
+ * in the page's Save bar. The key settles empty after a save: it is
+ * write-only, and the ledger row reads the redacted display.
+ */
+function ProviderFields({ row }: { row: ProviderRow }) {
   const descriptor = PROVIDERS[row.provider]
   const router = useRouter()
-  const [key, setKey] = useState('')
-  const [baseUrl, setBaseUrl] = useState(row.baseUrl ?? '')
-  const [headers, setHeaders] = useState(formatHeaderLines(row.headers))
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
-
-  async function save(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    if (!descriptor.keyless && !row.configured && !key.trim()) {
-      setError(`Paste a ${row.label} key.`)
-      return
-    }
-    setPending(true)
-    setError(null)
-    try {
+  const { draft, set } = useSettingsDraft(
+    {
+      key: '',
+      baseUrl: row.baseUrl ?? '',
+      headers: formatHeaderLines(row.headers),
+    },
+    async (next) => {
+      const key = next.key.trim()
+      if (!descriptor.keyless && !row.configured && key === '')
+        throw new Error(`Paste a ${row.label} key.`)
       const { display } = await saveAiKey({
         data: {
           provider: row.provider,
-          ...(key.trim() ? { key: key.trim() } : {}),
-          baseUrl: baseUrl.trim(),
-          headers,
+          ...(key === '' ? {} : { key }),
+          baseUrl: next.baseUrl.trim(),
+          headers: next.headers,
         },
       })
-      // The field empties: the key is write-only, and what is shown from
-      // here on is the redacted display the ledger row reads.
-      setKey('')
       toast(
         display ? `${row.label} key saved · ${display}` : `${row.label} saved`,
       )
       void router.invalidate()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save')
-    } finally {
-      setPending(false)
-    }
-  }
+      return { ...next, key: '' }
+    },
+  )
 
   const id = `ai-${row.provider}`
   return (
-    <form onSubmit={save} className="flex flex-col">
+    <div className="flex flex-col">
       {descriptor.keyless ? null : (
         <SettingsRow
           label={
@@ -296,8 +254,8 @@ function ProviderForm({ row }: { row: ProviderRow }) {
             type="password"
             autoComplete="off"
             spellCheck={false}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
+            value={draft.key}
+            onChange={(e) => set('key', e.target.value)}
             placeholder={
               row.configured ? '••••••••' : descriptor.keyPlaceholder
             }
@@ -317,8 +275,8 @@ function ProviderForm({ row }: { row: ProviderRow }) {
           id={`${id}-base-url`}
           aria-label={`${row.label} base URL`}
           type="url"
-          value={baseUrl}
-          onChange={(e) => setBaseUrl(e.target.value)}
+          value={draft.baseUrl}
+          onChange={(e) => set('baseUrl', e.target.value)}
           placeholder={descriptor.defaultBaseUrl}
           className="w-72 mono"
         />
@@ -332,26 +290,13 @@ function ProviderForm({ row }: { row: ProviderRow }) {
           aria-label={`${row.label} extra headers`}
           rows={2}
           spellCheck={false}
-          value={headers}
-          onChange={(e) => setHeaders(e.target.value)}
+          value={draft.headers}
+          onChange={(e) => set('headers', e.target.value)}
           placeholder="Helicone-Cache-Enabled: true"
           className="focus-ring w-72 rounded-md border border-rule bg-paper px-2.5 py-1.5 mono text-label outline-none placeholder:text-graphite"
         />
       </SettingsRow>
-      <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule px-3 py-2">
-        {error ? (
-          <span
-            role="alert"
-            className="mr-auto mono text-micro text-destructive"
-          >
-            {error}
-          </span>
-        ) : null}
-        <Button type="submit" size="sm" disabled={pending}>
-          Save
-        </Button>
-      </div>
-    </form>
+    </div>
   )
 }
 
@@ -370,15 +315,13 @@ const UNSET = 'unset'
 type CellValue = LlmProvider | typeof UNSET
 
 /**
- * Routing (SPA-69, `docs/spec-ai-substrate.md` §9) — the lane × sensitivity
- * table as a settings ledger (D20, Option 1): one 36px row per lane, the
- * lane's name and what it does left, then one fixed lane per sensitivity,
- * each a `Select` of the providers holding an active credential. The
- * sensitivity lanes are `AI_SENSITIVITIES`, iterated: the grid reads the axis
- * and never defines it, and the copy line says where a record or a space is
- * actually marked sensitive.
+ * Routing — the lane × sensitivity table as a settings ledger (D20): one
+ * 36px row per lane, its name and what it does left, then one `Select` per
+ * sensitivity of the providers holding an active credential. A cell saves
+ * when it is chosen. The sensitivities are `AI_SENSITIVITIES`, iterated: the
+ * grid reads the axis and never defines it.
  */
-function RoutingSection({
+function RoutingGroup({
   providers,
   routes,
 }: {
@@ -396,64 +339,49 @@ function RoutingSection({
   ).length
 
   return (
-    <SettingsSection
-      title="Routing"
-      blurb="Which provider and model each lane calls, at each sensitivity."
-      crumb="AI"
-    >
-      <div className="flex flex-col pt-8">
-        <SectionHead
-          as="h3"
-          title="Lanes"
-          count={`${routed} of ${AI_LANES.length * AI_SENSITIVITIES.length} routed`}
-        />
-        <p className="px-3 py-3 text-label text-graphite">
-          A lane with no model routed hides the features that use it. Sensitive
-          routes must be local (Ollama). Records and spaces are marked sensitive
-          on their own pages, not here.
-        </p>
+    <div className="flex flex-col pt-8">
+      <SectionHead
+        as="h3"
+        title="Routing"
+        count={`${routed} of ${AI_LANES.length * AI_SENSITIVITIES.length} routed`}
+      />
+      <p className="px-3 py-3 text-label text-graphite">
+        A lane with no model routed hides the features that use it. Sensitive
+        routes must be local (Ollama). Records and spaces are marked sensitive
+        on their own pages, not here.
+      </p>
 
-        <div className="flex h-8 items-center gap-3 border-y border-hairline px-3 field-label leading-4 text-graphite">
-          <span className="w-24 shrink-0">Lane</span>
-          <span className="min-w-0 flex-1" />
-          {AI_SENSITIVITIES.map((s) => (
-            <span key={s} className="w-56 shrink-0">
-              {s}
-            </span>
-          ))}
-        </div>
-        <ol>
-          {AI_LANES.map((lane) => (
-            <LedgerRow key={lane}>
-              <span className="w-24 shrink-0 text-body font-medium capitalize">
-                {lane}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-label text-graphite">
-                {LANE_ROLE[lane]}
-              </span>
-              {AI_SENSITIVITIES.map((sensitivity) => (
-                <RouteCellSelect
-                  key={sensitivity}
-                  lane={lane}
-                  sensitivity={sensitivity}
-                  stored={cellOf(lane, sensitivity)}
-                  routable={routable}
-                />
-              ))}
-            </LedgerRow>
-          ))}
-        </ol>
-
-        <div className="flex h-8 items-center justify-between px-3">
-          <span className="label-caps font-normal text-graphite">
-            lane × sensitivity · admin only
+      <div className="flex h-8 items-center gap-3 border-y border-hairline px-3 field-label leading-4 text-graphite">
+        <span className="w-24 shrink-0">Lane</span>
+        <span className="min-w-0 flex-1" />
+        {AI_SENSITIVITIES.map((s) => (
+          <span key={s} className="w-56 shrink-0">
+            {s}
           </span>
-          <span className="mono text-micro text-graphite">
-            only providers with a saved key are listed
-          </span>
-        </div>
+        ))}
       </div>
-    </SettingsSection>
+      <ol>
+        {AI_LANES.map((lane) => (
+          <LedgerRow key={lane}>
+            <span className="w-24 shrink-0 text-body font-medium capitalize">
+              {lane}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-label text-graphite">
+              {LANE_ROLE[lane]}
+            </span>
+            {AI_SENSITIVITIES.map((sensitivity) => (
+              <RouteCellSelect
+                key={sensitivity}
+                lane={lane}
+                sensitivity={sensitivity}
+                stored={cellOf(lane, sensitivity)}
+                routable={routable}
+              />
+            ))}
+          </LedgerRow>
+        ))}
+      </ol>
+    </div>
   )
 }
 

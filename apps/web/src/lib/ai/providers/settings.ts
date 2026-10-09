@@ -7,7 +7,8 @@ import {
 } from '@spaces/core/writes/vault'
 import type { CredentialMeta } from '@spaces/db/schema/vault'
 import { effectFn } from '#/lib/server/effect'
-import { requireAdmin } from '#/lib/server/shared'
+import { requireAdmin, requireSettingsReader } from '#/lib/server/shared'
+import { redactProviderRow } from '#/lib/settings-redact'
 import { LLM_PROVIDERS, PROVIDERS, PROVIDER_LABEL } from './ids'
 import type { AiKeyInput, LlmProvider } from './ids'
 import { resolveLanguageModel } from './index'
@@ -17,10 +18,10 @@ import { runTestCall } from './test-call'
 import type { TestCallResult } from './test-call'
 
 /**
- * Settings → AI → Providers (SPA-29): the three operations behind the
- * ledger. Every one of them is admin-only — keys are the admin's
- * (CONTEXT.md: admin owns settings, integrations, keys) — and the refusal is
- * `requireAdmin()`, the first line of each handler below, before any read.
+ * Settings → AI → Models: the three operations behind the Providers ledger.
+ * Save and Test are admin-only — keys are the admin's — and the refusal is
+ * `requireAdmin()`, the first line of the handler. The list is any member's,
+ * with every key and header value redacted for them (D81).
  *
  * The handlers live here rather than in `lib/server/ai-settings.ts` so a test
  * can drive them without a request: `lib/server/*` exports ship to the
@@ -218,11 +219,13 @@ export const testAiProviderProgram = Effect.fn('testAiProvider')(function* (
   return result
 })
 
-// The server fns' bodies. `requireAdmin()` first, always.
+// The server fns' bodies. `requireAdmin()` first on every write; the list is
+// a member's too, with every key and header value redacted (D81).
 
 export async function listAiProvidersHandler(): Promise<AiProviderRow[]> {
-  await requireAdmin()
-  return effectFn(listAiProvidersProgram)()
+  const { isAdmin } = await requireSettingsReader()
+  const rows = await effectFn(listAiProvidersProgram)()
+  return isAdmin ? rows : rows.map(redactProviderRow)
 }
 
 export async function saveAiKeyHandler(

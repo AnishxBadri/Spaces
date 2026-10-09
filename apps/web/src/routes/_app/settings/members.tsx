@@ -8,6 +8,7 @@ import {
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
+import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,6 +72,7 @@ function MembersSection({
   const [inviteRole, setInviteRole] = useState<MemberRole>('member')
   const [inviteEmail, setInviteEmail] = useState('')
   const [pending, setPending] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
 
   async function invite() {
     setPending(true)
@@ -89,6 +91,22 @@ function MembersSection({
     } finally {
       setPending(false)
     }
+  }
+
+  /** Suspending signs a member out everywhere, so it asks; restoring does not. */
+  async function setBanned(m: Member) {
+    if (!m.banned) {
+      const ok = await confirm({
+        title: `Suspend ${m.name}?`,
+        body: `${m.name} is signed out on every device and their API tokens stop working. Their notes and history stay; Restore access lets them back in.`,
+        action: 'Suspend',
+      })
+      if (!ok) return
+    }
+    await act(
+      () => setMemberBanned({ data: { userId: m.id, banned: !m.banned } }),
+      m.banned ? 'Access restored' : 'Access suspended',
+    )
   }
 
   async function act(fn: () => Promise<unknown>, ok: string) {
@@ -158,15 +176,7 @@ function MembersSection({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     {...(m.banned ? {} : { variant: 'destructive' as const })}
-                    onSelect={() =>
-                      act(
-                        () =>
-                          setMemberBanned({
-                            data: { userId: m.id, banned: !m.banned },
-                          }),
-                        m.banned ? 'Access restored' : 'Access suspended',
-                      )
-                    }
+                    onSelect={() => void setBanned(m)}
                   >
                     {m.banned ? 'Restore access' : 'Suspend access'}
                   </DropdownMenuItem>
@@ -259,6 +269,7 @@ function MembersSection({
           ) : null}
         </div>
       ) : null}
+      {confirmDialog}
     </SettingsSection>
   )
 }

@@ -9,6 +9,7 @@ import {
 import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
+import { useConfirm } from '#/components/ui/confirm-dialog'
 import { Input } from '#/components/ui/input'
 import { createApiToken, listApiTokens, revokeApiToken } from '#/lib/server-fns'
 import { API_SCOPES, API_SCOPE_HINTS } from '#/lib/tokens/scopes'
@@ -50,6 +51,7 @@ function TokensRoute() {
   const [created, setCreated] = useState<Created | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
 
   async function create(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -75,6 +77,12 @@ function TokensRoute() {
   }
 
   async function revoke(row: TokenRow) {
+    const ok = await confirm({
+      title: `Revoke ${row.name}?`,
+      body: 'Whatever uses it is refused from its next call, at /api/mcp and /api/v1. A revoked token cannot be restored.',
+      action: 'Revoke',
+    })
+    if (!ok) return
     try {
       await revokeApiToken({ data: { id: row.id } })
       if (created?.id === row.id) setCreated(null)
@@ -221,16 +229,8 @@ function TokensRoute() {
             </div>
           ))
         )}
-
-        <div className="flex h-8 items-center justify-between px-3">
-          <span className="label-caps font-normal text-graphite">
-            yours only · read as you
-          </span>
-          <span className="mono text-micro text-graphite">
-            /api/mcp · /api/v1 · Authorization: Bearer &lt;token&gt;
-          </span>
-        </div>
       </div>
+      {confirmDialog}
     </SettingsSection>
   )
 }

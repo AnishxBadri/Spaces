@@ -3,6 +3,7 @@ import { Check } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { backfillConfirmOptions, confirmThenStart } from './embed-backfill-flow'
+import { useSettingsDraft } from './settings-form'
 import { SettingsRow, SettingsSection } from './settings-section'
 import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
@@ -93,9 +94,8 @@ export function EmbeddingsSection({
     pin?.provider ?? 'openai',
   )
   const [model, setModel] = useState<string>(pin?.model ?? '')
-  const [key, setKey] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState<'key' | 'test' | 'pin' | null>(null)
+  const [pending, setPending] = useState<'test' | 'pin' | null>(null)
   const [result, setResult] = useState<TestResult | null>(null)
 
   const descriptor = EMBEDDING_PROVIDER_INFO[provider]
@@ -126,29 +126,6 @@ export function EmbeddingsSection({
     setModel(next.id)
     setResult(null)
     setError(null)
-  }
-
-  async function saveKey() {
-    const keyed = KEYED_EMBEDDING_PROVIDERS.find((p) => p === provider)
-    if (keyed === undefined) return
-    if (!key.trim()) {
-      setError(`Paste a ${descriptor.label} key.`)
-      return
-    }
-    setPending('key')
-    setError(null)
-    try {
-      const { display } = await saveEmbeddingKey({
-        data: { provider: keyed, key: key.trim() },
-      })
-      setKey('')
-      toast(`${descriptor.label} embedding key saved · ${display}`)
-      void router.invalidate()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save the key')
-    } finally {
-      setPending(null)
-    }
   }
 
   async function test() {
@@ -274,40 +251,11 @@ export function EmbeddingsSection({
             )}
           </SettingsRow>
         ) : (
-          <SettingsRow
-            label={
-              keyRow?.configured
-                ? `Replace ${descriptor.label} embedding key`
-                : `${descriptor.label} embedding key`
-            }
-            hint={
-              keyRow?.configured
-                ? `Saved as ${keyRow.display ?? '••••'}. Its own key, apart from the ${descriptor.label} provider key.`
-                : 'Stored encrypted as the workspace embedding key, apart from any provider key.'
-            }
-          >
-            <Input
-              id={`embed-${provider}-key`}
-              aria-label={`${descriptor.label} embedding API key`}
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder={
-                keyRow?.configured ? '••••••••' : descriptor.keyPlaceholder
-              }
-              className="w-72 mono"
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void saveKey()}
-              disabled={pending !== null}
-            >
-              Save key
-            </Button>
-          </SettingsRow>
+          <EmbeddingKeyField
+            key={provider}
+            provider={provider}
+            keyRow={keyRow}
+          />
         )}
 
         <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule px-3 py-2">
@@ -328,6 +276,7 @@ export function EmbeddingsSection({
             variant="outline"
             onClick={() => void test()}
             disabled={pending !== null || !canCall}
+            title="Embeds one word; its vector is not stored."
           >
             {pending === 'test' ? 'Testing' : 'Test'}
           </Button>
@@ -365,15 +314,6 @@ export function EmbeddingsSection({
           </div>
         ) : null}
 
-        <div className="flex h-8 items-center justify-between px-3">
-          <span className="label-caps font-normal text-graphite">
-            {PIN_DIMS} dimensions · admin only
-          </span>
-          <span className="mono text-micro text-graphite">
-            a test embeds one word · its vector is not stored
-          </span>
-        </div>
-
         {pin ? <SensitiveSlot pin={pin} slot={slot} keys={keys} /> : null}
 
         {backfill.pin ? (
@@ -382,6 +322,63 @@ export function EmbeddingsSection({
       </div>
       {confirmDialog}
     </SettingsSection>
+  )
+}
+
+/**
+ * The provider's own embedding key, apart from any provider key: a typed
+ * field in the page's Save bar. Write-only — it settles empty after a save,
+ * and the hint reads the redacted display.
+ */
+function EmbeddingKeyField({
+  provider,
+  keyRow,
+}: {
+  provider: EmbeddingProvider
+  keyRow: EmbeddingKeyRow | undefined
+}) {
+  const router = useRouter()
+  const descriptor = EMBEDDING_PROVIDER_INFO[provider]
+  const { draft, set } = useSettingsDraft({ key: '' }, async (next) => {
+    const keyed = KEYED_EMBEDDING_PROVIDERS.find((p) => p === provider)
+    if (keyed === undefined) return { key: '' }
+    const key = next.key.trim()
+    if (key === '') throw new Error(`Paste a ${descriptor.label} key.`)
+    const { display } = await saveEmbeddingKey({
+      data: { provider: keyed, key },
+    })
+    toast(`${descriptor.label} embedding key saved · ${display}`)
+    void router.invalidate()
+    return { key: '' }
+  })
+
+  return (
+    <SettingsRow
+      label={
+        keyRow?.configured
+          ? `Replace ${descriptor.label} embedding key`
+          : `${descriptor.label} embedding key`
+      }
+      hint={
+        keyRow?.configured
+          ? `Saved as ${keyRow.display ?? '••••'}. Its own key, apart from the ${descriptor.label} provider key.`
+          : 'Stored encrypted as the workspace embedding key, apart from any provider key.'
+      }
+    >
+      <Input
+        id={`embed-${provider}-key`}
+        aria-label={`${descriptor.label} embedding API key`}
+        type="password"
+        autoComplete="off"
+        spellCheck={false}
+        value={draft.key}
+        onChange={(e) => set('key', e.target.value)}
+        placeholder={
+          keyRow?.configured ? '••••••••' : descriptor.keyPlaceholder
+        }
+        className="w-72 mono"
+      />
+    </SettingsRow>
   )
 }
 

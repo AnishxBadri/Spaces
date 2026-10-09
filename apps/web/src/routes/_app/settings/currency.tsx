@@ -77,7 +77,6 @@ function FxSection({
   }
   const isLive = (r: { currency: string; date: string }) =>
     newest.has(`${r.currency}:${r.date}`)
-  const currencies = new Set(rates.map((r) => r.currency)).size
 
   return (
     <SettingsSection
@@ -173,16 +172,6 @@ function FxSection({
             </span>
           ) : null}
         </form>
-
-        <div className="flex h-8 items-center justify-between px-3">
-          <span className="label-caps font-normal text-graphite">
-            {rates.length} rate{rates.length === 1 ? '' : 's'} · {currencies}{' '}
-            currenc{currencies === 1 ? 'y' : 'ies'}
-          </span>
-          <span className="mono text-micro text-graphite">
-            rates are append-only · a new date supersedes, nothing edits
-          </span>
-        </div>
       </div>
     </SettingsSection>
   )

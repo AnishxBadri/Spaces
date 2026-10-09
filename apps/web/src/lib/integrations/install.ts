@@ -18,7 +18,7 @@ import {
 import type { InstallerError } from '@spaces/core/writes/plugins/install'
 import { registryEntrySchema } from '@spaces/sdk/pack'
 import type { RegistryEntry } from '@spaces/sdk/pack'
-import { requireAdmin } from '#/lib/server/shared'
+import { requireAdmin, requireUser } from '#/lib/server/shared'
 import { IntegrationRefused, run } from './admin'
 import { manifestOf } from './ledger'
 import { readRegistryProgram } from './registry'
@@ -285,8 +285,9 @@ export const uninstallIntegrationProgram = Effect.fn(
   }
 })
 
+/** Any member reads the catalogue (D81); install and upload are the admin's. */
 export async function listAvailableHandler(): Promise<RegistryView> {
-  await requireAdmin()
+  await requireUser()
   return run(availableProgram())
 }
 

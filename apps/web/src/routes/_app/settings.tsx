@@ -1,6 +1,8 @@
-import { createFileRoute, Outlet } from '@tanstack/react-router'
+import { createFileRoute, Outlet, useLocation } from '@tanstack/react-router'
 import { useSettingsNav } from '#/components/settings/settings-chassis'
-import { SettingsNav } from '#/components/settings/settings-nav'
+import { SettingsForm } from '#/components/settings/settings-form'
+import { SettingsNav, sectionAt } from '#/components/settings/settings-nav'
+import { SettingsPageProvider } from '#/components/settings/settings-section'
 import {
   getSession,
   countIntegrations,
@@ -20,10 +22,12 @@ import {
  *   app shell in place of the app nav); below it, a strip above the content.
  * - The loader stays whole here because the nav's right lane counts five of
  *   the sections — one round of queries for the shell, not one per section.
+ * - The page form and its Save bar live here, one per page; a member on an
+ *   admin-only row reads the page with its controls disabled. (D81)
  */
 export const Route = createFileRoute('/_app/settings')({
   loader: async () => {
-    const [session, workspace, members, templates, objects, fx] =
+    const [session, workspace, members, templates, objects, fx, integrations] =
       await Promise.all([
         getSession(),
         getWorkspace(),
@@ -31,11 +35,10 @@ export const Route = createFileRoute('/_app/settings')({
         listTemplates({ data: { includeArchived: true } }),
         listObjects({ data: { includeArchived: true } }),
         listFxRates(),
+        countIntegrations(),
       ])
     const isAdmin = session?.user.role === 'admin'
-    const [invites, integrations] = isAdmin
-      ? await Promise.all([listInvites(), countIntegrations()])
-      : [[], null]
+    const invites = isAdmin ? await listInvites() : []
     return {
       me: session!.user,
       isAdmin,
@@ -52,17 +55,24 @@ export const Route = createFileRoute('/_app/settings')({
 })
 
 function SettingsShell() {
-  const { isAdmin, counts } = useSettingsNav()
+  const { isAdmin, counts, admins } = useSettingsNav()
+  const { pathname } = useLocation()
+  const adminOnly = sectionAt(pathname)?.admin === true
 
   // One head per page: the section is the page, so the shell draws no title.
   return (
-    <div className="flex min-h-full flex-col">
-      <div className="md:hidden">
-        <SettingsNav variant="strip" isAdmin={isAdmin} counts={counts} />
+    <SettingsPageProvider value={{ isAdmin, adminOnly, admins }}>
+      <div className="flex min-h-full flex-col">
+        <SettingsForm>
+          <div className="md:hidden">
+            <SettingsNav variant="strip" counts={counts} />
+          </div>
+          {/* The foot clears the Save bar, so it never covers the last row. */}
+          <div className="flex w-full max-w-[56.25rem] flex-col gap-12 px-8 pt-7 pb-20">
+            <Outlet />
+          </div>
+        </SettingsForm>
       </div>
-      <div className="flex w-full max-w-[56.25rem] flex-col gap-12 px-8 pt-7 pb-8">
-        <Outlet />
-      </div>
-    </div>
+    </SettingsPageProvider>
   )
 }

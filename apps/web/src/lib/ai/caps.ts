@@ -13,7 +13,7 @@ import {
 import type { AiCaps, CapUsage } from '@spaces/core/ai/caps'
 import { formatNumber } from '@spaces/core/format'
 import { effectFn } from '#/lib/server/effect'
-import { requireAdmin } from '#/lib/server/shared'
+import { requireAdmin, requireUser } from '#/lib/server/shared'
 import type { AiCapsInput } from './caps-input'
 
 /**
@@ -184,10 +184,11 @@ export const setAiCapsProgram = Effect.fn('setAiCaps')(function* (
   return { dailyTokens: data.dailyTokens, perRunTokens: data.perRunTokens }
 })
 
-// The server fns' bodies. `requireAdmin()` first, always.
+// The server fns' bodies. `requireAdmin()` first on the write; the ceilings
+// and today's count are any member's to read (D81).
 
 export async function getAiCapsHandler(): Promise<AiCapsView> {
-  await requireAdmin()
+  await requireUser()
   const caps = await effectFn(readAiCapsProgram)()
   return {
     dailyTokens: caps.dailyTokens ?? null,
@@ -201,7 +202,7 @@ export async function setAiCapsHandler(data: AiCapsInput): Promise<AiCapsView> {
 }
 
 export async function getAiUsageTodayHandler(): Promise<AiUsageToday> {
-  await requireAdmin()
+  await requireUser()
   const now = new Date()
   const usage = await effectFn(usageTodayProgram)(now)
   return {
