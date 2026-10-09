@@ -2,53 +2,48 @@ import { Link } from '@tanstack/react-router'
 import { cn } from '#/lib/utils'
 
 /**
- * The settings nav grammar (SPA-26), the chassis grammar one level in.
+ * The settings nav grammar, the chassis grammar one level in.
  *
  * A settings section reaches the shell as **one row of data** in
- * `SETTINGS_SECTIONS`, and the row decides everything about its place there:
- * the child route it links to, the label, the group it joins, and whether it
- * is admin-only. Eleven pending slices add a section each — Providers,
- * Routing, Usage, Integrations, Connections, Binding health, embeddings,
- * install — and each of them is one row plus one file under
- * `routes/_app/settings/`, no other edit.
+ * `SETTINGS_SECTIONS`: the child route it links to, the label, the group it
+ * joins, and whether it is admin-only. A new section is one row plus one file
+ * under `routes/_app/settings/`, placed by D81's map.
  *
- * The groups:
- * - `general`: the workspace and who is in it.
- * - `data`: AI keys and runs, and the doors data comes in and out by.
- * - `objects`, `capital`: what it records and what it prices, as the chassis.
- * The group is also the eyebrow the section prints — `SETTINGS · GENERAL` —
+ * The groups are by whose it is (D81):
+ * - `you`: the reader's own accounts and tokens.
+ * - `workspace`: the workspace, its people, what it records and prices.
+ * - `ai`: models, search and what AI spends.
+ * - `integrations`: plugins and the doors data comes in by.
+ *
+ * The group is also the eyebrow the section prints — `SETTINGS · WORKSPACE` —
  * so a section cannot name a place the nav does not have.
- *
- * `settings-nav.test.ts` fails naming both sections when two rows claim one
- * path, on a group that is not one of the four, and on a row that breaks the
- * group order — so the grammar is checked, not negotiated.
  */
 
 /** The four groups of the settings shell, in the order the nav draws them. */
 export const SETTINGS_GROUP_IDS = [
-  'general',
-  'data',
-  'objects',
-  'capital',
+  'you',
+  'workspace',
+  'ai',
+  'integrations',
 ] as const
 export type SettingsGroupId = (typeof SETTINGS_GROUP_IDS)[number]
 
 /**
  * What each group is called — the caps label over its rows in the nav, and
- * the section's eyebrow (`SETTINGS · CAPITAL`). One name, printed twice.
+ * the section's eyebrow (`SETTINGS · AI`). One name, printed twice.
  */
 export const SETTINGS_CRUMBS = {
-  general: 'General',
-  data: 'Data & AI',
-  objects: 'Objects',
-  capital: 'Capital',
+  you: 'You',
+  workspace: 'Workspace',
+  ai: 'AI',
+  integrations: 'Integrations',
 } as const satisfies Record<SettingsGroupId, string>
 
 /** The crumbs a section may print, and nothing else. */
 export type SettingsCrumb = (typeof SETTINGS_CRUMBS)[SettingsGroupId]
 
 export type SettingsSectionRow = {
-  /** The child route under the shell. `/settings` redirects to the first. */
+  /** The child route under the shell. The path follows the label. */
   readonly to: string
   readonly label: string
   /** Which group the row joins. The groups are derived from this, not sliced. */
@@ -63,86 +58,76 @@ export type SettingsSectionRow = {
 }
 
 export const SETTINGS_SECTIONS = [
+  // The reader's own connections; the OAuth clients are Connection apps.
   {
-    to: '/settings/workspace',
-    label: 'Workspace',
-    group: 'general',
+    to: '/settings/connections',
+    label: 'Connections',
+    group: 'you',
+    admin: false,
+  },
+  // The MCP server's tokens: a token is its owner's, so not admin-only.
+  { to: '/settings/tokens', label: 'API tokens', group: 'you', admin: false },
+  {
+    to: '/settings/general',
+    label: 'General',
+    group: 'workspace',
     admin: false,
   },
   {
     to: '/settings/members',
     label: 'Members',
-    group: 'general',
+    group: 'workspace',
+    admin: false,
+  },
+  {
+    to: '/settings/objects',
+    label: 'Objects',
+    group: 'workspace',
     admin: false,
   },
   {
     to: '/settings/templates',
     label: 'Templates',
-    group: 'general',
+    group: 'workspace',
     admin: false,
   },
-  {
-    // ai-3a (SPA-29): the vault's LLM keys. Keys are the admin's, so the
-    // row locks for a member and the route's server fns refuse one.
-    to: '/settings/ai',
-    label: 'AI providers',
-    group: 'data',
-    admin: true,
-  },
-  {
-    // ai-9a (SPA-51): the embedding pin and its key, admin-only like the
-    // provider keys.
-    to: '/settings/embeddings',
-    label: 'Embeddings',
-    group: 'data',
-    admin: true,
-  },
-  {
-    // ai-25 (SPA-100): the run log. Provenance the inbox links every member
-    // to, and a page that writes nothing — not admin-only.
-    to: '/settings/usage',
-    label: 'AI usage',
-    group: 'data',
-    admin: false,
-  },
-  {
-    // ai-23a (SPA-23): the MCP server's per-user tokens. A token is its
-    // owner's, so every member manages their own — not admin-only.
-    to: '/settings/tokens',
-    label: 'API tokens',
-    group: 'data',
-    admin: false,
-  },
-  {
-    // arrival-1 (SPA-56): the forwarding mailbox — an address and an app
-    // password the workspace polls. Admin-only, like every vault secret.
-    to: '/settings/arrival',
-    label: 'Arrival',
-    group: 'data',
-    admin: true,
-  },
-  {
-    // The installed plugins, their keys and settings. Admin-only, like
-    // every vault secret.
-    to: '/settings/integrations',
-    label: 'Integrations',
-    group: 'data',
-    admin: true,
-  },
-  {
-    // Each member's own connections; the providers' OAuth clients on the
-    // same page are drawn for an admin only, so the row is open to all.
-    to: '/settings/connections',
-    label: 'Connections',
-    group: 'data',
-    admin: false,
-  },
-  { to: '/settings/objects', label: 'Objects', group: 'objects', admin: false },
   {
     to: '/settings/currency',
     label: 'Currency & FX',
-    group: 'capital',
+    group: 'workspace',
     admin: false,
+  },
+  // Providers and routing: the vault's LLM keys are the admin's.
+  { to: '/settings/models', label: 'Models', group: 'ai', admin: true },
+  // The embedding pin and its key, admin-only like the provider keys.
+  { to: '/settings/search', label: 'Search', group: 'ai', admin: true },
+  // The run log is every member's provenance; only its Caps are the admin's.
+  {
+    to: '/settings/usage',
+    label: 'Usage & limits',
+    group: 'ai',
+    admin: false,
+  },
+  // The installed plugins, their keys and settings.
+  {
+    to: '/settings/plugins',
+    label: 'Plugins',
+    group: 'integrations',
+    admin: true,
+  },
+  // The forwarding mailbox and its app password.
+  {
+    to: '/settings/email-forwarding',
+    label: 'Email forwarding',
+    group: 'integrations',
+    admin: true,
+  },
+  // The providers' OAuth clients every member's Connect leaves through.
+  {
+    to: '/settings/connection-apps',
+    label: 'Connection apps',
+    group: 'integrations',
+    admin: true,
   },
 ] as const satisfies readonly SettingsSectionRow[]
 
@@ -151,10 +136,10 @@ export const FIRST_SETTINGS_SECTION = SETTINGS_SECTIONS[0]
 
 /** The groups, derived by filter — a row may be inserted anywhere in its own run. */
 export const SETTINGS_GROUPS = {
-  general: SETTINGS_SECTIONS.filter((s) => s.group === 'general'),
-  data: SETTINGS_SECTIONS.filter((s) => s.group === 'data'),
-  objects: SETTINGS_SECTIONS.filter((s) => s.group === 'objects'),
-  capital: SETTINGS_SECTIONS.filter((s) => s.group === 'capital'),
+  you: SETTINGS_SECTIONS.filter((s) => s.group === 'you'),
+  workspace: SETTINGS_SECTIONS.filter((s) => s.group === 'workspace'),
+  ai: SETTINGS_SECTIONS.filter((s) => s.group === 'ai'),
+  integrations: SETTINGS_SECTIONS.filter((s) => s.group === 'integrations'),
 } satisfies Record<SettingsGroupId, readonly SettingsSectionRow[]>
 
 /**
@@ -168,51 +153,57 @@ export function sectionLocked(
   return row.admin && !isAdmin
 }
 
+/** A count for the right lane, keyed by the row's path. */
+export type SettingsCounts = Partial<Record<SettingsSectionRow['to'], number>>
+
 const ROW =
   'flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent px-2.5 text-ui whitespace-nowrap transition-colors'
 
 /**
- * The section nav: the chassis grammar one level in (2026-09-30). Caps group
- * labels the way the chassis prints OBJECTS and CAPITAL, 30px rows, current
- * section = paper + rule + medium weight (the No-Bar Rule — never a pine
- * edge), and a count in the right lane where the shell has one — the lane
- * the chassis uses for a chord or a count.
+ * The section nav: caps group labels the way the chassis prints them, 30px
+ * rows, current section = paper + rule + medium weight (the No-Bar Rule —
+ * never a pine edge), and a count in the right lane where the shell has one.
  *
- * Below `md` the same rows become a horizontal strip above the content,
- * scrolling on x inside their own container, with the rules between groups
- * drawn as vertical hairlines instead of horizontal ones. One component, two
- * orientations: no drawer, no second list to keep in step.
+ * - `chassis`: the rows down the sidebar, which settings takes over at `md`.
+ * - `strip`: below `md`, the same rows as a horizontal strip above the
+ *   content, scrolling on x, with vertical hairlines between groups.
  */
 export function SettingsNav({
   isAdmin,
   counts = {},
+  variant,
 }: {
   isAdmin: boolean
-  /** A count for the right lane, keyed by the row's path. */
-  counts?: Partial<Record<SettingsSectionRow['to'], number>>
+  counts?: SettingsCounts
+  variant: 'chassis' | 'strip'
 }) {
+  const chassis = variant === 'chassis'
   return (
     <nav
       aria-label="Settings sections"
       className={cn(
-        'flex shrink-0 gap-3 overflow-x-auto border-b border-hairline bg-bone px-3 py-2',
-        'md:w-52 md:flex-col md:gap-0 md:overflow-x-visible md:border-r md:border-b-0 md:px-3 md:pt-3 md:pb-3',
+        chassis
+          ? 'flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3 pb-3'
+          : 'flex shrink-0 gap-3 overflow-x-auto border-b border-hairline bg-bone px-3 py-2',
       )}
     >
       {SETTINGS_GROUP_IDS.map((id, i) => (
         <div
           key={id}
           className={cn(
-            'flex shrink-0 items-center gap-1 md:flex-col md:items-stretch md:gap-0.5',
-            i > 0 &&
-              'border-l border-hairline pl-3 md:mt-5 md:border-l-0 md:pl-0',
+            chassis
+              ? 'flex flex-col gap-0.5'
+              : 'flex shrink-0 items-center gap-1',
+            i > 0 && (chassis ? 'mt-5' : 'border-l border-hairline pl-3'),
           )}
         >
-          <div className="hidden h-6 items-center px-2.5 md:flex">
-            <span className="field-label leading-4 font-medium text-graphite">
-              {SETTINGS_CRUMBS[id]}
-            </span>
-          </div>
+          {chassis ? (
+            <div className="flex h-6 items-center px-2.5">
+              <span className="field-label leading-4 font-medium text-graphite">
+                {SETTINGS_CRUMBS[id]}
+              </span>
+            </div>
+          ) : null}
           {SETTINGS_GROUPS[id].map((row) => {
             const count = counts[row.to]
             return sectionLocked(row, isAdmin) ? (

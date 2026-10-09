@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -10,58 +12,137 @@ import {
 } from './settings-nav'
 
 /**
- * SPA-26: the settings nav grammar, the sibling of `nav-grammar.test.ts`.
- * `SETTINGS_SECTIONS` is the one place a settings section is declared — the
- * nav draws it, `/settings` redirects to its first row, and eleven pending
- * slices (Providers, Routing, Usage, Integrations, Connections, Binding
- * health, embeddings, install) each add one row. This file is what makes a
- * second section at one path, a stray group, or a row filed out of group
- * order a failing test instead of a nav that quietly draws it twice.
+ * The settings nav grammar, the sibling of `nav-grammar.test.ts`.
+ * `SETTINGS_SECTIONS` is the one place a settings section is declared; this
+ * file makes a second section at one path, a stray group, a row filed out of
+ * group order, or an eyebrow naming another group a failing test.
  */
+
+/** D81's map as shipped: group crumb, then each row as label → path. */
+const MAP: ReadonlyArray<
+  readonly [crumb: string, rows: ReadonlyArray<readonly [string, string]>]
+> = [
+  [
+    'You',
+    [
+      ['Connections', '/settings/connections'],
+      ['API tokens', '/settings/tokens'],
+    ],
+  ],
+  [
+    'Workspace',
+    [
+      ['General', '/settings/general'],
+      ['Members', '/settings/members'],
+      ['Objects', '/settings/objects'],
+      ['Templates', '/settings/templates'],
+      ['Currency & FX', '/settings/currency'],
+    ],
+  ],
+  [
+    'AI',
+    [
+      ['Models', '/settings/models'],
+      ['Search', '/settings/search'],
+      ['Usage & limits', '/settings/usage'],
+    ],
+  ],
+  [
+    'Integrations',
+    [
+      ['Plugins', '/settings/plugins'],
+      ['Email forwarding', '/settings/email-forwarding'],
+      ['Connection apps', '/settings/connection-apps'],
+    ],
+  ],
+]
 
 /** Where a row sits in the group order, by its `group` field. */
 const rank = (group: (typeof SETTINGS_SECTIONS)[number]['group']) =>
   SETTINGS_GROUP_IDS.indexOf(group)
 
+const webSrc = fileURLToPath(new URL('../../', import.meta.url))
+const read = (path: string) => readFileSync(`${webSrc}${path}`, 'utf8')
+
+/**
+ * Every eyebrow a section's route prints: the `crumb="…"` literals in its
+ * file, its drill-in page's, and the settings components either imports.
+ */
+function crumbsPrintedBy(to: string): Array<string> {
+  const slug = to.replace('/settings/', '')
+  const routes = [
+    `routes/_app/settings/${slug}.tsx`,
+    ...['$integrationId', '$objectSlug']
+      .map((p) => `routes/_app/settings/${slug}_.${p}.tsx`)
+      .filter((f) => existsSync(`${webSrc}${f}`)),
+  ]
+  const sources = routes.map(read)
+  for (const source of [...sources]) {
+    for (const m of source.matchAll(
+      /from '#\/components\/settings\/([a-z-]+)'/g,
+    )) {
+      if (m[1] !== 'settings-section' && m[1] !== 'settings-nav')
+        sources.push(read(`components/settings/${m[1]}.tsx`))
+    }
+  }
+  return sources.flatMap((s) =>
+    [...s.matchAll(/crumb="([^"]+)"/g)].map((m) => m[1]),
+  )
+}
+
 describe('the settings nav grammar', () => {
+  it('holds four groups in D81 order, You · Workspace · AI · Integrations', () => {
+    expect(SETTINGS_GROUP_IDS).toEqual([
+      'you',
+      'workspace',
+      'ai',
+      'integrations',
+    ])
+    expect(Object.keys(SETTINGS_GROUPS)).toEqual([...SETTINGS_GROUP_IDS])
+    expect(SETTINGS_GROUP_IDS.map((id) => SETTINGS_CRUMBS[id])).toEqual(
+      MAP.map(([crumb]) => crumb),
+    )
+  })
+
+  it('gives every row of the map exactly one path, in map order', () => {
+    expect(
+      SETTINGS_GROUP_IDS.map((id) => [
+        SETTINGS_CRUMBS[id],
+        SETTINGS_GROUPS[id].map((row) => [row.label, row.to]),
+      ]),
+    ).toEqual(MAP)
+  })
+
   it('gives each section exactly one path under the shell', () => {
     const owner = new Map<string, string>()
     const collisions: Array<string> = []
     for (const row of SETTINGS_SECTIONS) {
       const taken = owner.get(row.to)
       if (taken === undefined) owner.set(row.to, row.label)
-      // The message is the point: a new section that reuses
-      // `/settings/objects` fails naming both, so the author knows.
+      // A new section that reuses a path fails naming both.
       else collisions.push(`${row.to} — ${taken} and ${row.label}`)
     }
     expect(collisions).toEqual([])
     for (const row of SETTINGS_SECTIONS) {
-      // A section is a child route of the shell; anything else escapes the
-      // nav and the crumb with it.
       expect(`${row.label}: ${row.to}`).toMatch(/^.+: \/settings\/[a-z-]+$/)
     }
   })
 
-  it('puts every row in one of the four known groups', () => {
-    expect(SETTINGS_GROUP_IDS).toEqual([
-      'general',
-      'data',
-      'objects',
-      'capital',
-    ])
-    expect(Object.keys(SETTINGS_GROUPS)).toEqual([...SETTINGS_GROUP_IDS])
-    // Every group also prints a crumb — an id without one would print nothing.
-    expect(Object.keys(SETTINGS_CRUMBS)).toEqual([...SETTINGS_GROUP_IDS])
-    const strays = SETTINGS_SECTIONS.filter(
-      (row) => !SETTINGS_GROUP_IDS.some((id) => id === row.group),
-    )
-    expect(strays.map((row) => `${row.label} — ${row.group}`)).toEqual([])
+  it("prints its group's crumb as every row's eyebrow", () => {
+    const wrong: Array<string> = []
+    for (const row of SETTINGS_SECTIONS) {
+      const printed = crumbsPrintedBy(row.to)
+      expect(printed.length, `${row.label} prints no eyebrow`).toBeGreaterThan(
+        0,
+      )
+      for (const crumb of printed)
+        if (crumb !== SETTINGS_CRUMBS[row.group])
+          wrong.push(`${row.label}: ${crumb}`)
+    }
+    expect(wrong).toEqual([])
   })
 
-  it('keeps the groups contiguous and in the order general → data → objects → capital', () => {
-    // The groups are derived by filter, so a row filed out of its run would
-    // still render — just under a rule that no longer means anything. Hold
-    // the order and the derivation renders the array as written.
+  it('keeps the groups contiguous and in order', () => {
     const misplaced: Array<string> = []
     let reached = 0
     for (const row of SETTINGS_SECTIONS) {
@@ -72,26 +153,14 @@ describe('the settings nav grammar', () => {
       } else reached = rank(row.group)
     }
     expect(misplaced).toEqual([])
-  })
-
-  it('draws every row once, in SETTINGS_SECTIONS order', () => {
-    for (const id of SETTINGS_GROUP_IDS) {
-      const positions = SETTINGS_GROUPS[id].map((row) =>
-        SETTINGS_SECTIONS.indexOf(row),
-      )
-      expect(positions).toEqual([...positions].sort((a, b) => a - b))
-    }
-    expect([
-      ...SETTINGS_GROUPS.general,
-      ...SETTINGS_GROUPS.data,
-      ...SETTINGS_GROUPS.objects,
-      ...SETTINGS_GROUPS.capital,
-    ]).toEqual([...SETTINGS_SECTIONS])
+    expect(
+      SETTINGS_GROUP_IDS.flatMap((id) => [...SETTINGS_GROUPS[id]]),
+    ).toEqual([...SETTINGS_SECTIONS])
   })
 
   it('redirects /settings to the first row rather than to a literal path', () => {
     expect(FIRST_SETTINGS_SECTION).toBe(SETTINGS_SECTIONS[0])
-    expect(FIRST_SETTINGS_SECTION.to).toBe('/settings/workspace')
+    expect(FIRST_SETTINGS_SECTION.to).toBe('/settings/connections')
   })
 
   it('locks a row for a member only when the section is admin-only', () => {
@@ -100,21 +169,18 @@ describe('the settings nav grammar', () => {
       expect(sectionLocked(row, true)).toBe(false)
       expect(sectionLocked(row, false)).toBe(row.admin)
     }
-    // None of the five sections moved by SPA-26 is admin-only at the route:
-    // every one of them a member can read today, and the move changed no
-    // guard. The lane exists for the admin-only sections, which declare
-    // `admin: true` and get the graphite row with `admin` in the right lane
-    // instead of a dead link. Connections is not one: a member has their own
-    // connections there, and only its OAuth-client groups are the admin's.
-    const lockedForAMember = SETTINGS_SECTIONS.filter((row) =>
-      sectionLocked(row, false),
-    )
-    expect(lockedForAMember.map((row) => row.label)).toEqual([
-      'AI providers',
-      'Embeddings',
-      // arrival-1 (SPA-56): the forwarding mailbox and its app password.
-      'Arrival',
-      'Integrations',
+    // Usage & limits is not one: the run log is every member's provenance,
+    // and only its Caps load for an admin.
+    expect(
+      SETTINGS_SECTIONS.filter((row) => sectionLocked(row, false)).map(
+        (row) => row.label,
+      ),
+    ).toEqual([
+      'Models',
+      'Search',
+      'Plugins',
+      'Email forwarding',
+      'Connection apps',
     ])
   })
 })

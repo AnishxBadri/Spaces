@@ -225,8 +225,8 @@ describe('PickerButton', () => {
       integrationId: 'row',
     }
     expect(
-      render({ ...unconfigured, settingsHref: '/settings/integrations/row' }),
-    ).toContain('href="/settings/integrations/row"')
+      render({ ...unconfigured, settingsHref: '/settings/plugins/row' }),
+    ).toContain('href="/settings/plugins/row"')
     const member = render({ ...unconfigured, settingsHref: null })
     expect(member).toContain('Picker not set up')
     expect(member).not.toContain('href=')

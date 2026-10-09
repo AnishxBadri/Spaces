@@ -113,7 +113,7 @@ function ActionLane({
   row: IntegrationRow
   actions: LedgerActions
 }) {
-  const to = '/settings/integrations/$integrationId'
+  const to = '/settings/plugins/$integrationId'
   const params = { integrationId: row.id }
   switch (row.state) {
     case 'tripped':

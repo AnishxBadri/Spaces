@@ -49,7 +49,7 @@ function ObjectsSection({
     <SettingsSection
       title="Objects"
       blurb="The records you keep and the attributes on each."
-      crumb="Objects"
+      crumb="Workspace"
       action={
         isAdmin ? (
           <ObjectDialog

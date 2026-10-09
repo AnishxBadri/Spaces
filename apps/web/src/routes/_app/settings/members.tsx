@@ -105,7 +105,7 @@ function MembersSection({
     <SettingsSection
       title="Members"
       blurb="Who can open this workspace. Admins change structure; members change records."
-      crumb="General"
+      crumb="Workspace"
     >
       <ul className="flex flex-col">
         {members.map((m) => (

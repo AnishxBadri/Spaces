@@ -63,8 +63,8 @@ const PLUGIN_MARKERS: ReadonlyArray<string> = [
  * plugins directory.
  */
 const INTEGRATIONS_SURFACE: ReadonlyArray<string> = [
-  'src/routes/_app/settings/integrations.tsx',
-  'src/routes/_app/settings/integrations_.$integrationId.tsx',
+  'src/routes/_app/settings/plugins.tsx',
+  'src/routes/_app/settings/plugins_.$integrationId.tsx',
   'src/components/integrations/integration-ledger.tsx',
   'src/components/integrations/integration-settings.tsx',
   'src/lib/server/integrations.ts',

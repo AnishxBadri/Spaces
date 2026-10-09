@@ -111,7 +111,7 @@ const settingsOf = Effect.fn('picker.settings')(function* (
   if (row === null)
     return {
       _tag: 'unconfigured',
-      reason: `No ${spec.target.label} integration is installed; an admin adds it in Settings → Integrations.`,
+      reason: `No ${spec.target.label} integration is installed; an admin adds it in Settings → Plugins.`,
       integrationId: null,
     }
   const developerKey = jsonString(row.config[spec.settings.apiKey])
@@ -124,7 +124,7 @@ const settingsOf = Effect.fn('picker.settings')(function* (
   )
     return {
       _tag: 'unconfigured',
-      reason: `The ${spec.target.label} picker needs Picker API key and Picker app id, set on the integration in Settings → Integrations.`,
+      reason: `The ${spec.target.label} picker needs Picker API key and Picker app id, set on the integration in Settings → Plugins.`,
       integrationId: row.integrationId,
     }
   return { developerKey, appId }

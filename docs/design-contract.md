@@ -294,16 +294,17 @@ under `apps/web/src/routes/_app/settings/` plus one row in `SETTINGS_SECTIONS`
 another section's file, and never a page of its own outside the shell: the eleven
 pending sections (Providers, Routing, Usage, Integrations, the manifest form, install,
 OAuth, Connections, Binding health, and the two embeddings slices) all take this one
-answer. The row carries the path, the label, the `group` it joins — `general` (the
-workspace and its people), `data` (printed `Data & AI`: AI keys and runs, and the doors
-data comes in and out by), then `objects` and `capital` as the chassis has them — and
-`admin`. Those are the shipped groups until project 27 ports D81's four (`you`,
-`workspace`, `ai`, `integrations`; §5); a new section is placed by D81's map. The group is also
-the eyebrow the section prints, so `SETTINGS · CAPITAL` cannot name a place the nav does
-not have; `admin: true` draws the row graphite for a member with `admin` in the right
-lane rather than a link into a page that refuses, and changes no guard. Below `md` the
-nav is the same rows as a horizontal strip above the content. `/settings` redirects to
-the first row. `settings-nav.test.ts` holds the grammar the way `nav-grammar.test.ts`
+answer. The row carries the path, the label, the `group` it joins — D81's four, by
+whose it is: `you`, `workspace`, `ai`, `integrations` — and `admin`; a new section is
+placed by D81's map, and its path follows its label (`/settings/email-forwarding`), with
+a moved path answering one 301 from a route file at the old name
+(`lib/settings-moves.ts`). The group is also the eyebrow the section prints, so
+`SETTINGS · WORKSPACE` cannot name a place the nav does not have; `admin: true` draws
+the row graphite for a member with `admin` in the right lane rather than a link into a
+page that refuses, and changes no guard. At `md` and up settings takes over the chassis:
+`‹ Settings` (and `esc`) back to the page settings was opened from, Today on a cold
+load, over the nav (`SettingsChassis`); below `md` the nav is the same rows as a
+horizontal strip above the content. `/settings` redirects to the first row. `settings-nav.test.ts` holds the grammar the way `nav-grammar.test.ts`
 holds the chassis'. The shell's loader carries what the nav's right lane counts; a
 section that needs anything else loads it in its own child route's loader. A page that
 drills into one row of a section — one object's attributes — stays inside the shell with
@@ -485,9 +486,8 @@ the sticky head (`HeadBar`, inside `PageHeader` and `RecordHeader`).
 
 **Settings** (D81; project 27, `settings-*`)
 
-- `SETTINGS_SECTIONS` regroups into `you`, `workspace`, `ai`, `integrations`, and
-  `settings-nav.test.ts` follows. You is Email & calendar, Files, Meeting notes, API
-  tokens.
+- You is Email & calendar, Files, Meeting notes, API tokens; Connections stands in for
+  the first three until `settings-3`. (The four groups and the takeover shipped: §3.)
 - Toggles apply at once; typed fields share one Save bar shown only while dirty.
 - Confirms on revoking a token, suspending a member, archiving an object, unticking an
   identity key.

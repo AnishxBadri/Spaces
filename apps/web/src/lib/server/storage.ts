@@ -111,8 +111,8 @@ export const pickerReadiness = createServerFn()
           u.role !== 'admin'
             ? null
             : readiness.integrationId === null
-              ? '/settings/integrations'
-              : `/settings/integrations/${readiness.integrationId}`,
+              ? '/settings/plugins'
+              : `/settings/plugins/${readiness.integrationId}`,
       }
     } catch (failure) {
       return { _tag: 'refused' as const, reason: pickerMessage(failure) }

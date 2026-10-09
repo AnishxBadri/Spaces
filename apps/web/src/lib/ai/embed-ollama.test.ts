@@ -56,7 +56,7 @@ async function storedSettings(): Promise<WorkspaceSettings> {
   )
 }
 
-/** Ollama saved the way Settings → AI · Providers saves it: an address, no key. */
+/** Ollama saved the way Settings → Models saves it: an address, no key. */
 const saveOllama = (baseUrl = 'http://ollama:11434') =>
   Effect.runPromise(
     saveAiKeyProgram(FIXTURE_ACTOR.id, {
@@ -240,8 +240,7 @@ describe('the Ollama ledger', () => {
     )
     expect(failure).toMatchObject({
       _tag: 'PinRefused',
-      message:
-        'Save the Ollama address under Settings → AI · Providers before pinning',
+      message: 'Save the Ollama address under Settings → Models before pinning',
     })
   })
 })
@@ -325,7 +324,7 @@ describe('the sensitive slot', () => {
       'Google is a cloud provider; the sensitive slot takes only a model that runs on a box you run',
     )
     expect(await refusal(NOMIC)).toBe(
-      'Save the Ollama address under Settings → AI · Providers before setting the sensitive slot',
+      'Save the Ollama address under Settings → Models before setting the sensitive slot',
     )
     await saveOllama()
     expect(await refusal(NOMIC)).toBe(

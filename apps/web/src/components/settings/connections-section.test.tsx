@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { ConnectionListRow, ProviderAppRow } from '#/lib/server-fns'
+import { ConnectionAppsSection } from './connection-apps-section'
 import { ConnectionsSection } from './connections-section'
 
 /**
@@ -40,7 +41,7 @@ describe('ConnectionsSection', () => {
   it('offers Connect for a configured provider, leaving through the start route', () => {
     const html = renderToStaticMarkup(
       <ConnectionsSection
-        apps={null}
+        isAdmin={false}
         configured={['google']}
         connections={[]}
       />,
@@ -54,32 +55,60 @@ describe('ConnectionsSection', () => {
 
   it('tells a member to ask an admin when a provider has no OAuth client', () => {
     const html = renderToStaticMarkup(
-      <ConnectionsSection apps={null} configured={[]} connections={[]} />,
+      <ConnectionsSection isAdmin={false} configured={[]} connections={[]} />,
     )
     expect(html).toContain('Ask an admin to configure Google')
     expect(html).toContain('Ask an admin to configure Box')
     expect(html).not.toContain('/api/connections/')
-    expect(html).not.toContain('href="#oauth-client-')
+    expect(html).not.toContain('#oauth-client-')
   })
 
-  it('points an admin at the OAuth client group on the same page', () => {
+  it('points an admin at the OAuth client under Connection apps, and draws no client itself', () => {
     const html = renderToStaticMarkup(
-      <ConnectionsSection
-        apps={[googleApp]}
-        configured={[]}
-        connections={[]}
+      <ConnectionsSection isAdmin configured={[]} connections={[]} />,
+    )
+    expect(html).toContain(
+      'href="/settings/connection-apps#oauth-client-google"',
+    )
+    expect(html).toContain('Configure Google')
+    expect(html).not.toContain('id="oauth-client-google"')
+    expect(html).not.toContain('OAuth client')
+    expect(html).not.toContain('Redirect URI')
+    expect(html).not.toContain('Ask an admin')
+  })
+
+  it('leaves the OAuth clients to Connection apps, at the anchor Connections links to', () => {
+    const html = renderToStaticMarkup(
+      <ConnectionAppsSection
+        apps={[
+          googleApp,
+          {
+            ...googleApp,
+            provider: 'box',
+            label: 'Box',
+            configured: true,
+            clientId: 'box-client',
+            secretDisplay: '••••a1b2',
+            redirectUri: 'http://localhost:3000/api/connections/box/callback',
+          },
+        ]}
       />,
     )
-    expect(html).toContain('href="#oauth-client-google"')
-    expect(html).toContain('Configure Google')
+    expect(html).toContain('Settings · Integrations')
+    expect(html).toContain('>Connection apps</h1>')
     expect(html).toContain('id="oauth-client-google"')
-    expect(html).not.toContain('Ask an admin')
+    expect(html).toContain('Google OAuth client')
+    expect(html).toContain('id="oauth-client-box"')
+    expect(html).toContain('box-client')
+    expect(html).toContain(
+      'http://localhost:3000/api/connections/google/callback',
+    )
   })
 
   it('draws a held connection: account, product scopes as chips, last sync, status, actions', () => {
     const html = renderToStaticMarkup(
       <ConnectionsSection
-        apps={null}
+        isAdmin={false}
         configured={['google']}
         connections={[row()]}
       />,
@@ -102,7 +131,7 @@ describe('ConnectionsSection', () => {
   it("prints an error row's stored provider reason inline, and offers Reconnect", () => {
     const html = renderToStaticMarkup(
       <ConnectionsSection
-        apps={null}
+        isAdmin={false}
         configured={['google']}
         connections={[
           row({
@@ -124,7 +153,7 @@ describe('ConnectionsSection', () => {
   it('draws one row per account under the same product', () => {
     const html = renderToStaticMarkup(
       <ConnectionsSection
-        apps={null}
+        isAdmin={false}
         configured={['google']}
         connections={[
           row(),

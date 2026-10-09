@@ -1,10 +1,17 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { SectionHead } from '#/components/ledger-section'
+import { CapsSection } from '#/components/settings/caps-section'
 import { SettingsSection } from '#/components/settings/settings-section'
 import { SUGGESTION_KIND_WORD } from '#/components/inbox/suggestion-card'
 import { formatNumber } from '@spaces/core/format'
-import { getAiRun, getAiUsage } from '#/lib/server-fns'
+import {
+  getAiCaps,
+  getAiRun,
+  getAiUsage,
+  getAiUsageToday,
+  getSession,
+} from '#/lib/server-fns'
 import { recordPath } from '#/lib/record-path'
 import { cn } from '#/lib/utils'
 
@@ -15,33 +22,28 @@ type RunDetail = NonNullable<Awaited<ReturnType<typeof getAiRun>>>
 type RunStep = RunDetail['steps'][number]
 
 /**
- * Settings → AI usage (SPA-100, `docs/spec-ai-substrate.md` §6): the run log.
- * Every AI action is one `ai_run` — its task, the record it was about, who
- * started it, its status and what it cost — newest first; opening one
- * (`?run=<id>`, which the inbox's "produced by this run" links to) lists its
- * steps in order: the lane it ran on, the model, the tokens, and
- * `input_refs → output_ref` resolved to names server-side through
- * `cite.ts`. Calls no run owns — the settings Test call — list apart, under
- * "Calls outside a run".
- *
- * Its own section rather than a block of `ai.tsx`, because the settings
- * shell's grammar is one row per section and one file per row
- * (`docs/design-contract.md` §3, which names Usage). Not admin-only, unlike
- * AI providers: it writes nothing, it is the provenance a suggestion in the
- * inbox links every member to, and it reads only what the inbox already
- * shows them. The ledgers take the API tokens table's shape.
+ * Settings → AI → Usage & limits: the run log, then Caps for an admin. (D81)
+ * - Every AI action is one `ai_run`, newest first; `?run=<id>` (which the
+ *   inbox's "produced by this run" links to) opens its steps in order, refs
+ *   resolved to names server-side. Calls no run owns list apart.
+ * - Not admin-only: the log writes nothing and is every member's provenance.
+ *   Caps load only for an admin, since their server fns refuse anyone else.
  */
 export const Route = createFileRoute('/_app/settings/usage')({
   validateSearch: z.object({ run: z.string().uuid().optional() }),
   loaderDeps: ({ search }) => ({ run: search.run ?? null }),
   loader: async ({ deps }) => {
-    const [usage, run] = await Promise.all([
+    const [session, usage, run] = await Promise.all([
+      getSession(),
       getAiUsage(),
       deps.run === null
         ? Promise.resolve(null)
         : getAiRun({ data: { runId: deps.run } }),
     ])
-    return { usage, run, asked: deps.run }
+    if (session?.user.role !== 'admin')
+      return { usage, run, asked: deps.run, caps: null }
+    const [caps, today] = await Promise.all([getAiCaps(), getAiUsageToday()])
+    return { usage, run, asked: deps.run, caps: { caps, today } }
   },
   component: UsageRoute,
 })
@@ -59,16 +61,33 @@ function tokens(tokensIn: number | null, tokensOut: number | null): string {
 }
 
 function UsageRoute() {
-  const { usage, run, asked } = Route.useLoaderData()
+  const { caps, ...log } = Route.useLoaderData()
+  return (
+    <div className="flex flex-col gap-8">
+      <RunLog {...log} />
+      {caps ? <CapsSection caps={caps.caps} usage={caps.today} /> : null}
+    </div>
+  )
+}
+
+function RunLog({
+  usage,
+  run,
+  asked,
+}: {
+  usage: UsageView
+  run: RunDetail | null
+  asked: string | null
+}) {
   const spent = usage.runs.reduce(
     (sum, r) => sum + (r.tokensIn ?? 0) + (r.tokensOut ?? 0),
     0,
   )
   return (
     <SettingsSection
-      title="AI usage"
+      title="Usage & limits"
       blurb="Every AI action as a run: what it read, which models it called, what it cost and what it proposed."
-      crumb="Data & AI"
+      crumb="AI"
     >
       <div className="flex flex-col pt-8">
         <SectionHead

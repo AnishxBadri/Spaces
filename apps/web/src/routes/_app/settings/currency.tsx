@@ -1,32 +1,23 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import {
-  SettingsRow,
-  SettingsSection,
-} from '#/components/settings/settings-section'
+import { SettingsSection } from '#/components/settings/settings-section'
 import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
-import { setBaseCurrency, setFxRate } from '#/lib/server-fns'
+import { setFxRate } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 const shell = getRouteApi('/_app/settings')
 
-/** The base currency and the manual FX rate ledger. */
+/** The manual FX rate ledger. The base currency is set in General. (D81) */
 export const Route = createFileRoute('/_app/settings/currency')({
   component: CurrencyRoute,
 })
 
 function CurrencyRoute() {
   const data = shell.useLoaderData()
-  return (
-    <FxSection
-      isAdmin={data.isAdmin}
-      baseCurrency={data.fx.baseCurrency}
-      rates={data.fx.rates}
-    />
-  )
+  return <FxSection baseCurrency={data.fx.baseCurrency} rates={data.fx.rates} />
 }
 
 /**
@@ -35,34 +26,16 @@ function CurrencyRoute() {
  * when a non-base event needs one; upserting a correction just recomputes.
  */
 function FxSection({
-  isAdmin,
   baseCurrency,
   rates,
 }: {
-  isAdmin: boolean
   baseCurrency: string
   rates: Array<{ currency: string; date: string; rateToBase: number }>
 }) {
   const router = useRouter()
-  const [base, setBase] = useState(baseCurrency)
   const [form, setForm] = useState({ currency: '', date: '', rate: '' })
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
-
-  async function saveBase() {
-    if (base.trim().toUpperCase() === baseCurrency) return
-    setPending(true)
-    setError(null)
-    try {
-      await setBaseCurrency({ data: { currency: base.trim().toUpperCase() } })
-      toast('Base currency saved')
-      void router.invalidate()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save')
-    } finally {
-      setPending(false)
-    }
-  }
 
   async function addRate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -110,28 +83,8 @@ function FxSection({
     <SettingsSection
       title="Currency & FX rates"
       blurb="Every holding is priced in the base currency; a missing rate leaves it unpriced."
-      crumb="Capital"
+      crumb="Workspace"
     >
-      <SettingsRow
-        label="Base currency"
-        hint="Changing it re-prices the portfolio strip; ledgers keep their original currency."
-      >
-        <Input
-          id="fx-base"
-          aria-label="Base currency"
-          value={base}
-          onChange={(e) => setBase(e.target.value)}
-          maxLength={3}
-          className="w-24 mono uppercase"
-          disabled={!isAdmin}
-        />
-        {isAdmin && base.trim().toUpperCase() !== baseCurrency ? (
-          <Button size="sm" onClick={saveBase} disabled={pending}>
-            Save
-          </Button>
-        ) : null}
-      </SettingsRow>
-
       <div className="flex flex-col pt-8">
         <SectionHead
           as="h3"

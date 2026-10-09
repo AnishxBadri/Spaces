@@ -118,9 +118,9 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
   const run = settings.lastRun
   return (
     <SettingsSection
-      title="Arrival"
+      title="Email forwarding"
       blurb="An address you forward or BCC mail to. Threads land on the people and companies they match."
-      crumb="Data & AI"
+      crumb="Integrations"
     >
       <div className="flex flex-col pt-8">
         <SectionHead as="h3" title="Mailbox" count={readout(saved)} />

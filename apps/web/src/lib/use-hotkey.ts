@@ -15,7 +15,8 @@ export type Binding = [key: string, handler: () => void]
 
 export const CHORD_WINDOW_MS = 800
 
-function isTyping(e: KeyboardEvent) {
+/** Whether a key went to a field, an editor or a dialog rather than the page. */
+export function isTyping(e: KeyboardEvent) {
   const t = e.target
   if (!(t instanceof HTMLElement)) return false
   return (

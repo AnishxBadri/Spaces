@@ -7,6 +7,10 @@ import {
 import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { AppSidebar, NAV_ITEMS } from '#/components/app-sidebar'
+import {
+  SettingsChassis,
+  useSettingsTakeover,
+} from '#/components/settings/settings-chassis'
 import { KeyboardHelp } from '#/components/keyboard-help'
 import { CommandPalette } from '#/components/command-palette'
 import { UploadDialog } from '#/components/upload-dialog'
@@ -42,6 +46,9 @@ function AppShell() {
   const collapsed = useChassisCollapsed()
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const navigate = useNavigate()
+  // Settings takes the chassis over; it never folds to marks. (D81)
+  const onSettings = useSettingsTakeover()
+  const narrow = collapsed && !onSettings
   // The keys printed on the chassis: G-chords go, ⌘\ folds it, ? explains.
   useHotkeys([
     ...NAV_ITEMS.map((item): [string, () => void] => [
@@ -62,18 +69,22 @@ function AppShell() {
       <aside
         className={cn(
           'fixed inset-y-0 left-0 hidden md:block',
-          collapsed ? 'w-12' : 'w-58',
+          narrow ? 'w-12' : 'w-58',
         )}
       >
-        <AppSidebar
-          user={session.user}
-          workspaceName={workspace?.name ?? null}
-          objects={objects}
-          onOpenCommand={() => setCommandOpen(true)}
-          collapsed={collapsed}
-          onToggleCollapsed={() => setChassisCollapsed(!collapsed)}
-          onOpenKeyboard={() => setKeyboardOpen(true)}
-        />
+        {onSettings ? (
+          <SettingsChassis />
+        ) : (
+          <AppSidebar
+            user={session.user}
+            workspaceName={workspace?.name ?? null}
+            objects={objects}
+            onOpenCommand={() => setCommandOpen(true)}
+            collapsed={collapsed}
+            onToggleCollapsed={() => setChassisCollapsed(!collapsed)}
+            onOpenKeyboard={() => setKeyboardOpen(true)}
+          />
+        )}
       </aside>
 
       {/* Mobile top bar */}
@@ -121,7 +132,7 @@ function AppShell() {
       <main
         className={cn(
           'min-w-0 flex-1 pt-12 md:pt-0',
-          collapsed ? 'md:pl-12' : 'md:pl-58',
+          narrow ? 'md:pl-12' : 'md:pl-58',
         )}
       >
         <Outlet />

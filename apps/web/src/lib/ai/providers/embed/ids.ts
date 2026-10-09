@@ -253,7 +253,7 @@ export const missingCredentialMessage = (
   doing: string,
 ): string =>
   EMBEDDING_PROVIDER_INFO[provider].keyless
-    ? `Save the ${EMBEDDING_PROVIDER_INFO[provider].label} address under Settings → AI · Providers before ${doing}`
+    ? `Save the ${EMBEDDING_PROVIDER_INFO[provider].label} address under Settings → Models before ${doing}`
     : `Save a ${EMBEDDING_PROVIDER_INFO[provider].label} embedding key before ${doing}`
 
 /**

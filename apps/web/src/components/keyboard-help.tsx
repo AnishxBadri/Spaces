@@ -39,6 +39,7 @@ export function KeyboardHelp({
                 <Row key={item.to} label={item.label} keys={item.key} />
               ))}
               <Row label="Settings" keys="G ," />
+              <Row label="Leave settings" keys="esc" />
               <Row label="Palette" keys={`${mod}K`} />
               <Row label="Fold the sidebar" keys={`${mod}\\`} />
               <Row label="This sheet" keys="?" />

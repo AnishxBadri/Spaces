@@ -200,9 +200,9 @@ export function EmbeddingsSection({
 
   return (
     <SettingsSection
-      title="Embeddings"
+      title="Search"
       blurb="Which model turns text into vectors for search. Search reads only the pinned model's vectors."
-      crumb="Data & AI"
+      crumb="AI"
     >
       <div className="flex flex-col pt-8">
         <SectionHead
@@ -259,8 +259,8 @@ export function EmbeddingsSection({
             label={`${descriptor.label} address`}
             hint={
               keyRow?.configured
-                ? `The ${descriptor.label} provider's address, from Settings → AI · Providers. ${OLLAMA_URL_GUIDANCE}`
-                : `Add ${descriptor.label} under Settings → AI · Providers first — no key, only its address. ${OLLAMA_URL_GUIDANCE}`
+                ? `The ${descriptor.label} provider's address, from Settings → Models. ${OLLAMA_URL_GUIDANCE}`
+                : `Add ${descriptor.label} under Settings → Models first — no key, only its address. ${OLLAMA_URL_GUIDANCE}`
             }
           >
             {keyRow?.configured ? (
@@ -269,7 +269,7 @@ export function EmbeddingsSection({
               </span>
             ) : (
               <Button size="sm" variant="outline" asChild>
-                <Link to="/settings/ai">Providers</Link>
+                <Link to="/settings/models">Models</Link>
               </Button>
             )}
           </SettingsRow>

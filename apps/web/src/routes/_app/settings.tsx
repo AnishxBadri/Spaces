@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
+import { useSettingsNav } from '#/components/settings/settings-chassis'
 import { SettingsNav } from '#/components/settings/settings-nav'
 import {
   getSession,
@@ -12,18 +13,13 @@ import {
 } from '#/lib/server-fns'
 
 /**
- * Settings: the shell (SPA-26). The workspace singleton, members + invites,
- * templates, currency and the attribute registries are five child routes
- * under this layout — `routes/_app/settings/<name>.tsx` — and the eleven
- * pending sections are the sixth through sixteenth. The nav grammar they
- * join is `components/settings/settings-nav.tsx`; the shape they take is
- * `SettingsSection`. Structure fixed, content free; admin owns the
- * destructive edges.
- *
- * The loader stays whole here because the nav's right lane counts four of
- * the sections — one round of queries for the shell, not one per section. A
- * section that needs data no count reads loads it in its own child route's
- * loader.
+ * Settings: the shell. Every section is a child route under this layout,
+ * joining the nav by one row of `SETTINGS_SECTIONS` and taking the
+ * `SettingsSection` shape.
+ * - At `md` and up the nav is the chassis (`SettingsChassis`, drawn by the
+ *   app shell in place of the app nav); below it, a strip above the content.
+ * - The loader stays whole here because the nav's right lane counts five of
+ *   the sections — one round of queries for the shell, not one per section.
  */
 export const Route = createFileRoute('/_app/settings')({
   loader: async () => {
@@ -56,26 +52,14 @@ export const Route = createFileRoute('/_app/settings')({
 })
 
 function SettingsShell() {
-  const data = Route.useLoaderData()
+  const { isAdmin, counts } = useSettingsNav()
 
-  // One head per page (2026-09-30): the section is the page, so the shell
-  // draws no title of its own. What the old readout line counted now sits
-  // in the nav rows' right lane, the way the chassis prints a count.
+  // One head per page: the section is the page, so the shell draws no title.
   return (
-    <div className="flex min-h-full flex-col md:flex-row">
-      <SettingsNav
-        isAdmin={data.isAdmin}
-        counts={{
-          '/settings/members': data.members.length,
-          '/settings/templates': data.templates.length,
-          '/settings/objects': data.objects.length,
-          '/settings/currency': data.fx.rates.length,
-          // Admin-only: a member's row is locked and prints no count.
-          ...(data.integrations === null
-            ? {}
-            : { '/settings/integrations': data.integrations }),
-        }}
-      />
+    <div className="flex min-h-full flex-col">
+      <div className="md:hidden">
+        <SettingsNav variant="strip" isAdmin={isAdmin} counts={counts} />
+      </div>
       <div className="flex w-full max-w-[56.25rem] flex-col gap-12 px-8 pt-7 pb-8">
         <Outlet />
       </div>

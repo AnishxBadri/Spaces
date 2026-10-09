@@ -91,7 +91,7 @@ const SHOTS: ReadonlyArray<Shot> = [
     list: true,
   },
   { file: 'spaces.png', path: () => '/spaces', ready: heading },
-  { file: 'settings-ai.png', path: () => '/settings/ai', ready: heading },
+  { file: 'settings-ai.png', path: () => '/settings/models', ready: heading },
   {
     file: 'settings-objects.png',
     path: () => '/settings/objects',
@@ -519,7 +519,7 @@ const FRAGMENTS: ReadonlyArray<Fragment> = [
   },
   {
     name: 'ai-providers',
-    path: () => '/settings/ai',
+    path: () => '/settings/models',
     ready: heading,
     width: 1060,
     clip: async (page) => {

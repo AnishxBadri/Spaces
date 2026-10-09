@@ -90,7 +90,7 @@ function ObjectAttributesPage() {
     <SettingsSection
       title={object.plural}
       blurb={blurb}
-      crumb="Objects"
+      crumb="Workspace"
       action={
         <>
           {!object.isSystem && isAdmin ? (

@@ -2,16 +2,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ConnectionsSection } from '#/components/settings/connections-section'
 import {
   getConfiguredProviders,
-  getProviderApps,
   getSession,
   listMyConnections,
 } from '#/lib/server-fns'
 
 /**
  * Settings → Connections — the reader's own connections and the providers
- * they can connect to, and for an admin the providers' OAuth clients. The
- * loader asks for the clients only when the reader is an admin, since the
- * server fn refuses anyone else.
+ * they can connect to. The OAuth clients are Connection apps'.
  */
 export const Route = createFileRoute('/_app/settings/connections')({
   loader: async () => {
@@ -20,18 +17,20 @@ export const Route = createFileRoute('/_app/settings/connections')({
       getConfiguredProviders(),
       listMyConnections(),
     ])
-    if (session?.user.role !== 'admin')
-      return { apps: null, configured, connections }
-    return { apps: await getProviderApps(), configured, connections }
+    return {
+      isAdmin: session?.user.role === 'admin',
+      configured,
+      connections,
+    }
   },
   component: ConnectionsRoute,
 })
 
 function ConnectionsRoute() {
-  const { apps, configured, connections } = Route.useLoaderData()
+  const { isAdmin, configured, connections } = Route.useLoaderData()
   return (
     <ConnectionsSection
-      apps={apps}
+      isAdmin={isAdmin}
       configured={configured}
       connections={connections}
     />
