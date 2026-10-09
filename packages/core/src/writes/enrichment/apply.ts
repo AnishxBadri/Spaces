@@ -1,7 +1,12 @@
 import { Effect } from 'effect'
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { attributeEvent, entity, integration } from '@spaces/db/schema'
+import {
+  attributeEvent,
+  entity,
+  integration,
+  pendingBlob,
+} from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import type { Json } from '@spaces/db/json'
 import { Receipts } from '@spaces/sdk'
@@ -9,6 +14,12 @@ import { toObjectKind } from '../../attributes/registry'
 import { ref } from '../../context/ref'
 import { decide, enrichedLine, linksOf, written } from '../../enrichment/plan'
 import { WEBSITE_NAME } from '../../enrichment/website'
+import {
+  PICTURE_NAMES,
+  PICTURE_KEYS,
+  isPictureKey,
+} from '../../enrichment/picture'
+import type { PictureRefusal } from '../../enrichment/picture'
 import type {
   Decision,
   FieldDecision,
@@ -28,6 +39,7 @@ import type { EmbedSource } from '../ai/chunk-sources'
 import { INTEGRATION_CONFIDENCE } from '../ports/judgment'
 import { ReceiptsLive } from '../ports/receipts'
 import { SuggestionInvalid, proposeWith } from '../suggestions/propose'
+import type { PictureFetched } from './picture'
 
 /**
  * Applies one enrichment run's answers to a record (D76), in one
@@ -35,10 +47,12 @@ import { SuggestionInvalid, proposeWith } from '../suggestions/propose'
  * values the lock returned, never a read before it.
  * - Each source's winning fields are written as that source, citing its
  *   receipt; a person's disagreements become one card for the record.
+ * - A stored picture is set in the same transaction, only while the
+ *   record has none and no person held it; its `pending_blob` row goes then.
  * - After the commit: the run's receipt (every answer, the losers, the
- *   unlinked keys and each replaced figure with its date) through the
- *   Receipts port on the host's `core.enrichment` row, then one timeline
- *   line naming the sources, the field count and the credits.
+ *   unlinked keys, the picture and each replaced figure with its date)
+ *   through the Receipts port on the host's `core.enrichment` row, then one
+ *   timeline line naming the sources, the field count and the credits.
  */
 
 /** The host's own integration row: what a run's receipt is bound to, and the Website source's identity. */
@@ -61,7 +75,12 @@ export type RunInput = {
   readonly reason: string
   readonly sources: ReadonlyArray<RunSource>
   readonly answers: ReadonlyArray<SourceAnswer>
+  /** The run's picture answer, fetched; null when none was wanted or given. */
+  readonly picture?: PictureFetched | null
 }
+
+/** What became of the picture: set, found taken under the lock, or refused. */
+export type PictureOutcome = 'set' | 'taken' | PictureRefusal
 
 export type RunApplied = {
   readonly fields: number
@@ -69,6 +88,7 @@ export type RunApplied = {
   readonly suggestionId: string | null
   readonly receiptId: string
   readonly reembed: ReadonlyArray<EmbedSource>
+  readonly picture: PictureOutcome | null
 }
 
 /** The registry's linked attributes for a record, or [] for a custom object. */
@@ -224,6 +244,7 @@ const runReceipt = (
   decision: Decision,
   names: ReadonlyMap<string, string>,
   suggestionId: string | null,
+  picture: PictureOutcome | null,
 ): Json => ({
   run: 'enrichment',
   reason: input.reason,
@@ -254,9 +275,51 @@ const runReceipt = (
         }),
   })),
   losers: decision.losers.map((a) => ({ ...a })),
-  unlinked: decision.unlinked.map((a) => ({ ...a })),
+  unlinked: decision.unlinked
+    .filter((a) => !isPictureKey(a.key))
+    .map((a) => ({ ...a })),
+  picture:
+    input.picture == null || picture === null
+      ? null
+      : {
+          key: input.picture.key,
+          url: input.picture.url,
+          integrationId: input.picture.integrationId,
+          receiptId: input.picture.receiptId,
+          outcome: picture,
+          ...(input.picture.outcome === 'stored'
+            ? { sha: input.picture.sha }
+            : { reason: input.picture.reason }),
+        },
   suggestionId,
 })
+
+/** Set a stored picture while the record has none and no person held it. */
+async function setPicture(
+  tx: Tx,
+  entityId: string,
+  fetched: PictureFetched | null | undefined,
+): Promise<PictureOutcome | null> {
+  if (fetched == null) return null
+  if (fetched.outcome === 'refused') return fetched.why
+  const took = await tx
+    .update(entity)
+    .set({ pictureSha: fetched.sha })
+    .where(
+      and(
+        eq(entity.id, entityId),
+        isNull(entity.pictureSha),
+        eq(entity.pictureHeld, false),
+      ),
+    )
+    .returning({ id: entity.id })
+  if (took.length === 0) return 'taken'
+  await tx.delete(pendingBlob).where(eq(pendingBlob.sha, fetched.sha))
+  return 'set'
+}
+
+const pictureName = (key: string) =>
+  key === PICTURE_KEYS.person ? PICTURE_NAMES.person : PICTURE_NAMES.company
 
 /**
  * Apply a run. Throws `EntityNotFound` for a record that is gone and
@@ -304,16 +367,17 @@ export async function applyRun(input: RunInput): Promise<RunApplied> {
       decision.fields.filter((f) => f.outcome === 'person'),
       names,
     )
-    return { decision, suggestionId: card, reembed }
+    const picture = await setPicture(tx, entityId, input.picture)
+    return { decision, suggestionId: card, reembed, picture }
   })
-  const { decision, suggestionId, reembed } = applied
+  const { decision, suggestionId, reembed, picture } = applied
 
   const row = await enrichmentRow()
   const { receiptId } = await Effect.runPromise(
     Effect.gen(function* () {
       return yield* (yield* Receipts).store({
         entityId,
-        raw: runReceipt(input, decision, names, suggestionId),
+        raw: runReceipt(input, decision, names, suggestionId, picture),
       })
     }).pipe(Effect.provide(ReceiptsLive(row))),
   )
@@ -323,23 +387,39 @@ export async function applyRun(input: RunInput): Promise<RunApplied> {
   const sources = input.sources
     .filter((s) => s.skipped === undefined)
     .map(nameOf)
-  const skipped = input.sources.flatMap((s) =>
-    s.skipped === undefined || s.line === undefined
-      ? []
-      : [{ name: nameOf(s), why: s.line }],
-  )
+  const skipped = [
+    ...input.sources.flatMap((s) =>
+      s.skipped === undefined || s.line === undefined
+        ? []
+        : [{ name: nameOf(s), why: s.line }],
+    ),
+    ...(input.picture?.outcome === 'refused'
+      ? [{ name: pictureName(input.picture.key), why: input.picture.why }]
+      : []),
+  ]
+  const pictureSet =
+    picture === 'set' && input.picture != null
+      ? pictureName(input.picture.key).toLowerCase()
+      : null
   await db.insert(activity).values({
     verb: 'entity.enriched',
     subjectEntityId: entityId,
     meta: {
-      line: enrichedLine({ sources, fields, credits, skipped }),
+      line: enrichedLine({
+        sources,
+        fields,
+        credits,
+        skipped,
+        ...(pictureSet === null ? {} : { picture: pictureSet }),
+      }),
       sources,
       fields,
       credits,
       receiptId,
       ...(skipped.length === 0 ? {} : { skipped }),
       ...(suggestionId === null ? {} : { suggestionId }),
+      ...(picture === null ? {} : { picture }),
     },
   })
-  return { fields, credits, suggestionId, receiptId, reembed }
+  return { fields, credits, suggestionId, receiptId, reembed, picture }
 }

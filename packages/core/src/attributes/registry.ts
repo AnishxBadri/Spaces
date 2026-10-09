@@ -392,6 +392,8 @@ const LINKABLE_TYPES: {
   url: ['url', 'text'],
   phone: ['phone', 'text'],
   list: ['text'],
+  // A picture key fills the record's picture, never an attribute.
+  image: [],
 }
 
 /**

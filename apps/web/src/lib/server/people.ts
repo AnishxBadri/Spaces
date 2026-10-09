@@ -71,10 +71,12 @@ export const listPeopleTable = createServerFn()
     await requireUser()
     const { listPeoplePageProgram } = await import('../views/directory')
     const { effectFn } = await import('./effect')
-    return effectFn(listPeoplePageProgram)(
+    const { withPictures } = await import('../records/pictures')
+    const page = await effectFn(listPeoplePageProgram)(
       data.conditions ?? [],
       pageOptions(data),
     )
+    return { ...page, rows: await withPictures(page.rows) }
   })
 
 const createPersonInput = z.object({
@@ -140,6 +142,7 @@ export const getPerson = createServerFn()
           mergedIntoId: entity.mergedIntoId,
           createdAt: entity.createdAt,
           values: entity.values,
+          pictureSha: entity.pictureSha,
         })
         .from(entity)
         .innerJoin(person, eq(person.entityId, entity.id))
@@ -197,11 +200,13 @@ export const getPerson = createServerFn()
     const { effectFn } = await import('./effect')
     const readouts = await effectFn(personReadoutsProgram)(data.id, new Date())
 
+    const { pictureUrl } = await import('../records/pictures')
     return {
       id: head.id,
       name: head.name,
       mergedIntoId: head.mergedIntoId,
       values: head.values,
+      picture: await pictureUrl(head.pictureSha),
       readouts,
       companies,
       refNames,

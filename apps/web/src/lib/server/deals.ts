@@ -61,7 +61,8 @@ export const listDealsTable = createServerFn().handler(async () => {
 
   if (rows.length === 0) {
     const empty: Array<DealTableRow> = []
-    return { rows: empty, refNames: {}, userNames: {} }
+    const none: Record<string, string> = {}
+    return { rows: empty, refNames: {}, userNames: {}, pictures: none }
   }
   const dealIds = rows.map((r) => r.id)
   const refs = await db
@@ -82,6 +83,11 @@ export const listDealsTable = createServerFn().handler(async () => {
     refNames.set(r.toId, { id: r.toId, name: r.name, kind: r.kind })
 
   const users = await db.select({ id: user.id, name: user.name }).from(user)
+  // The board card draws its company's picture in place of the mark.
+  const { pictureUrlsFor } = await import('../records/pictures')
+  const pictures = await pictureUrlsFor(
+    [...refNames.values()].filter((r) => r.kind === 'company').map((r) => r.id),
+  )
 
   return {
     rows: rows.map((r) => ({
@@ -92,6 +98,7 @@ export const listDealsTable = createServerFn().handler(async () => {
     })),
     refNames: Object.fromEntries(refNames),
     userNames: Object.fromEntries(users.map((u) => [u.id, u.name])),
+    pictures: Object.fromEntries(pictures),
   }
 })
 

@@ -23,6 +23,7 @@ import {
   RecordHeader,
   RecordSection,
 } from '#/components/record/record-parts'
+import { RecordPicture } from '#/components/record/record-picture'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
@@ -164,7 +165,13 @@ function PersonRecordPage() {
             </Button>
           </>
         }
-        mark={<InitialsMark name={person.name} size="lg" />}
+        mark={
+          <RecordPicture
+            entityId={person.id}
+            picture={person.picture}
+            fallback={<InitialsMark name={person.name} size="lg" />}
+          />
+        }
         name={person.name}
         readouts={[
           {

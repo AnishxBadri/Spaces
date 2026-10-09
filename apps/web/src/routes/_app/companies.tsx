@@ -30,7 +30,7 @@ import {
 import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
-import { DitherMark } from '#/components/record/record-parts'
+import { DitherMark, RecordMark } from '#/components/record/record-parts'
 import { TemplatePicker } from '#/components/templates'
 import { ChipLink, DateCell, RecordLinkCell } from '#/components/table/cells'
 import { collisionToast } from '#/lib/attributes/collision-toast'
@@ -262,7 +262,13 @@ function CompaniesPage() {
             to="/companies/$companyId"
             params={{ companyId: info.row.original.id }}
             name={String(info.getValue())}
-            badge={<DitherMark size={18} />}
+            badge={
+              <RecordMark
+                picture={info.row.original.picture}
+                size={18}
+                fallback={<DitherMark size={18} />}
+              />
+            }
           />
         ),
       }),

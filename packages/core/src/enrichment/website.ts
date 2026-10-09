@@ -7,6 +7,7 @@ import type { VocabularyKey } from '@spaces/sdk/vocabulary'
 import type { Json } from '@spaces/db/json'
 import type { JsonSchema } from '../ai/schema'
 import type { ContextItem } from '../context/types'
+import { PICTURE_KEYS } from './picture'
 
 /**
  * The built-in Website source, pure half (D76): a company's own pages read
@@ -15,8 +16,8 @@ import type { ContextItem } from '../context/types'
  * - No JavaScript runs: a page is its served HTML, read with regexes.
  * - A link or a logo is answered only when the page itself carries it, so
  *   a model cannot invent a profile URL.
- * - The logo is answered as `company.logo`, outside the vocabulary: it stays
- *   in the run's receipt until records have a picture.
+ * - The logo is answered as `company.logo`, a picture key: the run fetches
+ *   it and sets the record's picture when empty.
  */
 
 /** The name the timeline and the where-from give the source. */
@@ -45,13 +46,14 @@ const FIELDS: { readonly [F in FieldName]: VocabularyKey } = {
   blog: 'company.blog',
 }
 
-/** The vocabulary keys the source can answer. */
-export const WEBSITE_KEYS: ReadonlyArray<VocabularyKey> = FIELD_NAMES.map(
-  (name) => FIELDS[name],
-)
+/** The logo's key: a picture key, never linked to an attribute. */
+export const LOGO_KEY: VocabularyKey = PICTURE_KEYS.company
 
-/** The logo URL, kept in the receipt; not a vocabulary key. */
-export const LOGO_KEY = 'company.logo'
+/** The vocabulary keys the source can answer, the logo's among them. */
+export const WEBSITE_KEYS: ReadonlyArray<VocabularyKey> = [
+  ...FIELD_NAMES.map((name) => FIELDS[name]),
+  LOGO_KEY,
+]
 
 /** A page's text is cut here before it reaches the model. */
 const PAGE_TEXT_CHARS = 12_000
@@ -67,7 +69,12 @@ export type FetchedPage =
       readonly contentType: string | null
       readonly bytes: Uint8Array
     }
-  | { readonly ok: false; readonly reason: string }
+  | {
+      readonly ok: false
+      readonly reason: string
+      /** The body passed the byte cap. */
+      readonly tooLarge?: boolean
+    }
 
 /** Where the Extract lane goes at one sensitivity: nowhere usable, this box, or a cloud provider. */
 export type ExtractRoute = 'unrouted' | 'local' | 'cloud'
@@ -75,12 +82,16 @@ export type ExtractRoute = 'unrouted' | 'local' | 'cloud'
 /**
  * The source's two reads of the outside: a guarded page fetch and the
  * Extract lane's route. The worker's Live is the deck-link clip's fetch and
- * the AI router.
+ * the AI router. The run fetches a record's picture through the same guard,
+ * under its own lower byte cap.
  */
 export class WebsiteReader extends Context.Service<
   WebsiteReader,
   {
-    readonly fetch: (url: string) => Effect.Effect<FetchedPage>
+    readonly fetch: (
+      url: string,
+      caps?: { readonly maxBytes: number },
+    ) => Effect.Effect<FetchedPage>
     readonly extractRoute: (
       sensitivity: 'normal' | 'sensitive',
     ) => Effect.Effect<ExtractRoute, JobError>
@@ -355,7 +366,7 @@ const PROFILE_HOSTS: { readonly [F in FieldName]?: ReadonlyArray<string> } = {
 }
 
 /**
- * The answers the output gives, for the keys asked and the logo:
+ * The answers the output gives, for the keys asked:
  * - a link counts only when a page links it, on the profile's own host;
  * - the logo only when it is one of the page's logo candidates;
  * - every vocabulary answer passes the vocabulary's own check.
@@ -401,6 +412,11 @@ export const websiteAnswers = (
   }
   const logo = squash(output.logo)
   const candidates = new Set(pages.flatMap((p) => p.images))
-  if (logo !== '' && candidates.has(logo)) answers[LOGO_KEY] = logo
+  if (
+    keys.includes(LOGO_KEY) &&
+    candidates.has(logo) &&
+    vocabularyProblem(LOGO_KEY, logo) === null
+  )
+    answers[LOGO_KEY] = logo
   return answers
 }

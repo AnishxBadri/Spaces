@@ -10,6 +10,9 @@ import type { JsonValue } from './contract.ts'
  * - `changing`: a figure that moves over time (headcount, revenue, total
  *   raised). A newer answer replaces one no person set; the old figure stays
  *   in the run's receipt with its date.
+ * - An `image` key (`company.logo`, `person.photo`) answers the URL of the
+ *   record's picture. The host fetches it once and stores it; it fills the
+ *   picture only when empty and is never linked to an attribute.
  * New keys are an SDK minor; a removed or retyped key is a major.
  */
 
@@ -20,6 +23,7 @@ export const VOCABULARY_TYPES = [
   'url',
   'phone',
   'list',
+  'image',
 ] as const
 export type VocabularyType = (typeof VOCABULARY_TYPES)[number]
 
@@ -58,6 +62,7 @@ export const ENRICHMENT_VOCABULARY = {
   'company.headcount': changing('company', 'number'),
   'company.revenue': changing('company', 'number'),
   'company.total_raised': changing('company', 'number'),
+  'company.logo': fixed('company', 'image'),
   'person.title': fixed('person', 'text'),
   'person.description': fixed('person', 'text'),
   'person.location': fixed('person', 'text'),
@@ -68,6 +73,7 @@ export const ENRICHMENT_VOCABULARY = {
   'person.github': fixed('person', 'url'),
   'person.facebook': fixed('person', 'url'),
   'person.phone': fixed('person', 'phone'),
+  'person.photo': fixed('person', 'image'),
 } as const satisfies { readonly [key: string]: VocabularyEntry }
 
 export type VocabularyKey = keyof typeof ENRICHMENT_VOCABULARY
@@ -87,6 +93,7 @@ const VALUE_SCHEMAS: { readonly [T in VocabularyType]: z.ZodType<JsonValue> } =
     url: z.url(),
     phone: z.string().trim().min(1).max(40),
     list: z.array(z.string().trim().min(1)).min(1),
+    image: z.url({ protocol: /^https?$/ }),
   }
 
 /**
@@ -101,5 +108,5 @@ export function vocabularyProblem(
   const { type } = ENRICHMENT_VOCABULARY[key]
   return VALUE_SCHEMAS[type].safeParse(value).success
     ? null
-    : `${key} takes a ${type}`
+    : `${key} takes ${type === 'image' ? 'an' : 'a'} ${type}`
 }

@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
-import { DitherMark, InitialsMark } from './record/record-parts'
+import { DitherMark, InitialsMark, RecordMark } from './record/record-parts'
 import { Badge } from './ui/badge'
 import { updateRecord } from '#/lib/server-fns'
 import { fmtMoney } from '@spaces/core/portfolio/format'
@@ -51,6 +51,7 @@ export function DealBoard({
   valueCurrency = 'USD',
   medianDaysInStage = {},
   daysInStage = {},
+  pictures = {},
 }: {
   deals: Array<BoardDeal>
   stages: Array<BoardStage>
@@ -61,6 +62,8 @@ export function DealBoard({
   medianDaysInStage?: Record<string, number | undefined>
   /** Days each deal has sat in its current stage, by deal id (funnel stats). */
   daysInStage?: Record<string, number | null | undefined>
+  /** Each referenced company's picture URL, drawn in place of the card's mark. */
+  pictures?: Record<string, string | undefined>
 }) {
   const router = useRouter()
   const today = localToday()
@@ -254,7 +257,15 @@ export function DealBoard({
                         className="focus-ring flex flex-col gap-2 rounded-md border border-rule bg-paper p-2.5 transition-colors duration-150 hover:border-hairline"
                       >
                         <span className="flex min-w-0 items-center gap-2">
-                          <DitherMark size={14} />
+                          <RecordMark
+                            picture={
+                              typeof d.values.company === 'string'
+                                ? pictures[d.values.company]
+                                : null
+                            }
+                            size={14}
+                            fallback={<DitherMark size={14} />}
+                          />
                           <span className="truncate text-ui leading-4 font-medium">
                             {d.name}
                           </span>

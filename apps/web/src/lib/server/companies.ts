@@ -114,10 +114,12 @@ export const listCompaniesTable = createServerFn()
     await requireUser()
     const { listCompaniesPageProgram } = await import('../views/directory')
     const { effectFn } = await import('./effect')
-    return effectFn(listCompaniesPageProgram)(
+    const { withPictures } = await import('../records/pictures')
+    const page = await effectFn(listCompaniesPageProgram)(
       data.conditions ?? [],
       pageOptions(data),
     )
+    return { ...page, rows: await withPictures(page.rows) }
   })
 
 export const getCompany = createServerFn()
@@ -134,6 +136,7 @@ export const getCompany = createServerFn()
           mergedIntoId: entity.mergedIntoId,
           createdAt: entity.createdAt,
           values: entity.values,
+          pictureSha: entity.pictureSha,
         })
         .from(entity)
         .innerJoin(company, eq(company.entityId, entity.id))
@@ -174,6 +177,7 @@ export const getCompany = createServerFn()
       .orderBy(desc(activity.at))
       .limit(50)
 
+    const { pictureUrl } = await import('../records/pictures')
     return {
       id: head.id,
       name: head.name,
@@ -181,6 +185,7 @@ export const getCompany = createServerFn()
       mergedIntoId: head.mergedIntoId,
       createdAt: head.createdAt.toISOString(),
       values: head.values,
+      picture: await pictureUrl(head.pictureSha),
       aliases,
       spaces,
       people,

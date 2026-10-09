@@ -28,6 +28,7 @@ import {
   RecordBody,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { RecordPicture } from '#/components/record/record-picture'
 import { OptionChip } from '#/components/attributes/value-editor'
 import { fmtPct } from '@spaces/core/portfolio/format'
 import { DASH, readoutDayAgo } from '#/lib/records/readout-format'
@@ -193,7 +194,13 @@ function CompanyRecordPage() {
             />
           </>
         }
-        mark={<DitherMark />}
+        mark={
+          <RecordPicture
+            entityId={company.id}
+            picture={company.picture}
+            fallback={<DitherMark />}
+          />
+        }
         name={company.name}
         badges={
           nameAliases.length > 0 ? (

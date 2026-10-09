@@ -66,6 +66,8 @@ export type GuardedFetchResult =
        */
       readonly kind: 'refused' | 'network'
       readonly reason: string
+      /** The body passed `maxBytes`: a refusal a caller may name apart. */
+      readonly tooLarge?: boolean
     }
 
 /** Parse, or say why it is not a URL at all. */
@@ -233,7 +235,7 @@ function isRedirect(status: number): boolean {
 async function readCapped(
   res: Response,
   maxBytes: number,
-): Promise<{ bytes: Uint8Array } | { reason: string }> {
+): Promise<{ bytes: Uint8Array } | { reason: string; tooLarge: boolean }> {
   const body = res.body
   if (body === null) return { bytes: new Uint8Array() }
 
@@ -248,6 +250,7 @@ async function readCapped(
       await reader.cancel()
       return {
         reason: `The page is larger than the ${String(maxBytes)} byte limit.`,
+        tooLarge: true,
       }
     }
     chunks.push(next.value)
@@ -351,9 +354,12 @@ export async function guardedFetch(
       reason: signal.aborted
         ? `The page did not finish within ${String(timeoutMs)}ms.`
         : `Could not read ${target}: ${messageOf(err)}`,
+      tooLarge: false,
     }))
     if ('reason' in read)
-      return { ok: false, kind: 'refused', reason: read.reason }
+      return read.tooLarge
+        ? { ok: false, kind: 'refused', reason: read.reason, tooLarge: true }
+        : { ok: false, kind: 'refused', reason: read.reason }
 
     return {
       ok: true,

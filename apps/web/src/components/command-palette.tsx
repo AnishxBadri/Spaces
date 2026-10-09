@@ -28,6 +28,8 @@ import {
 import { authClient } from '#/lib/auth-client'
 import { recordPath } from '#/lib/record-path'
 import { searchAll } from '#/lib/server-fns'
+import { PictureMark } from '#/components/record/record-parts'
+import type { SearchHit } from '#/lib/search/query'
 import { searchWaves, takesTheList } from '#/lib/search/waves'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 import { cn } from '#/lib/utils'
@@ -45,7 +47,8 @@ import { cn } from '#/lib/utils'
  * nothing of its own; a row it found by meaning alone says `· meaning`.
  */
 
-type Hit = Awaited<ReturnType<typeof searchAll>>[number]
+/** A search hit, with its record's picture URL when `searchAll` found one. */
+type Hit = SearchHit & { readonly picture?: string | null }
 
 const KIND_ICONS: Record<string, LucideIcon> = {
   company: Building2,
@@ -126,10 +129,14 @@ export function HitLine({ hit }: { hit: Hit }) {
   const done = hit.rowKind === 'task' && hit.task.done
   return (
     <>
-      <Icon
-        className="mt-0.5 size-4 shrink-0 text-graphite"
-        strokeWidth={1.75}
-      />
+      {hit.rowKind === 'entity' && hit.picture ? (
+        <PictureMark src={hit.picture} size={16} className="mt-0.5" />
+      ) : (
+        <Icon
+          className="mt-0.5 size-4 shrink-0 text-graphite"
+          strokeWidth={1.75}
+        />
+      )}
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
           <span

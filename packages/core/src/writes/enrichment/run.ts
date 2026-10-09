@@ -8,6 +8,11 @@ import type { JobError } from '@spaces/sdk'
 import { EnrichmentCollector } from '../../enrichment/collector'
 import type { Collector } from '../../enrichment/collector'
 import { wantedKeys } from '../../enrichment/plan'
+import {
+  PICTURE_KEYS,
+  pictureAnswerOf,
+  withPictureKey,
+} from '../../enrichment/picture'
 import type { SourceAnswer } from '../../enrichment/plan'
 import {
   enrichActionFor,
@@ -24,6 +29,7 @@ import { canonicalId } from '../entities/sweep'
 import type { ModelCall } from '../ports/ai'
 import { applyRun, holdingsOf, linksForEntity } from './apply'
 import type { RunApplied, RunSource } from './apply'
+import { fetchPicture } from './picture'
 import { askWebsite, websiteFor } from './website'
 
 /**
@@ -37,6 +43,8 @@ import { askWebsite, websiteFor } from './website'
  *   run goes on to the next.
  * - Nothing asked — no source, nothing wanted — writes nothing at all,
  *   unless a skip carries a timeline line (the Website on a sensitive record).
+ * - A record with no picture that no person held is asked for one too; the
+ *   first answer is fetched and stored before `applyRun` sets it.
  */
 
 export type RunOutcome =
@@ -127,7 +135,12 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
   const record = yield* read('enrichment.run', async () =>
     (
       await db
-        .select({ values: entity.values, now: sql<Date>`now()` })
+        .select({
+          values: entity.values,
+          pictureSha: entity.pictureSha,
+          pictureHeld: entity.pictureHeld,
+          now: sql<Date>`now()`,
+        })
         .from(entity)
         .where(eq(entity.id, entityId))
     ).at(0),
@@ -142,6 +155,10 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
     holdingsOf(db, entityId, record.values, links),
   )
   const started = new Date(record.now)
+  const pictureKey =
+    record.pictureSha === null && !record.pictureHeld
+      ? PICTURE_KEYS[kind]
+      : null
   const { settings, website, sources } = yield* sourcesFor(kind, entityId)
   const asker = yield* EnrichmentSources
 
@@ -149,7 +166,11 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
   const answers: Array<SourceAnswer> = []
   const answered = new Set<string>()
   for (const source of sources) {
-    const keys = wantedKeys(links, holdings, answered)
+    const keys = withPictureKey(
+      wantedKeys(links, holdings, answered),
+      pictureKey,
+      answered,
+    )
     if (keys.length === 0) break
     const collector: Collector = {
       integrationId: source.id,
@@ -193,8 +214,13 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
           : ran.map((s) => s.skipped).join('; '),
     }
 
+  const pictureAnswer =
+    pictureKey === null ? null : pictureAnswerOf(pictureKey, answers)
+  const picture =
+    pictureAnswer === null ? null : yield* fetchPicture(pictureAnswer)
+
   const applied = yield* Effect.tryPromise({
-    try: () => applyRun({ entityId, reason, sources: ran, answers }),
+    try: () => applyRun({ entityId, reason, sources: ran, answers, picture }),
     catch: retryable('enrichment.run'),
   })
   yield* enqueueEmbeds(applied.reembed)
@@ -204,5 +230,6 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
     credits: applied.credits,
     suggestionId: applied.suggestionId,
     receiptId: applied.receiptId,
+    picture: applied.picture,
   }
 })

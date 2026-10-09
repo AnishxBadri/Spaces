@@ -156,6 +156,25 @@ describe('a prepare with no finalize', () => {
     expect(await pendingRows(sha)).toEqual([])
   })
 
+  it('never takes the bytes of a record’s picture', async () => {
+    const { db } = await import('@spaces/db')
+    const { entity } = await import('@spaces/db/schema')
+    const { eq } = await import('drizzle-orm')
+    const { storage } = await import('@spaces/core/writes/storage')
+    const tag = randomUUID().slice(0, 8)
+    const { sha } = await prepareAndPut(tag)
+    const co = await aCompany(tag)
+    await db.update(entity).set({ pictureSha: sha }).where(eq(entity.id, co))
+
+    await agePendingBy(sha, 25 * 60 * 60 * 1000)
+    const result = await sweep()
+    expect(result).toMatchObject({ examined: 1, reclaimed: 0, kept: 1 })
+    expect(await storage().exists(sha)).toBe(true)
+
+    await db.update(entity).set({ pictureSha: null }).where(eq(entity.id, co))
+    await storage().delete(sha)
+  })
+
   it('reclaims nothing on an empty table', async () => {
     const result = await sweep(0)
     expect(result).toMatchObject({ examined: 0, reclaimed: 0, kept: 0 })

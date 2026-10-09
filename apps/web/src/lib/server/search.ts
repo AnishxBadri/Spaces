@@ -35,5 +35,7 @@ export const searchAll = createServerFn()
     // The body lives outside `lib/server/` so a test can call it (SPA-28:
     // the MCP `search_records` tool is pinned to answer exactly this).
     const { searchAllHandler } = await import('#/lib/search/search-all-handler')
-    return searchAllHandler(data)
+    // A record's picture draws in place of its kind icon; MCP has no use for it.
+    const { withPictures } = await import('#/lib/records/pictures')
+    return withPictures(await searchAllHandler(data))
   })

@@ -402,6 +402,7 @@ function DealsPage() {
               valueCurrency={
                 registry.find((d) => d.slug === 'value')?.options.code ?? 'USD'
               }
+              pictures={deals.pictures}
               medianDaysInStage={funnel.medianDaysInStage}
               daysInStage={Object.fromEntries(
                 funnel.daysInStage.map((d) => [d.id, d.days]),

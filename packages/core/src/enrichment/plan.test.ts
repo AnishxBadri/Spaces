@@ -161,6 +161,25 @@ describe('enrichedLine', () => {
       'Enriched · Website · 1 field',
     )
   })
+
+  it('says when the run set the picture, and why it did not', () => {
+    expect(
+      enrichedLine({
+        sources: ['Website'],
+        fields: 2,
+        credits: 0,
+        picture: 'logo',
+      }),
+    ).toBe('Enriched · Website · 2 fields · logo')
+    expect(
+      enrichedLine({
+        sources: ['Website'],
+        fields: 2,
+        credits: 0,
+        skipped: [{ name: 'Logo', why: 'not an image' }],
+      }),
+    ).toBe('Enriched · Website · 2 fields · Logo skipped · not an image')
+  })
 })
 
 describe('enrichment settings', () => {

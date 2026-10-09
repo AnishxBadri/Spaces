@@ -28,6 +28,7 @@ import {
 import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
+import { RecordMark } from '#/components/record/record-parts'
 import { TemplatePicker } from '#/components/templates'
 import {
   DateCell,
@@ -253,7 +254,13 @@ function PeoplePage() {
             to="/people/$personId"
             params={{ personId: info.row.original.id }}
             name={String(info.getValue())}
-            badge={<InitialBadge name={String(info.getValue())} />}
+            badge={
+              <RecordMark
+                picture={info.row.original.picture}
+                size={18}
+                fallback={<InitialBadge name={String(info.getValue())} />}
+              />
+            }
           />
         ),
       }),

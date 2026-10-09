@@ -103,7 +103,7 @@ describe('readPage', () => {
 describe('websiteAnswers', () => {
   const page = readPage(HOME, 'https://keyhold.example/')
 
-  it('answers the keys asked, and the logo beside them', () => {
+  it('answers the keys asked, the logo among them', () => {
     expect(
       websiteAnswers(
         output({
@@ -135,6 +135,13 @@ describe('websiteAnswers', () => {
         ['company.location'],
       ),
     ).toEqual({ 'company.location': 'Pune' })
+    expect(
+      websiteAnswers(
+        output({ logo: 'https://keyhold.example/img/keyhold-logo.svg' }),
+        [page],
+        ['company.location'],
+      ),
+    ).toEqual({})
   })
 
   it('never answers a link the page does not carry, or one on the wrong host', () => {

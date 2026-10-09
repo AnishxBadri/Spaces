@@ -31,6 +31,17 @@ describe('ENRICHMENT_VOCABULARY', () => {
     )
     expect(vocabularyProblem('company.keywords', ['a', 'b'])).toBeNull()
   })
+
+  it('takes a picture key as an http(s) image URL', () => {
+    expect(ENRICHMENT_VOCABULARY['company.logo'].type).toBe('image')
+    expect(ENRICHMENT_VOCABULARY['person.photo'].kind).toBe('person')
+    expect(
+      vocabularyProblem('company.logo', 'https://flent.in/logo.png'),
+    ).toBeNull()
+    expect(vocabularyProblem('person.photo', 'data:image/png;base64,AA')).toBe(
+      'person.photo takes an image',
+    )
+  })
 })
 
 describe('FactsTest.answer', () => {

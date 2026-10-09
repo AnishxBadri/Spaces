@@ -1,12 +1,14 @@
+import { createHash } from 'node:crypto'
 import { Cause, Effect, Exit, Layer } from 'effect'
 import { and, eq } from 'drizzle-orm'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   enrichmentRecord,
   entity,
   integration,
+  pendingBlob,
   suggestion,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
@@ -20,18 +22,22 @@ import {
   defineManifest,
   toManifestJson,
 } from '@spaces/sdk'
+import { PICTURE_MAX_BYTES } from '../../enrichment/picture'
 import { EnrichmentSources } from '../../enrichment/sources'
 import type { AskResult } from '../../enrichment/sources'
 import { WebsiteReader } from '../../enrichment/website'
+import type { FetchedPage } from '../../enrichment/website'
 import { ModelCall } from '../ports/ai'
 import { jsonRecord, jsonValue } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
 import { createAttributeProgram } from '../attributes/create'
 import { setValues } from '../attributes/values'
 import { updateAttributeProgram } from '../attributes/update'
+import { clearPictureProgram, setPictureProgram } from '../entities/picture'
 import { resolveEntity } from '../entities/resolve'
 import { FactsLive } from '../ports/facts'
 import { ReceiptsLive } from '../ports/receipts'
+import { storage } from '../storage'
 import { ENRICHMENT_CAPABILITY } from './apply'
 import { runEnrichment } from './run'
 
@@ -515,5 +521,189 @@ describe('enrichment.run', () => {
       reason: 'no source to ask',
     })
     expect(await lines(co)).toHaveLength(1)
+  })
+})
+
+describe('the record picture', () => {
+  const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+  /** A distinct PNG per test: the store is content-addressed and shared. */
+  const png = (tag: string) =>
+    new Uint8Array([...PNG, ...new TextEncoder().encode(tag)])
+  const stored: Array<string> = []
+  let served: Map<
+    string,
+    { contentType: string; bytes: Uint8Array } | 'too large'
+  >
+  let fetched: Array<{ url: string; maxBytes: number | undefined }>
+
+  const reader = Layer.succeed(
+    WebsiteReader,
+    WebsiteReader.of({
+      fetch: (url, caps) =>
+        Effect.sync((): FetchedPage => {
+          fetched.push({ url, maxBytes: caps?.maxBytes })
+          const hit = served.get(url)
+          if (hit === undefined)
+            return { ok: false, reason: `Could not reach ${url}` }
+          if (hit === 'too large')
+            return {
+              ok: false,
+              reason: 'The page is larger than the limit.',
+              tooLarge: true,
+            }
+          return { ok: true, url, ...hit }
+        }),
+      extractRoute: () => Effect.succeed('unrouted'),
+    }),
+  )
+
+  const runPictured = (entityId: string, fixtures: ReadonlyArray<Fixture>) =>
+    Effect.runPromise(
+      runEnrichment(entityId, 'test').pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            sourcesLayer(fixtures),
+            EnqueueTest,
+            reader,
+            Layer.succeed(
+              ModelCall,
+              ModelCall.of({
+                complete: () => Effect.die(new Error('no call expected')),
+              }),
+            ),
+          ),
+        ),
+      ),
+    )
+
+  const pictureOf = async (entityId: string) =>
+    (
+      await db
+        .select({ sha: entity.pictureSha, held: entity.pictureHeld })
+        .from(entity)
+        .where(eq(entity.id, entityId))
+    ).at(0)
+
+  beforeEach(() => {
+    served = new Map()
+    fetched = []
+  })
+
+  afterAll(async () => {
+    for (const sha of stored) await storage().delete(sha)
+  })
+
+  it('fetches a logo answer once, stores one blob and sets the picture; a second answer changes nothing', async () => {
+    const co = await company('Flent')
+    const bytes = png('flent')
+    served.set('https://flent.example/logo.png', {
+      contentType: 'image/png',
+      bytes,
+    })
+    website.knows = { 'company.logo': 'https://flent.example/logo.png' }
+
+    const outcome = await runPictured(co, [website, apollo])
+    expect(website.requests[0]?.keys).toContain('company.logo')
+    expect(apollo.requests[0]?.keys ?? []).not.toContain('company.logo')
+    expect(fetched).toEqual([
+      { url: 'https://flent.example/logo.png', maxBytes: PICTURE_MAX_BYTES },
+    ])
+    expect(outcome).toMatchObject({ ran: true, picture: 'set' })
+    const sha = createHash('sha256').update(bytes).digest('hex')
+    stored.push(sha)
+    expect(await pictureOf(co)).toEqual({ sha, held: false })
+    expect(await storage().exists(sha)).toBe(true)
+    expect(
+      await db.select().from(pendingBlob).where(eq(pendingBlob.sha, sha)),
+    ).toEqual([])
+    expect((await lines(co)).map((m) => m.line)).toEqual([
+      'Enriched · Website, Apollo · 0 fields · logo',
+    ])
+    const [receipt] = await runReceipts(co)
+    expect(receipt.unlinked).toEqual([])
+    expect(receipt.picture).toMatchObject({ outcome: 'set', sha })
+
+    served.set('https://flent.example/other.png', {
+      contentType: 'image/png',
+      bytes: png('other'),
+    })
+    website.knows = { 'company.logo': 'https://flent.example/other.png' }
+    website.answersAll = true
+    fetched = []
+    await runPictured(co, [website])
+    expect(website.requests[1]?.keys ?? []).not.toContain('company.logo')
+    expect(fetched).toEqual([])
+    expect(await pictureOf(co)).toEqual({ sha, held: false })
+  })
+
+  it('sets nothing for a non-image or an oversize response, and says so on the run line', async () => {
+    const co = await company('Vector')
+    served.set('https://vector.example/logo.svg', {
+      contentType: 'image/svg+xml',
+      bytes: new TextEncoder().encode(
+        '<svg xmlns="http://www.w3.org/2000/svg"/>',
+      ),
+    })
+    website.knows = { 'company.logo': 'https://vector.example/logo.svg' }
+    expect(await runPictured(co, [website])).toMatchObject({
+      picture: 'not an image',
+    })
+    expect(await pictureOf(co)).toEqual({ sha: null, held: false })
+
+    const big = await company('Big')
+    served.set('https://big.example/logo.png', 'too large')
+    website.knows = { 'company.logo': 'https://big.example/logo.png' }
+    await runPictured(big, [website])
+    expect(await pictureOf(big)).toEqual({ sha: null, held: false })
+
+    expect((await lines(co)).map((m) => m.line)).toEqual([
+      'Enriched · Website · 0 fields · Logo skipped · not an image',
+    ])
+    expect((await lines(big)).map((m) => m.line)).toEqual([
+      'Enriched · Website · 0 fields · Logo skipped · too large',
+    ])
+  })
+
+  it('keeps a picture cleared by hand clear on the next enrichment', async () => {
+    const co = await company('Cleared')
+    await Effect.runPromise(clearPictureProgram(co))
+    served.set('https://cleared.example/logo.png', {
+      contentType: 'image/png',
+      bytes: png('cleared'),
+    })
+    website.knows = { 'company.logo': 'https://cleared.example/logo.png' }
+    website.answersAll = true
+    await runPictured(co, [website])
+    expect(website.requests[0]?.keys ?? []).not.toContain('company.logo')
+    expect(fetched).toEqual([])
+    expect(await pictureOf(co)).toEqual({ sha: null, held: true })
+  })
+
+  it('sets a picture by hand as held, refuses a non-image, and clears to held', async () => {
+    const co = await company('By hand')
+    const bytes = png('by-hand')
+    const by = await aUser()
+    const set = await Effect.runPromise(
+      setPictureProgram({ entityId: co, bytes, contentType: 'image/png', by }),
+    )
+    stored.push(set.sha)
+    expect(set.previous).toBeNull()
+    expect(await pictureOf(co)).toEqual({ sha: set.sha, held: true })
+
+    const refused = await Effect.runPromise(
+      Effect.flip(
+        setPictureProgram({
+          entityId: co,
+          bytes: new TextEncoder().encode('<html></html>'),
+          contentType: 'text/html',
+          by,
+        }),
+      ),
+    )
+    expect(refused._tag).toBe('PictureRefused')
+
+    const cleared = await Effect.runPromise(clearPictureProgram(co))
+    expect(cleared.previous).toBe(set.sha)
+    expect(await pictureOf(co)).toEqual({ sha: null, held: true })
   })
 })

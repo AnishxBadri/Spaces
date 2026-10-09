@@ -218,13 +218,16 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 /**
  * The run's one timeline line: "Enriched · Website, Apollo · 6 fields ·
- * 1 credit". A free run says no credits. A skip the owner should see
- * follows ("Website skipped · sensitive"), and stands alone when nothing ran.
+ * 1 credit". A free run says no credits; a picture set says so ("logo").
+ * A skip the owner should see follows ("Website skipped · sensitive",
+ * "Logo skipped · not an image"), and stands alone when nothing ran.
  */
 export const enrichedLine = (run: {
   readonly sources: ReadonlyArray<string>
   readonly fields: number
   readonly credits: number
+  /** The picture's name when the run set it: "logo", "photo". */
+  readonly picture?: string
   readonly skipped?: ReadonlyArray<{
     readonly name: string
     readonly why: string
@@ -237,6 +240,7 @@ export const enrichedLine = (run: {
           'Enriched',
           run.sources.join(', '),
           plural(run.fields, 'field'),
+          ...(run.picture === undefined ? [] : [run.picture]),
           ...(run.credits > 0 ? [plural(run.credits, 'credit')] : []),
         ]),
     ...(run.skipped ?? []).map((s) => `${s.name} skipped · ${s.why}`),

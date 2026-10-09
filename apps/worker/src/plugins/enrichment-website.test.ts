@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { Effect, Layer } from 'effect'
 import { MockLanguageModelV4 } from 'ai/test'
 import { and, eq, isNotNull } from 'drizzle-orm'
@@ -29,6 +30,7 @@ import { updateAttributeProgram } from '@spaces/core/writes/attributes/update'
 import { ENRICHMENT_CAPABILITY } from '@spaces/core/writes/enrichment/apply'
 import { runEnrichment } from '@spaces/core/writes/enrichment/run'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { storage } from '@spaces/core/writes/storage'
 import { storeCredential } from '@spaces/core/writes/vault'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
 import { setAiRouteProgram } from '#web/lib/ai/route'
@@ -49,7 +51,7 @@ const HOME = `<!doctype html><html><head>
   <title>Keyhold</title>
   <meta name="description" content="Keyhold runs key handover for rental homes.">
 </head><body>
-  <img class="site-logo" src="/logo.svg" alt="Keyhold">
+  <img class="site-logo" src="/logo.png" alt="Keyhold">
   <h1>Key handover, done.</h1>
   <a href="/about">About</a>
   <a href="https://www.linkedin.com/company/keyhold">LinkedIn</a>
@@ -69,7 +71,7 @@ const EXTRACTED = {
   twitter: 'https://x.com/keyhold',
   crunchbase: 'https://www.crunchbase.com/organization/keyhold',
   blog: 'https://keyhold.example/blog',
-  logo: 'https://keyhold.example/logo.svg',
+  logo: 'https://keyhold.example/logo.png',
 }
 
 const html = (body: string, status = 200) =>
@@ -78,9 +80,26 @@ const html = (body: string, status = 200) =>
     headers: { 'content-type': 'text/html; charset=utf-8' },
   })
 
+/** A PNG's signature and a tag: enough for the host to take it as one. */
+const LOGO = new Uint8Array([
+  0x89,
+  0x50,
+  0x4e,
+  0x47,
+  0x0d,
+  0x0a,
+  0x1a,
+  0x0a,
+  ...new TextEncoder().encode('keyhold'),
+])
+
 /** The fixture sites, by URL; anything else is unreachable. */
 const SITES = new Map<string, () => Response>([
   ['https://keyhold.example/', () => html(HOME)],
+  [
+    'https://keyhold.example/logo.png',
+    () => new Response(LOGO, { headers: { 'content-type': 'image/png' } }),
+  ],
   ['https://keyhold.example/about', () => html(ABOUT)],
   ['https://gone.example/', () => html('<p>Not here</p>', 404)],
   ['https://huge.example/', () => html(`<p>${'x'.repeat(4000)}</p>`)],
@@ -275,6 +294,7 @@ describe('the Website against a fixture site', () => {
     expect(fetched).toEqual([
       'https://keyhold.example/',
       'https://keyhold.example/about',
+      'https://keyhold.example/logo.png',
     ])
     expect(model.doGenerateCalls).toHaveLength(1)
     expect(outcome).toMatchObject({ ran: true, fields: 4, credits: 0 })
@@ -300,7 +320,7 @@ describe('the Website against a fixture site', () => {
         .from(activity)
         .where(eq(activity.subjectEntityId, id))
     ).map((r) => jsonRecord(r.meta)['line'])
-    expect(lines).toContain('Enriched · Website, Paid · 4 fields')
+    expect(lines).toContain('Enriched · Website, Paid · 4 fields · logo')
   })
 
   it('needs no credential of its own: ai_usage is the Extract lane on the host row, and no credit is counted', async () => {
@@ -335,16 +355,26 @@ describe('the Website against a fixture site', () => {
     expect(website?.credits).toBe(0)
   })
 
-  it('keeps the logo in the run’s receipt, unapplied', async () => {
+  it('fetches the logo once and stores it as the record’s picture', async () => {
     const id = await company('keyhold.example')
     await run(id, mockModel())
+    const sha = createHash('sha256').update(LOGO).digest('hex')
+    const row = (
+      await db
+        .select({ sha: entity.pictureSha })
+        .from(entity)
+        .where(eq(entity.id, id))
+    ).at(0)
+    expect(row?.sha).toBe(sha)
+    expect(await storage().exists(sha)).toBe(true)
     const raw = await runReceipt(id)
-    expect(raw?.['unlinked']).toEqual([
-      expect.objectContaining({
-        key: 'company.logo',
-        value: 'https://keyhold.example/logo.svg',
-      }),
-    ])
+    expect(raw?.['unlinked']).toEqual([])
+    expect(raw?.['picture']).toMatchObject({
+      key: 'company.logo',
+      url: 'https://keyhold.example/logo.png',
+      outcome: 'set',
+    })
+    await storage().delete(sha)
   })
 })
 

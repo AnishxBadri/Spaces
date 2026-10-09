@@ -420,6 +420,50 @@ export function InitialsMark({
 }
 
 /**
+ * A record's picture in place of its mark, cropped square at the mark's
+ * size. `src` is only ever the blob store's URL for a stored picture, never
+ * a remote address (D67).
+ */
+export function PictureMark({
+  src,
+  size,
+  className,
+}: {
+  src: string
+  size: number
+  className?: string
+}) {
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      width={size}
+      height={size}
+      draggable={false}
+      style={{ width: size, height: size }}
+      className={cn(
+        'shrink-0 rounded-none border border-hairline bg-paper object-cover',
+        className,
+      )}
+    />
+  )
+}
+
+/** The picture when the record has one, else its own mark. */
+export function RecordMark({
+  picture,
+  size,
+  fallback,
+}: {
+  picture: string | null | undefined
+  size: number
+  fallback: ReactNode
+}) {
+  return picture ? <PictureMark src={picture} size={size} /> : fallback
+}
+
+/**
  * The fallback record mark: a paper tile with a hairline edge and a 2px
  * pine checker inside — 1-bit, never under text (the Dither Rule).
  */

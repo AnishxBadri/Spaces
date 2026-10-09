@@ -114,6 +114,17 @@ export const entity = pgTable(
      * - Inheritance from a filed space is resolved at read, never written here.
      */
     sensitive: boolean('sensitive').notNull().default(false),
+    /**
+     * The record's picture: a blob digest, fetched once and stored, never a
+     * remote URL (D76, D67). Not an `ENTITY_REFS` entry — it names a blob,
+     * and `blobIsReferenced` counts it so GC never takes one in use.
+     */
+    pictureSha: text('picture_sha'),
+    /**
+     * A person set or cleared the picture by hand: enrichment fills only
+     * when `picture_sha is null and not picture_held`.
+     */
+    pictureHeld: boolean('picture_held').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -38,9 +38,10 @@ export const enrichmentEnqueue: Layer.Layer<Enqueue> = Enqueue.fromSender({
 })
 
 /**
- * The Website source's reads: a page through the URL guard under the clip's
- * caps (size, time, no JavaScript), and the Extract lane's route as the AI
- * router and the trigger gate read it.
+ * The Website source's reads: a page — or a record's picture, under its
+ * own lower cap — through the URL guard under the clip's caps (size, time,
+ * no JavaScript), and the Extract lane's route as the AI router and the
+ * trigger gate read it.
  */
 export const WebsiteReaderLive = (
   caps: { readonly maxBytes?: number; readonly timeoutMs?: number } = {},
@@ -48,10 +49,13 @@ export const WebsiteReaderLive = (
   Layer.succeed(
     WebsiteReader,
     WebsiteReader.of({
-      fetch: (url) =>
+      fetch: (url, own) =>
         Effect.promise(() =>
           guardedFetch(url, {
-            maxBytes: caps.maxBytes ?? CLIP_MAX_BYTES,
+            maxBytes: Math.min(
+              own?.maxBytes ?? CLIP_MAX_BYTES,
+              caps.maxBytes ?? CLIP_MAX_BYTES,
+            ),
             timeoutMs: caps.timeoutMs ?? CLIP_TIMEOUT_MS,
           }),
         ).pipe(
@@ -63,7 +67,9 @@ export const WebsiteReaderLive = (
                   contentType: r.contentType,
                   bytes: r.bytes,
                 }
-              : { ok: false, reason: r.reason },
+              : r.tooLarge === true
+                ? { ok: false, reason: r.reason, tooLarge: true }
+                : { ok: false, reason: r.reason },
           ),
         ),
       extractRoute: Effect.fn('WebsiteReader.extractRoute')(function* (

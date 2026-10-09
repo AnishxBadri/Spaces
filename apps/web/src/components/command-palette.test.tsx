@@ -77,6 +77,16 @@ describe('the palette task row', () => {
     expect(html).not.toContain('lucide-square-check')
     expect(html).toMatch(/class="[^"]*mono[^"]*">company</)
   })
+
+  it('draws a record’s stored picture in place of its kind icon', () => {
+    const picture = 'http://localhost:3000/api/blob/abc?exp=1&sig=x'
+    const html = renderToStaticMarkup(
+      <HitLine hit={{ ...companyHit, picture }} />,
+    )
+    expect(html).toContain(`src="${picture.replaceAll('&', '&amp;')}"`)
+    expect(html).toContain('object-cover')
+    expect(html).not.toContain('lucide-building')
+  })
 })
 
 /**
