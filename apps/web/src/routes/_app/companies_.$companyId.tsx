@@ -39,7 +39,7 @@ import { RecordContext } from '#/components/record-context'
 import { RecordLedger } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
 import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
-import { PluginActions } from '#/components/record/plugin-actions'
+import { EnrichAction, PluginActions } from '#/components/record/plugin-actions'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { jsonStrings } from '@spaces/core/json'
@@ -47,6 +47,7 @@ import {
   countOpenSuggestions,
   createNote,
   getCompany,
+  getEnrichSetup,
   getEntitySensitivity,
   getRecordTimeline,
   listCompanyDeals,
@@ -75,6 +76,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       waiting,
       sensitivity,
       pluginActions,
+      enrichSetup,
     ] = await Promise.all([
       getCompany({ data: { id: params.companyId } }),
       listSpaces(),
@@ -87,6 +89,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       countOpenSuggestions({ data: { entityId: params.companyId } }),
       getEntitySensitivity({ data: { entityId: params.companyId } }),
       listRecordActions({ data: { kind: 'company' } }),
+      getEnrichSetup(),
     ])
     // Merged-away records redirect to their survivor — stale URLs keep working.
     if (companyData.mergedIntoId) {
@@ -107,6 +110,7 @@ export const Route = createFileRoute('/_app/companies_/$companyId')({
       waiting,
       sensitivity,
       pluginActions,
+      enrichSetup,
     }
   },
   component: CompanyRecordPage,
@@ -125,6 +129,7 @@ function CompanyRecordPage() {
     waiting,
     sensitivity,
     pluginActions,
+    enrichSetup,
   } = Route.useLoaderData()
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
@@ -170,6 +175,7 @@ function CompanyRecordPage() {
           <>
             <SensitiveToggle entityId={company.id} state={sensitivity} />
             <SummarizeRecordButton recordId={company.id} />
+            <EnrichAction entityId={company.id} setup={enrichSetup} />
             <PluginActions entityId={company.id} actions={pluginActions} />
             <LogInteractionDialog
               seed={{ id: company.id, name: company.name, kind: 'company' }}

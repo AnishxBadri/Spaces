@@ -36,44 +36,6 @@ export const getSetupState = createServerFn().handler(async () => {
   return { needsSetup }
 })
 
-/**
- * Signals for the getting-started card on /spaces — all derived, nothing
- * stored: each step is "done" because the real artifact exists, so the card
- * can never disagree with the data. Dismissal is client-side.
- */
-export const getOnboardingProgress = createServerFn().handler(async () => {
-  await requireUser()
-  const { eq, sql: dsql } = await import('drizzle-orm')
-  const { entity } = await import('@spaces/db/schema/entities')
-  const { note, space } = await import('@spaces/db/schema/kinds')
-  const { mandate } = await import('@spaces/db/schema/workspace')
-  const { invite } = await import('@spaces/db/schema/auth')
-  const [spaces, notes, mandates, companies, users, invites] =
-    await Promise.all([
-      db.select({ value: count() }).from(space),
-      db.select({ value: count() }).from(note),
-      db
-        .select({ value: count() })
-        .from(mandate)
-        .where(eq(mandate.status, 'active')),
-      db
-        .select({ value: count() })
-        .from(entity)
-        .where(
-          dsql`${entity.kind} = 'company' and ${entity.mergedIntoId} is null`,
-        ),
-      db.select({ value: count() }).from(user),
-      db.select({ value: count() }).from(invite),
-    ])
-  return {
-    mappedMarkets: spaces[0].value > 0,
-    filedMemo: notes[0].value > 0,
-    wroteMandate: mandates[0].value > 0,
-    trackedCompany: companies[0].value > 0,
-    invitedPartner: users[0].value > 1 || invites[0].value > 0,
-  }
-})
-
 export const listUsers = createServerFn().handler(async () => {
   await requireUser()
   return db.select({ id: user.id, name: user.name }).from(user)

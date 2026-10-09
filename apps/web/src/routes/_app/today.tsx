@@ -3,12 +3,14 @@ import { toast } from 'sonner'
 import { PageHeader, ReadoutStrip } from '#/components/page-header'
 import { PortfolioHeadlineRail } from '#/components/portfolio-headline'
 import { DayStrip } from '#/components/today/day-strip'
+import { FirstRun } from '#/components/today/first-run'
 import { NeedsYou } from '#/components/today/needs-you'
 import type { NeedsYouRow, StageBadge } from '#/components/today/needs-you'
 import { NoticesBand } from '#/components/today/notices'
 import { TeamActivity, WhatsMoving } from '#/components/today/rail'
 import { useBornRows } from '#/lib/born-rows'
 import {
+  countCompanies,
   countUnfiledDocuments,
   dealFunnelStats,
   getTodayAttention,
@@ -38,43 +40,52 @@ const DAY_MS = 86_400_000
  * Today: the one surface that gathers what needs the reader — tasks, idle
  * deals, stale marks and Review — in one ranked ledger, with what stops the
  * machine above it and the portfolio and what's moving beside it. (D79)
+ * With no company yet it is the three ways in and nothing else. (D80)
  */
 export const Route = createFileRoute('/_app/today')({
-  loader: async () => {
-    const [
-      tasks,
-      holdings,
-      funnel,
-      activity,
-      dealRegistry,
-      unfiledCount,
-      stoppedPlugins,
-      attention,
-    ] = await Promise.all([
-      listTasks(),
-      listHoldings(),
-      dealFunnelStats(),
-      getWorkspaceActivity(),
-      listRegistry({ data: { kind: 'deal' } }),
-      // One number, from the predicate `/files?filed=unfiled` filters with.
-      countUnfiledDocuments(),
-      listStoppedPlugins(),
-      getTodayAttention(),
-    ])
-    const since = Date.now() - DAY_MS
-    return {
-      tasks,
-      holdings,
-      funnel,
-      team: activity.filter((a) => Date.parse(a.at) >= since),
-      dealRegistry,
-      unfiledCount,
-      stoppedPlugins,
-      attention,
-    }
-  },
+  loader: () => loadToday(),
   component: TodayPage,
 })
+
+async function loadToday() {
+  if ((await countCompanies()) === 0)
+    return {
+      empty: true as const,
+      registry: await listRegistry({ data: { kind: 'company' } }),
+    }
+  const [
+    tasks,
+    holdings,
+    funnel,
+    activity,
+    dealRegistry,
+    unfiledCount,
+    stoppedPlugins,
+    attention,
+  ] = await Promise.all([
+    listTasks(),
+    listHoldings(),
+    dealFunnelStats(),
+    getWorkspaceActivity(),
+    listRegistry({ data: { kind: 'deal' } }),
+    // One number, from the predicate `/files?filed=unfiled` filters with.
+    countUnfiledDocuments(),
+    listStoppedPlugins(),
+    getTodayAttention(),
+  ])
+  const since = Date.now() - DAY_MS
+  return {
+    empty: false as const,
+    tasks,
+    holdings,
+    funnel,
+    team: activity.filter((a) => Date.parse(a.at) >= since),
+    dealRegistry,
+    unfiledCount,
+    stoppedPlugins,
+    attention,
+  }
+}
 
 /** The when-lane of a due row: −2d, today, or the ISO date. */
 function dueFigure(due: string, today: string): string {
@@ -84,7 +95,28 @@ function dueFigure(due: string, today: string): string {
   return due
 }
 
+type Loaded = Awaited<ReturnType<typeof loadToday>>
+
 function TodayPage() {
+  const data = Route.useLoaderData()
+  const today = localToday()
+  if (data.empty)
+    return (
+      <div className="flex min-h-full flex-col">
+        <PageHeader title="Today" description={todayStamp(today)} />
+        <FirstRun registry={data.registry} />
+      </div>
+    )
+  return <TodayLedger data={data} today={today} />
+}
+
+function TodayLedger({
+  data,
+  today,
+}: {
+  data: Extract<Loaded, { empty: false }>
+  today: string
+}) {
   const router = useRouter()
   const {
     tasks,
@@ -95,8 +127,7 @@ function TodayPage() {
     unfiledCount,
     stoppedPlugins,
     attention,
-  } = Route.useLoaderData()
-  const today = localToday()
+  } = data
   // The composer row reports what it made; the wash is for arrivals only.
   const { washes, bear } = useBornRows()
 

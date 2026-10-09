@@ -2,6 +2,7 @@ import { useRouter } from '@tanstack/react-router'
 import { useEffect, useReducer, useState } from 'react'
 import { toast } from 'sonner'
 import { LedgerFigure } from '#/components/ledger-section'
+import { NeedsSetup } from '#/components/needs-setup'
 import { Button } from '#/components/ui/button'
 import {
   decodeInit,
@@ -13,8 +14,8 @@ import {
   jobStatusInit,
 } from '#/lib/integrations/job-status-view'
 import type { JobStatusState } from '#/lib/integrations/job-status-view'
-import { fireRecordAction } from '#/lib/server-fns'
-import type { RecordAction } from '#/lib/server-fns'
+import { enrichRecord, fireRecordAction } from '#/lib/server-fns'
+import type { EnrichSetup, RecordAction, SetupAudience } from '#/lib/server-fns'
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 import type { JobStatusRow } from '#/lib/integrations/job-status'
 
@@ -187,6 +188,76 @@ function PluginActionButton({
           <LedgerFigure tone={figure.tone}>{figure.text}</LedgerFigure>
         </span>
       )}
+    </span>
+  )
+}
+
+/** What a company's Enrich asks, and who the reader is told to ask for more. */
+export type EnrichSetupView = EnrichSetup & { readonly audience: SetupAudience }
+
+/**
+ * A company's Enrich when only the free source is on (D80): the Website,
+ * then "More sources ›" in place.
+ * - With a plugin source runnable this draws nothing: its own action is in
+ *   the head beside it.
+ * - With no model the Website cannot read, so the line asks for one instead.
+ * - "More sources" opens Plugins until the Enrichment page exists.
+ */
+export function EnrichAction({
+  entityId,
+  setup,
+}: {
+  entityId: string
+  setup: EnrichSetupView
+}) {
+  const [state, setState] = useState<'idle' | 'firing' | 'queued'>('idle')
+  if (setup.sources > 0) return null
+  if (!setup.website)
+    return (
+      <NeedsSetup
+        needs="Enrich needs a model"
+        action="Add a model"
+        to="/settings/models"
+        thing="an AI model"
+        audience={setup.audience}
+      />
+    )
+
+  async function fire() {
+    setState('firing')
+    try {
+      const result = await enrichRecord({ data: { entityId } })
+      if (result.queued) setState('queued')
+      else {
+        setState('idle')
+        toast.error('The worker queue is unreachable; try again shortly')
+      }
+    } catch (err) {
+      setState('idle')
+      toast.error(err instanceof Error ? err.message : 'Could not start Enrich')
+    }
+  }
+
+  return (
+    <span className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        pending={state === 'firing'}
+        onClick={() => void fire()}
+        title="Enrich from the company's website"
+      >
+        Enrich
+      </Button>
+      {state === 'queued' ? (
+        <LedgerFigure tone="muted">queued</LedgerFigure>
+      ) : null}
+      <NeedsSetup
+        needs="Website"
+        action="More sources"
+        to="/settings/plugins"
+        thing="more enrichment sources"
+        audience={setup.audience}
+      />
     </span>
   )
 }

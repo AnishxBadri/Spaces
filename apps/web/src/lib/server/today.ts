@@ -20,3 +20,11 @@ export const getTodayAttention = createServerFn().handler(async () => {
   const { effectFn } = await import('./effect')
   return effectFn(todayAttentionProgram)(user.id, new Date())
 })
+
+/** Live companies: none means Today is the three ways in. (D80) */
+export const countCompanies = createServerFn().handler(async () => {
+  await requireUser()
+  const { companyCountProgram } = await import('../integrations/setup-status')
+  const { effectFn } = await import('./effect')
+  return effectFn(companyCountProgram)()
+})

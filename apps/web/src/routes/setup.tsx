@@ -168,10 +168,9 @@ function AdminStep({ onDone }: { onDone: () => void }) {
 }
 
 /**
- * Demo data, offered rather than assumed. The starter taxonomy is
- * deliberately tiny (CONTEXT.md), so this is what keeps a fresh install from
- * being an empty page — but shipping it silently would put fictional
- * companies in someone's CRM, so it is a choice with a visible cost.
+ * Demo data, offered rather than assumed: Start empty is the primary, and
+ * an empty Today is where a new workspace starts (D80). The demo records its
+ * ids, so General can remove it in one step.
  */
 function DemoStep() {
   const navigate = useNavigate()
@@ -194,21 +193,21 @@ function DemoStep() {
     <AuthShell
       eyebrow="Setup · step 2 of 2"
       title="Start with demo data?"
-      blurb="A worked example in data-center cooling — a small space tree, three companies, a memo, and a glossary. Obviously fictional, and safe to delete once you have seen how the pieces connect."
-      foot="3 companies · 1 memo · 1 space tree · deletable"
+      blurb="A worked example in data-center cooling — a small space tree, three companies, a memo, and a glossary. Obviously fictional, and removed in one step from Settings → General."
+      foot="3 companies · 1 memo · 1 space tree · removable"
     >
       <div className="flex flex-col gap-4">
         {error ? <FormError>{error}</FormError> : null}
         <div className="flex gap-2">
-          <Button className="flex-1" disabled={pending} onClick={withDemo}>
-            {pending ? 'Loading…' : 'Load demo data'}
-          </Button>
           <Button
-            variant="outline"
+            className="flex-1"
             disabled={pending}
-            onClick={() => navigate({ to: '/spaces' })}
+            onClick={() => navigate({ to: '/today' })}
           >
             Start empty
+          </Button>
+          <Button variant="outline" disabled={pending} onClick={withDemo}>
+            {pending ? 'Loading…' : 'Load demo data'}
           </Button>
         </div>
       </div>

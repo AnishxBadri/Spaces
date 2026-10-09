@@ -33,6 +33,7 @@ import type { RouteComponent } from '@tanstack/react-router'
 
 const writes = vi.hoisted(() => ({
   saveWorkspace: vi.fn(async () => ({ ok: true })),
+  removeDemoData: vi.fn(async () => ({ removed: 8, kept: 0 })),
   saveMailbox: vi.fn(async () => ({ queued: true })),
   setSensitivityDefault: vi.fn(
     async ({ data }: { data: { sensitivity: string } }) => data.sensitivity,
@@ -262,6 +263,18 @@ const pluginRow = {
 }
 
 const loaders: Record<string, () => object> = {
+  general: () => ({
+    demo: { total: 8, byKind: { company: 3, person: 1, term: 3, note: 1 } },
+    setUp: {
+      model: true,
+      team: false,
+      enrichment: true,
+      forwarding: false,
+      google: true,
+      granola: false,
+      exa: false,
+    },
+  }),
   'email-calendar': () => ({
     view: accounts,
     address: 'deals@in.fund.example',
@@ -389,7 +402,6 @@ const loaders: Record<string, () => object> = {
 /** Every page under the shell, as its URL. */
 const PATHS = [
   ...Object.keys({ ...loaders }),
-  'general',
   'members',
   'objects',
   'templates',
@@ -663,6 +675,45 @@ describe('the four acts that break something elsewhere ask first', () => {
     expect(dialog()?.textContent).toContain('Suspend Priya?')
     expect(dialog()?.textContent).toContain('signed out on every device')
     expect(writes.setMemberBanned).not.toHaveBeenCalled()
+  })
+})
+
+describe('General, after the first run (D80)', () => {
+  const dialog = () => document.querySelector('[role="dialog"]')
+
+  it('removes the demo only after a confirm naming its counts', async () => {
+    await mount('/settings/general')
+    await click(byText('Remove demo data'))
+    expect(dialog()?.textContent).toContain('Remove the demo data?')
+    expect(dialog()?.textContent).toContain('3 companies')
+    expect(dialog()?.textContent).toContain('1 person')
+    expect(writes.removeDemoData).not.toHaveBeenCalled()
+    await click(byText('Remove demo data⌘↵', dialog() ?? document))
+    expect(writes.removeDemoData).toHaveBeenCalledTimes(1)
+  })
+
+  it("lists the seven pieces in What's set up with their state and link", async () => {
+    await mount('/settings/general')
+    const text = document.body.textContent
+    expect(text).toContain("What's set up")
+    expect(text).toContain('3 of 7')
+    for (const label of [
+      'AI model',
+      'Team',
+      'Enrichment',
+      'Email forwarding',
+      'Google',
+      'Granola',
+      'Exa',
+    ])
+      expect(text).toContain(label)
+    expect(
+      document.querySelector('section a[href="/settings/meeting-notes"]')
+        ?.textContent,
+    ).toBe('Set up ›')
+    expect(
+      document.querySelector('section a[href="/settings/models"]')?.textContent,
+    ).toBe('Open ›')
   })
 })
 

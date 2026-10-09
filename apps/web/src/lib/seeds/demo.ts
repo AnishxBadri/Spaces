@@ -1,4 +1,6 @@
-import { count, eq } from 'drizzle-orm'
+import { Effect, Schema } from 'effect'
+import { count, eq, inArray, sql } from 'drizzle-orm'
+import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   company,
@@ -11,8 +13,11 @@ import {
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import type { EntityValues } from '@spaces/db/schema/entities'
+import { workspace } from '@spaces/db/schema/workspace'
+import type { WorkspaceSettings } from '@spaces/db/schema/workspace'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { setValues } from '@spaces/core/writes/attributes/values'
+import { deleteEntityProgram } from '@spaces/core/writes/entities/delete'
 
 /**
  * Demo data — opt-in at setup, never automatic.
@@ -106,6 +111,9 @@ export async function seedDemoData(
   userId: string,
 ): Promise<{ seeded: boolean }> {
   if (!(await canSeedDemo())) return { seeded: false }
+  // Every entity this run births, and only those: a space the starter
+  // taxonomy already held is reused and never recorded.
+  const born: Array<string> = []
 
   // --- spaces -------------------------------------------------------------
   const spaceIds = new Map<string, string>()
@@ -142,6 +150,7 @@ export async function seedDemoData(
       path,
       isSeeded: true,
     })
+    born.push(ent.id)
     spaceIds.set(node.slug, ent.id)
   }
 
@@ -158,6 +167,7 @@ export async function seedDemoData(
       createdBy: userId,
     })
     companyIds.set(c.name, result.entityId)
+    if (result.action === 'created') born.push(result.entityId)
     await db
       .update(entity)
       .set({ values: c.values })
@@ -193,6 +203,7 @@ export async function seedDemoData(
     source: { class: 'import' },
     createdBy: userId,
   })
+  if (personResult.action === 'created') born.push(personResult.entityId)
   await db
     .insert(person)
     .values({ entityId: personResult.entityId })
@@ -222,6 +233,7 @@ export async function seedDemoData(
         createdBy: userId,
       })
       .returning({ id: entity.id })
+    born.push(ent.id)
     await db.insert(term).values({
       entityId: ent.id,
       name: t.name,
@@ -241,6 +253,7 @@ export async function seedDemoData(
       createdBy: userId,
     })
     .returning({ id: entity.id })
+  born.push(memoEnt.id)
   const memoBody =
     'Air cooling runs out of road somewhere past 30kW of rack density, and ' +
     'accelerator racks are already past it. That makes liquid cooling a ' +
@@ -275,6 +288,158 @@ export async function seedDemoData(
       .onConflictDoNothing()
   }
 
+  await recordDemo(born)
   console.log('[demo] seeded demo data')
   return { seeded: true }
 }
+
+// --- removal -------------------------------------------------------------
+
+/** `workspace.settings.demo`: the ids `seedDemoData` birthed. Absent once removed. */
+const demoSetting = z.object({ entity_ids: z.array(z.string()) })
+
+/** The recorded demo ids, or null when no demo data is recorded. */
+export function demoIdsOf(settings: WorkspaceSettings): Array<string> | null {
+  const parsed = demoSetting.safeParse(settings.demo)
+  return parsed.success ? parsed.data.entity_ids : null
+}
+
+async function recordDemo(ids: Array<string>) {
+  const demo = { entity_ids: ids }
+  await db
+    .insert(workspace)
+    .values({ id: 1, name: 'Workspace', settings: { demo } })
+    .onConflictDoUpdate({
+      target: workspace.id,
+      set: {
+        settings: sql`${workspace.settings} || jsonb_build_object('demo', ${JSON.stringify(demo)}::jsonb)`,
+        updatedAt: new Date(),
+      },
+    })
+}
+
+export class DemoQueryFailed extends Schema.TaggedError<DemoQueryFailed>()(
+  'DemoQueryFailed',
+  { cause: Schema.Defect() },
+) {}
+
+const query = <T>(run: () => Promise<T>) =>
+  Effect.tryPromise({
+    try: run,
+    catch: (cause) => new DemoQueryFailed({ cause }),
+  })
+
+type EntityKind = (typeof entity.kind.enumValues)[number]
+
+/** What is left of the demo, by kind; null when none is recorded. */
+export type DemoSummary = {
+  readonly total: number
+  readonly byKind: Partial<Record<EntityKind, number>>
+}
+
+/** The recorded demo records that still exist. */
+const demoRows = Effect.fn('demoRows')(function* () {
+  const row = (yield* query(() =>
+    db
+      .select({ settings: workspace.settings })
+      .from(workspace)
+      .where(eq(workspace.id, 1)),
+  )).at(0)
+  const ids = row === undefined ? null : demoIdsOf(row.settings)
+  if (ids === null) return null
+  if (ids.length === 0) return []
+  return yield* query(() =>
+    db
+      .select({ id: entity.id, kind: entity.kind, path: space.path })
+      .from(entity)
+      .leftJoin(space, eq(space.entityId, entity.id))
+      .where(inArray(entity.id, ids)),
+  )
+})
+
+/** The counts the Remove confirm names; null when there is no demo key. */
+export const demoSummaryProgram = Effect.fn('demoSummaryProgram')(
+  function* (): Effect.fn.Return<DemoSummary | null, DemoQueryFailed> {
+    const rows = yield* demoRows()
+    if (rows === null) return null
+    const byKind: Partial<Record<EntityKind, number>> = {}
+    for (const r of rows) byKind[r.kind] = (byKind[r.kind] ?? 0) + 1
+    return { total: rows.length, byKind }
+  },
+)
+
+/**
+ * The order a demo comes apart in: what points at a space before the space,
+ * and a child space before its parent.
+ */
+const KIND_ORDER: ReadonlyArray<EntityKind> = [
+  'note',
+  'document',
+  'term',
+  'deal',
+  'custom',
+  'person',
+  'company',
+  'space',
+]
+
+/**
+ * Remove demo data: delete exactly the recorded ids through the entity
+ * delete program, then clear the key.
+ * - A record the registry refuses to delete (a holding on a demo company)
+ *   is kept and counted; so is a demo space that still has a space below it.
+ * - Nothing created after the seed is touched — only recorded ids are read.
+ */
+export const removeDemoDataProgram = Effect.fn('removeDemoDataProgram')(
+  function* (): Effect.fn.Return<
+    { readonly removed: number; readonly kept: number },
+    DemoQueryFailed
+  > {
+    const rows = yield* demoRows()
+    if (rows === null) return { removed: 0, kept: 0 }
+    const ordered = [...rows].sort((a, b) => {
+      const k = KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind)
+      if (k !== 0) return k
+      // Deeper paths first, so a parent never outlives into a dangling child.
+      return (b.path?.split('.').length ?? 0) - (a.path?.split('.').length ?? 0)
+    })
+    let removed = 0
+    let kept = 0
+    for (const r of ordered) {
+      if (r.kind === 'space' && r.path !== null) {
+        const path = r.path
+        // Children went first, so any descendant left is one to keep it for.
+        const below = yield* query(() =>
+          db
+            .select({ id: space.entityId })
+            .from(space)
+            .where(
+              sql`${space.path} <@ ${path}::ltree and ${space.path} <> ${path}::ltree`,
+            )
+            .limit(1),
+        )
+        if (below.length > 0) {
+          kept += 1
+          continue
+        }
+      }
+      const outcome = yield* deleteEntityProgram(r.id).pipe(
+        Effect.map(() => 'removed' as const),
+        Effect.catchTag('Blocked', () => Effect.succeed('kept' as const)),
+        Effect.mapError((cause) => new DemoQueryFailed({ cause })),
+      )
+      if (outcome === 'removed') removed += 1
+      else kept += 1
+    }
+    yield* query(() =>
+      db
+        .update(workspace)
+        .set({
+          settings: sql`${workspace.settings} - 'demo'`,
+          updatedAt: new Date(),
+        })
+        .where(eq(workspace.id, 1)),
+    )
+    return { removed, kept }
+  },
+)
