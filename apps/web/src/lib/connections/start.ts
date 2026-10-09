@@ -18,7 +18,7 @@ import { newNonce, signState } from '@spaces/core/writes/connections/state'
 import { auth } from '#/lib/auth'
 import { effectFn } from '#/lib/server/effect'
 import { describeExternalOrigin } from '#/lib/server/external-origin'
-import { PRODUCTS, productOf } from './products'
+import { PRODUCTS, productOf, productPage } from './products'
 
 /**
  * The outbound leg of a connect dance: `/api/connections/$provider/start`
@@ -56,8 +56,6 @@ export type ConnectStartError =
 /** The registry the start leg builds against; a test swaps an `authUrl`. */
 export type ProviderTable = Readonly<Record<ProviderId, ProviderEntry>>
 
-export const DEFAULT_RETURN = '/settings/connections'
-
 export type ConnectStartInput = {
   readonly userId: string
   readonly provider: string
@@ -76,9 +74,15 @@ export type ConnectStartRedirect = {
 
 const refuse = (message: string) => new ConnectRefused({ message })
 
-/** A same-origin path, or null: no scheme, no host, no `//` or `/\`. */
-function returnPath(raw: string | null): string | null {
-  if (raw === null || raw === '') return DEFAULT_RETURN
+/** An address to hand the provider as a hint: one `@`, no spaces, bounded. */
+const ACCOUNT_HINT = /^[^\s@]{1,128}@[^\s@]{1,253}$/
+
+/**
+ * A same-origin path, or null: no scheme, no host, no `//` or `/\`.
+ * Without one, the dance ends on the settings page that lists the product.
+ */
+function returnPath(raw: string | null, fallback: string): string | null {
+  if (raw === null || raw === '') return fallback
   if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\'))
     return null
   const base = 'http://return.invalid'
@@ -136,9 +140,16 @@ export const connectStartProgram = Effect.fn('connectStart')(function* (
       `Not a ${product.label} scope: ${foreign.map((s) => s.value).join(', ')}`,
     )
 
-  const returnTo = returnPath(params.get('return'))
+  const returnTo = returnPath(
+    params.get('return'),
+    productPage(provider, productId),
+  )
   if (returnTo === null)
     return yield* refuse('return must be a path on this site')
+
+  const account = params.get('account')
+  if (account !== null && !ACCOUNT_HINT.test(account))
+    return yield* refuse('account must be an email address')
 
   const client = yield* Effect.tryPromise({
     try: () => readWorkspaceCredential(provider, 'oauth_client'),
@@ -150,7 +161,7 @@ export const connectStartProgram = Effect.fn('connectStart')(function* (
   if (clientId === null)
     return yield* new ProviderUnconfigured({
       provider,
-      message: `${entry.label} has no OAuth client yet. An admin adds it in Settings → Connections.`,
+      message: `${entry.label} has no OAuth client yet. An admin adds it in Settings → Connection apps.`,
     })
 
   const held = yield* holdsConnection({
@@ -194,6 +205,9 @@ export const connectStartProgram = Effect.fn('connectStart')(function* (
     url.searchParams.set('access_type', 'offline')
     url.searchParams.set('prompt', 'consent')
   }
+  // Preselects the account a product is being added to. Box has no hint.
+  if (provider === 'google' && account !== null)
+    url.searchParams.set('login_hint', account)
   // Scope growth: the new token carries the earlier grant too. Box ignores it.
   if (held) url.searchParams.set('include_granted_scopes', 'true')
 

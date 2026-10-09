@@ -47,6 +47,15 @@ export function toEmailForwarding({ search }: { search: Search }): never {
   })
 }
 
+export function toEmailCalendar({ search }: { search: Search }): never {
+  throw redirect({
+    to: '/settings/email-calendar',
+    search,
+    statusCode: 301,
+    replace: true,
+  })
+}
+
 export function toPlugins({ search }: { search: Search }): never {
   throw redirect({
     to: '/settings/plugins',

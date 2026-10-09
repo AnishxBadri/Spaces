@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { connectionIdInput, providerAppInput } from '../connections/input'
 
 export type {
+  AccountsView,
   ConnectionCustodyRow,
   ConnectionDisconnectResult,
   ConnectionIdInput,
@@ -13,8 +14,8 @@ export type {
 
 /**
  * Settings → Connection apps: the providers' OAuth apps — written by an
- * admin, read by any member with the secret redacted (D81) — and which
- * providers a member can connect to.
+ * admin, read by any member with the secret redacted (D81) — and the
+ * reader's own accounts under You.
  * Bodies are imported inside the handler so the vault never reaches the
  * client bundle.
  */
@@ -50,13 +51,17 @@ export const refreshConnection = createServerFn({ method: 'POST' })
     return refreshConnectionHandler(data)
   })
 
-/** The session user's own connections, never another member's; no tokens. */
-export const listMyConnections = createServerFn().handler(async () => {
-  const { listConnectionsHandler } = await import('../connections/list')
-  return listConnectionsHandler()
+/**
+ * The accounts pages under You: the session user's own connections (never
+ * another member's, no tokens), the providers with a client, and which
+ * plugins are installed or offered.
+ */
+export const getMyAccounts = createServerFn().handler(async () => {
+  const { listAccountsHandler } = await import('../connections/list')
+  return listAccountsHandler()
 })
 
-/** Disconnect: revokes one of the session user's connections, then deletes it. */
+/** Disconnect one product: deletes the row; revokes when it was the account's last product. */
 export const disconnectConnection = createServerFn({ method: 'POST' })
   .validator(connectionIdInput)
   .handler(async ({ data }) => {

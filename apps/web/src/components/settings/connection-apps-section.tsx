@@ -35,7 +35,7 @@ export function ConnectionAppsSection({
   )
 }
 
-/** Where Connections' not-configured band points an admin: the client group. */
+/** Where an accounts page's Configure › points an admin: the client group. */
 export const oauthClientAnchor = (provider: ProviderId) =>
   `oauth-client-${provider}`
 

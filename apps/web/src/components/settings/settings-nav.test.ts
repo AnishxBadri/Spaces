@@ -25,7 +25,9 @@ const MAP: ReadonlyArray<
   [
     'You',
     [
-      ['Connections', '/settings/connections'],
+      ['Email & calendar', '/settings/email-calendar'],
+      ['Files', '/settings/files'],
+      ['Meeting notes', '/settings/meeting-notes'],
       ['API tokens', '/settings/tokens'],
     ],
   ],
@@ -72,7 +74,7 @@ function crumbsPrintedBy(to: string): Array<string> {
   const slug = to.replace('/settings/', '')
   const routes = [
     `routes/_app/settings/${slug}.tsx`,
-    ...['$integrationId', '$objectSlug']
+    ...['$integrationId', '$objectSlug', '$connectionId']
       .map((p) => `routes/_app/settings/${slug}_.${p}.tsx`)
       .filter((f) => existsSync(`${webSrc}${f}`)),
   ]
@@ -167,6 +169,10 @@ describe('the settings nav grammar', () => {
     expect(sectionAt('/settings/models')?.label).toBe('Models')
     expect(sectionAt('/settings/plugins/0b5cbe3e')?.label).toBe('Plugins')
     expect(sectionAt('/settings/objects/companies')?.label).toBe('Objects')
+    expect(sectionAt('/settings/files/7a3c1b52')?.label).toBe('Files')
+    expect(sectionAt('/settings/email-calendar/7a3c1b52')?.label).toBe(
+      'Email & calendar',
+    )
     // A prefix of another path is not that row.
     expect(sectionAt('/settings/pluginsx')).toBeUndefined()
     expect(sectionAt('/deals')).toBeUndefined()

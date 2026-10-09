@@ -80,8 +80,18 @@ beforeEach(() => {
   session.current = { id: FIXTURE_ACTOR.id, role: 'member' }
 })
 
-/** `forgotten`: tokens the IdP never issued, so its `/revoke` answers 400. */
-async function connectionOf(userId: string, { forgotten = false } = {}) {
+/**
+ * A connection row. `forgotten`: tokens the IdP never issued, so its
+ * `/revoke` answers 400. `email` puts it on an account another row shares.
+ */
+async function connectionOf(
+  userId: string,
+  {
+    forgotten = false,
+    product = 'drive',
+    email = `${crypto.randomUUID()}@fund.example`,
+  } = {},
+) {
   const pair = forgotten
     ? { accessToken: 'never-issued', refreshToken: 'never-issued-refresh' }
     : idp.mint()
@@ -90,8 +100,8 @@ async function connectionOf(userId: string, { forgotten = false } = {}) {
     .values({
       userId,
       provider: 'google',
-      product: 'drive',
-      externalEmail: `${crypto.randomUUID()}@fund.example`,
+      product,
+      externalEmail: email,
       tokensEnc: encryptBundle(
         { ...pair, tokenType: 'Bearer' },
         { userId, provider: 'google' },
@@ -259,5 +269,69 @@ describe('disconnectConnection', () => {
     ).rejects.toThrow('Not your connection')
     expect(idp.revokeRequests).toHaveLength(0)
     expect(await statusOf(row.id)).toBe('active')
+  })
+})
+
+describe('disconnecting one product of an account', () => {
+  it('deletes Drive alone and keeps the grant while Gmail and Calendar remain; the last one revokes', async () => {
+    const email = 'anish@fund.example'
+    const drive = await connectionOf(FIXTURE_ACTOR.id, { email })
+    const gmail = await connectionOf(FIXTURE_ACTOR.id, {
+      email,
+      product: 'gmail',
+    })
+    const calendar = await connectionOf(FIXTURE_ACTOR.id, {
+      email,
+      product: 'calendar',
+    })
+
+    await expect(
+      disconnectConnectionHandler({ connectionId: drive.id }, providers),
+    ).resolves.toEqual({ connectionId: drive.id, revoke: 'kept' })
+    expect(idp.revokeRequests).toHaveLength(0)
+    expect(await statusOf(drive.id)).toBeUndefined()
+    expect(await statusOf(gmail.id)).toBe('active')
+    expect(await statusOf(calendar.id)).toBe('active')
+
+    await expect(
+      disconnectConnectionHandler({ connectionId: gmail.id }, providers),
+    ).resolves.toEqual({ connectionId: gmail.id, revoke: 'kept' })
+    expect(idp.revokeRequests).toHaveLength(0)
+
+    await expect(
+      disconnectConnectionHandler({ connectionId: calendar.id }, providers),
+    ).resolves.toEqual({ connectionId: calendar.id, revoke: 'revoked' })
+    expect(idp.revokeRequests).toHaveLength(1)
+    expect(await statusOf(calendar.id)).toBeUndefined()
+  })
+
+  it('revokes when the only other product of the account is already revoked', async () => {
+    const email = 'deals@fund.example'
+    const gmail = await connectionOf(FIXTURE_ACTOR.id, {
+      email,
+      product: 'gmail',
+    })
+    await db
+      .update(accountConnection)
+      .set({ status: 'revoked' })
+      .where(eq(accountConnection.id, gmail.id))
+    const drive = await connectionOf(FIXTURE_ACTOR.id, { email })
+
+    await expect(
+      disconnectConnectionHandler({ connectionId: drive.id }, providers),
+    ).resolves.toEqual({ connectionId: drive.id, revoke: 'revoked' })
+    expect(idp.revokeRequests).toHaveLength(1)
+  })
+
+  it("does not count another address's rows, nor a teammate's on the same address", async () => {
+    const email = 'shared@fund.example'
+    await connectionOf(TEAMMATE.id, { email, product: 'gmail' })
+    await connectionOf(FIXTURE_ACTOR.id, { product: 'gmail' })
+    const drive = await connectionOf(FIXTURE_ACTOR.id, { email })
+
+    await expect(
+      disconnectConnectionHandler({ connectionId: drive.id }, providers),
+    ).resolves.toEqual({ connectionId: drive.id, revoke: 'revoked' })
+    expect(idp.revokeRequests).toHaveLength(1)
   })
 })

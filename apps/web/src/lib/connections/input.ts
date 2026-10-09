@@ -3,7 +3,7 @@ import { PROVIDER_IDS } from '@spaces/core/providers/registry'
 import type { ProviderId } from '@spaces/core/providers/registry'
 
 /**
- * A provider's OAuth app as Settings → Connections saves it. Client-safe: the
+ * A provider's OAuth app as Settings → Connection apps saves it. Client-safe: the
  * server fn validates with it and the section types its draft by it.
  * - `clientSecret` empty keeps the stored secret; a first save needs one.
  */
@@ -34,7 +34,7 @@ export const connectionIdInput = z.object({ connectionId: z.uuid() })
 
 export type ConnectionIdInput = z.infer<typeof connectionIdInput>
 
-/** A connection after a refresh, as Settings → Connections draws it. Never a token. */
+/** A connection after a refresh, as an account page draws it. Never a token. */
 export type ConnectionCustodyRow = {
   connectionId: string
   status: 'active' | 'error' | 'revoked'
@@ -48,7 +48,7 @@ export type ConnectionRevokeResult = {
   outcome: 'revoked' | 'already-revoked'
 }
 
-/** One of the session user's connections as Settings → Connections lists it. Never a token. */
+/** One of the session user's connections as the accounts pages list it. Never a token. */
 export type ConnectionListRow = {
   connectionId: string
   provider: ProviderId
@@ -62,13 +62,29 @@ export type ConnectionListRow = {
   errorReason: string | null
   /** ISO; null until a sync has run. */
   lastSyncAt: string | null
+  /** When the row was first made, ISO; the earliest mail account is the Default. */
+  connectedAt: string
 }
 
 /**
  * What Disconnect did at the provider before the row was deleted:
- * `unreachable` when the provider could not be asked and the row went anyway.
+ * `unreachable` when the provider could not be asked and the row went anyway;
+ * `kept` when another product of the same account still uses the grant, so
+ * the provider was not asked.
  */
 export type ConnectionDisconnectResult = {
   connectionId: string
-  revoke: 'revoked' | 'already-revoked' | 'unreachable'
+  revoke: 'revoked' | 'already-revoked' | 'unreachable' | 'kept'
+}
+
+/** What the accounts pages under You draw. Never a token, never a client secret. */
+export type AccountsView = {
+  /** The reader's own connections, never another member's. */
+  connections: ConnectionListRow[]
+  /** Providers with an active OAuth client. */
+  configured: ProviderId[]
+  /** Plugin ids installed here. */
+  installed: string[]
+  /** Plugin ids the registry offers that are not installed. */
+  offered: string[]
 }

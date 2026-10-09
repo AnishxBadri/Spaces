@@ -1,9 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
-import { accountConnection, user } from '@spaces/db/schema'
+import { accountConnection, integration, user } from '@spaces/db/schema'
 import { encryptBundle } from '@spaces/core/writes/connections/bundle'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { listConnectionsHandler } from './list'
+import { listAccountsHandler, listConnectionsHandler } from './list'
 
 /**
  * The list server fn's body, driven through its handler. Only the request is
@@ -82,6 +82,7 @@ describe('listMyConnections', () => {
         status: 'active',
         errorReason: null,
         lastSyncAt: null,
+        connectedAt: mine.createdAt.toISOString(),
       },
     ])
     expect(JSON.stringify(rows)).not.toContain(theirs.id)
@@ -95,5 +96,29 @@ describe('listMyConnections', () => {
   it('refuses without a session', async () => {
     session.current = null
     await expect(listConnectionsHandler()).rejects.toThrow('Unauthorized')
+  })
+})
+
+describe('getMyAccounts', () => {
+  it("hands the reader's rows, the configured providers and which plugins are installed", async () => {
+    const mine = await connectionOf(FIXTURE_ACTOR.id, 'mine@fund.example')
+    const theirs = await connectionOf(TEAMMATE.id, 'theirs@fund.example')
+    await db.insert(integration).values([
+      { capabilityId: 'google-drive', version: '0.1.0' },
+      { capabilityId: 'box', version: '0.1.0', removedAt: new Date() },
+    ])
+
+    const view = await listAccountsHandler()
+    const ids = view.connections.map((r) => r.connectionId)
+    expect(ids).toContain(mine.id)
+    expect(ids).not.toContain(theirs.id)
+    expect(view.configured).toEqual([])
+    expect(view.installed).toEqual(['google-drive'])
+    expect(view.offered).toEqual([])
+  })
+
+  it('refuses without a session', async () => {
+    session.current = null
+    await expect(listAccountsHandler()).rejects.toThrow('Unauthorized')
   })
 })

@@ -141,7 +141,7 @@ describe('the authorize request', () => {
       provider: 'google',
       product: 'drive',
       scopes: ['openid', 'email', 'drive.file'],
-      returnTo: '/settings/connections',
+      returnTo: '/settings/files',
     })
 
     // The verifier the cookie carries is the one the challenge was made from.
@@ -208,14 +208,14 @@ describe('refusals', () => {
     expect(idp.authorizeRequests).toHaveLength(0)
   })
 
-  it('answers ProviderUnconfigured naming Settings → Connections, never a redirect', async () => {
+  it('answers ProviderUnconfigured naming Settings → Connection apps, never a redirect', async () => {
     await configureGoogle()
     await deleteGoogleClient()
     const response = await start('google', 'product=drive')
     expect(response.status).toBe(409)
     expect(response.headers.get('location')).toBeNull()
     expect(response.headers.get('set-cookie')).toBeNull()
-    expect(await response.text()).toContain('Settings → Connections')
+    expect(await response.text()).toContain('Settings → Connection apps')
     expect(idp.authorizeRequests).toHaveLength(0)
 
     const error = await Effect.runPromise(
@@ -232,7 +232,7 @@ describe('refusals', () => {
     )
     expect(error._tag).toBe('ProviderUnconfigured')
     expect(error.message).toBe(
-      'Google has no OAuth client yet. An admin adds it in Settings → Connections.',
+      'Google has no OAuth client yet. An admin adds it in Settings → Connection apps.',
     )
   })
 

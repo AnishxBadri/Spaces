@@ -11,45 +11,70 @@ import type { ProviderId, ProviderScope } from '@spaces/core/providers/registry'
  * - `base` is what Connect asks for when no scopes are named.
  */
 
+/** The settings page an account is listed on, by the job its product does. (D81) */
+export const ACCOUNT_JOBS = [
+  'email-calendar',
+  'files',
+  'meeting-notes',
+] as const
+export type AccountJob = (typeof ACCOUNT_JOBS)[number]
+
+export const JOB_PAGE = {
+  'email-calendar': '/settings/email-calendar',
+  files: '/settings/files',
+  'meeting-notes': '/settings/meeting-notes',
+} as const satisfies Record<AccountJob, string>
+
 export type ProductEntry = {
   readonly label: string
   /** The label under its provider's group: `Drive` under Google. */
   readonly name: string
+  /** What an account is used for, as its row says it: `Mail · Calendar`. */
+  readonly word: string
+  readonly job: AccountJob
   readonly plugin: string
   readonly base: ReadonlyArray<string>
 }
 
 export const PRODUCTS = {
+  // In the order an account page lists them: Mail, Calendar, then Drive.
   google: {
-    drive: {
-      label: 'Google Drive',
-      name: 'Drive',
-      plugin: 'google-drive',
-      base: ['openid', 'email', 'drive.file'],
+    gmail: {
+      label: 'Gmail',
+      name: 'Gmail',
+      word: 'Mail',
+      job: 'email-calendar',
+      plugin: 'gmail',
+      base: ['openid', 'email', 'gmail.readonly', 'gmail.send'],
     },
     calendar: {
       label: 'Google Calendar',
       name: 'Calendar',
+      word: 'Calendar',
+      job: 'email-calendar',
       plugin: 'calendar',
       base: ['openid', 'email', 'calendar.events.readonly'],
     },
-    gmail: {
-      label: 'Gmail',
-      name: 'Gmail',
-      plugin: 'gmail',
-      base: ['openid', 'email', 'gmail.readonly', 'gmail.send'],
+    drive: {
+      label: 'Google Drive',
+      name: 'Drive',
+      word: 'Drive',
+      job: 'files',
+      plugin: 'google-drive',
+      base: ['openid', 'email', 'drive.file'],
     },
   },
   box: {
-    box: { label: 'Box', name: 'Box', plugin: 'box', base: ['root_readonly'] },
+    box: {
+      label: 'Box',
+      name: 'Box',
+      word: 'Box',
+      job: 'files',
+      plugin: 'box',
+      base: ['root_readonly'],
+    },
   },
 } as const satisfies Record<ProviderId, Record<string, ProductEntry>>
-
-/** The product the settings Connect control starts, one per provider. */
-export const CONNECT_PRODUCT = {
-  google: 'drive',
-  box: 'box',
-} as const satisfies Record<ProviderId, string>
 
 export function productOf(
   provider: ProviderId,
@@ -69,19 +94,40 @@ export function productScopes(provider: ProviderId, product: string): string[] {
   )
 }
 
+/** A provider's products in registry order, with their ids. */
+export function productsOf(
+  provider: ProviderId,
+): Array<{ readonly product: string; readonly entry: ProductEntry }> {
+  const products: Readonly<Record<string, ProductEntry>> = PRODUCTS[provider]
+  return Object.entries(products).map(([product, entry]) => ({
+    product,
+    entry,
+  }))
+}
+
+/** The settings page a product's accounts are listed on; where a dance with no return lands. */
+export function productPage(provider: ProviderId, product: string): string {
+  const entry = productOf(provider, product)
+  return JOB_PAGE[entry?.job ?? 'email-calendar']
+}
+
 /**
  * The start route a Connect control navigates to. With `scopes` (what
  * `hasScopes` named missing) it grows the held connection; with `returnTo`
- * the dance ends back on that path.
+ * the dance ends back on that path; with `account` the provider is asked to
+ * preselect that address, so a product added from an account page lands on
+ * the same account.
  */
 export function connectHref(
   provider: ProviderId,
   product: string,
   scopes: ReadonlyArray<string> = [],
   returnTo: string | null = null,
+  account: string | null = null,
 ): string {
   const query = new URLSearchParams({ product })
   if (scopes.length > 0) query.set('scopes', scopes.join(','))
   if (returnTo !== null) query.set('return', returnTo)
+  if (account !== null) query.set('account', account)
   return `/api/connections/${provider}/start?${query.toString()}`
 }

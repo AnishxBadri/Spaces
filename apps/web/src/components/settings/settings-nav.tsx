@@ -57,10 +57,18 @@ export type SettingsSectionRow = {
 }
 
 export const SETTINGS_SECTIONS = [
-  // The reader's own connections; the OAuth clients are Connection apps.
+  // The reader's own accounts, by the job they do; the OAuth clients are
+  // Connection apps. (D81)
   {
-    to: '/settings/connections',
-    label: 'Connections',
+    to: '/settings/email-calendar',
+    label: 'Email & calendar',
+    group: 'you',
+    admin: false,
+  },
+  { to: '/settings/files', label: 'Files', group: 'you', admin: false },
+  {
+    to: '/settings/meeting-notes',
+    label: 'Meeting notes',
     group: 'you',
     admin: false,
   },

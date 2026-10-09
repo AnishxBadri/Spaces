@@ -256,7 +256,7 @@ describe('refusals write no row', () => {
     )
     const forged = Buffer.from(payload, 'base64url')
       .toString('utf8')
-      .replace('/settings/connections', '/somewhere-else')
+      .replace('/settings/files', '/somewhere-else')
     url.searchParams.set(
       'state',
       `${Buffer.from(forged).toString('base64url')}.${signature}`,
@@ -463,5 +463,61 @@ describe('scope growth on a held connection', () => {
       status: 'active',
       scopes: ['openid', 'email', 'drive.file', 'drive.readonly'],
     })
+  })
+})
+
+/**
+ * Ticking a product on an account page: that product's own consent, for the
+ * same address, while another product's row stands untouched. (D66, D81)
+ */
+describe('a product added from the account page', () => {
+  const lastAuthorize = () => idp.authorizeRequests.at(-1)
+
+  it('asks only for Calendar, preselects the account and leaves the Drive row alone', async () => {
+    await dance('google', 'product=drive')
+    const drive = (await rows())[0]
+    const page = `/settings/files/${drive.id}`
+
+    const href = connectHref(
+      'google',
+      'calendar',
+      [],
+      page,
+      drive.externalEmail,
+    )
+    const { response } = await dance(
+      'google',
+      new URL(href, APP).search.slice(1),
+    )
+
+    expect(lastAuthorize()?.get('scope')).toBe(
+      'openid email https://www.googleapis.com/auth/calendar.events.readonly',
+    )
+    expect(lastAuthorize()?.get('include_granted_scopes')).toBeNull()
+    expect(lastAuthorize()?.get('login_hint')).toBe(drive.externalEmail)
+    expect(response.headers.get('location')).toBe(page)
+
+    const all = await rows()
+    expect(all.map((r) => r.product).sort()).toEqual(['calendar', 'drive'])
+    const calendar = all.find((r) => r.product === 'calendar')
+    expect(calendar).toMatchObject({
+      externalEmail: drive.externalEmail,
+      scopes: ['openid', 'email', 'calendar.events.readonly'],
+    })
+    const after = all.find((r) => r.product === 'drive')
+    expect(after?.scopes).toEqual(drive.scopes)
+    expect(after?.tokensEnc.equals(drive.tokensEnc)).toBe(true)
+  })
+
+  it('refuses an account hint that is not an address', async () => {
+    const started = await handleConnectStart(
+      new Request(
+        `${APP}/api/connections/google/start?product=calendar&account=not-an-address`,
+      ),
+      'google',
+      providers,
+    )
+    expect(started.status).toBe(400)
+    expect(await started.text()).toBe('account must be an email address')
   })
 })

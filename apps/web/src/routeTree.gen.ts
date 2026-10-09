@@ -45,10 +45,13 @@ import { Route as AppSettingsArrivalRouteImport } from './routes/_app/settings/a
 import { Route as AppSettingsConnectionAppsRouteImport } from './routes/_app/settings/connection-apps'
 import { Route as AppSettingsConnectionsRouteImport } from './routes/_app/settings/connections'
 import { Route as AppSettingsCurrencyRouteImport } from './routes/_app/settings/currency'
+import { Route as AppSettingsEmailCalendarRouteImport } from './routes/_app/settings/email-calendar'
 import { Route as AppSettingsEmailForwardingRouteImport } from './routes/_app/settings/email-forwarding'
 import { Route as AppSettingsEmbeddingsRouteImport } from './routes/_app/settings/embeddings'
+import { Route as AppSettingsFilesRouteImport } from './routes/_app/settings/files'
 import { Route as AppSettingsGeneralRouteImport } from './routes/_app/settings/general'
 import { Route as AppSettingsIntegrationsRouteImport } from './routes/_app/settings/integrations'
+import { Route as AppSettingsMeetingNotesRouteImport } from './routes/_app/settings/meeting-notes'
 import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
 import { Route as AppSettingsModelsRouteImport } from './routes/_app/settings/models'
 import { Route as AppSettingsObjectsRouteImport } from './routes/_app/settings/objects'
@@ -66,6 +69,8 @@ import { Route as ApiJobStatusEntityIdRouteImport } from './routes/api/job-statu
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as ApiWebhooksIdRouteImport } from './routes/api/webhooks/$id'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
+import { Route as AppSettingsEmailCalendarConnectionIdRouteImport } from './routes/_app/settings/email-calendar_.$connectionId'
+import { Route as AppSettingsFilesConnectionIdRouteImport } from './routes/_app/settings/files_.$connectionId'
 import { Route as AppSettingsIntegrationsIntegrationIdRouteImport } from './routes/_app/settings/integrations_.$integrationId'
 import { Route as AppSettingsObjectsObjectSlugRouteImport } from './routes/_app/settings/objects_.$objectSlug'
 import { Route as AppSettingsPluginsIntegrationIdRouteImport } from './routes/_app/settings/plugins_.$integrationId'
@@ -252,6 +257,12 @@ const AppSettingsCurrencyRoute = AppSettingsCurrencyRouteImport.update({
   path: '/currency',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsEmailCalendarRoute =
+  AppSettingsEmailCalendarRouteImport.update({
+    id: '/email-calendar',
+    path: '/email-calendar',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
 const AppSettingsEmailForwardingRoute =
   AppSettingsEmailForwardingRouteImport.update({
     id: '/email-forwarding',
@@ -263,6 +274,11 @@ const AppSettingsEmbeddingsRoute = AppSettingsEmbeddingsRouteImport.update({
   path: '/embeddings',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsFilesRoute = AppSettingsFilesRouteImport.update({
+  id: '/files',
+  path: '/files',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsGeneralRoute = AppSettingsGeneralRouteImport.update({
   id: '/general',
   path: '/general',
@@ -271,6 +287,11 @@ const AppSettingsGeneralRoute = AppSettingsGeneralRouteImport.update({
 const AppSettingsIntegrationsRoute = AppSettingsIntegrationsRouteImport.update({
   id: '/integrations',
   path: '/integrations',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsMeetingNotesRoute = AppSettingsMeetingNotesRouteImport.update({
+  id: '/meeting-notes',
+  path: '/meeting-notes',
   getParentRoute: () => AppSettingsRoute,
 } as any)
 const AppSettingsMembersRoute = AppSettingsMembersRouteImport.update({
@@ -358,6 +379,18 @@ const AppOObjectSlugRecordIdRoute = AppOObjectSlugRecordIdRouteImport.update({
   path: '/o/$objectSlug/$recordId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsEmailCalendarConnectionIdRoute =
+  AppSettingsEmailCalendarConnectionIdRouteImport.update({
+    id: '/email-calendar_/$connectionId',
+    path: '/email-calendar/$connectionId',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
+const AppSettingsFilesConnectionIdRoute =
+  AppSettingsFilesConnectionIdRouteImport.update({
+    id: '/files_/$connectionId',
+    path: '/files/$connectionId',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
 const AppSettingsIntegrationsIntegrationIdRoute =
   AppSettingsIntegrationsIntegrationIdRouteImport.update({
     id: '/integrations_/$integrationId',
@@ -424,10 +457,13 @@ export interface FileRoutesByFullPath {
   '/settings/connection-apps': typeof AppSettingsConnectionAppsRoute
   '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/currency': typeof AppSettingsCurrencyRoute
+  '/settings/email-calendar': typeof AppSettingsEmailCalendarRoute
   '/settings/email-forwarding': typeof AppSettingsEmailForwardingRoute
   '/settings/embeddings': typeof AppSettingsEmbeddingsRoute
+  '/settings/files': typeof AppSettingsFilesRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/integrations': typeof AppSettingsIntegrationsRoute
+  '/settings/meeting-notes': typeof AppSettingsMeetingNotesRoute
   '/settings/members': typeof AppSettingsMembersRoute
   '/settings/models': typeof AppSettingsModelsRoute
   '/settings/objects': typeof AppSettingsObjectsRoute
@@ -446,6 +482,8 @@ export interface FileRoutesByFullPath {
   '/api/webhooks/$id': typeof ApiWebhooksIdRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
+  '/settings/email-calendar/$connectionId': typeof AppSettingsEmailCalendarConnectionIdRoute
+  '/settings/files/$connectionId': typeof AppSettingsFilesConnectionIdRoute
   '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
   '/settings/plugins/$integrationId': typeof AppSettingsPluginsIntegrationIdRoute
@@ -486,10 +524,13 @@ export interface FileRoutesByTo {
   '/settings/connection-apps': typeof AppSettingsConnectionAppsRoute
   '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/currency': typeof AppSettingsCurrencyRoute
+  '/settings/email-calendar': typeof AppSettingsEmailCalendarRoute
   '/settings/email-forwarding': typeof AppSettingsEmailForwardingRoute
   '/settings/embeddings': typeof AppSettingsEmbeddingsRoute
+  '/settings/files': typeof AppSettingsFilesRoute
   '/settings/general': typeof AppSettingsGeneralRoute
   '/settings/integrations': typeof AppSettingsIntegrationsRoute
+  '/settings/meeting-notes': typeof AppSettingsMeetingNotesRoute
   '/settings/members': typeof AppSettingsMembersRoute
   '/settings/models': typeof AppSettingsModelsRoute
   '/settings/objects': typeof AppSettingsObjectsRoute
@@ -508,6 +549,8 @@ export interface FileRoutesByTo {
   '/api/webhooks/$id': typeof ApiWebhooksIdRoute
   '/settings': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
+  '/settings/email-calendar/$connectionId': typeof AppSettingsEmailCalendarConnectionIdRoute
+  '/settings/files/$connectionId': typeof AppSettingsFilesConnectionIdRoute
   '/settings/integrations/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/settings/objects/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
   '/settings/plugins/$integrationId': typeof AppSettingsPluginsIntegrationIdRoute
@@ -551,10 +594,13 @@ export interface FileRoutesById {
   '/_app/settings/connection-apps': typeof AppSettingsConnectionAppsRoute
   '/_app/settings/connections': typeof AppSettingsConnectionsRoute
   '/_app/settings/currency': typeof AppSettingsCurrencyRoute
+  '/_app/settings/email-calendar': typeof AppSettingsEmailCalendarRoute
   '/_app/settings/email-forwarding': typeof AppSettingsEmailForwardingRoute
   '/_app/settings/embeddings': typeof AppSettingsEmbeddingsRoute
+  '/_app/settings/files': typeof AppSettingsFilesRoute
   '/_app/settings/general': typeof AppSettingsGeneralRoute
   '/_app/settings/integrations': typeof AppSettingsIntegrationsRoute
+  '/_app/settings/meeting-notes': typeof AppSettingsMeetingNotesRoute
   '/_app/settings/members': typeof AppSettingsMembersRoute
   '/_app/settings/models': typeof AppSettingsModelsRoute
   '/_app/settings/objects': typeof AppSettingsObjectsRoute
@@ -573,6 +619,8 @@ export interface FileRoutesById {
   '/api/webhooks/$id': typeof ApiWebhooksIdRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
+  '/_app/settings/email-calendar_/$connectionId': typeof AppSettingsEmailCalendarConnectionIdRoute
+  '/_app/settings/files_/$connectionId': typeof AppSettingsFilesConnectionIdRoute
   '/_app/settings/integrations_/$integrationId': typeof AppSettingsIntegrationsIntegrationIdRoute
   '/_app/settings/objects_/$objectSlug': typeof AppSettingsObjectsObjectSlugRoute
   '/_app/settings/plugins_/$integrationId': typeof AppSettingsPluginsIntegrationIdRoute
@@ -616,10 +664,13 @@ export interface FileRouteTypes {
     | '/settings/connection-apps'
     | '/settings/connections'
     | '/settings/currency'
+    | '/settings/email-calendar'
     | '/settings/email-forwarding'
     | '/settings/embeddings'
+    | '/settings/files'
     | '/settings/general'
     | '/settings/integrations'
+    | '/settings/meeting-notes'
     | '/settings/members'
     | '/settings/models'
     | '/settings/objects'
@@ -638,6 +689,8 @@ export interface FileRouteTypes {
     | '/api/webhooks/$id'
     | '/settings/'
     | '/o/$objectSlug/$recordId'
+    | '/settings/email-calendar/$connectionId'
+    | '/settings/files/$connectionId'
     | '/settings/integrations/$integrationId'
     | '/settings/objects/$objectSlug'
     | '/settings/plugins/$integrationId'
@@ -678,10 +731,13 @@ export interface FileRouteTypes {
     | '/settings/connection-apps'
     | '/settings/connections'
     | '/settings/currency'
+    | '/settings/email-calendar'
     | '/settings/email-forwarding'
     | '/settings/embeddings'
+    | '/settings/files'
     | '/settings/general'
     | '/settings/integrations'
+    | '/settings/meeting-notes'
     | '/settings/members'
     | '/settings/models'
     | '/settings/objects'
@@ -700,6 +756,8 @@ export interface FileRouteTypes {
     | '/api/webhooks/$id'
     | '/settings'
     | '/o/$objectSlug/$recordId'
+    | '/settings/email-calendar/$connectionId'
+    | '/settings/files/$connectionId'
     | '/settings/integrations/$integrationId'
     | '/settings/objects/$objectSlug'
     | '/settings/plugins/$integrationId'
@@ -742,10 +800,13 @@ export interface FileRouteTypes {
     | '/_app/settings/connection-apps'
     | '/_app/settings/connections'
     | '/_app/settings/currency'
+    | '/_app/settings/email-calendar'
     | '/_app/settings/email-forwarding'
     | '/_app/settings/embeddings'
+    | '/_app/settings/files'
     | '/_app/settings/general'
     | '/_app/settings/integrations'
+    | '/_app/settings/meeting-notes'
     | '/_app/settings/members'
     | '/_app/settings/models'
     | '/_app/settings/objects'
@@ -764,6 +825,8 @@ export interface FileRouteTypes {
     | '/api/webhooks/$id'
     | '/_app/settings/'
     | '/_app/o_/$objectSlug/$recordId'
+    | '/_app/settings/email-calendar_/$connectionId'
+    | '/_app/settings/files_/$connectionId'
     | '/_app/settings/integrations_/$integrationId'
     | '/_app/settings/objects_/$objectSlug'
     | '/_app/settings/plugins_/$integrationId'
@@ -1042,6 +1105,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsCurrencyRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/email-calendar': {
+      id: '/_app/settings/email-calendar'
+      path: '/email-calendar'
+      fullPath: '/settings/email-calendar'
+      preLoaderRoute: typeof AppSettingsEmailCalendarRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/email-forwarding': {
       id: '/_app/settings/email-forwarding'
       path: '/email-forwarding'
@@ -1056,6 +1126,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsEmbeddingsRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/files': {
+      id: '/_app/settings/files'
+      path: '/files'
+      fullPath: '/settings/files'
+      preLoaderRoute: typeof AppSettingsFilesRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/general': {
       id: '/_app/settings/general'
       path: '/general'
@@ -1068,6 +1145,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations'
       fullPath: '/settings/integrations'
       preLoaderRoute: typeof AppSettingsIntegrationsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/meeting-notes': {
+      id: '/_app/settings/meeting-notes'
+      path: '/meeting-notes'
+      fullPath: '/settings/meeting-notes'
+      preLoaderRoute: typeof AppSettingsMeetingNotesRouteImport
       parentRoute: typeof AppSettingsRoute
     }
     '/_app/settings/members': {
@@ -1189,6 +1273,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOObjectSlugRecordIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/email-calendar_/$connectionId': {
+      id: '/_app/settings/email-calendar_/$connectionId'
+      path: '/email-calendar/$connectionId'
+      fullPath: '/settings/email-calendar/$connectionId'
+      preLoaderRoute: typeof AppSettingsEmailCalendarConnectionIdRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/files_/$connectionId': {
+      id: '/_app/settings/files_/$connectionId'
+      path: '/files/$connectionId'
+      fullPath: '/settings/files/$connectionId'
+      preLoaderRoute: typeof AppSettingsFilesConnectionIdRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/integrations_/$integrationId': {
       id: '/_app/settings/integrations_/$integrationId'
       path: '/integrations/$integrationId'
@@ -1233,10 +1331,13 @@ interface AppSettingsRouteChildren {
   AppSettingsConnectionAppsRoute: typeof AppSettingsConnectionAppsRoute
   AppSettingsConnectionsRoute: typeof AppSettingsConnectionsRoute
   AppSettingsCurrencyRoute: typeof AppSettingsCurrencyRoute
+  AppSettingsEmailCalendarRoute: typeof AppSettingsEmailCalendarRoute
   AppSettingsEmailForwardingRoute: typeof AppSettingsEmailForwardingRoute
   AppSettingsEmbeddingsRoute: typeof AppSettingsEmbeddingsRoute
+  AppSettingsFilesRoute: typeof AppSettingsFilesRoute
   AppSettingsGeneralRoute: typeof AppSettingsGeneralRoute
   AppSettingsIntegrationsRoute: typeof AppSettingsIntegrationsRoute
+  AppSettingsMeetingNotesRoute: typeof AppSettingsMeetingNotesRoute
   AppSettingsMembersRoute: typeof AppSettingsMembersRoute
   AppSettingsModelsRoute: typeof AppSettingsModelsRoute
   AppSettingsObjectsRoute: typeof AppSettingsObjectsRoute
@@ -1247,6 +1348,8 @@ interface AppSettingsRouteChildren {
   AppSettingsUsageRoute: typeof AppSettingsUsageRoute
   AppSettingsWorkspaceRoute: typeof AppSettingsWorkspaceRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppSettingsEmailCalendarConnectionIdRoute: typeof AppSettingsEmailCalendarConnectionIdRoute
+  AppSettingsFilesConnectionIdRoute: typeof AppSettingsFilesConnectionIdRoute
   AppSettingsIntegrationsIntegrationIdRoute: typeof AppSettingsIntegrationsIntegrationIdRoute
   AppSettingsObjectsObjectSlugRoute: typeof AppSettingsObjectsObjectSlugRoute
   AppSettingsPluginsIntegrationIdRoute: typeof AppSettingsPluginsIntegrationIdRoute
@@ -1258,10 +1361,13 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsConnectionAppsRoute: AppSettingsConnectionAppsRoute,
   AppSettingsConnectionsRoute: AppSettingsConnectionsRoute,
   AppSettingsCurrencyRoute: AppSettingsCurrencyRoute,
+  AppSettingsEmailCalendarRoute: AppSettingsEmailCalendarRoute,
   AppSettingsEmailForwardingRoute: AppSettingsEmailForwardingRoute,
   AppSettingsEmbeddingsRoute: AppSettingsEmbeddingsRoute,
+  AppSettingsFilesRoute: AppSettingsFilesRoute,
   AppSettingsGeneralRoute: AppSettingsGeneralRoute,
   AppSettingsIntegrationsRoute: AppSettingsIntegrationsRoute,
+  AppSettingsMeetingNotesRoute: AppSettingsMeetingNotesRoute,
   AppSettingsMembersRoute: AppSettingsMembersRoute,
   AppSettingsModelsRoute: AppSettingsModelsRoute,
   AppSettingsObjectsRoute: AppSettingsObjectsRoute,
@@ -1272,6 +1378,9 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsUsageRoute: AppSettingsUsageRoute,
   AppSettingsWorkspaceRoute: AppSettingsWorkspaceRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppSettingsEmailCalendarConnectionIdRoute:
+    AppSettingsEmailCalendarConnectionIdRoute,
+  AppSettingsFilesConnectionIdRoute: AppSettingsFilesConnectionIdRoute,
   AppSettingsIntegrationsIntegrationIdRoute:
     AppSettingsIntegrationsIntegrationIdRoute,
   AppSettingsObjectsObjectSlugRoute: AppSettingsObjectsObjectSlugRoute,

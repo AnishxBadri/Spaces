@@ -5,11 +5,13 @@ import { describe, expect, it } from 'vitest'
 
 import { Route as AiRoute } from '#/routes/_app/settings/ai'
 import { Route as ArrivalRoute } from '#/routes/_app/settings/arrival'
+import { Route as ConnectionsRoute } from '#/routes/_app/settings/connections'
 import { Route as EmbeddingsRoute } from '#/routes/_app/settings/embeddings'
 import { Route as IntegrationRoute } from '#/routes/_app/settings/integrations_.$integrationId'
 import { Route as IntegrationsRoute } from '#/routes/_app/settings/integrations'
 import { Route as WorkspaceRoute } from '#/routes/_app/settings/workspace'
 import {
+  toEmailCalendar,
   toEmailForwarding,
   toGeneral,
   toModels,
@@ -41,6 +43,12 @@ const MOVES = [
     '/settings/email-forwarding',
   ],
   ['/settings/integrations', IntegrationsRoute, toPlugins, '/settings/plugins'],
+  [
+    '/settings/connections',
+    ConnectionsRoute,
+    toEmailCalendar,
+    '/settings/email-calendar',
+  ],
 ] as const
 
 describe('the settings paths that moved', () => {
@@ -101,8 +109,9 @@ describe('the blocks that moved between sections', () => {
     expect(source('usage')).toContain('title="Usage & limits"')
   })
 
-  it('Connection apps holds the OAuth clients; Connections no longer loads them', () => {
+  it('Connection apps holds the OAuth clients; the accounts pages never load them', () => {
     expect(source('connection-apps')).toContain('getProviderApps')
-    expect(source('connections')).not.toContain('getProviderApps')
+    for (const page of ['email-calendar', 'files', 'meeting-notes'])
+      expect(source(page)).not.toContain('getProviderApps')
   })
 })

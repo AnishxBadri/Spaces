@@ -6,7 +6,10 @@ import {
 } from '@spaces/core/writes/connections/token'
 import type { ProviderEndpoints } from '@spaces/core/writes/connections/token'
 import { revokeConnection as revokeAtProvider } from '@spaces/core/writes/connections/revoke'
-import { forgetConnection } from '@spaces/core/writes/connections/list'
+import {
+  forgetConnection,
+  listConnectionsFor,
+} from '@spaces/core/writes/connections/list'
 import { effectFn } from '#/lib/server/effect'
 import { requireUser } from '#/lib/server/shared'
 import type {
@@ -18,7 +21,8 @@ import type {
 
 /**
  * The session user's hand on their own connections: force a refresh,
- * revoke at the provider, and Disconnect (revoke, then delete the row).
+ * revoke at the provider, and Disconnect (delete the row, revoking when it
+ * was the account's last product).
  * - The core accessor takes no user; ownership is asserted here, before
  *   anything reads the tokens. Someone else's id and an unknown id answer
  *   the same 'Not your connection'.
@@ -72,8 +76,29 @@ export const revokeConnectionProgram = Effect.fn('revokeConnection')(function* (
 
 type RevokeStep = ConnectionDisconnectResult['revoke']
 
+/** Whether another live product row of the user's holds the same account's grant. */
+const sharesGrant = Effect.fn('connectionSharesGrant')(function* (
+  userId: string,
+  connectionId: string,
+) {
+  const rows = yield* Effect.promise(() => listConnectionsFor(userId))
+  const self = rows.find((r) => r.id === connectionId)
+  if (self === undefined) return false
+  return rows.some(
+    (r) =>
+      r.id !== connectionId &&
+      r.provider === self.provider &&
+      r.externalEmail === self.externalEmail &&
+      r.status !== 'revoked',
+  )
+})
+
 /**
- * Disconnect: revoke at the provider, then delete the row.
+ * Disconnect one product: delete its row, and revoke at the provider only
+ * when it was the account's last live product row. (D81)
+ * - Google's revoke ends the whole grant for the account, so while a Mail,
+ *   Calendar or Drive row for the same address is live the grant is `kept`.
+ *   A sibling already `revoked` holds no grant and does not count.
  * - A 4xx is `already-revoked` (core logs it); an outage is `unreachable`,
  *   logged here, and the row goes anyway — a provider that already forgot
  *   the grant cannot strand it.
@@ -87,18 +112,23 @@ export const disconnectConnectionProgram = Effect.fn('disconnectConnection')(
     providers: ProviderEndpoints = PROVIDERS,
   ) {
     yield* ownedBy(userId, connectionId)
-    const revoke: RevokeStep = yield* revokeAtProvider(connectionId, {
-      providers,
-    }).pipe(
-      Effect.catchTag('ProviderUnavailable', (error) =>
-        Effect.logWarning(
-          `disconnecting connection ${connectionId}: the provider could not be asked to revoke (${error.message}); deleting the row anyway`,
-        ).pipe(Effect.andThen(Effect.succeed<RevokeStep>('unreachable'))),
-      ),
-      Effect.catchTag('ConnectionNotFound', () =>
-        Effect.fail(new NotYourConnection({ message: 'Not your connection' })),
-      ),
-    )
+    const shared = yield* sharesGrant(userId, connectionId)
+    const revoke: RevokeStep = shared
+      ? 'kept'
+      : yield* revokeAtProvider(connectionId, {
+          providers,
+        }).pipe(
+          Effect.catchTag('ProviderUnavailable', (error) =>
+            Effect.logWarning(
+              `disconnecting connection ${connectionId}: the provider could not be asked to revoke (${error.message}); deleting the row anyway`,
+            ).pipe(Effect.andThen(Effect.succeed<RevokeStep>('unreachable'))),
+          ),
+          Effect.catchTag('ConnectionNotFound', () =>
+            Effect.fail(
+              new NotYourConnection({ message: 'Not your connection' }),
+            ),
+          ),
+        )
     const forgotten = yield* Effect.promise(() =>
       forgetConnection(userId, connectionId),
     )

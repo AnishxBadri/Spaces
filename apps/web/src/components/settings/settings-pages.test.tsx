@@ -37,6 +37,12 @@ const writes = vi.hoisted(() => ({
   revokeApiToken: vi.fn(async () => ({ ok: true })),
   updateObject: vi.fn(async () => ({ ok: true })),
   setMemberBanned: vi.fn(async () => ({ ok: true })),
+  disconnectConnection: vi.fn(
+    async ({ data }: { data: { connectionId: string } }) => ({
+      connectionId: data.connectionId,
+      revoke: 'kept',
+    }),
+  ),
 }))
 
 vi.mock('#/lib/server-fns', async (importOriginal) => ({
@@ -93,7 +99,13 @@ beforeAll(async () => {
   router = await import('@tanstack/react-router')
   const modules = {
     settings: await import('#/routes/_app/settings'),
-    connections: await import('#/routes/_app/settings/connections'),
+    'email-calendar': await import('#/routes/_app/settings/email-calendar'),
+    'email-calendar/$connectionId':
+      await import('#/routes/_app/settings/email-calendar_.$connectionId'),
+    files: await import('#/routes/_app/settings/files'),
+    'files/$connectionId':
+      await import('#/routes/_app/settings/files_.$connectionId'),
+    'meeting-notes': await import('#/routes/_app/settings/meeting-notes'),
     tokens: await import('#/routes/_app/settings/tokens'),
     general: await import('#/routes/_app/settings/general'),
     members: await import('#/routes/_app/settings/members'),
@@ -147,6 +159,45 @@ afterEach(async () => {
 const ISO = '2026-10-09T12:00:00.000Z'
 const OBJECT_ID = '00000000-0000-4000-8000-0000000000f1'
 const PLUGIN_ID = '00000000-0000-4000-8000-0000000000a1'
+const MAIL = '00000000-0000-4000-8000-0000000000c1'
+const CALENDAR = '00000000-0000-4000-8000-0000000000c2'
+const DRIVE = '00000000-0000-4000-8000-0000000000c3'
+const DEALS_MAIL = '00000000-0000-4000-8000-0000000000c4'
+
+const connection = (
+  connectionId: string,
+  product: string,
+  externalEmail = 'anish@fund.example',
+  connectedAt = '2026-10-01T09:00:00.000Z',
+) => ({
+  connectionId,
+  provider: 'google' as const,
+  product,
+  externalEmail,
+  scopes: [],
+  status: 'active' as const,
+  errorReason: null,
+  lastSyncAt: null,
+  connectedAt,
+})
+
+/** One Google address with Mail, Calendar and Drive; a later one with Mail. */
+const accounts = {
+  connections: [
+    connection(MAIL, 'gmail'),
+    connection(CALENDAR, 'calendar'),
+    connection(DRIVE, 'drive'),
+    connection(
+      DEALS_MAIL,
+      'gmail',
+      'deals@fund.example',
+      '2026-10-05T09:00:00.000Z',
+    ),
+  ],
+  configured: ['google' as const],
+  installed: ['calendar', 'google-drive'],
+  offered: ['box'],
+}
 
 const shellData = (isAdmin: boolean) => ({
   me: {
@@ -206,7 +257,13 @@ const pluginRow = {
 }
 
 const loaders: Record<string, () => object> = {
-  connections: () => ({ isAdmin: true, configured: [], connections: [] }),
+  'email-calendar': () => ({
+    view: accounts,
+    address: 'deals@in.fund.example',
+  }),
+  'email-calendar/$connectionId': () => ({ view: accounts }),
+  files: () => ({ view: accounts }),
+  'files/$connectionId': () => ({ view: accounts }),
   tokens: () => ({
     tokens: [
       {
@@ -322,10 +379,11 @@ const PATHS = [
   'objects',
   'templates',
   'currency',
+  'meeting-notes',
 ]
   .map(
     (p) =>
-      `/settings/${p.replace('$objectSlug', 'funds').replace('$integrationId', PLUGIN_ID)}`,
+      `/settings/${p.replace('$objectSlug', 'funds').replace('$integrationId', PLUGIN_ID).replace('$connectionId', DRIVE)}`,
   )
   .sort()
 
@@ -367,7 +425,9 @@ async function mount(path: string, isAdmin = true) {
         Object.assign(route.options, {
           id: p
             .replace('objects/', 'objects_/')
-            .replace('plugins/', 'plugins_/'),
+            .replace('plugins/', 'plugins_/')
+            .replace('email-calendar/', 'email-calendar_/')
+            .replace('files/', 'files_/'),
         })
       return route
     })
@@ -588,5 +648,97 @@ describe('the four acts that break something elsewhere ask first', () => {
     expect(dialog()?.textContent).toContain('Suspend Priya?')
     expect(dialog()?.textContent).toContain('signed out on every device')
     expect(writes.setMemberBanned).not.toHaveBeenCalled()
+  })
+})
+
+describe('the accounts pages, by the job an account does', () => {
+  const text = () => document.body.textContent
+  const rowsNamed = (email: string) =>
+    Array.from(document.querySelectorAll('a[aria-label]')).filter(
+      (a) => a.getAttribute('aria-label') === `Options for ${email}`,
+    )
+
+  it('lists a Google address with Mail and Calendar once on Email & calendar, the earliest mail account as Default', async () => {
+    await mount('/settings/email-calendar')
+    expect(rowsNamed('anish@fund.example')).toHaveLength(1)
+    expect(rowsNamed('deals@fund.example')).toHaveLength(1)
+    expect(text()).toContain('Mail · Calendar')
+    expect(
+      document.querySelectorAll('[title="New email sends from this account"]'),
+    ).toHaveLength(1)
+    expect(text()).toContain('Connect Google')
+    expect(text()).toContain('deals@in.fund.example')
+    expect(
+      document.querySelector('a[href="/settings/email-forwarding"]'),
+    ).not.toBeNull()
+  })
+
+  it('lists the same address on Files for its Drive row', async () => {
+    await mount('/settings/files')
+    expect(rowsNamed('anish@fund.example')).toHaveLength(1)
+    expect(rowsNamed('deals@fund.example')).toHaveLength(0)
+    expect(rowsNamed('anish@fund.example')[0]?.getAttribute('href')).toBe(
+      `/settings/files/${DRIVE}`,
+    )
+  })
+
+  it('shows Install › to an admin and "Ask an admin" to a member for a plugin not installed', async () => {
+    await mount('/settings/files')
+    expect(
+      document.querySelector('section a[href="/settings/plugins"]')
+        ?.textContent,
+    ).toBe('Install ›')
+    expect(text()).not.toContain('Ask an admin')
+    await mount('/settings/files', false)
+    expect(
+      document.querySelector('section a[href="/settings/plugins"]'),
+    ).toBeNull()
+    expect(text()).toContain('Ask an admin')
+  })
+
+  it('unticks Drive on the account page: a confirm naming what stays, then that row alone', async () => {
+    const dialog = () => document.querySelector('[role="dialog"]')
+    await mount(`/settings/files/${DRIVE}`)
+    const ticks = Array.from(
+      document.querySelectorAll('button[role="checkbox"]'),
+    ).map((b) => [b.getAttribute('aria-label'), b.getAttribute('aria-checked')])
+    expect(ticks).toEqual([
+      ['Mail', 'true'],
+      ['Calendar', 'true'],
+      ['Drive', 'true'],
+    ])
+    await click(
+      document.querySelector('button[role="checkbox"][aria-label="Drive"]'),
+    )
+    expect(dialog()?.textContent).toContain(
+      'Stop using anish@fund.example for Drive?',
+    )
+    expect(dialog()?.textContent).toContain('Mail · Calendar stay connected')
+    expect(writes.disconnectConnection).not.toHaveBeenCalled()
+    const confirm = Array.from(dialog()?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent.trim().startsWith('Disconnect'),
+    )
+    await click(confirm)
+    expect(writes.disconnectConnection).toHaveBeenCalledTimes(1)
+    expect(writes.disconnectConnection).toHaveBeenCalledWith({
+      data: { connectionId: DRIVE },
+    })
+  })
+
+  it("ticks Calendar on an account without it: that product's own consent, for that address, back to the page", async () => {
+    const assign = vi.spyOn(win.location, 'assign').mockImplementation(() => {})
+    try {
+      await mount(`/settings/email-calendar/${DEALS_MAIL}`)
+      const calendar = document.querySelector(
+        'button[role="checkbox"][aria-label="Calendar"]',
+      )
+      expect(calendar?.getAttribute('aria-checked')).toBe('false')
+      await click(calendar)
+      expect(assign).toHaveBeenCalledWith(
+        `/api/connections/google/start?product=calendar&return=${encodeURIComponent(`/settings/email-calendar/${DEALS_MAIL}`)}&account=deals%40fund.example`,
+      )
+    } finally {
+      assign.mockRestore()
+    }
   })
 })
