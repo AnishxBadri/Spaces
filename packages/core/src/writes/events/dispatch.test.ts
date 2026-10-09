@@ -2,25 +2,35 @@ import { Effect, Layer } from 'effect'
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
-import { integration, jobRun } from '@spaces/db/schema'
+import {
+  entity,
+  entitySpace,
+  integration,
+  jobRun,
+  space,
+} from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
 import type { DomainEvent } from '@spaces/sdk'
 import { z } from 'zod'
 import { jsonRecord, jsonValue } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
+import { setValues } from '../attributes/values'
 import { mergeEntities } from '../entities/merge'
 import { resolveEntity, resolveEntityInTx } from '../entities/resolve'
 import type { ResolveSource } from '../entities/resolve'
 import {
+  dealLinked,
   dispatchDomainEvent,
   entityCreated,
+  filed,
   subscribedQueues,
 } from './dispatch'
 
 /**
- * `entity.created` from the births that emit it to the plugin queues that
- * subscribe to it, on a recording `Enqueue`. (D65)
+ * The domain events from the writes that emit them to the plugin queues that
+ * subscribe to them, gated by the row's auto-enrich scope, on a recording
+ * `Enqueue`. (D65, D76)
  */
 
 const sent: Array<{ queue: string; data: unknown }> = []
@@ -51,12 +61,12 @@ const apollo = toManifestJson(
     sdk: '^1.0',
     name: 'Apollo',
     description: 'Enrichment.',
-    settings: z.object({ autoEnrich: z.boolean().default(false) }),
+    settings: z.object({}),
     jobs: {
       enrichCompany: { trigger: 'action', uses: ['Read'] },
       onCompanyCreated: {
         trigger: 'event',
-        on: ['entity.created'],
+        on: ['entity.created', 'filed', 'deal.linked'],
         uses: ['Read'],
       },
     },
@@ -66,7 +76,7 @@ const apollo = toManifestJson(
 type Row = {
   enabled?: boolean
   status?: 'installing' | 'enabled' | 'degraded' | 'disabled'
-  config?: { [k: string]: string | boolean }
+  config?: { [k: string]: string | boolean | Array<string> }
   manifest?: unknown
 }
 
@@ -76,7 +86,7 @@ const install = async (row: Row = {}) => {
     version: '0.1.0',
     enabled: row.enabled ?? true,
     status: row.status ?? 'enabled',
-    config: row.config ?? { autoEnrich: true },
+    config: row.config ?? { autoEnrichScopes: ['deal'] },
     manifest: jsonRecord(jsonValue.parse(row.manifest ?? apollo)),
   })
 }
@@ -167,15 +177,125 @@ describe('resolveEntity hands back the birth it emits', () => {
   })
 })
 
+const actorId = async () => {
+  const row = (await db.select({ id: user.id }).from(user).limit(1)).at(0)
+  if (!row) throw new Error('the core seed has a fixture user')
+  return row.id
+}
+
+/** A space, under `parent` when given — written as core's other fixtures write one. */
+const aSpace = async (slug: string, parent?: { id: string; path: string }) => {
+  const ent = (
+    await db
+      .insert(entity)
+      .values({
+        kind: 'space',
+        canonicalName: slug,
+        sourceClass: 'manual',
+        createdBy: await actorId(),
+      })
+      .returning({ id: entity.id })
+  ).at(0)
+  if (!ent) throw new Error('no space')
+  const path = parent === undefined ? slug : `${parent.path}.${slug}`
+  await db.insert(space).values({
+    entityId: ent.id,
+    parentId: parent?.id ?? null,
+    slug,
+    path,
+  })
+  return { id: ent.id, path }
+}
+
+const aCompany = async (name: string) =>
+  (
+    await resolveEntity({
+      kind: 'company',
+      name,
+      keys: { domain: domain() },
+      source: manual,
+    })
+  ).entityId
+
+/** A deal on `companyId`, its parties handed back as the write found them. */
+const aDeal = async (companyId: string) => {
+  const deal = (
+    await db
+      .insert(entity)
+      .values({ kind: 'deal', canonicalName: 'Deal', sourceClass: 'manual' })
+      .returning({ id: entity.id })
+  ).at(0)
+  if (!deal) throw new Error('no deal')
+  const written = await setValues({
+    entityId: deal.id,
+    patch: { company: companyId },
+    actor: { type: 'user', id: await actorId() },
+  })
+  return { id: deal.id, parties: written.dealParties }
+}
+
+const at = new Date('2026-10-02T12:00:00Z')
+
+describe('the events a write emits', () => {
+  it('filed names the space; a kind no event names emits nothing', () => {
+    expect(filed('e', 'company', 's', at)).toEqual({
+      name: 'filed',
+      entityId: 'e',
+      kind: 'company',
+      spaceId: 's',
+      occurredAt: '2026-10-02T12:00:00.000Z',
+    })
+    expect(filed('e', 'note', 's')).toBeNull()
+  })
+
+  it('deal.linked names the deal, and is silent for a seed or an import', () => {
+    const party = { dealId: 'd', entityId: 'e', kind: 'person' } as const
+    expect(dealLinked(party, 'manual', at)).toEqual({
+      name: 'deal.linked',
+      entityId: 'e',
+      kind: 'person',
+      dealId: 'd',
+      occurredAt: '2026-10-02T12:00:00.000Z',
+    })
+    expect(dealLinked(party, 'seed')).toBeNull()
+    expect(dealLinked(party, 'import')).toBeNull()
+  })
+
+  it('setValues hands back a deal’s new parties, and only the new ones', async () => {
+    const acme = await aCompany('Party Co')
+    const deal = await aDeal(acme)
+    expect(deal.parties).toEqual([
+      { dealId: deal.id, entityId: acme, kind: 'company' },
+    ])
+    const ada = (
+      await resolveEntity({
+        kind: 'person',
+        name: 'Ada Party',
+        keys: { email: `ada-party-${++n}@born.example` },
+        source: manual,
+      })
+    ).entityId
+    const again = await setValues({
+      entityId: deal.id,
+      patch: { company: acme, people: [ada] },
+      actor: { type: 'user', id: await actorId() },
+    })
+    expect(again.dealParties).toEqual([
+      { dealId: deal.id, entityId: ada, kind: 'person' },
+    ])
+  })
+})
+
 describe('dispatchDomainEvent', () => {
   const event = (): DomainEvent => ({
-    name: 'entity.created',
+    name: 'deal.linked',
     entityId: '00000000-0000-4000-8000-000000000001',
     kind: 'company',
+    dealId: '00000000-0000-4000-8000-000000000002',
     occurredAt: '2026-10-02T12:00:00.000Z',
   })
 
-  it('with autoEnrich on, enqueues the subscribed event job once, in the worker’s shape', async () => {
+  it('in the deal scope, enqueues deal.linked once, in the worker’s shape', async () => {
     await install()
     expect(await dispatch(event())).toEqual(['plugin.apollo.onCompanyCreated'])
     expect(sent).toEqual([
@@ -184,13 +304,16 @@ describe('dispatchDomainEvent', () => {
   })
 
   it.each([
-    ['absent', {}],
-    ['off', { autoEnrich: false }],
-    ['not a boolean', { autoEnrich: 'true' }],
-  ])('with autoEnrich %s, enqueues nothing', async (_, config) => {
+    ['legacy autoEnrich: true', { autoEnrich: true }, 1],
+    ['legacy autoEnrich: false', { autoEnrich: false }, 0],
+    ['no scope keys (the default)', {}, 1],
+    ['the space scope only', { autoEnrichScopes: ['space'] }, 0],
+    ['the meeting scope only', { autoEnrichScopes: ['meeting'] }, 0],
+    ['no scopes', { autoEnrichScopes: [] }, 0],
+  ])('deal.linked with %s enqueues %i', async (_, config, count) => {
     await install({ config })
-    expect(await dispatch(event())).toEqual([])
-    expect(sent).toEqual([])
+    await dispatch(event())
+    expect(sent).toHaveLength(count)
   })
 
   it('with no subscribers, enqueues nothing and no job runs', async () => {
@@ -232,9 +355,11 @@ describe('dispatchDomainEvent', () => {
       },
     }
     expect(
-      subscribedQueues(event(), [
-        { config: { autoEnrich: true }, manifest: interactive },
-      ]),
+      subscribedQueues(
+        event(),
+        [{ config: { autoEnrich: true }, manifest: interactive }],
+        { dealParty: false, filedPaths: [], chosenPaths: new Map() },
+      ),
     ).toEqual(['plugin.apollo.onCompanyCreated.interactive'])
   })
 
@@ -258,47 +383,96 @@ describe('dispatchDomainEvent', () => {
   })
 })
 
-describe('end to end through resolveEntity', () => {
-  it('a manual birth with a domain enqueues the job; an attach and a merge add nothing', async () => {
-    await install()
-    const a = await resolveEntity({
+describe('filed, in and out of the space scope', () => {
+  it('enqueues for a chosen space and a space below it, never for another', async () => {
+    const fintech = await aSpace(`fintech_${++n}`)
+    const payments = await aSpace(`payments_${n}`, fintech)
+    const climate = await aSpace(`climate_${n}`)
+    await install({
+      config: { autoEnrichScopes: ['space'], autoEnrichSpaces: [fintech.id] },
+    })
+    const co = await aCompany('Filed Co')
+    await dispatch(filed(co, 'company', fintech.id))
+    await dispatch(filed(co, 'company', payments.id))
+    expect(sent).toHaveLength(2)
+    await dispatch(filed(co, 'company', climate.id))
+    expect(sent).toHaveLength(2)
+  })
+
+  it('with no space chosen, any space is in scope', async () => {
+    const anywhere = await aSpace(`anywhere_${++n}`)
+    await install({ config: { autoEnrichScopes: ['space'] } })
+    await dispatch(filed(await aCompany('Any Co'), 'company', anywhere.id))
+    expect(sent).toHaveLength(1)
+  })
+
+  it('in the deal scope only, a filing runs nothing', async () => {
+    const sp = await aSpace(`deal_only_${++n}`)
+    await install({ config: { autoEnrichScopes: ['deal'] } })
+    expect(
+      await dispatch(filed(await aCompany('Not Deal Co'), 'company', sp.id)),
+    ).toEqual([])
+  })
+})
+
+describe('entity.created, in scope only as far as the record already is', () => {
+  it('a company on no deal and in no space is out of every scope', async () => {
+    await install({ config: { autoEnrichScopes: ['deal', 'space'] } })
+    const born = await resolveEntity({
       kind: 'company',
-      name: 'Winner',
+      name: 'Loose Co',
       keys: { domain: domain() },
       source: manual,
     })
-    const loserDomain = domain()
-    const b = await resolveEntity({
-      kind: 'company',
-      name: 'Loser',
-      keys: { domain: loserDomain },
-      source: manual,
+    expect(await dispatch(born.emit)).toEqual([])
+  })
+
+  it('a deal party, or a record already filed in a chosen space, is in', async () => {
+    const sp = await aSpace(`born_in_${++n}`)
+    await install({
+      config: {
+        autoEnrichScopes: ['deal', 'space'],
+        autoEnrichSpaces: [sp.id],
+      },
     })
-    await dispatch(a.emit)
-    await dispatch(b.emit)
+    const party = await aCompany('Party Born Co')
+    await aDeal(party)
+    await dispatch(entityCreated(party, 'company', 'manual'))
+    const filedCo = await aCompany('Filed Born Co')
+    await db.insert(entitySpace).values({ entityId: filedCo, spaceId: sp.id })
+    await dispatch(entityCreated(filedCo, 'company', 'manual'))
     expect(sent.map((s) => s.queue)).toEqual([
       'plugin.apollo.onCompanyCreated',
       'plugin.apollo.onCompanyCreated',
     ])
+  })
+})
 
-    const actor = (await db.select({ id: user.id }).from(user).limit(1)).at(0)
-    if (!actor) throw new Error('the core seed has a fixture user')
-    await mergeEntities({
-      winnerId: a.entityId,
-      loserId: b.entityId,
-      mergedBy: actor.id,
+describe('end to end: a company joins a deal', () => {
+  it('in the deal scope, each new party enqueues once; re-writing the party adds nothing', async () => {
+    await install()
+    const a = await aCompany('Winner')
+    const deal = await aDeal(a)
+    for (const party of deal.parties)
+      await dispatch(dealLinked(party, 'manual'))
+    expect(sent).toHaveLength(1)
+    expect(sent.at(0)).toMatchObject({
+      data: { event: { name: 'deal.linked', entityId: a, dealId: deal.id } },
     })
-    const reResolved = await resolveEntity({
-      kind: 'company',
-      keys: { domain: loserDomain },
-      source: manual,
+
+    const again = await setValues({
+      entityId: deal.id,
+      patch: { company: a },
+      actor: { type: 'user', id: await actorId() },
     })
-    expect(reResolved).toMatchObject({
-      action: 'attached',
-      entityId: a.entityId,
-      emit: null,
-    })
-    await dispatch(reResolved.emit)
-    expect(sent).toHaveLength(2)
+    expect(again.dealParties).toEqual([])
+  })
+
+  it('a merge emits nothing', async () => {
+    await install()
+    const a = await aCompany('Merge Winner')
+    const b = await aCompany('Merge Loser')
+    await mergeEntities({ winnerId: a, loserId: b, mergedBy: await actorId() })
+    expect(sent).toEqual([])
   })
 })

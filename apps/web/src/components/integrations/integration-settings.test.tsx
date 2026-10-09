@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { settingsJsonSchema } from '@spaces/sdk'
 import { formValuesOf, settingsFormOf } from '#/lib/integrations/settings-form'
 import {
+  AutoEnrichFields,
   SecretFieldRow,
   SettingsFields,
   WebhookUrlRow,
@@ -162,5 +163,38 @@ describe('the webhook group', () => {
     expect(html).toContain(url)
     expect(html).toContain('Copy')
     expect(html).not.toContain('<input')
+  })
+})
+
+describe('AutoEnrichFields', () => {
+  const options = [
+    { id: '00000000-0000-4000-8000-0000000000a1', label: 'Fintech' },
+    { id: '00000000-0000-4000-8000-0000000000a2', label: 'Fintech / Payments' },
+  ]
+  const draw = (scopes: Array<'deal' | 'space' | 'meeting'>) =>
+    renderToStaticMarkup(
+      <AutoEnrichFields
+        view={{ scopes, spaces: [], options }}
+        disabled={false}
+        onSave={() => undefined}
+      />,
+    )
+
+  it('offers the three scopes as checkboxes, ticked as stored', () => {
+    const html = draw(['deal'])
+    expect(html).toContain('Auto-enrich')
+    expect(html.match(/role="checkbox"/g)).toHaveLength(3)
+    expect(html).toContain('When a record joins a deal')
+    expect(html).toContain('When a record is filed into a space')
+    expect(html).toContain('When a record appears in a synced meeting')
+    expect(html.match(/aria-checked="true"/g)).toHaveLength(1)
+    expect(html).not.toContain('Fintech')
+  })
+
+  it('with Spaces ticked, lists the spaces; none chosen is every space', () => {
+    const html = draw(['space'])
+    expect(html).toContain('Fintech / Payments')
+    expect(html).toContain('No space chosen: every space.')
+    expect(html.match(/role="checkbox"/g)).toHaveLength(5)
   })
 })

@@ -1,9 +1,11 @@
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
+import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { enrichmentRecord } from '@spaces/db/schema'
 import { JobRetryable, Receipts } from '@spaces/sdk'
 import type { ReceiptClaim } from '@spaces/sdk'
 import { jsonValue } from '../../json'
+import type { Tx } from '../attributes/values'
 import type { BoundIntegration } from './binding'
 
 /**
@@ -45,3 +47,35 @@ export const ReceiptsLive = (
         }),
     }),
   )
+
+/** The cited receipt is missing, or another integration's. */
+export class ReceiptNotOwned extends Schema.TaggedError<ReceiptNotOwned>()(
+  'ReceiptNotOwned',
+  { receiptId: Schema.String, message: Schema.String },
+) {}
+
+/**
+ * A receipt a port cites must be one **this** integration stored, checked
+ * inside the citing write's transaction — otherwise a plugin could cite
+ * someone else's response as its evidence. Throws `ReceiptNotOwned`.
+ */
+export async function checkReceipt(
+  tx: Tx,
+  integrationId: string,
+  receiptId: string,
+) {
+  const held = (
+    await tx
+      .select({ integrationId: enrichmentRecord.integrationId })
+      .from(enrichmentRecord)
+      .where(eq(enrichmentRecord.id, receiptId))
+  ).at(0)
+  if (held?.integrationId !== integrationId)
+    throw new ReceiptNotOwned({
+      receiptId,
+      message:
+        held === undefined
+          ? `no receipt ${receiptId}`
+          : `receipt ${receiptId} was stored by another integration`,
+    })
+}

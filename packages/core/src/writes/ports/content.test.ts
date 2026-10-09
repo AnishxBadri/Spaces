@@ -3,6 +3,8 @@ import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import {
+  attributeEvent,
+  enrichmentRecord,
   entity,
   integration,
   interaction,
@@ -345,6 +347,69 @@ describe('Content.emitSignal', () => {
     expect(JSON.stringify(exit)).toContain('JobPermanent')
     expect(
       await db.select().from(signal).where(eq(signal.sourceRef, row.id)),
+    ).toEqual([])
+  })
+})
+
+describe('Content.emitSignal citing a receipt', () => {
+  const receipt = async (integrationId: string, entityId: string) => {
+    const stored = (
+      await db
+        .insert(enrichmentRecord)
+        .values({
+          entityId,
+          provider: 'apollo',
+          raw: { organization: { funding_events: [{ type: 'Series A' }] } },
+          creditsUsed: 1,
+          integrationId,
+        })
+        .returning({ id: enrichmentRecord.id })
+    ).at(0)
+    if (!stored) throw new Error('no receipt')
+    return stored.id
+  }
+  const funding = (entityId: string, receiptId: string): SignalClaim => ({
+    _tag: 'signal',
+    entityId,
+    kind: 'funding',
+    title: 'Series A · $5M',
+    publishedAt: '2024-03-01T00:00:00.000Z',
+    payload: { round: 'Series A', amount: '5M' },
+    receiptId,
+  })
+
+  it('writes one signal on the company with the receipt as its ref and no attribute write', async () => {
+    const row = await boundRow('apollo')
+    const co = await company('Funded Co', 'funded-content.example')
+    const events = async () =>
+      (
+        await db
+          .select()
+          .from(attributeEvent)
+          .where(eq(attributeEvent.entityId, co))
+      ).length
+    const before = await events()
+    const receiptId = await receipt(row.id, co)
+    const { signalId } = await run(row, emitSignal(funding(co, receiptId)))
+    const rows = await db.select().from(signal).where(eq(signal.entityId, co))
+    expect(rows).toHaveLength(1)
+    expect(rows.at(0)).toMatchObject({
+      id: signalId,
+      sourceRef: row.id,
+      payload: { kind: 'funding', refs: [`event:${receiptId}`] },
+    })
+    expect(await events()).toBe(before)
+  })
+
+  it('refuses a receipt another integration stored, writing nothing', async () => {
+    const mine = await boundRow('apollo')
+    const theirs = await boundRow('pdl')
+    const co = await company('Borrowed Signal Co', 'borrowed-signal.example')
+    const receiptId = await receipt(theirs.id, co)
+    const exit = await runExit(mine, emitSignal(funding(co, receiptId)))
+    expect(JSON.stringify(exit)).toContain('another integration')
+    expect(
+      await db.select().from(signal).where(eq(signal.entityId, co)),
     ).toEqual([])
   })
 })

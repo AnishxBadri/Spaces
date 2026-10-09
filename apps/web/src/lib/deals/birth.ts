@@ -8,12 +8,13 @@ import {
   EntityNotFound,
   setValuesInTx,
 } from '@spaces/core/writes/attributes/values'
-import type { Tx } from '@spaces/core/writes/attributes/values'
+import type { DealParty, Tx } from '@spaces/core/writes/attributes/values'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import type { EmbedSource } from '@spaces/core/writes/ai/chunk-sources'
 import { birthHolding } from '#/lib/portfolio/holding'
 import { webEnqueue } from '#/lib/enqueue-live'
 import {
+  dealLinked,
   dispatchDomainEvent,
   entityCreated,
 } from '@spaces/core/writes/events/dispatch'
@@ -122,7 +123,12 @@ function suppliedOf(input: BirthDealInput): Record<string, unknown> {
 export async function birthDealInTx(
   tx: Tx,
   input: BirthDealInput,
-): Promise<BirthDealResult & { reembed: Array<EmbedSource> }> {
+): Promise<
+  BirthDealResult & {
+    reembed: Array<EmbedSource>
+    dealParties: Array<DealParty>
+  }
+> {
   const objectId = await objectIdForKindAsync('deal')
   const born = (
     await tx
@@ -141,7 +147,7 @@ export async function birthDealInTx(
   // Birth = supplied values, then defaults (spec §4). Owner is not stamped
   // here: `deal.owner` defaults to current-user, so the dialog, an import
   // and any other path with a human present agree on who owns it.
-  const { reembed } = await setValuesInTx(tx, {
+  const { reembed, dealParties } = await setValuesInTx(tx, {
     entityId: born.id,
     patch: suppliedOf(input),
     actor: { type: 'user', id: input.actorId },
@@ -167,13 +173,14 @@ export async function birthDealInTx(
           )
         ).id
       : null
-  return { id: born.id, holdingId, reembed }
+  return { id: born.id, holdingId, reembed, dealParties }
 }
 
 /**
  * The program. Without `tx` it opens its own transaction and, once that
  * commits, queues the embeddable values it set and dispatches the birth's
- * `entity.created` (none for an `import` birth, D65); with one, it runs
+ * `entity.created` and each party's `deal.linked` (none for an `import`
+ * birth, D65); with one, it runs
  * inside the caller's and leaves those steps to whoever commits it.
  */
 export const birthDealProgram = Effect.fn('birthDealProgram')(function* (
@@ -200,6 +207,10 @@ export const birthDealProgram = Effect.fn('birthDealProgram')(function* (
     yield* dispatchDomainEvent(
       entityCreated(out.id, 'deal', input.source),
     ).pipe(Effect.provide(webEnqueue))
+    for (const party of out.dealParties)
+      yield* dispatchDomainEvent(dealLinked(party, input.source)).pipe(
+        Effect.provide(webEnqueue),
+      )
   }
   return { id: out.id, holdingId: out.holdingId }
 })

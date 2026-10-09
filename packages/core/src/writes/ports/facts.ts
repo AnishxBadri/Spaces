@@ -1,7 +1,8 @@
-import { Effect, Layer, Schema } from 'effect'
-import { eq } from 'drizzle-orm'
+import { Effect, Layer } from 'effect'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { enrichmentRecord } from '@spaces/db/schema'
+import { entity, entityAlias } from '@spaces/db/schema'
+import type { Json } from '@spaces/db/json'
 import { Facts, JobPermanent, JobRetryable } from '@spaces/sdk'
 import type { FactClaim, FillResult } from '@spaces/sdk'
 import { ref } from '../../context/ref'
@@ -16,6 +17,7 @@ import type { Tx, ValueConflict } from '../attributes/values'
 import { canonicalId } from '../entities/sweep'
 import { SuggestionInvalid, proposeWith } from '../suggestions/propose'
 import type { BoundIntegration } from './binding'
+import { ReceiptNotOwned, checkReceipt } from './receipts'
 import { integrationPatch } from './judgment'
 
 /**
@@ -43,10 +45,10 @@ import { integrationPatch } from './judgment'
  *   is inserted in the fill's own transaction, so the fill and its
  *   suggestions commit together; a re-run raising the same conflict is a
  *   no-op insert against `suggestion_open_integration_unique`, never a read
- *   first. A conflict the inbox could not accept — a record or actor
- *   reference, which a suggestion proposes as a claim rather than an id —
- *   is returned and not raised. This integration's own earlier value is
- *   updated in place.
+ *   first. A relationship's conflict is proposed as identity claims (name
+ *   plus domain or email), never as record ids; one the inbox still could
+ *   not take is returned and not raised. This integration's own earlier
+ *   value is updated in place — a relationship's never is (D72).
  * - **One transaction.** A value the registry refuses fails the fill
  *   permanently (retrying would send it again) and nothing of the claim is
  *   written. A merged-away record is filled on its survivor.
@@ -54,29 +56,6 @@ import { integrationPatch } from './judgment'
  * Embeddable values go out through core's `Enqueue` after the commit, as
  * `IdentityLive`'s birth values do.
  */
-
-/** The cited receipt is missing, or another integration's. */
-class ReceiptNotOwned extends Schema.TaggedError<ReceiptNotOwned>()(
-  'ReceiptNotOwned',
-  { receiptId: Schema.String, message: Schema.String },
-) {}
-
-async function checkReceipt(tx: Tx, integrationId: string, receiptId: string) {
-  const held = (
-    await tx
-      .select({ integrationId: enrichmentRecord.integrationId })
-      .from(enrichmentRecord)
-      .where(eq(enrichmentRecord.id, receiptId))
-  ).at(0)
-  if (held?.integrationId !== integrationId)
-    throw new ReceiptNotOwned({
-      receiptId,
-      message:
-        held === undefined
-          ? `no receipt ${receiptId}`
-          : `receipt ${receiptId} was stored by another integration`,
-    })
-}
 
 const failure = (cause: unknown) =>
   cause instanceof AttributeValidationError ||
@@ -98,6 +77,46 @@ export const conflictRationale = (
   `${conflict.slug}: ${pluginId} says ${JSON.stringify(conflict.proposed)}; the record holds ${JSON.stringify(conflict.existing)}`
 
 /**
+ * Record ids as the identity claims a card proposes a relationship by: the
+ * record's name, with its domain or email when it holds one. A suggestion
+ * never carries a raw id.
+ */
+async function referenceClaims(tx: Tx, value: Json): Promise<Json> {
+  const ids = (Array.isArray(value) ? value : [value]).map(String)
+  if (ids.length === 0) return []
+  const rows = await tx
+    .select({ id: entity.id, name: entity.canonicalName })
+    .from(entity)
+    .where(inArray(entity.id, ids))
+  const keys = await tx
+    .select({
+      entityId: entityAlias.entityId,
+      kind: entityAlias.kind,
+      value: entityAlias.value,
+    })
+    .from(entityAlias)
+    .where(
+      and(
+        inArray(entityAlias.entityId, ids),
+        eq(entityAlias.isIdentity, true),
+        inArray(entityAlias.kind, ['domain', 'email']),
+      ),
+    )
+    .orderBy(asc(entityAlias.createdAt))
+  const claims = ids.flatMap((id) => {
+    const named = rows.find((r) => r.id === id)
+    if (named === undefined) return []
+    const key = keys.find((k) => k.entityId === id)
+    return [
+      key === undefined
+        ? { name: named.name }
+        : { name: named.name, [key.kind]: key.value },
+    ]
+  })
+  return Array.isArray(value) ? claims : (claims.at(0) ?? null)
+}
+
+/**
  * One suggestion per conflict, on the fill's transaction. A refusal by the
  * proposal validator is the one outcome skipped — it throws before any SQL,
  * so the transaction is untouched; anything else rolls the fill back.
@@ -110,6 +129,12 @@ async function raiseConflicts(
   refs: ReadonlyArray<string>,
 ) {
   for (const conflict of conflicts) {
+    const value = conflict.reference
+      ? await referenceClaims(tx, conflict.proposed)
+      : conflict.proposed
+    const existing = conflict.reference
+      ? await referenceClaims(tx, conflict.existing)
+      : conflict.existing
     try {
       await proposeWith(
         tx,
@@ -117,8 +142,12 @@ async function raiseConflicts(
           integrationId: row.id,
           entityId,
           slug: conflict.slug,
-          value: conflict.proposed,
-          rationale: conflictRationale(row.capabilityId, conflict),
+          value,
+          rationale: conflictRationale(row.capabilityId, {
+            ...conflict,
+            proposed: value,
+            existing,
+          }),
           refs,
         }),
       )
@@ -169,7 +198,13 @@ export const FactsLive = (
           catch: failure,
         })
         yield* enqueueEmbeds(written.reembed)
-        const result: FillResult = { conflicts: written.conflicts }
+        const result: FillResult = {
+          conflicts: written.conflicts.map((c) => ({
+            slug: c.slug,
+            existing: c.existing,
+            proposed: c.proposed,
+          })),
+        }
         return result
       })
 

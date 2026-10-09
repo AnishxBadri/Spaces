@@ -7,8 +7,9 @@ import { cn } from '#/lib/utils'
 
 /**
  * The Installed ledger: one 40px row per plugin — the operator's switch,
- * name and version, what it last did or why it is not running, today's
- * credits, the last run, the state, and the one action the state calls for.
+ * name and version, what it last did or why it is not running, its
+ * auto-enrich scope, today's credits, the last run, the state, and the one
+ * action the state calls for.
  * The three ways of not running read apart:
  * - degraded — amber row, the worker's reason, Fix;
  * - tripped — rose row, the breaker's reason, Reset;
@@ -250,6 +251,14 @@ function LedgerLine({
             {note}
           </span>
         ) : null}
+      </span>
+      <span
+        className="w-28 shrink-0 truncate mono text-micro text-graphite"
+        title={
+          row.autoEnrich === null ? undefined : `Auto-enrich: ${row.autoEnrich}`
+        }
+      >
+        {row.autoEnrich === null ? '' : `auto ${row.autoEnrich}`}
       </span>
       <span className="w-24 shrink-0 numeric text-micro text-graphite">
         {creditsOf(row)}

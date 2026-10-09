@@ -131,8 +131,18 @@ describe('setValuesEffect, fill-blanks mode', () => {
     )
     expect(result.changed).toEqual([])
     expect(result.conflicts).toEqual([
-      { slug: 'founded_year', existing: 1999, proposed: 2000 },
-      { slug: 'location', existing: 'Pune', proposed: 'Delhi' },
+      {
+        slug: 'founded_year',
+        existing: 1999,
+        proposed: 2000,
+        reference: false,
+      },
+      {
+        slug: 'location',
+        existing: 'Pune',
+        proposed: 'Delhi',
+        reference: false,
+      },
     ])
     expect(await eventsFor(co, 'location')).toHaveLength(0)
   })

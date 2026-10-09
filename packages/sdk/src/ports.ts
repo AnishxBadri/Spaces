@@ -103,6 +103,10 @@ export type FillResult = { readonly conflicts: ReadonlyArray<FactConflict> }
  * Fill blanks only (the lane is `setValues`). A value this integration wrote
  * before is updated in place; a value a human wrote is refused and returned
  * — and becomes one suggestion — so the job can see what it could not say.
+ * - A value a person cleared stays cleared: skipped, neither written nor
+ *   returned.
+ * - A relationship (a record reference) fills only when empty; any held
+ *   value that differs is returned and proposed, even this integration's.
  */
 export class Facts extends Context.Service<
   Facts,

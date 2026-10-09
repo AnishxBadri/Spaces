@@ -124,7 +124,7 @@ describe('boot with the four fixtures', () => {
     expect(verdicts.map((v) => [v.id, v.status, v.reason])).toEqual([
       ['echo', 'enabled', null],
       ['needs-key', 'degraded', 'missing credential'],
-      ['old-sdk', 'degraded', 'requires sdk ^2.0, host provides 1.1.0'],
+      ['old-sdk', 'degraded', 'requires sdk ^2.0, host provides 1.2.0'],
       ['tampered', 'degraded', 'bundle sha does not match lock.json'],
     ])
     expect(loaded.map((p) => p.manifest.id)).toEqual(['echo'])
@@ -138,7 +138,7 @@ describe('boot with the four fixtures', () => {
       ['core.mailbox', 'enabled', null],
       ['echo', 'enabled', null],
       ['needs-key', 'degraded', 'missing credential'],
-      ['old-sdk', 'degraded', 'requires sdk ^2.0, host provides 1.1.0'],
+      ['old-sdk', 'degraded', 'requires sdk ^2.0, host provides 1.2.0'],
       ['tampered', 'degraded', 'bundle sha does not match lock.json'],
     ])
   })
@@ -183,7 +183,7 @@ describe('boot with the four fixtures', () => {
       {
         id: 'old-sdk',
         version: '0.1.0',
-        reason: 'requires sdk ^2.0, host provides 1.1.0',
+        reason: 'requires sdk ^2.0, host provides 1.2.0',
       },
       {
         id: 'tampered',

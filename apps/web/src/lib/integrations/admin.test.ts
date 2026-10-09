@@ -33,6 +33,7 @@ import {
   listIntegrationsHandler,
   removeIntegrationSecretHandler,
   resetIntegrationHandler,
+  saveIntegrationAutoEnrichHandler,
   saveIntegrationSecretHandler,
   saveIntegrationSettingsHandler,
   setIntegrationEnabledHandler,
@@ -730,5 +731,76 @@ describe('the webhook secret field', () => {
     expect((await getIntegrationHandler({ id: apollo.id })).webhookUrl).toBe(
       null,
     )
+  })
+})
+
+describe('auto-enrich scope', () => {
+  /** Apollo as an older bundle stored it: the on/off switch and an event job. */
+  const SCOPED: IntegrationManifest = {
+    ...APOLLO,
+    jobs: {
+      enrichCompany: { trigger: 'action', uses: ['Read', 'Secrets'] },
+      autoEnrich: {
+        trigger: 'event',
+        on: ['entity.created', 'filed', 'deal.linked'],
+        uses: ['Read'],
+      },
+    },
+  }
+
+  it('reads the legacy switch as the deal scope, on the ledger row and the card', async () => {
+    asAdmin()
+    const apollo = await install({
+      manifest: SCOPED,
+      config: { autoEnrich: true },
+    })
+    const row = (await listIntegrationsHandler()).find(
+      (r) => r.id === apollo.id,
+    )
+    expect(row?.autoEnrich).toBe('deal')
+    const detail = await getIntegrationHandler({ id: apollo.id })
+    expect(detail.autoEnrichForm).toMatchObject({
+      scopes: ['deal'],
+      spaces: [],
+    })
+    // The switch is the scope's now: the form does not draw it twice.
+    expect(
+      detail.form.ok ? detail.form.fields.map((f) => f.key) : [],
+    ).not.toContain('autoEnrich')
+  })
+
+  it('a plugin with no event job has no scope', async () => {
+    asAdmin()
+    const apollo = await install({ manifest: APOLLO, config: {} })
+    const detail = await getIntegrationHandler({ id: apollo.id })
+    expect(detail.autoEnrich).toBeNull()
+    expect(detail.autoEnrichForm).toBeNull()
+    await expect(
+      saveIntegrationAutoEnrichHandler({
+        id: apollo.id,
+        scope: { scopes: ['deal'], spaces: [] },
+      }),
+    ).rejects.toThrow(/no auto-enrich scope/)
+  })
+
+  it('a save writes the scope keys, drops the legacy switch and keeps the rest', async () => {
+    asAdmin()
+    const apollo = await install({
+      manifest: SCOPED,
+      config: { autoEnrich: true, cacheDays: 30 },
+    })
+    await saveIntegrationAutoEnrichHandler({
+      id: apollo.id,
+      scope: { scopes: ['deal', 'space'], spaces: [] },
+    })
+    expect((await rowOf(apollo.id)).config).toEqual({
+      cacheDays: 30,
+      autoEnrichScopes: ['deal', 'space'],
+      autoEnrichSpaces: [],
+    })
+    const row = (await listIntegrationsHandler()).find(
+      (r) => r.id === apollo.id,
+    )
+    expect(row?.autoEnrich).toBe('deal · space')
   })
 })

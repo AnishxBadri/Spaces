@@ -6,9 +6,12 @@ import { releaseCredential } from '@spaces/core/writes/plugins/credential'
 import { PLUGIN_CHANGED } from '@spaces/core/writes/plugins/install'
 import { redact, storeCredential } from '@spaces/core/writes/vault'
 import { requireAdmin } from '#/lib/server/shared'
+import { autoEnrichConfig } from '@spaces/core/plugins/auto-enrich'
+import type { AutoEnrichScope } from '@spaces/core/plugins/auto-enrich'
 import {
   IntegrationNotFound,
   SECRET_SLOTS,
+  hasEventJob,
   integrationCountProgram,
   integrationDetailProgram,
   integrationLedgerProgram,
@@ -141,6 +144,30 @@ export const saveIntegrationSettingsProgram = Effect.fn(
   )
   yield* notifyChanged(row.capabilityId)
   return { ok: true }
+})
+
+/**
+ * Write the auto-enrich scope onto `integration.config`, the retired
+ * `autoEnrich` switch dropped. Refused for a plugin with no event job. The
+ * dispatcher reads the row on every event, so nothing reloads. (D76)
+ */
+export const saveIntegrationAutoEnrichProgram = Effect.fn(
+  'saveIntegrationAutoEnrichProgram',
+)(function* (
+  id: string,
+  scope: AutoEnrichScope,
+): Effect.fn.Return<void, Failure> {
+  const row = yield* rowOf(id)
+  if (!hasEventJob(manifestOf(row.manifest)))
+    return yield* new IntegrationRefused({
+      message: `${row.capabilityId} runs on no trigger, so it has no auto-enrich scope`,
+    })
+  yield* write(() =>
+    db
+      .update(integration)
+      .set({ config: autoEnrichConfig(row.config, scope) })
+      .where(eq(integration.id, row.id)),
+  )
 })
 
 export type { SecretSlot }
@@ -298,6 +325,14 @@ export async function saveIntegrationSettingsHandler(input: {
 }): Promise<SettingsSaved> {
   await requireAdmin()
   return run(saveIntegrationSettingsProgram(input.id, input.values))
+}
+
+export async function saveIntegrationAutoEnrichHandler(input: {
+  readonly id: string
+  readonly scope: AutoEnrichScope
+}): Promise<void> {
+  await requireAdmin()
+  return run(saveIntegrationAutoEnrichProgram(input.id, input.scope))
 }
 
 export async function saveIntegrationSecretHandler(input: {

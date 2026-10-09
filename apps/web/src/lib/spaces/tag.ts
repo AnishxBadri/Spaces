@@ -3,6 +3,8 @@ import type { db } from '@spaces/db'
 import { entity, entitySpace, space } from '@spaces/db/schema'
 import type { tagSource } from '@spaces/db/schema'
 import { raiseSensitivity } from '@spaces/core/writes/ai/stamp-sensitivity'
+import { filed } from '@spaces/core/writes/events/dispatch'
+import type { DomainEvent } from '@spaces/sdk'
 import type { Tx } from '@spaces/core/writes/attributes/values'
 
 /**
@@ -15,7 +17,8 @@ import type { Tx } from '@spaces/core/writes/attributes/values'
  *
  * `(entity_id, space_id)` is the primary key, so a record already in the
  * space keeps the row it has — its source, confidence and author — and the
- * answer is `false`. `tag.test.ts` greps that these two call sites reach
+ * answer is `tagged: false`. A new tag hands back the `filed` event its
+ * caller dispatches after the commit (D76). `tag.test.ts` greps that these two call sites reach
  * `entity_space` through here and nowhere else.
  *
  * A new tag raises the record's chunks to `sensitive` in the caller's
@@ -37,10 +40,19 @@ export type TagIntoSpaceInput = {
   createdBy: string
 }
 
+/**
+ * Whether the tag was new, and the `filed` it owes once the caller's
+ * transaction commits (null for a kind no event names, or no new tag).
+ */
+export type SpaceTagged = {
+  readonly tagged: boolean
+  readonly emit: DomainEvent | null
+}
+
 export async function insertSpaceTag(
   tx: Tx,
   input: TagIntoSpaceInput,
-): Promise<boolean> {
+): Promise<SpaceTagged> {
   const inserted = await tx
     .insert(entitySpace)
     .values({
@@ -52,13 +64,23 @@ export async function insertSpaceTag(
     })
     .onConflictDoNothing()
     .returning({ entityId: entitySpace.entityId })
-  if (inserted.length === 0) return false
+  if (inserted.length === 0) return { tagged: false, emit: null }
   await raiseSensitivity(tx, {
     kind: 'filed',
     entityId: input.entityId,
     spaceId: input.spaceId,
   })
-  return true
+  const kind = (
+    await tx
+      .select({ kind: entity.kind })
+      .from(entity)
+      .where(eq(entity.id, input.entityId))
+  ).at(0)?.kind
+  return {
+    tagged: true,
+    emit:
+      kind === undefined ? null : filed(input.entityId, kind, input.spaceId),
+  }
 }
 
 /**

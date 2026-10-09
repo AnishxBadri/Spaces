@@ -352,10 +352,14 @@ export type SetValuesInput = {
    * deciding "blank" before the transaction is the read-modify-write race
    * the lock exists to prevent. Per slug the patch changes:
    *
-   * - blank (absent or null) → filled;
+   * - blank (absent or null) → filled, unless a person cleared it: a
+   *   blank whose latest `attribute_event` is a user's is user-held and
+   *   skipped (`skipped`), neither written nor a conflict (D72);
    * - held, and the slug's latest `attribute_event` is this write's own
    *   actor (same type and id) recording the value still held → updated in
    *   place: machine-over-machine by the same integration is a fill;
+   * - a relationship (`record_reference`) fills only when empty: any held
+   *   value is refused, this actor's own included (D72);
    * - held by anyone else — a person, another integration, a merge, a
    *   value with no event at all → refused, written nowhere, and handed
    *   back in `conflicts`. Disagreement between providers is normal;
@@ -383,6 +387,8 @@ export type ValueConflict = {
   slug: string
   existing: Json
   proposed: Json
+  /** A relationship: `proposed` is record ids, never a claim a card can hold as is. */
+  reference: boolean
 }
 
 /**
@@ -426,7 +432,31 @@ export type SetValuesResult = {
    * for a patch write.
    */
   conflicts: Array<ValueConflict>
+  /** Blank slugs fill-blanks mode left alone because a person cleared them. */
+  skipped: Array<string>
+  /**
+   * Records this write made a party of a deal — targets added to a deal's
+   * `company` or `people` — for the caller to emit `deal.linked` once it
+   * has committed.
+   */
+  dealParties: Array<DealParty>
 }
+
+/** A company or person that became a party of a deal. */
+export type DealParty = {
+  dealId: string
+  entityId: string
+  kind: 'company' | 'person'
+}
+
+/** The deal slugs whose targets are its parties, and the kind each holds. */
+const DEAL_PARTY_SLUGS: ReadonlyMap<string, DealParty['kind']> = new Map([
+  ['company', 'company'],
+  ['people', 'person'],
+])
+
+const referenceIds = (v: Json): Array<string> =>
+  v === null ? [] : (Array.isArray(v) ? v : [v]).map(String)
 
 /**
  * Who wrote the value each held slug carries now: the latest
@@ -434,7 +464,11 @@ export type SetValuesResult = {
  * entity row lock — so a concurrent write to the same record has either
  * committed (and is read here) or is waiting on the lock.
  */
-async function lastWriters(tx: Tx, entityId: string, slugs: Array<string>) {
+export async function lastWriters(
+  tx: Tx,
+  entityId: string,
+  slugs: Array<string>,
+) {
   if (slugs.length === 0) return new Map<string, LastWriter>()
   const rows = await tx
     .selectDistinctOn([attributeEvent.attrSlug], {
@@ -455,7 +489,7 @@ async function lastWriters(tx: Tx, entityId: string, slugs: Array<string>) {
   return new Map(rows.map((r) => [r.slug, r]))
 }
 
-type LastWriter = {
+export type LastWriter = {
   to: Json | null
   actorType: Actor['type']
   actorId: string | null
@@ -549,22 +583,35 @@ export async function setValuesInTx(
   // else already holds. Conflicted slugs leave the patch altogether — no
   // event, no identity reconcile, no default — as if never named.
   const conflicts: Array<ValueConflict> = []
+  const skipped: Array<string> = []
   let changes = planned
   let effectivePatch = patch
   if (fillBlanks) {
     const writers = await lastWriters(
       tx,
       entityId,
-      planned.filter((c) => c.before !== null).map((c) => c.slug),
+      planned.map((c) => c.slug),
     )
     changes = []
     for (const c of planned) {
-      if (c.before === null || ownedBy(actor, c.before, writers.get(c.slug)))
+      const last = writers.get(c.slug)
+      const reference = c.def.type === 'record_reference'
+      if (c.before === null) {
+        // A blank a person left blank — they cleared it — is theirs.
+        if (last?.actorType === 'user') skipped.push(c.slug)
+        else changes.push(c)
+      } else if (!reference && ownedBy(actor, c.before, last)) {
         changes.push(c)
-      else
-        conflicts.push({ slug: c.slug, existing: c.before, proposed: c.value })
+      } else {
+        conflicts.push({
+          slug: c.slug,
+          existing: c.before,
+          proposed: c.value,
+          reference,
+        })
+      }
     }
-    const refused = new Set(conflicts.map((c) => c.slug))
+    const refused = new Set([...conflicts.map((c) => c.slug), ...skipped])
     effectivePatch = Object.fromEntries(
       Object.entries(patch).filter(([slug]) => !refused.has(slug)),
     )
@@ -717,8 +764,23 @@ export async function setValuesInTx(
     else reembed.push(chunked)
   }
 
+  // A deal's new parties: targets its `company` or `people` gained here.
+  const dealParties: Array<DealParty> = []
+  if (ent.kind === 'deal') {
+    for (const change of changes) {
+      const kind = DEAL_PARTY_SLUGS.get(change.slug)
+      if (kind === undefined || change.def.type !== 'record_reference') continue
+      const before = new Set(referenceIds(change.before))
+      for (const id of referenceIds(change.value))
+        if (!before.has(id))
+          dealParties.push({ dealId: entityId, entityId: id, kind })
+    }
+  }
+
   return {
     reembed,
+    skipped,
+    dealParties,
     changed: changes.filter((c) => c.door !== 'default').map((c) => c.slug),
     defaulted: changes.filter((c) => c.door === 'default').map((c) => c.slug),
     identity,

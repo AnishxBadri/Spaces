@@ -16,10 +16,18 @@ import { db } from '@spaces/db'
 import {
   credential,
   enrichmentRecord,
+  entity,
   integration,
   jobRun,
+  space,
 } from '@spaces/db/schema'
 import type { credentialKind } from '@spaces/db/schema'
+import {
+  LEGACY_KEY,
+  autoEnrichScopeOf,
+  scopeWords,
+} from '@spaces/core/plugins/auto-enrich'
+import type { AutoEnrichScopeName } from '@spaces/core/plugins/auto-enrich'
 import { updateFor } from '@spaces/core/plugins/registry'
 import { webhookSecretProvider } from '@spaces/core/writes/ingress/receive'
 import { MISSING_SETTINGS } from '@spaces/core/writes/ports/config'
@@ -85,6 +93,8 @@ export type IntegrationRow = {
   readonly lastRun: { readonly ago: string; readonly failed: boolean } | null
   /** Credits spent since UTC midnight, against the cap when one is set. */
   readonly credits: { readonly used: number; readonly cap: number | null }
+  /** The auto-enrich scope in words (`deal · space`, `off`); null with no event job. */
+  readonly autoEnrich: string | null
   /** Runs failed in a row, as the breaker counts them. */
   readonly errorCount: number
   /** The newest satisfying registry version past this one: the badge and Update's target. */
@@ -175,6 +185,16 @@ export type SecretField = {
   readonly display: string | null
 }
 
+/** A space the auto-enrich scope can name, labelled by its path of names. */
+export type SpaceOption = { readonly id: string; readonly label: string }
+
+/** The auto-enrich form: the row's scope and every space it could choose. */
+export type AutoEnrichView = {
+  readonly scopes: ReadonlyArray<AutoEnrichScopeName>
+  readonly spaces: ReadonlyArray<string>
+  readonly options: ReadonlyArray<SpaceOption>
+}
+
 export type IntegrationDetail = IntegrationRow & {
   readonly description: string | null
   /** For a degraded row whose sdk range this host cannot meet: what would fix it. */
@@ -185,6 +205,8 @@ export type IntegrationDetail = IntegrationRow & {
   readonly secrets: ReadonlyArray<SecretField>
   /** Where a provider posts deliveries, when the manifest declares ingress. */
   readonly webhookUrl: string | null
+  /** The auto-enrich scope form; null for a plugin with no event job. */
+  readonly autoEnrichForm: AutoEnrichView | null
 }
 
 const query = <T>(run: () => Promise<T>) =>
@@ -255,6 +277,35 @@ export const webhookUrlOf = (
   manifest?.ingress === undefined
     ? null
     : `${describeExternalOrigin(process.env.APP_URL).origin}/api/webhooks/${id}`
+
+/** Whether a plugin declares an event job — what an auto-enrich scope gates. */
+export const hasEventJob = (manifest: Manifest | null): boolean =>
+  manifest !== null &&
+  Object.values(manifest.jobs).some((job) => job.trigger === 'event')
+
+/** Every live space, labelled `Fintech / Payments`, in path order. */
+const spaceOptions = query(async () => {
+  const rows = await db
+    .select({
+      id: space.entityId,
+      path: space.path,
+      name: entity.canonicalName,
+    })
+    .from(space)
+    .innerJoin(entity, eq(entity.id, space.entityId))
+    .where(isNull(entity.mergedIntoId))
+    .orderBy(asc(space.path))
+  const names = new Map(rows.map((r) => [r.path, r.name]))
+  return rows.map((r) => {
+    const parts = r.path.split('.')
+    return {
+      id: r.id,
+      label: parts
+        .map((_, i) => names.get(parts.slice(0, i + 1).join('.')) ?? parts[i])
+        .join(' / '),
+    }
+  })
+})
 
 const fixOf = (row: Row, manifest: Manifest | null): string | null => {
   if (manifest === null || row.status !== 'degraded') return null
@@ -369,6 +420,9 @@ const readRows = Effect.fn('readRows')(function* (
           used: spend.find((s) => s.integrationId === row.id)?.used ?? 0,
           cap: capOf(row.config, manifest),
         },
+        autoEnrich: hasEventJob(manifest)
+          ? scopeWords(autoEnrichScopeOf(row.config))
+          : null,
         errorCount: row.errorCount,
         update: offer.target?.version ?? null,
         held: offer.target === null ? (offer.held?.reason ?? null) : null,
@@ -460,7 +514,7 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
               : '••••',
       })
     }
-    const form: SettingsForm =
+    const drawn: SettingsForm =
       manifest === null
         ? {
             ok: false,
@@ -468,6 +522,13 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
               'the worker has not read this plugin’s manifest yet, so its settings cannot be drawn',
           }
         : settingsFormOf(manifest.settings)
+    const scoped = hasEventJob(manifest)
+    // An older bundle's on/off switch is the scope's now: not drawn twice.
+    const form: SettingsForm =
+      drawn.ok && scoped
+        ? { ok: true, fields: drawn.fields.filter((f) => f.key !== LEGACY_KEY) }
+        : drawn
+    const scope = autoEnrichScopeOf(row.config)
     return {
       ...view,
       description: manifest?.description ?? null,
@@ -476,6 +537,13 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
       values: form.ok ? formValuesOf(form.fields, row.config) : {},
       secrets,
       webhookUrl: webhookUrlOf(manifest, row.id),
+      autoEnrichForm: scoped
+        ? {
+            scopes: scope.scopes,
+            spaces: scope.spaces,
+            options: yield* spaceOptions,
+          }
+        : null,
     }
   },
 )

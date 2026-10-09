@@ -7,6 +7,8 @@ import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
 import { Switch } from '#/components/ui/switch'
 import type {
+  AutoEnrichScopeName,
+  AutoEnrichView,
   FormValue,
   FormValues,
   SecretField,
@@ -209,6 +211,142 @@ export function SettingsFields({
           </FieldRow>
         )
       })}
+    </form>
+  )
+}
+
+/** The three auto-enrich scopes, each the trigger it stands for. (D76) */
+export const SCOPE_ROWS: ReadonlyArray<{
+  readonly scope: AutoEnrichScopeName
+  readonly label: string
+}> = [
+  { scope: 'deal', label: 'When a record joins a deal' },
+  { scope: 'space', label: 'When a record is filed into a space' },
+  { scope: 'meeting', label: 'When a record appears in a synced meeting' },
+]
+
+/** One checkbox row in the auto-enrich group. */
+function CheckRow({
+  id,
+  label,
+  checked,
+  disabled,
+  indent = false,
+  onChange,
+}: {
+  id: string
+  label: string
+  checked: boolean
+  disabled: boolean
+  indent?: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <div
+      className={cn(
+        'flex min-h-10 items-center gap-3 border-b border-rule py-2 pr-3',
+        indent ? 'pl-10' : 'pl-3',
+      )}
+    >
+      <Checkbox
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onChange}
+      />
+      <label htmlFor={id} className={indent ? 'text-label' : 'text-ui'}>
+        {label}
+      </label>
+    </div>
+  )
+}
+
+/**
+ * The Auto-enrich group: which triggers press Enrich for the owner. With
+ * Spaces ticked, the spaces it covers; none chosen is every space.
+ */
+export function AutoEnrichFields({
+  view,
+  disabled,
+  onSave,
+}: {
+  view: AutoEnrichView
+  disabled: boolean
+  onSave: (scope: {
+    scopes: Array<AutoEnrichScopeName>
+    spaces: Array<string>
+  }) => void
+}) {
+  const [scopes, setScopes] = useState<ReadonlyArray<AutoEnrichScopeName>>(
+    view.scopes,
+  )
+  const [spaces, setSpaces] = useState<ReadonlyArray<string>>(view.spaces)
+  const [dirty, setDirty] = useState(false)
+  const toggle = <T,>(list: ReadonlyArray<T>, item: T, on: boolean) =>
+    on
+      ? [...list.filter((x) => x !== item), item]
+      : list.filter((x) => x !== item)
+  return (
+    <form
+      className="flex flex-col pt-8"
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSave({
+          scopes: SCOPE_ROWS.map((r) => r.scope).filter((s) =>
+            scopes.includes(s),
+          ),
+          spaces: [...spaces],
+        })
+        setDirty(false)
+      }}
+    >
+      <SectionHead
+        as="h3"
+        title="Auto-enrich"
+        count={scopes.length === 0 ? 'off' : String(scopes.length)}
+        action={
+          <Button type="submit" size="sm" disabled={disabled || !dirty}>
+            Save auto-enrich
+          </Button>
+        }
+      />
+      {SCOPE_ROWS.map((row) => (
+        <div key={row.scope} className="flex flex-col">
+          <CheckRow
+            id={`auto-enrich-${row.scope}`}
+            label={row.label}
+            checked={scopes.includes(row.scope)}
+            disabled={disabled}
+            onChange={(on) => {
+              setScopes((list) => toggle(list, row.scope, on))
+              setDirty(true)
+            }}
+          />
+          {row.scope === 'space' && scopes.includes('space') ? (
+            <>
+              {spaces.length === 0 ? (
+                <p className="border-b border-rule py-2 pr-3 pl-10 text-label text-graphite">
+                  No space chosen: every space.
+                </p>
+              ) : null}
+              {view.options.map((option) => (
+                <CheckRow
+                  key={option.id}
+                  id={`auto-enrich-space-${option.id}`}
+                  label={option.label}
+                  checked={spaces.includes(option.id)}
+                  disabled={disabled}
+                  indent
+                  onChange={(on) => {
+                    setSpaces((list) => toggle(list, option.id, on))
+                    setDirty(true)
+                  }}
+                />
+              ))}
+            </>
+          ) : null}
+        </div>
+      ))}
     </form>
   )
 }

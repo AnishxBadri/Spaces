@@ -223,6 +223,11 @@ export type SignalClaim = {
   readonly publishedAt?: IsoTimestamp
   /** Anything else the provider said, kept whole. */
   readonly payload?: JsonObject
+  /**
+   * The receipt (`Receipts.store`) the observation was read from; must be
+   * one this integration stored. Cited as the signal's ref. (SDK 1.2)
+   */
+  readonly receiptId?: string
 }
 
 /**
@@ -318,15 +323,31 @@ export type JobError = JobRetryable | JobRateLimited | JobPermanent
  * The domain events an `event` job may subscribe to (`jobs[name].on`).
  * Closed: a new event is a minor.
  */
-export const DOMAIN_EVENTS = ['entity.created'] as const
+export const DOMAIN_EVENTS = ['entity.created', 'filed', 'deal.linked'] as const
 export type DomainEventName = (typeof DOMAIN_EVENTS)[number]
 
-export type DomainEvent = {
-  readonly name: 'entity.created'
+/** What every domain event names: the record it is about, and when. */
+type DomainEventBase = {
   readonly entityId: EntityId
   readonly kind: 'company' | 'person' | 'deal'
   readonly occurredAt: IsoTimestamp
 }
+
+/**
+ * One domain event, told apart by `name`:
+ * - `entity.created`: a record was born (never by a seed or an import);
+ * - `filed`: the record was filed into the space `spaceId` (SDK 1.2);
+ * - `deal.linked`: the company or person became a party of the deal
+ *   `dealId` (SDK 1.2).
+ */
+export type DomainEvent =
+  | (DomainEventBase & { readonly name: 'entity.created' })
+  | (DomainEventBase & { readonly name: 'filed'; readonly spaceId: EntityId })
+  | (DomainEventBase & {
+      readonly name: 'deal.linked'
+      readonly kind: 'company' | 'person'
+      readonly dealId: EntityId
+    })
 
 /** `action` — the "Enrich" button; one record. */
 export type ActionInput = { readonly entityId: EntityId }

@@ -34,8 +34,11 @@ import type {
   SuggestionKind,
 } from '@spaces/core/writes/suggestions/propose'
 import type { CaptureObject } from '@spaces/core/writes/ai/capture-read'
+import type { DomainEvent } from '@spaces/sdk'
+import { dealLinked } from '@spaces/core/writes/events/dispatch'
 import { writeSuggestedNoteInTx } from '#/lib/notes/from-suggestion'
 import { insertSpaceTag, isLiveSpace } from '#/lib/spaces/tag'
+import { emitDomainEvent } from '#/lib/events/emit'
 import { setPersonCompanyInTx } from '#/lib/people/companies'
 import { insertTaskInTx } from '#/lib/tasks/create'
 
@@ -291,6 +294,7 @@ async function acceptIdentityInTx(
   tx: Tx,
   row: Suggestion,
   actor: Decider,
+  owed: Array<DomainEvent | null>,
 ): Promise<{
   resolved: ResolveResult
   linked: boolean
@@ -370,6 +374,7 @@ async function acceptIdentityInTx(
           slug: claim.attribute,
           personId: resolved.entityId,
           actor,
+          owed,
         })
   return { resolved, linked: joined !== null, filed }
 }
@@ -435,9 +440,11 @@ async function fileIntoReference(
     slug: string
     personId: string
     actor: Decider
+    /** The `deal.linked` events the write owes after the commit. */
+    owed: Array<DomainEvent | null>
   },
 ): Promise<string | null> {
-  const { row, recordId, slug, personId, actor } = input
+  const { row, recordId, slug, personId, actor, owed } = input
   const def = (await registryFor(tx, recordId)).find((d) => d.slug === slug)
   if (
     def === undefined ||
@@ -463,7 +470,7 @@ async function fileIntoReference(
     if (held !== undefined && held !== null) return null
     next = personId
   }
-  await setValuesInTx(tx, {
+  const { dealParties } = await setValuesInTx(tx, {
     entityId: recordId,
     patch: { [slug]: next },
     actor,
@@ -471,6 +478,7 @@ async function fileIntoReference(
     suggestionId: row.id,
     refs: row.refs,
   })
+  for (const party of dealParties) owed.push(dealLinked(party, 'manual'))
   return slug
 }
 
@@ -579,7 +587,7 @@ async function acceptSpaceTagInTx(
   tx: Tx,
   row: Suggestion,
   actor: Decider,
-): Promise<{ spaceId: string; tagged: boolean }> {
+): Promise<{ spaceId: string; tagged: boolean; emit: DomainEvent | null }> {
   const { spaceId, confidence } = spaceTagOf(row.payload)
   if (!(await isLiveSpace(tx, spaceId)))
     throw new EntityNotFound({
@@ -587,7 +595,7 @@ async function acceptSpaceTagInTx(
       message: 'That space no longer exists',
     })
   const recordId = await canonicalId(row.entityId, tx)
-  const tagged = await insertSpaceTag(tx, {
+  const { tagged, emit } = await insertSpaceTag(tx, {
     entityId: recordId,
     spaceId,
     source: 'ai',
@@ -602,7 +610,7 @@ async function acceptSpaceTagInTx(
       objectEntityId: spaceId,
       meta: { suggestionId: row.id, source: 'ai' },
     })
-  return { spaceId, tagged }
+  return { spaceId, tagged, emit }
 }
 
 // ---------- task ----------
@@ -715,7 +723,10 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
         message: 'decided_by: only a person accepts a suggestion',
       },
     ])
-  return yield* Effect.tryPromise({
+  // The events an accept owes — a space tag's `filed`, a deal party's
+  // `deal.linked` — dispatched once the commit lands.
+  const owed: Array<DomainEvent | null> = []
+  const accepted = yield* Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
         const row = await lockOpen(tx, id)
@@ -731,6 +742,7 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
             tx,
             row,
             actor,
+            owed,
           )
           const decided = await close(tx, id, 'accepted', actor)
           return {
@@ -783,7 +795,12 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
                 message: 'fields: a space tag is accepted whole, not by field',
               },
             ])
-          const { spaceId, tagged } = await acceptSpaceTagInTx(tx, row, actor)
+          const { spaceId, tagged, emit } = await acceptSpaceTagInTx(
+            tx,
+            row,
+            actor,
+          )
+          owed.push(emit)
           const decided = await close(tx, id, 'accepted', actor)
           return {
             kind: 'space_tag',
@@ -876,6 +893,8 @@ export const acceptProgram = Effect.fn('acceptProgram')(function* (
       }),
     catch: asFailure,
   })
+  for (const event of owed) yield* Effect.promise(() => emitDomainEvent(event))
+  return accepted
 })
 
 // ---------- bulk accept (SPA-110, spec §10 "bulk accept per column/list") ----------

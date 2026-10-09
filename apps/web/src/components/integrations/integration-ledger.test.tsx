@@ -31,6 +31,7 @@ const base: IntegrationRow = {
   summary: '6 fields filled on Ohmium',
   lastRun: { ago: '4m ago', failed: false },
   credits: { used: 12, cap: 100 },
+  autoEnrich: 'deal · space',
   errorCount: 0,
   update: null,
   held: null,
@@ -48,6 +49,7 @@ const rows: Array<IntegrationRow> = [
     reason: 'requires sdk ^2.0, host provides 1.1.0',
     lastRun: null,
     credits: { used: 0, cap: null },
+    autoEnrich: null,
   },
   {
     ...base,
@@ -106,9 +108,14 @@ describe('IntegrationLedger', () => {
     expect(apollo).toContain('0.1.0')
     expect(apollo).toContain('6 fields filled on Ohmium')
     expect(apollo).toContain('12 / 100 cr')
+    expect(apollo).toContain('auto deal · space')
     expect(apollo).toContain('ran 4m ago')
     expect(apollo).toContain('>enabled<')
     expect(apollo).toContain('Configure')
+  })
+
+  it('names no scope on a row with no event job', () => {
+    expect(rowFor(render(), 'degraded')).not.toContain('auto ')
   })
 
   it('reads degraded, tripped and off as three different rows', () => {

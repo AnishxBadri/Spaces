@@ -54,11 +54,11 @@ describe('the apollo manifest.json', () => {
     expect(Object.keys(parsed.jobs)).toEqual([
       'enrichCompany',
       'enrichPerson',
-      'onCompanyCreated',
+      'autoEnrich',
     ])
-    expect(parsed.jobs.onCompanyCreated).toMatchObject({
+    expect(parsed.jobs.autoEnrich).toMatchObject({
       trigger: 'event',
-      on: ['entity.created'],
+      on: ['entity.created', 'filed', 'deal.linked'],
     })
     expect(parsed.actions?.map((a) => [a.on, a.job])).toEqual([
       ['company', 'enrichCompany'],
@@ -67,12 +67,17 @@ describe('the apollo manifest.json', () => {
     expect(parsed.settings).toEqual(settingsJsonSchema(manifest.settings))
   })
 
-  it('defaults the cache to 90 days, carries a daily credit cap and leaves autoEnrich off', () => {
+  it('defaults the cache to 90 days and carries a daily credit cap; auto-enrich is the host’s, not a setting', () => {
     expect(z.parse(manifest.settings, {})).toEqual({
       cacheDays: 90,
       dailyCreditCap: 100,
-      autoEnrich: false,
     })
+  })
+
+  it('still reads a config that holds the retired autoEnrich switch', () => {
+    expect(
+      z.parse(manifest.settings, { autoEnrich: true, cacheDays: 30 }),
+    ).toEqual({ cacheDays: 30, dailyCreditCap: 100 })
   })
 
   it('has the version the package declares', () => {

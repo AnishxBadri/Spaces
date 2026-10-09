@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { PORT_NAMES } from './contract.ts'
+import { DOMAIN_EVENTS, PORT_NAMES } from './contract.ts'
 import {
   STORAGE_SOURCE_WITHHELD,
   manifestSchema,
@@ -119,6 +119,18 @@ describe('manifestSchema', () => {
       expect(issues(m)[0]).toMatch(
         /^jobs\.onUpdate\.on\.0: unknown event "entity\.updated"/,
       )
+    })
+
+    it('takes filed and deal.linked beside entity.created (SDK 1.2)', () => {
+      expect(DOMAIN_EVENTS).toEqual(['entity.created', 'filed', 'deal.linked'])
+      const m = base()
+      m.jobs.onFiled = { trigger: 'event', uses: ['Facts'], on: ['filed'] }
+      m.jobs.onLinked = {
+        trigger: 'event',
+        uses: ['Facts'],
+        on: ['deal.linked', 'entity.created'],
+      }
+      expect(issues(m)).toEqual([])
     })
 
     it('takes accepts on a file job only, as a pattern that compiles', () => {

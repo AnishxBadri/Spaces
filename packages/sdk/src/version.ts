@@ -5,4 +5,4 @@
  * release bumps both or the suite fails. New port method or trigger = minor;
  * changed signature = major (docs/spec-plugin-sdk.md §6).
  */
-export const SDK_VERSION = '1.1.0'
+export const SDK_VERSION = '1.2.0'

@@ -37,6 +37,26 @@
     "short_description": "Warehouse picking robots that learn a new SKU from one demonstration.",
     "annual_revenue_printed": null,
     "annual_revenue": null,
+    "funding_events": [
+      {
+        "id": "6612a0b1c2d3e40001f0a1b2",
+        "date": "2024-03-01T00:00:00.000+00:00",
+        "news_url": "https://news.example/northwind-robotics-series-a",
+        "type": "Series A",
+        "investors": "Blume Ventures, Kae Capital",
+        "amount": "5M",
+        "currency": "$"
+      },
+      {
+        "id": "60c8b2a1f3e4d50001a0b1c2",
+        "date": "2021-06-15T00:00:00.000+00:00",
+        "news_url": null,
+        "type": "Seed",
+        "investors": "Kae Capital",
+        "amount": "1.5M",
+        "currency": "$"
+      }
+    ],
     "total_funding": 6500000,
     "total_funding_printed": "6.5M",
     "latest_funding_round_date": "2024-03-01T00:00:00.000+00:00",

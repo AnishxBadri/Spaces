@@ -6,8 +6,10 @@ import type {
   FactClaim,
   FactValues,
   IdentityKeys,
+  JsonObject,
   JsonValue,
   ReceiptClaim,
+  SignalClaim,
 } from '@spaces/sdk'
 
 /**
@@ -16,6 +18,8 @@ import type {
  * - Fields are parsed, never trusted: an absent or null field claims nothing.
  * - Values are keyed by the slugs `SYSTEM_ATTRIBUTES` seeds for the kind.
  * - A domain or an email is an identity key; a LinkedIn URL is a value. (D75)
+ * - A funding round and a change of title are signals, never values: dated
+ *   evidence citing the receipt. (D72)
  */
 
 export const APOLLO_API = 'https://api.apollo.io/api/v1'
@@ -40,6 +44,24 @@ const text = z
 const place = (...parts: ReadonlyArray<string | null | undefined>) =>
   parts.filter((p) => p != null && p !== '').join(', ')
 
+/** An ISO timestamp from Apollo's date text, or null when it is not one. */
+const isoOf = (date: string | null | undefined): string | null => {
+  if (date == null) return null
+  const at = new Date(date)
+  return Number.isNaN(at.getTime()) ? null : at.toISOString()
+}
+
+/** One of `funding_events`: Apollo spells the amount as text or a number. */
+const fundingEvent = z.object({
+  id: text,
+  date: text,
+  type: text,
+  amount: z.union([z.string(), z.number()]).nullish().catch(null),
+  currency: text,
+  news_url: text,
+  investors: text,
+})
+
 /** `organizations/enrich` — `{ organization }`, or `{}` for no match. */
 const organizationResponse = z.object({
   organization: z
@@ -52,9 +74,78 @@ const organizationResponse = z.object({
       short_description: text,
       city: text,
       country: text,
+      funding_events: z.array(fundingEvent.catch({})).nullish().catch(null),
+      latest_funding_stage: text,
+      latest_funding_round_date: text,
     })
     .nullish(),
 })
+
+type FundingEvent = z.infer<typeof fundingEvent>
+
+/** The fields of a JSON object that hold something, nulls left out. */
+const present = (fields: {
+  readonly [key: string]: string | number | null | undefined
+}): JsonObject => {
+  const out: { [key: string]: string | number } = {}
+  for (const [key, value] of Object.entries(fields))
+    if (value != null && value !== '') out[key] = value
+  return out
+}
+
+/**
+ * The latest round: the newest dated `funding_events` entry, else the
+ * `latest_funding_stage` and its date. Null when Apollo names no round.
+ */
+const latestRound = (org: {
+  readonly funding_events?: ReadonlyArray<FundingEvent> | null | undefined
+  readonly latest_funding_stage?: string | null | undefined
+  readonly latest_funding_round_date?: string | null | undefined
+}): (FundingEvent & { readonly at: string }) | null => {
+  const dated = (org.funding_events ?? []).flatMap((e) => {
+    const at = isoOf(e.date)
+    return at === null || (e.type == null && e.amount == null)
+      ? []
+      : [{ ...e, at }]
+  })
+  dated.sort((a, b) => b.at.localeCompare(a.at))
+  const newest = dated.at(0)
+  if (newest !== undefined) return newest
+  const at = isoOf(org.latest_funding_round_date)
+  return at === null || org.latest_funding_stage == null
+    ? null
+    : {
+        type: org.latest_funding_stage,
+        date: org.latest_funding_round_date,
+        at,
+      }
+}
+
+/** A round as the signal the record's timeline shows. */
+const fundingSignal = (
+  entityId: EntityId,
+  receiptId: string,
+  round: FundingEvent & { readonly at: string },
+): SignalClaim => {
+  const amount =
+    round.amount == null ? null : `${round.currency ?? ''}${round.amount}`
+  return {
+    _tag: 'signal',
+    entityId,
+    kind: 'funding',
+    title: [round.type ?? 'Funding round', amount].filter(Boolean).join(' · '),
+    ...(round.news_url ? { url: round.news_url } : {}),
+    publishedAt: round.at,
+    payload: present({
+      round: round.type,
+      amount: round.amount,
+      currency: round.currency,
+      investors: round.investors,
+      apolloEventId: round.id,
+    }),
+    receiptId,
+  }
+}
 
 /** `people/match` — `{ person }`, with `person: null` for no match. */
 const personResponse = z.object({
@@ -66,6 +157,15 @@ const personResponse = z.object({
       title: text,
       city: text,
       country: text,
+      organization: z.object({ name: text }).nullish().catch(null),
+      employment_history: z
+        .array(
+          z
+            .object({ current: z.boolean().nullish(), start_date: text })
+            .catch({}),
+        )
+        .nullish()
+        .catch(null),
     })
     .nullish(),
 })
@@ -80,16 +180,23 @@ export type Enrichment = {
   readonly receipt: ReceiptClaim
   readonly alias: AliasClaim | null
   readonly facts: (receiptId: string) => FactClaim | null
+  /** What Apollo observed that is evidence, not a value, citing the receipt. */
+  readonly signals: (receiptId: string) => ReadonlyArray<SignalClaim>
 }
 
 const enrichment = (
   entityId: EntityId,
   raw: JsonValue,
-  found: { readonly keys: IdentityKeys; readonly values: FactValues } | null,
+  found: {
+    readonly keys: IdentityKeys
+    readonly values: FactValues
+    readonly signals?: (receiptId: string) => ReadonlyArray<SignalClaim>
+  } | null,
 ): Enrichment => {
   const keys = found?.keys ?? {}
   const values = found?.values ?? {}
   return {
+    signals: found?.signals ?? (() => []),
     matched: found !== null,
     receipt: {
       entityId,
@@ -111,7 +218,10 @@ export const organizationEnrichment = (
   if (org == null) return enrichment(entityId, raw, null)
   const domain = org.primary_domain ?? org.website_url
   const location = place(org.city, org.country)
+  const round = latestRound(org)
   return enrichment(entityId, raw, {
+    signals: (receiptId) =>
+      round === null ? [] : [fundingSignal(entityId, receiptId, round)],
     keys: domain ? { domain } : {},
     values: {
       ...(org.short_description ? { description: org.short_description } : {}),
@@ -131,13 +241,35 @@ const LOCKED_EMAIL = /^email_not_unlocked@/i
 /**
  * Throws when `raw` is not a person response. A role email (`info@`) never
  * becomes an identity key (`isRoleEmail`), and neither does a locked one.
+ * A title that differs from the one the record holds (`heldTitle`) is a
+ * hiring change: a signal dated by the current role's start.
  */
 export const personEnrichment = (
   entityId: EntityId,
   raw: JsonValue,
+  heldTitle: string | null = null,
 ): Enrichment => {
   const person = personResponse.parse(raw).person
   if (person == null) return enrichment(entityId, raw, null)
+  const held = heldTitle?.trim() ?? ''
+  const title = person.title
+  const org = person.organization?.name ?? null
+  const started = isoOf(
+    (person.employment_history ?? []).find((e) => e.current === true)
+      ?.start_date,
+  )
+  const move =
+    held !== '' && title != null && title !== held
+      ? {
+          title: org === null ? `Now ${title}` : `Now ${title} at ${org}`,
+          ...(started === null ? {} : { publishedAt: started }),
+          payload: present({ from: held, to: title, at: org }),
+        }
+      : null
+  const hiring = (receiptId: string): ReadonlyArray<SignalClaim> =>
+    move === null
+      ? []
+      : [{ _tag: 'signal', entityId, kind: 'hiring', ...move, receiptId }]
   const email =
     person.email &&
     !isRoleEmail(person.email) &&
@@ -146,6 +278,7 @@ export const personEnrichment = (
       : null
   const location = place(person.city, person.country)
   return enrichment(entityId, raw, {
+    signals: hiring,
     keys: email ? { email } : {},
     values: {
       ...(person.title ? { job_title: person.title } : {}),

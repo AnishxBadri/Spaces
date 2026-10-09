@@ -10,12 +10,15 @@ import { z } from 'zod'
  */
 
 export type {
+  AutoEnrichView,
   IntegrationDetail,
   IntegrationRow,
   IntegrationState,
   SecretField,
   SecretSlot,
+  SpaceOption,
 } from '../integrations/ledger'
+export type { AutoEnrichScopeName } from '@spaces/core/plugins/auto-enrich'
 export type { SettingsSaved } from '../integrations/admin'
 export type {
   AvailablePlugin,
@@ -80,6 +83,24 @@ export const saveIntegrationSettings = createServerFn({ method: 'POST' })
     const { saveIntegrationSettingsHandler } =
       await import('../integrations/admin')
     return saveIntegrationSettingsHandler(data)
+  })
+
+/** Writes the auto-enrich scope: which triggers run the plugin's event jobs. */
+export const saveIntegrationAutoEnrich = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.string().uuid(),
+      scopes: z.array(z.enum(['deal', 'space', 'meeting'])).max(3),
+      spaces: z.array(z.string().uuid()).max(500),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { saveIntegrationAutoEnrichHandler } =
+      await import('../integrations/admin')
+    return saveIntegrationAutoEnrichHandler({
+      id: data.id,
+      scope: { scopes: data.scopes, spaces: data.spaces },
+    })
   })
 
 const secretSlot = z.enum(['credential', 'webhook'])

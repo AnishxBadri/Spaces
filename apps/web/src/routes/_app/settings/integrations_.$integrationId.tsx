@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
+  AutoEnrichFields,
   DropDataOption,
   SECRET_GROUPS,
   SecretFieldRow,
@@ -26,6 +27,7 @@ import {
   getSession,
   removeIntegrationSecret,
   resetIntegration,
+  saveIntegrationAutoEnrich,
   saveIntegrationSecret,
   saveIntegrationSettings,
   setIntegrationEnabled,
@@ -354,6 +356,21 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
         onChange={change}
         onSave={() => void saveSettings()}
       />
+      {detail.autoEnrichForm !== null ? (
+        <AutoEnrichFields
+          view={detail.autoEnrichForm}
+          disabled={pending}
+          onSave={(scope) =>
+            void act(
+              () =>
+                saveIntegrationAutoEnrich({
+                  data: { id: detail.id, ...scope },
+                }),
+              `${detail.name} auto-enrich saved`,
+            )
+          }
+        />
+      ) : null}
       {confirmDialog}
     </SettingsSection>
   )

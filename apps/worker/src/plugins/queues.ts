@@ -13,7 +13,6 @@ import { ImportRun } from '@spaces/core/writes/ports/import'
 import { storage } from '@spaces/core/writes/storage'
 import {
   ACTION_TARGETS,
-  DOMAIN_EVENTS,
   JobPermanent,
   JobRateLimited,
   JobRetryable,
@@ -232,13 +231,23 @@ const writeCursor = async (
 
 const actionData = z.object({ entityId: z.uuid() })
 const scheduleData = z.object({})
+/** What core's dispatcher sends, one shape per `DOMAIN_EVENTS` name. */
+const eventBase = {
+  entityId: z.uuid(),
+  kind: z.enum(ACTION_TARGETS),
+  occurredAt: z.string().min(1),
+}
 const eventData = z.object({
-  event: z.object({
-    name: z.enum(DOMAIN_EVENTS),
-    entityId: z.uuid(),
-    kind: z.enum(ACTION_TARGETS),
-    occurredAt: z.string().min(1),
-  }),
+  event: z.discriminatedUnion('name', [
+    z.object({ name: z.literal('entity.created'), ...eventBase }),
+    z.object({ name: z.literal('filed'), ...eventBase, spaceId: z.uuid() }),
+    z.object({
+      name: z.literal('deal.linked'),
+      ...eventBase,
+      kind: z.enum(['company', 'person']),
+      dealId: z.uuid(),
+    }),
+  ]),
 })
 const webhookData = z.object({
   payload: z.json(),

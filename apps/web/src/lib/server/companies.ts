@@ -15,6 +15,7 @@ import { jsonString } from '@spaces/core/json'
 import { requireUser } from './shared'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { emitDomainEvent } from '#/lib/events/emit'
+import { dealLinked } from '@spaces/core/writes/events/dispatch'
 import { pagedListInput, pageOptions } from '#/lib/views/page-input'
 import type { SetValuesResult } from '@spaces/core/writes/attributes/values'
 
@@ -250,6 +251,9 @@ export const updateRecord = createServerFn({ method: 'POST' })
       // because core hands them back rather than reaching the queue
       // (SPA-174/175).
       for (const s of result.reembed) await enqueueSourceEmbed(s)
+      // A company or person this write made a deal's party (D76).
+      for (const party of result.dealParties)
+        await emitDomainEvent(dealLinked(party, 'manual'))
       // The pipeline→portfolio seam: a deal reaching Invested births a
       // holding (idempotent — follow-ons land on the existing one).
       if (data.patch.stage === 'invested') {
@@ -277,7 +281,7 @@ export const tagIntoSpace = createServerFn({ method: 'POST' })
     const u = await requireUser()
     // The one entity_space insert (SPA-103), shared with the space_tag accept.
     const { insertSpaceTag } = await import('../spaces/tag')
-    await db.transaction((tx) =>
+    const { emit } = await db.transaction((tx) =>
       insertSpaceTag(tx, {
         entityId: data.entityId,
         spaceId: data.spaceId,
@@ -292,6 +296,7 @@ export const tagIntoSpace = createServerFn({ method: 'POST' })
       subjectEntityId: data.entityId,
       objectEntityId: data.spaceId,
     })
+    await emitDomainEvent(emit)
     return { ok: true }
   })
 

@@ -61,6 +61,26 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
           "estimated_num_employees": 84,
           "facebook_url": null,
           "founded_year": 2019,
+          "funding_events": [
+            {
+              "amount": "5M",
+              "currency": "$",
+              "date": "2024-03-01T00:00:00.000+00:00",
+              "id": "6612a0b1c2d3e40001f0a1b2",
+              "investors": "Blume Ventures, Kae Capital",
+              "news_url": "https://news.example/northwind-robotics-series-a",
+              "type": "Series A",
+            },
+            {
+              "amount": "1.5M",
+              "currency": "$",
+              "date": "2021-06-15T00:00:00.000+00:00",
+              "id": "60c8b2a1f3e4d50001a0b1c2",
+              "investors": "Kae Capital",
+              "news_url": null,
+              "type": "Seed",
+            },
+          ],
           "id": "64b7f0c2a1e3d900015a2b3c",
           "industries": [
             "machinery",
@@ -142,6 +162,28 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
     },
   },
   {
+    "call": "Content.emitSignal",
+    "input": {
+      "_tag": "signal",
+      "entityId": "entity-0",
+      "kind": "funding",
+      "payload": {
+        "amount": "5M",
+        "apolloEventId": "6612a0b1c2d3e40001f0a1b2",
+        "currency": "$",
+        "investors": "Blume Ventures, Kae Capital",
+        "round": "Series A",
+      },
+      "publishedAt": "2024-03-01T00:00:00.000Z",
+      "receiptId": "receipt-1",
+      "title": "Series A · $5M",
+      "url": "https://news.example/northwind-robotics-series-a",
+    },
+    "output": {
+      "signalId": "signal-1",
+    },
+  },
+  {
     "call": "Log.info",
     "input": {
       "fields": {
@@ -152,6 +194,9 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then fills the ma
         "endpoint": "organizations/enrich",
         "entityId": "entity-0",
         "receiptId": "receipt-1",
+        "signals": [
+          "signal-1",
+        ],
       },
       "message": "enriched",
     },
@@ -303,6 +348,7 @@ exports[`enrichPerson > matches by email and adds the email before filling, Link
         "endpoint": "people/match",
         "entityId": "entity-0",
         "receiptId": "receipt-1",
+        "signals": [],
       },
       "message": "enriched",
     },

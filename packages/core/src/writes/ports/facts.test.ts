@@ -7,13 +7,14 @@ import {
   attributeEvent,
   entity,
   integration,
+  suggestion,
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { Facts, JobPermanent, Receipts } from '@spaces/sdk'
 import type { FactClaim } from '@spaces/sdk'
 import { Enqueue } from '../../queue/enqueue'
 import { objectIdForKindAsync } from '../attributes/objects'
-import { setValues } from '../attributes/values'
+import { lastWriters, setValues, setValuesInTx } from '../attributes/values'
 import { resolveEntity } from '../entities/resolve'
 import { FactsLive } from './facts'
 import { ReceiptsLive } from './receipts'
@@ -270,5 +271,128 @@ describe('Facts.fill, bound to an integration row', () => {
     })
     expect(permanentReason(exit)).toMatch(/no receipt/)
     expect(await eventsFor(co)).toHaveLength(0)
+  })
+
+  it('leaves a value a person cleared empty: the clear is user-held, skipped, not a conflict', async () => {
+    const row = await boundRow()
+    const co = await company('Cleared Co')
+    const person = await aUser()
+    await setValues({
+      entityId: co,
+      patch: { location: 'Pune' },
+      actor: { type: 'user', id: person },
+    })
+    await setValues({
+      entityId: co,
+      patch: { location: null },
+      actor: { type: 'user', id: person },
+    })
+
+    const writers = await db.transaction((tx) =>
+      lastWriters(tx, co, ['location']),
+    )
+    expect(writers.get('location')).toMatchObject({
+      actorType: 'user',
+      actorId: person,
+      to: null,
+    })
+
+    const result = await fill(row, {
+      entityId: co,
+      values: { location: 'Bengaluru', founded_year: 2015 },
+    })
+    expect(result.conflicts).toEqual([])
+    expect(await valuesOf(co)).not.toHaveProperty('location')
+    // The blank nobody cleared beside it still fills.
+    expect((await valuesOf(co)).founded_year).toBe(2015)
+    expect(await eventsFor(co, 'location')).toHaveLength(2)
+
+    const skipped = await db.transaction((tx) =>
+      setValuesInTx(tx, {
+        entityId: co,
+        patch: { location: 'Mumbai' },
+        actor: { type: 'integration', id: row.id },
+        source: 'enrichment',
+        fillBlanks: true,
+      }),
+    )
+    expect(skipped).toMatchObject({ skipped: ['location'], changed: [] })
+  })
+})
+
+describe('Facts.fill on a relationship', () => {
+  const personNamed = async (name: string) =>
+    (
+      await resolveEntity({
+        kind: 'person',
+        name,
+        keys: {
+          email: `${name.toLowerCase().replace(/\W+/g, '.')}@rel.example`,
+        },
+        source: { class: 'manual' },
+      })
+    ).entityId
+  const companyAt = async (name: string, domain: string) =>
+    (
+      await resolveEntity({
+        kind: 'company',
+        name,
+        keys: { domain },
+        source: { class: 'manual' },
+      })
+    ).entityId
+  const cardsOn = (entityId: string) =>
+    db.select().from(suggestion).where(eq(suggestion.entityId, entityId))
+
+  it('fills an empty companies', async () => {
+    const row = await boundRow()
+    const ana = await personNamed('Ana Empty')
+    const acme = await companyAt('Acme Rel', 'acme-rel.example')
+    const result = await fill(row, {
+      entityId: ana,
+      values: { companies: [acme] },
+    })
+    expect(result.conflicts).toEqual([])
+    expect((await valuesOf(ana)).companies).toEqual([acme])
+    expect(await cardsOn(ana)).toEqual([])
+  })
+
+  it('proposes a card for a differing companies and writes nothing — a person’s or its own', async () => {
+    const row = await boundRow()
+    const acme = await companyAt('Acme Held', 'acme-held.example')
+    const beta = await companyAt('Beta Proposed', 'beta-proposed.example')
+
+    const held = await personNamed('Bo Held')
+    await setValues({
+      entityId: held,
+      patch: { companies: [acme] },
+      actor: { type: 'user', id: await aUser() },
+    })
+    const own = await personNamed('Cy Own')
+    await fill(row, { entityId: own, values: { companies: [acme] } })
+
+    for (const who of [held, own]) {
+      const before = await eventsFor(who, 'companies')
+      const result = await fill(row, {
+        entityId: who,
+        values: { companies: [beta] },
+      })
+      expect(result.conflicts).toEqual([
+        { slug: 'companies', existing: [acme], proposed: [beta] },
+      ])
+      expect((await valuesOf(who)).companies).toEqual([acme])
+      expect(await eventsFor(who, 'companies')).toHaveLength(before.length)
+      const cards = await cardsOn(who)
+      expect(cards).toHaveLength(1)
+      expect(cards.at(0)).toMatchObject({
+        kind: 'attribute_patch',
+        status: 'open',
+        payload: {
+          companies: {
+            value: [{ name: 'Beta Proposed', domain: 'beta-proposed.example' }],
+          },
+        },
+      })
+    }
   })
 })

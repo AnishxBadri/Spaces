@@ -38,8 +38,14 @@ describe('one entity_space insert for tagging', () => {
     expect(start).toBeGreaterThan(-1)
     const body = src.slice(start, end)
     expect(body).toContain('insertSpaceTag(')
+    expect(body).toContain('emitDomainEvent(emit)')
     expect(body).not.toMatch(INSERT)
     expect(src).not.toMatch(INSERT)
+  })
+
+  it('a new tag hands back the filed event its callers dispatch after the commit', () => {
+    expect(read('lib/spaces/tag.ts')).toContain('filed(input.entityId')
+    expect(read('lib/ai/propose.ts')).toContain('owed.push(emit)')
   })
 
   it('accept() has exactly one space_tag branch, and it calls insertSpaceTag', () => {

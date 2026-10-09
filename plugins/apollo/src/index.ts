@@ -1,6 +1,7 @@
 import { Effect, Redacted } from 'effect'
 import { z } from 'zod'
 import {
+  Content,
   Facts,
   Http,
   Identity,
@@ -89,7 +90,7 @@ const callApollo = Effect.fn('apollo.call')(function* (
 
 /**
  * D52's order: the receipt first, then the keys Apollo returned, then the
- * values — each citing the receipt the store returned.
+ * values, then the signals — each citing the receipt the store returned.
  */
 const record = Effect.fn('apollo.record')(function* (
   endpoint: Endpoint,
@@ -108,12 +109,17 @@ const record = Effect.fn('apollo.record')(function* (
   const fill = claims.facts(receiptId)
   const conflicts =
     fill === null ? [] : (yield* (yield* Facts).fill(fill)).conflicts
+  const content = yield* Content
+  const signals: Array<string> = []
+  for (const claim of claims.signals(receiptId))
+    signals.push((yield* content.emitSignal(claim)).signalId)
   yield* log.info('enriched', {
     endpoint,
     entityId: claims.receipt.entityId,
     receiptId,
     aliases: aliases.map((a) => `${a.key}:${a.outcome}`),
     conflicts: conflicts.map((c) => c.slug),
+    signals,
   })
 })
 
@@ -151,6 +157,20 @@ const cost = ({ entityIds }: CostInput) => ({
 })
 
 /** One company, by the domain it was read with: the call, then the claims. */
+/** One person, by email or LinkedIn: the call, then the claims. */
+const enrichPersonRecord = Effect.fn('apollo.enrichPersonRecord')(function* (
+  entityId: EntityId,
+  person: ReadEntity,
+  query: { readonly [name: string]: string },
+) {
+  const raw = yield* callApollo('people/match', query)
+  const held = person.values.job_title
+  const claims = yield* mapped('people/match', () =>
+    personEnrichment(entityId, raw, typeof held === 'string' ? held : null),
+  )
+  yield* record('people/match', claims)
+})
+
 const enrichByDomain = Effect.fn('apollo.enrichByDomain')(function* (
   entityId: EntityId,
   domain: string,
@@ -180,24 +200,33 @@ export const jobs = {
     cost,
   },
   /**
-   * Enrich-on-create. Anything but a company with a domain is declined
-   * before the key is read or Apollo is called, so it spends no credit —
-   * and declining is a success, not a failure: nothing was asked of it.
+   * Auto-enrich: the Enrich button pressed by the host when a trigger fires
+   * in the owner's scope. A company is asked by domain, a person by email or
+   * LinkedIn; anything else — a deal, a record with no key — is declined
+   * before the key is read or Apollo is called, so it spends no credit, and
+   * declining is a success: nothing was asked of it.
    */
-  onCompanyCreated: Effect.fn('apollo.onCompanyCreated')(function* ({
-    event,
-  }: EventInput) {
-    if (event.kind !== 'company') return
-    const company = yield* (yield* Read).entity(event.entityId)
-    const domain =
-      company?.kind === 'company' ? first(company.keys.domain) : undefined
-    if (domain === undefined) {
-      yield* (yield* Log).info('declined: no domain', {
-        entityId: event.entityId,
+  autoEnrich: Effect.fn('apollo.autoEnrich')(function* ({ event }: EventInput) {
+    if (event.kind === 'deal') return
+    const found = yield* (yield* Read).entity(event.entityId)
+    const declined = (reason: string) =>
+      Effect.gen(function* () {
+        yield* (yield* Log).info(`declined: ${reason}`, {
+          entityId: event.entityId,
+          trigger: event.name,
+        })
       })
-      return
+    if (found?.kind === 'company') {
+      const domain = first(found.keys.domain)
+      if (domain === undefined) return yield* declined('no domain')
+      return yield* enrichByDomain(event.entityId, domain)
     }
-    yield* enrichByDomain(event.entityId, domain)
+    if (found?.kind === 'person') {
+      const query = personQuery(found)
+      if (query === null) return yield* declined('no email or LinkedIn')
+      return yield* enrichPersonRecord(event.entityId, found, query)
+    }
+    return yield* declined('not a company or a person')
   }),
   enrichPerson: {
     run: Effect.fn('apollo.enrichPerson')(function* ({
@@ -210,11 +239,7 @@ export const jobs = {
           reason: `${person.name} has no email or LinkedIn to match on`,
         })
       }
-      const raw = yield* callApollo('people/match', query)
-      const claims = yield* mapped('people/match', () =>
-        personEnrichment(entityId, raw),
-      )
-      yield* record('people/match', claims)
+      yield* enrichPersonRecord(entityId, person, query)
     }),
     cost,
   },

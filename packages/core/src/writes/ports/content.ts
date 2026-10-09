@@ -20,6 +20,7 @@ import type {
   JsonValue,
   SignalClaim,
 } from '@spaces/sdk'
+import { ref } from '../../context/ref'
 import { DOCUMENT_KINDS } from '../../documents'
 import { jsonValue } from '../../json'
 import {
@@ -33,6 +34,7 @@ import type { DocumentIntakeFailure } from '../documents/intake'
 import type { BodyVisibility } from '../interactions/write'
 import type { BoundIntegration } from './binding'
 import { integrationMeta } from './identity'
+import { ReceiptNotOwned, checkReceipt } from './receipts'
 
 /**
  * ContentLive's interaction and signal lanes (sdk-7b; spec §4, D52, D57):
@@ -59,7 +61,8 @@ import { integrationMeta } from './identity'
  *   connection user, else the admin who installed it, else the first admin.
  * - `emitSignal` writes one `signal` row on the entity — `source` is the
  *   manifest id (display text), the claim's own fields and its `payload`
- *   kept whole in `payload` — and one `signal.emitted` activity row with no
+ *   kept whole in `payload`, a cited receipt (this integration's own) as
+ *   `refs: ['event:<receiptId>']` — and one `signal.emitted` activity row with no
  *   user and the integration in `meta`, which is how the record timeline
  *   names the plugin (sdk-7a). Evidence, not a fact: it never touches an
  *   attribute.
@@ -139,6 +142,7 @@ const signalPayload = (claim: SignalClaim): JsonObject => {
   if (claim.url !== undefined) out.url = claim.url
   if (claim.publishedAt !== undefined) out.publishedAt = claim.publishedAt
   if (claim.payload !== undefined) out.payload = claim.payload
+  if (claim.receiptId !== undefined) out.refs = [ref.event(claim.receiptId)]
   return out
 }
 
@@ -400,6 +404,12 @@ export const ContentLive = (
   const emitSignal = Effect.fn('Content.emitSignal')(function* (
     claim: SignalClaim,
   ) {
+    const { receiptId } = claim
+    if (receiptId !== undefined && !UUID.test(receiptId)) {
+      return yield* new JobPermanent({
+        reason: `Content.emitSignal: no receipt ${receiptId}`,
+      })
+    }
     const target = yield* survivors([claim.entityId])
     const entityId = target.ids.at(0)
     if (entityId === undefined) {
@@ -417,6 +427,7 @@ export const ContentLive = (
     const signalId = yield* Effect.tryPromise({
       try: () =>
         db.transaction(async (tx) => {
+          if (receiptId !== undefined) await checkReceipt(tx, row.id, receiptId)
           const inserted = (
             await tx
               .insert(signal)
@@ -443,7 +454,12 @@ export const ContentLive = (
           })
           return inserted.id
         }),
-      catch: retryable('emitSignal'),
+      catch: (cause) =>
+        cause instanceof ReceiptNotOwned
+          ? new JobPermanent({
+              reason: `Content.emitSignal: ${cause.message}`,
+            })
+          : retryable('emitSignal')(cause),
     })
     return { signalId }
   })
