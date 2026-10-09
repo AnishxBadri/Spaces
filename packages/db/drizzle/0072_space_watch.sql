@@ -33,5 +33,9 @@ ALTER TABLE "space_watch_dismissal" ADD CONSTRAINT "space_watch_dismissal_space_
 ALTER TABLE "space_watch_dismissal" ADD CONSTRAINT "space_watch_dismissal_dismissed_by_user_id_fk" FOREIGN KEY ("dismissed_by") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "space_watch_lens_unique" ON "space_watch" USING btree ("space_id","integration_id","settings_hash");--> statement-breakpoint
 CREATE INDEX "space_watch_integration_idx" ON "space_watch" USING btree ("integration_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "suggestion_open_discovery_unique" ON "suggestion" USING btree (("payload" ->> 'spaceId'),("payload" ->> 'domain')) WHERE "suggestion"."status" = 'open' AND "suggestion"."kind" NOT IN ('attribute_patch', 'note', 'ledger_event', 'identity', 'document_kind', 'space_tag', 'task');--> statement-breakpoint
-ALTER TABLE "suggestion" ADD CONSTRAINT "suggestion_entity_present" CHECK ("suggestion"."entity_id" IS NOT NULL OR "suggestion"."kind" NOT IN ('attribute_patch', 'note', 'ledger_event', 'identity', 'document_kind', 'space_tag', 'task'));
+-- A discovery card is add_record or file_record. IMMUTABLE on purpose: an index predicate
+-- may not name an enum value added earlier in the same transaction (55P04) and may not
+-- cast the enum (42P17); a text comparison inside an immutable function is allowed.
+CREATE FUNCTION suggestion_is_discovery(suggestion_kind) RETURNS boolean LANGUAGE sql IMMUTABLE STRICT AS $$ select $1::text in ('add_record', 'file_record') $$;--> statement-breakpoint
+CREATE UNIQUE INDEX "suggestion_open_discovery_unique" ON "suggestion" USING btree (("payload" ->> 'spaceId'),("payload" ->> 'domain')) WHERE "suggestion"."status" = 'open' AND suggestion_is_discovery("suggestion"."kind");--> statement-breakpoint
+ALTER TABLE "suggestion" ADD CONSTRAINT "suggestion_entity_present" CHECK ("suggestion"."entity_id" IS NOT NULL OR suggestion_is_discovery("suggestion"."kind"));

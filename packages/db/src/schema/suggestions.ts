@@ -51,16 +51,6 @@ export const suggestionKind = pgEnum('suggestion_kind', [
   'file_record',
 ])
 
-/**
- * The kinds that existed before the discovery kinds, spelled as literals.
- * An index predicate or CHECK cannot name an enum value added in the same
- * transaction, so the two discovery kinds are reached as "none of these".
- * Never extend this list.
- */
-const RECORD_KINDS = sql.raw(
-  `('attribute_patch', 'note', 'ledger_event', 'identity', 'document_kind', 'space_tag', 'task')`,
-)
-
 export const suggestionStatus = pgEnum('suggestion_status', [
   'open',
   'accepted',
@@ -140,15 +130,18 @@ export const suggestion = pgTable(
     /**
      * One open discovery card per (space, domain): a later find appends its
      * evidence to the open card instead of proposing again. (D77)
-     * - `NOT IN` the record kinds is the two discovery kinds; see `RECORD_KINDS`.
+     * - `suggestion_is_discovery` is an IMMUTABLE SQL function from migration
+     *   0072, never an enum comparison: an index predicate may not name an
+     *   enum value added earlier in the same transaction (55P04) and may not
+     *   cast the enum (42P17), and a fresh database migrates in one transaction.
      */
     uniqueIndex('suggestion_open_discovery_unique')
       .on(sql`(${t.payload} ->> 'spaceId')`, sql`(${t.payload} ->> 'domain')`)
-      .where(sql`${t.status} = 'open' AND ${t.kind} NOT IN ${RECORD_KINDS}`),
+      .where(sql`${t.status} = 'open' AND suggestion_is_discovery(${t.kind})`),
     // A record kind always names its record.
     check(
       'suggestion_entity_present',
-      sql`${t.entityId} IS NOT NULL OR ${t.kind} NOT IN ${RECORD_KINDS}`,
+      sql`${t.entityId} IS NOT NULL OR suggestion_is_discovery(${t.kind})`,
     ),
     // Decided ⇔ someone decided it, when. An open row carries neither.
     check(

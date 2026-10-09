@@ -2118,7 +2118,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"suggestion\".\"status\" = 'open' AND \"suggestion\".\"kind\" NOT IN ('attribute_patch', 'note', 'ledger_event', 'identity', 'document_kind', 'space_tag', 'task')",
+          "where": "\"suggestion\".\"status\" = 'open' AND suggestion_is_discovery(\"suggestion\".\"kind\")",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2171,7 +2171,7 @@
       "checkConstraints": {
         "suggestion_entity_present": {
           "name": "suggestion_entity_present",
-          "value": "\"suggestion\".\"entity_id\" IS NOT NULL OR \"suggestion\".\"kind\" NOT IN ('attribute_patch', 'note', 'ledger_event', 'identity', 'document_kind', 'space_tag', 'task')"
+          "value": "\"suggestion\".\"entity_id\" IS NOT NULL OR suggestion_is_discovery(\"suggestion\".\"kind\")"
         },
         "suggestion_decision_invariant": {
           "name": "suggestion_decision_invariant",
