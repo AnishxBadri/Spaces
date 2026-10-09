@@ -22,6 +22,8 @@ import {
 } from '@spaces/sdk'
 import { EnrichmentSources } from '../../enrichment/sources'
 import type { AskResult } from '../../enrichment/sources'
+import { WebsiteReader } from '../../enrichment/website'
+import { ModelCall } from '../ports/ai'
 import { jsonRecord, jsonValue } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
 import { createAttributeProgram } from '../attributes/create'
@@ -42,6 +44,21 @@ import { runEnrichment } from './run'
 const EnqueueTest = Layer.succeed(
   Enqueue,
   Enqueue.of({ enqueue: () => Effect.succeed(null) }),
+)
+
+/** No AI model set up: the built-in Website is not in the order. */
+const NoModel = Layer.mergeAll(
+  Layer.succeed(
+    WebsiteReader,
+    WebsiteReader.of({
+      fetch: () => Effect.die(new Error('no fetch expected')),
+      extractRoute: () => Effect.succeed('unrouted'),
+    }),
+  ),
+  Layer.succeed(
+    ModelCall,
+    ModelCall.of({ complete: () => Effect.die(new Error('no call expected')) }),
+  ),
 )
 
 type Row = { readonly id: string; readonly capabilityId: string }
@@ -145,7 +162,9 @@ const sourcesLayer = (fixtures: ReadonlyArray<Fixture>) =>
 const run = (entityId: string, fixtures: ReadonlyArray<Fixture>) =>
   Effect.runPromise(
     runEnrichment(entityId, 'test').pipe(
-      Effect.provide(Layer.merge(sourcesLayer(fixtures), EnqueueTest)),
+      Effect.provide(
+        Layer.mergeAll(sourcesLayer(fixtures), EnqueueTest, NoModel),
+      ),
     ),
   )
 

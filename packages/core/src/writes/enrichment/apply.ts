@@ -8,6 +8,7 @@ import { Receipts } from '@spaces/sdk'
 import { toObjectKind } from '../../attributes/registry'
 import { ref } from '../../context/ref'
 import { decide, enrichedLine, linksOf, written } from '../../enrichment/plan'
+import { WEBSITE_NAME } from '../../enrichment/website'
 import type {
   Decision,
   FieldDecision,
@@ -40,7 +41,7 @@ import { SuggestionInvalid, proposeWith } from '../suggestions/propose'
  *   line naming the sources, the field count and the credits.
  */
 
-/** The host's own integration row: what a run's receipt is bound to. */
+/** The host's own integration row: what a run's receipt is bound to, and the Website source's identity. */
 export const ENRICHMENT_CAPABILITY = 'core.enrichment'
 
 /** One source the run asked, with what it was asked and what it spent. */
@@ -51,6 +52,8 @@ export type RunSource = {
   readonly credits: number
   /** Why it was not asked, when it was not. */
   readonly skipped?: string
+  /** The skip in the run's timeline line, when the owner should see it ("sensitive"). */
+  readonly line?: string
 }
 
 export type RunInput = {
@@ -128,7 +131,7 @@ export async function holdingsOf(
   return holdings
 }
 
-/** Display names by integration id: the manifest's name, else the capability. */
+/** Display names by integration id: the Website for the host's row, the manifest's name, else the capability. */
 async function sourceNames(ids: ReadonlyArray<string>) {
   if (ids.length === 0) return new Map<string, string>()
   const rows = await db
@@ -142,13 +145,15 @@ async function sourceNames(ids: ReadonlyArray<string>) {
   return new Map(
     rows.map((r) => [
       r.id,
-      jsonString(jsonRecord(r.manifest).name) ?? r.capabilityId,
+      r.capabilityId === ENRICHMENT_CAPABILITY
+        ? WEBSITE_NAME
+        : (jsonString(jsonRecord(r.manifest).name) ?? r.capabilityId),
     ]),
   )
 }
 
-/** The host's `core.enrichment` row, made on first use. */
-async function enrichmentRow() {
+/** The host's `core.enrichment` row, made on first use: the run's receipts and the Website source. */
+export async function enrichmentRow() {
   const held = (
     await db
       .select({ id: integration.id, capabilityId: integration.capabilityId })
@@ -228,6 +233,7 @@ const runReceipt = (
     asked: s.asked === null ? null : [...s.asked],
     credits: s.credits,
     ...(s.skipped === undefined ? {} : { skipped: s.skipped }),
+    ...(s.line === undefined ? {} : { line: s.line }),
   })),
   fields: decision.fields.map((f) => ({
     key: f.key,
@@ -313,18 +319,25 @@ export async function applyRun(input: RunInput): Promise<RunApplied> {
   )
   const fields = written(decision).length
   const credits = input.sources.reduce((sum, s) => sum + s.credits, 0)
+  const nameOf = (s: RunSource) => names.get(s.integrationId) ?? s.integrationId
   const sources = input.sources
     .filter((s) => s.skipped === undefined)
-    .map((s) => names.get(s.integrationId) ?? s.integrationId)
+    .map(nameOf)
+  const skipped = input.sources.flatMap((s) =>
+    s.skipped === undefined || s.line === undefined
+      ? []
+      : [{ name: nameOf(s), why: s.line }],
+  )
   await db.insert(activity).values({
     verb: 'entity.enriched',
     subjectEntityId: entityId,
     meta: {
-      line: enrichedLine({ sources, fields, credits }),
+      line: enrichedLine({ sources, fields, credits, skipped }),
       sources,
       fields,
       credits,
       receiptId,
+      ...(skipped.length === 0 ? {} : { skipped }),
       ...(suggestionId === null ? {} : { suggestionId }),
     },
   })

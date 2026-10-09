@@ -92,3 +92,18 @@ export const orderSources = <TRow extends { readonly id: string }>(
   settings.sources === null
     ? rows
     : settings.sources.flatMap((id) => rows.filter((r) => r.id === id))
+
+/**
+ * The order with a built-in source in it: where the owner's list puts it,
+ * else first — the Website is on for every record from install (D76).
+ */
+export const withBuiltIn = <TRow extends { readonly id: string }>(
+  settings: EnrichmentSettings,
+  builtIn: TRow | null,
+  rows: ReadonlyArray<TRow>,
+): ReadonlyArray<TRow> => {
+  if (builtIn === null) return orderSources(settings, rows)
+  if (settings.sources?.includes(builtIn.id) === true)
+    return orderSources(settings, [builtIn, ...rows])
+  return [builtIn, ...orderSources(settings, rows)]
+}

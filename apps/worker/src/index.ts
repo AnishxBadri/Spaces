@@ -30,8 +30,13 @@ import { summarize } from './jobs/summarize'
 import { embedDocument } from './jobs/embed-document'
 import { embedSource } from './jobs/embed-source'
 import { restampSensitivity } from './jobs/restamp-sensitivity'
-import { enrichmentEnqueue, enrichmentRun } from './jobs/enrichment-run'
+import {
+  WebsiteReaderLive,
+  enrichmentEnqueue,
+  enrichmentRun,
+} from './jobs/enrichment-run'
 import { EnrichmentSourcesLive } from './plugins/enrichment-sources'
+import { ModelCallLive } from './plugins/model-call'
 import { embedBackfill, embedBackfillRetry } from './jobs/embed-backfill'
 import { classifyDocument } from './jobs/classify-document'
 import { suggestSpaces } from './jobs/suggest-spaces'
@@ -155,7 +160,8 @@ async function main() {
   )
   // An enrichment run (D76): `stately` with `singletonKey = entityId`, so a
   // burst of triggers on one record is one queued run. Its sources run in
-  // process on the wired plugin host. Created before the plain create loop
+  // process on the wired plugin host; the built-in Website reads through the
+  // URL guard and the Extract lane. Created before the plain create loop
   // below; a queue's policy is fixed at create.
   await boss
     .createQueue(QUEUES.enrichmentRun, { policy: 'stately' })
@@ -171,7 +177,12 @@ async function main() {
     { batchSize: 1, includeMetadata: true },
     runJob(enrichmentRun, {
       host,
-      layer: Layer.merge(EnrichmentSourcesLive(plugins), enrichmentEnqueue),
+      layer: Layer.mergeAll(
+        EnrichmentSourcesLive(plugins),
+        enrichmentEnqueue,
+        WebsiteReaderLive(),
+        ModelCallLive(),
+      ),
     }),
   )
   // The corpus backfill (SPA-136): `exclusive` with one fixed singletonKey,

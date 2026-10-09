@@ -8,6 +8,7 @@ import type { JobError } from '@spaces/sdk'
  * `Facts.answer`, which the run collects (`EnrichmentCollector`).
  * - `asked: false` with the reason when the host declined before any call:
  *   not loaded, no action for the kind, a reusable receipt, the credit cap.
+ *   The built-in Website source is asked by the run itself (`askWebsite`).
  * - The worker's Live runs the plugin's job in process; tests hand fixtures.
  */
 
@@ -20,7 +21,13 @@ export type AskInput = {
 }
 
 export type AskResult =
-  { readonly asked: true } | { readonly asked: false; readonly reason: string }
+  | { readonly asked: true }
+  | {
+      readonly asked: false
+      readonly reason: string
+      /** The skip in the run's timeline line, when the owner should see it. */
+      readonly line?: string
+    }
 
 export class EnrichmentSources extends Context.Service<
   EnrichmentSources,

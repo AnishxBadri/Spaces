@@ -191,7 +191,8 @@ const workspaceSensitivity = Effect.tryPromise({
   ),
 )
 
-const subjectSensitivity = (
+/** The sensitivity a model call about this record carries: its live read, or the workspace default with no record. */
+export const subjectSensitivity = (
   entityId: string | null,
 ): Effect.Effect<ResolvedSensitivity, JobError> => {
   if (entityId === null) return workspaceSensitivity

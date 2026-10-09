@@ -1,12 +1,23 @@
-import { Effect } from 'effect'
-import type { Layer } from 'effect'
+import { Effect, Layer } from 'effect'
 import { z } from 'zod'
 import { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import { runEnrichment } from '@spaces/core/writes/enrichment/run'
 import type { EnrichmentSources } from '@spaces/core/enrichment/sources'
+import { WebsiteReader } from '@spaces/core/enrichment/website'
+import type { ExtractRoute, FetchedPage } from '@spaces/core/enrichment/website'
+import type { ModelCall } from '@spaces/core/writes/ports/ai'
+import type { JobError } from '@spaces/sdk'
+import {
+  aiRouteProgram,
+  isLaneRoutedProgram,
+  isLocalProvider,
+} from '#web/lib/ai/route'
+import { guardedFetch } from '#web/lib/documents/fetch-guard'
 import { enqueue } from '#web/lib/queue'
+import { JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
+import { CLIP_MAX_BYTES, CLIP_TIMEOUT_MS } from './clip-document'
 
 /**
  * enrichment.run — one record enriched from the owner's sources in order
@@ -26,9 +37,60 @@ export const enrichmentEnqueue: Layer.Layer<Enqueue> = Enqueue.fromSender({
   enqueue: (queue, data, options) => enqueue(queue, data, options),
 })
 
+/**
+ * The Website source's reads: a page through the URL guard under the clip's
+ * caps (size, time, no JavaScript), and the Extract lane's route as the AI
+ * router and the trigger gate read it.
+ */
+export const WebsiteReaderLive = (
+  caps: { readonly maxBytes?: number; readonly timeoutMs?: number } = {},
+): Layer.Layer<WebsiteReader> =>
+  Layer.succeed(
+    WebsiteReader,
+    WebsiteReader.of({
+      fetch: (url) =>
+        Effect.promise(() =>
+          guardedFetch(url, {
+            maxBytes: caps.maxBytes ?? CLIP_MAX_BYTES,
+            timeoutMs: caps.timeoutMs ?? CLIP_TIMEOUT_MS,
+          }),
+        ).pipe(
+          Effect.map((r): FetchedPage =>
+            r.ok
+              ? {
+                  ok: true,
+                  url: r.url,
+                  contentType: r.contentType,
+                  bytes: r.bytes,
+                }
+              : { ok: false, reason: r.reason },
+          ),
+        ),
+      extractRoute: Effect.fn('WebsiteReader.extractRoute')(function* (
+        sensitivity: 'normal' | 'sensitive',
+      ): Effect.fn.Return<ExtractRoute, JobError> {
+        const target = yield* aiRouteProgram('extract', sensitivity).pipe(
+          Effect.catchTag('LaneNotRouted', () => Effect.succeed(null)),
+          Effect.mapError(
+            () =>
+              new JobRetryable({
+                reason: 'Website: could not read the AI routing',
+              }),
+          ),
+        )
+        if (target === null) return 'unrouted'
+        const local = isLocalProvider(target.provider)
+        if (sensitivity === 'sensitive' && !local) return 'cloud'
+        const routed = yield* isLaneRoutedProgram('extract', null)
+        if (!routed[sensitivity]) return 'unrouted'
+        return local ? 'local' : 'cloud'
+      }),
+    }),
+  )
+
 export const enrichmentRun: JobDef<
   EnrichmentRunData,
-  EnrichmentSources | Enqueue
+  EnrichmentSources | Enqueue | WebsiteReader | ModelCall
 > = {
   name: QUEUES.enrichmentRun,
   schema: enrichmentRunData,

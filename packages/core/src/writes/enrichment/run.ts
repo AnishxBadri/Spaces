@@ -12,26 +12,31 @@ import type { SourceAnswer } from '../../enrichment/plan'
 import {
   enrichActionFor,
   enrichmentSettingsOf,
-  orderSources,
+  withBuiltIn,
 } from '../../enrichment/settings'
 import { EnrichmentSources } from '../../enrichment/sources'
 import type { AskResult } from '../../enrichment/sources'
+import type { WebsiteReader } from '../../enrichment/website'
 import type { Enqueue } from '../../queue/enqueue'
 import { enqueueEmbeds } from '../ai/enqueue-embed'
 import { EntityNotFound } from '../attributes/values'
 import { canonicalId } from '../entities/sweep'
+import type { ModelCall } from '../ports/ai'
 import { applyRun, holdingsOf, linksForEntity } from './apply'
 import type { RunApplied, RunSource } from './apply'
+import { askWebsite, websiteFor } from './website'
 
 /**
  * `enrichment.run(entityId, reason)` (D76): the owner's sources asked in
  * order, each for the linked keys still wanted after the ones before it,
  * and every answer applied at once by `applyRun`.
- * - A source is asked through `EnrichmentSources`; its `Facts.answer` lands
- *   in this run's `EnrichmentCollector`, not on the record.
+ * - A plugin source is asked through `EnrichmentSources`, the built-in
+ *   Website by `askWebsite`; either's answers land in this run's
+ *   `EnrichmentCollector`, not on the record.
  * - A source that fails or is declined is recorded in the receipt and the
  *   run goes on to the next.
- * - Nothing asked — no source, nothing wanted — writes nothing at all.
+ * - Nothing asked — no source, nothing wanted — writes nothing at all,
+ *   unless a skip carries a timeline line (the Website on a sensitive record).
  */
 
 export type RunOutcome =
@@ -50,9 +55,13 @@ const retryable = (what: string) => (cause: unknown) =>
 const read = <T>(what: string, run: () => Promise<T>) =>
   Effect.tryPromise({ try: run, catch: retryable(what) })
 
-/** The runnable integrations with an enrich action for `kind`, in the owner's order. */
-const sourcesFor = (kind: 'company' | 'person') =>
+/**
+ * The runnable integrations with an enrich action for `kind`, and the
+ * Website when it serves this record, in the owner's order.
+ */
+const sourcesFor = (kind: 'company' | 'person', entityId: string) =>
   Effect.gen(function* () {
+    const website = yield* websiteFor(kind, entityId)
     const settings = yield* read('enrichment.run: settings', async () =>
       enrichmentSettingsOf(
         (
@@ -73,7 +82,13 @@ const sourcesFor = (kind: 'company' | 'person') =>
         .orderBy(asc(integration.createdAt)),
     )
     const runnable = rows.filter((r) => enrichActionFor(r.manifest, kind))
-    return { settings, sources: orderSources(settings, runnable) }
+    const builtIn =
+      website === null ? null : { id: website.row.id, manifest: null }
+    return {
+      settings,
+      website,
+      sources: withBuiltIn(settings, builtIn, runnable),
+    }
   })
 
 /** Credits a source's receipts for this record used since the run began. */
@@ -103,7 +118,11 @@ const creditsSince = (integrationId: string, entityId: string, since: Date) =>
 export const runEnrichment = Effect.fn('runEnrichment')(function* (
   requested: string,
   reason: string,
-): Effect.fn.Return<RunOutcome, JobError, EnrichmentSources | Enqueue> {
+): Effect.fn.Return<
+  RunOutcome,
+  JobError,
+  EnrichmentSources | Enqueue | WebsiteReader | ModelCall
+> {
   const entityId = yield* read('enrichment.run', () => canonicalId(requested))
   const record = yield* read('enrichment.run', async () =>
     (
@@ -123,7 +142,7 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
     holdingsOf(db, entityId, record.values, links),
   )
   const started = new Date(record.now)
-  const { settings, sources } = yield* sourcesFor(kind)
+  const { settings, website, sources } = yield* sourcesFor(kind, entityId)
   const asker = yield* EnrichmentSources
 
   const ran: Array<RunSource> = []
@@ -137,14 +156,17 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
       entityId,
       answers: [],
     }
-    const result = yield* asker
-      .ask(source.id, { entityId, kind, keys, reuseDays: settings.reuseDays })
-      .pipe(
-        Effect.provideService(EnrichmentCollector, collector),
-        Effect.catch((error: JobError) =>
-          Effect.succeed<AskResult>({ asked: false, reason: reasonOf(error) }),
-        ),
-      )
+    const input = { entityId, kind, keys, reuseDays: settings.reuseDays }
+    const result = yield* (
+      website !== null && source.id === website.row.id
+        ? askWebsite(website, input)
+        : asker.ask(source.id, input)
+    ).pipe(
+      Effect.provideService(EnrichmentCollector, collector),
+      Effect.catch((error: JobError) =>
+        Effect.succeed<AskResult>({ asked: false, reason: reasonOf(error) }),
+      ),
+    )
     const credits = yield* creditsSince(source.id, entityId, started)
     if (!result.asked && collector.answers.length === 0) {
       ran.push({
@@ -152,6 +174,7 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
         asked: keys,
         credits,
         skipped: result.reason,
+        ...(result.line === undefined ? {} : { line: result.line }),
       })
       continue
     }
@@ -161,7 +184,7 @@ export const runEnrichment = Effect.fn('runEnrichment')(function* (
       for (const key of Object.keys(answer.answers)) answered.add(key)
     }
   }
-  if (!ran.some((s) => s.skipped === undefined))
+  if (!ran.some((s) => s.skipped === undefined || s.line !== undefined))
     return {
       ran: false,
       reason:
