@@ -4,7 +4,7 @@ import {
   Link,
   useRouter,
 } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { SectionHead } from '#/components/ledger-section'
 import { useSettingsDraft } from '#/components/settings/settings-form'
@@ -15,12 +15,15 @@ import {
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { Input } from '#/components/ui/input'
+import { WorkspaceMark } from '#/components/workspace-mark'
 import {
+  clearWorkspaceLogo,
   getDemoSummary,
   getWhatsSetUp,
   removeDemoData,
   saveWorkspace,
   setBaseCurrency,
+  setWorkspaceLogo,
 } from '#/lib/server-fns'
 import type { DemoSummary } from '#/lib/server-fns'
 import { SETUP_ITEMS } from '#/lib/setup/whats-set-up'
@@ -29,9 +32,10 @@ import type { SetupState } from '#/lib/setup/whats-set-up'
 const shell = getRouteApi('/_app/settings')
 
 /**
- * The workspace singleton: its name and the currency it prices in, the demo
+ * The workspace singleton: its name, its logo and the currency it prices in, the demo
  * while it is loaded, and What's set up at the foot. (D80, D81)
  * - Name and currency are typed fields: they collect into the page's Save bar.
+ * - The logo's Upload and Remove write at once, with a toast.
  * - Only an admin changes them; a member reads them disabled.
  */
 export const Route = createFileRoute('/_app/settings/general')({
@@ -48,6 +52,10 @@ function GeneralRoute() {
   return (
     <SettingsSection title="General" crumb="Workspace" adminOnly>
       <WorkspaceNameRow name={data.workspace?.name ?? ''} />
+      <LogoRow
+        name={data.workspace?.name ?? ''}
+        logo={data.workspace?.logo ?? null}
+      />
       <BaseCurrencyRow baseCurrency={data.fx.baseCurrency} />
       {demo === null ? null : <DemoDataRow demo={demo} />}
       <WhatsSetUp state={setUp} />
@@ -165,6 +173,89 @@ function WorkspaceNameRow({ name }: { name: string }) {
         onChange={(e) => set('name', e.target.value)}
         placeholder="Your fund's name"
         className="w-56"
+      />
+    </SettingsRow>
+  )
+}
+
+const LOGO_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml'
+
+/** The logo at 48px, or the monogram without one; it heads the sidebar. */
+function LogoRow({ name, logo }: { name: string; logo: string | null }) {
+  const router = useRouter()
+  const input = useRef<HTMLInputElement>(null)
+  const [pending, setPending] = useState<'upload' | 'remove' | null>(null)
+
+  async function run(
+    kind: 'upload' | 'remove',
+    write: () => Promise<unknown>,
+    done: string,
+    failed: string,
+  ) {
+    setPending(kind)
+    try {
+      await write()
+      toast(done)
+      await router.invalidate()
+    } catch (err) {
+      toast.error(
+        err instanceof Error && err.message !== '' ? err.message : failed,
+      )
+    } finally {
+      setPending(null)
+    }
+  }
+
+  function upload(file: File) {
+    const form = new FormData()
+    form.set('file', file)
+    void run(
+      'upload',
+      () => setWorkspaceLogo({ data: form }),
+      'Logo saved',
+      'Could not save the logo',
+    )
+  }
+
+  return (
+    <SettingsRow label="Logo">
+      <WorkspaceMark name={name} logo={logo} size={48} />
+      <Button
+        variant="outline"
+        pending={pending === 'upload'}
+        disabled={pending !== null}
+        onClick={() => input.current?.click()}
+      >
+        Upload
+      </Button>
+      {logo === null ? null : (
+        <Button
+          variant="ghost"
+          pending={pending === 'remove'}
+          disabled={pending !== null}
+          onClick={() =>
+            void run(
+              'remove',
+              () => clearWorkspaceLogo(),
+              'Logo removed',
+              'Could not remove the logo',
+            )
+          }
+        >
+          Remove
+        </Button>
+      )}
+      <input
+        ref={input}
+        type="file"
+        accept={LOGO_ACCEPT}
+        aria-label="Logo file"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.currentTarget.files?.item(0)
+          e.currentTarget.value = ''
+          if (file) upload(file)
+        }}
       />
     </SettingsRow>
   )

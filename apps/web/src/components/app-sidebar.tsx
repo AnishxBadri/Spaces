@@ -20,6 +20,7 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { Mark, Wordmark } from './wordmark'
+import { WorkspaceMark } from './workspace-mark'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -198,6 +199,7 @@ function usePinnedViewRows(): ReadonlyArray<PinnedView> {
 export function AppSidebar({
   user,
   workspaceName,
+  workspaceLogo = null,
   objects = [],
   onOpenCommand,
   onNavigate,
@@ -209,6 +211,8 @@ export function AppSidebar({
   user: { name: string; email: string }
   /** The workspace singleton's name — the deployment's identity. */
   workspaceName?: string | null | undefined
+  /** The logo's URL; the monogram stands in without one. */
+  workspaceLogo?: string | null
   /** Custom objects (spec §9) — they join the nav right after Deals. */
   objects?: Array<CustomObject>
   onOpenCommand: () => void
@@ -244,6 +248,7 @@ export function AppSidebar({
       <CollapsedSidebar
         user={user}
         workspaceName={workspaceName}
+        workspaceLogo={workspaceLogo}
         objects={objects}
         onOpenCommand={onOpenCommand}
         onExpand={onToggleCollapsed}
@@ -308,18 +313,26 @@ export function AppSidebar({
           <Link
             to="/spaces"
             onClick={onNavigate}
-            className="focus-ring"
+            className="focus-ring flex min-w-0 items-center gap-2.5"
             // Accessible name must contain the visible text (WCAG 2.5.3).
             aria-label={workspaceName ? `${workspaceName} home` : 'Spaces home'}
           >
-            <Wordmark />
-          </Link>
-          <span className="flex min-w-0 items-center gap-2">
             {workspaceName ? (
-              <span className="truncate mono text-micro text-graphite">
-                {workspaceName}
-              </span>
-            ) : null}
+              <>
+                <WorkspaceMark
+                  name={workspaceName}
+                  logo={workspaceLogo}
+                  size={24}
+                />
+                <span className="truncate text-ui font-medium text-foreground">
+                  {workspaceName}
+                </span>
+              </>
+            ) : (
+              <Wordmark />
+            )}
+          </Link>
+          <span className="flex shrink-0 items-center gap-2">
             {onToggleCollapsed ? (
               <IconTip label="Collapse sidebar · ⌘\\">
                 <button
@@ -660,7 +673,7 @@ function AccountMenu({
 }
 
 /**
- * The collapsed chassis: a 48px cell with the mark on a hairline, ⌘K on a
+ * The collapsed chassis: a 48px cell with the workspace mark on a hairline, ⌘K on a
  * rule, 36px rows of 14px marks with a 24px rule between groups and no
  * headings, the current page in a 36×32 paper box; the foot is Upload,
  * Settings and the ink initials square.
@@ -668,6 +681,7 @@ function AccountMenu({
 function CollapsedSidebar({
   user,
   workspaceName,
+  workspaceLogo,
   objects,
   onOpenCommand,
   onExpand,
@@ -676,6 +690,7 @@ function CollapsedSidebar({
 }: {
   user: { name: string; email: string }
   workspaceName?: string | null | undefined
+  workspaceLogo: string | null
   objects: Array<CustomObject>
   onOpenCommand: () => void
   onExpand?: (() => void) | undefined
@@ -697,7 +712,15 @@ function CollapsedSidebar({
           aria-label="Expand sidebar"
           className="focus-ring-inset flex h-12 w-12 shrink-0 items-center justify-center border-b border-hairline transition-colors hover:bg-bone-deep"
         >
-          <Mark className="text-foreground" />
+          {workspaceName ? (
+            <WorkspaceMark
+              name={workspaceName}
+              logo={workspaceLogo}
+              size={24}
+            />
+          ) : (
+            <Mark className="text-foreground" />
+          )}
         </button>
       </IconTip>
       <IconTip label="Search or jump to…">

@@ -78,6 +78,7 @@ function AppShell() {
           <AppSidebar
             user={session.user}
             workspaceName={workspace?.name ?? null}
+            workspaceLogo={workspace?.logo ?? null}
             objects={objects}
             onOpenCommand={() => setCommandOpen(true)}
             collapsed={collapsed}
@@ -118,6 +119,7 @@ function AppShell() {
               hideWordmark
               user={session.user}
               workspaceName={workspace?.name ?? null}
+              workspaceLogo={workspace?.logo ?? null}
               objects={objects}
               onOpenCommand={() => {
                 setMobileNavOpen(false)

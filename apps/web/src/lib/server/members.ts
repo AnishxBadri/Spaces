@@ -15,7 +15,9 @@ export const getWorkspace = createServerFn().handler(async () => {
     0,
   )
   if (!row) return null
-  return { name: row.name }
+  const { logoShaOf, logoPath } = await import('../members/workspace-logo')
+  const sha = logoShaOf(row.settings)
+  return { name: row.name, logo: sha === null ? null : logoPath(sha) }
 })
 
 export const saveWorkspace = createServerFn({ method: 'POST' })

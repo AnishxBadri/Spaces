@@ -4,7 +4,7 @@ import { count } from 'drizzle-orm'
 import { auth } from '../auth'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
-import { requireUser } from './shared'
+import { requireAdmin, requireUser } from './shared'
 
 export const getSession = createServerFn().handler(async () => {
   const session = await auth.api.getSession({
@@ -56,3 +56,43 @@ export const canSeedDemoData = createServerFn().handler(async () => {
   const { canSeedDemo } = await import('../seeds/demo')
   return { canSeed: await canSeedDemo() }
 })
+
+/**
+ * The workspace logo set or removed from General: written at once, admin
+ * only. The bytes it replaced are reclaimed once no row names them. (D81)
+ */
+export const setWorkspaceLogo = createServerFn({ method: 'POST' })
+  .validator((data: FormData) => {
+    const file = data.get('file')
+    if (!(file instanceof File)) throw new Error('Choose an image')
+    return { file }
+  })
+  .handler(async ({ data }) => {
+    const u = await requireAdmin()
+    const { LOGO_MAX_BYTES, LOGO_TOO_LARGE } =
+      await import('../members/workspace-logo-file')
+    // Refused before the bytes are read into memory.
+    if (data.file.size > LOGO_MAX_BYTES) throw new Error(LOGO_TOO_LARGE)
+    const { setLogoProgram, logoPath } =
+      await import('../members/workspace-logo')
+    const { reclaimBlobIfOrphaned } = await import('../documents/blob-refs')
+    const { effectFn } = await import('./effect')
+    const { sha, previous } = await effectFn(setLogoProgram)({
+      bytes: new Uint8Array(await data.file.arrayBuffer()),
+      by: u.id,
+    })
+    if (previous !== null) await reclaimBlobIfOrphaned(previous)
+    return { logo: logoPath(sha) }
+  })
+
+export const clearWorkspaceLogo = createServerFn({ method: 'POST' }).handler(
+  async () => {
+    await requireAdmin()
+    const { clearLogoProgram } = await import('../members/workspace-logo')
+    const { reclaimBlobIfOrphaned } = await import('../documents/blob-refs')
+    const { effectFn } = await import('./effect')
+    const { previous } = await effectFn(clearLogoProgram)()
+    if (previous !== null) await reclaimBlobIfOrphaned(previous)
+    return { logo: null }
+  },
+)

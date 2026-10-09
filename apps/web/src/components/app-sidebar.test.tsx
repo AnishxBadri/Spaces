@@ -96,16 +96,28 @@ afterEach(() => {
 
 const user = { name: 'Anish Badri', email: 'anish@fund.example' }
 
+type HeadProps = {
+  workspaceName?: string
+  workspaceLogo?: string | null
+  collapsed?: boolean
+}
+
 async function mount(
   path: string,
   objects: Array<{ slug: string; plural: string; icon: string | null }> = [],
+  head: HeadProps = {},
 ) {
   const { AppSidebar } = sidebar
   const { RouterProvider, createMemoryHistory, createRootRoute, createRouter } =
     router
   const rootRoute = createRootRoute({
     component: () => (
-      <AppSidebar user={user} objects={objects} onOpenCommand={() => {}} />
+      <AppSidebar
+        user={user}
+        objects={objects}
+        onOpenCommand={() => {}}
+        {...head}
+      />
     ),
   })
   const r = createRouter({
@@ -259,6 +271,40 @@ describe('the chassis', () => {
     // No pine bar: the tab is paper on a hairline.
     expect(current[0]?.className).not.toMatch(/primary|pine/)
     expect(current[0]?.className).toContain('bg-paper')
+  })
+})
+
+describe('the head', () => {
+  const mark = () => {
+    const el = document.querySelector('img, [data-monogram]')
+    if (!el) throw new Error('no workspace mark')
+    return el
+  }
+
+  it('draws the monogram beside the workspace name when there is no logo', async () => {
+    await mount('/today', [], { workspaceName: 'northwind Capital' })
+    const home = document.querySelector(
+      'a[aria-label="northwind Capital home"]',
+    )
+    expect(home?.textContent).toBe('Nnorthwind Capital')
+    expect(mark().hasAttribute('data-monogram')).toBe(true)
+    expect(mark().getAttribute('style')).toContain('width: 24px')
+  })
+
+  it('draws the logo in its place when one is set', async () => {
+    await mount('/today', [], {
+      workspaceName: 'Northwind',
+      workspaceLogo: '/api/workspace-logo/abc',
+    })
+    expect(mark().tagName).toBe('IMG')
+    expect(mark().getAttribute('src')).toBe('/api/workspace-logo/abc')
+  })
+
+  it('keeps the 24px mark when collapsed', async () => {
+    await mount('/today', [], { workspaceName: 'Northwind', collapsed: true })
+    expect(button(/^Expand sidebar$/).contains(mark())).toBe(true)
+    expect(mark().textContent).toBe('N')
+    expect(mark().getAttribute('style')).toContain('width: 24px')
   })
 })
 

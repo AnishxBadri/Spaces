@@ -68,6 +68,7 @@ import { Route as ApiBlobKeyRouteImport } from './routes/api/blob/$key'
 import { Route as ApiJobStatusEntityIdRouteImport } from './routes/api/job-status/$entityId'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as ApiWebhooksIdRouteImport } from './routes/api/webhooks/$id'
+import { Route as ApiWorkspaceLogoShaRouteImport } from './routes/api/workspace-logo/$sha'
 import { Route as AppOObjectSlugRecordIdRouteImport } from './routes/_app/o_.$objectSlug.$recordId'
 import { Route as AppSettingsEmailCalendarConnectionIdRouteImport } from './routes/_app/settings/email-calendar_.$connectionId'
 import { Route as AppSettingsFilesConnectionIdRouteImport } from './routes/_app/settings/files_.$connectionId'
@@ -374,6 +375,11 @@ const ApiWebhooksIdRoute = ApiWebhooksIdRouteImport.update({
   path: '/api/webhooks/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceLogoShaRoute = ApiWorkspaceLogoShaRouteImport.update({
+  id: '/api/workspace-logo/$sha',
+  path: '/api/workspace-logo/$sha',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppOObjectSlugRecordIdRoute = AppOObjectSlugRecordIdRouteImport.update({
   id: '/o_/$objectSlug/$recordId',
   path: '/o/$objectSlug/$recordId',
@@ -480,6 +486,7 @@ export interface FileRoutesByFullPath {
   '/api/job-status/$entityId': typeof ApiJobStatusEntityIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/api/webhooks/$id': typeof ApiWebhooksIdRoute
+  '/api/workspace-logo/$sha': typeof ApiWorkspaceLogoShaRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/email-calendar/$connectionId': typeof AppSettingsEmailCalendarConnectionIdRoute
@@ -547,6 +554,7 @@ export interface FileRoutesByTo {
   '/api/job-status/$entityId': typeof ApiJobStatusEntityIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/api/webhooks/$id': typeof ApiWebhooksIdRoute
+  '/api/workspace-logo/$sha': typeof ApiWorkspaceLogoShaRoute
   '/settings': typeof AppSettingsIndexRoute
   '/o/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/settings/email-calendar/$connectionId': typeof AppSettingsEmailCalendarConnectionIdRoute
@@ -617,6 +625,7 @@ export interface FileRoutesById {
   '/api/job-status/$entityId': typeof ApiJobStatusEntityIdRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/api/webhooks/$id': typeof ApiWebhooksIdRoute
+  '/api/workspace-logo/$sha': typeof ApiWorkspaceLogoShaRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/o_/$objectSlug/$recordId': typeof AppOObjectSlugRecordIdRoute
   '/_app/settings/email-calendar_/$connectionId': typeof AppSettingsEmailCalendarConnectionIdRoute
@@ -687,6 +696,7 @@ export interface FileRouteTypes {
     | '/api/job-status/$entityId'
     | '/api/v1/$'
     | '/api/webhooks/$id'
+    | '/api/workspace-logo/$sha'
     | '/settings/'
     | '/o/$objectSlug/$recordId'
     | '/settings/email-calendar/$connectionId'
@@ -754,6 +764,7 @@ export interface FileRouteTypes {
     | '/api/job-status/$entityId'
     | '/api/v1/$'
     | '/api/webhooks/$id'
+    | '/api/workspace-logo/$sha'
     | '/settings'
     | '/o/$objectSlug/$recordId'
     | '/settings/email-calendar/$connectionId'
@@ -823,6 +834,7 @@ export interface FileRouteTypes {
     | '/api/job-status/$entityId'
     | '/api/v1/$'
     | '/api/webhooks/$id'
+    | '/api/workspace-logo/$sha'
     | '/_app/settings/'
     | '/_app/o_/$objectSlug/$recordId'
     | '/_app/settings/email-calendar_/$connectionId'
@@ -847,6 +859,7 @@ export interface RootRouteChildren {
   ApiJobStatusEntityIdRoute: typeof ApiJobStatusEntityIdRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
   ApiWebhooksIdRoute: typeof ApiWebhooksIdRoute
+  ApiWorkspaceLogoShaRoute: typeof ApiWorkspaceLogoShaRoute
   ApiConnectionsProviderCallbackRoute: typeof ApiConnectionsProviderCallbackRoute
   ApiConnectionsProviderStartRoute: typeof ApiConnectionsProviderStartRoute
 }
@@ -1266,6 +1279,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWebhooksIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspace-logo/$sha': {
+      id: '/api/workspace-logo/$sha'
+      path: '/api/workspace-logo/$sha'
+      fullPath: '/api/workspace-logo/$sha'
+      preLoaderRoute: typeof ApiWorkspaceLogoShaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/o_/$objectSlug/$recordId': {
       id: '/_app/o_/$objectSlug/$recordId'
       path: '/o/$objectSlug/$recordId'
@@ -1464,6 +1484,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiJobStatusEntityIdRoute: ApiJobStatusEntityIdRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
   ApiWebhooksIdRoute: ApiWebhooksIdRoute,
+  ApiWorkspaceLogoShaRoute: ApiWorkspaceLogoShaRoute,
   ApiConnectionsProviderCallbackRoute: ApiConnectionsProviderCallbackRoute,
   ApiConnectionsProviderStartRoute: ApiConnectionsProviderStartRoute,
 }

@@ -1,16 +1,18 @@
-import { count, eq } from 'drizzle-orm'
+import { count, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   document,
   entity,
   extractionCache,
   importBatch,
+  workspace,
 } from '@spaces/db/schema'
 import { storage } from '@spaces/core/writes/storage'
 
 /**
  * **Is any row still on this digest?** A document, a staged import batch,
- * or a record's picture (`entity.picture_sha`) — the one question both
+ * a record's picture (`entity.picture_sha`) or the workspace logo
+ * (`workspace.settings.logo`) — the one question both
  * directions of blob GC ask, asked in one place (SPA-54).
  *
  * Content addressing means one file backs several rows: the deck emailed to
@@ -58,7 +60,15 @@ export async function blobIsReferenced(sha: string): Promise<boolean> {
       .from(entity)
       .where(eq(entity.pictureSha, sha))
   ).at(0)
-  return (picture?.value ?? 0) > 0
+  if ((picture?.value ?? 0) > 0) return true
+  // The workspace logo names its bytes by digest in the settings jsonb.
+  const logo = (
+    await db
+      .select({ value: count() })
+      .from(workspace)
+      .where(sql`${workspace.settings} ->> 'logo' = ${sha}`)
+  ).at(0)
+  return (logo?.value ?? 0) > 0
 }
 
 /**
