@@ -365,7 +365,8 @@ function DateCellEditor({ def, value, onSave, variant }: Props) {
         variant === 'cell'
           ? 'focus-ring-inset h-full rounded-md px-1'
           : boxChrome(variant),
-        !stored ? 'text-graphite' : variant === 'cell' ? 'numeric' : 'tabular',
+        variant === 'cell' ? 'numeric' : 'tabular',
+        !stored && 'text-graphite',
       )}
     >
       {stored ? stored.slice(0, 10) : '—'}
@@ -526,7 +527,13 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
             : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
-        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+        <span
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-1',
+            // A cell is one 36px line: its chips clip rather than wrap.
+            variant === 'cell' ? 'overflow-hidden' : 'flex-wrap',
+          )}
+        >
           {selected.length === 0 ? (
             <span className="text-ui text-graphite">—</span>
           ) : (
@@ -631,7 +638,13 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
             : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
-        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+        <span
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-1',
+            // A cell is one 36px line: its chips clip rather than wrap.
+            variant === 'cell' ? 'overflow-hidden' : 'flex-wrap',
+          )}
+        >
           {selected.length === 0 ? (
             <span className="text-ui text-graphite">—</span>
           ) : (
@@ -804,7 +817,13 @@ function OptionPicker({
             : 'focus-ring-inset h-full w-full rounded-md px-1',
         )}
       >
-        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+        <span
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-1',
+            // A cell is one 36px line: its chips clip rather than wrap.
+            variant === 'cell' ? 'overflow-hidden' : 'flex-wrap',
+          )}
+        >
           {selected.length === 0 ? (
             <span className="text-ui text-graphite">—</span>
           ) : (

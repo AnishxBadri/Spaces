@@ -1,4 +1,5 @@
-import { fmtMoney, fmtMultiple } from '@spaces/core/portfolio/format'
+import { ReadoutStrip } from '#/components/page-header'
+import { fmtMoney, fmtMultiple, fmtXirr } from '@spaces/core/portfolio/format'
 import { portfolioHeadline } from '@spaces/core/portfolio/rollup'
 import type {
   HeadlineFigure,
@@ -22,7 +23,10 @@ function formatFigure(
     : fmtMoney(f.amount, baseCurrency, { compact })
 }
 
-/** Portfolio: one inline strip, money compact — the table carries the rest. */
+/**
+ * Portfolio: the head's readout strip, money compact — the table carries the
+ * rest. The book's gross XIRR closes it; Today's rail does not print it.
+ */
 export function PortfolioHeadlineStrip({
   rollup,
   baseCurrency,
@@ -31,16 +35,15 @@ export function PortfolioHeadlineStrip({
   baseCurrency: string
 }) {
   return (
-    <>
-      {portfolioHeadline(rollup).map((f) => (
-        <div key={f.key} className="flex items-baseline gap-2">
-          <span className="text-label text-graphite">{f.label}</span>
-          <span className="tabular text-ui font-medium">
-            {formatFigure(f, baseCurrency, true)}
-          </span>
-        </div>
-      ))}
-    </>
+    <ReadoutStrip
+      cells={[
+        ...portfolioHeadline(rollup).map((f) => ({
+          label: f.label,
+          value: formatFigure(f, baseCurrency, true),
+        })),
+        { label: 'XIRR', value: fmtXirr(rollup.grossXirr) },
+      ]}
+    />
   )
 }
 

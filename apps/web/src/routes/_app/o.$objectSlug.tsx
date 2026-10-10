@@ -31,6 +31,7 @@ import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { EmptyState } from '#/components/empty-state'
 import {
+  attributeColumnMeta,
   ChipLink,
   DateCell,
   IconBadge,
@@ -39,9 +40,9 @@ import {
 import {
   AddColumnButton,
   RecordTable,
-  TableToolbar,
+  TableTools,
 } from '#/components/table/record-table'
-import { PageHeader } from '#/components/page-header'
+import { KeyHint, PageHeader } from '#/components/page-header'
 import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
@@ -70,6 +71,7 @@ import {
   updateRecord,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
+import { useHotkey } from '#/lib/use-hotkey'
 
 /**
  * The registry-generated list page for a custom object (spec §9): if this
@@ -100,7 +102,7 @@ export const Route = createFileRoute('/_app/o/$objectSlug')({
     const sort = view?.sort ?? null
     // Every chip's count rides the same load (SPA-162), so the bar paints
     // with its numbers — the inactive views' included — beside page one.
-    const [initial, counts] = await Promise.all([
+    const [initial, counts, all] = await Promise.all([
       listObjectRecords({
         data: {
           objectId: object.id,
@@ -117,6 +119,19 @@ export const Route = createFileRoute('/_app/o/$objectSlug')({
           viewIds: viewData.views.map((v) => v.id),
         },
       }),
+      // The head's count and the All tab's: page one already is that count
+      // when no view narrows it.
+      view === null
+        ? null
+        : listObjectRecords({
+            data: {
+              objectId: object.id,
+              conditions: [],
+              sort: null,
+              limit: 1,
+              cursor: null,
+            },
+          }),
     ])
     return {
       object,
@@ -124,6 +139,7 @@ export const Route = createFileRoute('/_app/o/$objectSlug')({
       conditions,
       sort,
       initial,
+      allTotal: (all ?? initial).total,
       views: viewData.views,
       counts,
       me: session?.user ?? null,
@@ -142,6 +158,7 @@ function ObjectListPage() {
     conditions,
     sort: loaderSort,
     initial,
+    allTotal,
     views,
     counts,
     me,
@@ -297,6 +314,7 @@ function ObjectListPage() {
           id: `attr:${def.slug}`,
           header: def.name,
           size: def.type === 'text' ? 200 : 140,
+          meta: attributeColumnMeta(def.type),
           cell: (info) => (
             <AiCell def={def} entityId={info.row.original.id}>
               <ValueEditor
@@ -335,6 +353,7 @@ function ObjectListPage() {
         id: 'createdAt',
         header: 'Added',
         size: 110,
+        meta: { numeric: true },
         cell: (info) => <DateCell value={info.getValue()} />,
       }),
     ]
@@ -374,25 +393,33 @@ function ObjectListPage() {
       refNames={refNames}
     />
   )
+  const headCreateDialog = (
+    <CreateRecordDialog
+      object={object}
+      registry={registry}
+      refNames={refNames}
+      hotkey="c"
+    />
+  )
   const noun = {
     one: object.singular.toLowerCase(),
     many: object.plural.toLowerCase(),
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col">
       <PageHeader
         title={object.plural}
-        description={`Every ${noun.one} you keep — your own object, your own attributes.`}
+        count={allTotal}
         action={
           <>
             <ImportAction objectSlug={object.slug} />
-            {createDialog}
+            {headCreateDialog}
           </>
         }
       />
-      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
-        {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (
+      {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (
+        <div className="px-8 pb-8">
           <EmptyState
             icon={Icon}
             title={`No ${noun.many} yet`}
@@ -403,35 +430,36 @@ function ObjectListPage() {
             }
             action={createDialog}
           />
-        ) : (
-          <>
-            <TableToolbar
-              table={table}
-              filter={globalFilter}
-              onFilterChange={setGlobalFilter}
-              filterPlaceholder={`Filter ${noun.many}…`}
-              filterLabel={`Filter ${noun.many}`}
-              noun={noun}
-              total={total}
-              shown={rows.length}
-            >
-              <ViewBar
-                objectId={object.id}
-                registry={registry}
-                views={views}
-                counts={counts}
-                activeId={activeId ?? null}
-                snapshot={vs.snapshot}
-                onApply={(v) => {
-                  vs.apply(v)
-                  selectView(v?.id ?? null)
-                }}
-                selectView={selectView}
-                onFilterChange={vs.setConditions}
-                onSaved={() => void router.invalidate()}
-                canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+        </div>
+      ) : (
+        <>
+          <ViewBar
+            objectId={object.id}
+            registry={registry}
+            views={views}
+            counts={counts}
+            total={allTotal}
+            activeId={activeId ?? null}
+            snapshot={vs.snapshot}
+            onApply={(v) => {
+              vs.apply(v)
+              selectView(v?.id ?? null)
+            }}
+            selectView={selectView}
+            onFilterChange={vs.setConditions}
+            onSaved={() => void router.invalidate()}
+            canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+            tools={
+              <TableTools
+                table={table}
+                filter={globalFilter}
+                onFilterChange={setGlobalFilter}
+                filterPlaceholder={`Filter ${noun.many}…`}
+                filterLabel={`Filter ${noun.many}`}
               />
-            </TableToolbar>
+            }
+          />
+          <div className="px-8 pb-8">
             <AiCellsProvider
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
               registry={registry}
@@ -460,10 +488,10 @@ function ObjectListPage() {
                 }
               />
             </AiCellsProvider>
-            {columnRun.dialog}
-          </>
-        )}
-      </div>
+          </div>
+          {columnRun.dialog}
+        </>
+      )}
     </div>
   )
 }
@@ -473,14 +501,18 @@ function CreateRecordDialog({
   object,
   registry,
   refNames,
+  hotkey,
 }: {
   object: { id: string; singular: string; plural: string }
   registry: Array<RegistryEntry>
   refNames: Record<string, { name: string }>
+  /** Bare key that opens it from the page — printed in the trigger. */
+  hotkey?: string
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
+  useHotkey(hotkey, () => setOpen(true))
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [name, setName] = useState('')
@@ -530,6 +562,7 @@ function CreateRecordDialog({
         <Button size="sm">
           <Plus className="size-4" strokeWidth={2} />
           New {object.singular.toLowerCase()}
+          {hotkey ? <KeyHint>{hotkey.toUpperCase()}</KeyHint> : null}
         </Button>
       </DialogTrigger>
       <DialogContent

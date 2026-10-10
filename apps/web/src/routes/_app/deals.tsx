@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Handshake, Kanban, Plus, Table2 } from 'lucide-react'
+import { Handshake, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -27,13 +27,19 @@ import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { EmptyState } from '#/components/empty-state'
 import { TemplatePicker } from '#/components/templates'
-import { IconBadge, RecordLinkCell } from '#/components/table/cells'
+import {
+  attributeColumnMeta,
+  IconBadge,
+  RecordLinkCell,
+} from '#/components/table/cells'
 import {
   AddColumnButton,
   RecordTable,
-  TableToolbar,
+  TableTools,
 } from '#/components/table/record-table'
-import { PageHeader } from '#/components/page-header'
+import { ListMenu } from '#/components/table/list-menu'
+import { FilterCount, FilterRow, FilterTab } from '#/components/filter-row'
+import { KeyHint, PageHeader } from '#/components/page-header'
 import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
@@ -59,6 +65,7 @@ import {
   updateRecord,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
+import { useHotkey } from '#/lib/use-hotkey'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { EntityValues } from '@spaces/db/schema/entities'
 
@@ -262,17 +269,18 @@ function DealsPage() {
     })
   }, [deals, groupFilter, stageFilter, stageOptions, vs.conditions, typeOf])
 
-  // Counts per group for the filter chips — over every deal, which is why
-  // this surface holds them all (see the note on the route above).
-  const groupCounts = useMemo(() => {
-    const counts: Record<string, number> = { active: 0, parked: 0, closed: 0 }
+  // Counts per group and per stage for the filter row — over every deal,
+  // which is why this surface holds them all (see the note on the route).
+  const { groupCounts, stageCounts } = useMemo(() => {
+    const groups: Record<string, number> = { active: 0, parked: 0, closed: 0 }
+    const stages = new Map<string, number>()
     for (const d of deals.rows) {
-      const opt = stageOptions.find(
-        (o) => o.id === String(d.values.stage ?? ''),
-      )
-      counts[opt?.group ?? 'active'] += 1
+      const stage = String(d.values.stage ?? '')
+      const opt = stageOptions.find((o) => o.id === stage)
+      groups[opt?.group ?? 'active'] += 1
+      stages.set(stage, (stages.get(stage) ?? 0) + 1)
     }
-    return counts
+    return { groupCounts: groups, stageCounts: stages }
   }, [deals, stageOptions])
 
   useEffect(() => {
@@ -319,6 +327,7 @@ function DealsPage() {
             id: `attr:${def.slug}`,
             header: def.name,
             size: def.type === 'text' ? 200 : 140,
+            meta: attributeColumnMeta(def.type),
             sortUndefined: 'last',
             cell: (info) => (
               <AiCell def={def} entityId={info.row.original.id}>
@@ -366,152 +375,134 @@ function DealsPage() {
     columnResizeMode: 'onChange',
   })
 
+  const groupStages =
+    groupFilter === null
+      ? []
+      : stageOptions.filter((o) => (o.group ?? 'active') === groupFilter)
+  const stageTab = (o: { id: string; label: string; archived?: boolean }) => (
+    <FilterTab
+      key={o.id}
+      active={stageFilter === o.id}
+      onClick={() => setStageFilter(stageFilter === o.id ? null : o.id)}
+    >
+      {o.label} <FilterCount n={stageCounts.get(o.id) ?? 0} />
+    </FilterTab>
+  )
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col">
       <PageHeader
         title="Deals"
-        description="One record per opportunity — born at Pre-lead, closed as Invested, Passed, or Lost. History is the point."
+        count={deals.rows.length}
         action={
           <>
             <ImportAction objectSlug="deals" />
-            <CreateDealDialog registry={registry} />
+            <CreateDealDialog registry={registry} hotkey="c" />
+            <ListMenu
+              label="Deals"
+              verbs={[
+                view === 'board'
+                  ? {
+                      label: 'Show as table',
+                      onSelect: () => switchView('table'),
+                    }
+                  : {
+                      label: 'Show as board',
+                      onSelect: () => switchView('board'),
+                    },
+              ]}
+            />
           </>
         }
       />
-      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
-        {deals.rows.length === 0 ? (
+      {deals.rows.length === 0 ? (
+        <div className="px-8 pb-8">
           <EmptyState
             icon={Handshake}
             title="No deals yet"
             body="A deal starts when something arrives — a deck, an intro, a founder email. Create one against a company and triage it from Pre-lead."
             action={<CreateDealDialog registry={registry} />}
           />
-        ) : view === 'board' ? (
-          <>
-            <div className="mb-4 flex h-9 items-center justify-between gap-3 border-b border-rule">
-              <ViewToggle view={view} onChange={switchView} />
-              <span className="flex items-center gap-4 mono text-micro text-graphite">
-                <TerminalSplit rows={deals.rows} />
-                <span>drag to move</span>
-              </span>
-            </div>
-            <DealBoard
-              deals={deals.rows}
-              stages={stageOptions}
-              refNames={refNames}
-              valueCurrency={
-                registry.find((d) => d.slug === 'value')?.options.code ?? 'USD'
-              }
-              pictures={deals.pictures}
-              medianDaysInStage={funnel.medianDaysInStage}
-              daysInStage={Object.fromEntries(
-                funnel.daysInStage.map((d) => [d.id, d.days]),
-              )}
-            />
-          </>
-        ) : (
-          <>
-            <TableToolbar
-              table={table}
-              filter={globalFilter}
-              onFilterChange={setGlobalFilter}
-              filterPlaceholder="Filter by deal or company…"
-              filterLabel="Filter deals"
-              noun={{ one: 'deal', many: 'deals' }}
-              total={deals.rows.length}
-              shown={table.getRowModel().rows.length}
-            >
-              <ViewToggle view={view} onChange={switchView} />
-              <ViewBar
-                objectId={objectId}
-                registry={registry}
-                views={views}
-                counts={viewCounts}
-                activeId={activeId ?? null}
-                snapshot={vs.snapshot}
-                onApply={(v) => {
-                  vs.apply(v)
-                  selectView(v?.id ?? null)
-                }}
-                selectView={selectView}
-                onFilterChange={vs.setConditions}
-                onSaved={() => router.invalidate()}
-                canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+        </div>
+      ) : view === 'board' ? (
+        <div className="px-8 pb-8">
+          <div className="mb-4 flex h-9 items-center justify-between gap-3 border-b border-rule">
+            <TerminalSplit rows={deals.rows} />
+            <span className="mono text-micro text-graphite">drag to move</span>
+          </div>
+          <DealBoard
+            deals={deals.rows}
+            stages={stageOptions}
+            refNames={refNames}
+            valueCurrency={
+              registry.find((d) => d.slug === 'value')?.options.code ?? 'USD'
+            }
+            pictures={deals.pictures}
+            medianDaysInStage={funnel.medianDaysInStage}
+            daysInStage={Object.fromEntries(
+              funnel.daysInStage.map((d) => [d.id, d.days]),
+            )}
+          />
+        </div>
+      ) : (
+        <>
+          <ViewBar
+            objectId={objectId}
+            registry={registry}
+            views={views}
+            counts={viewCounts}
+            total={deals.rows.length}
+            activeId={activeId ?? null}
+            snapshot={vs.snapshot}
+            onApply={(v) => {
+              vs.apply(v)
+              selectView(v?.id ?? null)
+            }}
+            selectView={selectView}
+            onFilterChange={vs.setConditions}
+            onSaved={() => router.invalidate()}
+            canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+            tools={
+              <TableTools
+                table={table}
+                filter={globalFilter}
+                onFilterChange={setGlobalFilter}
+                filterPlaceholder="Filter by deal or company…"
+                filterLabel="Filter deals"
               />
-              <div
-                className="flex items-center gap-1"
-                role="group"
-                aria-label="Stage group"
-              >
-                {(['active', 'parked', 'closed'] as const).map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    aria-pressed={groupFilter === g}
-                    onClick={() => setGroupFilter(groupFilter === g ? null : g)}
-                    className={cn(
-                      'focus-ring flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-label font-medium whitespace-nowrap transition-colors duration-150 ease-out-quart',
-                      groupFilter === g
-                        ? 'border-primary/40 bg-selected text-foreground'
-                        : 'border-rule text-graphite hover:border-hairline hover:text-foreground',
-                    )}
-                  >
-                    {GROUP_LABELS[g]}
-                    <span className="tabular">{groupCounts[g]}</span>
-                  </button>
-                ))}
-              </div>
-              {groupFilter ? (
-                <div
-                  className="flex items-center gap-1"
-                  role="group"
-                  aria-label={`${GROUP_LABELS[groupFilter]} stages`}
+            }
+          />
+          <div className="px-8 pb-8">
+            {/* The view's own narrowing, saved in its `extra`: a group, then
+                one of its stages. Retired stages stay filterable after the
+                divider — that is how the deals still parked on one are found
+                and retagged. */}
+            <FilterRow label="Stage">
+              {(['active', 'parked', 'closed'] as const).map((g) => (
+                <FilterTab
+                  key={g}
+                  active={groupFilter === g}
+                  onClick={() => setGroupFilter(groupFilter === g ? null : g)}
                 >
-                  {stageOptions
-                    .filter((o) => (o.group ?? 'active') === groupFilter)
-                    .filter((o) => !o.archived)
-                    .map((o) => (
-                      <StageChip
-                        key={o.id}
-                        option={o}
-                        pressed={stageFilter === o.id}
-                        onToggle={() =>
-                          setStageFilter(stageFilter === o.id ? null : o.id)
-                        }
-                      />
-                    ))}
-                  {/* Filtering is reading history, so retired stages stay
-                    filterable behind a divider — that's how the records
-                    still parked on one get found and retagged (spec §3). */}
-                  {stageOptions.some(
-                    (o) => o.archived && (o.group ?? 'active') === groupFilter,
-                  ) ? (
-                    <>
-                      <span
-                        role="separator"
-                        aria-orientation="vertical"
-                        className="mx-1 flex h-4 items-center self-center border-l border-rule pl-2 text-micro font-medium tracking-wide text-graphite uppercase"
-                      >
-                        Archived
-                      </span>
-                      {stageOptions
-                        .filter((o) => (o.group ?? 'active') === groupFilter)
-                        .filter((o) => o.archived)
-                        .map((o) => (
-                          <StageChip
-                            key={o.id}
-                            option={o}
-                            pressed={stageFilter === o.id}
-                            onToggle={() =>
-                              setStageFilter(stageFilter === o.id ? null : o.id)
-                            }
-                          />
-                        ))}
-                    </>
-                  ) : null}
-                </div>
+                  {GROUP_LABELS[g]} <FilterCount n={groupCounts[g]} />
+                </FilterTab>
+              ))}
+              {groupStages.length > 0 ? (
+                <span
+                  aria-hidden
+                  className="mx-2 h-4 self-center border-l border-rule"
+                />
               ) : null}
-            </TableToolbar>
+              {groupStages.filter((o) => !o.archived).map(stageTab)}
+              {groupStages.some((o) => o.archived) ? (
+                <>
+                  <span className="mr-1 ml-3 self-center field-label text-graphite">
+                    Archived
+                  </span>
+                  {groupStages.filter((o) => o.archived).map(stageTab)}
+                </>
+              ) : null}
+            </FilterRow>
             <AiCellsProvider
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
               registry={registry}
@@ -530,39 +521,11 @@ function DealsPage() {
                 }
               />
             </AiCellsProvider>
-            {columnRun.dialog}
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function StageChip({
-  option,
-  pressed,
-  onToggle,
-}: {
-  option: { id: string; label: string; archived?: boolean }
-  pressed: boolean
-  onToggle: () => void
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onToggle}
-      title={option.archived ? 'Archived option' : undefined}
-      className={cn(
-        'focus-ring h-7 shrink-0 rounded-md border px-2.5 text-label whitespace-nowrap transition-colors duration-150 ease-out-quart',
-        pressed
-          ? 'border-primary/40 bg-selected font-medium text-foreground'
-          : 'border-transparent text-graphite hover:text-foreground',
-        option.archived && !pressed && 'opacity-70',
+          </div>
+          {columnRun.dialog}
+        </>
       )}
-    >
-      {option.label}
-    </button>
+    </div>
   )
 }
 
@@ -584,59 +547,24 @@ function TerminalSplit({ rows }: { rows: Array<DealRow> }) {
   )
 }
 
-function ViewToggle({
-  view,
-  onChange,
-}: {
-  view: 'table' | 'board'
-  onChange: (v: 'table' | 'board') => void
-}) {
-  return (
-    <div
-      role="group"
-      aria-label="View"
-      className="flex items-center rounded-md border border-hairline"
-    >
-      {(
-        [
-          ['table', Table2, 'Table'],
-          ['board', Kanban, 'Board'],
-        ] as const
-      ).map(([v, Icon, label]) => (
-        <button
-          key={v}
-          type="button"
-          aria-pressed={view === v}
-          onClick={() => onChange(v)}
-          className={cn(
-            'focus-ring-inset flex h-7 items-center gap-1 px-2.5 text-label transition-colors duration-150',
-            view === v
-              ? 'bg-hairline font-medium text-paper'
-              : 'text-foreground hover:bg-bone',
-          )}
-        >
-          <Icon className="size-3.5" strokeWidth={2} />
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 export function CreateDealDialog({
   registry,
   presetCompany,
   triggerLabel = 'New deal',
   trigger,
+  hotkey,
 }: {
   registry: Array<RegistryEntry>
   presetCompany?: { id: string; name: string }
   triggerLabel?: string
   /** A trigger of the caller's own — must forward props (plain DOM elements do). */
   trigger?: React.ReactNode
+  /** Bare key that opens it from the page — printed in the default trigger. */
+  hotkey?: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  useHotkey(hotkey, () => setOpen(true))
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [name, setName] = useState('')
@@ -702,6 +630,7 @@ export function CreateDealDialog({
           <Button size="sm">
             <Plus className="size-4" strokeWidth={2} />
             {triggerLabel}
+            {hotkey ? <KeyHint>{hotkey.toUpperCase()}</KeyHint> : null}
           </Button>
         )}
       </DialogTrigger>

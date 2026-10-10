@@ -16,8 +16,11 @@ import type { ViewRow } from '@spaces/core/writes/views/store'
 import type * as ViewBarModule from './view-bar'
 
 /**
- * The view bar's `···` menu: Pin to sidebar / Unpin for any view on an object
- * list, Rename and Delete only for a view the user may edit.
+ * The view bar: the saved views as real tabs on the bone head bar — `All`
+ * with the list's total, each view with its count, `+ view` — with Filter and
+ * the table's tools on the same bar. Its `···` menu: Pin to sidebar / Unpin
+ * for any view on an object list, Rename and Delete only for a view the user
+ * may edit.
  */
 
 vi.mock('#/lib/server-fns', () => ({
@@ -100,7 +103,12 @@ const SEED: ViewRow = {
   updatedAt: '2026-10-10T00:00:00.000Z',
 }
 
-async function mount(opts: { objectId: string | null; canEdit: boolean }) {
+async function mount(opts: {
+  objectId: string | null
+  canEdit: boolean
+  activeId?: string | null
+  onApply?: (v: ViewRow | null) => void
+}) {
   const { ViewBar } = bar
   await act(async () => {
     root.render(
@@ -109,9 +117,12 @@ async function mount(opts: { objectId: string | null; canEdit: boolean }) {
           objectId={opts.objectId}
           registry={[]}
           views={[SEED]}
-          activeId={SEED.id}
+          counts={{ [SEED.id]: { count: 4 } }}
+          total={37}
+          tools={<button type="button">Columns</button>}
+          activeId={opts.activeId === undefined ? SEED.id : opts.activeId}
           snapshot={{ filter: [], sort: null, columns: {}, extra: {} }}
-          onApply={() => {}}
+          onApply={opts.onApply ?? (() => {})}
           selectView={() => {}}
           onFilterChange={() => {}}
           onSaved={() => {}}
@@ -186,5 +197,70 @@ describe('the view menu', () => {
     root = createRoot(host)
     await mount({ objectId: null, canEdit: false })
     expect(trigger()).toBeNull()
+  })
+})
+
+describe('the tab bar', () => {
+  const tabs = () =>
+    Array.from(document.querySelectorAll('[role="tab"]')).map((t) => ({
+      text: t.textContent.trim(),
+      selected: t.getAttribute('aria-selected'),
+    }))
+
+  it('draws All with the total and each view with its count, as real tabs', async () => {
+    await mount({ objectId: SEED.objectId, canEdit: false, activeId: null })
+    expect(tabs()).toEqual([
+      { text: 'All37', selected: 'true' },
+      { text: 'Seed, India4', selected: 'false' },
+    ])
+    const list = document.querySelector('[role="tablist"]')
+    expect(list?.closest('[data-tab-bar]')?.className).toContain('bg-bone')
+  })
+
+  it('carries + view, Filter and the tools on the same bar, outside the tablist', async () => {
+    await mount({ objectId: SEED.objectId, canEdit: false, activeId: null })
+    const barEl = document.querySelector('[data-tab-bar]')
+    if (!(barEl instanceof HTMLElement)) throw new Error('no bar')
+    const controls = Array.from(barEl.querySelectorAll('button'))
+      .filter((b) => b.getAttribute('role') !== 'tab')
+      .map((b) => b.textContent.trim())
+    expect(controls).toEqual(['+ view', 'Filter', 'Columns'])
+    expect(
+      barEl.querySelector('[role="tablist"]')?.querySelectorAll('button'),
+    ).toHaveLength(2)
+    // One bar: nothing of the view bar renders outside it.
+    expect(document.querySelectorAll('[data-tab-bar]')).toHaveLength(1)
+  })
+
+  it('applies a view from its tab and All from the first', async () => {
+    const applied: Array<string | null> = []
+    await mount({
+      objectId: SEED.objectId,
+      canEdit: false,
+      activeId: null,
+      onApply: (v) => applied.push(v?.id ?? null),
+    })
+    const [all, seed] = Array.from(document.querySelectorAll('[role="tab"]'))
+    if (!(all instanceof HTMLElement && seed instanceof HTMLElement))
+      throw new Error('tabs missing')
+    await act(async () => {
+      seed.click()
+    })
+    expect(applied).toEqual([SEED.id])
+    act(() => root.unmount())
+    const host = document.createElement('div')
+    document.body.append(host)
+    root = createRoot(host)
+    await mount({
+      objectId: SEED.objectId,
+      canEdit: false,
+      onApply: (v) => applied.push(v?.id ?? null),
+    })
+    const first = document.querySelector('[role="tab"]')
+    if (!(first instanceof HTMLElement)) throw new Error('no All')
+    await act(async () => {
+      first.click()
+    })
+    expect(applied).toEqual([SEED.id, null])
   })
 })

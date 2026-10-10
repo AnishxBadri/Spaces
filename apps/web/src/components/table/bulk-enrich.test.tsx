@@ -8,7 +8,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { useListEnrich } from './bulk-enrich-dialog'
-import { RecordTable, TableToolbar } from './record-table'
+import { RecordTable } from './record-table'
 
 /**
  * Enrich… on a record list: the row checkboxes raise the selection bar, its
@@ -119,17 +119,7 @@ function Harness() {
   return (
     <div>
       {enrich.menu}
-      <TableToolbar
-        table={table}
-        filter=""
-        onFilterChange={() => undefined}
-        filterPlaceholder="Filter"
-        filterLabel="Filter companies"
-        noun={{ one: 'company', many: 'companies' }}
-        total={ROWS.length}
-        shown={ROWS.length}
-        selectionBar={enrich.selectionBar}
-      />
+      {enrich.selectionBar}
       <RecordTable
         table={table}
         label="Companies"

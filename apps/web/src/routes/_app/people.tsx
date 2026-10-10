@@ -18,6 +18,7 @@ import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { useColumnRun } from '#/components/views/column-run'
 import { cn } from '#/lib/utils'
+import { useHotkey } from '#/lib/use-hotkey'
 import { jsonRecord } from '@spaces/core/json'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
@@ -31,6 +32,7 @@ import { EmptyState } from '#/components/empty-state'
 import { RecordMark } from '#/components/record/record-parts'
 import { TemplatePicker } from '#/components/templates'
 import {
+  attributeColumnMeta,
   DateCell,
   InitialBadge,
   RecordLinkCell,
@@ -40,9 +42,9 @@ import { identityFirst } from '#/lib/attributes/identity-first'
 import {
   AddColumnButton,
   RecordTable,
-  TableToolbar,
+  TableTools,
 } from '#/components/table/record-table'
-import { PageHeader } from '#/components/page-header'
+import { KeyHint, PageHeader } from '#/components/page-header'
 import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { useListEnrich } from '#/components/table/bulk-enrich-dialog'
@@ -92,7 +94,7 @@ export const Route = createFileRoute('/_app/people')({
     const sort = view?.sort ?? null
     // Every chip's count rides the same load (SPA-162), so the bar paints
     // with its numbers — the inactive views' included — beside page one.
-    const [initial, counts] = await Promise.all([
+    const [initial, counts, all] = await Promise.all([
       listPeopleTable({
         data: { conditions, sort, limit: RECORD_PAGE_SIZE, cursor: null },
       }),
@@ -103,11 +105,19 @@ export const Route = createFileRoute('/_app/people')({
           viewIds: viewData.views.map((v) => v.id),
         },
       }),
+      // The head's count and the All tab's: page one already is that count
+      // when no view narrows it.
+      view === null
+        ? null
+        : listPeopleTable({
+            data: { conditions: [], sort: null, limit: 1, cursor: null },
+          }),
     ])
     return {
       conditions,
       sort,
       initial,
+      allTotal: (all ?? initial).total,
       registry,
       companies,
       views: viewData.views,
@@ -130,6 +140,7 @@ function PeoplePage() {
     conditions,
     sort: loaderSort,
     initial,
+    allTotal,
     registry,
     companies,
     views,
@@ -288,6 +299,7 @@ function PeoplePage() {
           id: `attr:${def.slug}`,
           header: def.name,
           size: def.type === 'text' ? 180 : 140,
+          meta: attributeColumnMeta(def.type),
           cell: (info) => (
             <AiCell def={def} entityId={info.row.original.id}>
               <ValueEditor
@@ -307,6 +319,7 @@ function PeoplePage() {
         id: 'createdAt',
         header: 'Added',
         size: 110,
+        meta: { numeric: true },
         cell: (info) => <DateCell value={info.getValue()} />,
       }),
     ]
@@ -336,20 +349,24 @@ function PeoplePage() {
   })
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col">
       <PageHeader
         title="People"
-        description="Founders, operators, co-investors — deduped by email, linked to their companies."
+        count={allTotal}
         action={
           <>
             <ImportAction objectSlug="people" />
-            <CreatePersonDialog companies={companies} registry={registry} />
+            <CreatePersonDialog
+              companies={companies}
+              registry={registry}
+              hotkey="c"
+            />
             {enrich.menu}
           </>
         }
       />
-      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
-        {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (
+      {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (
+        <div className="px-8 pb-8">
           <EmptyState
             icon={Users}
             title="No people yet"
@@ -359,36 +376,38 @@ function PeoplePage() {
             }
             hint="Gmail and calendar sync will create these automatically later — through the same dedupe gate."
           />
-        ) : (
-          <>
-            <TableToolbar
-              table={table}
-              filter={globalFilter}
-              onFilterChange={setGlobalFilter}
-              filterPlaceholder="Filter by name or email…"
-              filterLabel="Filter people"
-              noun={{ one: 'person', many: 'people' }}
-              total={total}
-              shown={rows.length}
-              selectionBar={enrich.selectionBar}
-            >
-              <ViewBar
-                objectId={objectId}
-                registry={filterRegistry}
-                views={views}
-                counts={counts}
-                activeId={activeId ?? null}
-                snapshot={vs.snapshot}
-                onApply={(v) => {
-                  vs.apply(v)
-                  selectView(v?.id ?? null)
-                }}
-                selectView={selectView}
-                onFilterChange={vs.setConditions}
-                onSaved={() => void router.invalidate()}
-                canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
-              />
-            </TableToolbar>
+        </div>
+      ) : (
+        <>
+          {enrich.selectionBar ?? (
+            <ViewBar
+              objectId={objectId}
+              registry={filterRegistry}
+              views={views}
+              counts={counts}
+              total={allTotal}
+              activeId={activeId ?? null}
+              snapshot={vs.snapshot}
+              onApply={(v) => {
+                vs.apply(v)
+                selectView(v?.id ?? null)
+              }}
+              selectView={selectView}
+              onFilterChange={vs.setConditions}
+              onSaved={() => void router.invalidate()}
+              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+              tools={
+                <TableTools
+                  table={table}
+                  filter={globalFilter}
+                  onFilterChange={setGlobalFilter}
+                  filterPlaceholder="Filter by name or email…"
+                  filterLabel="Filter people"
+                />
+              }
+            />
+          )}
+          <div className="px-8 pb-8">
             <AiCellsProvider
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
               registry={registry}
@@ -415,10 +434,10 @@ function PeoplePage() {
                 }
               />
             </AiCellsProvider>
-            {columnRun.dialog}
-          </>
-        )}
-      </div>
+          </div>
+          {columnRun.dialog}
+        </>
+      )}
       {enrich.dialog}
     </div>
   )
@@ -427,13 +446,17 @@ function PeoplePage() {
 function CreatePersonDialog({
   companies,
   registry,
+  hotkey,
 }: {
   companies: Array<{ id: string; name: string }>
   registry: Array<RegistryEntry>
+  /** Bare key that opens it from the page — printed in the trigger. */
+  hotkey?: string
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
+  useHotkey(hotkey, () => setOpen(true))
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [values, setValues] = useState<Record<string, unknown>>({})
@@ -494,6 +517,7 @@ function CreatePersonDialog({
         <Button size="sm">
           <Plus className="size-4" strokeWidth={2} />
           New person
+          {hotkey ? <KeyHint>{hotkey.toUpperCase()}</KeyHint> : null}
         </Button>
       </DialogTrigger>
       <DialogContent

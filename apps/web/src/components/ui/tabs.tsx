@@ -16,6 +16,8 @@ import { cn } from '#/lib/utils'
  *   bone band; the default bar is 36px.
  * - `pinned` keeps the head under the folded `HeadBar` while its body
  *   scrolls.
+ * - `trail` sits on the same bone bar after the tabs, outside the tablist:
+ *   a list's `+ view` and its Filter · Sort · Columns lane.
  * - A switch transitions the text colour only: the open tab's ink fill
  *   switches at once, so no frame shows two half-inked tabs.
  *
@@ -59,6 +61,7 @@ export function Tabs<T extends string>({
   disabled,
   size = 'bar',
   pinned = false,
+  trail,
   children,
   className,
 }: {
@@ -71,6 +74,8 @@ export function Tabs<T extends string>({
   size?: 'bar' | 'head' | undefined
   /** Stick under the folded head bar while the page scrolls. */
   pinned?: boolean | undefined
+  /** Controls on the bar after the tabs; never inside the tablist. */
+  trail?: ReactNode
   /** The open tab's body; rendered as its `tabpanel` when given. */
   children?: ReactNode
   className?: string | undefined
@@ -93,66 +98,80 @@ export function Tabs<T extends string>({
     refs.current[next]?.focus()
   }
 
+  // No overflow clip: the open tab hangs 1px over this foot rule.
+  const bar = cn(
+    'flex items-end border-b border-hairline bg-bone pt-1',
+    size === 'head' && 'h-11 px-3',
+    pinned && PIN_UNDER_HEAD_BAR,
+  )
+  const list = (
+    <div
+      role="tablist"
+      aria-label={label}
+      onKeyDown={onKeyDown}
+      className={trail === undefined ? bar : 'flex shrink-0 items-end'}
+    >
+      {items.map((t, i) => {
+        const open = i === selected
+        const empty = t.count === 0
+        return (
+          <button
+            key={t.id}
+            ref={(el) => {
+              refs.current[i] = el
+            }}
+            id={tabId(i)}
+            type="button"
+            role="tab"
+            aria-selected={open}
+            {...(children !== undefined ? { 'aria-controls': panelId } : {})}
+            tabIndex={open ? 0 : -1}
+            {...(empty ? { 'data-empty': true } : {})}
+            disabled={disabled}
+            onClick={() => {
+              if (!open) onValueChange(t.id)
+            }}
+            className={cn(
+              'focus-ring-inset flex shrink-0 items-center gap-2 px-3 label-caps whitespace-nowrap transition-[color] duration-150 ease-out-quart disabled:opacity-50',
+              size === 'head' ? 'h-9.75' : 'h-8',
+              // Closed: ink when it holds something, graphite when empty.
+              open
+                ? 'tab-open -mb-px text-foreground'
+                : t.count !== undefined && t.count > 0
+                  ? 'text-foreground'
+                  : 'text-graphite hover:text-foreground',
+            )}
+          >
+            {t.label}
+            {t.count !== undefined ? (
+              <span
+                data-tab-count
+                className={cn(
+                  'tabular mono text-micro font-normal',
+                  t.count > 0 ? 'text-foreground' : 'text-graphite',
+                )}
+              >
+                {t.count}
+              </span>
+            ) : null}
+          </button>
+        )
+      })}
+    </div>
+  )
+
   return (
     <div className={cn('flex flex-col', className)}>
-      <div
-        role="tablist"
-        aria-label={label}
-        onKeyDown={onKeyDown}
-        // No overflow clip: the open tab hangs 1px over this foot rule.
-        className={cn(
-          'flex items-end border-b border-hairline bg-bone pt-1',
-          size === 'head' && 'h-11 px-3',
-          pinned && PIN_UNDER_HEAD_BAR,
-        )}
-      >
-        {items.map((t, i) => {
-          const open = i === selected
-          const empty = t.count === 0
-          return (
-            <button
-              key={t.id}
-              ref={(el) => {
-                refs.current[i] = el
-              }}
-              id={tabId(i)}
-              type="button"
-              role="tab"
-              aria-selected={open}
-              {...(children !== undefined ? { 'aria-controls': panelId } : {})}
-              tabIndex={open ? 0 : -1}
-              {...(empty ? { 'data-empty': true } : {})}
-              disabled={disabled}
-              onClick={() => {
-                if (!open) onValueChange(t.id)
-              }}
-              className={cn(
-                'focus-ring-inset flex shrink-0 items-center gap-2 px-3 label-caps whitespace-nowrap transition-[color] duration-150 ease-out-quart disabled:opacity-50',
-                size === 'head' ? 'h-9.75' : 'h-8',
-                // Closed: ink when it holds something, graphite when empty.
-                open
-                  ? 'tab-open -mb-px text-foreground'
-                  : t.count !== undefined && t.count > 0
-                    ? 'text-foreground'
-                    : 'text-graphite hover:text-foreground',
-              )}
-            >
-              {t.label}
-              {t.count !== undefined ? (
-                <span
-                  data-tab-count
-                  className={cn(
-                    'tabular mono text-micro font-normal',
-                    t.count > 0 ? 'text-foreground' : 'text-graphite',
-                  )}
-                >
-                  {t.count}
-                </span>
-              ) : null}
-            </button>
-          )
-        })}
-      </div>
+      {trail === undefined ? (
+        list
+      ) : (
+        <div data-tab-bar className={bar}>
+          {list}
+          <div className="flex min-w-0 flex-1 items-center gap-1 self-stretch pb-1">
+            {trail}
+          </div>
+        </div>
+      )}
       {children !== undefined ? (
         <div
           role="tabpanel"

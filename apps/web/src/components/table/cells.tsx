@@ -1,7 +1,6 @@
 import { createLink } from '@tanstack/react-router'
 import type { LucideIcon } from 'lucide-react'
 import type { AnchorHTMLAttributes, ReactNode, Ref } from 'react'
-import { formatDate } from '@spaces/core/format'
 import { cn } from '#/lib/utils'
 
 /**
@@ -102,8 +101,26 @@ export function MetaCell({
 }
 
 /**
- * A date in a column. `.numeric` carries both halves of the Tabular Rule —
- * tabular figures and right alignment — so the two cannot be applied apart.
+ * A registry column's meta: figures and dates right-align their head over
+ * the `numeric` cell the value editor draws for them.
+ */
+export function attributeColumnMeta(type: string): { numeric: boolean } {
+  return {
+    numeric: type === 'number' || type === 'currency' || type === 'date',
+  }
+}
+
+/** A column's date as its ISO day — UTC, so the server and the browser agree. */
+export function isoDay(value: string | Date | null | undefined): string {
+  if (!value) return ''
+  const d = typeof value === 'string' ? new Date(value) : value
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
+}
+
+/**
+ * A date in a column, ISO and mono. `.numeric` carries both halves of the
+ * Tabular Rule — tabular figures and right alignment — so the two cannot be
+ * applied apart.
  */
 export function DateCell({
   value,
@@ -112,10 +129,10 @@ export function DateCell({
   value: string | Date | null | undefined
   className?: string
 }) {
-  const text = formatDate(value)
+  const text = isoDay(value)
   if (!text) return null
   return (
-    <span className={cn('block px-1 numeric text-graphite', className)}>
+    <span className={cn('block px-1 numeric mono text-graphite', className)}>
       {text}
     </span>
   )

@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -16,8 +16,8 @@ import { PageHeader } from '#/components/page-header'
 import { PortfolioHeadlineStrip } from '#/components/portfolio-headline'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { listHoldings } from '#/lib/server-fns'
+import { cn } from '#/lib/utils'
 import {
-  fmtDate,
   fmtMoney,
   fmtMultiple,
   fmtPct,
@@ -83,13 +83,16 @@ function PortfolioPage() {
         id: 'invested',
         header: 'Invested',
         size: 130,
+        meta: { numeric: true },
         cell: (info) => {
           const m = metricsOf(info.row.original)
-          return (
-            <span className="tabular">
-              {m
-                ? fmtMoney(m.costBasis, m.currency, { compact: true })
-                : 'needs fx rate'}
+          return m ? (
+            <Figure>
+              {fmtMoney(m.costBasis, m.currency, { compact: true })}
+            </Figure>
+          ) : (
+            <span className="block px-1 text-right mono text-label text-graphite">
+              needs fx rate
             </span>
           )
         },
@@ -98,13 +101,14 @@ function PortfolioPage() {
         id: 'value',
         header: 'Current value',
         size: 140,
+        meta: { numeric: true },
         cell: (info) => {
           const m = metricsOf(info.row.original)
-          if (!m) return <span className="text-graphite">—</span>
+          if (!m) return <Figure muted>—</Figure>
           return (
-            <span className="tabular">
+            <Figure>
               {fmtMoney(m.unrealized, m.currency, { compact: true })}
-            </span>
+            </Figure>
           )
         },
       }),
@@ -112,15 +116,14 @@ function PortfolioPage() {
         id: 'realized',
         header: 'Realized',
         size: 120,
+        meta: { numeric: true },
         cell: (info) => {
           const m = metricsOf(info.row.original)
-          if (!m) return <span className="text-graphite">—</span>
+          if (!m || m.realized <= 0) return <Figure muted>—</Figure>
           return (
-            <span className="tabular">
-              {m.realized > 0
-                ? fmtMoney(m.realized, m.currency, { compact: true })
-                : '—'}
-            </span>
+            <Figure>
+              {fmtMoney(m.realized, m.currency, { compact: true })}
+            </Figure>
           )
         },
       }),
@@ -128,28 +131,29 @@ function PortfolioPage() {
         id: 'ownership',
         header: 'Ownership',
         size: 110,
-        cell: (info) => (
-          <span className="tabular">{ownershipText(info.row.original)}</span>
-        ),
+        meta: { numeric: true },
+        cell: (info) => <Figure>{ownershipText(info.row.original)}</Figure>,
       }),
       col.accessor((r) => metricsOf(r)?.moic ?? -1, {
         id: 'moic',
         header: 'MOIC',
         size: 90,
+        meta: { numeric: true },
         cell: (info) => (
-          <span className="tabular">
+          <Figure>
             {fmtMultiple(metricsOf(info.row.original)?.moic ?? null)}
-          </span>
+          </Figure>
         ),
       }),
       col.accessor((r) => metricsOf(r)?.grossXirr ?? -999, {
         id: 'xirr',
         header: 'Gross XIRR',
-        size: 100,
+        size: 110,
+        meta: { numeric: true },
         cell: (info) => (
-          <span className="tabular">
+          <Figure>
             {fmtXirr(metricsOf(info.row.original)?.grossXirr ?? null)}
-          </span>
+          </Figure>
         ),
       }),
       col.accessor((r) => metricsOf(r)?.lastMarkDate ?? '', {
@@ -157,13 +161,14 @@ function PortfolioPage() {
         header: 'Last mark',
         size: 110,
         sortUndefined: 'last',
+        meta: { numeric: true },
         cell: (info) => {
           const m = metricsOf(info.row.original)
-          const d = m?.lastMarkDate ?? null
+          // The mark's own ISO day, as every date in a list prints.
           return (
-            <span className={d ? 'tabular' : 'text-graphite'}>
-              {m?.writtenOff ? 'written off' : fmtDate(d)}
-            </span>
+            <Figure muted>
+              {m?.writtenOff ? 'written off' : (m?.lastMarkDate ?? '—')}
+            </Figure>
           )
         },
       }),
@@ -195,53 +200,76 @@ function PortfolioPage() {
   })
 
   const rollup = data.rollup
+  const excluded = rollup.excludedForMissingRates.length
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col">
       <PageHeader
         title="Portfolio"
-        description="Every holding computed live from its event ledger — checks, marks, distributions. Staleness is visible on purpose."
+        count={data.holdings.length}
+        description={
+          excluded > 0 ? (
+            <span>
+              {excluded} holding{excluded === 1 ? '' : 's'} out of the totals ·
+              fx rate missing ·{' '}
+              <Link
+                to="/settings/currency"
+                className="focus-ring text-foreground underline-offset-4 hover:underline"
+              >
+                set rates ›
+              </Link>
+            </span>
+          ) : undefined
+        }
       />
-      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
-        {data.holdings.length === 0 ? (
+      {data.holdings.length === 0 ? (
+        <div className="px-8 pb-8">
           <EmptyState
             icon={Briefcase}
             title="No holdings yet"
             body="A holding is born when a deal reaches Invested — or record a check directly from a company page. Existing positions arrive via the bootstrap import."
           />
-        ) : (
-          <>
-            <div className="mb-4 flex flex-wrap items-baseline gap-x-8 gap-y-2">
-              <PortfolioHeadlineStrip
-                rollup={rollup}
-                baseCurrency={data.baseCurrency}
-              />
-              {rollup.excludedForMissingRates.length > 0 ? (
-                <span className="text-ui text-destructive">
-                  {rollup.excludedForMissingRates.length} holding
-                  {rollup.excludedForMissingRates.length === 1 ? '' : 's'}{' '}
-                  excluded from totals — fx rates missing (Settings → FX rates)
-                </span>
-              ) : null}
-            </div>
-            <TableToolbar
-              table={table}
-              filter={globalFilter}
-              onFilterChange={setGlobalFilter}
-              filterPlaceholder="Filter by company…"
-              filterLabel="Filter holdings"
-              noun={{ one: 'holding', many: 'holdings' }}
-              total={data.holdings.length}
-              shown={table.getRowModel().rows.length}
-            />
+        </div>
+      ) : (
+        <>
+          <PortfolioHeadlineStrip
+            rollup={rollup}
+            baseCurrency={data.baseCurrency}
+          />
+          <TableToolbar
+            table={table}
+            label="Holdings"
+            tabs={[{ id: 'all', label: 'All', count: data.holdings.length }]}
+            value="all"
+            onValueChange={() => {}}
+            filter={globalFilter}
+            onFilterChange={setGlobalFilter}
+            filterPlaceholder="Filter by company…"
+            filterLabel="Filter holdings"
+          />
+          <div className="px-8 pb-8">
             <RecordTable
               table={table}
               label="Portfolio"
               stickyColumnId="company"
             />
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
+  )
+}
+
+/** A figure in a column: mono, tabular, right-aligned under its head. */
+function Figure({ muted, children }: { muted?: boolean; children: string }) {
+  return (
+    <span
+      className={cn(
+        'block truncate px-1 numeric mono',
+        muted ? 'text-graphite' : 'text-foreground',
+      )}
+    >
+      {children}
+    </span>
   )
 }

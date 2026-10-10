@@ -9,6 +9,7 @@ import {
   ValueEditor,
 } from '#/components/attributes/value-editor'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
+import { KeyHint } from '#/components/page-header'
 import { TemplatePicker } from '#/components/templates'
 import { Button } from '#/components/ui/button'
 import {
@@ -23,6 +24,7 @@ import {
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { createCompany } from '#/lib/server-fns'
+import { useHotkey } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 import { jsonRecord } from '@spaces/core/json'
 
@@ -34,14 +36,18 @@ import { jsonRecord } from '@spaces/core/json'
 export function CreateCompanyDialog({
   registry,
   trigger,
+  hotkey,
 }: {
   registry: Array<RegistryEntry>
   /** The control that opens it; the head's New company button by default. */
   trigger?: ReactNode
+  /** Bare key that opens it from the page — printed in the default trigger. */
+  hotkey?: string
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
+  useHotkey(hotkey, () => setOpen(true))
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [name, setName] = useState('')
@@ -83,7 +89,7 @@ export function CreateCompanyDialog({
       }
       void router.invalidate()
       // The rows come from a keyed query now, not from the loader alone —
-      // and the dedupe banner's count comes from the loader, so both.
+      // and the head's count comes from the loader, so both.
       void queryClient.invalidateQueries({ queryKey: ['company-records'] })
     } catch (err) {
       setError(
@@ -101,6 +107,7 @@ export function CreateCompanyDialog({
           <Button size="sm">
             <Plus className="size-4" strokeWidth={2} />
             New company
+            {hotkey ? <KeyHint>{hotkey.toUpperCase()}</KeyHint> : null}
           </Button>
         )}
       </DialogTrigger>

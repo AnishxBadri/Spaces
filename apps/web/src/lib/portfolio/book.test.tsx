@@ -199,12 +199,15 @@ describe('loadPortfolio — the one book Today and Portfolio read', () => {
       ['Realized', '$50,000'],
       ['MOIC', '2.41×'],
     ])
-    expect(portfolio).toEqual([
+    expect(portfolio.slice(0, 4)).toEqual([
       ['Invested', '$320K'],
       ['Current value', '$720K'],
       ['Realized', '$50K'],
       ['MOIC', '2.41×'],
     ])
+    // Portfolio's strip closes on the book's XIRR; Today's rail does not.
+    expect(portfolio.at(4)?.[0]).toBe('XIRR')
+    expect(portfolio).toHaveLength(5)
     // The old Today rail: realized folded into "Value".
     expect(today.map(([, v]) => v)).not.toContain('$770,000')
   })

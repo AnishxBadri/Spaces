@@ -1,16 +1,11 @@
-import {
-  createFileRoute,
-  Link,
-  useNavigate,
-  useRouter,
-} from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Building2, Copy, Layers } from 'lucide-react'
+import { Building2, Layers } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   keepPreviousData,
@@ -28,13 +23,18 @@ import { AiCell, AiCellsProvider } from '#/components/attributes/ai-cell'
 import { EmptyState } from '#/components/empty-state'
 import { DitherMark, RecordMark } from '#/components/record/record-parts'
 import { CreateCompanyDialog } from '#/components/create-company-dialog'
-import { ChipLink, DateCell, RecordLinkCell } from '#/components/table/cells'
+import {
+  attributeColumnMeta,
+  ChipLink,
+  DateCell,
+  RecordLinkCell,
+} from '#/components/table/cells'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { identityFirst } from '#/lib/attributes/identity-first'
 import {
   AddColumnButton,
   RecordTable,
-  TableToolbar,
+  TableTools,
 } from '#/components/table/record-table'
 import { PageHeader } from '#/components/page-header'
 import { ImportAction } from '#/components/import/import-action'
@@ -44,7 +44,6 @@ import { statColumns } from '#/components/table/stat-columns'
 import { INTERACTION_STAT_FILTERS } from '#/lib/views/stat-fields'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import {
-  countOpenInbox,
   countViews,
   getSession,
   listCompaniesTable,
@@ -59,9 +58,8 @@ export const Route = createFileRoute('/_app/companies')({
   // an ad-hoc condition edit refetches through the query below instead.
   loaderDeps: ({ search }) => ({ view: search.view ?? null }),
   loader: async ({ deps }) => {
-    const [registry, dupes, viewData, session] = await Promise.all([
+    const [registry, viewData, session] = await Promise.all([
       listRegistry({ data: { kind: 'company' } }),
-      countOpenInbox(),
       listViews({ data: { surface: 'object', kind: 'company' } }),
       getSession(),
     ])
@@ -74,7 +72,7 @@ export const Route = createFileRoute('/_app/companies')({
     const sort = view?.sort ?? null
     // Every chip's count rides the same load (SPA-162), so the bar paints
     // with its numbers — the inactive views' included — beside page one.
-    const [initial, counts] = await Promise.all([
+    const [initial, counts, all] = await Promise.all([
       listCompaniesTable({
         data: { conditions, sort, limit: RECORD_PAGE_SIZE, cursor: null },
       }),
@@ -85,14 +83,20 @@ export const Route = createFileRoute('/_app/companies')({
           viewIds: viewData.views.map((v) => v.id),
         },
       }),
+      // The head's count and the All tab's: page one already is that count
+      // when no view narrows it.
+      view === null
+        ? null
+        : listCompaniesTable({
+            data: { conditions: [], sort: null, limit: 1, cursor: null },
+          }),
     ])
     return {
       conditions,
       sort,
       initial,
+      allTotal: (all ?? initial).total,
       registry,
-      // The banner speaks for one lane of the queue, not the whole of it.
-      openDuplicates: dupes.byKind.duplicate_candidate,
       views: viewData.views,
       counts,
       objectId: viewData.objectId,
@@ -113,8 +117,8 @@ function CompaniesPage() {
     conditions,
     sort: loaderSort,
     initial,
+    allTotal,
     registry,
-    openDuplicates,
     views,
     counts,
     objectId,
@@ -277,6 +281,7 @@ function CompaniesPage() {
           id: `attr:${def.slug}`,
           header: def.name,
           size: def.type === 'text' ? 200 : 140,
+          meta: attributeColumnMeta(def.type),
           cell: (info) => (
             <AiCell def={def} entityId={info.row.original.id}>
               <ValueEditor
@@ -295,7 +300,7 @@ function CompaniesPage() {
         size: 180,
         enableSorting: false,
         cell: (info) => (
-          <span className="flex flex-wrap items-center gap-1 px-1">
+          <span className="flex items-center gap-1 overflow-hidden px-1">
             {info.row.original.spaces.map((s) => (
               <ChipLink
                 key={s.id}
@@ -314,6 +319,7 @@ function CompaniesPage() {
         id: 'createdAt',
         header: 'Added',
         size: 110,
+        meta: { numeric: true },
         cell: (info) => <DateCell value={info.getValue()} />,
       }),
     ]
@@ -347,68 +353,58 @@ function CompaniesPage() {
   })
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col">
       <PageHeader
         title="Companies"
-        description="Every company you track — deduped by domain, tagged into spaces."
+        count={allTotal}
         action={
           <>
             <ImportAction objectSlug="companies" />
-            <CreateCompanyDialog registry={registry} />
+            <CreateCompanyDialog registry={registry} hotkey="c" />
             {enrich.menu}
           </>
         }
       />
-      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8">
-        {openDuplicates > 0 ? (
-          <Link
-            to="/review"
-            className="focus-ring mt-4 flex items-center gap-2 rounded-md border border-rule bg-bone px-3 py-2 text-ui transition-colors duration-150 ease-out-quart hover:bg-bone"
-          >
-            <Copy className="size-3.5 text-graphite" strokeWidth={1.75} />
-            <span className="tabular font-medium">{openDuplicates}</span>
-            possible duplicate{openDuplicates === 1 ? '' : 's'} to review
-            <span className="ml-auto text-graphite">Review →</span>
-          </Link>
-        ) : null}
-
-        {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (
+      {rows.length === 0 && vs.conditions.length === 0 && q === '' ? (
+        <div className="px-8 pb-8">
           <EmptyState
             icon={Building2}
             title="No companies yet"
             body="Add one by name or domain. The domain is identity — the same company arriving twice becomes one record, not two."
             action={<CreateCompanyDialog registry={registry} />}
           />
-        ) : (
-          <>
-            <TableToolbar
-              table={table}
-              filter={globalFilter}
-              onFilterChange={setGlobalFilter}
-              filterPlaceholder="Filter by name or domain…"
-              filterLabel="Filter companies"
-              noun={{ one: 'company', many: 'companies' }}
-              total={total}
-              shown={rows.length}
-              selectionBar={enrich.selectionBar}
-            >
-              <ViewBar
-                objectId={objectId}
-                registry={filterRegistry}
-                views={views}
-                counts={counts}
-                activeId={activeId ?? null}
-                snapshot={vs.snapshot}
-                onApply={(v) => {
-                  vs.apply(v)
-                  selectView(v?.id ?? null)
-                }}
-                selectView={selectView}
-                onFilterChange={vs.setConditions}
-                onSaved={() => void router.invalidate()}
-                canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
-              />
-            </TableToolbar>
+        </div>
+      ) : (
+        <>
+          {enrich.selectionBar ?? (
+            <ViewBar
+              objectId={objectId}
+              registry={filterRegistry}
+              views={views}
+              counts={counts}
+              total={allTotal}
+              activeId={activeId ?? null}
+              snapshot={vs.snapshot}
+              onApply={(v) => {
+                vs.apply(v)
+                selectView(v?.id ?? null)
+              }}
+              selectView={selectView}
+              onFilterChange={vs.setConditions}
+              onSaved={() => void router.invalidate()}
+              canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
+              tools={
+                <TableTools
+                  table={table}
+                  filter={globalFilter}
+                  onFilterChange={setGlobalFilter}
+                  filterPlaceholder="Filter by name or domain…"
+                  filterLabel="Filter companies"
+                />
+              }
+            />
+          )}
+          <div className="px-8 pb-8">
             <AiCellsProvider
               entityIds={table.getRowModel().rows.map((r) => r.original.id)}
               registry={registry}
@@ -435,10 +431,10 @@ function CompaniesPage() {
                 }
               />
             </AiCellsProvider>
-            {columnRun.dialog}
-          </>
-        )}
-      </div>
+          </div>
+          {columnRun.dialog}
+        </>
+      )}
       {enrich.dialog}
     </div>
   )

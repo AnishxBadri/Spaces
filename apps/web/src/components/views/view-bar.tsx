@@ -1,5 +1,6 @@
 import { Check, Filter, Plus, Save, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   keepPreviousData,
   useQuery,
@@ -32,6 +33,8 @@ import {
   PopoverTrigger,
 } from '#/components/ui/popover'
 import { Select } from '#/components/ui/select'
+import { Tabs } from '#/components/ui/tabs'
+import type { TabItem } from '#/components/ui/tabs'
 import {
   PINNED_VIEWS_QUERY,
   togglePinnedView,
@@ -57,15 +60,19 @@ import type { ViewRow, ViewSort } from '@spaces/core/writes/views/store'
 import type { ViewCount } from '#/lib/views/counts'
 
 /**
- * Views on a list page (SPA-14): chips for the saved views, a Filter
- * popover for attribute conditions, and save/update/delete for the active
- * view. The bar owns nothing but the chips — the page owns its table state
- * and hands the bar a snapshot to compare and to save. `?view=` in the URL
- * makes a view linkable.
+ * Views on an object list: the saved views as real tabs on the bone bar —
+ * `All` with the list's total, each view with its count, `+ view` — and on
+ * the same bar's right the Filter popover and the table's own tools. The page
+ * owns its table state and hands the bar a snapshot to compare and to save.
+ * `?view=` in the URL makes a view linkable.
  * - The active view's `···` menu pins it to the sidebar (an object list's
  *   views only — the sidebar lists them under their object) and, for a view
  *   the user may edit, renames or deletes it.
+ * - Object surfaces only: a shelf is not one, and has no saved views.
  */
+
+/** The `All` tab's id; a view id is a uuid, so the two never meet. */
+const ALL = 'all'
 
 export type ViewSnapshot = {
   filter: Array<Condition>
@@ -80,6 +87,8 @@ export function ViewBar({
   filterUnavailable,
   views,
   counts,
+  total,
+  tools,
   activeId,
   snapshot,
   onApply,
@@ -116,6 +125,10 @@ export function ViewBar({
    * `countViews` in `lib/server/views.ts`.
    */
   counts?: Record<string, ViewCount>
+  /** Every record on the list, unfiltered: the `All` tab's count. */
+  total?: number | undefined
+  /** The table's tools, right of Filter on the same bar. */
+  tools?: ReactNode
   /** the view the page is currently showing, from `?view=` */
   activeId: string | null
   /** the page's current filter/sort/columns/extra */
@@ -195,203 +208,213 @@ export function ViewBar({
     return saved
   }
 
+  const items: Array<TabItem<string>> = [
+    { id: ALL, label: 'All', count: total },
+    ...views.map((v) => {
+      const count = countOf(v.id)
+      return {
+        id: v.id,
+        label: (
+          <ViewLabel
+            name={v.name}
+            dirty={v.id === activeId && dirty}
+            shared={v.visibility === 'shared'}
+            count={count}
+          />
+        ),
+        count:
+          count === undefined || count.count === null ? undefined : count.count,
+      }
+    }),
+  ]
+
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <ViewChip
-        active={active === null}
-        onClick={() => onApply(null)}
-        label="All"
-      />
-      {views.map((v) => (
-        <ViewChip
-          key={v.id}
-          active={v.id === activeId}
-          dirty={v.id === activeId && dirty}
-          shared={v.visibility === 'shared'}
-          onClick={() => onApply(v)}
-          label={v.name}
-          count={countOf(v.id)}
-        />
-      ))}
-
-      {filterUnavailable === undefined ? (
-        <FilterPopover
-          registry={registry}
-          conditions={snapshot.filter}
-          onChange={onFilterChange}
-        />
-      ) : (
-        /*
-          The control stays in place, disabled, rather than vanishing: one bar
-          across every surface, and a button that is simply missing reads as a
-          different bar rather than as a thing that is coming. The title is on
-          the wrapper because a disabled Button takes `pointer-events-none` —
-          the span is the only element the cursor can still reach.
-        */
-        <span title={filterUnavailable} className="inline-flex">
-          <Button size="xs" variant="ghost" disabled>
-            <Filter className="size-3" strokeWidth={2} />
-            Filter
-          </Button>
-        </span>
-      )}
-
-      {active && dirty && canEdit(active) ? (
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={() => {
-            persist({
-              id: active.id,
-              name: active.name,
-              visibility: active.visibility,
-            })
-              .then(() => toast(`${active.name} updated`))
-              .catch((err: unknown) =>
-                toast.error(
-                  err instanceof Error ? err.message : 'Could not save',
-                ),
-              )
-          }}
-        >
-          <Save className="size-3" strokeWidth={2} />
-          Update view
-        </Button>
-      ) : null}
-      <Button size="xs" variant="ghost" onClick={() => setSaving('new')}>
-        <Plus className="size-3" strokeWidth={2} />
-        Save view
-      </Button>
-      {active && (objectId !== null || canEdit(active)) ? (
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
+    <Tabs
+      label="Views"
+      size="head"
+      items={items}
+      value={active?.id ?? ALL}
+      onValueChange={(id) =>
+        onApply(id === ALL ? null : (views.find((v) => v.id === id) ?? null))
+      }
+      trail={
+        <>
+          {active && dirty && canEdit(active) ? (
             <Button
               size="xs"
-              variant="ghost"
-              aria-label={`View menu for ${active.name}`}
-            >
-              ···
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            {objectId !== null ? (
-              <DropdownMenuItem
-                onSelect={() => {
-                  const pinned = pins.includes(active.id)
-                  togglePinnedView(active.id)
-                  toast(
-                    pinned
-                      ? `${active.name} unpinned`
-                      : `${active.name} pinned to the sidebar`,
+              variant="outline"
+              onClick={() => {
+                persist({
+                  id: active.id,
+                  name: active.name,
+                  visibility: active.visibility,
+                })
+                  .then(() => toast(`${active.name} updated`))
+                  .catch((err: unknown) =>
+                    toast.error(
+                      err instanceof Error ? err.message : 'Could not save',
+                    ),
                   )
-                }}
-              >
-                {pins.includes(active.id) ? 'Unpin' : 'Pin to sidebar'}
-              </DropdownMenuItem>
-            ) : null}
-            {canEdit(active) ? (
-              <>
-                {objectId !== null ? <DropdownMenuSeparator /> : null}
-                <DropdownMenuItem onSelect={() => setSaving('rename')}>
-                  Rename…
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  variant="destructive"
-                  onSelect={async () => {
-                    try {
-                      await deleteView({
-                        data: { id: active.id, ...viewTarget(objectId) },
-                      })
-                      toast(`${active.name} deleted`)
-                      if (pins.includes(active.id)) refreshPins()
-                      onApply(null)
-                      onSaved()
-                    } catch (err) {
-                      toast.error(
-                        err instanceof Error ? err.message : 'Could not delete',
-                      )
-                    }
-                  }}
+              }}
+            >
+              <Save className="size-3" strokeWidth={2} />
+              Update view
+            </Button>
+          ) : null}
+          {active && (objectId !== null || canEdit(active)) ? (
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  aria-label={`View menu for ${active.name}`}
                 >
-                  Delete view
-                </DropdownMenuItem>
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
+                  ···
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                {objectId !== null ? (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      const pinned = pins.includes(active.id)
+                      togglePinnedView(active.id)
+                      toast(
+                        pinned
+                          ? `${active.name} unpinned`
+                          : `${active.name} pinned to the sidebar`,
+                      )
+                    }}
+                  >
+                    {pins.includes(active.id) ? 'Unpin' : 'Pin to sidebar'}
+                  </DropdownMenuItem>
+                ) : null}
+                {canEdit(active) ? (
+                  <>
+                    {objectId !== null ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuItem onSelect={() => setSaving('rename')}>
+                      Rename…
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={async () => {
+                        try {
+                          await deleteView({
+                            data: { id: active.id, ...viewTarget(objectId) },
+                          })
+                          toast(`${active.name} deleted`)
+                          if (pins.includes(active.id)) refreshPins()
+                          onApply(null)
+                          onSaved()
+                        } catch (err) {
+                          toast.error(
+                            err instanceof Error
+                              ? err.message
+                              : 'Could not delete',
+                          )
+                        }
+                      }}
+                    >
+                      Delete view
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setSaving('new')}
+            title="Save the current filter, sort and columns as a view"
+            className="focus-ring flex h-7 shrink-0 items-center rounded-md px-2 mono text-micro text-primary transition-colors duration-150 ease-out-quart hover:bg-paper"
+          >
+            + view
+          </button>
+          <span className="flex-1" />
 
-      <SaveViewDialog
-        open={saving !== null}
-        onOpenChange={(o) => {
-          if (!o) setSaving(null)
-        }}
-        initial={
-          saving === 'rename' && active
-            ? { name: active.name, visibility: active.visibility }
-            : { name: '', visibility: 'private' }
-        }
-        title={saving === 'rename' ? 'Rename view' : 'Save view'}
-        onSubmit={async (v) => {
-          await persist(
-            saving === 'rename' && active ? { id: active.id, ...v } : v,
-          )
-          toast(`${v.name} saved`)
-          setSaving(null)
-        }}
-      />
-    </div>
+          {filterUnavailable === undefined ? (
+            <FilterPopover
+              registry={registry}
+              conditions={snapshot.filter}
+              onChange={onFilterChange}
+            />
+          ) : (
+            /*
+              The control stays in place, disabled, rather than vanishing: one
+              bar across every surface. The title is on the wrapper because a
+              disabled Button takes `pointer-events-none`.
+            */
+            <span title={filterUnavailable} className="inline-flex">
+              <Button size="xs" variant="ghost" disabled>
+                <Filter className="size-3" strokeWidth={2} />
+                Filter
+              </Button>
+            </span>
+          )}
+          {tools}
+
+          <SaveViewDialog
+            open={saving !== null}
+            onOpenChange={(o) => {
+              if (!o) setSaving(null)
+            }}
+            initial={
+              saving === 'rename' && active
+                ? { name: active.name, visibility: active.visibility }
+                : { name: '', visibility: 'private' }
+            }
+            title={saving === 'rename' ? 'Rename view' : 'Save view'}
+            onSubmit={async (v) => {
+              await persist(
+                saving === 'rename' && active ? { id: active.id, ...v } : v,
+              )
+              toast(`${v.name} saved`)
+              setSaving(null)
+            }}
+          />
+        </>
+      }
+    />
   )
 }
 
-function ViewChip({
-  active,
+/**
+ * A view tab's label: the name, a dash where the view cannot be counted,
+ * and the pine dot while its conditions differ from the saved ones. The
+ * reasons are the tab's hover.
+ */
+function ViewLabel({
+  name,
   dirty,
   shared,
-  label,
   count,
-  onClick,
 }: {
-  active: boolean
-  dirty?: boolean
-  shared?: boolean
-  label: string
-  /** undefined: this surface is not counted, so the chip prints no slot */
-  count?: ViewCount | undefined
-  onClick: () => void
+  name: string
+  dirty: boolean
+  shared: boolean
+  /** undefined: this surface is not counted, so the tab prints no slot */
+  count: ViewCount | undefined
 }) {
   // A view the compiler cannot express prints no number — never one from a
-  // partial `where` — and says why on hover, on the whole chip.
+  // partial `where` — and says why on hover.
   const notes = [
     shared ? 'Shared view' : null,
     count?.count === null ? count.reason : null,
   ].filter((t) => t !== null)
-  const title = notes.length > 0 ? notes.join(' · ') : undefined
   return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        'focus-ring-inset flex h-9 items-center gap-1.5 border-b-2 px-3 label-caps transition-colors duration-150 ease-out-quart',
-        active
-          ? 'border-primary text-foreground'
-          : 'border-transparent text-graphite hover:text-foreground',
-      )}
-      title={title}
+    <span
+      className="flex items-center gap-2"
+      {...(notes.length > 0 ? { title: notes.join(' · ') } : {})}
     >
-      {label}
-      {count === undefined ? null : count.count === null ? (
+      {name}
+      {count?.count === null ? (
         <span aria-label={count.reason} className="text-graphite">
           –
         </span>
-      ) : (
-        <span className="tabular text-graphite">{count.count}</span>
-      )}
+      ) : null}
       {dirty ? (
         <span aria-label="unsaved changes" className="size-1.5 bg-primary" />
       ) : null}
-    </button>
+    </span>
   )
 }
 
