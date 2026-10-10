@@ -15,6 +15,13 @@ import { cn } from '#/lib/utils'
  *   so every hotkey and every effect inside it stays bound once.
  */
 
+/**
+ * Pins an element directly under the folded 40px bar (and the mobile top
+ * bar): a record's tab head, a page head's tabs. One line for every page,
+ * so nothing hangs across the bar's rule.
+ */
+export const PIN_UNDER_HEAD_BAR = 'sticky top-22 z-sticky md:top-10'
+
 /** The title folds once it passes under this line: the mobile top bar. */
 const FOLD_LINE_PX = 48
 

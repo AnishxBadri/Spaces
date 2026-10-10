@@ -5,19 +5,19 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
+import { useCallback } from 'react'
 import { toast } from 'sonner'
-import { SpaceRailRow } from '#/components/record/space-rail-row'
 import { SaveAsTemplateAction } from '#/components/templates'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
 import { Button } from '#/components/ui/button'
-import { Select } from '#/components/ui/select'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { TasksRail } from '#/components/tasks-rail'
 import { RailField } from '#/components/attributes/rail-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import { KeyHint } from '#/components/page-header'
 import {
+  DetailsAddRow,
   DitherMark,
   InitialsMark,
   PropertyCell,
@@ -28,23 +28,28 @@ import {
   RecordBody,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { DetailsPickRow } from '#/components/record/details-add'
+import { RecordSpacesSection } from '#/components/record/spaces-section'
+import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordPicture } from '#/components/record/record-picture'
 import { OptionChip } from '#/components/attributes/value-editor'
 import { fmtPct } from '@spaces/core/portfolio/format'
 import { DASH, readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
-import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import {
+  LogComposerRow,
+  LogInteractionDialog,
+} from '#/components/log-interaction-dialog'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
-import { RecordContext } from '#/components/record-context'
-import { RecordLedger } from '#/components/record-timeline'
+import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
-import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
 import { PluginActions } from '#/components/record/plugin-actions'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { jsonStrings } from '@spaces/core/json'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { runBinding, usePageActions } from '#/lib/page-actions'
+import { recordSearch, recordTabCounts } from '#/lib/records/record-tabs'
 import {
   countOpenSuggestions,
   createNote,
@@ -58,13 +63,19 @@ import {
   listRecordNotes,
   listRegistry,
   listSpaces,
-  tagIntoSpace,
-  untagFromSpace,
+  searchEntities,
+  setPersonCompany,
   updateRecord,
   saveRecordAsTemplate,
 } from '#/lib/server-fns'
 
+/**
+ * A company's page (D74): the head and readouts, then the details column —
+ * the property grid, Waiting, Team, Associated deals, Spaces, Tasks — and
+ * the tabbed view. `?tab=` deep-links a tab.
+ */
 export const Route = createFileRoute('/_app/companies_/$companyId')({
+  validateSearch: recordSearch,
   loader: async ({ params }) => {
     const [
       companyData,
@@ -138,14 +149,27 @@ function CompanyRecordPage() {
   const stageDef = dealRegistry.find((d) => d.slug === 'stage')
   const router = useRouter()
   const navigate = useNavigate()
+  const go = Route.useNavigate()
+  const [tab, changeTab] = useRecordTab(
+    'company',
+    Route.useSearch().tab,
+    (next) =>
+      void go({ search: { tab: next }, replace: true, resetScroll: false }),
+  )
 
   // Identity is an attribute (D75): the first domain names the record.
   const firstDomain = jsonStrings(company.values.domains).at(0)
   const nameAliases = company.aliases.filter(
     (a) => a.kind === 'name' && a.value !== company.name,
   )
-  const untaggedSpaces = allSpaces.filter(
-    (s) => !company.spaces.some((cs) => cs.id === s.id),
+  const team = company.people
+  const searchPeople = useCallback(
+    async (q: string) => {
+      const on = new Set(team.map((p) => p.id))
+      const rows = await searchEntities({ data: { q, kinds: ['person'] } })
+      return rows.filter((r) => !on.has(r.id))
+    },
+    [team],
   )
 
   async function newNoteAboutThis() {
@@ -268,184 +292,159 @@ function CompanyRecordPage() {
       />
 
       <RecordBody
-        rail={
+        details={
           <>
-            <WaitingRail entityId={company.id} counts={waiting} />
-            <RailSection
-              label="Deals"
-              meta={
-                <>
-                  <span>{deals.length}</span>
-                  <CreateDealDialog
-                    registry={dealRegistry}
-                    presetCompany={{ id: company.id, name: company.name }}
-                    triggerLabel="New"
+            <AiCellsProvider entityIds={[company.id]} registry={registry}>
+              <PropertyGrid>
+                {registry.map((def) => (
+                  <RailField
+                    key={def.slug}
+                    entityId={company.id}
+                    def={def}
+                    attr={def}
+                    objectLabel={'company'}
+                    fillFrom="company"
+                    whereFrom={enrichment.whereFrom[def.slug]}
+                    onAttributeSaved={() => router.invalidate()}
+                    value={company.values[def.slug] ?? null}
+                    onSave={async (v) => {
+                      const result = await updateRecord({
+                        data: { id: company.id, patch: { [def.slug]: v } },
+                      })
+                      // A domain another company holds was refused; say so.
+                      const collision = collisionToast(result, 'company')
+                      if (collision)
+                        toast(collision.title, {
+                          description: collision.description,
+                        })
+                      void router.invalidate()
+                    }}
                   />
-                </>
-              }
-            >
-              {deals.length === 0 ? (
-                <RailEmpty>No deals yet — watching only.</RailEmpty>
-              ) : (
-                deals.map((d) => (
-                  <RailItem key={d.id}>
-                    <Link
-                      to="/deals/$dealId"
-                      params={{ dealId: d.id }}
-                      className="focus-ring min-w-0 flex-1 truncate hover:underline"
-                    >
-                      {d.name}
-                    </Link>
-                    {d.stage && stageDef ? (
-                      <OptionChip
-                        def={stageDef}
-                        id={d.stage}
-                        className="shrink-0"
-                      />
-                    ) : null}
-                  </RailItem>
-                ))
-              )}
-            </RailSection>
+                ))}
+                <PropertyCell label="">
+                  <AttributeCreateDialog
+                    objectKind="company"
+                    onCreated={() => router.invalidate()}
+                    trigger={
+                      <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
+                        + add attribute
+                      </button>
+                    }
+                  />
+                </PropertyCell>
+              </PropertyGrid>
+            </AiCellsProvider>
 
-            <RailSection label="Spaces" meta={`${company.spaces.length}`}>
-              {company.spaces.map((s) => (
-                <SpaceRailRow
-                  key={s.id}
-                  space={s}
-                  onRemove={async () => {
-                    await untagFromSpace({
-                      data: { entityId: company.id, spaceId: s.id },
-                    })
-                    void router.invalidate()
-                  }}
-                />
+            <WaitingRail entityId={company.id} counts={waiting} />
+
+            <RailSection label="Team" meta={`${team.length}`}>
+              {team.length === 0 ? <RailEmpty>No one yet.</RailEmpty> : null}
+              {team.map((p) => (
+                <RailItem key={p.id}>
+                  <InitialsMark name={p.name} outline />
+                  <Link
+                    to="/people/$personId"
+                    params={{ personId: p.id }}
+                    className="focus-ring min-w-0 flex-1 truncate hover:underline"
+                  >
+                    {p.name}
+                  </Link>
+                </RailItem>
               ))}
-              {untaggedSpaces.length > 0 ? (
-                <Select
-                  aria-label="Tag into space"
-                  value=""
-                  onChange={async (spaceId) => {
-                    await tagIntoSpace({
-                      data: { entityId: company.id, spaceId },
-                    })
-                    void router.invalidate()
-                  }}
-                  items={untaggedSpaces.map((s) => ({
-                    value: s.id,
-                    label: s.name,
-                    depth: s.depth,
-                  }))}
-                  width="content"
-                  placeholder="+ Tag into space…"
-                  searchPlaceholder="Search spaces…"
-                  emptyLabel="No space matches."
-                  className="mt-1 h-7 rounded-none bg-paper px-2 text-label text-graphite"
-                />
-              ) : null}
-              <SuggestSpacesAction entityId={company.id} />
+              <DetailsPickRow
+                label="Add a person…"
+                placeholder="Person name…"
+                search={searchPeople}
+                onPick={async (hit) => {
+                  await setPersonCompany({
+                    data: {
+                      personId: hit.id,
+                      companyId: company.id,
+                      action: 'link',
+                    },
+                  })
+                  void router.invalidate()
+                }}
+              />
             </RailSection>
 
-            <RailSection label="People" meta={`${company.people.length}`}>
-              {company.people.length === 0 ? (
-                <RailEmpty>
-                  No contacts yet — link people from their records.
-                </RailEmpty>
-              ) : (
-                company.people.map((p) => (
-                  <RailItem key={p.id}>
-                    <InitialsMark name={p.name} outline />
-                    <Link
-                      to="/people/$personId"
-                      params={{ personId: p.id }}
-                      className="focus-ring min-w-0 flex-1 truncate hover:underline"
-                    >
-                      {p.name}
-                    </Link>
-                  </RailItem>
-                ))
-              )}
+            <RailSection label="Associated deals" meta={`${deals.length}`}>
+              {deals.length === 0 ? (
+                <RailEmpty>Watching only.</RailEmpty>
+              ) : null}
+              {deals.map((d) => (
+                <RailItem key={d.id}>
+                  <Link
+                    to="/deals/$dealId"
+                    params={{ dealId: d.id }}
+                    className="focus-ring min-w-0 flex-1 truncate hover:underline"
+                  >
+                    {d.name}
+                  </Link>
+                  {d.stage && stageDef ? (
+                    <OptionChip
+                      def={stageDef}
+                      id={d.stage}
+                      className="shrink-0"
+                    />
+                  ) : null}
+                </RailItem>
+              ))}
+              <CreateDealDialog
+                registry={dealRegistry}
+                presetCompany={{ id: company.id, name: company.name }}
+                trigger={<DetailsAddRow>New deal…</DetailsAddRow>}
+              />
             </RailSection>
+
+            <RecordSpacesSection
+              entityId={company.id}
+              spaces={company.spaces}
+              allSpaces={allSpaces}
+            />
 
             <TasksRail
               entityId={company.id}
               entityName={company.name}
               entityKind="company"
+              composer="row"
             />
           </>
         }
       >
-        <AiCellsProvider entityIds={[company.id]} registry={registry}>
-          <PropertyGrid>
-            {registry.map((def) => (
-              <RailField
-                key={def.slug}
-                entityId={company.id}
-                def={def}
-                attr={def}
-                objectLabel={'company'}
-                fillFrom="company"
-                whereFrom={enrichment.whereFrom[def.slug]}
-                onAttributeSaved={() => router.invalidate()}
-                value={company.values[def.slug] ?? null}
-                onSave={async (v) => {
-                  const result = await updateRecord({
-                    data: { id: company.id, patch: { [def.slug]: v } },
-                  })
-                  // A domain another company holds was refused; say so.
-                  const collision = collisionToast(result, 'company')
-                  if (collision)
-                    toast(collision.title, {
-                      description: collision.description,
-                    })
-                  void router.invalidate()
-                }}
+        <RecordTabs
+          label={company.name}
+          tab={tab}
+          onTabChange={changeTab}
+          counts={recordTabCounts({ notes, timeline, documents })}
+          panels={{
+            notes: (
+              <RecordNotes
+                filed={notes.filed}
+                mentions={notes.mentions}
+                onNewNote={newNoteAboutThis}
               />
-            ))}
-            <PropertyCell label="">
-              <AttributeCreateDialog
-                objectKind="company"
-                onCreated={() => router.invalidate()}
-                trigger={
-                  <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
-                    + add attribute
-                  </button>
+            ),
+            interactions: (
+              <RecordInteractions
+                items={timeline}
+                registry={registry}
+                composer={
+                  <LogInteractionDialog
+                    seed={{
+                      id: company.id,
+                      name: company.name,
+                      kind: 'company',
+                    }}
+                    trigger={<LogComposerRow />}
+                  />
                 }
               />
-            </PropertyCell>
-          </PropertyGrid>
-        </AiCellsProvider>
-
-        <RecordNotes
-          filed={notes.filed}
-          mentions={notes.mentions}
-          onNewNote={newNoteAboutThis}
+            ),
+            files: <RecordFiles entityId={company.id} documents={documents} />,
+            history: <RecordHistory items={timeline} registry={registry} />,
+          }}
         />
-
-        <RecordLedger
-          items={timeline}
-          registry={registry}
-
-          composer={
-            <LogInteractionDialog
-              seed={{ id: company.id, name: company.name, kind: 'company' }}
-              trigger={
-                <button className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 border-b border-rule px-3 text-left">
-                  <span className="mono text-micro text-primary">+</span>
-                  <span className="min-w-0 truncate text-ui text-graphite">
-                    Log a call, meeting, or note…
-                  </span>
-                  <span className="flex-1" />
-                  <KeyHint>L</KeyHint>
-                </button>
-              }
-            />
-          }
-        />
-
-        <RecordFiles entityId={company.id} documents={documents} />
-
-        <RecordContext entityId={company.id} />
       </RecordBody>
     </div>
   )

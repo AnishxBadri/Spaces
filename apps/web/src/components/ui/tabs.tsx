@@ -1,17 +1,21 @@
 import { useId, useRef } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
+import { PIN_UNDER_HEAD_BAR } from '#/components/head-fold'
 import { cn } from '#/lib/utils'
 
 /**
  * Real tabs (DESIGN.md §5, Printed details): a bone bar on a hairline foot;
  * the open tab is paper with cut shoulders, joined to the body under it with
- * no rule between, and the others sit on the bone. Each tab may carry its
- * mono count, and an empty tab stays visible, graphite at 0.
+ * no rule between, and the others sit on the bone in ink. Each tab may carry
+ * its mono count, and an empty tab stays visible, graphite at 0 (D74): the
+ * head stays the index.
  * - Keyboard: ←→ move and wrap, Home/End jump, and moving selects (automatic
  *   activation). Only the open tab is in the tab order.
  * - Filter rows under a tab keep the underline grammar; this is the tab head.
  * - `size="head"` is a record body's 44px head, the height of a section's
  *   bone band; the default bar is 36px.
+ * - `pinned` keeps the head under the folded `HeadBar` while its body
+ *   scrolls.
  *
  * Generic over the tab ids so a caller with a union gets it back in
  * `onValueChange`.
@@ -52,6 +56,7 @@ export function Tabs<T extends string>({
   label,
   disabled,
   size = 'bar',
+  pinned = false,
   children,
   className,
 }: {
@@ -62,6 +67,8 @@ export function Tabs<T extends string>({
   label: string
   disabled?: boolean | undefined
   size?: 'bar' | 'head' | undefined
+  /** Stick under the folded head bar while the page scrolls. */
+  pinned?: boolean | undefined
   /** The open tab's body; rendered as its `tabpanel` when given. */
   children?: ReactNode
   className?: string | undefined
@@ -94,10 +101,12 @@ export function Tabs<T extends string>({
         className={cn(
           'flex items-end border-b border-hairline bg-bone pt-1',
           size === 'head' && 'h-11 px-3',
+          pinned && PIN_UNDER_HEAD_BAR,
         )}
       >
         {items.map((t, i) => {
           const open = i === selected
+          const empty = t.count === 0
           return (
             <button
               key={t.id}
@@ -110,6 +119,7 @@ export function Tabs<T extends string>({
               aria-selected={open}
               {...(children !== undefined ? { 'aria-controls': panelId } : {})}
               tabIndex={open ? 0 : -1}
+              {...(empty ? { 'data-empty': true } : {})}
               disabled={disabled}
               onClick={() => {
                 if (!open) onValueChange(t.id)
@@ -117,9 +127,12 @@ export function Tabs<T extends string>({
               className={cn(
                 'focus-ring-inset flex shrink-0 items-center gap-2 px-3 label-caps whitespace-nowrap transition-colors duration-150 ease-out-quart disabled:opacity-50',
                 size === 'head' ? 'h-9.75' : 'h-8',
+                // Closed: ink when it holds something, graphite when empty.
                 open
                   ? 'tab-open -mb-px text-foreground'
-                  : 'text-graphite hover:text-foreground',
+                  : t.count !== undefined && t.count > 0
+                    ? 'text-foreground'
+                    : 'text-graphite hover:text-foreground',
               )}
             >
               {t.label}
@@ -128,7 +141,7 @@ export function Tabs<T extends string>({
                   data-tab-count
                   className={cn(
                     'tabular mono text-micro font-normal',
-                    open && t.count > 0 ? 'text-foreground' : 'text-graphite',
+                    t.count > 0 ? 'text-foreground' : 'text-graphite',
                   )}
                 >
                   {t.count}

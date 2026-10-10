@@ -224,6 +224,31 @@ describe('the folded head', () => {
     expect(logged).toHaveBeenCalledTimes(1)
   })
 
+  it('pins a page head’s tabs under the folded bar, never into it', () => {
+    mount(
+      <div className="flex min-h-full flex-col">
+        <PageHeader
+          title="Review"
+          action={<LogButton />}
+          tabs={<button type="button">All 4</button>}
+        />
+        <main data-body>Cards</main>
+      </div>,
+    )
+    measureSlot()
+    titleVisible(false)
+    const tabs = q('[data-head-tabs]')
+    // A row of its own after the head, not inside the lifted actions.
+    expect(q('header').contains(tabs)).toBe(false)
+    expect(q('[data-head-actions]').contains(tabs)).toBe(false)
+    expect(tabs.previousElementSibling).toBe(q('header'))
+    // The bar is 40px from the top; the row sticks at exactly its foot.
+    expect(q('[data-head-bar]').className.split(' ')).toContain('h-10')
+    expect(tabs.className.split(' ')).toEqual(
+      expect.arrayContaining(['sticky', 'md:top-10', 'top-22', 'z-sticky']),
+    )
+  })
+
   it('animates transform and opacity only, and not at all under reduced motion', () => {
     mount(record)
     const bar = q('[data-head-bar]').className.split(' ')

@@ -8,6 +8,7 @@ import { mandate } from '@spaces/db/schema/workspace'
 import { jsonString } from '@spaces/core/json'
 import type { EntityValues } from '@spaces/db/schema/entities'
 import { requireUser } from './shared'
+import { recordSpaces } from '#/lib/spaces/filed-in'
 
 const createDealInput = z.object({
   companyId: z.string().uuid(),
@@ -190,6 +191,9 @@ export const getDeal = createServerFn()
       }
     }
 
+    // The spaces this deal is filed in, for its details column.
+    const spaces = await recordSpaces(data.id)
+
     const { dealReadoutsProgram } = await import('../records/readouts')
     const { effectFn } = await import('./effect')
     const readouts = await effectFn(dealReadoutsProgram)(data.id, new Date())
@@ -202,6 +206,7 @@ export const getDeal = createServerFn()
       createdAt: head.createdAt.toISOString(),
       outsideMandate,
       readouts,
+      spaces,
       refNames: Object.fromEntries(
         refs.map((r) => [r.toId, { name: r.name, kind: r.kind }]),
       ),

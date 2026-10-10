@@ -627,10 +627,13 @@ export function CreateDealDialog({
   registry,
   presetCompany,
   triggerLabel = 'New deal',
+  trigger,
 }: {
   registry: Array<RegistryEntry>
   presetCompany?: { id: string; name: string }
   triggerLabel?: string
+  /** A trigger of the caller's own — must forward props (plain DOM elements do). */
+  trigger?: React.ReactNode
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -695,10 +698,12 @@ export function CreateDealDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4" strokeWidth={2} />
-          {triggerLabel}
-        </Button>
+        {trigger ?? (
+          <Button size="sm">
+            <Plus className="size-4" strokeWidth={2} />
+            {triggerLabel}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>

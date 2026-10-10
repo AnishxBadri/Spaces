@@ -6,35 +6,40 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
-import { SpaceRailRow } from '#/components/record/space-rail-row'
 import { Button } from '#/components/ui/button'
-import { Select } from '#/components/ui/select'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
 import { NameField } from '#/components/attributes/name-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import { KeyHint } from '#/components/page-header'
 import {
+  DitherMark,
   InitialsMark,
   PropertyCell,
   PropertyGrid,
+  RailEmpty,
+  RailItem,
   RailSection,
   RecordBody,
   RecordHeader,
-  RecordSection,
 } from '#/components/record/record-parts'
+import { DetailsPickRow } from '#/components/record/details-add'
+import { RecordSpacesSection } from '#/components/record/spaces-section'
+import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordPicture } from '#/components/record/record-picture'
-import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import {
+  LogComposerRow,
+  LogInteractionDialog,
+} from '#/components/log-interaction-dialog'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
-import { RecordContext } from '#/components/record-context'
-import { RecordLedger } from '#/components/record-timeline'
+import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
+import { TasksRail } from '#/components/tasks-rail'
 import { WaitingRail } from '#/components/record/waiting-rail'
-import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
 import { PluginActions } from '#/components/record/plugin-actions'
 import { recordPath } from '#/lib/record-path'
 import { collisionToast } from '#/lib/attributes/collision-toast'
@@ -42,9 +47,11 @@ import { jsonString, jsonStrings } from '@spaces/core/json'
 import { isNamePart } from '@spaces/core/attributes/person-name'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { runBinding, usePageActions } from '#/lib/page-actions'
+import { recordSearch, recordTabCounts } from '#/lib/records/record-tabs'
 import {
   countOpenSuggestions,
   createNote,
+  getDeal,
   getEntitySensitivity,
   getPerson,
   getRecordEnrichment,
@@ -54,12 +61,18 @@ import {
   listRecordNotes,
   listRegistry,
   listSpaces,
-  tagIntoSpace,
-  untagFromSpace,
+  searchEntities,
+  setPersonCompany,
   updateRecord,
 } from '#/lib/server-fns'
 
+/**
+ * A person's page (D74): the head and readouts, then the details column —
+ * the property grid, Companies with the role, Deals, Waiting, Spaces, Tasks
+ * — and the tabbed view. `?tab=` deep-links a tab.
+ */
 export const Route = createFileRoute('/_app/people_/$personId')({
+  validateSearch: recordSearch,
   loader: async ({ params }) => {
     const [
       personData,
@@ -126,11 +139,50 @@ function PersonRecordPage() {
   // The name as the Name cell's First and Last are typed; the head shows it.
   const [nameDraft, setNameDraft] = useState<string | null>(null)
 
+  const go = Route.useNavigate()
+  const [tab, changeTab] = useRecordTab(
+    'person',
+    Route.useSearch().tab,
+    (next) =>
+      void go({ search: { tab: next }, replace: true, resetScroll: false }),
+  )
+
   // Identity is an attribute (D75): the first email names the record.
   const firstEmail = jsonStrings(person.values.emails).at(0)
-  const untaggedSpaces = allSpaces.filter(
-    (s) => !person.spaces.some((ps) => ps.id === s.id),
+  const role = jsonString(person.values.job_title)
+  const companies = person.companies
+  const searchCompanies = useCallback(
+    async (q: string) => {
+      const on = new Set(companies.map((c) => c.id))
+      const rows = await searchEntities({ data: { q, kinds: ['company'] } })
+      return rows.filter((r) => !on.has(r.id))
+    },
+    [companies],
   )
+  const dealGroup = person.referencedBy.find(
+    (g) => g.attrSlug === 'people' && g.items.every((i) => i.kind === 'deal'),
+  )
+  const searchDeals = useCallback(
+    async (q: string) => {
+      const on = new Set(dealGroup?.items.map((i) => i.id) ?? [])
+      const rows = await searchEntities({ data: { q, kinds: ['deal'] } })
+      return rows.filter((r) => !on.has(r.id))
+    },
+    [dealGroup],
+  )
+
+  /** Put this person on a deal's People, through the deal's own value. */
+  async function addToDeal(dealId: string) {
+    const deal = await getDeal({ data: { id: dealId } })
+    const held = Array.isArray(deal.values.people)
+      ? deal.values.people.map(String)
+      : []
+    if (held.includes(person.id)) return
+    await updateRecord({
+      data: { id: dealId, patch: { people: [...held, person.id] } },
+    })
+    void router.invalidate()
+  }
 
   async function newNoteAboutThis() {
     try {
@@ -240,189 +292,203 @@ function PersonRecordPage() {
       />
 
       <RecordBody
-        rail={
+        details={
           <>
-            <WaitingRail entityId={person.id} counts={waiting} />
-            {/* Spaces (SPA-99). The same rail the company and custom-record
-                pages carry, on the same two server fns — and the writer the
-                space page's Contacts section had been missing: `entity_space`
-                always took a person, but nothing in the UI could write one,
-                so the direct lane could never fill. */}
-            <RailSection label="Spaces" meta={`${person.spaces.length}`}>
-              {person.spaces.map((s) => (
-                <SpaceRailRow
-                  key={s.id}
-                  space={s}
-                  onRemove={async () => {
-                    await untagFromSpace({
-                      data: { entityId: person.id, spaceId: s.id },
-                    })
-                    void router.invalidate()
-                  }}
-                />
+            <AiCellsProvider entityIds={[person.id]} registry={registry}>
+              <PropertyGrid>
+                {/* The name's two parts are one cell; the head is their join. (D67) */}
+                {registry.some((def) => isNamePart(def.slug)) ? (
+                  <NameField
+                    first={jsonString(person.values.first_name)}
+                    last={jsonString(person.values.last_name)}
+                    onDraft={setNameDraft}
+                    onSave={async (parts) => {
+                      await updateRecord({
+                        data: { id: person.id, patch: parts },
+                      })
+                      await router.invalidate()
+                    }}
+                  />
+                ) : null}
+                {registry
+                  .filter((def) => !isNamePart(def.slug))
+                  .map((def) => (
+                    <RailField
+                      key={def.slug}
+                      entityId={person.id}
+                      def={def}
+                      attr={def}
+                      objectLabel={'person'}
+                      fillFrom="person"
+                      whereFrom={enrichment.whereFrom[def.slug]}
+                      onAttributeSaved={() => router.invalidate()}
+                      value={person.values[def.slug] ?? null}
+                      refNames={person.refNames}
+                      onSave={async (v) => {
+                        const result = await updateRecord({
+                          data: { id: person.id, patch: { [def.slug]: v } },
+                        })
+                        // An email another person holds was refused; say so.
+                        const collision = collisionToast(result, 'person')
+                        if (collision)
+                          toast(collision.title, {
+                            description: collision.description,
+                          })
+                        void router.invalidate()
+                      }}
+                    />
+                  ))}
+                <PropertyCell label="">
+                  <AttributeCreateDialog
+                    objectKind="person"
+                    onCreated={() => router.invalidate()}
+                    trigger={
+                      <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
+                        + add attribute
+                      </button>
+                    }
+                  />
+                </PropertyCell>
+              </PropertyGrid>
+            </AiCellsProvider>
+
+            {/* The person's `companies` value, the role on the first. */}
+            <RailSection label="Companies" meta={`${companies.length}`}>
+              {companies.length === 0 ? <RailEmpty>None yet.</RailEmpty> : null}
+              {companies.map((c, i) => (
+                <RailItem key={c.id}>
+                  <DitherMark size={14} />
+                  <Link
+                    to="/companies/$companyId"
+                    params={{ companyId: c.id }}
+                    className="focus-ring min-w-0 flex-1 truncate hover:underline"
+                  >
+                    {c.name}
+                  </Link>
+                  {i === 0 && role ? (
+                    <span className="max-w-30 shrink-0 truncate mono text-micro text-graphite">
+                      {role}
+                    </span>
+                  ) : null}
+                </RailItem>
               ))}
-              {untaggedSpaces.length > 0 ? (
-                <Select
-                  aria-label="Tag into space"
-                  value=""
-                  onChange={async (spaceId) => {
-                    await tagIntoSpace({
-                      data: { entityId: person.id, spaceId },
-                    })
-                    void router.invalidate()
-                  }}
-                  items={untaggedSpaces.map((s) => ({
-                    value: s.id,
-                    label: s.name,
-                    depth: s.depth,
-                  }))}
-                  width="content"
-                  placeholder="+ Tag into space…"
-                  searchPlaceholder="Search spaces…"
-                  emptyLabel="No space matches."
-                  className="mt-1 h-7 rounded-none bg-paper px-2 text-label text-graphite"
-                />
-              ) : null}
-              <SuggestSpacesAction entityId={person.id} />
+              <DetailsPickRow
+                label="Add a company…"
+                placeholder="Company name…"
+                search={searchCompanies}
+                onPick={async (hit) => {
+                  await setPersonCompany({
+                    data: {
+                      personId: person.id,
+                      companyId: hit.id,
+                      action: 'link',
+                    },
+                  })
+                  void router.invalidate()
+                }}
+              />
             </RailSection>
+
+            {/* Inbound record-references, one section per attribute — the
+                heading and the grouping are both data, so a second attribute
+                pointing at people lands here with no edit. */}
+            {dealGroup ? null : (
+              <RailSection label="Deals" meta="0">
+                <RailEmpty>None yet.</RailEmpty>
+                <DetailsPickRow
+                  label="Add to a deal…"
+                  placeholder="Deal name…"
+                  search={searchDeals}
+                  onPick={(hit) => addToDeal(hit.id)}
+                />
+              </RailSection>
+            )}
+            {person.referencedBy.map((group) => (
+              <RailSection
+                key={`${group.label}:${group.attrSlug}`}
+                label={group.label}
+                meta={`${group.items.length} via ${group.via.toLowerCase()}`}
+              >
+                {group.items.map((item) => {
+                  const href = recordPath({
+                    kind: item.kind,
+                    id: item.id,
+                    objectSlug: item.objectSlug,
+                  })
+                  return (
+                    <RailItem key={item.id}>
+                      {href ? (
+                        <Link
+                          to={href}
+                          className="focus-ring min-w-0 flex-1 truncate hover:underline"
+                        >
+                          {item.name}
+                        </Link>
+                      ) : (
+                        <span className="min-w-0 flex-1 truncate text-graphite">
+                          {item.name}
+                        </span>
+                      )}
+                    </RailItem>
+                  )
+                })}
+                {group === dealGroup ? (
+                  <DetailsPickRow
+                    label="Add to a deal…"
+                    placeholder="Deal name…"
+                    search={searchDeals}
+                    onPick={(hit) => addToDeal(hit.id)}
+                  />
+                ) : null}
+              </RailSection>
+            ))}
+
+            <WaitingRail entityId={person.id} counts={waiting} />
+
+            <RecordSpacesSection
+              entityId={person.id}
+              spaces={person.spaces}
+              allSpaces={allSpaces}
+            />
+
+            <TasksRail
+              entityId={person.id}
+              entityName={person.name}
+              entityKind="person"
+              composer="row"
+            />
           </>
         }
       >
-        <AiCellsProvider entityIds={[person.id]} registry={registry}>
-          <PropertyGrid>
-            {/* The name's two parts are one cell; the head is their join. (D67) */}
-            {registry.some((def) => isNamePart(def.slug)) ? (
-              <NameField
-                first={jsonString(person.values.first_name)}
-                last={jsonString(person.values.last_name)}
-                onDraft={setNameDraft}
-                onSave={async (parts) => {
-                  await updateRecord({ data: { id: person.id, patch: parts } })
-                  await router.invalidate()
-                }}
+        <RecordTabs
+          label={person.name}
+          tab={tab}
+          onTabChange={changeTab}
+          counts={recordTabCounts({ notes, timeline, documents })}
+          panels={{
+            notes: (
+              <RecordNotes
+                filed={notes.filed}
+                mentions={notes.mentions}
+                onNewNote={newNoteAboutThis}
               />
-            ) : null}
-            {registry
-              .filter((def) => !isNamePart(def.slug))
-              .map((def) => (
-                <RailField
-                  key={def.slug}
-                  entityId={person.id}
-                  def={def}
-                  attr={def}
-                  objectLabel={'person'}
-                  fillFrom="person"
-                  whereFrom={enrichment.whereFrom[def.slug]}
-                  onAttributeSaved={() => router.invalidate()}
-                  value={person.values[def.slug] ?? null}
-                  refNames={person.refNames}
-                  onSave={async (v) => {
-                    const result = await updateRecord({
-                      data: { id: person.id, patch: { [def.slug]: v } },
-                    })
-                    // An email another person holds was refused; say so.
-                    const collision = collisionToast(result, 'person')
-                    if (collision)
-                      toast(collision.title, {
-                        description: collision.description,
-                      })
-                    void router.invalidate()
-                  }}
-                />
-              ))}
-            <PropertyCell label="">
-              <AttributeCreateDialog
-                objectKind="person"
-                onCreated={() => router.invalidate()}
-                trigger={
-                  <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
-                    + add attribute
-                  </button>
+            ),
+            interactions: (
+              <RecordInteractions
+                items={timeline}
+                registry={registry}
+                composer={
+                  <LogInteractionDialog
+                    seed={{ id: person.id, name: person.name, kind: 'person' }}
+                    trigger={<LogComposerRow />}
+                  />
                 }
               />
-            </PropertyCell>
-          </PropertyGrid>
-        </AiCellsProvider>
-
-        <RecordNotes
-          filed={notes.filed}
-          mentions={notes.mentions}
-          onNewNote={newNoteAboutThis}
+            ),
+            files: <RecordFiles entityId={person.id} documents={documents} />,
+            history: <RecordHistory items={timeline} registry={registry} />,
+          }}
         />
-
-        {/* Inbound record-references, one section per attribute — the
-            heading and the grouping are both data (`attr_slug` and the
-            attribute's display name), so a second attribute pointing at
-            people lands here with no edit. No inbound refs, no heading. */}
-        {person.referencedBy.map((group) => (
-          <RecordSection
-            key={`${group.label}:${group.attrSlug}`}
-            label={group.label}
-            meta={`via ${group.via} · ${group.items.length}`}
-          >
-            <ol>
-              {group.items.map((item) => {
-                const href = recordPath({
-                  kind: item.kind,
-                  id: item.id,
-                  objectSlug: item.objectSlug,
-                })
-                const body = (
-                  <>
-                    <span className="font-serif text-title font-medium">
-                      {item.name}
-                    </span>
-                    <span className="flex-1" />
-                    <span className="mono text-micro text-graphite">
-                      {item.objectSingular ?? item.kind}
-                    </span>
-                  </>
-                )
-                return (
-                  <li key={item.id} className="border-b border-rule">
-                    {href ? (
-                      <Link
-                        to={href}
-                        className="focus-ring-inset flex h-ledger-row items-center gap-3 px-3 text-ui hover:bg-bone"
-                      >
-                        {body}
-                      </Link>
-                    ) : (
-                      <span className="flex h-ledger-row items-center gap-3 px-3 text-ui text-graphite">
-                        {body}
-                      </span>
-                    )}
-                  </li>
-                )
-              })}
-            </ol>
-          </RecordSection>
-        ))}
-
-        <RecordLedger
-          items={timeline}
-          registry={registry}
-
-          composer={
-            <LogInteractionDialog
-              seed={{ id: person.id, name: person.name, kind: 'person' }}
-              trigger={
-                <button className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 border-b border-rule px-3 text-left">
-                  <span className="mono text-micro text-primary">+</span>
-                  <span className="min-w-0 truncate text-ui text-graphite">
-                    Log a call, meeting, or note…
-                  </span>
-                  <span className="flex-1" />
-                  <KeyHint>L</KeyHint>
-                </button>
-              }
-            />
-          }
-        />
-
-        <RecordFiles entityId={person.id} documents={documents} />
-
-        <RecordContext entityId={person.id} />
       </RecordBody>
     </div>
   )

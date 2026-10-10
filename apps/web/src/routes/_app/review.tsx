@@ -236,29 +236,28 @@ function InboxPage() {
             <span>rejected and dismissed never come back</span>
           </>
         }
-        action={
-          <>
-            <ScanAction />
-            {rows.length > 0 ? (
-              <div
-                className="-mb-4 ml-2 flex items-center self-end"
-                role="group"
-              >
-                {LANES.map((l) => (
-                  <HeaderTab
-                    key={l.key}
-                    active={lane === l.key}
-                    onClick={() => setLane(l.key)}
-                  >
-                    {l.label}
-                    <span className="font-normal tracking-normal normal-case">
-                      {countOf(l.key)}
-                    </span>
-                  </HeaderTab>
-                ))}
-              </div>
-            ) : null}
-          </>
+        action={<ScanAction />}
+        tabs={
+          rows.length > 0 ? (
+            <div
+              className="-mb-px flex items-end"
+              role="group"
+              aria-label="Lanes"
+            >
+              {LANES.map((l) => (
+                <HeaderTab
+                  key={l.key}
+                  active={lane === l.key}
+                  onClick={() => setLane(l.key)}
+                >
+                  {l.label}
+                  <span className="font-normal tracking-normal normal-case">
+                    {countOf(l.key)}
+                  </span>
+                </HeaderTab>
+              ))}
+            </div>
+          ) : undefined
         }
       />
 

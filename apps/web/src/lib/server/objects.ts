@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { db } from '@spaces/db'
 import { attribute, entity, link, objectDef } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
-import { referencedByRows, requireUser } from './shared'
+import { groupReferencedBy, referencedByRows, requireUser } from './shared'
 import { pagedListShape, pageOptions } from '#/lib/views/page-input'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
 import { recordSpaces } from '#/lib/spaces/filed-in'
@@ -264,10 +264,9 @@ export const getObjectRecord = createServerFn()
       .where(
         andOp(eq(link.fromEntityId, data.id), eq(link.relation, 'references')),
       )
-    // Incoming references — backlinks both ways (§9): who points at this.
-    // The query is `referencedByRows` (server/shared.ts), shared with the
-    // person page; this page renders it flat, unchanged.
-    const referencedBy = await referencedByRows(data.id)
+    // Incoming references — backlinks both ways (§9): who points at this,
+    // one details section per referring object and attribute, as on a person.
+    const referencedBy = groupReferencedBy(await referencedByRows(data.id))
     const users = await db.select({ id: user.id, name: user.name }).from(user)
     const userNames = Object.fromEntries(users.map((u) => [u.id, u.name]))
     const { recordReadoutsProgram } = await import('../records/readouts')

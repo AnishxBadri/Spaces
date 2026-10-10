@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { HeadActions, HeadBar, useHeadFold } from '#/components/head-fold'
 import { SectionHead } from '#/components/ledger-section'
 import { Stamp } from '#/components/ui/stamp'
@@ -6,14 +6,13 @@ import type { StampProps } from '#/components/ui/stamp'
 import { cn } from '#/lib/utils'
 
 /**
- * P7 — Record page anatomy (Instrument, 2026-09-10). Header: the stamp and
- * breadcrumb, actions, serif name + badge, a readout strip of the numbers
- * that matter, the double rule under; scrolled past its name it folds to
- * `HeadBar`.
- * Body left: property grid (two columns, hairline top and bottom, rules
- * inside), then the sections — notes, interactions, history, files. Rail right on bone:
- * stage stepper, readouts, people. Every part is markup only; the pages
- * keep their data and handlers.
+ * P7 — Record page anatomy (D74). Header: the stamp and breadcrumb, actions,
+ * serif name + badge, a readout strip of the numbers that matter, the
+ * double rule under; scrolled past its name it folds to `HeadBar`.
+ * Body: `RecordBody details=…` — the 320px details column on bone left (the
+ * property grid as label–value rows, then the relationship sections), the
+ * tab head over one view right. Every part is markup only; the pages keep
+ * their data and handlers.
  */
 
 /**
@@ -201,11 +200,11 @@ export function PreviewHead({
 }
 
 /**
- * Body: the page left, the rail right on bone. The rail never scrolls with
- * the body on wide screens; it sticks under the folded head's bar.
- * - With `details` it is the tabbed record (D74): the 320px details column
- *   on bone left, and `children` — the tab head over its view — taking the
- *   rest, edge to edge.
+ * Body. With `details` it is the tabbed record (D74): the 320px details
+ * column on bone left, sticking under the folded bar on wide screens, and
+ * `children` — the tab head over its view — taking the rest, edge to edge.
+ * - Without it, the older shape the term and holding pages keep: the page
+ *   left, a `rail` right on bone.
  */
 export function RecordBody({
   children,
@@ -218,7 +217,10 @@ export function RecordBody({
 }) {
   if (details !== undefined) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+      <div
+        data-record-body="details"
+        className="flex min-h-0 flex-1 flex-col xl:flex-row"
+      >
         <aside
           aria-label="Details"
           className="flex w-full shrink-0 flex-col border-b border-hairline bg-bone xl:sticky xl:top-10 xl:max-h-[calc(100dvh-2.5rem)] xl:w-80 xl:overflow-y-auto xl:border-r xl:border-b-0"
@@ -266,15 +268,15 @@ export function RecordSection({
   )
 }
 
-/** Two columns of label + value cells; hairline top and bottom, rules
- *  inside. Cells are `PropertyCell`s (RailField renders one). Three columns
- *  until 2026-09-30 — at 1440 wide they truncated their own labels
- *  (`CLOSE REAS…`, `BUSINESS M…`) and every URL. */
+/**
+ * The property grid at the head of the details column: one label–value row
+ * per attribute on rules, the label in lowercase mono, the value lane
+ * left-aligned. Cells are `PropertyCell`s (RailField renders one).
+ */
 export function PropertyGrid({ children }: { children: ReactNode }) {
   return (
-    <div className="border-t border-hairline">
-      <div className="grid grid-cols-1 md:grid-cols-2">{children}</div>
-      <div className="-mt-px border-t border-hairline" />
+    <div data-property-grid className="flex flex-col border-b border-hairline">
+      {children}
     </div>
   )
 }
@@ -326,7 +328,7 @@ export function PropertyCell({
   return (
     <div
       className={cn(
-        'relative flex min-h-[2.125rem] flex-col justify-center border-r border-b border-rule px-3 py-1 max-md:border-r-0 md:[&:nth-child(2n)]:border-r-0',
+        'relative flex min-h-[2.125rem] flex-col justify-center border-b border-rule px-6 py-1 last:border-b-0',
         className,
       )}
     >
@@ -334,7 +336,10 @@ export function PropertyCell({
         <span aria-hidden className={rejectPaneClass(reject)} />
       )}
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex w-30 shrink-0 items-center gap-1 field-label text-graphite">
+        <div
+          data-property-label
+          className="flex w-24 shrink-0 items-center gap-1 mono text-micro text-graphite lowercase"
+        >
           {label}
         </div>
         <div className="min-w-0 flex-1">{children}</div>
@@ -417,6 +422,33 @@ export function RailItem({
   )
 }
 
+/**
+ * The composer row a details section ends on: `+ Add …` in graphite. A
+ * plain button that spreads its props, so a dialog trigger can hand it its
+ * own.
+ */
+export function DetailsAddRow({
+  children,
+  className,
+  ...props
+}: ComponentProps<'button'>) {
+  return (
+    <button
+      type="button"
+      {...props}
+      className={cn(
+        'focus-ring flex h-row w-full min-w-0 items-center gap-2.5 border-t border-rule text-left text-ui text-graphite transition-colors hover:text-foreground',
+        className,
+      )}
+    >
+      <span className="w-3.5 shrink-0 text-center mono text-ui text-primary">
+        +
+      </span>
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+    </button>
+  )
+}
+
 /** Quiet line for an empty rail section. */
 export function RailEmpty({ children }: { children: ReactNode }) {
   return <p className="py-1 text-label text-graphite">{children}</p>
@@ -425,16 +457,20 @@ export function RailEmpty({ children }: { children: ReactNode }) {
 /**
  * The stage stepper: one 8px segment per live stage, pine up to and
  * including the current one, hairline outline after. Labels: first, the
- * current with its days, last.
+ * current with its days and the stage's median (`Diligence 11d · med 9`),
+ * last.
  */
 export function StageStepper({
   stages,
   currentId,
   days,
+  median,
 }: {
   stages: Array<{ id: string; label: string }>
   currentId: string | null
   days?: number | null
+  /** Median days deals spend in this stage, when there is one. */
+  median?: number | null
 }) {
   const idx = stages.findIndex((s) => s.id === currentId)
   const first = stages.at(0)
@@ -459,7 +495,9 @@ export function StageStepper({
           {current
             ? days === null || days === undefined
               ? current.label
-              : `${current.label} · ${days}d`
+              : median === null || median === undefined
+                ? `${current.label} ${days}d`
+                : `${current.label} ${days}d · med ${median}`
             : '—'}
         </span>
         <span className="text-graphite">

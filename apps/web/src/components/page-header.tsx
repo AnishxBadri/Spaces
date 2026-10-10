@@ -1,6 +1,11 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { HeadActions, HeadBar, useHeadFold } from './head-fold'
+import {
+  HeadActions,
+  HeadBar,
+  PIN_UNDER_HEAD_BAR,
+  useHeadFold,
+} from './head-fold'
 import { keyHintClasses, useButtonPending } from './ui/button'
 import { cn } from '#/lib/utils'
 
@@ -11,12 +16,15 @@ import { cn } from '#/lib/utils'
  * each carrying its key hint inside the button. The double rule under,
  * 32px inset, 28px above — the header owns its own anatomy so every field
  * starts on the same line. Scrolled past its title, it folds to `HeadBar`.
+ * - `tabs` is the page's own tab row, under the double rule; scrolled, it
+ *   pins under the folded bar rather than riding into it.
  */
 export function PageHeader({
   eyebrow,
   title,
   description,
   action,
+  tabs,
   className,
 }: {
   /** Mono caps line above the title — "Today · Wednesday · 2026-09-10". */
@@ -25,6 +33,8 @@ export function PageHeader({
   /** Mono readout under the title — counts, last touch. Never prose. */
   description?: ReactNode
   action?: ReactNode
+  /** The page's tab row: underline tabs that pin under the folded bar. */
+  tabs?: ReactNode
   className?: string
 }) {
   const { titleRef, actionsRef, fold } = useHeadFold()
@@ -58,6 +68,17 @@ export function PageHeader({
           </HeadActions>
         ) : null}
       </header>
+      {tabs ? (
+        <div
+          data-head-tabs
+          className={cn(
+            'flex h-10 shrink-0 items-end border-b border-rule bg-paper px-5',
+            PIN_UNDER_HEAD_BAR,
+          )}
+        >
+          {tabs}
+        </div>
+      ) : null}
     </>
   )
 }

@@ -6,38 +6,41 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { Link2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { SpaceRailRow } from '#/components/record/space-rail-row'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import { RailField } from '#/components/attributes/rail-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import {
   PropertyCell,
   PropertyGrid,
-  RailEmpty,
   RailItem,
   RailSection,
   RecordBody,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { RecordSpacesSection } from '#/components/record/spaces-section'
+import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
-import { RecordContext } from '#/components/record-context'
-import { RecordLedger } from '#/components/record-timeline'
+import { RecordHistory, RecordInteractions } from '#/components/record-timeline'
 import { WaitingRail } from '#/components/record/waiting-rail'
-import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
+import {
+  LogComposerRow,
+  LogInteractionDialog,
+} from '#/components/log-interaction-dialog'
+import { KeyHint } from '#/components/page-header'
+import { TasksRail } from '#/components/tasks-rail'
 import { SensitiveToggle } from '#/components/sensitive-toggle'
 import { SummarizeRecordButton } from '#/components/summarize'
 import { Button } from '#/components/ui/button'
-import { Select } from '#/components/ui/select'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { recordPath } from '#/lib/record-path'
 import { readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
 import { fileInSpaceAction } from '#/lib/file-in-space'
-import { usePageActions } from '#/lib/page-actions'
+import { runBinding, usePageActions } from '#/lib/page-actions'
+import { recordSearch, recordTabCounts } from '#/lib/records/record-tabs'
 import {
   countOpenSuggestions,
   createNote,
@@ -48,20 +51,18 @@ import {
   listRecordNotes,
   listRegistry,
   listSpaces,
-  tagIntoSpace,
-  untagFromSpace,
   updateRecord,
 } from '#/lib/server-fns'
 
 /**
- * The registry-generated record page for a custom object (spec §9). Same
- * shape as a company page minus the core-only machinery: rail from the
- * registry, activity/notes/files, spaces, backlinks both ways. No
- * interactions and no enrichment — by design, not by omission. Merge does
- * reach here (narrowed 2026-09-13): a record merged away redirects to its
- * winner from the loader below.
+ * The registry-generated record page for a custom object (spec §9, D74): a
+ * company's anatomy minus enrichment. The details column holds the grid
+ * from the registry, the records that point here, Spaces and Tasks; the
+ * head logs an interaction (`L`) and adds a task (`T`). A record merged
+ * away redirects to its winner from the loader.
  */
 export const Route = createFileRoute('/_app/o_/$objectSlug/$recordId')({
+  validateSearch: recordSearch,
   loader: async ({ params }) => {
     const record = await getObjectRecord({ data: { id: params.recordId } })
     if (record.object.slug !== params.objectSlug) throw notFound()
@@ -114,8 +115,12 @@ function ObjectRecordPage() {
   const router = useRouter()
   const navigate = useNavigate()
   const Icon = objectIcon(record.object)
-  const untaggedSpaces = allSpaces.filter(
-    (s) => !record.spaces.some((rs) => rs.id === s.id),
+  const go = Route.useNavigate()
+  const [tab, changeTab] = useRecordTab(
+    `o:${record.object.slug}`,
+    Route.useSearch().tab,
+    (next) =>
+      void go({ search: { tab: next }, replace: true, resetScroll: false }),
   )
 
   async function newNoteAboutThis() {
@@ -137,6 +142,8 @@ function ObjectRecordPage() {
   }
 
   usePageActions([
+    { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+    { id: 'task', label: 'Add a task', key: 'T', run: runBinding('T') },
     {
       id: 'note',
       label: 'Note about this',
@@ -173,6 +180,21 @@ function ObjectRecordPage() {
           <>
             <SensitiveToggle entityId={record.id} state={sensitivity} />
             <SummarizeRecordButton recordId={record.id} />
+            <LogInteractionDialog
+              seed={{ id: record.id, name: record.name, kind: 'custom' }}
+              hotkey="l"
+              trigger={
+                <Button variant="outline">
+                  Log interaction
+                  <KeyHint>L</KeyHint>
+                </Button>
+              }
+            />
+            {/* Opens the Tasks section's composer, which `T` binds. */}
+            <Button variant="outline" onClick={runBinding('T')}>
+              Task
+              <KeyHint>T</KeyHint>
+            </Button>
             <Button variant="outline" onClick={newNoteAboutThis}>
               Note about this
             </Button>
@@ -216,152 +238,142 @@ function ObjectRecordPage() {
       />
 
       <RecordBody
-        rail={
+        details={
           <>
-            <WaitingRail entityId={record.id} counts={waiting} />
-            <RailSection label="Spaces" meta={`${record.spaces.length}`}>
-              {record.spaces.map((s) => (
-                <SpaceRailRow
-                  key={s.id}
-                  space={s}
-                  onRemove={async () => {
-                    await untagFromSpace({
-                      data: { entityId: record.id, spaceId: s.id },
-                    })
-                    void router.invalidate()
-                  }}
-                />
-              ))}
-              {untaggedSpaces.length > 0 ? (
-                <Select
-                  aria-label="Tag into space"
-                  value=""
-                  onChange={async (spaceId) => {
-                    await tagIntoSpace({
-                      data: { entityId: record.id, spaceId },
-                    })
-                    void router.invalidate()
-                  }}
-                  items={untaggedSpaces.map((s) => ({
-                    value: s.id,
-                    label: s.name,
-                    depth: s.depth,
-                  }))}
-                  width="content"
-                  placeholder="+ Tag into space…"
-                  searchPlaceholder="Search spaces…"
-                  emptyLabel="No space matches."
-                  className="mt-1 h-7 rounded-none bg-paper px-2 text-label text-graphite"
-                />
-              ) : null}
-              <SuggestSpacesAction entityId={record.id} />
-            </RailSection>
+            <AiCellsProvider entityIds={[record.id]} registry={registry}>
+              <PropertyGrid>
+                {registry.map((def) => (
+                  <RailField
+                    key={def.slug}
+                    entityId={record.id}
+                    def={def}
+                    attr={def}
+                    objectLabel={record.object.singular}
+                    onAttributeSaved={() => router.invalidate()}
+                    value={record.values[def.slug] ?? null}
+                    refNames={record.refNames}
+                    onSave={async (v) => {
+                      const result = await updateRecord({
+                        data: { id: record.id, patch: { [def.slug]: v } },
+                      })
+                      // The save succeeded either way — the value is the
+                      // operator's field and always lands. What a collision
+                      // withholds is the *claim*, and this is where it is said.
+                      const collision = collisionToast(
+                        result,
+                        record.object.singular,
+                      )
+                      if (collision)
+                        toast(collision.title, {
+                          description: collision.description,
+                        })
+                      void router.invalidate()
+                    }}
+                  />
+                ))}
+                <PropertyCell label="">
+                  <AttributeDialog
+                    mode="create"
+                    objectId={record.object.id}
+                    objectLabel={record.object.singular}
+                    onSaved={() => router.invalidate()}
+                    trigger={
+                      <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
+                        + add attribute
+                      </button>
+                    }
+                  />
+                </PropertyCell>
+              </PropertyGrid>
+            </AiCellsProvider>
 
-            <RailSection
-              label="Referenced by"
-              meta={`${record.referencedBy.length}`}
-            >
-              {record.referencedBy.length === 0 ? (
-                <RailEmpty>No record points here yet.</RailEmpty>
-              ) : (
-                record.referencedBy.map((r) => {
+            <WaitingRail entityId={record.id} counts={waiting} />
+
+            {/* The records that point here, one section per referring
+                object and attribute; the link is set on the referrer. */}
+            {record.referencedBy.map((group) => (
+              <RailSection
+                key={`${group.label}:${group.attrSlug}`}
+                label={group.label}
+                meta={`${group.items.length} via ${group.via.toLowerCase()}`}
+              >
+                {group.items.map((item) => {
                   const href = recordPath({
-                    kind: r.kind,
-                    id: r.fromId,
-                    objectSlug: r.objectSlug,
+                    kind: item.kind,
+                    id: item.id,
+                    objectSlug: item.objectSlug,
                   })
-                  const body = (
-                    <>
-                      <Link2
-                        className="size-3.5 shrink-0 text-graphite"
-                        strokeWidth={1.75}
-                      />
-                      <span className="min-w-0 flex-1 truncate">{r.name}</span>
-                      <span className="mono text-micro text-graphite">
-                        {r.objectSingular ?? r.kind}
-                      </span>
-                    </>
-                  )
                   return (
-                    <RailItem key={`${r.fromId}:${r.attrSlug}`}>
+                    <RailItem key={item.id}>
                       {href ? (
                         <Link
                           to={href}
-                          className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 hover:underline"
+                          className="focus-ring min-w-0 flex-1 truncate hover:underline"
                         >
-                          {body}
+                          {item.name}
                         </Link>
                       ) : (
-                        <span className="flex min-w-0 flex-1 items-center gap-2.5">
-                          {body}
+                        <span className="min-w-0 flex-1 truncate text-graphite">
+                          {item.name}
                         </span>
                       )}
                     </RailItem>
                   )
-                })
-              )}
-            </RailSection>
+                })}
+              </RailSection>
+            ))}
+
+            <RecordSpacesSection
+              entityId={record.id}
+              spaces={record.spaces}
+              allSpaces={allSpaces}
+            />
+
+            <TasksRail
+              entityId={record.id}
+              entityName={record.name}
+              entityKind="custom"
+              composer="row"
+            />
           </>
         }
       >
-        <AiCellsProvider entityIds={[record.id]} registry={registry}>
-          <PropertyGrid>
-            {registry.map((def) => (
-              <RailField
-                key={def.slug}
-                entityId={record.id}
-                def={def}
-                attr={def}
-                objectLabel={record.object.singular}
-                onAttributeSaved={() => router.invalidate()}
-                value={record.values[def.slug] ?? null}
-                refNames={record.refNames}
-                onSave={async (v) => {
-                  const result = await updateRecord({
-                    data: { id: record.id, patch: { [def.slug]: v } },
-                  })
-                  // The save succeeded either way — the value is the
-                  // operator's field and always lands. What a collision
-                  // withholds is the *claim*, and this is where it is said.
-                  const collision = collisionToast(
-                    result,
-                    record.object.singular,
-                  )
-                  if (collision)
-                    toast(collision.title, {
-                      description: collision.description,
-                    })
-                  void router.invalidate()
-                }}
+        <RecordTabs
+          label={record.name}
+          tab={tab}
+          onTabChange={changeTab}
+          counts={recordTabCounts({ notes, timeline, documents })}
+          panels={{
+            notes: (
+              <RecordNotes
+                filed={notes.filed}
+                mentions={notes.mentions}
+                onNewNote={newNoteAboutThis}
               />
-            ))}
-            <PropertyCell label="">
-              <AttributeDialog
-                mode="create"
-                objectId={record.object.id}
-                objectLabel={record.object.singular}
-                onSaved={() => router.invalidate()}
-                trigger={
-                  <button className="focus-ring mono text-micro text-graphite hover:text-foreground">
-                    + add attribute
-                  </button>
+            ),
+            interactions: (
+              <RecordInteractions
+                items={timeline}
+                registry={registry}
+                refNames={record.refNames}
+                composer={
+                  <LogInteractionDialog
+                    seed={{ id: record.id, name: record.name, kind: 'custom' }}
+                    trigger={<LogComposerRow />}
+                  />
                 }
               />
-            </PropertyCell>
-          </PropertyGrid>
-        </AiCellsProvider>
-
-        <RecordNotes
-          filed={notes.filed}
-          mentions={notes.mentions}
-          onNewNote={newNoteAboutThis}
+            ),
+            files: <RecordFiles entityId={record.id} documents={documents} />,
+            history: (
+              <RecordHistory
+                items={timeline}
+                registry={registry}
+                refNames={record.refNames}
+              />
+            ),
+          }}
         />
-
-        <RecordLedger items={timeline} registry={registry} />
-
-        <RecordFiles entityId={record.id} documents={documents} />
-
-        <RecordContext entityId={record.id} />
       </RecordBody>
     </div>
   )

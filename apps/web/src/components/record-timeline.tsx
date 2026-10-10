@@ -128,16 +128,26 @@ export const VERB_TYPES: Record<string, string> = {
 export const HISTORY_FOLD = 6
 
 /**
- * The two ledgers of a record (2026-09-30). One flat list of nineteen rows
- * gave a call the same weight as `tagged into a space`; the reader wants the
- * conversations and can ask for the bookkeeping. **Interactions** — calls,
- * emails, meetings, each with its way in to a write-up — under the composer
- * row (DESIGN.md P7, the Composer Row: a stream is added to from a row, not
- * a corner button). **History** — stage moves, attribute bursts, filings,
- * the portfolio's verbs — folded past `HISTORY_FOLD` behind a `+ N more`
- * row, the way the contract's question 17 asks a surface to bound itself.
+ * A record's ledger split into its two tabs: the conversations, and the
+ * bookkeeping (stage moves, attribute bursts, filings, the portfolio's
+ * verbs). One flat list gave a call the weight of `tagged into a space`.
  */
-export function RecordLedger({
+export function splitLedger(items: Items): {
+  interactions: Items
+  history: Items
+} {
+  return {
+    interactions: items.filter((i) => i.type === 'interaction'),
+    history: items.filter((i) => i.type !== 'interaction'),
+  }
+}
+
+/**
+ * The Interactions tab: calls, emails, meetings, each with its way in to a
+ * write-up, under the composer row (DESIGN.md P7, the Composer Row: a stream
+ * is added to from a row, not a corner button).
+ */
+export function RecordInteractions({
   items,
   registry,
   refNames,
@@ -146,11 +156,37 @@ export function RecordLedger({
   items: Items
   registry: Array<RegistryEntry>
   refNames?: RefNames | undefined
-  /** The composer row — a `LogInteractionDialog` trigger; none on a custom record. */
+  /** The composer row — a `LogInteractionDialog` trigger. */
   composer?: React.ReactNode
 }) {
-  const interactions = items.filter((i) => i.type === 'interaction')
-  const history = items.filter((i) => i.type !== 'interaction')
+  const { interactions } = splitLedger(items)
+  return (
+    <RecordSection label="Interactions" meta={`${interactions.length}`}>
+      {composer}
+      <RecordTimeline
+        items={interactions}
+        registry={registry}
+        refNames={refNames}
+        empty={composer ? null : 'None logged.'}
+      />
+    </RecordSection>
+  )
+}
+
+/**
+ * The History tab, folded past `HISTORY_FOLD` behind a `+ N more` row, the
+ * way the contract's question 17 asks a surface to bound itself.
+ */
+export function RecordHistory({
+  items,
+  registry,
+  refNames,
+}: {
+  items: Items
+  registry: Array<RegistryEntry>
+  refNames?: RefNames | undefined
+}) {
+  const { history } = splitLedger(items)
   const [unfolded, setUnfolded] = useState(false)
   const shown =
     unfolded || history.length <= HISTORY_FOLD
@@ -158,35 +194,24 @@ export function RecordLedger({
       : history.slice(0, HISTORY_FOLD)
   const hidden = history.length - shown.length
   return (
-    <>
-      <RecordSection label="Interactions" meta={`${interactions.length}`}>
-        {composer}
-        <RecordTimeline
-          items={interactions}
-          registry={registry}
-          refNames={refNames}
-          empty={composer ? null : 'None logged.'}
-        />
-      </RecordSection>
-      <RecordSection label="History" meta={`${history.length}`}>
-        <RecordTimeline
-          items={shown}
-          registry={registry}
-          refNames={refNames}
-          last={hidden === 0}
-        />
-        {hidden > 0 ? (
-          <button
-            type="button"
-            onClick={() => setUnfolded(true)}
-            className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-3 text-left mono text-micro text-graphite hover:text-foreground"
-          >
-            <span className="text-primary">+</span>
-            {hidden} more
-          </button>
-        ) : null}
-      </RecordSection>
-    </>
+    <RecordSection label="History" meta={`${history.length}`}>
+      <RecordTimeline
+        items={shown}
+        registry={registry}
+        refNames={refNames}
+        last={hidden === 0}
+      />
+      {hidden > 0 ? (
+        <button
+          type="button"
+          onClick={() => setUnfolded(true)}
+          className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-3 text-left mono text-micro text-graphite hover:text-foreground"
+        >
+          <span className="text-primary">+</span>
+          {hidden} more
+        </button>
+      ) : null}
+    </RecordSection>
   )
 }
 

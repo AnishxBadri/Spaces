@@ -289,6 +289,53 @@ describe('logInteractionProgram', () => {
     expect(logged).toMatchObject({ noteId })
   })
 
+  it('logs from a custom record’s own head, written up and on its Interactions tab', async () => {
+    const { db } = await import('@spaces/db')
+    const { entity, objectDef } = await import('@spaces/db/schema')
+    const { logInteractionProgram } = await import('./log')
+    const { listRecordNotesProgram } = await import('#/lib/notes/list-record')
+    const { recordTimelineProgram } = await import('#/lib/timeline/record')
+
+    const tag = randomUUID().slice(0, 8)
+    const author = await actorId()
+    const [obj] = await db
+      .insert(objectDef)
+      .values({
+        slug: `vehicles_${tag}`,
+        singular: 'Vehicle',
+        plural: 'Vehicles',
+      })
+      .returning({ id: objectDef.id })
+    const [rec] = await db
+      .insert(entity)
+      .values({
+        kind: 'custom',
+        objectId: obj.id,
+        canonicalName: `Fund II ${tag}`,
+      })
+      .returning({ id: entity.id })
+
+    // The page seeds the dialog with the record itself, as a company's does.
+    const { id, noteId } = await Effect.runPromise(
+      logInteractionProgram(author, {
+        kind: 'call',
+        subject: `LP update ${tag}`,
+        occurredAt: new Date('2026-09-18T15:00:00Z'),
+        attendeeIds: [rec.id],
+        writeUp: true,
+      }),
+    )
+
+    const items = await Effect.runPromise(recordTimelineProgram(rec.id))
+    expect(
+      items.find((i) => i.type === 'interaction' && i.id === id),
+    ).toMatchObject({ noteId })
+    const lanes = await Effect.runPromise(
+      listRecordNotesProgram(author, rec.id),
+    )
+    expect(lanes.filed.map((f) => f.id)).toEqual([noteId])
+  })
+
   it('leaves the timeline row noteId null for a plain log', async () => {
     const { logInteractionProgram } = await import('./log')
     const { recordTimelineProgram } = await import('#/lib/timeline/record')
