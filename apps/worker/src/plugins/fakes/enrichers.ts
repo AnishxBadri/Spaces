@@ -21,6 +21,8 @@ export type Enricher = {
     readonly name: string
     readonly domain: string
     readonly values: { readonly [slug: string]: JsonValue }
+    /** The vocabulary keys it answers that no attribute links by default. */
+    readonly unlinked: ReadonlyArray<string>
   }
   readonly unmatched: { readonly name: string; readonly domain: string }
   /** True for the provider request that asks about `domain`. */
@@ -45,7 +47,17 @@ export const ENRICHERS: ReadonlyArray<Enricher> = [
         founded_year: 2019,
         location: 'Pune, India',
         linkedin: 'http://www.linkedin.com/company/northwind-robotics',
+        funding_stage: 'series_a',
       },
+      unlinked: [
+        'company.address',
+        'company.headcount',
+        'company.industry',
+        'company.keywords',
+        'company.tech_stack',
+        'company.total_raised',
+        'company.twitter',
+      ],
     },
     unmatched: { name: 'Nobody Knows', domain: 'no-such-company.example' },
     asksAbout: byDomainParam,

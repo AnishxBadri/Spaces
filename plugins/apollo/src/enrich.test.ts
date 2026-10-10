@@ -5,7 +5,7 @@ import type { RecordedCall } from '@spaces/sdk/testing'
 import type { EventInput, ReadEntity } from '@spaces/sdk'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { jobs } from './index.ts'
-import { APOLLO_API, endpointUrl } from './map.ts'
+import { APOLLO_API, PHONE_CREDITS, endpointUrl } from './map.ts'
 import { fixture } from './test-fixtures.ts'
 
 /**
@@ -50,6 +50,21 @@ const person = readEntity({
   },
 })
 
+/** The keys the host links by default: the system attributes' links. */
+const SYSTEM_LINKS = [
+  'company.description',
+  'company.founded_year',
+  'company.location',
+  'company.linkedin',
+  'company.funding_stage',
+  'person.title',
+  'person.description',
+  'person.location',
+  'person.linkedin',
+  'person.twitter',
+  'person.company',
+]
+
 type Job = (typeof jobs)['enrichCompany' | 'enrichPerson']
 
 const run = (job: Job, ports: ReturnType<typeof testPorts>) =>
@@ -61,10 +76,17 @@ const portsFor = (
   entity: ReadEntity,
   url: string,
   response: { readonly status?: number; readonly body: unknown },
+  more: {
+    readonly linked?: ReadonlyArray<string>
+    readonly config?: { readonly phone: boolean }
+    readonly entities?: ReadonlyArray<ReadEntity>
+  } = {},
 ) =>
   testPorts({
     secret: TEST_KEY,
-    entities: [entity],
+    entities: [entity, ...(more.entities ?? [])],
+    ...(more.linked === undefined ? {} : { linked: more.linked }),
+    ...(more.config === undefined ? {} : { config: more.config }),
     // The record already holds the key it was read by.
     known: {
       [entity.id]: entity.keys.domain[0]
@@ -77,6 +99,7 @@ const portsFor = (
       {
         method: 'POST',
         url,
+        repeat: true,
         response: {
           ...(response.status === undefined ? {} : { status: response.status }),
           body: JSON.stringify(response.body),
@@ -121,16 +144,60 @@ describe('enrichCompany', () => {
       headers: { 'x-api-key': TEST_KEY },
     })
     expect(ports.receipts.calls[0]?.input).toMatchObject({ creditsUsed: 1 })
-    expect(ports.facts.answers.get('entity-0')).toEqual({
+    expect(ports.facts.answers.get('entity-0')).toMatchObject({
       'company.description':
         'Warehouse picking robots that learn a new SKU from one demonstration.',
       'company.founded_year': 2019,
       'company.location': 'Pune, India',
       'company.linkedin': 'http://www.linkedin.com/company/northwind-robotics',
+      'company.funding_stage': 'Series A',
+      'company.headcount': 84,
+      'company.total_raised': 6500000,
     })
     expect(ports.facts.calls[0]?.input).toMatchObject({
       receiptId: 'receipt-1',
     })
+  })
+
+  it('answers the linked keys and the unlinked ones alike; an unlinked key is in the receipt and in no other port call', async () => {
+    const ports = portsFor(
+      company,
+      ORG_URL,
+      { body: fixture('organization.json') },
+      { linked: SYSTEM_LINKS },
+    )
+    expect((await run(jobs.enrichCompany, ports))._tag).toBe('Success')
+    const answered = ports.facts.calls[0]?.output
+    expect(answered).toEqual({
+      linked: [
+        'company.description',
+        'company.founded_year',
+        'company.location',
+        'company.linkedin',
+        'company.funding_stage',
+      ],
+      unlinked: [
+        'company.total_raised',
+        'company.headcount',
+        'company.industry',
+        'company.keywords',
+        'company.tech_stack',
+        'company.twitter',
+        'company.address',
+      ],
+    })
+    // The unlinked values travel once, in the answer the host keeps in its
+    // receipt; nothing else carries them.
+    const elsewhere = JSON.stringify(
+      ports.calls.filter(
+        (c) => c.port !== 'Facts' && c.port !== 'Receipts' && c.port !== 'Http',
+      ),
+    )
+    for (const value of ['machinery', 'Amazon Web Services', 'Baner, Pune'])
+      expect(elsewhere).not.toContain(value)
+    expect(JSON.stringify(ports.receipts.calls[0]?.input)).toContain(
+      'machinery',
+    )
   })
 
   it('stores a no-match receipt with no credit and calls nothing else', async () => {
@@ -208,11 +275,56 @@ describe('enrichPerson', () => {
         email: 'meera@northwind-robotics.example',
       },
     })
-    expect(ports.facts.answers.get('entity-0')).toEqual({
+    expect(ports.facts.answers.get('entity-0')).toMatchObject({
       'person.title': 'Co-founder & CTO',
       'person.location': 'Pune, India',
       'person.linkedin': 'http://www.linkedin.com/in/meera-kulkarni-robots',
       'person.twitter': 'https://twitter.com/meerak',
+      'person.company': {
+        name: 'Northwind Robotics',
+        domain: 'northwind-robotics.example',
+      },
+    })
+  })
+
+  it.each([
+    ['unverified', 'person-unverified.json'],
+    ['a role address', 'person-role-email.json'],
+    ['locked', 'person-locked.json'],
+  ])('claims no identity for an email that is %s', async (_why, name) => {
+    const ports = portsFor(person, PERSON_URL, { body: fixture(name) })
+    expect((await run(jobs.enrichPerson, ports))._tag).toBe('Success')
+    expect(ports.identity.calls).toEqual([])
+  })
+
+  it('asks for no phone and answers none with the setting off', async () => {
+    const ports = portsFor(person, PERSON_URL, {
+      body: fixture('person-keyhold.json'),
+    })
+    expect((await run(jobs.enrichPerson, ports))._tag).toBe('Success')
+    expect(ports.http.calls[0]?.input).toMatchObject({ url: PERSON_URL })
+    expect(ports.facts.answers.get('entity-0')).not.toHaveProperty(
+      'person.phone',
+    )
+    expect(ports.receipts.calls[0]?.input).toMatchObject({ creditsUsed: 1 })
+  })
+
+  it('asks Apollo to reveal the phone with the setting on, answers it and counts the extra credits', async () => {
+    const ports = portsFor(
+      person,
+      endpointUrl('people/match', {
+        email: 'meera@northwind-robotics.example',
+        reveal_phone_number: 'true',
+      }),
+      { body: fixture('person-keyhold.json') },
+      { config: { phone: true } },
+    )
+    expect((await run(jobs.enrichPerson, ports))._tag).toBe('Success')
+    expect(ports.facts.answers.get('entity-0')).toMatchObject({
+      'person.phone': '+919845012345',
+    })
+    expect(ports.receipts.calls[0]?.input).toMatchObject({
+      creditsUsed: 1 + PHONE_CREDITS,
     })
   })
 
@@ -241,6 +353,7 @@ describe('enrichPerson', () => {
     expect(ports.identity.calls).toEqual([])
     expect(ports.calls.map((c) => `${c.port}.${c.method}`)).toEqual([
       'Read.entity',
+      'Config.get',
       'Secrets.get',
       'Http.request',
       'Receipts.store',
@@ -278,15 +391,24 @@ describe('signals', () => {
           apolloEventId: '6612a0b1c2d3e40001f0a1b2',
         },
         receiptId: 'receipt-1',
+        key: 'funding:Series A:2024-03-01',
       },
     ])
-    const answered = ports.facts.answers.get('entity-0') ?? {}
-    expect(Object.keys(answered).sort()).toEqual([
-      'company.description',
-      'company.founded_year',
-      'company.linkedin',
-      'company.location',
+    const answered = JSON.stringify(ports.facts.answers.get('entity-0') ?? {})
+    expect(answered).not.toContain('Blume Ventures')
+  })
+
+  it('writes the same round once: a second run emits it under the same key and nothing new is written', async () => {
+    const ports = portsFor(company, ORG_URL, {
+      body: fixture('organization.json'),
+    })
+    expect((await run(jobs.enrichCompany, ports))._tag).toBe('Success')
+    expect((await run(jobs.enrichCompany, ports))._tag).toBe('Success')
+    expect(ports.content.calls.map((c) => c.output)).toEqual([
+      { signalId: 'signal-1' },
+      { signalId: 'signal-1' },
     ])
+    expect(ports.content.signals).toHaveLength(1)
   })
 
   it('logs a changed title as a hiring signal dated by the current role', async () => {
@@ -309,7 +431,51 @@ describe('signals', () => {
           at: 'Northwind Robotics',
         },
         receiptId: 'receipt-1',
+        key: 'role:northwind-robotics.example:Co-founder & CTO',
       },
+    ])
+  })
+
+  it('writes one dated event when the title changed on a second run, however often it runs after', async () => {
+    const ports = portsFor(person, PERSON_URL, { body: fixture('person.json') })
+    expect((await run(jobs.enrichPerson, ports))._tag).toBe('Success')
+    expect(ports.content.signals).toEqual([])
+
+    // The first run filled the title; Apollo now says another.
+    const filled = readEntity({ ...person, values: { job_title: 'CTO' } })
+    const later = portsFor(filled, PERSON_URL, {
+      body: fixture('person.json'),
+    })
+    expect((await run(jobs.enrichPerson, later))._tag).toBe('Success')
+    expect((await run(jobs.enrichPerson, later))._tag).toBe('Success')
+    expect(later.content.signals.map((s) => s.title)).toEqual([
+      'Now Co-founder & CTO at Northwind Robotics',
+    ])
+  })
+
+  it('reads the companies the person links and logs a move away from one', async () => {
+    const keyhold = readEntity({
+      id: 'entity-9',
+      name: 'Keyhold',
+      keys: { domain: ['keyhold.example'], email: [], linkedin: [] },
+    })
+    const moved = readEntity({
+      ...person,
+      values: { job_title: 'COO', companies: ['entity-9'] },
+    })
+    const ports = portsFor(
+      moved,
+      PERSON_URL,
+      { body: fixture('person.json') },
+      { entities: [keyhold] },
+    )
+    expect((await run(jobs.enrichPerson, ports))._tag).toBe('Success')
+    expect(ports.read.calls.map((c) => c.input)).toEqual([
+      { id: 'entity-0' },
+      { id: 'entity-9' },
+    ])
+    expect(ports.content.signals.map((s) => s.title)).toEqual([
+      'Moved from Keyhold to Northwind Robotics as Co-founder & CTO',
     ])
   })
 

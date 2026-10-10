@@ -312,7 +312,7 @@ describe('the Website against a fixture site', () => {
       twitter: EXTRACTED.twitter,
     })
     // The paid source after it is asked only for what is still empty.
-    expect(asked).toEqual([['company.founded_year']])
+    expect(asked).toEqual([['company.funding_stage', 'company.founded_year']])
 
     const lines = (
       await db

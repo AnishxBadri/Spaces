@@ -387,30 +387,36 @@ export function valueValidator(
 const LINKABLE_TYPES: {
   readonly [T in VocabularyType]: ReadonlyArray<AttributeType>
 } = {
-  text: ['text'],
+  // A select fills by the option whose label the text matches exactly.
+  text: ['text', 'select'],
   number: ['number', 'currency'],
   url: ['url', 'text'],
   phone: ['phone', 'text'],
   list: ['text'],
   // A picture key fills the record's picture, never an attribute.
   image: [],
+  company: ['record_reference'],
 }
 
 /**
  * Why an attribute of `type` on an object of `kind` cannot fill from `key`,
  * or null when it can. A custom object has no vocabulary: its `kind` is null.
+ * A `company` key needs a reference whose `targetKind` is company.
  */
 export function enrichmentLinkProblem(
   type: AttributeType,
   kind: ObjectKind | null,
   key: string,
+  targetKind?: string | null,
 ): string | null {
   if (!isVocabularyKey(key)) return `${key} is not in the enrichment vocabulary`
   const entry = ENRICHMENT_VOCABULARY[key]
   if (kind !== entry.kind) return `${key} describes a ${entry.kind}`
-  return LINKABLE_TYPES[entry.type].includes(type)
-    ? null
-    : `a ${type} attribute cannot hold ${key}, a ${entry.type}`
+  if (!LINKABLE_TYPES[entry.type].includes(type))
+    return `a ${type} attribute cannot hold ${key}, a ${entry.type}`
+  if (entry.type === 'company' && targetKind !== 'company')
+    return `${key} holds a company, not a ${targetKind ?? 'record'}`
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -491,6 +497,7 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       name: 'Funding stage',
       type: 'select',
       options: {
+        enrichmentKey: 'company.funding_stage',
         options: [
           opt('pre_seed', 'Pre-seed', undefined, 'slate'),
           opt('seed', 'Seed', undefined, 'cyan'),
@@ -588,7 +595,11 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       slug: 'companies',
       name: 'Companies',
       type: 'record_reference',
-      options: { targetKind: 'company', multi: true },
+      options: {
+        targetKind: 'company',
+        multi: true,
+        enrichmentKey: 'person.company',
+      },
     },
     {
       // Identity (D75), like a company's domains. Appended, never slotted.

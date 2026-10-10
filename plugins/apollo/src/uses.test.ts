@@ -1,5 +1,6 @@
 import { defineManifest, definePlugin } from '@spaces/sdk'
 import type {
+  Config,
   Content,
   Facts,
   Http,
@@ -22,7 +23,7 @@ type Services<T> =
   T extends Effect.Effect<unknown, unknown, infer R> ? R : never
 
 describe('the ports each job needs', () => {
-  it('are exactly the eight each job uses grants', () => {
+  it('are exactly the ports each job’s uses grants, Config for the person jobs', () => {
     type Granted =
       Read | Secrets | Http | Identity | Receipts | Facts | Content | Log
     expectTypeOf<
@@ -30,10 +31,10 @@ describe('the ports each job needs', () => {
     >().toEqualTypeOf<Granted>()
     expectTypeOf<
       Services<ReturnType<typeof jobs.enrichPerson.run>>
-    >().toEqualTypeOf<Granted>()
-    expectTypeOf<
-      Services<ReturnType<typeof jobs.autoEnrich>>
-    >().toEqualTypeOf<Granted>()
+    >().toEqualTypeOf<Granted | Config>()
+    expectTypeOf<Services<ReturnType<typeof jobs.autoEnrich>>>().toEqualTypeOf<
+      Granted | Config
+    >()
   })
 
   it('fail typecheck without Secrets in uses', () => {

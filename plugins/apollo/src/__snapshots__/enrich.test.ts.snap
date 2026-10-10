@@ -149,10 +149,25 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then answers in t
     "call": "Facts.answer",
     "input": {
       "answers": {
+        "company.address": "Baner, Pune, Maharashtra, India",
         "company.description": "Warehouse picking robots that learn a new SKU from one demonstration.",
         "company.founded_year": 2019,
+        "company.funding_stage": "Series A",
+        "company.headcount": 84,
+        "company.industry": "machinery",
+        "company.keywords": [
+          "robotics",
+          "warehouse automation",
+          "computer vision",
+        ],
         "company.linkedin": "http://www.linkedin.com/company/northwind-robotics",
         "company.location": "Pune, India",
+        "company.tech_stack": [
+          "Amazon Web Services",
+          "Google Analytics",
+        ],
+        "company.total_raised": 6500000,
+        "company.twitter": "https://twitter.com/northwindbots",
       },
       "entityId": "entity-0",
       "receiptId": "receipt-1",
@@ -163,6 +178,14 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then answers in t
         "company.founded_year",
         "company.location",
         "company.linkedin",
+        "company.funding_stage",
+        "company.total_raised",
+        "company.headcount",
+        "company.industry",
+        "company.keywords",
+        "company.tech_stack",
+        "company.twitter",
+        "company.address",
       ],
       "unlinked": [],
     },
@@ -172,6 +195,7 @@ exports[`enrichCompany > stores the receipt, adds the aliases, then answers in t
     "input": {
       "_tag": "signal",
       "entityId": "entity-0",
+      "key": "funding:Series A:2024-03-01",
       "kind": "funding",
       "payload": {
         "amount": "5M",
@@ -231,6 +255,11 @@ exports[`enrichPerson > matches by email and adds the email before filling, Link
       "name": "Meera Kulkarni",
       "values": {},
     },
+  },
+  {
+    "call": "Config.get",
+    "input": {},
+    "output": {},
   },
   {
     "call": "Secrets.get",
@@ -331,8 +360,15 @@ exports[`enrichPerson > matches by email and adds the email before filling, Link
     "call": "Facts.answer",
     "input": {
       "answers": {
+        "person.company": {
+          "domain": "northwind-robotics.example",
+          "name": "Northwind Robotics",
+        },
+        "person.department": "Engineering technical",
+        "person.description": "Co-founder & CTO at Northwind Robotics",
         "person.linkedin": "http://www.linkedin.com/in/meera-kulkarni-robots",
         "person.location": "Pune, India",
+        "person.seniority": "C-suite",
         "person.title": "Co-founder & CTO",
         "person.twitter": "https://twitter.com/meerak",
       },
@@ -342,9 +378,13 @@ exports[`enrichPerson > matches by email and adds the email before filling, Link
     "output": {
       "linked": [
         "person.title",
+        "person.description",
         "person.location",
         "person.linkedin",
         "person.twitter",
+        "person.company",
+        "person.seniority",
+        "person.department",
       ],
       "unlinked": [],
     },

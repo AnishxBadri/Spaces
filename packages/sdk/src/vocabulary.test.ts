@@ -44,6 +44,34 @@ describe('ENRICHMENT_VOCABULARY', () => {
   })
 })
 
+describe('the funding stage and the company keys', () => {
+  it('takes a funding stage as text, matched to an option by the host', () => {
+    expect(ENRICHMENT_VOCABULARY['company.funding_stage']).toEqual({
+      kind: 'company',
+      type: 'text',
+      changing: false,
+    })
+  })
+
+  it('takes a person’s company by name and domain, nothing else', () => {
+    expect(ENRICHMENT_VOCABULARY['person.company'].type).toBe('company')
+    expect(
+      vocabularyProblem('person.company', {
+        name: 'Flent',
+        domain: 'flent.in',
+      }),
+    ).toBeNull()
+    for (const value of [
+      'flent.in',
+      { name: 'Flent' },
+      { name: 'Flent', domain: 'flent.in', id: 'x' },
+    ])
+      expect(vocabularyProblem('person.company', value)).toBe(
+        'person.company takes a company by name and domain',
+      )
+  })
+})
+
 describe('FactsTest.answer', () => {
   it('holds answers by key and refuses one outside the vocabulary', async () => {
     const facts = FactsTest({ linked: ['company.headcount'] })

@@ -9,6 +9,7 @@ import type {
   JsonObject,
   JsonValue,
   PortName,
+  SignalClaim,
 } from '../contract.ts'
 import { landImportGrid } from '../import-grid.ts'
 import { vocabularyProblem } from '../vocabulary.ts'
@@ -264,15 +265,21 @@ export const FactsTest = (
 // Content, Judgment, Receipts
 // ---------------------------------------------------------------------------
 
-/** Interactions dedupe on `messageId`, as the lane does; signals and documents never. */
+/**
+ * Interactions dedupe on `messageId` and signals on `key` per record, as the
+ * lanes do; documents never. `signals` is every signal written, a deduped
+ * emit left out.
+ */
 export const ContentTest = (
   options: { readonly recorder?: Recorder } = {},
-): TestPort<Content> => {
+): TestPort<Content> & { readonly signals: ReadonlyArray<SignalClaim> } => {
   const { calls, record } = tap('Content', options.recorder)
   const nextDocument = counter('document')
   const nextInteraction = counter('interaction')
   const nextSignal = counter('signal')
   const byMessageId = new Map<string, string>()
+  const byKey = new Map<string, string>()
+  const signals: Array<SignalClaim> = []
   const layer = Layer.succeed(Content, {
     fileDocument: (claim) =>
       Effect.sync(() => {
@@ -295,11 +302,19 @@ export const ContentTest = (
         return record('logInteraction', claim, { interactionId })
       }),
     emitSignal: (claim) =>
-      Effect.sync(() =>
-        record('emitSignal', claim, { signalId: nextSignal() }),
-      ),
+      Effect.sync(() => {
+        const keyed =
+          claim.key === undefined ? null : `${claim.entityId} ${claim.key}`
+        const seen = keyed === null ? undefined : byKey.get(keyed)
+        if (seen !== undefined)
+          return record('emitSignal', claim, { signalId: seen })
+        const signalId = nextSignal()
+        if (keyed !== null) byKey.set(keyed, signalId)
+        signals.push(claim)
+        return record('emitSignal', claim, { signalId })
+      }),
   })
-  return { layer, calls }
+  return { layer, calls, signals }
 }
 
 export const JudgmentTest = (
@@ -711,6 +726,8 @@ export const SpacesTest = (
 export type TestPortsOptions = {
   readonly known?: { readonly [entityId: string]: IdentityKeys }
   readonly human?: { readonly [entityId: string]: JsonObject }
+  /** The vocabulary keys `Facts.answer` treats as linked; absent, every key. */
+  readonly linked?: ReadonlyArray<string>
   readonly entities?: ReadonlyArray<ReadEntity>
   readonly secret?: string
   readonly accessToken?: string
@@ -734,6 +751,7 @@ export const testPorts = (options: TestPortsOptions = {}) => {
   })
   const facts = FactsTest({
     ...(options.human ? { human: options.human } : {}),
+    ...(options.linked ? { linked: options.linked } : {}),
     recorder,
   })
   const content = ContentTest({ recorder })

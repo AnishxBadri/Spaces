@@ -247,6 +247,13 @@ export type SignalClaim = {
    * one this integration stored. Cited as the signal's ref. (SDK 1.2)
    */
   readonly receiptId?: string
+  /**
+   * What makes the observation the same one on a re-run (`funding:Series
+   * A:2024-03-01`). A keyed signal is written once per (record,
+   * integration, key): a second emit writes nothing and hands back the
+   * first signal's id. Unkeyed, every emit is a new signal.
+   */
+  readonly key?: string
 }
 
 /**

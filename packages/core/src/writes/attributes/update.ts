@@ -309,6 +309,7 @@ const applyConfig = Effect.fn('applyConfig')(function* (
         attr.type,
         owner === undefined ? null : coreKindOf(owner),
         patch.enrichmentKey,
+        current.targetKind,
       )
       if (problem !== null)
         return yield* new AttributeConfigRejected({

@@ -11,6 +11,9 @@ import { defineManifest } from '@spaces/sdk'
  * - `autoEnrich` runs on the triggers D76 names; which of them reach it is
  *   the host's auto-enrich scope on the integration row, never a setting
  *   here. Seed and import births emit nothing. (D65, D76)
+ * - `phone` is off by default: asking Apollo for a phone number costs extra
+ *   credits, so only the owner turns it on. The person jobs read it through
+ *   `Config`.
  */
 export const manifest = defineManifest({
   manifestVersion: 1,
@@ -20,11 +23,15 @@ export const manifest = defineManifest({
   name: 'Apollo',
   roles: ['enrichment'],
   description:
-    'Fills blank company and person fields from Apollo.io (description, location, founding year, LinkedIn, job title, Twitter), adds the domains and emails it returns, and logs a funding round or a change of title as a signal; every value and signal cites the raw response.',
+    'Answers company and person fields from Apollo.io: description, founding year, location, LinkedIn, funding stage, headcount and total raised for a company (sent the domain only); job title, LinkedIn, Twitter and the company for a person (sent the email and LinkedIn URL). Adds the domains and verified emails it returns, and logs the latest funding round and a change of role as dated events; every value and event cites the raw response.',
   requires: { credential: { kind: 'enrichment', scope: 'workspace' } },
   settings: z.object({
     cacheDays: z.int().min(0).max(3650).default(90),
     dailyCreditCap: z.int().min(0).default(100),
+    phone: z
+      .boolean()
+      .default(false)
+      .describe('Ask for a person’s phone number (extra Apollo credits)'),
   }),
   jobs: {
     enrichCompany: {
@@ -50,6 +57,7 @@ export const manifest = defineManifest({
         'Receipts',
         'Facts',
         'Content',
+        'Config',
         'Log',
       ],
     },
@@ -64,6 +72,7 @@ export const manifest = defineManifest({
         'Receipts',
         'Facts',
         'Content',
+        'Config',
         'Log',
       ],
     },

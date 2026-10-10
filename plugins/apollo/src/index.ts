@@ -11,6 +11,7 @@ import {
   Read,
   Receipts,
   Secrets,
+  configOf,
   definePlugin,
   responseJson,
 } from '@spaces/sdk'
@@ -30,7 +31,7 @@ import {
   organizationEnrichment,
   personEnrichment,
 } from './map.ts'
-import type { Endpoint, Enrichment } from './map.ts'
+import type { Endpoint, Enrichment, HeldCompany } from './map.ts'
 import { manifest } from './manifest.ts'
 
 /** The record the action was pressed on, of the kind the job enriches. */
@@ -157,20 +158,53 @@ const cost = ({ entityIds }: CostInput) => ({
   credits: entityIds.length * CREDITS_PER_MATCH,
 })
 
-/** One company, by the domain it was read with: the call, then the claims. */
-/** One person, by email or LinkedIn: the call, then the claims. */
+const textValue = (value: JsonValue | undefined): string | null =>
+  typeof value === 'string' && value.trim() !== '' ? value : null
+
+/** The companies the person links, by name and domain, as the job may read them. */
+const heldCompanies = Effect.fn('apollo.heldCompanies')(function* (
+  person: ReadEntity,
+) {
+  const linked = person.values.companies
+  const ids = Array.isArray(linked)
+    ? linked.flatMap((id) => (typeof id === 'string' ? [id] : []))
+    : []
+  const read = yield* Read
+  const held: Array<HeldCompany> = []
+  for (const id of ids) {
+    const company = yield* read.entity(id)
+    if (company !== null)
+      held.push({ name: company.name, domains: company.keys.domain })
+  }
+  return held
+})
+
+/**
+ * One person, by email or LinkedIn: the call, then the claims. The phone is
+ * asked for only with the `phone` setting on — Apollo charges extra for it.
+ */
 const enrichPersonRecord = Effect.fn('apollo.enrichPersonRecord')(function* (
   entityId: EntityId,
   person: ReadEntity,
   query: { readonly [name: string]: string },
 ) {
-  const raw = yield* callApollo('people/match', query)
-  const held = person.values.job_title
+  const { phone } = yield* configOf(manifest)
+  const raw = yield* callApollo(
+    'people/match',
+    phone ? { ...query, reveal_phone_number: 'true' } : query,
+  )
+  const held = {
+    title: textValue(person.values.job_title),
+    description: textValue(person.values.description),
+    companies: yield* heldCompanies(person),
+  }
   const claims = yield* mapped('people/match', () =>
-    personEnrichment(entityId, raw, typeof held === 'string' ? held : null),
+    personEnrichment(entityId, raw, held, { phone }),
   )
   yield* record('people/match', claims)
 })
+
+/** One company, by the domain it was read with: the call, then the claims. */
 
 const enrichByDomain = Effect.fn('apollo.enrichByDomain')(function* (
   entityId: EntityId,

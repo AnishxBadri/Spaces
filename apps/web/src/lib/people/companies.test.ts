@@ -86,7 +86,11 @@ describe('the companies attribute', () => {
     ).at(0)
     expect(row).toEqual({
       type: 'record_reference',
-      options: { targetKind: 'company', multi: true },
+      options: {
+        targetKind: 'company',
+        multi: true,
+        enrichmentKey: 'person.company',
+      },
     })
   })
 

@@ -68,17 +68,18 @@ describe('the apollo manifest.json', () => {
     expect(parsed.settings).toEqual(settingsJsonSchema(manifest.settings))
   })
 
-  it('defaults the cache to 90 days and carries a daily credit cap; auto-enrich is the host’s, not a setting', () => {
+  it('defaults the cache to 90 days, carries a daily credit cap and leaves the phone off; auto-enrich is the host’s, not a setting', () => {
     expect(z.parse(manifest.settings, {})).toEqual({
       cacheDays: 90,
       dailyCreditCap: 100,
+      phone: false,
     })
   })
 
   it('still reads a config that holds the retired autoEnrich switch', () => {
     expect(
       z.parse(manifest.settings, { autoEnrich: true, cacheDays: 30 }),
-    ).toEqual({ cacheDays: 30, dailyCreditCap: 100 })
+    ).toEqual({ cacheDays: 30, dailyCreditCap: 100, phone: false })
   })
 
   it('has the version the package declares', () => {

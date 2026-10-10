@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream'
 import { Effect, Layer } from 'effect'
-import { asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   accountConnection,
@@ -32,6 +32,7 @@ import type { DocumentFilingTarget } from '../../documents/filing'
 import type { Enqueue } from '../../queue/enqueue'
 import type { DocumentIntakeFailure } from '../documents/intake'
 import type { BodyVisibility } from '../interactions/write'
+import type { Tx } from '../attributes/values'
 import type { BoundIntegration } from './binding'
 import { integrationMeta } from './identity'
 import { ReceiptNotOwned, checkReceipt } from './receipts'
@@ -65,7 +66,9 @@ import { ReceiptNotOwned, checkReceipt } from './receipts'
  *   `refs: ['event:<receiptId>']` — and one `signal.emitted` activity row with no
  *   user and the integration in `meta`, which is how the record timeline
  *   names the plugin (sdk-7a). Evidence, not a fact: it never touches an
- *   attribute.
+ *   attribute. A claim with a `key` is written once per (record,
+ *   integration, key), decided under a transaction-scoped advisory lock on
+ *   the triple: a re-emit writes nothing and hands back the first id.
  * - `fileDocument` (sdk-8, D52) is a **thin port over core's intake** and
  *   has no pipeline of its own: it validates the claim, opens the plugin's
  *   bytes as a `Readable`, and hands them to `intakeDocumentProgram` with
@@ -143,6 +146,7 @@ const signalPayload = (claim: SignalClaim): JsonObject => {
   if (claim.publishedAt !== undefined) out.publishedAt = claim.publishedAt
   if (claim.payload !== undefined) out.payload = claim.payload
   if (claim.receiptId !== undefined) out.refs = [ref.event(claim.receiptId)]
+  if (claim.key !== undefined) out.key = claim.key
   return out
 }
 
@@ -401,6 +405,31 @@ export const ContentLive = (
     return { interactionId: kept.id }
   })
 
+  /** The signal this integration already wrote under `key`, after locking the triple. */
+  const keyedSignal = async (
+    tx: Tx,
+    entityId: string,
+    key: string,
+  ): Promise<string | null> => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`signal ${entityId} ${row.id} ${key}`}, 0))`,
+    )
+    const held = (
+      await tx
+        .select({ id: signal.id })
+        .from(signal)
+        .where(
+          and(
+            eq(signal.entityId, entityId),
+            eq(signal.sourceRef, row.id),
+            sql`${signal.payload} ->> 'key' = ${key}`,
+          ),
+        )
+        .limit(1)
+    ).at(0)
+    return held?.id ?? null
+  }
+
   const emitSignal = Effect.fn('Content.emitSignal')(function* (
     claim: SignalClaim,
   ) {
@@ -428,6 +457,10 @@ export const ContentLive = (
       try: () =>
         db.transaction(async (tx) => {
           if (receiptId !== undefined) await checkReceipt(tx, row.id, receiptId)
+          if (claim.key !== undefined) {
+            const held = await keyedSignal(tx, entityId, claim.key)
+            if (held !== null) return held
+          }
           const inserted = (
             await tx
               .insert(signal)

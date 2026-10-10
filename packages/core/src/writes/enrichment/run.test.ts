@@ -5,10 +5,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
+  attribute,
   enrichmentRecord,
   entity,
+  entitySpace,
   integration,
   pendingBlob,
+  space,
   suggestion,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
@@ -705,5 +708,170 @@ describe('the record picture', () => {
     const cleared = await Effect.runPromise(clearPictureProgram(co))
     expect(cleared.previous).toBe(set.sha)
     expect(await pictureOf(co)).toEqual({ sha: null, held: true })
+  })
+})
+
+/** One source's answers outside a run: its own button, applied at once. */
+const answerAs = (
+  row: Row,
+  entityId: string,
+  answers: { [key: string]: Json },
+) =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const { receiptId } = yield* (yield* Receipts).store({
+        entityId,
+        raw: answers,
+        creditsUsed: 1,
+      })
+      return yield* (yield* Facts).answer({ entityId, answers, receiptId })
+    }).pipe(Effect.provide(ports(row))),
+  )
+
+const optionsOf = async (slug: string) =>
+  (
+    await db
+      .select({ options: attribute.options })
+      .from(attribute)
+      .where(eq(attribute.slug, slug))
+  ).map((r) => r.options.options?.map((o) => o.label) ?? [])
+
+describe('the funding stage', () => {
+  it('fills the option whose label Apollo’s wording matches exactly', async () => {
+    const co = await company('Flent')
+    await answerAs(apollo.row, co, { 'company.funding_stage': 'Series A' })
+    expect((await valuesOf(co)).funding_stage).toBe('series_a')
+  })
+
+  it('fills nothing and adds no option for a wording no option carries', async () => {
+    const co = await company('Odd round')
+    const before = await optionsOf('funding_stage')
+    await answerAs(apollo.row, co, { 'company.funding_stage': 'Series A1' })
+    expect((await valuesOf(co)).funding_stage).toBeUndefined()
+    expect(await optionsOf('funding_stage')).toEqual(before)
+    const [receipt] = await runReceipts(co)
+    expect(receipt.fields).toEqual([
+      expect.objectContaining({
+        key: 'company.funding_stage',
+        value: 'Series A1',
+        outcome: 'invalid',
+      }),
+    ])
+  })
+})
+
+let spaces = 0
+const aSpace = async (name: string) => {
+  const ent = (
+    await db
+      .insert(entity)
+      .values({ kind: 'space', canonicalName: name })
+      .returning({ id: entity.id })
+  ).at(0)
+  if (!ent) throw new Error('no space')
+  const slug = `s${String(++spaces)}`
+  await db
+    .insert(space)
+    .values({ entityId: ent.id, parentId: null, slug, path: slug })
+  return ent.id
+}
+
+const aPerson = async (name: string) =>
+  (
+    await resolveEntity({
+      kind: 'person',
+      name: `${name} ${++n}`,
+      source: { class: 'manual' },
+    })
+  ).entityId
+
+const companyRows = (name: string) =>
+  db
+    .select({ id: entity.id })
+    .from(entity)
+    .where(and(eq(entity.kind, 'company'), eq(entity.canonicalName, name)))
+
+const addCards = () =>
+  db
+    .select({
+      payload: suggestion.payload,
+      proposedById: suggestion.proposedById,
+    })
+    .from(suggestion)
+    .where(eq(suggestion.kind, 'add_record'))
+
+describe('a person’s company', () => {
+  it('links a company that exists, by its domain, only while the link is empty', async () => {
+    const flent = (
+      await resolveEntity({
+        kind: 'company',
+        name: 'Flent',
+        keys: { domain: 'flent.example' },
+        source: { class: 'manual' },
+      })
+    ).entityId
+    const coo = await aPerson('COO')
+    await answerAs(apollo.row, coo, {
+      'person.company': { name: 'Flent', domain: 'flent.example' },
+    })
+    expect((await valuesOf(coo)).companies).toEqual([flent])
+
+    const elsewhere = await company('Keyhold')
+    const held = await aPerson('Held')
+    await setValues({
+      entityId: held,
+      patch: { companies: [elsewhere] },
+      actor: { type: 'user', id: await aUser() },
+    })
+    await answerAs(apollo.row, held, {
+      'person.company': { name: 'Flent', domain: 'flent.example' },
+    })
+    expect((await valuesOf(held)).companies).toEqual([elsewhere])
+    expect(await cardsFor(held)).toEqual([])
+  })
+
+  it('proposes an unknown company as one add card in the person’s space, and makes no company', async () => {
+    const proptech = await aSpace('Proptech')
+    const coo = await aPerson('Second COO')
+    await db.insert(entitySpace).values({ entityId: coo, spaceId: proptech })
+    const keyhold = { name: 'Keyhold', domain: 'keyhold.example' }
+
+    await answerAs(apollo.row, coo, { 'person.company': keyhold })
+    await answerAs(apollo.row, coo, { 'person.company': keyhold })
+
+    expect(await companyRows('Keyhold')).toEqual([])
+    expect((await valuesOf(coo)).companies).toBeUndefined()
+    const cards = (await addCards()).filter(
+      (c) => jsonRecord(c.payload).domain === 'keyhold.example',
+    )
+    expect(cards).toHaveLength(1)
+    expect(cards[0]).toMatchObject({
+      proposedById: apollo.row.id,
+      payload: expect.objectContaining({
+        spaceId: proptech,
+        name: 'Keyhold',
+        watchIds: [],
+      }),
+    })
+  })
+
+  it('proposes nothing for a person filed in no space, and says so in the receipt', async () => {
+    const loner = await aPerson('Loner')
+    await answerAs(apollo.row, loner, {
+      'person.company': { name: 'Nowhere Co', domain: 'nowhere-co.example' },
+    })
+    const cards = (await addCards()).filter(
+      (c) => jsonRecord(c.payload).domain === 'nowhere-co.example',
+    )
+    expect(cards).toEqual([])
+    expect(await companyRows('Nowhere Co')).toEqual([])
+    const [receipt] = await runReceipts(loner)
+    expect(receipt.cards).toEqual([
+      expect.objectContaining({
+        domain: 'nowhere-co.example',
+        spaceId: null,
+        outcome: 'not filed in a space',
+      }),
+    ])
   })
 })

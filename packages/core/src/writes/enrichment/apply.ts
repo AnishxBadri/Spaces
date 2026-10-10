@@ -4,15 +4,22 @@ import { db } from '@spaces/db'
 import {
   attributeEvent,
   entity,
+  entitySpace,
   integration,
   pendingBlob,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import type { Json } from '@spaces/db/json'
-import { Receipts } from '@spaces/sdk'
+import { ENRICHMENT_VOCABULARY, Receipts, isVocabularyKey } from '@spaces/sdk'
 import { toObjectKind } from '../../attributes/registry'
 import { ref } from '../../context/ref'
-import { decide, enrichedLine, linksOf, written } from '../../enrichment/plan'
+import {
+  companyDomainOf,
+  decide,
+  enrichedLine,
+  linksOf,
+  written,
+} from '../../enrichment/plan'
 import { WEBSITE_NAME } from '../../enrichment/website'
 import {
   PICTURE_NAMES,
@@ -36,6 +43,8 @@ import {
 } from '../attributes/values'
 import type { Tx } from '../attributes/values'
 import type { EmbedSource } from '../ai/chunk-sources'
+import { previewResolve } from '../entities/resolve'
+import { DiscoverSpaceRefused, discoverWith } from '../ports/discover'
 import { INTEGRATION_CONFIDENCE } from '../ports/judgment'
 import { ReceiptsLive } from '../ports/receipts'
 import { SuggestionInvalid, proposeWith } from '../suggestions/propose'
@@ -49,10 +58,16 @@ import type { PictureFetched } from './picture'
  *   receipt; a person's disagreements become one card for the record.
  * - A stored picture is set in the same transaction, only while the
  *   record has none and no person held it; its `pending_blob` row goes then.
+ * - A company answer is looked up by its domain before the transaction and
+ *   never resolved into a new record. An empty link to a company nobody
+ *   holds becomes one add card per space the record is filed in, after the
+ *   commit, proposed by the answering source; a record filed nowhere gets
+ *   none, and the receipt says so.
  * - After the commit: the run's receipt (every answer, the losers, the
- *   unlinked keys, the picture and each replaced figure with its date)
- *   through the Receipts port on the host's `core.enrichment` row, then one
- *   timeline line naming the sources, the field count and the credits.
+ *   unlinked keys, the picture, the add cards and each replaced figure with
+ *   its date) through the Receipts port on the host's `core.enrichment`
+ *   row, then one timeline line naming the sources, the field count and the
+ *   credits.
  */
 
 /** The host's own integration row: what a run's receipt is bound to, and the Website source's identity. */
@@ -77,6 +92,18 @@ export type RunInput = {
   readonly answers: ReadonlyArray<SourceAnswer>
   /** The run's picture answer, fetched; null when none was wanted or given. */
   readonly picture?: PictureFetched | null
+}
+
+/** What became of an unknown company's add card in one space, or why none was made. */
+export type CompanyCard = {
+  readonly key: string
+  readonly name: string
+  readonly domain: string
+  readonly integrationId: string
+  readonly spaceId: string | null
+  /** `proposed`, `merged`, `dismissed`, `member`, or why no card was made. */
+  readonly outcome: string
+  readonly suggestionId?: string
 }
 
 /** What became of the picture: set, found taken under the lock, or refused. */
@@ -245,6 +272,7 @@ const runReceipt = (
   names: ReadonlyMap<string, string>,
   suggestionId: string | null,
   picture: PictureOutcome | null,
+  cards: ReadonlyArray<CompanyCard>,
 ): Json => ({
   run: 'enrichment',
   reason: input.reason,
@@ -292,6 +320,7 @@ const runReceipt = (
             : { reason: input.picture.reason }),
         },
   suggestionId,
+  ...(cards.length === 0 ? {} : { cards: cards.map((c) => ({ ...c })) }),
 })
 
 /** Set a stored picture while the record has none and no person held it. */
@@ -318,6 +347,106 @@ async function setPicture(
   return 'set'
 }
 
+/** Each company answer's domain → the company holding it, by identity only. */
+async function heldCompanies(
+  answers: ReadonlyArray<SourceAnswer>,
+): Promise<Map<string, string>> {
+  const domains = new Set(
+    answers.flatMap((a) =>
+      Object.entries(a.answers).flatMap(([key, value]) =>
+        isVocabularyKey(key) && ENRICHMENT_VOCABULARY[key].type === 'company'
+          ? (companyDomainOf(value) ?? [])
+          : [],
+      ),
+    ),
+  )
+  const held = new Map<string, string>()
+  for (const domain of domains) {
+    const found = await previewResolve({ kind: 'company', keys: { domain } })
+    if (found.verdict === 'attach') held.set(domain, found.entityId)
+  }
+  return held
+}
+
+const nameOfCompany = (value: Json, domain: string): string => {
+  const name =
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? value.name
+      : null
+  return typeof name === 'string' && name.trim() !== '' ? name.trim() : domain
+}
+
+/**
+ * One add card per space the record is filed in, for each unknown company,
+ * through the same checks a watch's find passes (dismissed, member, open
+ * card). A space that takes no cards is noted, not fatal.
+ */
+async function proposeCompanies(
+  entityId: string,
+  unknown: ReadonlyArray<FieldDecision>,
+): Promise<Array<CompanyCard>> {
+  if (unknown.length === 0) return []
+  const spaces = (
+    await db
+      .select({ spaceId: entitySpace.spaceId })
+      .from(entitySpace)
+      .where(eq(entitySpace.entityId, entityId))
+  ).map((r) => r.spaceId)
+  const cards: Array<CompanyCard> = []
+  for (const field of unknown) {
+    const domain = companyDomainOf(field.value)
+    if (domain === null) continue
+    const base = {
+      key: field.key,
+      name: nameOfCompany(field.value, domain),
+      domain,
+      integrationId: field.integrationId,
+    }
+    if (spaces.length === 0) {
+      cards.push({ ...base, spaceId: null, outcome: 'not filed in a space' })
+      continue
+    }
+    for (const spaceId of spaces) {
+      try {
+        const found = await discoverWith({
+          claim: {
+            spaceId,
+            name: base.name,
+            domain,
+            evidence: [],
+            refs: [`event:${field.receiptId}`],
+          },
+          proposedBy: { type: 'integration', id: field.integrationId },
+          watchId: null,
+        })
+        cards.push({
+          ...base,
+          spaceId,
+          outcome: found.outcome,
+          ...(found.outcome === 'proposed' || found.outcome === 'merged'
+            ? { suggestionId: found.suggestion.id }
+            : {}),
+        })
+      } catch (cause) {
+        if (
+          !(cause instanceof DiscoverSpaceRefused) &&
+          !(cause instanceof SuggestionInvalid)
+        )
+          throw cause
+        cards.push({
+          ...base,
+          spaceId,
+          outcome:
+            cause instanceof DiscoverSpaceRefused
+              ? cause.reason
+              : cause.message,
+        })
+      }
+    }
+  }
+  return cards
+}
+
 const pictureName = (key: string) =>
   key === PICTURE_KEYS.person ? PICTURE_NAMES.person : PICTURE_NAMES.company
 
@@ -335,6 +464,7 @@ export async function applyRun(input: RunInput): Promise<RunApplied> {
     ]),
   ]
   const names = await sourceNames(ids)
+  const companies = await heldCompanies(input.answers)
   const applied = await db.transaction(async (tx) => {
     const ent = (
       await tx
@@ -347,7 +477,7 @@ export async function applyRun(input: RunInput): Promise<RunApplied> {
       throw new EntityNotFound({ entityId, message: 'Entity not found' })
     const { links } = await linksForEntity(entityId, tx)
     const holdings = await holdingsOf(tx, entityId, ent.values, links)
-    const decision = decide(links, holdings, input.answers)
+    const decision = decide(links, holdings, input.answers, companies)
     const reembed: Array<EmbedSource> = []
     for (const source of ids) {
       const fields = written(decision).filter((f) => f.integrationId === source)
@@ -371,13 +501,17 @@ export async function applyRun(input: RunInput): Promise<RunApplied> {
     return { decision, suggestionId: card, reembed, picture }
   })
   const { decision, suggestionId, reembed, picture } = applied
+  const cards = await proposeCompanies(
+    entityId,
+    decision.fields.filter((f) => f.outcome === 'unknown'),
+  )
 
   const row = await enrichmentRow()
   const { receiptId } = await Effect.runPromise(
     Effect.gen(function* () {
       return yield* (yield* Receipts).store({
         entityId,
-        raw: runReceipt(input, decision, names, suggestionId, picture),
+        raw: runReceipt(input, decision, names, suggestionId, picture, cards),
       })
     }).pipe(Effect.provide(ReceiptsLive(row))),
   )

@@ -13,6 +13,11 @@ import type { JsonValue } from './contract.ts'
  * - An `image` key (`company.logo`, `person.photo`) answers the URL of the
  *   record's picture. The host fetches it once and stores it; it fills the
  *   picture only when empty and is never linked to an attribute.
+ * - A `company` key (`person.company`) answers a company by name and domain.
+ *   The host links an existing company only when the link is empty, and
+ *   never creates one; an unknown company is proposed as an add card.
+ * - A `text` answer linked to a select fills only the option whose label it
+ *   matches exactly; it never adds an option.
  * New keys are an SDK minor; a removed or retyped key is a major.
  */
 
@@ -24,6 +29,7 @@ export const VOCABULARY_TYPES = [
   'phone',
   'list',
   'image',
+  'company',
 ] as const
 export type VocabularyType = (typeof VOCABULARY_TYPES)[number]
 
@@ -45,6 +51,7 @@ const changing = (
 
 export const ENRICHMENT_VOCABULARY = {
   'company.description': fixed('company', 'text'),
+  'company.funding_stage': fixed('company', 'text'),
   'company.founded_year': fixed('company', 'number'),
   'company.location': fixed('company', 'text'),
   'company.address': fixed('company', 'text'),
@@ -73,6 +80,7 @@ export const ENRICHMENT_VOCABULARY = {
   'person.github': fixed('person', 'url'),
   'person.facebook': fixed('person', 'url'),
   'person.phone': fixed('person', 'phone'),
+  'person.company': fixed('person', 'company'),
   'person.photo': fixed('person', 'image'),
 } as const satisfies { readonly [key: string]: VocabularyEntry }
 
@@ -94,6 +102,12 @@ const VALUE_SCHEMAS: { readonly [T in VocabularyType]: z.ZodType<JsonValue> } =
     phone: z.string().trim().min(1).max(40),
     list: z.array(z.string().trim().min(1)).min(1),
     image: z.url({ protocol: /^https?$/ }),
+    company: z
+      .object({
+        name: z.string().trim().min(1),
+        domain: z.string().trim().min(1),
+      })
+      .strict(),
   }
 
 /**
@@ -108,5 +122,5 @@ export function vocabularyProblem(
   const { type } = ENRICHMENT_VOCABULARY[key]
   return VALUE_SCHEMAS[type].safeParse(value).success
     ? null
-    : `${key} takes ${type === 'image' ? 'an' : 'a'} ${type}`
+    : `${key} takes ${type === 'image' ? 'an' : 'a'} ${type === 'company' ? 'company by name and domain' : type}`
 }

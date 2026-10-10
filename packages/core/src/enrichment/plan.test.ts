@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { enrichmentLinkProblem } from '../attributes/registry'
 import type { AttributeDef } from '../attributes/registry'
 import { decide, enrichedLine, linksOf, wantedKeys, written } from './plan'
 import type { Holding, SourceAnswer } from './plan'
@@ -149,6 +150,89 @@ describe('decide', () => {
     ])
     expect(d.fields.map((f) => f.outcome)).toEqual(['cleared', 'same'])
     expect(written(d)).toEqual([])
+  })
+})
+
+describe('enrichmentLinkProblem', () => {
+  it('links a funding stage to a select and a person’s company to a company reference only', () => {
+    expect(
+      enrichmentLinkProblem('select', 'company', 'company.funding_stage'),
+    ).toBeNull()
+    expect(
+      enrichmentLinkProblem(
+        'record_reference',
+        'person',
+        'person.company',
+        'company',
+      ),
+    ).toBeNull()
+    expect(
+      enrichmentLinkProblem(
+        'record_reference',
+        'person',
+        'person.company',
+        'person',
+      ),
+    ).toBe('person.company holds a company, not a person')
+    expect(enrichmentLinkProblem('text', 'person', 'person.company')).toBe(
+      'a text attribute cannot hold person.company, a company',
+    )
+  })
+})
+
+describe('decide, for a select and a company link', () => {
+  const stage: AttributeDef = {
+    ...def('funding_stage', 'select', 'company.funding_stage'),
+    options: {
+      enrichmentKey: 'company.funding_stage',
+      options: [
+        { id: 'seed', label: 'Seed' },
+        { id: 'series_a', label: 'Series A' },
+        { id: 'old', label: 'Series A1', archived: true },
+      ],
+    },
+  }
+  const companies: AttributeDef = {
+    ...def('companies', 'record_reference', 'person.company'),
+    objectId: 'people',
+    options: {
+      enrichmentKey: 'person.company',
+      targetKind: 'company',
+      multi: true,
+    },
+  }
+  const FLENT = '11111111-1111-4111-8111-111111111111'
+  const known = new Map([['flent.example', FLENT]])
+
+  it('fills a select by the label the text matches exactly, else nothing', () => {
+    const outcome = (stageText: string) =>
+      decide(linksOf([stage]), new Map(), [
+        answer('apollo', { 'company.funding_stage': stageText }),
+      ]).fields.map((f) => [f.value, f.outcome])
+    expect(outcome('Series A')).toEqual([['series_a', 'filled']])
+    expect(outcome('series a')).toEqual([['series a', 'invalid']])
+    expect(outcome('Series A1')).toEqual([['Series A1', 'invalid']])
+  })
+
+  it('links a held company into an empty link, keeps any link held, and marks a company nobody holds unknown', () => {
+    const holding = (value: Holding['value']): Holding => ({
+      value,
+      writer: value === null ? null : { type: 'user', integrationId: null },
+      at: null,
+    })
+    const run = (value: Holding['value'], domain: string) =>
+      decide(
+        linksOf([companies]),
+        new Map([['companies', holding(value)]]),
+        [answer('apollo', { 'person.company': { name: 'X', domain } })],
+        known,
+      ).fields.map((f) => [f.value, f.outcome])
+    expect(run(null, 'flent.example')).toEqual([[[FLENT], 'filled']])
+    expect(run(['other'], 'flent.example')).toEqual([[FLENT, 'kept']])
+    expect(run([FLENT], 'flent.example')).toEqual([[FLENT, 'same']])
+    expect(run(null, 'keyhold.example')).toEqual([
+      [{ name: 'X', domain: 'keyhold.example' }, 'unknown'],
+    ])
   })
 })
 

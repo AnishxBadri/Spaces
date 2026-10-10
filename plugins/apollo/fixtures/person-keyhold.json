@@ -1,0 +1,60 @@
+{
+  "person": {
+    "id": "64c1d2e3f4a5b60001a2b3e7",
+    "first_name": "Rohan",
+    "last_name": "Mehta",
+    "name": "Rohan Mehta",
+    "linkedin_url": "http://www.linkedin.com/in/rohan-mehta-ops",
+    "title": "COO",
+    "email_status": "verified",
+    "photo_url": "https://images.example/rohan-mehta.jpg",
+    "twitter_url": null,
+    "github_url": "https://github.com/rohan-ops",
+    "facebook_url": null,
+    "headline": "COO at Keyhold",
+    "email": "rohan@keyhold.example",
+    "organization_id": "64b7f0c2a1e3d900015a9f01",
+    "employment_history": [
+      {
+        "current": true,
+        "end_date": null,
+        "organization_id": "64b7f0c2a1e3d900015a9f01",
+        "organization_name": "Keyhold",
+        "start_date": "2025-04-01",
+        "title": "COO"
+      },
+      {
+        "current": false,
+        "end_date": "2025-03-31",
+        "organization_id": "64b7f0c2a1e3d900015a2b3c",
+        "organization_name": "Northwind Robotics",
+        "start_date": "2021-02-01",
+        "title": "Head of Operations"
+      }
+    ],
+    "state": "Karnataka",
+    "city": "Bengaluru",
+    "country": "India",
+    "organization": {
+      "id": "64b7f0c2a1e3d900015a9f01",
+      "name": "Keyhold",
+      "website_url": "http://www.keyhold.example",
+      "linkedin_url": "http://www.linkedin.com/company/keyhold",
+      "primary_domain": "keyhold.example",
+      "founded_year": 2023
+    },
+    "departments": ["c_suite"],
+    "subdepartments": ["operations_executive"],
+    "seniority": "c_suite",
+    "functions": ["operations"],
+    "phone_numbers": [
+      {
+        "raw_number": "+91 98450 12345",
+        "sanitized_number": "+919845012345",
+        "type": "mobile",
+        "position": 0,
+        "status": "valid_number"
+      }
+    ]
+  }
+}

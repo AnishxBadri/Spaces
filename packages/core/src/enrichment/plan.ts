@@ -3,6 +3,7 @@ import type { VocabularyKey } from '@spaces/sdk/vocabulary'
 import type { Json } from '@spaces/db/json'
 import { valueValidator } from '../attributes/registry'
 import type { AttributeDef } from '../attributes/registry'
+import { normalizeDomain } from '../entities/normalize'
 
 /**
  * The enrichment rules, pure (D76): which linked keys a source is still
@@ -15,6 +16,9 @@ import type { AttributeDef } from '../attributes/registry'
  * - A value another integration holds stands, unless it is a changing
  *   figure and the answer is newer: then it is replaced, and the old figure
  *   is kept in the receipt with its date.
+ * - A company answer links a held company only into an empty link, and
+ *   anything held stands; a company nobody holds is `unknown`, for the
+ *   caller to propose — never created here.
  */
 
 /** An attribute that fills from a vocabulary key. */
@@ -87,10 +91,19 @@ export type SourceAnswer = {
  *   this source's own earlier value replaced;
  * - `same`: already held; `kept`: another source's value stands;
  * - `person`: a person's value differs — on the card; `cleared`: a person
- *   cleared it; `invalid`: the attribute's validator refused the answer.
+ *   cleared it; `invalid`: the attribute's validator refused the answer;
+ * - `unknown`: an empty link to a company nobody holds — the caller's to
+ *   propose as an add card.
  */
 export type FieldOutcome =
-  'filled' | 'replaced' | 'same' | 'kept' | 'person' | 'cleared' | 'invalid'
+  | 'filled'
+  | 'replaced'
+  | 'same'
+  | 'kept'
+  | 'person'
+  | 'cleared'
+  | 'invalid'
+  | 'unknown'
 
 export type FieldDecision = {
   readonly key: VocabularyKey
@@ -123,9 +136,62 @@ export type Decision = {
   readonly unlinked: ReadonlyArray<HeldAnswer>
 }
 
-/** A vocabulary answer in the attribute's write shape: a list joins for text. */
-export const toAttributeValue = (def: AttributeDef, value: Json): Json =>
-  Array.isArray(value) && def.type === 'text' ? value.join(', ') : value
+/**
+ * A vocabulary answer in the attribute's write shape: a list joins for
+ * text, and a text fills a select as the option whose label it matches
+ * exactly — no match stays text, which the validator refuses.
+ */
+export const toAttributeValue = (def: AttributeDef, value: Json): Json => {
+  if (Array.isArray(value) && def.type === 'text') return value.join(', ')
+  if (def.type === 'select' && typeof value === 'string') {
+    const label = value.trim()
+    const option = (def.options.options ?? []).find(
+      (o) => !o.archived && o.label === label,
+    )
+    return option === undefined ? value : option.id
+  }
+  return value
+}
+
+/** The domain a company answer names, normalized; null when it names none. */
+export const companyDomainOf = (value: Json): string | null => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    return null
+  const domain = value.domain
+  return typeof domain === 'string' ? normalizeDomain(domain) : null
+}
+
+/** A held reference value as ids. */
+const idsOf = (value: Json | null): Array<string> =>
+  Array.isArray(value)
+    ? value.flatMap((v) => (typeof v === 'string' ? [v] : []))
+    : typeof value === 'string'
+      ? [value]
+      : []
+
+/**
+ * A company answer against a reference: the held company by its domain
+ * (`companies`), filled only into an empty link.
+ */
+const companyField = (
+  def: AttributeDef,
+  holding: Holding,
+  raw: Json,
+  companies: ReadonlyMap<string, string>,
+): { value: Json; outcome: FieldOutcome } => {
+  const domain = companyDomainOf(raw)
+  const id = domain === null ? undefined : companies.get(domain)
+  if (!isBlank(holding.value))
+    return {
+      value: id ?? raw,
+      outcome:
+        id !== undefined && idsOf(holding.value).includes(id) ? 'same' : 'kept',
+    }
+  if (cleared(holding)) return { value: raw, outcome: 'cleared' }
+  if (id === undefined)
+    return { value: raw, outcome: domain === null ? 'invalid' : 'unknown' }
+  return { value: def.options.multi ? [id] : id, outcome: 'filled' }
+}
 
 const same = (a: Json | null, b: Json | null) =>
   JSON.stringify(a) === JSON.stringify(b)
@@ -144,11 +210,33 @@ const outcomeFor = (
   return ENRICHMENT_VOCABULARY[key].changing && newer ? 'replaced' : 'kept'
 }
 
-/** The run's answers, in source order, against what the record holds. */
+/** Any other answer: validated in the attribute's shape, then judged. */
+const fieldOf = (
+  def: AttributeDef,
+  key: VocabularyKey,
+  holding: Holding,
+  raw: Json,
+  answer: SourceAnswer,
+): { value: Json; outcome: FieldOutcome } => {
+  const value = toAttributeValue(def, raw)
+  const valid = valueValidator(def, holding.value).safeParse(value)
+  return valid.success
+    ? {
+        value: valid.data,
+        outcome: outcomeFor(key, holding, valid.data, answer),
+      }
+    : { value, outcome: 'invalid' }
+}
+
+/**
+ * The run's answers, in source order, against what the record holds.
+ * `companies` maps a normalized domain to the company that holds it.
+ */
 export const decide = (
   links: ReadonlyArray<Link>,
   holdings: ReadonlyMap<string, Holding>,
   answers: ReadonlyArray<SourceAnswer>,
+  companies: ReadonlyMap<string, string> = new Map(),
 ): Decision => {
   const byKey = new Map(links.map((l) => [l.key, l]))
   const fields: Array<FieldDecision> = []
@@ -180,19 +268,18 @@ export const decide = (
         writer: null,
         at: null,
       }
-      const value = toAttributeValue(def, raw)
-      const valid = valueValidator(def, holding.value).safeParse(value)
-      const outcome = valid.success
-        ? outcomeFor(link.key, holding, valid.data, answer)
-        : 'invalid'
+      const decided =
+        ENRICHMENT_VOCABULARY[link.key].type === 'company'
+          ? companyField(def, holding, raw, companies)
+          : fieldOf(def, link.key, holding, raw, answer)
       fields.push({
         key: link.key,
         slug: def.slug,
         integrationId: answer.integrationId,
         receiptId: answer.receiptId,
-        value: valid.success ? valid.data : value,
+        value: decided.value,
         asOf: answer.asOf,
-        outcome,
+        outcome: decided.outcome,
         ...(holding.value === null
           ? {}
           : {

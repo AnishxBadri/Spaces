@@ -184,6 +184,36 @@ describe('ContentTest', () => {
       'interaction-3',
     ])
   })
+
+  it('writes a keyed signal once per record, and an unkeyed one every time', () => {
+    const content = ContentTest()
+    const ids = Effect.runSync(
+      Effect.gen(function* () {
+        const port = yield* Content
+        const round = {
+          _tag: 'signal',
+          entityId: 'entity-1',
+          kind: 'funding',
+          key: 'funding:Series A:2024-03-01',
+        } as const
+        const a = yield* port.emitSignal(round)
+        const b = yield* port.emitSignal(round)
+        const c = yield* port.emitSignal({ ...round, entityId: 'entity-2' })
+        const { key: _, ...unkeyed } = round
+        const d = yield* port.emitSignal(unkeyed)
+        const e = yield* port.emitSignal(unkeyed)
+        return [a, b, c, d, e].map((r) => r.signalId)
+      }).pipe(Effect.provide(content.layer)),
+    )
+    expect(ids).toEqual([
+      'signal-1',
+      'signal-1',
+      'signal-2',
+      'signal-3',
+      'signal-4',
+    ])
+    expect(content.signals).toHaveLength(4)
+  })
 })
 
 describe('ReadTest', () => {

@@ -351,6 +351,43 @@ describe('Content.emitSignal', () => {
   })
 })
 
+describe('Content.emitSignal with a key', () => {
+  it('writes a keyed signal once per record and integration; a re-emit hands back the first id', async () => {
+    const row = await boundRow('apollo')
+    const other = await boundRow('exa')
+    const co = await company('Keyed Co', 'keyed-signal.example')
+    const twin = await company('Twin Co', 'keyed-twin.example')
+    const round: SignalClaim = {
+      _tag: 'signal',
+      entityId: co,
+      kind: 'funding',
+      title: 'Series A · $5M',
+      publishedAt: '2024-03-01T00:00:00.000Z',
+      key: 'funding:Series A:2024-03-01',
+    }
+    const first = await run(row, emitSignal(round))
+    const again = await run(row, emitSignal(round))
+    expect(again).toEqual(first)
+    const elsewhere = await run(row, emitSignal({ ...round, entityId: twin }))
+    const byOther = await run(other, emitSignal(round))
+    const { key: _, ...unkeyed } = round
+    const plain = await run(row, emitSignal(unkeyed))
+    expect(
+      new Set([first, elsewhere, byOther, plain].map((r) => r.signalId)).size,
+    ).toBe(4)
+
+    const onCo = await db.select().from(signal).where(eq(signal.entityId, co))
+    expect(onCo).toHaveLength(3)
+    expect(onCo.find((r) => r.id === first.signalId)?.payload).toMatchObject({
+      key: 'funding:Series A:2024-03-01',
+    })
+    const emitted = (
+      await db.select().from(activity).where(eq(activity.subjectEntityId, co))
+    ).filter((a) => a.verb === 'signal.emitted')
+    expect(emitted).toHaveLength(3)
+  })
+})
+
 describe('Content.emitSignal citing a receipt', () => {
   const receipt = async (integrationId: string, entityId: string) => {
     const stored = (

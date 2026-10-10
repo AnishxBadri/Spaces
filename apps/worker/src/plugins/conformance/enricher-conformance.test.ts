@@ -16,6 +16,7 @@ import { setValues } from '@spaces/core/writes/attributes/values'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { storeCredential } from '@spaces/core/writes/vault'
 import { ENRICHMENT_CAPABILITY } from '@spaces/core/writes/enrichment/apply'
+import { jsonRecord } from '@spaces/core/json'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { ENRICHERS, pluginsRootWith } from '../fakes/enrichers'
 import type { Enricher } from '../fakes/enrichers'
@@ -158,6 +159,22 @@ describe.each(ENRICHERS)('enricher $id', (enricher) => {
       all.filter((r) => r.provider === ENRICHMENT_CAPABILITY),
     ).toHaveLength(1)
     expect(await valuesOf(companyId)).toMatchObject(matched.values)
+  })
+
+  it('an answer no attribute links is kept in the run’s receipt and written nowhere', async () => {
+    const { enrich } = await wire(enricher)
+    const companyId = await seedCompany(matched.name, matched.domain)
+
+    expect((await enrich(companyId))._tag).toBe('Success')
+    const run = (await receiptsOf(companyId)).find(
+      (r) => r.provider === ENRICHMENT_CAPABILITY,
+    )
+    const raw = jsonRecord(run?.raw)
+    const held = Array.isArray(raw.unlinked) ? raw.unlinked.map(jsonRecord) : []
+    expect(held.map((a) => a.key).sort()).toEqual([...matched.unlinked])
+    const values = JSON.stringify(await valuesOf(companyId))
+    for (const answer of held)
+      expect(values).not.toContain(JSON.stringify(answer.value))
   })
 
   it('a value a person set is never overwritten', async () => {
