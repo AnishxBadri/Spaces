@@ -219,7 +219,6 @@ function IntegrationCard({ detail }: { detail: IntegrationDetail }) {
   return (
     <SettingsSection
       title={detail.name}
-      blurb={detail.description}
       crumb="Integrations"
       action={
         <>

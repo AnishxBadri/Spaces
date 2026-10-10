@@ -286,10 +286,18 @@ row is a decision, not a cell.
 → **the FX ledger**, `apps/web/src/routes/_app/settings/currency.tsx`, built from
 `SettingsSection` and `SettingsRow`
 (`apps/web/src/components/settings/settings-section.tsx`). The section is the page
-(2026-09-30): the shell draws no head of its own, so the section head is P1 — mono
-`SETTINGS · …` eyebrow, serif title in `title-serif`, one optional sans sentence that
-says what the section decides, the one action right, hairline under; 48px rows on
-rules with the control right. The nav left is the chassis grammar one level in: bone,
+(2026-09-30): the shell draws no head of its own, so the section head is P1 — a mono
+eyebrow in sentence case (`Settings · Workspace`), the serif title in `title-serif`,
+**no sentence under it** (page blurbs go, D81), the one action right, and the
+**double rule** under the head (`double-rule`: a settings section is the page). The
+content column is 700px inside the gutters (`max-w-[43.75rem]`, the Save bar matches).
+A group inside a page is a mono caps label on a hairline (`SettingsGroupHead`:
+`IDENTITY`, `PROVIDERS`, `RATES`, an optional mono count beside it), 28px above —
+never the 44px bone `SectionHead` band. Rows (`SettingsRow`) are 48px on rules, the
+label in a 210px lane and the controls in a left-aligned lane after it, never pinned to
+the row's end. A field hint under the label survives only for cost, privacy or
+something irreversible; any other explanation is a tooltip on the control
+(`SettingsTip`) or goes. The nav left is the chassis grammar one level in: bone,
 caps group labels, 30px rows, counts in the right lane. A ledger inside the section takes a `field-label` head on
 `border-y-hairline` with lanes shared by head and rows. It carries no foot caption: a
 line under a settings ledger survives only for cost, privacy or irreversibility (D81).
@@ -306,10 +314,10 @@ whose it is: `you`, `workspace`, `ai`, `integrations` — and `admin`; a new sec
 placed by D81's map, and its path follows its label (`/settings/email-forwarding`), with
 a moved path answering one 301 from a route file at the old name
 (`lib/settings-moves.ts`). The group is also the eyebrow the section prints, so
-`SETTINGS · WORKSPACE` cannot name a place the nav does not have; `admin: true` draws
+`Settings · Workspace` cannot name a place the nav does not have; `admin: true` draws
 the row graphite for a member with `admin` in the right lane rather than a link into a
 page that refuses, and changes no guard. At `md` and up settings takes over the chassis:
-`‹ Settings` (and `esc`) back to the page settings was opened from, Today on a cold
+`‹ Settings` (and Escape, with no `esc` printed beside it) back to the page settings was opened from, Today on a cold
 load, over the nav (`SettingsChassis`); below `md` the nav is the same rows as a
 horizontal strip above the content. `/settings` redirects to the first row. `settings-nav.test.ts` holds the grammar the way `nav-grammar.test.ts`
 holds the chassis'. The shell's loader carries what the nav's right lane counts; a

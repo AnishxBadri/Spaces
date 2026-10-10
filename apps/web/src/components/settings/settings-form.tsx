@@ -143,7 +143,7 @@ function SaveBar({
         data-shown={shown}
         className="absolute inset-x-0 bottom-0 isolate translate-y-full border-t border-hairline bg-paper opacity-0 transition-[transform,opacity] duration-[120ms] ease-out-quart data-[shown=true]:pointer-events-auto data-[shown=true]:translate-y-0 data-[shown=true]:opacity-100 data-[shown=true]:duration-[180ms] motion-reduce:transition-none"
       >
-        <div className="flex h-12 w-full max-w-[56.25rem] items-center gap-3 px-8">
+        <div className="box-content flex h-12 max-w-[43.75rem] items-center gap-3 px-8">
           <span className="tabular mono text-micro text-graphite">
             {count} {count === 1 ? 'change' : 'changes'}
           </span>

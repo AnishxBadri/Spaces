@@ -2,8 +2,12 @@ import { useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useSettingsDraft } from './settings-form'
-import { SettingsRow, SettingsSection } from './settings-section'
-import { SectionHead } from '#/components/ledger-section'
+import {
+  SettingsGroupHead,
+  SettingsRow,
+  SettingsSection,
+  SettingsTip,
+} from './settings-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Switch } from '#/components/ui/switch'
@@ -22,7 +26,7 @@ type TestResult = Awaited<ReturnType<typeof testMailbox>>
  * - The typed fields are one draft in the page's Save bar; the TLS switch
  *   saves alone once a mailbox exists (D81).
  * - The app password is write-only. A saved one reads as its `redact()`
- *   display in the hint, the field stays empty, and a save with it empty
+ *   display beside the field, the field stays empty, and a save with it empty
  *   keeps it. Test connection tries what is typed, without saving.
  */
 export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
@@ -107,17 +111,13 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
 
   const run = settings.lastRun
   return (
-    <SettingsSection
-      title="Email forwarding"
-      blurb="An address you forward or BCC mail to. Threads land on the people and companies they match."
-      crumb="Integrations"
-    >
-      <div className="flex flex-col pt-8">
-        <SectionHead as="h3" title="Mailbox" count={readout(saved)} />
+    <SettingsSection title="Email forwarding" crumb="Integrations">
+      <div className="flex flex-col">
+        <SettingsGroupHead title="Mailbox" count={readout(saved)} />
 
         <SettingsRow
           label="Address"
-          hint="Also the login. What is forwarded here is shared with every member."
+          hint="What is forwarded here is shared with every member."
         >
           <Input
             aria-label="Mailbox address"
@@ -131,19 +131,18 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
           />
         </SettingsRow>
 
-        <SettingsRow
-          label="IMAP server"
-          hint="Host and port, as the provider lists them."
-        >
-          <Input
-            aria-label="IMAP host"
-            autoComplete="off"
-            spellCheck={false}
-            value={draft.host}
-            onChange={(e) => set('host', e.target.value)}
-            placeholder="imap.fastmail.com"
-            className="w-52 mono"
-          />
+        <SettingsRow label="IMAP server">
+          <SettingsTip tip="Host and port, as the provider lists them.">
+            <Input
+              aria-label="IMAP host"
+              autoComplete="off"
+              spellCheck={false}
+              value={draft.host}
+              onChange={(e) => set('host', e.target.value)}
+              placeholder="imap.fastmail.com"
+              className="w-52 mono"
+            />
+          </SettingsTip>
           <Input
             aria-label="IMAP port"
             inputMode="numeric"
@@ -160,38 +159,35 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
           </Switch>
         </SettingsRow>
 
-        <SettingsRow
-          label="Folder"
-          hint="Read-only: nothing is marked read or moved."
-        >
-          <Input
-            aria-label="IMAP folder"
-            autoComplete="off"
-            spellCheck={false}
-            value={draft.folder}
-            onChange={(e) => set('folder', e.target.value)}
-            className="w-52 mono"
-          />
+        <SettingsRow label="Folder">
+          <SettingsTip tip="Read-only: nothing is marked read or moved.">
+            <Input
+              aria-label="IMAP folder"
+              autoComplete="off"
+              spellCheck={false}
+              value={draft.folder}
+              onChange={(e) => set('folder', e.target.value)}
+              className="w-52 mono"
+            />
+          </SettingsTip>
         </SettingsRow>
 
-        <SettingsRow label="Poll every" hint="Minutes between polls, 1 to 60.">
-          <Input
-            aria-label="Poll cadence in minutes"
-            inputMode="numeric"
-            value={draft.cadence}
-            onChange={(e) => set('cadence', e.target.value)}
-            className="w-18 mono"
-          />
+        <SettingsRow label="Poll every">
+          <SettingsTip tip="Minutes between polls, 1 to 60.">
+            <Input
+              aria-label="Poll cadence in minutes"
+              inputMode="numeric"
+              value={draft.cadence}
+              onChange={(e) => set('cadence', e.target.value)}
+              className="w-18 mono"
+            />
+          </SettingsTip>
           <span className="mono text-micro text-graphite">min</span>
         </SettingsRow>
 
         <SettingsRow
           label={saved ? 'Replace app password' : 'App password'}
-          hint={
-            saved?.passwordDisplay
-              ? `Saved as ${saved.passwordDisplay}. Stored encrypted; never shown again.`
-              : 'An app password, not the account password. Stored encrypted.'
-          }
+          hint="Not your account password."
         >
           <Input
             aria-label="Mailbox app password"
@@ -203,9 +199,14 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
             placeholder={saved ? '••••••••' : 'app password'}
             className="w-72 mono"
           />
+          {saved?.passwordDisplay ? (
+            <span className="mono text-micro text-graphite">
+              saved {saved.passwordDisplay}
+            </span>
+          ) : null}
         </SettingsRow>
 
-        <div className="flex min-h-12 items-center justify-end gap-3 border-b border-rule px-3 py-2">
+        <SettingsRow label="">
           <Button
             size="sm"
             variant="outline"
@@ -214,12 +215,12 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
           >
             {pending === 'test' ? 'Testing' : 'Test connection'}
           </Button>
-        </div>
+        </SettingsRow>
 
         {result ? (
           <div
             role="status"
-            className="flex min-h-9 items-start gap-3 border-b border-rule px-3 py-2"
+            className="flex min-h-9 items-start gap-3 border-b border-rule py-2"
           >
             <span
               className={cn(
@@ -237,23 +238,24 @@ export function ArrivalSection({ settings }: { settings: ArrivalSettings }) {
           </div>
         ) : null}
 
-        <SettingsRow
-          label="Last poll"
-          hint={
-            run === null
-              ? 'Not polled yet.'
-              : (run.summary ?? run.error ?? run.status)
-          }
-        >
+        <SettingsRow label="Last poll">
           <span className="tabular mono text-micro text-graphite">
             {saved?.lastPolledAt ? stamp(saved.lastPolledAt) : 'never'}
+          </span>
+          <span className="min-w-0 text-label text-graphite">
+            {run === null
+              ? 'Not polled yet.'
+              : (run.summary ?? run.error ?? run.status)}
           </span>
         </SettingsRow>
 
         {saved?.lastError ? (
-          <SettingsRow label="Last error" hint={saved.lastError}>
+          <SettingsRow label="Last error">
             <span className="mono text-micro text-destructive">
               {saved.status}
+            </span>
+            <span className="min-w-0 text-label break-words text-graphite">
+              {saved.lastError}
             </span>
           </SettingsRow>
         ) : null}

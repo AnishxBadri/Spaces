@@ -97,7 +97,7 @@ describe('the double rule', () => {
     }
   })
 
-  it('is spelled only by the page head and the record head', () => {
+  it('is spelled only by the page head, the record head and the settings head', () => {
     const spelling = tsxFiles(src)
       .filter((f) => readFileSync(f, 'utf8').includes('double-rule'))
       .map((f) => relative(src, f))
@@ -105,6 +105,7 @@ describe('the double rule', () => {
     expect(spelling).toEqual([
       'components/page-header.tsx',
       'components/record/record-parts.tsx',
+      'components/settings/settings-section.tsx',
     ])
   })
 })

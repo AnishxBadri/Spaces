@@ -33,6 +33,7 @@ import type { RouteComponent } from '@tanstack/react-router'
 
 const writes = vi.hoisted(() => ({
   saveWorkspace: vi.fn(async () => ({ ok: true })),
+  setBaseCurrency: vi.fn(async () => ({ ok: true })),
   removeDemoData: vi.fn(async () => ({ removed: 8, kept: 0 })),
   saveMailbox: vi.fn(async () => ({ queued: true })),
   setSensitivityDefault: vi.fn(
@@ -207,13 +208,19 @@ const accounts = {
   offered: ['box'],
 }
 
+/** The workspace row the shell hands every page; a test may give it a logo. */
+const workspace: { name: string; logo: string | null } = {
+  name: 'Fund One',
+  logo: null,
+}
+
 const shellData = (isAdmin: boolean) => ({
   me: {
     id: isAdmin ? 'u-admin' : 'u-member',
     role: isAdmin ? 'admin' : 'member',
   },
   isAdmin,
-  workspace: { name: 'Fund One' },
+  workspace: { ...workspace },
   members: [
     {
       id: 'u-admin',
@@ -565,6 +572,8 @@ async function mount(path: string, isAdmin = true) {
 }
 
 const buttons = () => Array.from(document.querySelectorAll('button'))
+const currency = () =>
+  document.querySelector('button[aria-label="Base currency"]')
 const saveControls = () =>
   buttons().filter((b) => /^sav(e|ing)/i.test(b.textContent.trim()))
 const bar = () => document.querySelector('[data-save-bar]')
@@ -617,6 +626,32 @@ describe('every settings page', () => {
       expect(document.body.textContent).not.toMatch(/admin only/i)
     },
   )
+
+  it.each(PATHS)(
+    '%s heads the page with a sentence-case eyebrow, the title and the double rule, no sentence',
+    async (path) => {
+      await mount(path)
+      const head = document.querySelector('[data-settings-head]')
+      expect(head?.className).toContain('double-rule')
+      expect(head?.className).not.toContain('border-b')
+      const eyebrow = head?.querySelector('h1')?.previousElementSibling
+      expect(eyebrow?.textContent).toMatch(
+        /^Settings · [A-Z][a-z]+|^Settings · AI$/,
+      )
+      expect(eyebrow?.className).not.toContain('uppercase')
+      // Nothing under the title but the member's read-only line.
+      expect(
+        head
+          ?.querySelector('h1')
+          ?.nextElementSibling?.hasAttribute('data-read-only') ?? true,
+      ).toBe(true)
+      // Groups are caps labels on a hairline, never the bone band.
+      for (const group of document.querySelectorAll('[data-settings-group]'))
+        expect(group.className).not.toContain('bg-bone')
+      for (const h3 of document.querySelectorAll('section h3'))
+        expect(h3.closest('.bg-bone')).toBeNull()
+    },
+  )
 })
 
 describe('saving', () => {
@@ -629,12 +664,18 @@ describe('saving', () => {
     expect(bar()?.getAttribute('data-shown')).toBe('true')
     expect(bar()?.textContent).toContain('1 change')
 
-    await type(input('Base currency'), 'EUR')
+    await click(currency())
+    await click(
+      Array.from(document.querySelectorAll('[cmdk-item]')).find(
+        (el) => el.textContent.trim() === 'EUR · Euro',
+      ),
+    )
+    expect(currency()?.textContent).toContain('EUR · Euro')
     expect(bar()?.textContent).toContain('2 changes')
 
     await click(byText('Discard', bar() ?? document))
     expect(input('Workspace name').value).toBe('Fund One')
-    expect(input('Base currency').value).toBe('USD')
+    expect(currency()?.textContent).toContain('USD · US dollar')
     expect(bar()?.getAttribute('data-shown')).toBe('false')
     expect(writes.saveWorkspace).not.toHaveBeenCalled()
   })
@@ -770,6 +811,57 @@ describe('the four acts that break something elsewhere ask first', () => {
   })
 })
 
+describe('General, by sheet 01', () => {
+  const groups = () =>
+    Array.from(document.querySelectorAll('[data-settings-group] h3')).map((h) =>
+      h.textContent.trim(),
+    )
+
+  it('groups Identity (Logo, then Name) and Defaults under caps labels', async () => {
+    await mount('/settings/general')
+    expect(groups().slice(0, 2)).toEqual(['Identity', 'Defaults'])
+    for (const h3 of document.querySelectorAll('[data-settings-group] h3'))
+      expect(h3.className).toContain('field-label')
+    const text = document.body.textContent
+    expect(text.indexOf('Logo')).toBeLessThan(text.indexOf('Name'))
+    expect(text.indexOf('Name')).toBeLessThan(text.indexOf('Base currency'))
+  })
+
+  it('offers Upload and no Remove while no logo is saved', async () => {
+    await mount('/settings/general')
+    expect(byText('Upload')).toBeDefined()
+    expect(byText('Remove')).toBeUndefined()
+  })
+
+  it('offers Remove beside Upload once a logo is saved', async () => {
+    workspace.logo = '/api/blob/logo'
+    try {
+      await mount('/settings/general')
+      expect(byText('Upload')).toBeDefined()
+      expect(byText('Remove')).toBeDefined()
+    } finally {
+      workspace.logo = null
+    }
+  })
+
+  it('reads Base currency as a Select, USD · US dollar, with no hint, and saves the chosen code', async () => {
+    await mount('/settings/general')
+    expect(currency()?.textContent).toContain('USD · US dollar')
+    const row = currency()?.closest('.border-b')
+    expect(row?.textContent).not.toMatch(/re-prices|ledgers keep/)
+    await click(currency())
+    await click(
+      Array.from(document.querySelectorAll('[cmdk-item]')).find(
+        (el) => el.textContent.trim() === 'GBP · British pound',
+      ),
+    )
+    await click(saveControls().at(0))
+    expect(writes.setBaseCurrency).toHaveBeenCalledWith({
+      data: { currency: 'GBP' },
+    })
+  })
+})
+
 describe('General, after the first run (D80)', () => {
   const dialog = () => document.querySelector('[role="dialog"]')
 
@@ -789,6 +881,13 @@ describe('General, after the first run (D80)', () => {
     const text = document.body.textContent
     expect(text).toContain("What's set up")
     expect(text).toContain('3 of 7')
+    // A caps label on a hairline, not a bone band.
+    const head = Array.from(
+      document.querySelectorAll('[data-settings-group]'),
+    ).find((g) => g.textContent.includes("What's set up"))
+    expect(head?.className).toContain('border-hairline')
+    expect(head?.className).not.toContain('bg-bone')
+    expect(head?.querySelector('h3')?.className).toContain('field-label')
     for (const label of [
       'AI model',
       'Team',

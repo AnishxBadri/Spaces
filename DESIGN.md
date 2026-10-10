@@ -538,13 +538,14 @@ A page reads as stacked sections, and each section separates itself from its nei
 by at least two of three means: **material**, **space**, **ink weight**. Approved by the
 owner on 2026-10-05 after the storage and email drafts read as one flat plane. The
 shared primitives draw it — `SectionHead` (the band, inside `LedgerSection`,
-`RecordSection` and settings groups), `LedgerRow` at `h-ledger-row`, `DialogHeader`,
+`RecordSection`; a group inside a settings page is a caps label on a hairline instead,
+`SettingsGroupHead`), `LedgerRow` at `h-ledger-row`, `DialogHeader`,
 the confirm — so every surface built on them follows; rows sit 12px in from the
 band's edge, under its title.
 
 - **Material.** A section head is a 44px band on bone — title, count, tabs, filters and
-  the head's one action live in it. A Drive folder band and a group band inside a
-  settings section are the same band. Dialog heads and feet are bone. Rows sit on paper.
+  the head's one action live in it. A Drive folder band is the same band; a settings
+  page is the page, so its groups take no band. Dialog heads and feet are bone. Rows sit on paper.
 - **Scale.** The section title is the title step (15/22, sans 500, sentence case) with a
   mono count beside it. A row's primary is body (14/20) in ink; at most one graphite
   meta line under it. Column heads, tabs and field labels stay CAPS.

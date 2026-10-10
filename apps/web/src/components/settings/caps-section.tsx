@@ -1,8 +1,12 @@
 import { useRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { useSettingsDraft } from './settings-form'
-import { SettingsRow, SettingsSection } from './settings-section'
-import { SectionHead } from '#/components/ledger-section'
+import {
+  SettingsGroupHead,
+  SettingsRow,
+  SettingsSection,
+  SettingsTip,
+} from './settings-section'
 import { Input } from '#/components/ui/input'
 import { formatNumber } from '@spaces/core/format'
 import { setAiCaps } from '#/lib/server-fns'
@@ -73,51 +77,44 @@ export function CapsSection({
   const reached = caps.dailyTokens !== null && usage.used >= caps.dailyTokens
 
   return (
-    <SettingsSection
-      title="Caps"
-      blurb="How many tokens the workspace may spend on AI, counted from every call's usage."
-      crumb="AI"
-      adminOnly
-    >
-      <div className="flex flex-col pt-8">
-        <SectionHead as="h3" title="Ceilings" count={readout} />
-        <SettingsRow
-          label="Daily tokens"
-          hint="Tokens in and out across every lane, per UTC day. Blank is no cap."
-        >
-          <Input
-            id="ai-cap-daily"
-            aria-label="Daily token cap"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            step={1}
-            value={draft.daily}
-            onChange={(e) => set('daily', e.target.value)}
-            placeholder="No cap"
-            className="w-40 mono"
-          />
+    <SettingsSection title="Caps" crumb="AI" adminOnly>
+      <div className="flex flex-col">
+        <SettingsGroupHead title="Ceilings" count={readout} />
+        <SettingsRow label="Daily tokens">
+          <SettingsTip tip="Tokens in and out across every lane, per UTC day. Blank is no cap.">
+            <Input
+              id="ai-cap-daily"
+              aria-label="Daily token cap"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={draft.daily}
+              onChange={(e) => set('daily', e.target.value)}
+              placeholder="No cap"
+              className="w-40 mono"
+            />
+          </SettingsTip>
         </SettingsRow>
-        <SettingsRow
-          label="Per-run tokens"
-          hint="The largest prompt one call may send, estimated at four characters a token. Blank is no cap."
-        >
-          <Input
-            id="ai-cap-per-run"
-            aria-label="Per-run token cap"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            step={1}
-            value={draft.perRun}
-            onChange={(e) => set('perRun', e.target.value)}
-            placeholder="No cap"
-            className="w-40 mono"
-          />
+        <SettingsRow label="Per-run tokens">
+          <SettingsTip tip="The largest prompt one call may send, estimated at four characters a token. Blank is no cap.">
+            <Input
+              id="ai-cap-per-run"
+              aria-label="Per-run token cap"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={draft.perRun}
+              onChange={(e) => set('perRun', e.target.value)}
+              placeholder="No cap"
+              className="w-40 mono"
+            />
+          </SettingsTip>
         </SettingsRow>
         <SettingsRow
           label="Used today"
-          hint={`Since 00:00 UTC, from the AI usage ledger. ${reached ? 'Calls are refused until' : 'The day resets at'} 00:00 UTC.`}
+          hint={reached ? 'Calls are refused until 00:00 UTC.' : undefined}
         >
           <span
             className={cn(

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
@@ -192,5 +192,30 @@ describe('the settings nav grammar', () => {
       'Email forwarding',
       'Connection apps',
     ])
+  })
+})
+
+/** Every source file a settings page is drawn from, by directory. */
+const SETTINGS_DIRS = ['components/settings', 'routes/_app/settings']
+const settingsSources = () =>
+  SETTINGS_DIRS.flatMap((dir) =>
+    readdirSync(`${webSrc}${dir}`)
+      .filter((f) => f.endsWith('.tsx') && !f.includes('.test.'))
+      .map((f) => `${dir}/${f}`),
+  )
+
+describe('the settings page grammar', () => {
+  it('draws groups as caps labels: no settings file imports the SectionHead band', () => {
+    const sources = settingsSources()
+    expect(sources.length).toBeGreaterThan(20)
+    const banded = sources.filter((f) =>
+      /import[^;]*\bSectionHead\b[^;]*from/.test(read(f)),
+    )
+    expect(banded).toEqual([])
+  })
+
+  it('prints no sentence under a page title: no section passes a blurb', () => {
+    const blurbs = settingsSources().filter((f) => /\bblurb=/.test(read(f)))
+    expect(blurbs).toEqual([])
   })
 })

@@ -1,8 +1,10 @@
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { SettingsSection } from '#/components/settings/settings-section'
-import { SectionHead } from '#/components/ledger-section'
+import {
+  SettingsGroupHead,
+  SettingsSection,
+} from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { setFxRate } from '#/lib/server-fns'
@@ -79,14 +81,9 @@ function FxSection({
     newest.has(`${r.currency}:${r.date}`)
 
   return (
-    <SettingsSection
-      title="Currency & FX rates"
-      blurb="Every holding is priced in the base currency; a missing rate leaves it unpriced."
-      crumb="Workspace"
-    >
-      <div className="flex flex-col pt-8">
-        <SectionHead
-          as="h3"
+    <SettingsSection title="Currency & FX rates" crumb="Workspace">
+      <div className="flex flex-col">
+        <SettingsGroupHead
           title="Rates"
           count={`${rates.length} · sparse, dated, newest wins`}
         />

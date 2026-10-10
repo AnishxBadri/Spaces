@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { SectionHead } from '#/components/ledger-section'
+import { SettingsGroupHead } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
@@ -157,8 +157,8 @@ export function SettingsFields({
 }) {
   if (!form.ok)
     return (
-      <div className="flex flex-col pt-8">
-        <SectionHead as="h3" title="Settings" />
+      <div className="flex flex-col">
+        <SettingsGroupHead title="Settings" />
         <p
           role="alert"
           className="border-b border-rule px-3 py-3 mono text-micro text-destructive"
@@ -169,9 +169,8 @@ export function SettingsFields({
     )
   if (form.fields.length === 0) return null
   return (
-    <div className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <div className="flex flex-col">
+      <SettingsGroupHead
         title="Settings"
         count={notYet ? 'not yet' : String(form.fields.length)}
       />
@@ -288,9 +287,8 @@ export function AutoEnrichFields({
     })
   }
   return (
-    <div className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <div className="flex flex-col">
+      <SettingsGroupHead
         title="Auto-enrich"
         count={scopes.length === 0 ? 'off' : String(scopes.length)}
       />

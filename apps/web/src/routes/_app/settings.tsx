@@ -67,8 +67,9 @@ function SettingsShell() {
           <div className="md:hidden">
             <SettingsNav variant="strip" counts={counts} />
           </div>
-          {/* The foot clears the Save bar, so it never covers the last row. */}
-          <div className="flex w-full max-w-[56.25rem] flex-col gap-12 px-8 pt-7 pb-20">
+          {/* A 700px column inside the gutters (the Save bar matches it); the
+              foot clears the bar, so it never covers the last row. */}
+          <div className="box-content flex max-w-[43.75rem] flex-col gap-12 px-8 pt-7 pb-20">
             <Outlet />
           </div>
         </SettingsForm>

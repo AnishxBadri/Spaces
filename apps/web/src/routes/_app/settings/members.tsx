@@ -120,11 +120,7 @@ function MembersSection({
   }
 
   return (
-    <SettingsSection
-      title="Members"
-      blurb="Who can open this workspace. Admins change structure; members change records."
-      crumb="Workspace"
-    >
+    <SettingsSection title="Members" crumb="Workspace">
       <ul className="flex flex-col">
         {members.map((m) => (
           <li
@@ -193,7 +189,7 @@ function MembersSection({
         <div className="flex flex-col">
           <SettingsRow
             label="Invite"
-            hint="Single-use link, valid 7 days. Leave email empty for a link anyone can use once."
+            hint="With no email, anyone holding the link can join, once, within 7 days."
           >
             <Input
               id="invite-email"

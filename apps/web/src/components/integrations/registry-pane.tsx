@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { SectionHead } from '#/components/ledger-section'
+import { SettingsGroupHead } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Tabs } from '#/components/ui/tabs'
 import { catalogueTabs, inTab, roleWords } from '#/lib/integrations/catalogue'
@@ -81,9 +81,8 @@ export function RegistryPane({
   const tab = tabs.some((t) => t.id === chosen) ? chosen : 'all'
   const shown = available.filter((p) => inTab(p, tab))
   return (
-    <div className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <div className="flex flex-col">
+      <SettingsGroupHead
         title="Available"
         count={String(available.length)}
         action="signed by the project"

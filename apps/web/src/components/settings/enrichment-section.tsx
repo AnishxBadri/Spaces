@@ -2,7 +2,6 @@ import { Link, useRouter } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
-import { SectionHead } from '#/components/ledger-section'
 import { ReadoutStrip } from '#/components/page-header'
 import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
@@ -27,8 +26,10 @@ import type {
 import { cn } from '#/lib/utils'
 import { useSettingsDraft } from './settings-form'
 import {
+  SettingsGroupHead,
   SettingsRow,
   SettingsSection,
+  SettingsTip,
   useSettingsPage,
 } from './settings-section'
 
@@ -44,11 +45,7 @@ import {
  */
 export function EnrichmentSection({ page }: { page: EnrichmentPage }) {
   return (
-    <SettingsSection
-      title="Enrichment"
-      blurb="Where enriched values come from, and when Spaces asks for them."
-      crumb="Integrations"
-    >
+    <SettingsSection title="Enrichment" crumb="Integrations">
       <ReadoutStrip
         className="mt-6 border-t border-rule"
         cells={[
@@ -131,12 +128,8 @@ function SourcesBlock({
   }
 
   return (
-    <section data-block="sources" className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
-        title="Sources, in order"
-        action="first answer wins"
-      />
+    <section data-block="sources" className="flex flex-col">
+      <SettingsGroupHead title="Sources, in order" action="first answer wins" />
       <ol aria-label="Enrichment sources">
         {rows.map((source, idx) => (
           <li
@@ -362,9 +355,8 @@ function AutoBlock({
   ]
 
   return (
-    <section data-block="auto" className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <section data-block="auto" className="flex flex-col">
+      <SettingsGroupHead
         title="Enrich automatically when a record"
         count={
           auto.paid.length === 0
@@ -437,21 +429,20 @@ function AutoBlock({
           })}
         </div>
       )}
-      <SettingsRow
-        label="Re-use a result for"
-        hint="A source answered within this many days is not asked again."
-      >
-        <Input
-          id="enrichment-reuse"
-          aria-label="Re-use days"
-          type="number"
-          inputMode="numeric"
-          min={0}
-          step={1}
-          value={reuseDraft.draft.days}
-          onChange={(e) => reuseDraft.set('days', e.target.value)}
-          className="w-24 mono"
-        />
+      <SettingsRow label="Re-use a result for">
+        <SettingsTip tip="A source answered within this many days is not asked again.">
+          <Input
+            id="enrichment-reuse"
+            aria-label="Re-use days"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            value={reuseDraft.draft.days}
+            onChange={(e) => reuseDraft.set('days', e.target.value)}
+            className="w-24 mono"
+          />
+        </SettingsTip>
         <span className="mono text-micro text-graphite">days</span>
       </SettingsRow>
     </section>
@@ -509,10 +500,9 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
     <section
       id="what-fills-what"
       data-block="grid"
-      className="flex scroll-mt-6 flex-col pt-8"
+      className="flex scroll-mt-6 flex-col"
     >
-      <SectionHead
-        as="h3"
+      <SettingsGroupHead
         title="What fills what"
         action={
           <Segmented
@@ -630,9 +620,8 @@ const stampOf = (iso: string) => `${iso.slice(5, 10)} ${iso.slice(11, 16)}`
 
 function RunsBlock({ runs }: { runs: ReadonlyArray<RecentRun> }) {
   return (
-    <section data-block="runs" className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <section data-block="runs" className="flex flex-col">
+      <SettingsGroupHead
         title="Recent runs"
         count={runs.length === 0 ? undefined : String(runs.length)}
       />

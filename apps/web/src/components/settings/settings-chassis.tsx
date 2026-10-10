@@ -50,7 +50,7 @@ export function useSettingsNav(): {
 }
 
 /**
- * The key that leaves settings: a bare `esc` the page itself received.
+ * The key that leaves settings: a bare Escape the page itself received.
  * - Not from a field, an editor or a dialog (`isTyping`).
  * - Not one a popover or menu already spent closing itself — Radix marks
  *   that `defaultPrevented`.
@@ -70,7 +70,7 @@ export function isLeaveSettingsKey(e: KeyboardEvent): boolean {
 /**
  * The chassis while settings is open (D81): `‹ Settings` back to the page
  * settings was opened from, over the settings nav, in place of the app nav.
- * `esc` goes back too.
+ * Escape goes back too; no key hint is printed beside it.
  */
 export function SettingsChassis() {
   const navigate = useNavigate()
@@ -106,9 +106,6 @@ export function SettingsChassis() {
             ‹
           </span>
           <span className="min-w-0 flex-1 truncate">Settings</span>
-          <kbd className="shrink-0 mono text-micro font-normal text-graphite">
-            esc
-          </kbd>
         </button>
       </div>
       <SettingsNav variant="chassis" counts={counts} />

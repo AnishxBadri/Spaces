@@ -7,8 +7,10 @@ import { AiConfigSection } from '#/components/attributes/ai-config-section'
 import { ObjectDialog } from '#/components/objects/object-dialog'
 import { RegistryList } from '#/components/attributes/registry-list'
 import { KeyHint } from '#/components/page-header'
-import { SettingsSection } from '#/components/settings/settings-section'
-import { SectionHead } from '#/components/ledger-section'
+import {
+  SettingsGroupHead,
+  SettingsSection,
+} from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -46,7 +48,6 @@ function ObjectAttributesPage() {
   const { isAdmin } = shell.useLoaderData()
   const router = useRouter()
   const live = registry.filter((a) => !a.archived).length
-  const archivedCount = registry.length - live
   const [creating, setCreating] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
   useHotkey('a', () => setCreating(true))
@@ -91,16 +92,9 @@ function ObjectAttributesPage() {
     }
   }
 
-  const blurb = [
-    `${live} attribute${live === 1 ? '' : 's'} on every ${object.singular.toLowerCase()}`,
-    ...(archivedCount > 0 ? [`${archivedCount} archived`] : []),
-    ...(isAdmin ? [] : ['reshaping is admin-only']),
-  ].join(' · ')
-
   return (
     <SettingsSection
       title={object.plural}
-      blurb={blurb}
       crumb="Workspace"
       action={
         <>
@@ -203,9 +197,8 @@ function ObjectAttributesPage() {
             Core objects are not listed: their identity is core-owned and
             lives in entity_alias, not in this column. */}
       {object.isSystem ? null : (
-        <section className="mt-8 flex flex-col">
-          <SectionHead
-            as="h3"
+        <section className="flex flex-col">
+          <SettingsGroupHead
             title="Identity keys"
             count={`${object.identityKeys.length} declared`}
           />

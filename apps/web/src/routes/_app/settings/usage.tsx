@@ -1,8 +1,10 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { SectionHead } from '#/components/ledger-section'
 import { CapsSection } from '#/components/settings/caps-section'
-import { SettingsSection } from '#/components/settings/settings-section'
+import {
+  SettingsGroupHead,
+  SettingsSection,
+} from '#/components/settings/settings-section'
 import { SUGGESTION_KIND_WORD } from '#/components/inbox/suggestion-card'
 import { formatNumber } from '@spaces/core/format'
 import {
@@ -81,14 +83,9 @@ function RunLog({
     0,
   )
   return (
-    <SettingsSection
-      title="Usage & limits"
-      blurb="Every AI action as a run: what it read, which models it called, what it cost and what it proposed."
-      crumb="AI"
-    >
-      <div className="flex flex-col pt-8">
-        <SectionHead
-          as="h3"
+    <SettingsSection title="Usage & limits" crumb="AI">
+      <div className="flex flex-col">
+        <SettingsGroupHead
           title="Runs"
           count={`${usage.runs.length} listed · ${formatNumber(spent)} tokens`}
         />
@@ -370,9 +367,8 @@ function StepRow({ step, index }: { step: RunStep; index: number }) {
 
 function LoneCalls({ calls }: { calls: ReadonlyArray<LoneCall> }) {
   return (
-    <div className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <div className="flex flex-col">
+      <SettingsGroupHead
         title="Calls outside a run"
         count={`${calls.length} · the settings Test call`}
       />

@@ -170,7 +170,9 @@ describe('the settings chassis', () => {
 
     await go(r)
     expect(document.querySelector('nav[aria-label="Primary"]')).toBeNull()
-    expect(backButton().textContent).toContain('Settings')
+    // The head reads `‹ Settings` and prints no key hint beside it.
+    expect(backButton().textContent).toBe('‹Settings')
+    expect(backButton().querySelector('kbd')).toBeNull()
     const groups = Array.from(
       settingsNav()?.querySelectorAll('.field-label') ?? [],
     ).map((el) => el.textContent)

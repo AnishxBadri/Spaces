@@ -44,11 +44,7 @@ function TemplatesSection({ templates }: { templates: Array<TemplateRow> }) {
   }
 
   return (
-    <SettingsSection
-      title="Templates"
-      blurb="Saved patterns for notes, records, and space breakdowns."
-      crumb="Workspace"
-    >
+    <SettingsSection title="Templates" crumb="Workspace">
       {templates.length === 0 ? (
         <p className="border-b border-rule py-3 text-label text-graphite">
           None yet. Open a note, record, or space you like the shape of and save

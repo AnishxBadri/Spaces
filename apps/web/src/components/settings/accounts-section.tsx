@@ -8,9 +8,12 @@ import { Copy } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
-import { SettingsSection, useSettingsPage } from './settings-section'
+import {
+  SettingsGroupHead,
+  SettingsSection,
+  useSettingsPage,
+} from './settings-section'
 import { oauthClientAnchor } from './connection-apps-section'
-import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -103,8 +106,8 @@ export function AccountsSection({
     job === 'email-calendar' ? defaultMailAccount(view.connections) : null
   return (
     <SettingsSection title={TITLE[job]} crumb="You">
-      <div className="flex flex-col pt-8">
-        <SectionHead as="h3" title="Accounts" count={accounts.length} />
+      <div className="flex flex-col">
+        <SettingsGroupHead title="Accounts" count={accounts.length} />
         {accounts.length === 0 ? (
           <p className="border-b border-rule px-3 py-3 text-label text-graphite">
             No accounts connected.
@@ -302,9 +305,8 @@ function ForwardingAddress({ address }: { address: string | null }) {
     )
   }
   return (
-    <div className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <div className="flex flex-col">
+      <SettingsGroupHead
         title="Bcc address"
         action={
           <Link to="/settings/email-forwarding" className={LINK}>
@@ -490,8 +492,8 @@ export function AccountSection({
       <p className="px-3 pt-3 mono text-micro text-graphite">
         {provider} · {syncStateOf(account.held).text}
       </p>
-      <div className="flex flex-col pt-8">
-        <SectionHead as="h3" title="Used for" />
+      <div className="flex flex-col">
+        <SettingsGroupHead title="Used for" />
         {productsOf(account.provider).map(({ product, entry }) => {
           const held = account.rows.find((r) => r.product === product)
           return (
@@ -690,8 +692,8 @@ const MARKS: Record<string, ReactNode> = {
 export function MeetingNotesSection() {
   return (
     <SettingsSection title="Meeting notes" crumb="You">
-      <div className="flex flex-col pt-8">
-        <SectionHead as="h3" title="Recorders" count={0} />
+      <div className="flex flex-col">
+        <SettingsGroupHead title="Recorders" count={0} />
         <p className="border-b border-rule px-3 py-3 text-label text-graphite">
           No recorders connected.
         </p>

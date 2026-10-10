@@ -48,7 +48,6 @@ function ObjectsSection({
   return (
     <SettingsSection
       title="Objects"
-      blurb="The records you keep and the attributes on each."
       crumb="Workspace"
       action={
         isAdmin ? (

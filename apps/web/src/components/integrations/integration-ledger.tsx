@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { SectionHead } from '#/components/ledger-section'
+import { SettingsGroupHead } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Switch } from '#/components/ui/switch'
 import { roleWords } from '#/lib/integrations/catalogue'
@@ -316,8 +316,8 @@ export function IntegrationLedger({
   actions: LedgerActions
 }) {
   return (
-    <div className="flex flex-col pt-8">
-      <SectionHead as="h3" title="Installed" count={String(rows.length)} />
+    <div className="flex flex-col">
+      <SettingsGroupHead title="Installed" count={String(rows.length)} />
       {rows.length === 0 ? (
         <p className="px-3 py-3 text-ui text-graphite">No plugins installed.</p>
       ) : (

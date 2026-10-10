@@ -3,10 +3,11 @@ import { Copy } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
+  SettingsGroupHead,
   SettingsRow,
   SettingsSection,
+  SettingsTip,
 } from '#/components/settings/settings-section'
-import { SectionHead } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -102,35 +103,27 @@ function TokensRoute() {
   const live = tokens.filter((t) => t.revokedAt === null).length
 
   return (
-    <SettingsSection
-      title="API tokens"
-      blurb="Tokens that let your own assistant read Spaces as you, over MCP, for the scopes you tick."
-      crumb="You"
-    >
+    <SettingsSection title="API tokens" crumb="You">
       <form onSubmit={create} className="flex flex-col">
-        <SettingsRow
-          label="New token"
-          hint="Name it for where it will live — the assistant, the machine."
-        >
+        <SettingsRow label="New token">
           <span className="flex items-center gap-2">
-            <Input
-              id="api-token-name"
-              aria-label="Token name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Claude Desktop · laptop"
-              maxLength={80}
-              className="w-60"
-            />
+            <SettingsTip tip="Name it for where it will live — the assistant, the machine.">
+              <Input
+                id="api-token-name"
+                aria-label="Token name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Claude Desktop · laptop"
+                maxLength={80}
+                className="w-60"
+              />
+            </SettingsTip>
             <Button type="submit" size="sm" disabled={pending}>
               Create
             </Button>
           </span>
         </SettingsRow>
-        <SettingsRow
-          label="Scopes"
-          hint="What it may do at /api/v1. It still acts as you, never more."
-        >
+        <SettingsRow label="Scopes" hint="It acts as you, never more.">
           <span className="flex flex-col">
             {API_SCOPES.map((scope) => (
               <label
@@ -163,9 +156,8 @@ function TokensRoute() {
 
       {created ? <CreatedStrip created={created} /> : null}
 
-      <div className="flex flex-col pt-8">
-        <SectionHead
-          as="h3"
+      <div className="flex flex-col">
+        <SettingsGroupHead
           title="Your tokens"
           count={`${live} live · ${tokens.length - live} revoked`}
         />

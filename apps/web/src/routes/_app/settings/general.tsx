@@ -6,16 +6,18 @@ import {
 } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { SectionHead } from '#/components/ledger-section'
 import { useSettingsDraft } from '#/components/settings/settings-form'
 import {
+  SettingsGroupHead,
   SettingsRow,
   SettingsSection,
 } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { Input } from '#/components/ui/input'
+import { Select } from '#/components/ui/select'
 import { WorkspaceMark } from '#/components/workspace-mark'
+import { baseCurrencyCodes, currencyLabel } from '#/lib/currency-names'
 import {
   clearWorkspaceLogo,
   getDemoSummary,
@@ -32,9 +34,10 @@ import type { SetupState } from '#/lib/setup/whats-set-up'
 const shell = getRouteApi('/_app/settings')
 
 /**
- * The workspace singleton: its name, its logo and the currency it prices in, the demo
- * while it is loaded, and What's set up at the foot. (D80, D81)
- * - Name and currency are typed fields: they collect into the page's Save bar.
+ * The workspace singleton: Identity (logo, then name), Defaults (the currency
+ * it prices in), the demo while it is loaded, and What's set up at the foot.
+ * (D80, D81)
+ * - Name and currency are drafts: they collect into the page's Save bar.
  * - The logo's Upload and Remove write at once, with a toast.
  * - Only an admin changes them; a member reads them disabled.
  */
@@ -51,11 +54,13 @@ function GeneralRoute() {
   const { demo, setUp } = Route.useLoaderData()
   return (
     <SettingsSection title="General" crumb="Workspace" adminOnly>
-      <WorkspaceNameRow name={data.workspace?.name ?? ''} />
+      <SettingsGroupHead title="Identity" />
       <LogoRow
         name={data.workspace?.name ?? ''}
         logo={data.workspace?.logo ?? null}
       />
+      <WorkspaceNameRow name={data.workspace?.name ?? ''} />
+      <SettingsGroupHead title="Defaults" />
       <BaseCurrencyRow baseCurrency={data.fx.baseCurrency} />
       {demo === null ? null : <DemoDataRow demo={demo} />}
       <WhatsSetUp state={setUp} />
@@ -114,15 +119,22 @@ function DemoDataRow({ demo }: { demo: DemoSummary }) {
   }
 
   return (
-    <SettingsRow
-      label="Demo data"
-      hint={counts.length === 0 ? 'Nothing left' : counts.join(' · ')}
-    >
-      <Button variant="outline" pending={pending} onClick={() => void remove()}>
-        Remove demo data
-      </Button>
-      {confirmDialog}
-    </SettingsRow>
+    <>
+      <SettingsGroupHead title="Demo data" />
+      <SettingsRow label="Loaded">
+        <span className="mono text-micro text-graphite">
+          {counts.length === 0 ? 'nothing left' : counts.join(' · ')}
+        </span>
+        <Button
+          variant="outline"
+          pending={pending}
+          onClick={() => void remove()}
+        >
+          Remove demo data
+        </Button>
+        {confirmDialog}
+      </SettingsRow>
+    </>
   )
 }
 
@@ -130,12 +142,12 @@ function DemoDataRow({ demo }: { demo: DemoSummary }) {
 function WhatsSetUp({ state }: { state: SetupState }) {
   const set = SETUP_ITEMS.filter((item) => state[item.id]).length
   return (
-    <div className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <div className="flex flex-col">
+      <SettingsGroupHead
         title="What's set up"
         count={`${set} of ${SETUP_ITEMS.length}`}
       />
+      {/* The one line each item unlocks is D80's list itself, not a hint. */}
       {SETUP_ITEMS.map((item) => (
         <SettingsRow key={item.id} label={item.label} hint={item.unlocks}>
           <span className="mono text-micro text-graphite">
@@ -172,7 +184,7 @@ function WorkspaceNameRow({ name }: { name: string }) {
         value={draft.name}
         onChange={(e) => set('name', e.target.value)}
         placeholder="Your fund's name"
-        className="w-56"
+        className="w-70"
       />
     </SettingsRow>
   )
@@ -267,26 +279,26 @@ function BaseCurrencyRow({ baseCurrency }: { baseCurrency: string }) {
   const { draft, set } = useSettingsDraft(
     { currency: baseCurrency },
     async (next) => {
-      const currency = next.currency.trim().toUpperCase()
-      await setBaseCurrency({ data: { currency } })
+      await setBaseCurrency({ data: { currency: next.currency } })
       toast('Base currency saved')
       void router.invalidate()
-      return { currency }
+      return next
     },
   )
 
   return (
-    <SettingsRow
-      label="Base currency"
-      hint="Changing it re-prices the portfolio strip; ledgers keep their original currency."
-    >
-      <Input
+    <SettingsRow label="Base currency">
+      <Select
         id="fx-base"
         aria-label="Base currency"
         value={draft.currency}
-        onChange={(e) => set('currency', e.target.value)}
-        maxLength={3}
-        className="w-24 mono uppercase"
+        onChange={(code) => set('currency', code)}
+        items={baseCurrencyCodes(baseCurrency).map((code) => ({
+          value: code,
+          label: currencyLabel(code),
+        }))}
+        width="trigger"
+        className="w-60"
       />
     </SettingsRow>
   )

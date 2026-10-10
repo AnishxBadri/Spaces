@@ -8,7 +8,7 @@ import {
   readAiConfig,
 } from '@spaces/core/ai/attribute-ai'
 import type { AiAttributeMode } from '@spaces/core/ai/attribute-ai'
-import { SectionHead } from '#/components/ledger-section'
+import { SettingsGroupHead } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Segmented } from '#/components/ui/segmented'
 import { updateAttribute } from '#/lib/server-fns'
@@ -56,9 +56,8 @@ export function AiConfigSection({
   const configured = eligible.filter((a) => readAiConfig(a) !== null).length
   if (eligible.length === 0) return null
   return (
-    <section className="mt-8 flex flex-col">
-      <SectionHead
-        as="h3"
+    <section className="flex flex-col">
+      <SettingsGroupHead
         title="AI attributes"
         count={`${configured} configured`}
       />

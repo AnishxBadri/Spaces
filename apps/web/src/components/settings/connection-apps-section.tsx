@@ -3,8 +3,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { useSettingsDraft } from './settings-form'
-import { SettingsSection } from './settings-section'
-import { SectionHead } from '#/components/ledger-section'
+import { SettingsGroupHead, SettingsSection } from './settings-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import type { ProviderId } from '@spaces/core/providers/registry'
@@ -23,11 +22,7 @@ export function ConnectionAppsSection({
   apps: ReadonlyArray<ProviderAppRow>
 }) {
   return (
-    <SettingsSection
-      title="Connection apps"
-      blurb="The OAuth clients members connect their accounts through."
-      crumb="Integrations"
-    >
+    <SettingsSection title="Connection apps" crumb="Integrations">
       {apps.map((app) => (
         <OAuthClientGroup key={app.provider} app={app} />
       ))}
@@ -63,9 +58,8 @@ function OAuthClientGroup({ app }: { app: ProviderAppRow }) {
   )
 
   return (
-    <div id={oauthClientAnchor(app.provider)} className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <div id={oauthClientAnchor(app.provider)} className="flex flex-col">
+      <SettingsGroupHead
         title={`${app.label} OAuth client`}
         count={app.configured ? 'configured' : 'not configured'}
       />

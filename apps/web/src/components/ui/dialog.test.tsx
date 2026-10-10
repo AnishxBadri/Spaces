@@ -65,7 +65,7 @@ describe('the printed esc', () => {
     expect(source('./dialog.tsx')).not.toMatch(ESC)
   })
 
-  it.todo(
-    'is absent from settings-chassis.tsx — the settings head drops its own esc separately',
-  )
+  it('is absent from the settings chassis head', () => {
+    expect(source('../settings/settings-chassis.tsx')).not.toMatch(ESC)
+  })
 })

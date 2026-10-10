@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { SectionHead } from '#/components/ledger-section'
+import { SettingsGroupHead } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import type { CapabilityOwner } from '#/lib/integrations/catalogue'
 import type { IntegrationDetail } from '#/lib/server-fns'
@@ -70,8 +70,8 @@ export function PluginBlock({
   return (
     <section data-block={id} className="flex flex-col">
       {title === undefined ? null : (
-        <div className="flex flex-col pt-8">
-          <SectionHead as="h3" title={title} count={count} />
+        <div className="flex flex-col">
+          <SettingsGroupHead title={title} count={count} />
         </div>
       )}
       {children}

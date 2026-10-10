@@ -4,8 +4,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { backfillConfirmOptions, confirmThenStart } from './embed-backfill-flow'
 import { useSettingsDraft } from './settings-form'
-import { SettingsRow, SettingsSection } from './settings-section'
-import { SectionHead } from '#/components/ledger-section'
+import {
+  SettingsGroupHead,
+  SettingsRow,
+  SettingsSection,
+  SettingsTip,
+} from './settings-section'
 import { Button } from '#/components/ui/button'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { Input } from '#/components/ui/input'
@@ -177,14 +181,9 @@ export function EmbeddingsSection({
   }
 
   return (
-    <SettingsSection
-      title="Search"
-      blurb="Which model turns text into vectors for search. Search reads only the pinned model's vectors."
-      crumb="AI"
-    >
-      <div className="flex flex-col pt-8">
-        <SectionHead
-          as="h3"
+    <SettingsSection title="Search" crumb="AI">
+      <div className="flex flex-col">
+        <SettingsGroupHead
           title="Pin"
           count={pin ? pinHeadline(pin) : NO_PIN_HEADLINE}
         />
@@ -233,22 +232,19 @@ export function EmbeddingsSection({
         </ol>
 
         {descriptor.keyless ? (
-          <SettingsRow
-            label={`${descriptor.label} address`}
-            hint={
-              keyRow?.configured
-                ? `The ${descriptor.label} provider's address, from Settings → Models. ${OLLAMA_URL_GUIDANCE}`
-                : `Add ${descriptor.label} under Settings → Models first — no key, only its address. ${OLLAMA_URL_GUIDANCE}`
-            }
-          >
+          <SettingsRow label={`${descriptor.label} address`}>
             {keyRow?.configured ? (
               <span className="mono text-micro text-graphite">
                 {keyRow.baseUrl ?? descriptor.defaultBaseUrl}
               </span>
             ) : (
-              <Button size="sm" variant="outline" asChild>
-                <Link to="/settings/models">Models</Link>
-              </Button>
+              <SettingsTip
+                tip={`Add ${descriptor.label} under Settings → Models first — no key, only its address. ${OLLAMA_URL_GUIDANCE}`}
+              >
+                <Button size="sm" variant="outline" asChild>
+                  <Link to="/settings/models">Models</Link>
+                </Button>
+              </SettingsTip>
             )}
           </SettingsRow>
         ) : keyRow?.source === 'models' && keyRow.configured ? (
@@ -344,11 +340,11 @@ function ReusedModelsKey({
   if (different)
     return <EmbeddingKeyField provider={provider} keyRow={undefined} />
   return (
-    <SettingsRow
-      label={`${EMBEDDING_PROVIDER_INFO[provider].label} key`}
-      hint={reusedKeyLine(provider)}
-    >
+    <SettingsRow label={`${EMBEDDING_PROVIDER_INFO[provider].label} key`}>
       <span className="mono text-label">{keyRow.display ?? '••••'}</span>
+      <span className="mono text-micro text-graphite">
+        {reusedKeyLine(provider)}
+      </span>
       <Button size="sm" variant="outline" onClick={() => setDifferent(true)}>
         Use a different key
       </Button>
@@ -359,7 +355,7 @@ function ReusedModelsKey({
 /**
  * The provider's own embedding key, apart from any provider key: a typed
  * field in the page's Save bar. Write-only — it settles empty after a save,
- * and the hint reads the redacted display.
+ * and the redacted display sits beside it.
  */
 function EmbeddingKeyField({
   provider,
@@ -390,25 +386,29 @@ function EmbeddingKeyField({
           ? `Replace ${descriptor.label} embedding key`
           : `${descriptor.label} embedding key`
       }
-      hint={
-        keyRow?.configured
-          ? `Saved as ${keyRow.display ?? '••••'}. Its own key, apart from the ${descriptor.label} provider key.`
-          : 'Stored encrypted as the workspace embedding key, apart from any provider key.'
-      }
     >
-      <Input
-        id={`embed-${provider}-key`}
-        aria-label={`${descriptor.label} embedding API key`}
-        type="password"
-        autoComplete="off"
-        spellCheck={false}
-        value={draft.key}
-        onChange={(e) => set('key', e.target.value)}
-        placeholder={
-          keyRow?.configured ? '••••••••' : descriptor.keyPlaceholder
-        }
-        className="w-72 mono"
-      />
+      <SettingsTip
+        tip={`Its own key, apart from the ${descriptor.label} provider key.`}
+      >
+        <Input
+          id={`embed-${provider}-key`}
+          aria-label={`${descriptor.label} embedding API key`}
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          value={draft.key}
+          onChange={(e) => set('key', e.target.value)}
+          placeholder={
+            keyRow?.configured ? '••••••••' : descriptor.keyPlaceholder
+          }
+          className="w-72 mono"
+        />
+      </SettingsTip>
+      {keyRow?.configured ? (
+        <span className="mono text-micro text-graphite">
+          saved {keyRow.display ?? '••••'}
+        </span>
+      ) : null}
     </SettingsRow>
   )
 }
@@ -504,24 +504,22 @@ function Backfill({
 
   return (
     <>
-      <SectionHead
-        as="h3"
+      <SettingsGroupHead
         title="Backfill"
         count={<span className="tabular">{runLine(view)}</span>}
-        className="mt-8"
       />
       <SettingsRow
         label="Embed what is stored"
         hint={
           pendingChunks === 0
-            ? `Every chunk carries ${view.pin.model}. New ones are embedded as they arrive.`
+            ? undefined
             : sensitive === null
               ? 'Asks with this estimate first. Sensitive records are left out.'
               : `Asks with this estimate first. Sensitive records go only to ${sensitive.model}.`
         }
       >
         {pendingChunks > 0 ? (
-          <span className="flex flex-col items-end">
+          <span className="flex flex-col">
             {estimate.chunks > 0 ? (
               <span className="tabular mono text-micro text-graphite">
                 {backfillEstimateLine(estimate)}
@@ -620,8 +618,7 @@ function SensitiveSlot({
 
   return (
     <>
-      <SectionHead
-        as="h3"
+      <SettingsGroupHead
         title="Sensitive slot"
         count={
           pinLocal
@@ -630,7 +627,6 @@ function SensitiveSlot({
               ? slotHeadline(slot)
               : NO_SLOT_HEADLINE
         }
-        className="mt-8"
       />
       {pinLocal ? null : candidate === null ? (
         <SettingsRow

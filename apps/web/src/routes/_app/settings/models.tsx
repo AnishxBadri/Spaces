@@ -3,10 +3,12 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { useSettingsDraft } from '#/components/settings/settings-form'
 import {
+  SettingsGroupHead,
   SettingsRow,
   SettingsSection,
+  SettingsTip,
 } from '#/components/settings/settings-section'
-import { LedgerRow, SectionHead } from '#/components/ledger-section'
+import { LedgerRow } from '#/components/ledger-section'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
@@ -66,11 +68,7 @@ function ModelsRoute() {
   const { providers, routes, sensitivityDefault, embeddingPin } =
     Route.useLoaderData()
   return (
-    <SettingsSection
-      title="Models"
-      blurb="Which model providers this workspace calls, with whose key."
-      crumb="AI"
-    >
+    <SettingsSection title="Models" crumb="AI">
       <SensitivityGroup stored={sensitivityDefault} />
       <ProvidersGroup providers={providers} />
       <RoutingGroup
@@ -118,9 +116,8 @@ function SensitivityGroup({ stored }: { stored: AiSensitivity }) {
   }
 
   return (
-    <div className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <div className="flex flex-col">
+      <SettingsGroupHead
         title="Sensitivity"
         count="a floor · raises a record, never lowers it"
       />
@@ -167,9 +164,8 @@ function statusOf(row: ProviderRow): string {
  */
 function ProvidersGroup({ providers }: { providers: ProviderRow[] }) {
   return (
-    <div className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <div className="flex flex-col">
+      <SettingsGroupHead
         title="Providers"
         count={`${providers.filter((p) => p.configured).length} of ${providers.length} configured`}
       />
@@ -326,11 +322,6 @@ function ProviderFields({ row }: { row: ProviderRow }) {
           label={
             row.configured ? `Replace ${row.label} key` : `${row.label} key`
           }
-          hint={
-            row.configured
-              ? `Saved as ${row.display ?? '••••'}. Leave empty to keep it.`
-              : 'Stored encrypted as the workspace key.'
-          }
         >
           <Input
             id={`${id}-key`}
@@ -345,29 +336,37 @@ function ProviderFields({ row }: { row: ProviderRow }) {
             }
             className="w-72 mono"
           />
+          {row.configured ? (
+            <span className="mono text-micro text-graphite">
+              saved {row.display ?? '••••'}
+            </span>
+          ) : null}
         </SettingsRow>
       )}
       <SettingsRow
         label={descriptor.keyless ? `${row.label} base URL` : 'Base URL'}
-        hint={
-          descriptor.keyless
-            ? `Where ${row.label} listens. No key is needed; empty is ${descriptor.defaultBaseUrl}.`
-            : "Optional. Point the provider at a gateway you run; empty is the provider's own."
-        }
       >
-        <Input
-          id={`${id}-base-url`}
-          aria-label={`${row.label} base URL`}
-          type="url"
-          value={draft.baseUrl}
-          onChange={(e) => set('baseUrl', e.target.value)}
-          placeholder={descriptor.defaultBaseUrl}
-          className="w-72 mono"
-        />
+        <SettingsTip
+          tip={
+            descriptor.keyless
+              ? `Where ${row.label} listens. No key is needed; empty is ${descriptor.defaultBaseUrl}.`
+              : "Optional. Point the provider at a gateway you run; empty is the provider's own."
+          }
+        >
+          <Input
+            id={`${id}-base-url`}
+            aria-label={`${row.label} base URL`}
+            type="url"
+            value={draft.baseUrl}
+            onChange={(e) => set('baseUrl', e.target.value)}
+            placeholder={descriptor.defaultBaseUrl}
+            className="w-72 mono"
+          />
+        </SettingsTip>
       </SettingsRow>
       <SettingsRow
         label="Extra headers"
-        hint="Optional. One per line, Name: value. Stored as config, not encrypted."
+        hint="Stored as config, not encrypted."
       >
         <textarea
           id={`${id}-headers`}
@@ -427,9 +426,8 @@ function RoutingGroup({
   ).length
 
   return (
-    <div className="flex flex-col pt-8">
-      <SectionHead
-        as="h3"
+    <div className="flex flex-col">
+      <SettingsGroupHead
         title="Routing"
         count={`${routed} of ${MODELS_GRID_LANES.length * AI_SENSITIVITIES.length} routed`}
       />

@@ -1,38 +1,39 @@
 import { createContext, useContext } from 'react'
-import type { ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { SettingsForm, useInSettingsForm } from './settings-form'
 import type { SettingsCrumb } from './settings-nav'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '#/components/ui/tooltip'
 
 /**
  * The settings section — the shape every section of the settings shell takes
  * (`docs/design-contract.md` §3, "A settings section"), and the page head:
  * the shell draws no title of its own. Top to bottom:
  *
- *   - the **mono eyebrow**, `SETTINGS · <GROUP>` — the group is the one the
- *     section's row names in `SETTINGS_SECTIONS`;
- *   - the **serif title** in `title-serif`;
- *   - **one sans sentence** under it, graphite, optional — what the section
- *     decides, never instructions and never doctrine;
+ *   - the **mono eyebrow** in sentence case, `Settings · <Group>` — the group
+ *     is the one the section's row names in `SETTINGS_SECTIONS`;
+ *   - the **serif title** in `title-serif`, and no sentence under it (D81);
  *   - for a member on an admin page, one mono line, "Only admins can change
  *     this · ask <admins>", and every control in the section disabled (D81);
  *   - an optional **action** right — the one primary of the section;
- *   - a **hairline under** the head, then the rows.
+ *   - the **double rule** under the head (a settings section is the page),
+ *     then the rows, grouped under `SettingsGroupHead` caps labels.
  *
  * The section belongs to a page form (`SettingsForm`): typed fields collect
  * into its one Save bar. With no page form above it, the section opens one.
  */
 export function SettingsSection({
   title,
-  blurb,
   crumb,
   action,
   adminOnly = false,
   children,
 }: {
   title: string
-  /** One sentence, what the section decides. Omit when the title says it. */
-  blurb?: ReactNode
-  /** The section's group, printed caps in the eyebrow as `SETTINGS · GENERAL`. */
+  /** The section's group, printed in the eyebrow as `Settings · Workspace`. */
   crumb: SettingsCrumb
   action?: ReactNode
   /**
@@ -48,13 +49,15 @@ export function SettingsSection({
 
   const section = (
     <section className="flex flex-col">
-      <div className="flex items-end justify-between gap-6 border-b border-hairline pb-4">
+      <div
+        data-settings-head
+        className="flex items-end justify-between gap-6 pb-2.5 double-rule"
+      >
         <div className="flex min-w-0 flex-col gap-1.5">
-          <div className="mono text-micro leading-3.5 tracking-[0.08em] text-graphite uppercase">
+          <div className="mono text-micro leading-3.5 text-graphite">
             Settings · {crumb}
           </div>
           <h1 className="title-serif">{title}</h1>
-          {blurb ? <p className="text-ui text-graphite">{blurb}</p> : null}
           {readOnly ? (
             <p data-read-only className="mono text-micro text-graphite">
               {readOnlyLine(page.admins)}
@@ -119,8 +122,73 @@ export function useSettingsPage(): SettingsPage {
   return useContext(PageContext)
 }
 
-/** One row: label + hint left, the control right. 48px on a rule, inset
- *  12px so the label sits under a group band's title. */
+/**
+ * A group inside a settings page: a mono caps label on a hairline
+ * (`IDENTITY`, `PROVIDERS`, `RATES`), 28px above it.
+ * - Never the bone `SectionHead` band: a band heads a ledger, and a settings
+ *   page is the page.
+ */
+export function SettingsGroupHead({
+  title,
+  count,
+  action,
+}: {
+  title: ReactNode
+  /** Mono readout after the label — "1 of 7". */
+  count?: ReactNode
+  /** The group's one action, mono, right. */
+  action?: ReactNode
+}) {
+  return (
+    <div
+      data-settings-group
+      className="flex items-end justify-between gap-4 border-b border-hairline pt-7 pb-1.5"
+    >
+      <div className="flex min-w-0 items-baseline gap-3">
+        <h3 className="min-w-0 truncate field-label leading-3.5 font-medium text-graphite">
+          {title}
+        </h3>
+        {count ? (
+          <span className="shrink-0 mono text-micro leading-3.5 text-graphite">
+            {count}
+          </span>
+        ) : null}
+      </div>
+      {action ? (
+        <div className="flex shrink-0 items-baseline gap-3 mono text-micro text-graphite">
+          {action}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * A tooltip on one control — where a row's explanation goes when it is not
+ * about cost, privacy or something irreversible (D81). The child must take a
+ * ref and spread its props (an `Input`, a `Button`).
+ */
+export function SettingsTip({
+  tip,
+  children,
+}: {
+  tip: ReactNode
+  children: ReactElement
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent className="max-w-64">{tip}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/**
+ * One row on a rule: the label in a 210px lane, the control in the lane after
+ * it, left-aligned — never pinned to the row's end.
+ * - `hint` is for cost, privacy or something irreversible only (D81); any
+ *   other explanation is a tooltip on the control, or nothing.
+ */
 export function SettingsRow({
   label,
   hint,
@@ -131,13 +199,15 @@ export function SettingsRow({
   children?: ReactNode
 }) {
   return (
-    <div className="flex min-h-12 items-center justify-between gap-6 border-b border-rule px-3 py-2">
-      <div className="flex min-w-0 flex-col">
+    <div className="flex min-h-12 items-center gap-6 border-b border-rule py-2">
+      <div className="flex w-[13.125rem] shrink-0 flex-col gap-0.5">
         <span className="text-ui font-medium">{label}</span>
         {hint ? <span className="text-label text-graphite">{hint}</span> : null}
       </div>
       {children ? (
-        <div className="flex shrink-0 items-center gap-2">{children}</div>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
+          {children}
+        </div>
       ) : null}
     </div>
   )
