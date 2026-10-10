@@ -2,7 +2,7 @@ import { Effect, Exit } from 'effect'
 import { z } from 'zod'
 import { readEntity, testPorts } from '@spaces/sdk/testing'
 import type { RecordedCall } from '@spaces/sdk/testing'
-import type { EventInput, ReadEntity } from '@spaces/sdk'
+import type { ReadEntity } from '@spaces/sdk'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { jobs } from './index.ts'
 import { APOLLO_API, PHONE_CREDITS, endpointUrl } from './map.ts'
@@ -487,84 +487,6 @@ describe('signals', () => {
       expect((await run(jobs.enrichPerson, ports))._tag).toBe('Success')
       expect(ports.content.calls).toEqual([])
     }
-  })
-})
-
-describe('autoEnrich', () => {
-  const fired = (
-    event: EventInput['event'],
-    ports: ReturnType<typeof testPorts>,
-  ) =>
-    Effect.runPromiseExit(
-      jobs.autoEnrich({ event }).pipe(Effect.provide(ports.layer)),
-    )
-  const base = { entityId: 'entity-0', occurredAt: '2026-10-02T12:00:00Z' }
-  const triggers: ReadonlyArray<EventInput['event']> = [
-    { ...base, name: 'entity.created', kind: 'company' },
-    { ...base, name: 'filed', kind: 'company', spaceId: 'space-1' },
-    { ...base, name: 'deal.linked', kind: 'company', dealId: 'deal-1' },
-  ]
-
-  it.each(triggers.map((t): [string, EventInput['event']] => [t.name, t]))(
-    'enriches a company with a domain on %s exactly as the action does',
-    async (_, event) => {
-      const ports = portsFor(company, ORG_URL, {
-        body: fixture('organization.json'),
-      })
-      expect((await fired(event, ports))._tag).toBe('Success')
-      expect(ports.calls.map((c) => `${c.port}.${c.method}`)).toEqual([
-        'Read.entity',
-        'Secrets.get',
-        'Http.request',
-        'Receipts.store',
-        'Identity.addAlias',
-        'Facts.answer',
-        'Content.emitSignal',
-        'Log.info',
-      ])
-      expect(ports.receipts.calls[0]?.input).toMatchObject({ creditsUsed: 1 })
-    },
-  )
-
-  it('enriches a person who joins a deal, by email', async () => {
-    const ports = portsFor(person, PERSON_URL, { body: fixture('person.json') })
-    const exit = await fired(
-      { ...base, name: 'deal.linked', kind: 'person', dealId: 'deal-1' },
-      ports,
-    )
-    expect(exit._tag).toBe('Success')
-    expect(ports.http.calls).toHaveLength(1)
-    expect(ports.facts.answers.get('entity-0')).toMatchObject({
-      'person.title': 'Co-founder & CTO',
-    })
-  })
-
-  it('declines a company with no domain without a key, a call or a credit', async () => {
-    const ports = testPorts({
-      secret: TEST_KEY,
-      entities: [readEntity({ id: 'entity-0', name: 'No domain' })],
-    })
-    const exit = await fired(
-      { ...base, name: 'entity.created', kind: 'company' },
-      ports,
-    )
-    expect(exit._tag).toBe('Success')
-    expect(ports.calls.map((c) => `${c.port}.${c.method}`)).toEqual([
-      'Read.entity',
-      'Log.info',
-    ])
-    expect(ports.http.calls).toEqual([])
-    expect(ports.receipts.calls).toEqual([])
-  })
-
-  it('declines a deal before reading anything', async () => {
-    const ports = testPorts({ secret: TEST_KEY, entities: [person] })
-    const exit = await fired(
-      { ...base, name: 'entity.created', kind: 'deal' },
-      ports,
-    )
-    expect(exit._tag).toBe('Success')
-    expect(ports.calls).toEqual([])
   })
 })
 

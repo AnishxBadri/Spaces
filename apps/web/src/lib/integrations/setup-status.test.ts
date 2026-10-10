@@ -13,7 +13,6 @@ import { resolveEntity } from '@spaces/core/writes/entities/resolve'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import {
   companyCountProgram,
-  enrichSetupProgram,
   setupAudienceProgram,
   whatsSetUpProgram,
 } from './setup-status'
@@ -120,10 +119,6 @@ describe("What's set up", () => {
       google: true,
       granola: true,
       exa: true,
-    })
-    expect(await run(enrichSetupProgram())).toEqual({
-      website: false,
-      sources: 1,
     })
   })
 })

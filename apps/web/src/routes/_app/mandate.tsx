@@ -210,7 +210,7 @@ function FactsGrid({
     >
       <FactRow
         label="Stages"
-        note={`${mandate.stages.length} of ${stages.length} · click toggles`}
+        note={`${mandate.stages.length} of ${stages.length}`}
       >
         {stages.map((opt) => {
           const active = mandate.stages.includes(opt.id)
@@ -244,7 +244,7 @@ function FactsGrid({
         <GeoChips geos={mandate.geos} onSave={(geos) => save({ geos })} />
       </FactRow>
 
-      <FactRow label="Check size" note="whole units · flags, never blocks" last>
+      <FactRow label="Check size" note="whole units" last>
         <CheckSizeInputs
           checkMin={mandate.checkMin}
           checkMax={mandate.checkMax}

@@ -142,13 +142,10 @@ export const listJumpViews = createServerFn().handler(async () => {
  * bar. `live` carries the conditions the page is showing for its active view
  * when they differ from the saved ones, so that chip moves with the table.
  *
- * **Object surfaces only.** `/files` is excluded by this validator, not
- * by an oversight: its registry is synthetic (docsurf-12b,
- * `lib/documents/registry.ts`) — its fields are columns and edges projected
- * in the browser, there is no `entity.values` for `entityValuesResolver` to
- * read, and its conditions do not compile through `compileConditions`
- * today. Counting it would take a column-backed `FieldResolver` for the
- * shelf, which is a surface resolver of its own, not a count.
+ * **Object surfaces only.** The document surface is excluded on purpose:
+ * its fields are columns and edges, there is no `entity.values` for
+ * `entityValuesResolver` to read, and counting it would take a
+ * column-backed `FieldResolver` of its own.
  */
 export const countViews = createServerFn()
   .validator(

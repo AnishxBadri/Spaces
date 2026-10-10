@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { eq } from 'drizzle-orm'
+import { db } from '@spaces/db'
+import { integration } from '@spaces/db/schema'
+import { jsonValue } from '@spaces/core/json'
 import { settingsJsonSchema } from '@spaces/sdk'
 import {
   checkSettings,
@@ -33,6 +37,49 @@ const fieldsOf = (settings: unknown) => {
 }
 
 describe('settingsFormOf', () => {
+  it('draws a stored manifest in declaration order, though jsonb sorts its keys', async () => {
+    const settings = settingsJsonSchema(
+      z.object({ z: z.string(), a: z.int(), m: z.boolean() }),
+    )
+    const row = (
+      await db
+        .insert(integration)
+        .values({
+          capabilityId: 'order-fixture',
+          version: '1.0.0',
+          manifest: {
+            name: 'Order fixture',
+            settings: jsonValue.parse(settings),
+          },
+        })
+        .returning({ id: integration.id })
+    ).at(0)
+    if (!row) throw new Error('no integration')
+    const stored = (
+      await db
+        .select({ manifest: integration.manifest })
+        .from(integration)
+        .where(eq(integration.id, row.id))
+    ).at(0)?.manifest
+    const back = z.object({ settings: z.unknown() }).parse(stored).settings
+    // What Postgres hands back is sorted; the form still reads z, a, m.
+    expect(
+      Object.keys(
+        z.object({ properties: z.object({}).loose() }).parse(back).properties,
+      ),
+    ).toEqual(['a', 'm', 'z'])
+    expect(fieldsOf(back).map((f) => f.key)).toEqual(['z', 'a', 'm'])
+  })
+
+  it('falls back to the stored order for a manifest without propertyOrder', () => {
+    expect(
+      fieldsOf({
+        type: 'object',
+        properties: { b: { type: 'string' }, a: { type: 'string' } },
+      }).map((f) => f.key),
+    ).toEqual(['b', 'a'])
+  })
+
   it('draws string, number, boolean and enum fields in declaration order', () => {
     const fields = fieldsOf(
       settingsJsonSchema(

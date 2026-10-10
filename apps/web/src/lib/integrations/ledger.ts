@@ -320,7 +320,7 @@ export const hasEventJob = (manifest: Manifest | null): boolean =>
   manifest !== null &&
   Object.values(manifest.jobs).some((job) => job.trigger === 'event')
 
-/** Every live space, labelled `Fintech / Payments`, in path order. */
+/** Every live space, labelled `Fintech / Payments`, in path order; archived ones are out of the picker. (D73) */
 export const spaceOptions = query(async () => {
   const rows = await db
     .select({
@@ -330,7 +330,7 @@ export const spaceOptions = query(async () => {
     })
     .from(space)
     .innerJoin(entity, eq(entity.id, space.entityId))
-    .where(isNull(entity.mergedIntoId))
+    .where(and(isNull(entity.mergedIntoId), isNull(space.archivedAt)))
     .orderBy(asc(space.path))
   const names = new Map(rows.map((r) => [r.path, r.name]))
   return rows.map((r) => {

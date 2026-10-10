@@ -8,6 +8,8 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
+import { Popover, PopoverAnchor, PopoverContent } from '#/components/ui/popover'
+import { useCallingCodes } from './calling-codes'
 import { DitherMark, InitialsMark } from '#/components/record/record-parts'
 import { Badge } from '#/components/ui/badge'
 import { Checkbox } from '#/components/ui/checkbox'
@@ -431,11 +433,18 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
         : def.type === 'number' || def.type === 'currency'
           ? 'number'
           : 'text'
+  // A phone offers the ITU codes on focus until one is in.
+  const codes = useCallingCodes({
+    draft,
+    active: phone && focused,
+    onPick: setDraft,
+  })
 
-  return (
+  const field = (
     <input
       type={inputType}
       inputMode={def.type === 'number' ? 'decimal' : phone ? 'tel' : undefined}
+      {...(phone ? codes.inputProps : {})}
       value={formatted ? atRest(draft) : draft}
       autoFocus={autoFocus}
       aria-label={def.name}
@@ -447,6 +456,7 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
         commit()
       }}
       onKeyDown={(e) => {
+        if (phone && codes.onKeyDown(e)) return
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- React types a key event's target as EventTarget; the handler is on the input itself
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
         if (e.key === 'Escape') {
@@ -469,6 +479,20 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
             'focus-ring-inset h-full rounded-md px-1',
       )}
     />
+  )
+  if (!phone) return field
+  return (
+    <Popover open={codes.open}>
+      <PopoverAnchor asChild>{field}</PopoverAnchor>
+      <PopoverContent
+        align="start"
+        className="w-64 p-0"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        {codes.list}
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -603,8 +627,14 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
   const selected: Array<string> = Array.isArray(value) ? value.map(String) : []
   const [draft, setDraft] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
+  const [focused, setFocused] = useState(false)
   const phone = def.type === 'phone'
   const shown = (v: string) => (phone ? formatPhone(v) : v)
+  const codes = useCallingCodes({
+    draft,
+    active: phone && focused,
+    onPick: setDraft,
+  })
   // A cell shows a list's first phone, a property row a person's first
   // email; a mono +N counts the rest.
   const chips =
@@ -681,12 +711,16 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
                   ? '+14155550100 ↵'
                   : 'company.com ↵'
             }
+            {...(phone ? codes.inputProps : {})}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             onChange={(e) => {
               setDraft(e.target.value)
               setProblem(null)
             }}
             onKeyDown={(e) => {
               e.stopPropagation()
+              if (phone && codes.onKeyDown(e)) return
               if (e.key === 'Enter') {
                 e.preventDefault()
                 add()
@@ -700,6 +734,9 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
             </p>
           ) : null}
         </div>
+        {phone && codes.open ? (
+          <div className="border-b border-rule">{codes.list}</div>
+        ) : null}
         {selected.map((v) => (
           <DropdownMenuItem
             key={v}

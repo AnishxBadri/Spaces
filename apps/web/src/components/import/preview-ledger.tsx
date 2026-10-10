@@ -9,7 +9,9 @@ import {
   whyOf,
 } from '@spaces/core/import/plan'
 import { NoLandTail } from '#/components/import/import-wizard'
-import { KeyHint, PageHeader, ReadoutStrip } from '#/components/page-header'
+import { KeyHint, PageHeader } from '#/components/page-header'
+import { ReadoutStrip, countReadout } from '#/components/record/record-parts'
+import type { CountCell } from '#/components/record/record-parts'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { cn } from '#/lib/utils'
@@ -103,36 +105,38 @@ export function PreviewStrip({
   const to = `/import/${batchId}`
   return (
     <ReadoutStrip
-      className="border-t border-t-hairline border-b-rule"
-      cells={[
-        {
-          label: 'Create',
-          value: counts.create,
-          to,
-          search: { show: 'create' },
-        },
-        {
-          label: 'Attach',
-          value: counts.attach,
-          to,
-          search: { show: 'attach' },
-        },
-        {
-          label: 'Will not land',
-          value: counts.noLand,
-          tone: 'bad',
-          to,
-          search: { show: 'noland' },
-        },
-        {
-          label: 'Collide',
-          value: counts.collide,
-          tone: 'warn',
-          to,
-          search: { show: 'decide' },
-        },
-        { label: 'Cells skipped', value: counts.cellsSkipped },
-      ]}
+      className="border-b border-rule px-8"
+      readouts={(
+        [
+          {
+            label: 'Create',
+            value: counts.create,
+            to,
+            search: { show: 'create' },
+          },
+          {
+            label: 'Attach',
+            value: counts.attach,
+            to,
+            search: { show: 'attach' },
+          },
+          {
+            label: 'Will not land',
+            value: counts.noLand,
+            tone: 'bad',
+            to,
+            search: { show: 'noland' },
+          },
+          {
+            label: 'Collide',
+            value: counts.collide,
+            tone: 'warn',
+            to,
+            search: { show: 'decide' },
+          },
+          { label: 'Cells skipped', value: counts.cellsSkipped },
+        ] satisfies Array<CountCell>
+      ).map(countReadout)}
     />
   )
 }

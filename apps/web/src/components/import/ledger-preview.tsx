@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { INSTRUMENT_LABELS, ledgerSentence } from '@spaces/core/import/ledger'
 import { NoLandTail, StepStrip } from '#/components/import/import-wizard'
-import { KeyHint, PageHeader, ReadoutStrip } from '#/components/page-header'
+import { KeyHint, PageHeader } from '#/components/page-header'
+import { ReadoutStrip, countReadout } from '#/components/record/record-parts'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
@@ -220,8 +221,8 @@ export function LedgerPreviewStep({
       />
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto pb-6">
         <ReadoutStrip
-          className="border-t border-t-hairline border-b-rule"
-          cells={ledgerStripCells(counts)}
+          className="border-b border-rule px-8"
+          readouts={ledgerStripCells(counts).map(countReadout)}
         />
         <section className="flex flex-col px-8">
           <div className="flex h-8 items-center gap-3 border-b border-hairline px-2 label-caps text-graphite">

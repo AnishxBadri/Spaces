@@ -19,7 +19,6 @@ import type {
   ActionInput,
   CostInput,
   EntityId,
-  EventInput,
   JsonValue,
   ReadEntity,
   RecordKind,
@@ -234,35 +233,6 @@ export const jobs = {
     }),
     cost,
   },
-  /**
-   * Auto-enrich: the Enrich button pressed by the host when a trigger fires
-   * in the owner's scope. A company is asked by domain, a person by email or
-   * LinkedIn; anything else — a deal, a record with no key — is declined
-   * before the key is read or Apollo is called, so it spends no credit, and
-   * declining is a success: nothing was asked of it.
-   */
-  autoEnrich: Effect.fn('apollo.autoEnrich')(function* ({ event }: EventInput) {
-    if (event.kind === 'deal') return
-    const found = yield* (yield* Read).entity(event.entityId)
-    const declined = (reason: string) =>
-      Effect.gen(function* () {
-        yield* (yield* Log).info(`declined: ${reason}`, {
-          entityId: event.entityId,
-          trigger: event.name,
-        })
-      })
-    if (found?.kind === 'company') {
-      const domain = first(found.keys.domain)
-      if (domain === undefined) return yield* declined('no domain')
-      return yield* enrichByDomain(event.entityId, domain)
-    }
-    if (found?.kind === 'person') {
-      const query = personQuery(found)
-      if (query === null) return yield* declined('no email or LinkedIn')
-      return yield* enrichPersonRecord(event.entityId, found, query)
-    }
-    return yield* declined('not a company or a person')
-  }),
   enrichPerson: {
     run: Effect.fn('apollo.enrichPerson')(function* ({
       entityId,

@@ -182,6 +182,7 @@ describe('loadPortfolio — the one book Today and Portfolio read', () => {
         />,
       ),
     )
+    // The strip prints each number over its label; read it label first.
     const portfolio = figures(
       renderToStaticMarkup(
         <PortfolioHeadlineStrip
@@ -189,7 +190,7 @@ describe('loadPortfolio — the one book Today and Portfolio read', () => {
           baseCurrency={now.baseCurrency}
         />,
       ),
-    )
+    ).map(([value, label]): [string, string] => [label, value])
 
     // Same figures from one rollup — only the money's precision is the
     // surface's to choose (Today exact, Portfolio compact). The rail leaves

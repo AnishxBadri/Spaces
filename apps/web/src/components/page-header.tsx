@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import {
   HeadActions,
@@ -115,86 +114,5 @@ export function KeyHint({ children }: { children: ReactNode }) {
     >
       {children}
     </kbd>
-  )
-}
-
-export type ReadoutTone = 'bad' | 'warn'
-
-export type ReadoutCell = {
-  label: ReactNode
-  value: number | string
-  /** Colour only when the number is nonzero and means trouble. */
-  tone?: ReadoutTone
-  to?: string
-  /**
-   * Search params for `to` (SPA-124). A counter whose destination is a
-   * *filtered* list — Today's Unfiled cell pointing at
-   * `/files?filed=unfiled` — has to carry the filter or the link lands on
-   * a different number than the one it printed. Dropping the link instead
-   * would make that cell the only dead one in the strip.
-   */
-  search?: Record<string, string>
-}
-
-/**
- * Readout strip: cells split by rules, hairline under. Label is caps mono
- * 10px; value is mono 20/500. A zero reads in graphite — nothing to see —
- * and colour appears only when the value is nonzero and bad.
- */
-export function ReadoutStrip({
-  cells,
-  className,
-}: {
-  cells: Array<ReadoutCell>
-  className?: string
-}) {
-  return (
-    <div
-      className={cn('flex h-16 shrink-0 border-b border-hairline', className)}
-    >
-      {cells.map((cell, i) => {
-        const zero = cell.value === 0 || cell.value === '0'
-        const colour = zero
-          ? 'text-graphite'
-          : cell.tone === 'bad'
-            ? 'text-destructive'
-            : cell.tone === 'warn'
-              ? 'text-warning'
-              : 'text-foreground'
-        const inner = (
-          <>
-            <span className="field-label text-graphite">{cell.label}</span>
-            <span className={cn('mono text-xl leading-6 font-medium', colour)}>
-              {cell.value}
-            </span>
-          </>
-        )
-        const cls = cn(
-          'flex min-w-0 flex-1 flex-col justify-center gap-0.5 border-r border-rule px-6 last:border-r-0',
-          i === 0 && 'pl-8',
-        )
-        return cell.to ? (
-          <Link
-            key={i}
-            to={cell.to}
-            // Spread rather than `search={cell.search}`: under
-            // `exactOptionalPropertyTypes` an omitted field is not the same
-            // claim as an explicit `undefined`, and a cell with no filter
-            // must pass no `search` at all.
-            {...(cell.search ? { search: cell.search } : {})}
-            className={cn(
-              cls,
-              'focus-ring-inset transition-colors hover:bg-bone',
-            )}
-          >
-            {inner}
-          </Link>
-        ) : (
-          <div key={i} className={cls}>
-            {inner}
-          </div>
-        )
-      })}
-    </div>
   )
 }

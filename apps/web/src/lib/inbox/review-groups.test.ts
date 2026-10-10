@@ -8,6 +8,8 @@ import {
   space,
   suggestion,
 } from '@spaces/db/schema'
+import { listInboxProgram } from './queue'
+import type { InboxRow } from './queue'
 import { reviewGroupsProgram } from './review-groups'
 
 /**
@@ -189,5 +191,32 @@ describe('reviewGroupsProgram', () => {
       },
     ])
     expect(groups[0].spaceId).toBe(ops)
+    expect(groups[0].sourceRef).toBe(exa)
+
+    // Each row's link opens the queue on its source and space: the cards
+    // there are the cards the rows sharing that pair count.
+    const cards = (rows: ReadonlyArray<InboxRow>) =>
+      rows.reduce(
+        (n, r) =>
+          r.kind === 'suggestion' || r.kind === 'discovery'
+            ? n + r.suggestions.length
+            : n,
+        0,
+      )
+    const opened = (source: string | null, spaceId: string | null) =>
+      Effect.runPromise(
+        listInboxProgram({ record: null, source, space: spaceId }),
+      )
+    for (const g of groups) {
+      const rows = await opened(g.sourceRef, g.spaceId)
+      const counted = groups
+        .filter((o) => o.sourceRef === g.sourceRef && o.spaceId === g.spaceId)
+        .reduce((n, o) => n + o.total, 0)
+      if (g.spaceId !== null) expect(cards(rows), g.key).toBe(counted)
+      expect(rows.some((r) => r.kind === 'duplicate_candidate')).toBe(false)
+    }
+    // Judgment alone: the filed card and the unfiled one.
+    expect(cards(await opened('judgment', null))).toBe(2)
+    expect(cards(await opened(null, ops))).toBe(6)
   })
 })

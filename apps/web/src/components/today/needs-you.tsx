@@ -112,14 +112,16 @@ function ReviewLink({
   group: ReviewGroup
   children: ReactNode
 }) {
-  // Review filters by one anchor: a space's discovery cards come back under
-  // `record=<space>`; any other group opens the whole queue.
-  return group.spaceId !== null && group.toReview === 0 ? (
-    <Link to="/review" search={{ record: group.spaceId }} className={rowLink}>
-      {children}
-    </Link>
-  ) : (
-    <Link to="/review" className={rowLink}>
+  // The row opens the queue filtered to its source and space.
+  return (
+    <Link
+      to="/review"
+      search={{
+        ...(group.sourceRef === null ? {} : { source: group.sourceRef }),
+        ...(group.spaceId === null ? {} : { space: group.spaceId }),
+      }}
+      className={rowLink}
+    >
       {children}
     </Link>
   )

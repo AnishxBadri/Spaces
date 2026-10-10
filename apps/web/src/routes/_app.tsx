@@ -17,7 +17,14 @@ import { UploadDialog } from '#/components/upload-dialog'
 import { Wordmark } from '#/components/wordmark'
 import { Toaster } from '#/components/ui/sonner'
 import { setChassisCollapsed, useChassisCollapsed } from '#/lib/chassis-store'
-import { getSession, getWorkspace, listObjects } from '#/lib/server-fns'
+import {
+  getSession,
+  getWorkspace,
+  listDueTaskDays,
+  listObjects,
+} from '#/lib/server-fns'
+import { dueCount } from '#/lib/tasks/due'
+import { localToday } from '@spaces/core/tasks/parse-due'
 import { useHotkeys } from '#/lib/use-hotkey'
 import { cn } from '#/lib/utils'
 
@@ -29,18 +36,22 @@ export const Route = createFileRoute('/_app')({
     return { session }
   },
   loader: async () => {
-    const [workspace, objects] = await Promise.all([
+    // Due days ride the shell's loader, so a task saved anywhere (which
+    // invalidates the router) moves the sidebar's count too.
+    const [workspace, objects, dueDays] = await Promise.all([
       getWorkspace(),
       listObjects(),
+      listDueTaskDays(),
     ])
-    return { workspace, objects: objects.filter((o) => !o.isSystem) }
+    return { workspace, objects: objects.filter((o) => !o.isSystem), dueDays }
   },
   component: AppShell,
 })
 
 function AppShell() {
   const { session } = Route.useRouteContext()
-  const { workspace, objects } = Route.useLoaderData()
+  const { workspace, objects, dueDays } = Route.useLoaderData()
+  const tasksDue = dueCount(dueDays, localToday())
   const [commandOpen, setCommandOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const collapsed = useChassisCollapsed()
@@ -81,6 +92,7 @@ function AppShell() {
             workspaceName={workspace?.name ?? null}
             workspaceLogo={workspace?.logo ?? null}
             objects={objects}
+            tasksDue={tasksDue}
             onOpenCommand={() => setCommandOpen(true)}
             collapsed={collapsed}
             onToggleCollapsed={() => setChassisCollapsed(!collapsed)}
@@ -122,6 +134,7 @@ function AppShell() {
               workspaceName={workspace?.name ?? null}
               workspaceLogo={workspace?.logo ?? null}
               objects={objects}
+              tasksDue={tasksDue}
               onOpenCommand={() => {
                 setMobileNavOpen(false)
                 setCommandOpen(true)

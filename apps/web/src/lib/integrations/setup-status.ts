@@ -10,14 +10,12 @@ import {
   user,
 } from '@spaces/db/schema'
 import { manifestSchema } from '@spaces/sdk'
-import { enrichActionFor } from '@spaces/core/enrichment/settings'
 import { isLaneRoutedProgram } from '#/lib/ai/route'
-import { runnable } from '#/lib/integrations/runnable'
 import type { SetupState } from '#/lib/setup/whats-set-up'
 
 /**
  * The first-run reads (D80): whether the workspace holds a company yet, who
- * a member asks, what Enrich will ask, and What's set up. Each is read live;
+ * a member asks, and What's set up. Each is read live;
  * nothing about setup is stored.
  */
 
@@ -68,33 +66,6 @@ export const setupAudienceProgram = Effect.fn('setupAudienceProgram')(
 /** Whether the Extract lane is routed for a normal record — the Website's one need. */
 const websiteAvailable = () =>
   isLaneRoutedProgram('extract', null).pipe(Effect.map((r) => r.normal))
-
-/** Runnable plugins that answer Enrich on a company. */
-const companySources = Effect.fn('companySources')(function* () {
-  const rows = yield* query(() =>
-    db
-      .select({ manifest: integration.manifest })
-      .from(integration)
-      .where(runnable),
-  )
-  return rows.filter((r) => enrichActionFor(r.manifest, 'company') !== null)
-    .length
-})
-
-/** What a company's Enrich will ask: the built-in Website and the plugin sources. */
-export type EnrichSetup = {
-  readonly website: boolean
-  readonly sources: number
-}
-
-export const enrichSetupProgram = Effect.fn('enrichSetupProgram')(
-  function* (): Effect.fn.Return<EnrichSetup, SetupReadFailed> {
-    return {
-      website: yield* websiteAvailable(),
-      sources: yield* companySources(),
-    }
-  },
-)
 
 /**
  * What's set up, each item from where it lives:

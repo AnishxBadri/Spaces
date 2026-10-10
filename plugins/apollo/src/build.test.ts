@@ -52,15 +52,8 @@ describe('the apollo manifest.json', () => {
       credential: { kind: 'enrichment', scope: 'workspace' },
     })
     expect(parsed.http).toEqual({ rateLimit: { rpm: 50 } })
-    expect(Object.keys(parsed.jobs)).toEqual([
-      'enrichCompany',
-      'enrichPerson',
-      'autoEnrich',
-    ])
-    expect(parsed.jobs.autoEnrich).toMatchObject({
-      trigger: 'event',
-      on: ['entity.created', 'filed', 'deal.linked'],
-    })
+    // No event job: the host's enrichment run presses the actions. (D76)
+    expect(Object.keys(parsed.jobs)).toEqual(['enrichCompany', 'enrichPerson'])
     expect(parsed.actions?.map((a) => [a.on, a.job])).toEqual([
       ['company', 'enrichCompany'],
       ['person', 'enrichPerson'],

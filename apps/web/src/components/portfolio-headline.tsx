@@ -1,4 +1,4 @@
-import { ReadoutStrip } from '#/components/page-header'
+import { ReadoutStrip } from '#/components/record/record-parts'
 import { fmtMoney, fmtMultiple, fmtXirr } from '@spaces/core/portfolio/format'
 import {
   portfolioHeadline,
@@ -40,7 +40,8 @@ export function PortfolioHeadlineStrip({
 }) {
   return (
     <ReadoutStrip
-      cells={[
+      className="border-t-0 border-b border-hairline px-8"
+      readouts={[
         ...portfolioHeadline(rollup).map((f) => ({
           label: f.label,
           value: formatFigure(f, baseCurrency, true),

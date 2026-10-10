@@ -1,9 +1,21 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  sql,
+} from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, objectDef } from '@spaces/db/schema'
 import { task, taskEntity } from '@spaces/db/schema/tasks'
 import { user } from '@spaces/db/schema/auth'
+import type { DueDay } from './due'
 
 /**
  * The /tasks read (CONTEXT.md 15b), outside `lib/server/` so a test can run
@@ -141,3 +153,22 @@ export const listTasksProgram = Effect.fn('listTasksProgram')(function* ({
   })
   return { open: open.map(serialize), done: done.map(serialize) }
 })
+
+/**
+ * Open tasks with a due date, counted per day up to tomorrow: the overdue
+ * ones and every day a reader's clock could call today.
+ */
+export const dueDaysProgram = Effect.fn('dueDaysProgram')(
+  function* (): Effect.fn.Return<Array<DueDay>, TaskQueryFailed> {
+    const rows = yield* query(() =>
+      db
+        .select({ day: task.dueDate, n: count() })
+        .from(task)
+        .where(
+          and(isNull(task.doneAt), lte(task.dueDate, sql`current_date + 1`)),
+        )
+        .groupBy(task.dueDate),
+    )
+    return rows.flatMap((r) => (r.day === null ? [] : [{ day: r.day, n: r.n }]))
+  },
+)

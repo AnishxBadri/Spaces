@@ -6,11 +6,13 @@ import { describe, expect, it } from 'vitest'
 
 import { SheetTabs } from './import/import-wizard.tsx'
 import { LedgerSection, SectionHead } from './ledger-section.tsx'
-import { PageHeader, ReadoutStrip } from './page-header.tsx'
+import { PageHeader } from './page-header.tsx'
 import {
   RailSection,
+  ReadoutStrip,
   RecordHeader,
   RecordSection,
+  countReadout,
 } from './record/record-parts.tsx'
 import { DialogHeader } from './ui/dialog.tsx'
 import { Stamp, spaceStamp } from './ui/stamp.tsx'
@@ -90,7 +92,7 @@ describe('the double rule', () => {
       ),
       renderToStaticMarkup(<DialogHeader>Head</DialogHeader>),
       renderToStaticMarkup(
-        <ReadoutStrip cells={[{ label: 'Open', value: 3 }]} />,
+        <ReadoutStrip readouts={[{ label: 'Open', value: '3' }]} />,
       ),
     ]) {
       expect(html).not.toContain('double-rule')
@@ -107,6 +109,38 @@ describe('the double rule', () => {
       'components/record/record-parts.tsx',
       'components/settings/settings-section.tsx',
     ])
+  })
+})
+
+describe('the readout strip', () => {
+  it('is the record strip alone: page-header draws none of its own', () => {
+    const header = readFileSync(join(src, 'components/page-header.tsx'), 'utf8')
+    expect(header).not.toMatch(/function ReadoutStrip/)
+  })
+
+  it('reads a zero count graphite and colours only a nonzero one', () => {
+    expect(countReadout({ label: 'Failed', value: 0, tone: 'bad' })).toEqual({
+      label: 'Failed',
+      value: '0',
+      tone: 'muted',
+    })
+    expect(countReadout({ label: 'Failed', value: 2, tone: 'bad' })).toEqual({
+      label: 'Failed',
+      value: '2',
+      tone: 'bad',
+    })
+    const html = renderToStaticMarkup(
+      <ReadoutStrip
+        readouts={[
+          countReadout({ label: 'Create', value: 4 }),
+          countReadout({ label: 'Collide', value: 0, tone: 'warn' }),
+        ]}
+      />,
+    )
+    // The number over a sentence-case label, never the caps field label.
+    expect(html).not.toContain('field-label')
+    expect(html).toMatch(/text-foreground[^>]*>4</)
+    expect(html).toMatch(/text-graphite[^>]*>0</)
   })
 })
 

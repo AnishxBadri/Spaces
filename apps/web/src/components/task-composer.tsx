@@ -179,7 +179,7 @@ export function TaskComposer({
           <span className="mono text-ui text-primary">+</span>
           <input
             className="h-full min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-graphite"
-            placeholder="Add a task — “chase data room Friday”, “revisit after their raise”…"
+            placeholder="Add a task…"
             aria-label="New task"
             value={content}
             onChange={(e) => setContent(e.target.value)}

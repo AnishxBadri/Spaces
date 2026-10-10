@@ -1,11 +1,18 @@
 import { Link, useRouter } from '@tanstack/react-router'
+import { ChevronDown } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import { ReadoutStrip } from '#/components/record/record-parts'
 import { Checkbox } from '#/components/ui/checkbox'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { Input } from '#/components/ui/input'
-import { Select } from '#/components/ui/select'
+import { Select, selectClasses } from '#/components/ui/select'
 import { Switch } from '#/components/ui/switch'
 import {
   saveEnrichmentAuto,
@@ -306,7 +313,83 @@ const SCOPE_LABELS: ReadonlyArray<{
   { scope: 'meeting', label: 'is in a meeting', hint: null },
 ]
 
-const ANY_SPACE = 'any'
+type SpaceOption = EnrichmentAutoView['options'][number]
+
+/** What the spaces picker reads: `any space`, the one space's path, or `n spaces`. */
+export function spacesLabel(
+  chosen: ReadonlyArray<string>,
+  options: ReadonlyArray<SpaceOption>,
+): string {
+  const only = chosen.length === 1 ? chosen.at(0) : undefined
+  if (chosen.length === 0) return 'any space'
+  if (only !== undefined)
+    return options.find((o) => o.id === only)?.label ?? '1 space'
+  return `${chosen.length} spaces`
+}
+
+/**
+ * The spaces `is filed in` covers, several at once; none chosen is any
+ * space. Each tick saves, and the sheet stays open for the next.
+ */
+function SpacesPicker({
+  chosen,
+  options,
+  disabled,
+  onChange,
+}: {
+  chosen: ReadonlyArray<string>
+  options: ReadonlyArray<SpaceOption>
+  disabled: boolean
+  onChange: (next: ReadonlyArray<string>) => void
+}) {
+  const keepOpen = (e: Event) => e.preventDefault()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label="Which spaces"
+        disabled={disabled}
+        className={
+          selectClasses({
+            width: 'content',
+            className: 'h-6 rounded-none px-2 text-label',
+          }).trigger
+        }
+      >
+        <span className="min-w-0 flex-1 truncate">
+          {spacesLabel(chosen, options)}
+        </span>
+        <ChevronDown
+          aria-hidden
+          className="size-3 shrink-0 text-graphite"
+          strokeWidth={2}
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-72 max-w-88">
+        <DropdownMenuCheckboxItem
+          checked={chosen.length === 0}
+          onSelect={keepOpen}
+          onCheckedChange={() => onChange([])}
+        >
+          any space
+        </DropdownMenuCheckboxItem>
+        {options.map((o) => (
+          <DropdownMenuCheckboxItem
+            key={o.id}
+            checked={chosen.includes(o.id)}
+            onSelect={keepOpen}
+            onCheckedChange={(on) =>
+              onChange(
+                on ? [...chosen, o.id] : chosen.filter((id) => id !== o.id),
+              )
+            }
+          >
+            <span className="truncate">{o.label}</span>
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 function AutoBlock({
   auto,
@@ -362,11 +445,6 @@ function AutoBlock({
     }
   }
 
-  const spaceItems = [
-    { value: ANY_SPACE, label: 'any space' },
-    ...auto.options.map((o) => ({ value: o.id, label: o.label })),
-  ]
-
   return (
     <section data-block="auto" className="flex flex-col">
       <SettingsGroupHead
@@ -408,23 +486,18 @@ function AutoBlock({
                     {row.label}
                   </label>
                   {row.scope === 'space' ? (
-                    <Select
-                      aria-label="Which space"
-                      value={spaces.at(0) ?? ANY_SPACE}
-                      onChange={(v) =>
+                    <SpacesPicker
+                      chosen={spaces}
+                      options={auto.options}
+                      disabled={pending || auto.paid.length === 0}
+                      onChange={(next) =>
                         void save(
-                          v === ANY_SPACE || scopes.includes('space')
+                          next.length === 0 || scopes.includes('space')
                             ? scopes
                             : [...scopes, row.scope],
-                          v === ANY_SPACE ? [] : [v],
+                          next,
                         )
                       }
-                      items={spaceItems}
-                      width="content"
-                      disabled={pending || auto.paid.length === 0}
-                      searchPlaceholder="Search spaces…"
-                      emptyLabel="No space matches."
-                      className="h-6 rounded-none px-2 text-label"
                     />
                   ) : null}
                 </span>

@@ -261,8 +261,8 @@ describe('spaceWatchingProgram', () => {
       watching.engines.find((e) => e.integrationId === exa)?.form,
     ).toMatchObject({
       ok: true,
-      // jsonb keeps keys shortest first, not in declaration order.
-      fields: [{ key: 'cap' }, { key: 'criteria' }],
+      // Declaration order, though jsonb keeps keys shortest first.
+      fields: [{ key: 'criteria' }, { key: 'cap' }],
     })
     expect(watching.installed).toContain('Harmonic')
     expect(watching.installed).not.toContain('Plain')

@@ -15,6 +15,13 @@ function PopoverTrigger({
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
 }
 
+/** What the sheet hangs from when the trigger is not the thing it opens on — an input. */
+function PopoverAnchor({
+  ...props
+}: React.ComponentProps<typeof PopoverPrimitive.Anchor>) {
+  return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />
+}
+
 function PopoverContent({
   className,
   align = 'center',
@@ -39,4 +46,4 @@ function PopoverContent({
   )
 }
 
-export { Popover, PopoverContent, PopoverTrigger }
+export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger }

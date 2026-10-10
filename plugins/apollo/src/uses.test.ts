@@ -32,9 +32,6 @@ describe('the ports each job needs', () => {
     expectTypeOf<
       Services<ReturnType<typeof jobs.enrichPerson.run>>
     >().toEqualTypeOf<Granted | Config>()
-    expectTypeOf<Services<ReturnType<typeof jobs.autoEnrich>>>().toEqualTypeOf<
-      Granted | Config
-    >()
   })
 
   it('fail typecheck without Secrets in uses', () => {
@@ -54,7 +51,6 @@ describe('the ports each job needs', () => {
           ],
         },
         enrichPerson: manifest.jobs.enrichPerson,
-        autoEnrich: manifest.jobs.autoEnrich,
       },
     })
     // @ts-expect-error — enrichCompany yields Secrets, which these uses do not grant

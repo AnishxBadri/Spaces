@@ -13,7 +13,7 @@ import type { ReviewGroup } from '#/lib/server-fns'
 /**
  * Today's review row (D79): a space's open discovery cards as one row,
  * "Proptech / Property ops · via Exa · 3 to add · 1 to file", linking to
- * Review filtered by that space.
+ * Review filtered by that source and space.
  */
 
 // The composer reads the session from the app route; it is not under test.
@@ -22,12 +22,14 @@ vi.mock('#/components/task-composer', () => ({
 }))
 
 const SPACE = '00000000-0000-4000-8000-000000000001'
+const EXA = '00000000-0000-4000-8000-0000000000e1'
 
 const group = (over: Partial<ReviewGroup>): ReviewGroup => ({
   key: `Exa|${SPACE}|discovery`,
   spaceId: SPACE,
   spaceLabel: 'Proptech / Property ops',
   source: 'Exa',
+  sourceRef: EXA,
   toAdd: 3,
   toFile: 1,
   toReview: 0,
@@ -57,20 +59,23 @@ async function render(rows: ReadonlyArray<NeedsYouRow>) {
 }
 
 describe("Today's review row", () => {
-  it("counts a space's add and file cards and opens Review on that space", async () => {
+  it("counts a space's add and file cards and opens Review on that source and space", async () => {
     const g = group({})
     const html = await render([
       { kind: 'review', key: `review:${g.key}`, weight: g.total, group: g },
     ])
     expect(html).toContain('Proptech / Property ops')
     expect(html).toContain('via Exa · 3 to add · 1 to file')
-    expect(html).toContain(`href="/review?record=${SPACE}"`)
+    expect(html).toContain(`href="/review?source=${EXA}&amp;space=${SPACE}"`)
   })
 
-  it('opens the whole queue for a row of other cards', async () => {
+  it('opens Review on Judgment alone for a row filed nowhere', async () => {
     const g = group({
-      key: `Judgment|${SPACE}`,
+      key: 'judgment|',
+      spaceId: null,
+      spaceLabel: null,
       source: 'Judgment',
+      sourceRef: 'judgment',
       toAdd: 0,
       toFile: 0,
       toReview: 2,
@@ -80,7 +85,7 @@ describe("Today's review row", () => {
       { kind: 'review', key: `review:${g.key}`, weight: g.total, group: g },
     ])
     expect(html).toContain('via Judgment · 2 to review')
-    expect(html).toContain('href="/review"')
-    expect(html).not.toContain('record=')
+    expect(html).toContain('href="/review?source=judgment"')
+    expect(html).not.toContain('space=')
   })
 })

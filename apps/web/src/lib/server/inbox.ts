@@ -28,6 +28,7 @@ export type {
   DiscoverySpace,
   DuplicateCandidateRow,
   InboxCounts,
+  InboxFilterLabels,
   InboxKind,
   InboxLane,
   InboxRow,
@@ -43,25 +44,39 @@ export type { InboxSide } from '../inbox/context'
 export type { SuggestionKind } from '../ai/propose'
 
 /**
- * The queue, optionally scoped to one record (SPA-114: the record rail's
- * "Waiting" chips land here with `?record=`). `scope` is the record's name
- * for the header's dismissible chip, read beside the rows rather than from
- * them — an emptied queue still names what it is scoped to.
+ * The queue, optionally scoped to one record (the record rail's "Waiting"
+ * chips land here with `?record=`) or to Today's source and space. `scope`
+ * and `filter` name them for the header's dismissible chips, read beside the
+ * rows rather than from them — an emptied queue still names its scope.
  */
 export const listInbox = createServerFn()
-  .validator(z.object({ record: z.string().uuid().nullable() }))
+  .validator(
+    z.object({
+      record: z.string().uuid().nullable(),
+      source: z.string().min(1).max(100).nullable().optional(),
+      space: z.string().uuid().nullable().optional(),
+    }),
+  )
   .handler(async ({ data }) => {
     await requireUser()
-    const { listInboxProgram, inboxScopeRecordProgram } =
-      await import('../inbox/queue')
+    const {
+      listInboxProgram,
+      inboxScopeRecordProgram,
+      inboxFilterLabelsProgram,
+    } = await import('../inbox/queue')
     const { effectFn } = await import('./effect')
-    const [rows, scope] = await Promise.all([
-      effectFn(listInboxProgram)({ record: data.record }),
+    const source = data.source ?? null
+    const space = data.space ?? null
+    const [rows, scope, filter] = await Promise.all([
+      effectFn(listInboxProgram)({ record: data.record, source, space }),
       data.record === null
         ? Promise.resolve(null)
         : effectFn(inboxScopeRecordProgram)(data.record),
+      source === null && space === null
+        ? Promise.resolve(null)
+        : effectFn(inboxFilterLabelsProgram)(source, space),
     ])
-    return { rows, scope }
+    return { rows, scope, filter }
   })
 
 export const countOpenInbox = createServerFn().handler(async () => {

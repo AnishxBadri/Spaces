@@ -73,6 +73,8 @@ export const VERB_LABELS: Record<string, string> = {
   // A plugin's Content.emitSignal (packages/core/src/writes/ports/content.ts);
   // the actor is the integration, named from `meta.integrationId`.
   'signal.emitted': 'reported a signal',
+  // One enrichment run on the record, whichever sources answered.
+  'entity.enriched': 'enriched this record',
   // The portfolio ledger's verbs (lib/portfolio/write.ts, holding.ts,
   // reverse.ts). Read raw as `mark.added` on every company record until
   // 2026-09-30; a producer's verb is pinned here by record-timeline.test.ts.
@@ -111,6 +113,7 @@ export const VERB_TYPES: Record<string, string> = {
   'term.created': 'term',
   'mandate.created': 'mandate',
   'signal.emitted': 'signal',
+  'entity.enriched': 'enrich',
   'holding.created': 'holding',
   'holding.writtenoff': 'writeoff',
   'investment.added': 'invest',

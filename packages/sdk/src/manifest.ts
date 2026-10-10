@@ -372,9 +372,16 @@ export const defineManifest = <const TManifest extends AuthoredManifest>(
  * The settings block as web renders it: JSON Schema of what the operator
  * *types* (`io: 'input'`), so a field with a default is optional on the
  * form, where the output schema would mark it required.
+ * - `propertyOrder` names the properties in declaration order: the host
+ *   stores the manifest as jsonb, which keeps object keys sorted, so the
+ *   order the form draws in has to travel as a list. (SDK 1.5)
  */
-export const settingsJsonSchema = (settings: z.ZodType) =>
-  z.toJSONSchema(settings, { io: 'input' })
+export const settingsJsonSchema = (settings: z.ZodType) => {
+  const schema = z.toJSONSchema(settings, { io: 'input' })
+  return schema.properties === undefined
+    ? schema
+    : { ...schema, propertyOrder: Object.keys(schema.properties) }
+}
 
 /**
  * The authored manifest as it goes on disk: settings — the plugin's and a

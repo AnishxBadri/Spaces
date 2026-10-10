@@ -209,6 +209,7 @@ export function AppSidebar({
   workspaceName,
   workspaceLogo = null,
   objects = [],
+  tasksDue = 0,
   onOpenCommand,
   onNavigate,
   hideWordmark = false,
@@ -223,6 +224,8 @@ export function AppSidebar({
   workspaceLogo?: string | null
   /** Custom objects (spec §9) — they join the nav right after Deals. */
   objects?: Array<CustomObject>
+  /** Open tasks due today or overdue; nonzero, Tasks' lane reads `n due`. */
+  tasksDue?: number
   onOpenCommand: () => void
   onNavigate?: (() => void) | undefined
   /** Drawer usage — the mobile top bar already shows the wordmark. */
@@ -379,7 +382,11 @@ export function AppSidebar({
               <NavLink
                 to={item.to}
                 icon={item.icon}
-                hint={item.key}
+                hint={
+                  item.to === '/tasks' && tasksDue > 0
+                    ? `${tasksDue} due`
+                    : item.key
+                }
                 onClick={onNavigate}
                 exact={item.to === '/spaces' && onStarredSpace}
               >

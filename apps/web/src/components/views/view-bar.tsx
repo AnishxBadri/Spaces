@@ -107,12 +107,8 @@ export function ViewBar({
   /**
    * Why this surface cannot build conditions yet, when it cannot: the Filter
    * control then renders disabled and titled with the reason rather than
-   * vanishing. **No surface passes it today** — /files was the one, and
-   * docsurf-12b (SPA-141) gave the shelf a registry of its own
-   * (`lib/documents/registry.ts`), so the five lists all filter. It stays
-   * because the next shelf admitted before its field list is declared wants
-   * exactly this, and the alternative is re-deriving the disabled branch
-   * from scratch.
+   * vanishing. No surface passes it today; it stays for the next shelf
+   * admitted before its field list is declared.
    */
   filterUnavailable?: string
   views: Array<ViewRow>

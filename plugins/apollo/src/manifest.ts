@@ -8,9 +8,8 @@ import { defineManifest } from '@spaces/sdk'
  *   `uses`, and the job reads the key from it for the `X-Api-Key` header.
  * - `cacheDays` and `dailyCreditCap` are the host's to enforce (D53); the
  *   jobs never read them.
- * - `autoEnrich` runs on the triggers D76 names; which of them reach it is
- *   the host's auto-enrich scope on the integration row, never a setting
- *   here. Seed and import births emit nothing. (D65, D76)
+ * - No event job: auto-enrich is the host's `enrichment.run`, which presses
+ *   these actions in the owner's scope. (D76)
  * - `phone` is off by default: asking Apollo for a phone number costs extra
  *   credits, so only the owner turns it on. The person jobs read it through
  *   `Config`.
@@ -49,21 +48,6 @@ export const manifest = defineManifest({
     },
     enrichPerson: {
       trigger: 'action',
-      uses: [
-        'Read',
-        'Secrets',
-        'Http',
-        'Identity',
-        'Receipts',
-        'Facts',
-        'Content',
-        'Config',
-        'Log',
-      ],
-    },
-    autoEnrich: {
-      trigger: 'event',
-      on: ['entity.created', 'filed', 'deal.linked'],
       uses: [
         'Read',
         'Secrets',

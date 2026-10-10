@@ -1,5 +1,15 @@
 import { Effect, Schema } from 'effect'
-import { and, count, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import {
+  and,
+  count,
+  desc,
+  eq,
+  inArray,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   aiRun,
@@ -30,6 +40,7 @@ import type { ResolvedRef } from '@spaces/core/writes/context/names'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { entityContext } from './context'
+import { JUDGMENT, JUDGMENT_REF } from './review-groups'
 import type { InboxSide } from './context'
 
 /**
@@ -246,19 +257,66 @@ export type InboxCounts = {
 }
 
 /**
- * What the queue is narrowed to. `record` set: only rows about that entity —
- * its suggestion card, and every open pair it is either side of (SPA-114,
- * the record rail's "Waiting" chips link here). Null: the whole queue.
+ * What the queue is narrowed to. Null or absent: not narrowed that way.
+ * - `record`: only rows about that entity — its suggestion card, and every
+ *   open pair it is either side of (the record rail's "Waiting" chips).
+ * - `source` and `space`: Today's Review rows. `source` is a proposer id or
+ *   `judgment`; `space` takes a discovery card by its payload and any other
+ *   card by its record's earliest live filing, as `reviewGroupsProgram`
+ *   counts them. Either one leaves the duplicate lane out.
  */
-export type InboxScope = { record: string | null }
+export type InboxScope = {
+  record: string | null
+  source?: string | null
+  space?: string | null
+}
 
 const ALL: InboxScope = { record: null }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/** Whether Today's source or space filter narrows the queue. */
+const filtered = (scope: InboxScope): boolean =>
+  (scope.source ?? null) !== null || (scope.space ?? null) !== null
+
+/** Cards whose record's earliest filing in a live space is `spaceId`. */
+const firstFiledIn = (spaceId: string) => sql`${suggestion.entityId} in (
+  select f.entity_id from (
+    select distinct on (es.entity_id) es.entity_id, es.space_id
+    from entity_space es
+    join space s on s.entity_id = es.space_id
+    join entity e on e.id = s.entity_id
+    where s.archived_at is null and e.merged_into_id is null
+    order by es.entity_id, es.created_at, es.space_id
+  ) f
+  where f.space_id = ${spaceId}::uuid
+)`
+
+const sourceIs = (source: string) =>
+  source === JUDGMENT_REF
+    ? ne(suggestion.proposedByType, 'integration')
+    : and(
+        eq(suggestion.proposedByType, 'integration'),
+        eq(suggestion.proposedById, source),
+      )
+
+const spaceIs = (spaceId: string) =>
+  or(
+    and(
+      inArray(suggestion.kind, [...DISCOVERY_KINDS]),
+      sql`${suggestion.payload} ->> 'spaceId' = ${spaceId}`,
+    ),
+    and(
+      notInArray(suggestion.kind, [...DISCOVERY_KINDS]),
+      firstFiledIn(spaceId),
+    ),
+  )
+
 const listDuplicateLane = Effect.fn('listDuplicateLane')(function* (
   scope: InboxScope,
 ): Effect.fn.Return<Array<DuplicateCandidateRow>, InboxQueryFailed> {
+  // A pair has no source and no space: a Today row never names one.
+  if (filtered(scope)) return []
   const open = eq(duplicateCandidate.status, 'open')
   const rows = yield* query(() =>
     db
@@ -330,23 +388,27 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   InboxQueryFailed
 > {
   const isOpen = eq(suggestion.status, 'open')
+  const source = scope.source ?? null
+  const spaceId = scope.space ?? null
   const open = yield* query(() =>
     db
       .select()
       .from(suggestion)
       .where(
-        scope.record === null
-          ? isOpen
-          : and(
-              isOpen,
-              or(
+        and(
+          isOpen,
+          scope.record === null
+            ? undefined
+            : or(
                 eq(suggestion.entityId, scope.record),
                 and(
                   inArray(suggestion.kind, [...DISCOVERY_KINDS]),
                   sql`${suggestion.payload} ->> 'spaceId' = ${scope.record}`,
                 ),
               ),
-            ),
+          source === null ? undefined : sourceIs(source),
+          spaceId === null ? undefined : spaceIs(spaceId),
+        ),
       )
       .orderBy(desc(suggestion.createdAt), desc(suggestion.id)),
   )
@@ -757,6 +819,62 @@ export const inboxScopeRecordProgram = Effect.fn('inboxScopeRecordProgram')(
         .limit(1),
     )
     return row.at(0) ?? null
+  },
+)
+
+/** Today's filter in words, for the header's chip; null for a name nothing answers. */
+export type InboxFilterLabels = { source: string | null; space: string | null }
+
+/** The names of a `source` and a `space` filter: the proposer and the space's path. */
+export const inboxFilterLabelsProgram = Effect.fn('inboxFilterLabelsProgram')(
+  function* (
+    source: string | null,
+    spaceId: string | null,
+  ): Effect.fn.Return<InboxFilterLabels, InboxQueryFailed> {
+    const sourceName =
+      source === null
+        ? null
+        : source === JUDGMENT_REF
+          ? JUDGMENT
+          : !UUID.test(source)
+            ? null
+            : yield* query(async () => {
+                const plugin = (
+                  await db
+                    .select({
+                      capabilityId: integration.capabilityId,
+                      manifest: integration.manifest,
+                    })
+                    .from(integration)
+                    .where(eq(integration.id, source))
+                ).at(0)
+                if (plugin !== undefined)
+                  return (
+                    jsonString(jsonRecord(plugin.manifest).name) ??
+                    plugin.capabilityId
+                  )
+                const token = (
+                  await db
+                    .select({ name: apiToken.name })
+                    .from(apiToken)
+                    .where(eq(apiToken.id, source))
+                ).at(0)
+                return token?.name ?? null
+              })
+    const spaceName =
+      spaceId === null
+        ? null
+        : yield* query(async () => {
+            const res = await db.execute<{ path: string | null }>(sql`
+              select string_agg(e.canonical_name, ' / ' order by nlevel(a.path)) as path
+              from space s
+              join space a on a.path @> s.path
+              join entity e on e.id = a.entity_id
+              where s.entity_id = ${spaceId}::uuid
+            `)
+            return res.rows.at(0)?.path ?? null
+          })
+    return { source: sourceName, space: spaceName }
   },
 )
 

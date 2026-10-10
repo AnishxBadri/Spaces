@@ -63,6 +63,14 @@ export const listTasks = createServerFn()
     })
   })
 
+/** Open tasks per due day, overdue through tomorrow: the sidebar's `n due`. */
+export const listDueTaskDays = createServerFn().handler(async () => {
+  await requireUser()
+  const { dueDaysProgram } = await import('#/lib/tasks/list')
+  const { effectFn } = await import('./effect')
+  return effectFn(dueDaysProgram)()
+})
+
 export const listEntityTasks = createServerFn()
   .validator(z.object({ entityId: z.string().uuid() }))
   .handler(async ({ data }) => {

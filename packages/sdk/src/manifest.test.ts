@@ -497,6 +497,17 @@ describe('toManifestJson', () => {
     expect(JSON.parse(JSON.stringify(json))).toEqual(json)
   })
 
+  it('names the settings in declaration order, which jsonb would sort away', () => {
+    const json = toManifestJson({
+      ...authored,
+      settings: z.object({ z: z.string(), a: z.int(), m: z.boolean() }),
+    })
+    expect(json.settings).toMatchObject({ propertyOrder: ['z', 'a', 'm'] })
+    expect(settingsJsonSchema(z.object({}))).toMatchObject({
+      propertyOrder: [],
+    })
+  })
+
   it("serialises a watch job's settings the same way", () => {
     const watchSettings = z.object({
       criteria: z.string(),

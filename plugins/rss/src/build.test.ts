@@ -96,6 +96,7 @@ describe('the rss manifest.json', () => {
         },
       },
       required: ['feedUrl', 'record'],
+      propertyOrder: ['feedUrl', 'record', 'maxItems'],
     })
   })
 

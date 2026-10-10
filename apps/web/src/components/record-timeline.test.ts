@@ -27,6 +27,8 @@ const PRODUCED = [
   'mandate.created',
   // packages/core/src/writes/ports/content.ts (sdk-7b)
   'signal.emitted',
+  // packages/core/src/writes/enrichment/apply.ts
+  'entity.enriched',
   // the record, note and document verbs pinned before
   'record.created',
   'company.created',

@@ -100,6 +100,7 @@ type HeadProps = {
   workspaceName?: string
   workspaceLogo?: string | null
   collapsed?: boolean
+  tasksDue?: number
 }
 
 async function mount(
@@ -181,6 +182,19 @@ describe('the chassis', () => {
       'Portfolio',
       'Mandate',
     ])
+  })
+
+  it('prints Tasks’ due count in its lane, else its chord', async () => {
+    const tasksLane = () =>
+      nav().querySelector('a[href="/tasks"]')?.lastElementChild?.textContent
+    await mount('/today', [], { tasksDue: 3 })
+    expect(tasksLane()).toBe('3 due')
+    act(() => root.unmount())
+    const host = document.createElement('div')
+    document.body.append(host)
+    root = createRoot(host)
+    await mount('/today', [], { tasksDue: 0 })
+    expect(tasksLane()).toBe('G K')
   })
 
   it('folds a group to its heading and count, and remembers it', async () => {

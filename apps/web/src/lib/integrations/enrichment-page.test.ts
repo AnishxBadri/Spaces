@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { attributeEvent, integration } from '@spaces/db/schema'
+import { attributeEvent, entity, integration, space } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { workspace } from '@spaces/db/schema/workspace'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
@@ -170,6 +170,34 @@ describe('auto-enrich and reuse', () => {
     const page = await run(enrichmentPageProgram())
     expect(page.auto.scopes).toEqual(['deal', 'space'])
     expect(page.reuse).toEqual({ days: 30, stored: true })
+  })
+
+  it('offers live spaces only, and keeps several chosen', async () => {
+    const mint = async (name: string, archivedAt: Date | null) => {
+      const row = (
+        await db
+          .insert(entity)
+          .values({ kind: 'space', canonicalName: name })
+          .returning({ id: entity.id })
+      ).at(0)
+      if (!row) throw new Error('no space')
+      const slug = name.toLowerCase().replace(/\W+/g, '_')
+      await db
+        .insert(space)
+        .values({ entityId: row.id, slug, path: slug, archivedAt })
+      return row.id
+    }
+    const fintech = await mint('Ae Fintech', null)
+    const climate = await mint('Ae Climate', null)
+    const shelved = await mint('Ae Shelved', new Date())
+    await run(
+      saveAutoEnrichProgram({ scopes: ['space'], spaces: [fintech, climate] }),
+    )
+    const page = await run(enrichmentPageProgram())
+    const offered = page.auto.options.map((o) => o.id)
+    expect(offered).toEqual(expect.arrayContaining([fintech, climate]))
+    expect(offered).not.toContain(shelved)
+    expect(page.auto.spaces).toEqual([fintech, climate])
   })
 })
 

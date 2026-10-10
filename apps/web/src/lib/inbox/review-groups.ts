@@ -32,6 +32,20 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** The source a card's proposer reads as when no integration wrote it. */
 export const JUDGMENT = 'Judgment'
 
+/** Review's `source` filter for every card no integration or token proposed. */
+export const JUDGMENT_REF = 'judgment'
+
+/**
+ * The `source` filter a card answers to: its integration's or API token's
+ * id, or `judgment`. Null for an integration card with no proposer id,
+ * which no filter can name.
+ */
+export const sourceRefOf = (s: {
+  proposedByType: 'user' | 'integration' | 'system'
+  proposedById: string | null
+}): string | null =>
+  s.proposedByType === 'integration' ? s.proposedById : JUDGMENT_REF
+
 /** Open Review cards from one source about one space. */
 export type ReviewGroup = {
   key: string
@@ -41,6 +55,8 @@ export type ReviewGroup = {
   spaceLabel: string | null
   /** An integration's name, an API token's name, or `Judgment`. */
   source: string
+  /** Review's `source` filter for these cards; null when none can name them. */
+  sourceRef: string | null
   /** Discovery cards: companies to add, records to file here. */
   toAdd: number
   toFile: number
@@ -177,15 +193,17 @@ export const reviewGroupsProgram = Effect.fn('reviewGroupsProgram')(
         s.proposedByType === 'integration' && s.proposedById !== null
           ? (sourceName.get(s.proposedById) ?? 'Integration')
           : JUDGMENT
+      const sourceRef = sourceRefOf(s)
       // A space's discovery cards are their own row, so it counts only add
-      // and file cards and can open Review on that space alone.
-      const key = `${source}|${spaceId ?? ''}${isDiscoveryKind(s.kind) ? '|discovery' : ''}`
+      // and file cards.
+      const key = `${sourceRef ?? source}|${spaceId ?? ''}${isDiscoveryKind(s.kind) ? '|discovery' : ''}`
       const at = s.createdAt.toISOString()
       const g = groups.get(key) ?? {
         key,
         spaceId,
         spaceLabel: spaceId === null ? null : (labels.get(spaceId) ?? null),
         source,
+        sourceRef,
         toAdd: 0,
         toFile: 0,
         toReview: 0,

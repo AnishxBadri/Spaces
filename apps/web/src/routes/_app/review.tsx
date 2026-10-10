@@ -21,6 +21,7 @@ import type {
   ColumnRunRow,
   DiscoveryRow,
   DuplicateCandidateRow,
+  InboxFilterLabels,
   InboxKind,
   InboxLane,
   InboxSide,
@@ -36,13 +37,16 @@ import { cn } from '#/lib/utils'
  */
 /**
  * `record` scopes both lanes to one entity (SPA-114 — the record rail's
- * "Waiting" chips link here); it is a loader dep, since it changes what the
- * server sends. `lane` only seeds the tab on arrival and is not a dep: the
+ * "Waiting" chips link here); `source` and `space` are a Today Review row's
+ * filter. All three are loader deps, since they change what the server
+ * sends. `lane` only seeds the tab on arrival and is not a dep: the
  * tabs stay React state, as they were. `.catch` rather than a failure, so a
  * hand-typed bad value lands on the whole queue, not an error boundary.
  */
 const inboxSearch = z.object({
   record: z.string().uuid().optional().catch(undefined),
+  source: z.string().min(1).max(100).optional().catch(undefined),
+  space: z.string().uuid().optional().catch(undefined),
   lane: z
     .enum(['all', 'suggestions', 'duplicates'])
     .optional()
@@ -51,10 +55,14 @@ const inboxSearch = z.object({
 
 export const Route = createFileRoute('/_app/review')({
   validateSearch: inboxSearch,
-  loaderDeps: ({ search }) => ({ record: search.record ?? null }),
+  loaderDeps: ({ search }) => ({
+    record: search.record ?? null,
+    source: search.source ?? null,
+    space: search.space ?? null,
+  }),
   loader: async ({ deps }) => {
     const [inbox, stoppedPlugins] = await Promise.all([
-      listInbox({ data: { record: deps.record } }),
+      listInbox({ data: deps }),
       listStoppedPlugins(),
     ])
     return { ...inbox, stoppedPlugins }
@@ -198,7 +206,7 @@ const LANE_PARAM: Record<'all' | 'suggestions' | 'duplicates', Lane> = {
 }
 
 function InboxPage() {
-  const { rows, scope, stoppedPlugins } = Route.useLoaderData()
+  const { rows, scope, filter, stoppedPlugins } = Route.useLoaderData()
   const search = Route.useSearch()
   const [lane, setLane] = useState<Lane>(
     search.lane ? LANE_PARAM[search.lane] : 'all',
@@ -226,6 +234,7 @@ function InboxPage() {
         description={
           <>
             {scope ? <ScopeChip name={scope.name} /> : null}
+            {filter ? <FilterChip filter={filter} /> : null}
             <span>{rows.length} open</span>
             {suggestionCount > 0 ? (
               <span>
@@ -308,6 +317,33 @@ function ScopeChip({ name }: { name: string }) {
   return (
     <span className="mention-chip cursor-default">
       on {name}
+      <Link
+        to="/review"
+        search={{}}
+        aria-label={`Show the whole queue, not just ${name}`}
+        className="focus-ring -mr-0.5 text-graphite hover:text-foreground"
+      >
+        <X className="size-3" strokeWidth={2} />
+      </Link>
+    </span>
+  )
+}
+
+/**
+ * `via Exa · in Fintech / Payments` — the queue is narrowed to a Today Review
+ * row's source and space. Its × clears both back to the whole queue.
+ */
+function FilterChip({ filter }: { filter: InboxFilterLabels }) {
+  const words = [
+    filter.source === null ? null : `via ${filter.source}`,
+    filter.space === null ? null : `in ${filter.space}`,
+  ]
+    .filter((w) => w !== null)
+    .join(' · ')
+  const name = words === '' ? 'filtered' : words
+  return (
+    <span className="mention-chip cursor-default">
+      {name}
       <Link
         to="/review"
         search={{}}

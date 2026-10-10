@@ -110,6 +110,7 @@ const objectSchema = z.strictObject({
   properties: z.record(z.string(), z.unknown()).optional(),
   required: z.array(z.string()).optional(),
   additionalProperties: z.literal(false).optional(),
+  propertyOrder: z.array(z.string()).optional(),
 })
 
 /** `cacheDays` → `Cache days`: the label when the schema gives no title. */
@@ -205,8 +206,11 @@ const fieldOf = (
 }
 
 /**
- * A stored manifest's `settings` as form fields, in declaration order, or the
- * reason it cannot be drawn. `{}` is a plugin with no settings.
+ * A stored manifest's `settings` as form fields, or the reason it cannot be
+ * drawn. `{}` is a plugin with no settings.
+ * - Fields follow `propertyOrder`, the declaration order the SDK emits: the
+ *   stored manifest is jsonb, whose keys come back sorted. A key the list
+ *   misses (a manifest built before it) follows in stored order.
  */
 export const settingsFormOf = (settings: unknown): SettingsForm => {
   const empty = z.strictObject({}).safeParse(settings)
@@ -219,8 +223,14 @@ export const settingsFormOf = (settings: unknown): SettingsForm => {
         'settings is not an object schema — the form renders string, number, boolean and enum settings only',
     }
   const required = new Set(parsed.data.required ?? [])
+  const properties = parsed.data.properties ?? {}
+  const declared = (parsed.data.propertyOrder ?? []).filter((key) =>
+    Object.hasOwn(properties, key),
+  )
+  const keys = [...new Set([...declared, ...Object.keys(properties)])]
   const fields: Array<SettingsField> = []
-  for (const [key, property] of Object.entries(parsed.data.properties ?? {})) {
+  for (const key of keys) {
+    const property = properties[key]
     const field = fieldOf(key, property, required.has(key))
     if (field === null) return refusal(key, property)
     fields.push(field)

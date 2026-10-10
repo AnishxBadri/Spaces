@@ -192,6 +192,31 @@ export function ReadoutStrip({
 }
 
 /**
+ * A counted cell: a zero reads graphite, and a tone colours only a nonzero
+ * count.
+ */
+export type CountCell = {
+  label: ReactNode
+  value: number
+  tone?: 'bad' | 'warn' | undefined
+  to?: string | undefined
+  search?: Record<string, string> | undefined
+}
+
+export function countReadout({
+  value,
+  tone,
+  ...cell
+}: CountCell): RecordReadout {
+  const shown = value === 0 ? 'muted' : tone
+  return {
+    ...cell,
+    value: String(value),
+    ...(shown === undefined ? {} : { tone: shown }),
+  }
+}
+
+/**
  * A head at preview size, for Cmd-K's pane: the stamp and crumb, then the
  * name in serif. A `record` head closes on the double rule, as the record
  * page's does; anything else on a hairline.

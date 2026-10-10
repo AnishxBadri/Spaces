@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { KeyHint, PageHeader, ReadoutStrip } from '#/components/page-header'
+import { KeyHint, PageHeader } from '#/components/page-header'
+import { ReadoutStrip, countReadout } from '#/components/record/record-parts'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { cn } from '#/lib/utils'
@@ -172,27 +173,26 @@ export function ReceiptStrip({
   const remaining = { label: 'Remaining', value: counts.remaining }
   return (
     <ReadoutStrip
-      className="border-t border-t-hairline border-b-rule"
-      cells={
-        ledger
-          ? [
-              { label: 'Holdings', value: ledger.holdings },
-              { label: 'Investments', value: ledger.investments },
-              { label: 'Rounds', value: ledger.rounds },
-              { label: 'Marks', value: ledger.marks },
-              ...(ledger.distributions > 0
-                ? [{ label: 'Distributions', value: ledger.distributions }]
-                : []),
-              failed,
-              remaining,
-            ]
-          : [
-              { label: 'Written', value: counts.written },
-              { label: 'Attached', value: counts.attached },
-              failed,
-              remaining,
-            ]
-      }
+      className="border-b border-rule px-8"
+      readouts={(ledger
+        ? [
+            { label: 'Holdings', value: ledger.holdings },
+            { label: 'Investments', value: ledger.investments },
+            { label: 'Rounds', value: ledger.rounds },
+            { label: 'Marks', value: ledger.marks },
+            ...(ledger.distributions > 0
+              ? [{ label: 'Distributions', value: ledger.distributions }]
+              : []),
+            failed,
+            remaining,
+          ]
+        : [
+            { label: 'Written', value: counts.written },
+            { label: 'Attached', value: counts.attached },
+            failed,
+            remaining,
+          ]
+      ).map(countReadout)}
     />
   )
 }
