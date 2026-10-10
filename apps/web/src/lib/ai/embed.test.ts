@@ -527,7 +527,7 @@ describe('Search reuses the Models key', () => {
       lastTestOk: true,
       testedModel: 'text-embedding-3-small',
     })
-    expect(reusedKeyLine('openai')).toBe('using the OpenAI key from Models')
+    expect(reusedKeyLine('openai')).toBe('Use the OpenAI key from Models')
 
     expect((await pin('openai', 'text-embedding-3-small')).model).toBe(
       'text-embedding-3-small',

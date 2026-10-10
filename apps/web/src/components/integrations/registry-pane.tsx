@@ -53,6 +53,9 @@ export function UploadPlugin({
   )
 }
 
+/** The hash an `Install ›` elsewhere in settings lands on: this plugin's row. */
+export const pluginAnchor = (pluginId: string): string => `plugin-${pluginId}`
+
 /**
  * Available: every plugin the image's signed registry offers that this box
  * has not installed, in tabs by the job it does — All, each role some entry
@@ -106,9 +109,10 @@ export function RegistryPane({
             {shown.map((plugin, i) => (
               <li
                 key={plugin.pluginId}
+                id={pluginAnchor(plugin.pluginId)}
                 data-plugin={plugin.pluginId}
                 className={cn(
-                  'flex min-h-ledger-row items-center gap-3 px-3 py-1.5',
+                  'flex min-h-ledger-row scroll-mt-6 items-center gap-3 px-3 py-1.5',
                   i !== shown.length - 1 && 'border-b border-rule',
                 )}
               >

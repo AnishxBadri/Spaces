@@ -1,5 +1,4 @@
 import { useRouter } from '@tanstack/react-router'
-import { Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -11,26 +10,19 @@ import type { AiAttributeMode } from '@spaces/core/ai/attribute-ai'
 import { SettingsGroupHead } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { Segmented } from '#/components/ui/segmented'
+import { Select } from '#/components/ui/select'
 import { updateAttribute } from '#/lib/server-fns'
-import { TYPE_LABELS } from './registry-list'
 import type { RegistryAttr } from './registry-list'
 
 /**
- * AI attributes (SPA-72, spec-ai-substrate §13) — the per-object config
- * panel. The spec's `attribute.config.ai` is stored as `attribute.options.ai`
- * (there is no `config` column), written through `updateAttribute`'s
+ * AI answers (spec-ai-substrate §13) — the per-object config, listing only
+ * the attributes that answer with AI. The spec's `attribute.config.ai` is
+ * stored as `attribute.options.ai`, written through `updateAttribute`'s
  * `config.ai`, the same door as a currency code or a rating's max.
- *
- * **The panel offers only the modes the type can hold**
- * (`aiModesFor`, `@spaces/core/ai/attribute-ai`): Classify on a select,
- * multi-select, status or checkbox; Summarize, Prompt or Research on text;
- * Prompt on a number, amount or date; Research on a URL or domain. An
- * attribute whose type holds none is not listed. The program refuses the
- * rest anyway; the panel just never offers them.
- *
- * Laid out as the Identity keys ledger below the registry: the bone head
- * band, one row per attribute on a rule, the editor opening under its
- * row. Reshaping is admin-owned, like every other attribute setting.
+ * - `+ Add` offers the rest of the attributes whose type can hold a mode
+ *   (`aiModesFor`); the editor opens under its row. One the type holds
+ *   none of is never offered, and the program refuses it anyway.
+ * - Reshaping is admin-owned, like every other attribute setting.
  */
 
 const MODE_HINT: Record<AiAttributeMode, string> = {
@@ -53,65 +45,74 @@ export function AiConfigSection({
     (a) => !a.archived && aiModesFor(a.type).length > 0,
   )
   const [open, setOpen] = useState<string | null>(null)
-  const configured = eligible.filter((a) => readAiConfig(a) !== null).length
+  const configured = eligible.filter((a) => readAiConfig(a) !== null)
+  const offered = eligible.filter((a) => readAiConfig(a) === null)
   if (eligible.length === 0) return null
+  // The attribute being set up is listed while its editor is open.
+  const listed = eligible.filter(
+    (a) => readAiConfig(a) !== null || a.id === open,
+  )
   return (
     <section className="flex flex-col">
       <SettingsGroupHead
-        title="AI attributes"
-        count={`${configured} configured`}
+        title="AI answers"
+        count={`${configured.length} set`}
+        action={
+          canReshape && offered.length > 0 ? (
+            <Select
+              aria-label={`Add an AI answer to ${objectPlural}`}
+              value=""
+              placeholder="+ Add"
+              items={offered.map((a) => ({ value: a.id, label: a.name }))}
+              onChange={(id) => setOpen(id)}
+              width="content"
+              className="h-6 w-auto rounded-none border-0 bg-transparent px-1 mono text-micro text-graphite hover:text-foreground"
+            />
+          ) : undefined
+        }
       />
-      <ul aria-label={`${objectPlural} AI attributes`}>
-        {eligible.map((attr) => {
-          const ai = readAiConfig(attr)
-          return (
-            <li
-              key={attr.id}
-              className="flex flex-col border-b border-rule px-3"
-            >
-              <div className="flex h-ledger-row items-center gap-3 text-body">
-                <span className="min-w-0 flex-1 truncate">{attr.name}</span>
-                <span className="mono text-micro text-graphite">
-                  {TYPE_LABELS[attr.type] ?? attr.type}
-                </span>
-                <span className="w-24 shrink-0 text-label text-graphite">
-                  {ai === null ? (
-                    'off'
-                  ) : (
-                    <span className="flex items-center gap-1 text-foreground">
-                      <Sparkles className="size-3" strokeWidth={1.75} />
-                      {AI_MODE_LABEL[ai.mode]}
-                    </span>
-                  )}
-                </span>
-                {canReshape ? (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    aria-expanded={open === attr.id}
-                    onClick={() =>
-                      setOpen((o) => (o === attr.id ? null : attr.id))
-                    }
-                  >
-                    {open === attr.id ? 'Close' : 'Configure'}
-                  </Button>
+      {listed.length === 0 ? (
+        <p className="border-b border-rule py-3 text-label text-graphite">
+          No attribute answers with AI.
+        </p>
+      ) : (
+        <ul aria-label={`${objectPlural} AI answers`}>
+          {listed.map((attr) => {
+            const ai = readAiConfig(attr)
+            return (
+              <li key={attr.id} className="flex flex-col border-b border-rule">
+                <div className="flex h-ledger-row items-center gap-3 text-ui">
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {attr.name}
+                  </span>
+                  <span className="w-24 shrink-0 mono text-micro text-graphite">
+                    {ai === null ? 'not set' : AI_MODE_LABEL[ai.mode]}
+                  </span>
+                  {canReshape ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      aria-expanded={open === attr.id}
+                      onClick={() =>
+                        setOpen((o) => (o === attr.id ? null : attr.id))
+                      }
+                    >
+                      {open === attr.id ? 'Close' : 'Configure'}
+                    </Button>
+                  ) : null}
+                </div>
+                {open === attr.id ? (
+                  <AiConfigEditor
+                    attr={attr}
+                    registry={registry}
+                    onDone={() => setOpen(null)}
+                  />
                 ) : null}
-              </div>
-              {open === attr.id ? (
-                <AiConfigEditor
-                  attr={attr}
-                  registry={registry}
-                  onDone={() => setOpen(null)}
-                />
-              ) : null}
-            </li>
-          )
-        })}
-      </ul>
-      <p className="flex h-8 items-center px-3 mono text-micro text-graphite">
-        manual, per cell · every answer lands in Review as a suggestion · types
-        are unchanged
-      </p>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </section>
   )
 }

@@ -64,4 +64,57 @@ function Checkbox({
   )
 }
 
-export { Checkbox }
+/**
+ * The class string a radio box wears: the checkbox's 14px square, which
+ * holds a 6px pine square when chosen instead of filling — one of a set,
+ * never a tick. Exported for tests.
+ */
+export function radioClasses({
+  checked,
+  className,
+}: {
+  checked: boolean
+  className?: string | undefined
+}) {
+  return cn(
+    'focus-ring flex size-3.5 shrink-0 touch-manipulation items-center justify-center border bg-paper transition-colors duration-150 ease-out-quart disabled:pointer-events-none disabled:opacity-50',
+    checked ? 'border-primary' : 'border-hairline hover:bg-bone',
+    className,
+  )
+}
+
+/**
+ * A radio: one choice of a set, for a single-choice pin or floor. A
+ * `<button role="radio">` for the same reasons as `Checkbox`; the caller
+ * draws the `radiogroup` around the set and owns each label.
+ */
+function Radio({
+  checked,
+  onSelect,
+  className,
+  ...props
+}: Omit<
+  React.ComponentProps<'button'>,
+  'type' | 'role' | 'aria-checked' | 'onChange' | 'onSelect' | 'children'
+> & {
+  checked: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={checked}
+      data-slot="radio"
+      onClick={() => {
+        if (!checked) onSelect()
+      }}
+      className={radioClasses({ checked, className })}
+      {...props}
+    >
+      {checked ? <span aria-hidden className="size-1.5 bg-primary" /> : null}
+    </button>
+  )
+}
+
+export { Checkbox, Radio }

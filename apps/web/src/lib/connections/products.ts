@@ -5,9 +5,12 @@ import type { ProviderId, ProviderScope } from '@spaces/core/providers/registry'
  * A connection is per product (D66): Drive, Calendar and Gmail each carry
  * their own consent under the one Google client; Box is its own product.
  * Client-safe data, read by the start route and the Connect control.
- * - `plugin` is the registry `ProviderScope.plugin` whose scopes the
+ * - `plugin` is the plugin's manifest id, as the plugin registry carries it
+ *   (`google-calendar`), and the `ProviderScope.plugin` whose scopes the
  *   product may ask for, beside core's own (`plugin: null`). A product's
  *   consent screen never lists another product's scopes.
+ * - The product key (`calendar`) is stored on each connection row; it is
+ *   not the plugin id and never renamed.
  * - `base` is what Connect asks for when no scopes are named.
  */
 
@@ -52,7 +55,7 @@ export const PRODUCTS = {
       name: 'Calendar',
       word: 'Calendar',
       job: 'email-calendar',
-      plugin: 'calendar',
+      plugin: 'google-calendar',
       base: ['openid', 'email', 'calendar.events.readonly'],
     },
     drive: {

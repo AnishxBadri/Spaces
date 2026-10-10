@@ -101,11 +101,11 @@ describe('the blocks that moved between sections', () => {
     expect(source('currency')).toContain('title="Rates"')
   })
 
-  it('Models holds Providers and Routing; Caps moved to Usage & limits', () => {
+  it('Models holds Providers and Who does what; Limits moved to Usage & limits', () => {
     expect(source('models')).toContain('title="Providers"')
-    expect(source('models')).toContain('title="Routing"')
-    expect(source('models')).not.toMatch(/CapsSection|setAiCaps|getAiCaps/)
-    expect(source('usage')).toContain('<CapsSection')
+    expect(source('models')).toContain('title="Who does what"')
+    expect(source('models')).not.toMatch(/LimitsGroup|setAiCaps|getAiCaps/)
+    expect(source('usage')).toContain('<LimitsGroup')
     expect(source('usage')).toContain('title="Usage & limits"')
   })
 

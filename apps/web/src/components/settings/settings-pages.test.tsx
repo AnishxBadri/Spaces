@@ -41,6 +41,7 @@ const writes = vi.hoisted(() => ({
   ),
   revokeApiToken: vi.fn(async () => ({ ok: true })),
   updateObject: vi.fn(async () => ({ ok: true })),
+  updateAttribute: vi.fn(async () => ({ ok: true })),
   setMemberBanned: vi.fn(async () => ({ ok: true })),
   setMemberRole: vi.fn(async () => ({ ok: true })),
   createInvite: vi.fn(async () => ({
@@ -217,9 +218,12 @@ const accounts = {
     ),
   ],
   configured: ['google' as const],
-  installed: ['calendar', 'google-drive'],
+  installed: ['google-calendar', 'google-drive'],
   offered: ['box'],
 }
+
+/** The objects the shell lists; a test may set them. */
+let shellObjects: Array<object> = []
 
 /** The workspace row the shell hands every page; a test may give it a logo. */
 const workspace: { name: string; logo: string | null } = {
@@ -301,7 +305,7 @@ const shellData = (isAdmin: boolean) => ({
       ]
     : [],
   integrations: 1,
-  objects: [],
+  objects: shellObjects,
   fx: {
     baseCurrency: 'USD',
     rates: [
@@ -474,6 +478,7 @@ const loaders: Record<string, () => object> = {
       archived: false,
     },
     registry: [],
+    filledBy: {},
   }),
   models: () => ({
     providers: [
@@ -504,7 +509,7 @@ const loaders: Record<string, () => object> = {
     backfill: { pin: null },
   }),
   usage: () => ({
-    usage: { runs: [], loneCalls: [] },
+    usage: { runs: [], loneCalls: [], today: { runs: 14, waiting: 6 } },
     run: null,
     asked: null,
     caps: {
@@ -1019,15 +1024,34 @@ describe('the accounts pages, by the job an account does', () => {
   it('shows Install › to an admin and "Ask an admin" to a member for a plugin not installed', async () => {
     await mount('/settings/files')
     expect(
-      document.querySelector('section a[href="/settings/plugins"]')
+      document.querySelector('section a[href="/settings/plugins#plugin-box"]')
         ?.textContent,
     ).toBe('Install ›')
     expect(text()).not.toContain('Ask an admin')
     await mount('/settings/files', false)
     expect(
-      document.querySelector('section a[href="/settings/plugins"]'),
+      document.querySelector('section a[href^="/settings/plugins"]'),
     ).toBeNull()
     expect(text()).toContain('Ask an admin')
+  })
+
+  it("keys Email & calendar's Install › on the calendar plugin's registry id", async () => {
+    const original = loaders['email-calendar']
+    loaders['email-calendar'] = () => ({
+      view: { ...accounts, installed: [], offered: ['google-calendar'] },
+      address: null,
+    })
+    try {
+      await mount('/settings/email-calendar')
+      expect(
+        document.querySelector(
+          'section a[href="/settings/plugins#plugin-google-calendar"]',
+        )?.textContent,
+      ).toBe('Install ›')
+      expect(text()).not.toContain('Not available yet')
+    } finally {
+      loaders['email-calendar'] = original
+    }
   })
 
   it('unticks Drive on the account page: a confirm naming what stays, then that row alone', async () => {
@@ -1078,26 +1102,120 @@ describe('the accounts pages, by the job an account does', () => {
 })
 
 describe('the AI pages, as D81 splits them', () => {
-  it('Models opens on the sensitivity floor, and choosing Sensitive writes it at once', async () => {
+  it('Models opens on the sensitivity floor as radios, and choosing Sensitive writes it at once', async () => {
     await mount('/settings/models')
     const heads = Array.from(document.querySelectorAll('h3')).map((h) =>
       h.textContent.trim(),
     )
     expect(heads.at(0)).toBe('Sensitivity')
     expect(document.body.textContent).toContain(
-      'a floor · raises a record, never lowers it',
+      'a record can be raised, never lowered',
     )
-    await click(
-      document.querySelector('button[aria-label="Treat every record as"]'),
+    const radios = Array.from(
+      document.querySelectorAll('[role="radiogroup"] button[role="radio"]'),
     )
-    const sensitive = Array.from(document.querySelectorAll('[cmdk-item]')).find(
-      (el) => el.textContent.trim() === 'Sensitive',
+    expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual([
+      'true',
+      'false',
+    ])
+    expect(document.body.textContent).toContain('Any routed model may read it.')
+    expect(document.body.textContent).toContain(
+      'Only local models read it, and no plugin sees it.',
     )
-    await click(sensitive)
+    await click(radios.at(1))
     expect(writes.setSensitivityDefault).toHaveBeenCalledWith({
       data: { sensitivity: 'sensitive' },
     })
     expect(bar()?.getAttribute('data-shown')).toBe('false')
+  })
+
+  it('Models reads Set up on an unset provider and opens one provider at a time', async () => {
+    const original = loaders.models
+    const unset = (provider: string, label: string) => ({
+      provider,
+      label,
+      configured: false,
+      status: null,
+      display: null,
+      baseUrl: null,
+      headers: {},
+      lastUsedAt: null,
+      lastTestedAt: null,
+      lastTestOk: null,
+    })
+    loaders.models = () => ({
+      ...original(),
+      providers: [
+        {
+          provider: 'anthropic',
+          label: 'Anthropic',
+          configured: true,
+          status: 'active',
+          display: '••••7Hq2',
+          baseUrl: null,
+          headers: {},
+          lastUsedAt: ISO,
+          lastTestedAt: ISO,
+          lastTestOk: true,
+        },
+        unset('openai', 'OpenAI'),
+        unset('ollama', 'Ollama'),
+      ],
+    })
+    try {
+      await mount('/settings/models')
+      const row = (p: string) =>
+        document.querySelector(`[data-provider="${p}"]`)
+      expect(row('anthropic')?.textContent).toContain('works')
+      expect(byText('Edit', row('anthropic') ?? document)).toBeDefined()
+      expect(byText('Set up', row('openai') ?? document)).toBeDefined()
+      expect(row('openai')?.textContent).toContain('not set up')
+      expect(row('ollama')?.textContent).toContain('local')
+      // Closed, no provider's fields are drawn.
+      expect(
+        document.querySelectorAll('input[aria-label$="base URL"]'),
+      ).toHaveLength(0)
+
+      await click(byText('Set up', row('openai') ?? document))
+      expect(
+        document.querySelectorAll('input[aria-label$="base URL"]'),
+      ).toHaveLength(1)
+      expect(input('OpenAI API key').value).toBe('')
+
+      await click(byText('Edit', row('anthropic') ?? document))
+      const urls = Array.from(
+        document.querySelectorAll('input[aria-label$="base URL"]'),
+      ).map((i) => i.getAttribute('aria-label'))
+      expect(urls).toEqual(['Anthropic base URL'])
+
+      await type(input('Anthropic base URL'), 'https://gateway.example/v1')
+      expect(bar()?.textContent).toContain('1 change')
+      expect(
+        saveControls().every((b) => b.closest('[data-save-bar]') !== null),
+      ).toBe(true)
+    } finally {
+      loaders.models = original
+    }
+  })
+
+  it('names the jobs as the sheet does, with no description lines', async () => {
+    await mount('/settings/models')
+    const heads = Array.from(document.querySelectorAll('h3')).map((h) =>
+      h.textContent.trim(),
+    )
+    expect(heads).toContain('Who does what')
+    const text = document.body.textContent
+    for (const job of [
+      'Read documentsextract',
+      'Sortclassify',
+      'Writesynthesize',
+      'Read imagesvision',
+      'Web researchresearch',
+    ])
+      expect(text).toContain(job)
+    expect(text).not.toContain('A lane with no model routed')
+    expect(text).toContain('Everyday records')
+    expect(text).toContain('Sensitive records')
   })
 
   it('the routing grid has no Embed row, and one line pointing to Search', async () => {
@@ -1143,13 +1261,16 @@ describe('the AI pages, as D81 splits them', () => {
     })
     try {
       await mount('/settings/search')
+      const reuse = document.querySelector('#embed-openai-reuse')
+      expect(reuse?.getAttribute('aria-checked')).toBe('true')
       expect(document.body.textContent).toContain(
-        'using the OpenAI key from Models',
+        'Use the OpenAI key from Models',
       )
       expect(
         document.querySelector('input[aria-label="OpenAI embedding API key"]'),
       ).toBeNull()
       await click(byText('Use a different key'))
+      expect(reuse?.getAttribute('aria-checked')).toBe('false')
       expect(input('OpenAI embedding API key').value).toBe('')
     } finally {
       loaders.search = original
@@ -1383,5 +1504,247 @@ describe('the workspace and integration forms, by sheets 02, 05, 07 and 08', () 
     expect(new Set(rows.map((r) => r.textContent)).size).toBe(rows.length)
     expect(document.body.textContent).not.toContain('superseded')
     expect(document.body.textContent).not.toContain('newest wins')
+  })
+})
+
+/** One shell object row, as `listObjects` hands it. */
+const objectRow = (
+  n: number,
+  plural: string,
+  over: { isSystem?: boolean; archived?: boolean; attributeCount?: number },
+) => ({
+  id: `00000000-0000-4000-8000-00000000010${n}`,
+  slug: plural.toLowerCase(),
+  singular: plural.slice(0, -1),
+  plural,
+  icon: null,
+  identityKeys: [],
+  isSystem: over.isSystem ?? false,
+  archived: over.archived ?? false,
+  attributeCount: over.attributeCount ?? 3,
+})
+
+describe('Objects, by sheet 06', () => {
+  afterEach(() => {
+    shellObjects = []
+  })
+
+  it('splits the index into Built in, Yours and Archived, and restores an archived object', async () => {
+    const advisors = objectRow(4, 'Advisors', { archived: true })
+    shellObjects = [
+      objectRow(1, 'Companies', { isSystem: true, attributeCount: 9 }),
+      objectRow(2, 'People', { isSystem: true }),
+      objectRow(3, 'Funds', {}),
+      advisors,
+    ]
+    await mount('/settings/objects')
+    const groups = Array.from(
+      document.querySelectorAll('[data-settings-group]'),
+    ).map((g) => g.textContent)
+    expect(groups).toEqual(['Built in2', 'Yours1', 'Archived1'])
+    expect(document.body.textContent).toContain('9 attributes')
+    await click(byText('Restore'))
+    expect(writes.updateObject).toHaveBeenCalledWith({
+      data: { id: advisors.id, archived: false },
+    })
+  })
+
+  it('prints types in words, a Rules lane and ··· per row, the count in the head, no foot caption, and AI answers only where set', async () => {
+    const original = loaders['objects/$objectSlug']
+    const attr = (
+      n: number,
+      slug: string,
+      name: string,
+      kind: string,
+      options: object,
+      archived = false,
+    ) => ({
+      id: `00000000-0000-4000-8000-0000000000e${n}`,
+      slug,
+      name,
+      description: null,
+      type: kind,
+      options,
+      isSystem: false,
+      archived,
+      sortOrder: 0,
+      filterable: false,
+      sortable: false,
+    })
+    const option = (i: number) => ({ id: `o${i}`, label: `Option ${i}` })
+    loaders['objects/$objectSlug'] = () => ({
+      ...original(),
+      registry: [
+        attr(1, 'name', 'Name', 'text', { required: true }),
+        attr(2, 'domain', 'Domain', 'domain', { identityKey: 'domain' }),
+        attr(3, 'model', 'Model', 'multi_select', {
+          options: [1, 2, 3, 4, 5, 6].map(option),
+          ai: { mode: 'classify', prompt: '', lane: 'classify' },
+        }),
+        attr(4, 'founders', 'Founders', 'record_reference', {
+          targetKind: 'person',
+        }),
+        attr(5, 'old', 'Old', 'text', {}, true),
+      ],
+    })
+    try {
+      await mount('/settings/objects/funds')
+      const text = document.body.textContent
+      for (const slug of ['multi_select', 'record_reference'])
+        expect(text).not.toContain(slug)
+      const typeOf = (slug: string) =>
+        document.querySelector(`[data-attribute="${slug}"] [data-type]`)
+          ?.textContent
+      expect(typeOf('model')).toBe('Multi-select · 6')
+      expect(typeOf('founders')).toBe('Record · People')
+      const rulesOf = (slug: string) =>
+        document.querySelector(`[data-attribute="${slug}"] [data-rules]`)
+          ?.textContent
+      expect(rulesOf('domain')).toBe('identity · unique')
+      expect(rulesOf('name')).toBe('required')
+      expect(rulesOf('model')).toBe('AI answers')
+      expect(
+        document.querySelector('button[aria-label="More for Name"]'),
+      ).not.toBeNull()
+      expect(text).toContain('4 · drag to reorder')
+      expect(text).not.toMatch(/live · drag/)
+      expect(
+        document.querySelectorAll('[aria-label="Funds AI answers"] li'),
+      ).toHaveLength(1)
+      expect(
+        document.querySelector('[aria-label="Funds AI answers"]')?.textContent,
+      ).toContain('Model')
+    } finally {
+      loaders['objects/$objectSlug'] = original
+    }
+  })
+})
+
+describe('Search, Usage and Plugins, by sheets 04 and 07', () => {
+  it('Search opens on three readouts, number above label', async () => {
+    const original = loaders.search
+    const pin = {
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      dims: 768,
+      pinnedAt: '2026-09-20T10:00:00.000Z',
+    }
+    loaders.search = () => ({
+      settings: { pin, slot: null, keys: [] },
+      backfill: {
+        pin,
+        total: 200,
+        embedded: 184,
+        estimate: { chunks: 16, tokens: 4000, cost: 'under $0.01' },
+        sensitive: null,
+        run: { state: 'idle' },
+      },
+    })
+    try {
+      await mount('/settings/search')
+      const cells = Array.from(
+        document.querySelectorAll('[data-readouts] > *'),
+      ).map((c) => Array.from(c.children).map((x) => x.textContent))
+      expect(cells).toEqual([
+        ['92%', 'Passages searchable by meaning'],
+        ['16', 'Waiting'],
+        ['Left out', 'Sensitive records'],
+      ])
+      const heads = Array.from(document.querySelectorAll('h3')).map((h) =>
+        h.textContent.trim(),
+      )
+      expect(heads).toEqual(['Model', 'Sensitive records', 'Catch up'])
+      expect(byText('Embed 16')).toBeDefined()
+      const radios = document.querySelectorAll(
+        '[role="radiogroup"] [role="radio"]',
+      )
+      expect(radios.length).toBeGreaterThan(0)
+    } finally {
+      loaders.search = original
+    }
+  })
+
+  it('Usage & limits is one page: one head, three readouts, Limits and Runs', async () => {
+    await mount('/settings/usage')
+    expect(document.querySelectorAll('[data-settings-head]')).toHaveLength(1)
+    const cells = Array.from(
+      document.querySelectorAll('[data-readouts] > *'),
+    ).map((c) => Array.from(c.children).map((x) => x.textContent))
+    expect(cells).toEqual([
+      ['0of 1,000', 'Tokens today · resets 00:00 UTC'],
+      ['14', 'Runs today'],
+      ['6', 'Waiting in Review'],
+    ])
+    const heads = Array.from(document.querySelectorAll('h3')).map((h) =>
+      h.textContent.trim(),
+    )
+    expect(heads).toEqual(['Limits', 'Runs'])
+    expect(document.body.textContent).toContain('No runs yet.')
+    expect(document.body.textContent).not.toContain('Read a deck')
+  })
+
+  it('Plugins draws Available flush under Installed, both caps labels', async () => {
+    await mount('/settings/plugins')
+    const heads = Array.from(
+      document.querySelectorAll('[data-settings-group] h3'),
+    ).map((h) => h.textContent.trim())
+    expect(heads).toEqual(['Installed', 'Available'])
+    const section = document.querySelector('section')
+    expect(section?.parentElement?.className).toContain('flex-col')
+    expect(section?.nextElementSibling?.textContent).toContain('Available')
+  })
+})
+
+describe('Enrichment, by p-L-0 01', () => {
+  it('reads each readout as a number above a sentence-case label', async () => {
+    await mount('/settings/enrichment')
+    const cells = Array.from(
+      document.querySelectorAll('[data-readouts] > *'),
+    ).map((c) => Array.from(c.children).map((x) => x.textContent))
+    expect(cells).toEqual([
+      ['41', 'Fields filled · 7 days'],
+      ['3', 'Credits spent today'],
+      ['1', 'Waiting in Review'],
+    ])
+  })
+
+  it('draws a membership switch on every source row, the Website on and fixed', async () => {
+    await mount('/settings/enrichment')
+    const switches = Array.from(
+      document.querySelectorAll('[data-block="sources"] li'),
+    ).map((li) => li.querySelector('button[role="switch"]'))
+    expect(switches.every((s) => s !== null)).toBe(true)
+    const website = switches.at(0)
+    expect(website?.getAttribute('aria-checked')).toBe('true')
+    expect(website?.hasAttribute('disabled')).toBe(true)
+  })
+
+  it('draws the triggers with no source to write them for, and no sentence in their place', async () => {
+    const original = loaders.enrichment
+    loaders.enrichment = () => ({
+      page: {
+        ...enrichmentPage,
+        sources: enrichmentPage.sources.slice(0, 1),
+        auto: { ...enrichmentPage.auto, paid: [] },
+      },
+    })
+    try {
+      await mount('/settings/enrichment')
+      const auto = document.querySelector('[data-block="auto"]')
+      expect(auto?.textContent).not.toContain('The Website enriches every')
+      const ticks = auto?.querySelectorAll('button[role="checkbox"]') ?? []
+      expect(ticks).toHaveLength(3)
+      for (const t of ticks) expect(t.hasAttribute('disabled')).toBe(true)
+      expect(auto?.textContent).toContain('gets a domain or email')
+    } finally {
+      loaders.enrichment = original
+    }
+  })
+
+  it('heads What fills what with a caps label and the object as a picker', async () => {
+    await mount('/settings/enrichment')
+    const picker = document.querySelector('button[aria-label="Object"]')
+    expect(picker?.getAttribute('role')).toBe('combobox')
+    expect(picker?.textContent).toContain('Companies')
   })
 })

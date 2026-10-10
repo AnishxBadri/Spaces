@@ -5,13 +5,18 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import { ChevronRight, Plus } from 'lucide-react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { ObjectDialog } from '#/components/objects/object-dialog'
-import { SettingsSection } from '#/components/settings/settings-section'
+import {
+  SettingsGroupHead,
+  SettingsSection,
+} from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
 import { updateObject } from '#/lib/server-fns'
 import type { listObjects } from '#/lib/server-fns'
 import { objectIcon } from '#/lib/object-icons'
+import { cn } from '#/lib/utils'
 
 const shell = getRouteApi('/_app/settings')
 
@@ -31,9 +36,9 @@ function ObjectsRoute() {
 type ObjectRow = Awaited<ReturnType<typeof listObjects>>[number]
 
 /**
- * The object index: one row per object (system rows first), each linking to
- * its attributes page. Custom objects join this list when SPA-13 lands —
- * the page they get is the same one.
+ * The object index in three groups: Built in (the system objects), Yours
+ * (the custom ones) and Archived, each object restorable from there. A live
+ * row links to its attributes page.
  */
 function ObjectsSection({
   objects,
@@ -43,8 +48,24 @@ function ObjectsSection({
   isAdmin: boolean
 }) {
   const router = useRouter()
-  const live = objects.filter((o) => !o.archived)
+  const [restoring, setRestoring] = useState<string | null>(null)
+  const builtIn = objects.filter((o) => o.isSystem && !o.archived)
+  const yours = objects.filter((o) => !o.isSystem && !o.archived)
   const archived = objects.filter((o) => o.archived)
+
+  async function restore(o: ObjectRow) {
+    setRestoring(o.id)
+    try {
+      await updateObject({ data: { id: o.id, archived: false } })
+      toast(`${o.plural} restored`)
+      void router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not restore')
+    } finally {
+      setRestoring(null)
+    }
+  }
+
   return (
     <SettingsSection
       title="Objects"
@@ -64,79 +85,105 @@ function ObjectsSection({
         ) : null
       }
     >
-      <ul className="flex flex-col">
-        {live.map((o) => {
-          const Icon = objectIcon(o)
-          return (
-            <li key={o.id}>
-              <Link
-                to="/settings/objects/$objectSlug"
-                params={{ objectSlug: o.slug }}
-                className="focus-ring-inset flex h-12 items-center gap-3 border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-bone"
-              >
-                <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-hairline bg-paper">
-                  <Icon className="size-3 text-foreground" strokeWidth={1.75} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-ui font-medium">
-                    {o.plural}
-                  </span>
-                  <span className="block mono text-micro text-graphite">
-                    {o.attributeCount} attribute
-                    {o.attributeCount === 1 ? '' : 's'}
-                    {' · '}
-                    {o.isSystem ? 'system' : 'custom'}
-                  </span>
-                </span>
-                <ChevronRight
-                  className="size-3.5 shrink-0 text-graphite"
-                  strokeWidth={1.75}
-                />
-              </Link>
-            </li>
-          )
-        })}
-      </ul>
+      <SettingsGroupHead title="Built in" count={String(builtIn.length)} />
+      <ObjectList objects={builtIn} label="Built-in objects" />
+
+      <SettingsGroupHead title="Yours" count={String(yours.length)} />
+      {yours.length === 0 ? (
+        <p className="border-b border-rule py-3 text-label text-graphite">
+          No objects of your own.
+        </p>
+      ) : (
+        <ObjectList objects={yours} label="Your objects" />
+      )}
+
       {archived.length > 0 ? (
-        <ul className="flex flex-col text-graphite">
-          {archived.map((o) => {
-            const Icon = objectIcon(o)
-            return (
+        <>
+          <SettingsGroupHead title="Archived" count={String(archived.length)} />
+          <ul aria-label="Archived objects" className="flex flex-col">
+            {archived.map((o) => (
               <li
                 key={o.id}
-                className="flex h-12 items-center gap-3 border-b border-dashed border-rule"
+                className="flex h-11 items-center gap-3 border-b border-rule text-graphite"
               >
-                <span className="flex size-[1.375rem] shrink-0 items-center justify-center border border-rule bg-paper">
-                  <Icon className="size-3" strokeWidth={1.75} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-ui font-medium line-through">
-                    {o.plural}
-                  </span>
-                  <span className="block mono text-micro">
-                    archived — records kept, routes and pickers hidden
-                  </span>
+                <ObjectMark object={o} muted />
+                <span className="min-w-0 flex-1 truncate text-ui line-through">
+                  {o.plural}
                 </span>
                 {isAdmin ? (
-                  <button
-                    type="button"
-                    className="focus-ring mono text-micro hover:text-foreground"
-                    onClick={async () => {
-                      await updateObject({
-                        data: { id: o.id, archived: false },
-                      })
-                      toast(`${o.plural} restored`)
-                      void router.invalidate()
-                    }}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={restoring !== null}
+                    onClick={() => void restore(o)}
                   >
-                    restore
-                  </button>
+                    Restore
+                  </Button>
                 ) : null}
               </li>
-            )
-          })}
-        </ul>
+            ))}
+          </ul>
+        </>
       ) : null}
     </SettingsSection>
+  )
+}
+
+/** An object's mark: its icon in a 22px frame, ink live, rule when archived. */
+function ObjectMark({
+  object,
+  muted = false,
+}: {
+  object: ObjectRow
+  muted?: boolean
+}) {
+  const Icon = objectIcon(object)
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'flex size-[1.375rem] shrink-0 items-center justify-center border bg-paper',
+        muted ? 'border-rule' : 'border-hairline',
+      )}
+    >
+      <Icon
+        className={cn('size-3', muted ? 'text-graphite' : 'text-foreground')}
+        strokeWidth={1.75}
+      />
+    </span>
+  )
+}
+
+function ObjectList({
+  objects,
+  label,
+}: {
+  objects: Array<ObjectRow>
+  label: string
+}) {
+  return (
+    <ul aria-label={label} className="flex flex-col">
+      {objects.map((o) => (
+        <li key={o.id}>
+          <Link
+            to="/settings/objects/$objectSlug"
+            params={{ objectSlug: o.slug }}
+            className="focus-ring-inset flex h-11 items-center gap-3 border-b border-rule transition-colors duration-150 ease-out-quart hover:bg-bone"
+          >
+            <ObjectMark object={o} />
+            <span className="min-w-0 flex-1 truncate text-ui font-medium">
+              {o.plural}
+            </span>
+            <span className="shrink-0 mono text-micro text-graphite">
+              {o.attributeCount} attribute{o.attributeCount === 1 ? '' : 's'}
+            </span>
+            <ChevronRight
+              className="size-3.5 shrink-0 text-graphite"
+              strokeWidth={1.75}
+            />
+          </Link>
+        </li>
+      ))}
+    </ul>
   )
 }

@@ -1,24 +1,30 @@
 import { useRouter } from '@tanstack/react-router'
-import { Archive, Pencil } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { readAiConfig } from '@spaces/core/ai/attribute-ai'
 import { AttributeDialog } from './attribute-dialog'
+import { SettingsGroupHead } from '#/components/settings/settings-section'
 import { Button } from '#/components/ui/button'
-import { Badge } from '#/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { reorderAttributes, updateAttribute } from '#/lib/server-fns'
 import type { listRegistry } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
- * One object's registry as a settings ledger (spec §7; Instrument
- * "Settings — Object" board): a caps column head on a hairline, rows on
- * rules — grip · name (+ description, + option badges) · type · constraints
- * · origin · order/edit — and a mono foot with the live count and the
- * reorder keys.
- * Drag or ↑↓ persists sort_order, which every table and rail reads.
- * Archived attributes wait in a collapsed section below — never deleted,
- * values intact, one click from coming back. Keyed on the object row, so a
- * custom object gets exactly this page.
+ * One object's registry as a settings ledger (spec §7): `ATTRIBUTES` with
+ * the live count and `drag to reorder` in its head, then one row per
+ * attribute — grip · name · type in words (`Multi-select · 6`,
+ * `Record · People`) · rules (`identity · unique`, `filled by Apollo`) ·
+ * `···` (Edit, Move up, Move down, Archive).
+ * Drag or the menu's moves persist sort_order, which every table and rail
+ * reads. Archived attributes wait in a collapsed group below — never
+ * deleted, values intact, one click from coming back. Keyed on the object
+ * row, so a custom object gets exactly this page.
  */
 
 export type RegistryAttr = Awaited<ReturnType<typeof listRegistry>>[number]
@@ -45,8 +51,68 @@ export const TYPE_LABELS: Record<string, string> = {
   url: 'URL',
   phone: 'Phone',
   rating: 'Rating',
-  record_reference: 'Relationship',
+  record_reference: 'Record',
   actor_reference: 'User',
+}
+
+/** A core kind's list name, for `Record · People`. */
+const KIND_PLURAL: Record<string, string> = {
+  company: 'Companies',
+  person: 'People',
+  deal: 'Deals',
+}
+
+/**
+ * An attribute's type in words: the type, then what it holds when that
+ * matters — its live options, the object it points at, its currency.
+ * `objectNames` maps an object row's id to its plural.
+ */
+export function typeWords(
+  attr: Pick<RegistryAttr, 'type' | 'options'>,
+  objectNames: ReadonlyMap<string, string>,
+): string {
+  const label = TYPE_LABELS[attr.type] ?? attr.type
+  const stored = attr.options
+  switch (attr.type) {
+    case 'select':
+    case 'multi_select':
+    case 'status':
+      return `${label} · ${(stored.options ?? []).filter((o) => o.archived !== true).length}`
+    case 'record_reference': {
+      const target =
+        stored.targetObjectId === undefined
+          ? stored.targetKind === undefined
+            ? undefined
+            : KIND_PLURAL[stored.targetKind]
+          : objectNames.get(stored.targetObjectId)
+      return target === undefined ? label : `${label} · ${target}`
+    }
+    case 'currency':
+      return `${label} · ${stored.code ?? 'USD'}`
+    default:
+      return label
+  }
+}
+
+/**
+ * An attribute's rules in words: required, an identity key (unique by
+ * construction, D75), the enrichment source that fills it, an AI answer.
+ * `filledBy` is the source's name, or null when none fills it.
+ */
+export function ruleWords(
+  attr: Pick<RegistryAttr, 'type' | 'options' | 'archived'>,
+  filledBy: string | null,
+): string {
+  const stored = attr.options
+  return [
+    stored.required ? 'required' : null,
+    stored.identityKey === undefined ? null : 'identity · unique',
+    filledBy === null ? null : `filled by ${filledBy}`,
+    readAiConfig(attr) === null ? null : 'AI answers',
+    attr.archived ? 'values kept' : null,
+  ]
+    .filter((w) => w !== null)
+    .join(' · ')
 }
 
 /** The record kind whose vocabulary Fill from offers: Companies and People only. (D76) */
@@ -69,21 +135,26 @@ function moveItem<T>(list: Array<T>, from: number, to: number): Array<T> {
 
 // The lanes, shared by the head and every row so they stay one grid.
 const LANE = {
-  grip: 'w-6 shrink-0',
-  type: 'w-35 shrink-0',
-  constraints: 'w-50 shrink-0 max-lg:hidden',
-  origin: 'w-18 shrink-0',
-  actions: 'w-28 shrink-0',
+  grip: 'w-4 shrink-0',
+  type: 'w-36 shrink-0',
+  rules: 'w-44 shrink-0 max-md:hidden',
+  actions: 'flex w-18 shrink-0 justify-end',
 } as const
 
 export function RegistryList({
   object,
   registry,
   canReshape,
+  objectNames,
+  filledBy,
 }: {
   object: ObjectRow
   registry: Array<RegistryAttr>
   canReshape: boolean
+  /** Object row id → plural, for a relationship's target. */
+  objectNames: ReadonlyMap<string, string>
+  /** Attribute id → the enrichment source that fills it. */
+  filledBy: ReadonlyMap<string, string>
 }) {
   const router = useRouter()
   const live = registry.filter((a) => !a.archived)
@@ -117,25 +188,38 @@ export function RegistryList({
     }
   }
 
+  const words = (attr: RegistryAttr) => ({
+    type: typeWords(attr, objectNames),
+    rules: ruleWords(attr, filledBy.get(attr.id) ?? null),
+  })
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col">
       <section className="flex flex-col">
+        <SettingsGroupHead
+          title="Attributes"
+          action={
+            canReshape && ordered.length > 1
+              ? `${ordered.length} · drag to reorder`
+              : String(ordered.length)
+          }
+        />
         <div
           aria-hidden
-          className="flex h-8 items-center gap-3 border-b border-hairline px-3 label-caps text-graphite"
+          className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite"
         >
           <span className={LANE.grip} />
           <span className="min-w-0 flex-1">Attribute</span>
           <span className={LANE.type}>Type</span>
-          <span className={LANE.constraints}>Constraints</span>
-          <span className={LANE.origin}>Origin</span>
-          <span className={cn(LANE.actions, 'text-right')}>Order · edit</span>
+          <span className={LANE.rules}>Rules</span>
+          <span className={LANE.actions} />
         </div>
         <ol aria-label={`${object.plural} attributes`}>
           {ordered.map((attr, idx) => (
             <AttributeRow
               key={attr.id}
               attr={attr}
+              words={words(attr)}
               object={object}
               canReshape={canReshape}
               isFirst={idx === 0}
@@ -162,28 +246,27 @@ export function RegistryList({
             />
           ))}
           {ordered.length === 0 ? (
-            <li className="flex h-row items-center border-b border-rule px-3 text-ui text-graphite">
-              No attributes yet — add the first one above.
+            <li className="flex h-row items-center border-b border-rule text-ui text-graphite">
+              No attributes yet.
             </li>
           ) : null}
         </ol>
-        <div className="flex h-8 items-center px-3 mono text-micro text-graphite">
-          <span>{ordered.length} live · drag ⋮⋮ or ↑↓ to reorder</span>
-        </div>
       </section>
 
       {archived.length > 0 ? (
-        <section className="flex flex-col">
+        <section className="flex flex-col pt-7">
           <button
             type="button"
             aria-expanded={showArchived}
             onClick={() => setShowArchived((v) => !v)}
-            className="focus-ring-inset flex h-8 items-center gap-2 border-b border-hairline px-3 text-left"
+            className="focus-ring-inset flex items-baseline gap-2 border-b border-hairline pb-1.5 text-left"
           >
             <span className="w-3 mono text-micro text-graphite">
               {showArchived ? '⌄' : '›'}
             </span>
-            <span className="label-caps text-foreground">Archived</span>
+            <span className="field-label leading-3.5 font-medium text-graphite">
+              Archived
+            </span>
             <span className="mono text-micro text-graphite">
               {archived.length}
             </span>
@@ -194,6 +277,7 @@ export function RegistryList({
                 <AttributeRow
                   key={attr.id}
                   attr={attr}
+                  words={words(attr)}
                   object={object}
                   canReshape={canReshape}
                   isFirst
@@ -212,6 +296,7 @@ export function RegistryList({
 
 function AttributeRow({
   attr,
+  words,
   object,
   canReshape,
   isFirst,
@@ -225,6 +310,7 @@ function AttributeRow({
   onDrop,
 }: {
   attr: RegistryAttr
+  words: { type: string; rules: string }
   object: ObjectRow
   canReshape: boolean
   isFirst: boolean
@@ -256,30 +342,31 @@ function AttributeRow({
     }
   }
 
-  const stored = attr.options
-  const options = stored.options ?? []
-  const hasOptions = ['select', 'multi_select', 'status'].includes(attr.type)
-  const constraints = [
-    hasOptions
-      ? `${options.length} option${options.length === 1 ? '' : 's'}`
-      : null,
-    attr.type === 'record_reference'
-      ? `→ ${stored.targetKind ?? 'your object'}`
-      : null,
-    attr.type === 'currency' ? (stored.code ?? 'USD') : null,
-    attr.type === 'rating' ? `out of ${stored.max ?? 5}` : null,
-    attr.type === 'number' && stored.precision !== undefined
-      ? `${stored.precision} decimals`
-      : null,
-    stored.required ? 'required' : null,
-    stored.default !== undefined && stored.default !== null
-      ? 'has default'
-      : null,
-    attr.archived ? 'values kept' : null,
-  ].filter(Boolean)
+  const verbs: Array<RowVerb> = [
+    { label: 'Edit…', onSelect: () => setEditing(true) },
+    ...(onMove === undefined
+      ? []
+      : [
+          {
+            label: 'Move up',
+            disabled: isFirst,
+            onSelect: () => onMove('up'),
+          },
+          {
+            label: 'Move down',
+            disabled: isLast,
+            onSelect: () => onMove('down'),
+          },
+        ]),
+    {
+      label: 'Archive',
+      onSelect: () => void act({ archived: true }, `${attr.name} archived`),
+    },
+  ]
 
   return (
     <li
+      data-attribute={attr.slug}
       draggable={draggable}
       onDragStart={(e) => {
         if (!draggable) return
@@ -300,135 +387,58 @@ function AttributeRow({
         onDrop()
       }}
       className={cn(
-        'flex flex-col border-b border-rule transition-[background-color,opacity] duration-150 ease-out-quart',
+        'flex h-ledger-row items-center gap-3 border-b border-rule transition-[background-color,opacity] duration-150 ease-out-quart',
         dragging && 'opacity-50',
         over && 'bg-bone',
       )}
     >
-      <div className="flex min-h-10 items-center gap-3 px-3 py-2">
-        <span
-          aria-hidden
-          className={cn(
-            LANE.grip,
-            'flex justify-center mono text-label',
-            onDragStart && draggable
-              ? 'cursor-grab touch-none text-rule active:cursor-grabbing'
-              : 'text-transparent',
-          )}
-        >
-          ⋮⋮
-        </span>
+      <span
+        aria-hidden
+        className={cn(
+          LANE.grip,
+          'mono text-micro',
+          onDragStart && draggable
+            ? 'cursor-grab touch-none text-graphite active:cursor-grabbing'
+            : 'text-transparent',
+        )}
+      >
+        ⋮⋮
+      </span>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <InlineName
-            name={attr.name}
+      <span className="min-w-0 flex-1">
+        <InlineName
+          name={attr.name}
+          disabled={!canReshape}
+          muted={attr.archived}
+          onSave={(name) => act({ name })}
+        />
+      </span>
+
+      <span
+        data-type
+        className={cn(LANE.type, 'truncate text-ui text-graphite')}
+      >
+        {words.type}
+      </span>
+
+      <span data-rules className={cn(LANE.rules, 'truncate text-label')}>
+        {words.rules}
+      </span>
+
+      <span className={LANE.actions}>
+        {attr.archived ? (
+          <Button
+            size="sm"
+            variant="outline"
             disabled={!canReshape}
-            muted={attr.archived}
-            onSave={(name) => act({ name })}
-          />
-          {attr.description ? (
-            <p className="truncate text-label text-graphite">
-              {attr.description}
-            </p>
-          ) : null}
-        </div>
-
-        <span
-          className={cn(
-            LANE.type,
-            'truncate mono text-label',
-            attr.archived ? 'text-graphite' : 'text-foreground',
-          )}
-        >
-          {attr.type}
-        </span>
-
-        <span
-          className={cn(
-            LANE.constraints,
-            'truncate mono text-label text-graphite',
-          )}
-        >
-          {constraints.length > 0 ? constraints.join(' · ') : '—'}
-        </span>
-
-        <span className={cn(LANE.origin, 'flex')}>
-          <span
-            className={cn(
-              'h-4 px-1.25 field-label leading-4 font-medium',
-              attr.isSystem
-                ? 'bg-bone text-graphite'
-                : 'bg-selected text-foreground',
-            )}
+            onClick={() => act({ archived: false }, `${attr.name} restored`)}
           >
-            {attr.isSystem ? 'system' : 'custom'}
-          </span>
-        </span>
-
-        <span className={cn(LANE.actions, 'flex justify-end gap-0.5')}>
-          {attr.archived ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!canReshape}
-              onClick={() => act({ archived: false }, `${attr.name} restored`)}
-            >
-              Restore
-            </Button>
-          ) : (
-            <>
-              {onMove ? (
-                <>
-                  <RowBtn
-                    label="Move up"
-                    disabled={isFirst || !canReshape}
-                    onClick={() => onMove('up')}
-                  >
-                    ↑
-                  </RowBtn>
-                  <RowBtn
-                    label="Move down"
-                    disabled={isLast || !canReshape}
-                    onClick={() => onMove('down')}
-                  >
-                    ↓
-                  </RowBtn>
-                </>
-              ) : null}
-              <RowBtn
-                label="Edit attribute"
-                disabled={!canReshape}
-                onClick={() => setEditing(true)}
-              >
-                <Pencil className="size-3" strokeWidth={1.75} />
-              </RowBtn>
-              <RowBtn
-                label="Archive"
-                disabled={!canReshape}
-                onClick={() => act({ archived: true }, `${attr.name} archived`)}
-              >
-                <Archive className="size-3" strokeWidth={1.75} />
-              </RowBtn>
-            </>
-          )}
-        </span>
-      </div>
-
-      {hasOptions && options.length > 0 ? (
-        <div className="flex flex-wrap gap-1 pr-3 pb-2.5 pl-12">
-          {options.map((o, i) => (
-            <Badge
-              key={o.id}
-              option={o}
-              index={i}
-              archived={o.archived}
-              title={o.archived ? 'Archived option' : undefined}
-            >
-              {o.label}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
+            Restore
+          </Button>
+        ) : canReshape ? (
+          <RowMenu name={attr.name} verbs={verbs} />
+        ) : null}
+      </span>
 
       <AttributeDialog
         mode="edit"
@@ -445,30 +455,55 @@ function AttributeRow({
   )
 }
 
-/** A 24px mark in the row's action lane: mono glyph or 12px icon, graphite
- *  until hover, rule when disabled. Always visible — nothing needs hover. */
-function RowBtn({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
+type RowVerb = {
   label: string
   disabled?: boolean
-  onClick: () => void
-  children: React.ReactNode
+  /** Runs once the menu has closed, so a window it opens keeps its focus. */
+  onSelect: () => void
+}
+
+/** A row's `···`: its verbs in a menu, the one that opens a window run after close. */
+function RowMenu({
+  name,
+  verbs,
+}: {
+  name: string
+  verbs: ReadonlyArray<RowVerb>
 }) {
+  const afterClose = useRef<(() => void) | null>(null)
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="focus-ring flex size-6 shrink-0 touch-manipulation items-center justify-center rounded-md mono text-label text-graphite transition-colors duration-150 ease-out-quart hover:bg-bone hover:text-foreground disabled:pointer-events-none disabled:text-rule"
-    >
-      {children}
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon-xs" aria-label={`More for ${name}`}>
+          <span aria-hidden className="mono text-ui text-graphite">
+            ···
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-40"
+        onCloseAutoFocus={(e) => {
+          const run = afterClose.current
+          if (run === null) return
+          e.preventDefault()
+          afterClose.current = null
+          run()
+        }}
+      >
+        {verbs.map((v) => (
+          <DropdownMenuItem
+            key={v.label}
+            disabled={v.disabled === true}
+            onSelect={() => {
+              afterClose.current = v.onSelect
+            }}
+          >
+            {v.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

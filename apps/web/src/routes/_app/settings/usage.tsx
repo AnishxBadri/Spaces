@@ -1,10 +1,12 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { CapsSection } from '#/components/settings/caps-section'
+import { LimitsGroup } from '#/components/settings/caps-section'
 import {
   SettingsGroupHead,
   SettingsSection,
 } from '#/components/settings/settings-section'
+import { ReadoutStrip } from '#/components/record/record-parts'
+import type { RecordReadout } from '#/components/record/record-parts'
 import { SUGGESTION_KIND_WORD } from '#/components/inbox/suggestion-card'
 import { formatNumber } from '@spaces/core/format'
 import {
@@ -23,12 +25,13 @@ type RunDetail = NonNullable<Awaited<ReturnType<typeof getAiRun>>>
 type RunStep = RunDetail['steps'][number]
 
 /**
- * Settings → AI → Usage & limits: the run log, then Caps. (D81)
+ * Settings → AI → Usage & limits: one page — today's readouts, Limits, then
+ * the run log. (D81)
  * - Every AI action is one `ai_run`, newest first; `?run=<id>` (which the
  *   inbox's "produced by this run" links to) opens its steps in order, refs
  *   resolved to names server-side. Calls no run owns list apart.
  * - Not admin-only: the log writes nothing and is every member's provenance.
- *   A member reads Caps disabled; only an admin changes them.
+ *   A member reads Limits disabled; only an admin changes them.
  */
 export const Route = createFileRoute('/_app/settings/usage')({
   validateSearch: z.object({ run: z.string().uuid().optional() }),
@@ -52,6 +55,11 @@ function stamp(iso: string | null): string {
   return iso ? `${iso.slice(0, 16).replace('T', ' ')} UTC` : '—'
 }
 
+/** A run's start in the ledger's At lane: `09-23 14:02`, UTC. */
+function at(iso: string): string {
+  return `${iso.slice(5, 10)} ${iso.slice(11, 16)}`
+}
+
 /** `1,204 / 312`; a side the provider did not report reads `—`. */
 function tokens(tokensIn: number | null, tokensOut: number | null): string {
   if (tokensIn === null && tokensOut === null) return '—'
@@ -60,13 +68,52 @@ function tokens(tokensIn: number | null, tokensOut: number | null): string {
 }
 
 function UsageRoute() {
-  const { caps, ...log } = Route.useLoaderData()
+  const { caps, usage, run, asked } = Route.useLoaderData()
   return (
-    <div className="flex flex-col gap-8">
-      <RunLog {...log} />
-      <CapsSection caps={caps.caps} usage={caps.today} />
-    </div>
+    <SettingsSection title="Usage & limits" crumb="AI">
+      <ReadoutStrip
+        readouts={usageReadouts(caps, usage.today)}
+        className="border-t-0 border-b border-rule"
+      />
+      <LimitsGroup caps={caps.caps} />
+      <RunLog usage={usage} run={run} asked={asked} />
+    </SettingsSection>
   )
+}
+
+/** Tokens today against the daily limit, runs today, and what waits in Review. */
+function usageReadouts(
+  caps: {
+    caps: Awaited<ReturnType<typeof getAiCaps>>
+    today: Awaited<ReturnType<typeof getAiUsageToday>>
+  },
+  today: UsageView['today'],
+): Array<RecordReadout> {
+  const cap = caps.caps.dailyTokens
+  const used = caps.today.used
+  return [
+    {
+      label: 'Tokens today · resets 00:00 UTC',
+      value:
+        cap === null ? (
+          formatNumber(used, 0)
+        ) : (
+          <>
+            {formatNumber(used, 0)}
+            <span className="ml-1.5 text-label text-graphite">
+              of {formatNumber(cap, 0)}
+            </span>
+          </>
+        ),
+      tone: cap !== null && used >= cap ? 'bad' : undefined,
+    },
+    { label: 'Runs today', value: formatNumber(today.runs, 0) },
+    {
+      label: 'Waiting in Review',
+      value: formatNumber(today.waiting, 0),
+      to: '/review',
+    },
+  ]
 }
 
 function RunLog({
@@ -83,25 +130,26 @@ function RunLog({
     0,
   )
   return (
-    <SettingsSection title="Usage & limits" crumb="AI">
+    <>
       <div className="flex flex-col">
         <SettingsGroupHead
           title="Runs"
-          count={`${usage.runs.length} listed · ${formatNumber(spent)} tokens`}
+          action={
+            usage.runs.length === 0
+              ? undefined
+              : `${usage.runs.length} listed · ${formatNumber(spent)} tokens`
+          }
         />
-        <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 field-label leading-4 text-graphite">
-          <span className="min-w-0 flex-1">Task</span>
-          <span className="w-36 shrink-0">Record</span>
-          <span className="w-28 shrink-0">Who</span>
-          <span className="w-36 shrink-0">Started</span>
-          <span className="w-16 shrink-0">Status</span>
-          <span className="w-28 shrink-0 text-right">Tokens in / out</span>
-          <span className="w-36 shrink-0 text-right">Suggestions</span>
+        <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
+          <span className="min-w-0 flex-1">Run</span>
+          <span className="w-24 shrink-0">Who</span>
+          <span className="w-24 shrink-0">At</span>
+          <span className="w-40 shrink-0">Result</span>
+          <span className="w-24 shrink-0 text-right">Tokens</span>
         </div>
         {usage.runs.length === 0 ? (
-          <p className="border-b border-rule px-3 py-3 text-label text-graphite">
-            No runs yet. Read a deck, summarize a document or suggest spaces,
-            and each shows here as one run.
+          <p className="border-b border-rule py-3 text-label text-graphite">
+            No runs yet.
           </p>
         ) : (
           usage.runs.map((r) => (
@@ -118,62 +166,61 @@ function RunLog({
         <RunPanel detail={run} />
       )}
 
-      <LoneCalls calls={usage.loneCalls} />
-    </SettingsSection>
+      {usage.loneCalls.length === 0 ? null : (
+        <LoneCalls calls={usage.loneCalls} />
+      )}
+    </>
   )
 }
 
-function StatusWord({ status }: { status: RunItem['status'] }) {
-  return (
-    <span
-      className={cn(
-        'w-16 shrink-0 mono text-micro',
-        status === 'failed'
-          ? 'text-destructive'
-          : status === 'running'
-            ? 'text-graphite'
-            : 'text-foreground',
-      )}
-    >
-      {status}
-    </span>
-  )
+/** The Result lane: what the run left in Review, or why it stopped. */
+function resultOf(run: RunItem): string {
+  if (run.status === 'failed') return `failed · ${run.error ?? 'no reason'}`
+  if (run.status === 'running') return 'running'
+  const { open: waiting, accepted, rejected } = run.suggestions
+  if (waiting + accepted + rejected === 0) return 'nothing proposed'
+  return `${waiting} to Review · ${accepted} accepted`
 }
 
 function RunRow({ run, open }: { run: RunItem; open: boolean }) {
-  const { open: waiting, accepted, rejected } = run.suggestions
-  const produced = waiting + accepted + rejected
+  const total =
+    run.tokensIn === null && run.tokensOut === null
+      ? '—'
+      : formatNumber((run.tokensIn ?? 0) + (run.tokensOut ?? 0), 0)
   return (
     <Link
       to="/settings/usage"
       search={open ? {} : { run: run.id }}
       aria-current={open ? 'true' : undefined}
       className={cn(
-        'focus-ring-inset flex h-9 items-center gap-3 border-b border-rule px-3 hover:bg-bone',
+        'focus-ring-inset flex min-h-12 items-center gap-3 border-b border-rule py-1.5 hover:bg-bone',
         open && 'bg-bone',
       )}
     >
-      <span className="min-w-0 flex-1 truncate text-ui font-medium">
-        {run.task}
-        <span className="ml-2 mono text-micro font-normal text-graphite">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-ui font-medium">{run.task}</span>
+        <span className="truncate mono text-micro text-graphite">
+          {run.record === null ? '' : `on ${run.record.name} · `}
           {run.steps} step{run.steps === 1 ? '' : 's'}
         </span>
       </span>
-      <span className="w-36 shrink-0 truncate text-label">
-        {run.record?.name ?? '—'}
-      </span>
-      <span className="w-28 shrink-0 truncate text-label text-graphite">
+      <span className="w-24 shrink-0 truncate text-label text-graphite">
         {run.who}
       </span>
-      <span className="w-36 shrink-0 mono text-micro text-graphite">
-        {stamp(run.startedAt)}
+      <span className="w-24 shrink-0 mono text-micro text-graphite">
+        {at(run.startedAt)}
       </span>
-      <StatusWord status={run.status} />
-      <span className="w-28 shrink-0 numeric text-right text-micro">
-        {tokens(run.tokensIn, run.tokensOut)}
+      <span
+        title={resultOf(run)}
+        className={cn(
+          'line-clamp-2 w-40 shrink-0 text-label',
+          run.status === 'failed' ? 'text-destructive' : 'text-foreground',
+        )}
+      >
+        {resultOf(run)}
       </span>
-      <span className="w-36 shrink-0 text-right mono text-micro text-graphite">
-        {produced === 0 ? '—' : `${waiting} open · ${accepted} accepted`}
+      <span className="w-24 shrink-0 numeric text-right text-micro">
+        {total}
       </span>
     </Link>
   )
@@ -370,41 +417,35 @@ function LoneCalls({ calls }: { calls: ReadonlyArray<LoneCall> }) {
     <div className="flex flex-col">
       <SettingsGroupHead
         title="Calls outside a run"
-        count={`${calls.length} · the settings Test call`}
+        count={String(calls.length)}
       />
-      <div className="flex h-8 items-center gap-3 border-b border-hairline px-3 field-label leading-4 text-graphite">
+      <div className="flex h-8 items-center gap-3 border-b border-hairline field-label leading-4 text-graphite">
         <span className="w-20 shrink-0">Lane</span>
         <span className="min-w-0 flex-1">Provider · model</span>
         <span className="w-28 shrink-0">Who</span>
         <span className="w-36 shrink-0">At</span>
         <span className="w-28 shrink-0 text-right">Tokens in / out</span>
       </div>
-      {calls.length === 0 ? (
-        <p className="border-b border-rule px-3 py-3 text-label text-graphite">
-          None — every call so far was a step of a run.
-        </p>
-      ) : (
-        calls.map((c) => (
-          <div
-            key={c.id}
-            className="flex h-9 items-center gap-3 border-b border-rule px-3"
-          >
-            <span className="w-20 shrink-0 mono text-micro">{c.lane}</span>
-            <span className="min-w-0 flex-1 truncate mono text-micro">
-              {c.provider} · {c.model}
-            </span>
-            <span className="w-28 shrink-0 truncate text-label text-graphite">
-              {c.who}
-            </span>
-            <span className="w-36 shrink-0 mono text-micro text-graphite">
-              {stamp(c.at)}
-            </span>
-            <span className="w-28 shrink-0 numeric text-right text-micro">
-              {tokens(c.tokensIn, c.tokensOut)}
-            </span>
-          </div>
-        ))
-      )}
+      {calls.map((c) => (
+        <div
+          key={c.id}
+          className="flex h-9 items-center gap-3 border-b border-rule"
+        >
+          <span className="w-20 shrink-0 mono text-micro">{c.lane}</span>
+          <span className="min-w-0 flex-1 truncate mono text-micro">
+            {c.provider} · {c.model}
+          </span>
+          <span className="w-28 shrink-0 truncate text-label text-graphite">
+            {c.who}
+          </span>
+          <span className="w-36 shrink-0 mono text-micro text-graphite">
+            {stamp(c.at)}
+          </span>
+          <span className="w-28 shrink-0 numeric text-right text-micro">
+            {tokens(c.tokensIn, c.tokensOut)}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }

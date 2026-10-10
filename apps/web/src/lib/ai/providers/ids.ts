@@ -83,6 +83,17 @@ export const PROVIDERS: Record<LlmProvider, ProviderDescriptor> = {
   },
 }
 
+/**
+ * Providers that run on the operator's own box. A `sensitive` call goes to
+ * one of these or nowhere — never to the cloud as a fallback.
+ */
+export const LOCAL_PROVIDERS = [
+  'ollama',
+] as const satisfies readonly LlmProvider[]
+
+export const isLocalProvider = (provider: LlmProvider): boolean =>
+  LOCAL_PROVIDERS.some((p) => p === provider)
+
 export const PROVIDER_LABEL: Record<LlmProvider, string> = {
   anthropic: PROVIDERS.anthropic.label,
   openai: PROVIDERS.openai.label,

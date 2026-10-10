@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { checkboxClasses } from './checkbox.tsx'
+import { checkboxClasses, radioClasses } from './checkbox.tsx'
 
 /** SPA-22. Asserted through the class helper — see `badge.test.ts` for why. */
 describe('checkboxClasses', () => {
@@ -46,5 +46,21 @@ describe('checkboxClasses', () => {
     )
     expect(c).toContain('mt-0.5')
     expect(c).toContain('size-3.5')
+  })
+})
+
+describe('radioClasses', () => {
+  it('is the checkbox square, never a circle', () => {
+    const c = radioClasses({ checked: false }).split(' ')
+    expect(c).toContain('size-3.5')
+    expect(c).toContain('border')
+    expect(radioClasses({ checked: true })).not.toMatch(/rounded/)
+  })
+
+  it('stays on paper when chosen: a pine border, not a pine fill', () => {
+    const on = radioClasses({ checked: true })
+    expect(on).toMatch(/border-primary/)
+    expect(on).toMatch(/bg-paper/)
+    expect(on).not.toMatch(/bg-primary/)
   })
 })

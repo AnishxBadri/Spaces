@@ -139,7 +139,8 @@ export function syncStateOf(rows: ReadonlyArray<ConnectionListRow>): SyncState {
 export type Offer =
   | { readonly kind: 'connect'; readonly product: string }
   | { readonly kind: 'configure' }
-  | { readonly kind: 'install' }
+  /** `plugin` is the registry's plugin id, for its row in the catalogue. */
+  | { readonly kind: 'install'; readonly plugin: string }
   | { readonly kind: 'ask' }
   | { readonly kind: 'unavailable' }
 
@@ -160,8 +161,11 @@ export function offerFor(
       return { kind: 'connect', product: installed.product }
     return isAdmin ? { kind: 'configure' } : { kind: 'ask' }
   }
-  if (plugins.some((p) => view.offered.includes(p.plugin)))
-    return isAdmin ? { kind: 'install' } : { kind: 'ask' }
+  const offered = plugins.find((p) => view.offered.includes(p.plugin))
+  if (offered !== undefined)
+    return isAdmin
+      ? { kind: 'install', plugin: offered.plugin }
+      : { kind: 'ask' }
   return { kind: 'unavailable' }
 }
 

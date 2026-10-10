@@ -2,10 +2,9 @@ import { Link, useRouter } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
-import { ReadoutStrip } from '#/components/page-header'
+import { ReadoutStrip } from '#/components/record/record-parts'
 import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
-import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
 import { Switch } from '#/components/ui/switch'
 import {
@@ -35,8 +34,9 @@ import {
 
 /**
  * Settings → Integrations → Enrichment (D76, D81): where enriched values
- * come from. Top to bottom: three readouts, the sources in order (drag or
- * ↑↓; the switch takes a source in or out of the order), when to enrich
+ * come from. Top to bottom: three readouts (number above a sentence-case
+ * label), the sources in order (drag or ↑↓; each row's switch takes a source
+ * in or out of the order — the Website's is always on), when to enrich
  * automatically and how long an answer is reused, What fills what, and the
  * recent runs.
  * - Switches, ticks and the order apply at once with a toast; the reuse
@@ -47,13 +47,19 @@ export function EnrichmentSection({ page }: { page: EnrichmentPage }) {
   return (
     <SettingsSection title="Enrichment" crumb="Integrations">
       <ReadoutStrip
-        className="mt-6 border-t border-rule"
-        cells={[
-          { label: 'Fields filled · 7 days', value: page.readouts.fieldsWeek },
-          { label: 'Credits spent today', value: page.readouts.creditsToday },
+        className="border-t-0 border-b border-rule"
+        readouts={[
+          {
+            label: 'Fields filled · 7 days',
+            value: String(page.readouts.fieldsWeek),
+          },
+          {
+            label: 'Credits spent today',
+            value: String(page.readouts.creditsToday),
+          },
           {
             label: 'Waiting in Review',
-            value: page.readouts.review,
+            value: String(page.readouts.review),
             to: '/review',
           },
         ]}
@@ -233,7 +239,14 @@ function SourcesBlock({
                 ↓
               </button>
               {source.builtIn ? (
-                <span className="w-6" />
+                <span title="The Website is always asked">
+                  <Switch
+                    checked
+                    disabled
+                    aria-label={`Ask ${source.name}`}
+                    onCheckedChange={() => undefined}
+                  />
+                </span>
               ) : (
                 <Switch
                   checked={source.on}
@@ -360,75 +373,69 @@ function AutoBlock({
         title="Enrich automatically when a record"
         count={
           auto.paid.length === 0
-            ? undefined
+            ? 'no paid source'
             : scopes.length === 0
               ? 'off'
-              : String(scopes.length)
+              : undefined
         }
       />
-      {auto.paid.length === 0 ? (
-        <p className="border-b border-rule px-3 py-3 text-ui text-graphite">
-          The Website enriches every new record. Add a source to choose more.
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 border-b border-rule px-3 py-2 max-md:grid-cols-1">
-          {SCOPE_LABELS.map((row) => {
-            const id = `auto-${row.scope}`
-            const checked = scopes.includes(row.scope)
-            return (
-              <div
-                key={row.scope}
-                className="flex min-h-10 items-start gap-2.5 py-1.5"
-              >
-                <Checkbox
-                  id={id}
-                  checked={checked}
-                  disabled={pending}
-                  className="mt-[0.1875rem]"
-                  onCheckedChange={(on) =>
-                    void save(
-                      on
-                        ? [...scopes, row.scope]
-                        : scopes.filter((s) => s !== row.scope),
-                      spaces,
-                    )
-                  }
-                />
-                <span className="flex min-w-0 flex-col">
-                  <span className="flex items-center gap-2">
-                    <label htmlFor={id} className="text-ui text-foreground">
-                      {row.label}
-                    </label>
-                    {row.scope === 'space' ? (
-                      <Select
-                        aria-label="Which space"
-                        value={spaces.at(0) ?? ANY_SPACE}
-                        onChange={(v) =>
-                          void save(
-                            v === ANY_SPACE || scopes.includes('space')
-                              ? scopes
-                              : [...scopes, row.scope],
-                            v === ANY_SPACE ? [] : [v],
-                          )
-                        }
-                        items={spaceItems}
-                        width="content"
-                        disabled={pending}
-                        searchPlaceholder="Search spaces…"
-                        emptyLabel="No space matches."
-                        className="h-6 rounded-none px-2 text-label"
-                      />
-                    ) : null}
-                  </span>
-                  {row.hint === null ? null : (
-                    <span className="text-label text-graphite">{row.hint}</span>
-                  )}
+      <div className="grid grid-cols-2 border-b border-rule py-2 max-md:grid-cols-1">
+        {SCOPE_LABELS.map((row) => {
+          const id = `auto-${row.scope}`
+          const checked = scopes.includes(row.scope)
+          return (
+            <div
+              key={row.scope}
+              className="flex min-h-10 items-start gap-2.5 py-1.5"
+            >
+              <Checkbox
+                id={id}
+                checked={checked}
+                disabled={pending || auto.paid.length === 0}
+                className="mt-[0.1875rem]"
+                onCheckedChange={(on) =>
+                  void save(
+                    on
+                      ? [...scopes, row.scope]
+                      : scopes.filter((s) => s !== row.scope),
+                    spaces,
+                  )
+                }
+              />
+              <span className="flex min-w-0 flex-col">
+                <span className="flex items-center gap-2">
+                  <label htmlFor={id} className="text-ui text-foreground">
+                    {row.label}
+                  </label>
+                  {row.scope === 'space' ? (
+                    <Select
+                      aria-label="Which space"
+                      value={spaces.at(0) ?? ANY_SPACE}
+                      onChange={(v) =>
+                        void save(
+                          v === ANY_SPACE || scopes.includes('space')
+                            ? scopes
+                            : [...scopes, row.scope],
+                          v === ANY_SPACE ? [] : [v],
+                        )
+                      }
+                      items={spaceItems}
+                      width="content"
+                      disabled={pending || auto.paid.length === 0}
+                      searchPlaceholder="Search spaces…"
+                      emptyLabel="No space matches."
+                      className="h-6 rounded-none px-2 text-label"
+                    />
+                  ) : null}
                 </span>
-              </div>
-            )
-          })}
-        </div>
-      )}
+                {row.hint === null ? null : (
+                  <span className="text-label text-graphite">{row.hint}</span>
+                )}
+              </span>
+            </div>
+          )
+        })}
+      </div>
       <SettingsRow label="Re-use a result for">
         <SettingsTip tip="A source answered within this many days is not asked again.">
           <Input
@@ -505,12 +512,13 @@ function GridBlock({ grids }: { grids: ReadonlyArray<FillsWhat> }) {
       <SettingsGroupHead
         title="What fills what"
         action={
-          <Segmented
-            size="sm"
-            label="Object"
-            value={kind}
+          <Select<FillsWhat['kind']>
+            aria-label="Object"
+            value={grid.kind}
             onChange={setKind}
-            options={grids.map((g) => ({ id: g.kind, label: g.label }))}
+            items={grids.map((g) => ({ value: g.kind, label: g.label }))}
+            width="content"
+            className="h-6 w-auto rounded-none border-0 bg-transparent px-1 mono text-micro text-foreground"
           />
         }
       />

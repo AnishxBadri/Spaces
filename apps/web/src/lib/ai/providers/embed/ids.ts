@@ -258,9 +258,9 @@ export const reusableModelsKey = (
 /** Where an embedding call's credential comes from. */
 export type EmbeddingKeySource = 'own' | 'models'
 
-/** What Search says while it embeds on the Models key. */
+/** Search's tick while it embeds on the Models key. */
 export const reusedKeyLine = (provider: EmbeddingProvider): string =>
-  `using the ${EMBEDDING_PROVIDER_INFO[provider].label} key from Models`
+  `Use the ${EMBEDDING_PROVIDER_INFO[provider].label} key from Models`
 
 /**
  * Where to point an embedding provider's address, said once for the

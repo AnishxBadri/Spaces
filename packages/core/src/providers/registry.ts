@@ -15,7 +15,7 @@ export type ProviderScope = {
   /** The scope string the authorize request carries. */
   readonly wire: string
   readonly label: string
-  /** The plugin that asks for it; `null` for core's own (sign-in, userinfo). */
+  /** The plugin id that asks for it; `null` for core's own (sign-in, userinfo). */
   readonly plugin: string | null
   /** In the provider's restricted class, which brings a security assessment. */
   readonly restricted: boolean
@@ -67,7 +67,7 @@ export const PROVIDERS = {
       google(
         'calendar.events.readonly',
         'Read calendar events',
-        'calendar',
+        'google-calendar',
         false,
       ),
       google('gmail.readonly', 'Read mail', 'gmail', true),

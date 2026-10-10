@@ -147,7 +147,7 @@ describe('offerFor', () => {
       offerFor(
         'google',
         ['gmail', 'calendar'],
-        { ...none, configured: ['google'], installed: ['calendar'] },
+        { ...none, configured: ['google'], installed: ['google-calendar'] },
         false,
       ),
     ).toEqual({ kind: 'connect', product: 'calendar' })
@@ -161,9 +161,18 @@ describe('offerFor', () => {
     }
     expect(offerFor('google', ['gmail', 'calendar'], view, true)).toEqual({
       kind: 'install',
+      plugin: 'gmail',
     })
     expect(offerFor('google', ['gmail', 'calendar'], view, false)).toEqual({
       kind: 'ask',
+    })
+  })
+
+  it("keys the calendar on its plugin's registry id, google-calendar", () => {
+    const view = { ...none, offered: ['google-calendar'] }
+    expect(offerFor('google', ['gmail', 'calendar'], view, true)).toEqual({
+      kind: 'install',
+      plugin: 'google-calendar',
     })
   })
 

@@ -5,7 +5,7 @@ import { aiRoute, credential, workspace } from '@spaces/db/schema'
 import { workspaceDefaultOf } from '@spaces/core/ai/sensitivity'
 import { effectFn } from '#/lib/server/effect'
 import { requireAdmin, requireUser } from '#/lib/server/shared'
-import { LLM_PROVIDERS } from './providers/ids'
+import { LLM_PROVIDERS, isLocalProvider } from './providers/ids'
 import type { LlmProvider } from './providers/ids'
 import { AI_SENSITIVITIES } from './lanes'
 import type {
@@ -28,16 +28,7 @@ import type {
 
 export type AiTarget = { provider: LlmProvider; model: string }
 
-/**
- * Providers that run on the operator's own box. A `sensitive` call goes to
- * one of these or nowhere — never to the cloud as a fallback.
- */
-export const LOCAL_PROVIDERS = [
-  'ollama',
-] as const satisfies readonly LlmProvider[]
-
-export const isLocalProvider = (provider: LlmProvider): boolean =>
-  LOCAL_PROVIDERS.some((p) => p === provider)
+export { LOCAL_PROVIDERS, isLocalProvider } from './providers/ids'
 
 const isLlmProvider = (value: string): value is LlmProvider =>
   LLM_PROVIDERS.some((p) => p === value)

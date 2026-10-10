@@ -14,6 +14,7 @@ import {
   useSettingsPage,
 } from './settings-section'
 import { oauthClientAnchor } from './connection-apps-section'
+import { pluginAnchor } from '#/components/integrations/registry-pane'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
@@ -285,7 +286,11 @@ function OfferControl({
       )
     case 'install':
       return (
-        <Link to="/settings/plugins" className={LINK}>
+        <Link
+          to="/settings/plugins"
+          hash={pluginAnchor(offer.plugin)}
+          className={LINK}
+        >
           Install ›
         </Link>
       )

@@ -101,8 +101,9 @@ function IntegrationsRoute() {
     }
   }
 
+  // One column: the section and Available sit flush, no shell gap between.
   return (
-    <>
+    <div className="flex flex-col">
       <SettingsSection
         title="Plugins"
         crumb="Integrations"
@@ -147,6 +148,6 @@ function IntegrationsRoute() {
         disabled={!page.isAdmin}
         onInstall={(plugin) => void install(plugin.pluginId)}
       />
-    </>
+    </div>
   )
 }

@@ -1,5 +1,4 @@
 import { Link, useRouter } from '@tanstack/react-router'
-import { Check } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { backfillConfirmOptions, confirmThenStart } from './embed-backfill-flow'
@@ -10,7 +9,10 @@ import {
   SettingsSection,
   SettingsTip,
 } from './settings-section'
+import { ReadoutStrip } from '#/components/record/record-parts'
+import type { RecordReadout } from '#/components/record/record-parts'
 import { Button } from '#/components/ui/button'
+import { Checkbox, radioClasses } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import { Input } from '#/components/ui/input'
 import { Select } from '#/components/ui/select'
@@ -19,8 +21,6 @@ import {
   EMBEDDING_PROVIDERS,
   EMBEDDING_PROVIDER_INFO,
   KEYED_EMBEDDING_PROVIDERS,
-  LOCAL_PIN_HEADLINE,
-  NO_PIN_HEADLINE,
   NO_SLOT_HEADLINE,
   OLLAMA_URL_GUIDANCE,
   PIN_DIMS,
@@ -35,6 +35,7 @@ import {
   slotHeadline,
   slotSearchNote,
 } from '#/lib/ai/providers/embed/ids'
+import { formatNumber } from '@spaces/core/format'
 import type {
   EmbeddingModelInfo,
   EmbeddingPinView,
@@ -58,11 +59,10 @@ type TestResult = Awaited<ReturnType<typeof testEmbedding>>
 type BackfillView = Awaited<ReturnType<typeof getEmbedBackfill>>
 
 /**
- * Settings → AI · Embeddings (SPA-51, `docs/spec-ai-substrate.md` §9) — the
- * embedding pin, in the settings-ledger shape the Providers, Routing and Caps
- * sections use: a head whose readout is the pin in one sentence, the
- * provider row, a ledger of that provider's models, the key row, then the
- * Test and Pin actions.
+ * Settings → AI → Search — the embedding pin: three readouts (how much is
+ * searchable by meaning, what waits, where sensitive records go), then
+ * Model (the provider, its models as radios, the key, Test and Pin),
+ * Sensitive records and Catch up.
  *
  * Its words are its safety mechanism. A model that cannot emit the
  * workspace's 768 stays in the ledger, greyed on bone-deep with its note
@@ -80,7 +80,7 @@ type BackfillView = Awaited<ReturnType<typeof getEmbedBackfill>>
  * the Sensitive slot block offers it beside a cloud pin, and says in its
  * readout what search will and will not read.
  *
- * The Backfill block (SPA-136) shows how many chunks carry the pinned model
+ * Catch up (the backfill) shows how many chunks carry the pinned model
  * and what embedding the rest would cost; its button asks with that
  * estimate before anything is queued. With a local route it counts the
  * sensitive chunks apart and prices them "free — local model".
@@ -169,7 +169,7 @@ export function EmbeddingsSection({
       })
       toast(
         swapFrom
-          ? `${pinHeadline(pinned)} Backfill re-embeds what is stored.`
+          ? `${pinHeadline(pinned)} Catch up re-embeds what is stored.`
           : pinHeadline(pinned),
       )
       void router.invalidate()
@@ -182,10 +182,14 @@ export function EmbeddingsSection({
 
   return (
     <SettingsSection title="Search" crumb="AI">
+      <ReadoutStrip
+        readouts={searchReadouts(backfill)}
+        className="border-t-0 border-b border-rule"
+      />
       <div className="flex flex-col">
         <SettingsGroupHead
-          title="Pin"
-          count={pin ? pinHeadline(pin) : NO_PIN_HEADLINE}
+          title="Model"
+          action={pin ? `set ${pin.pinnedAt.slice(5, 10)}` : 'not set'}
         />
 
         <SettingsRow
@@ -325,9 +329,47 @@ export function EmbeddingsSection({
 }
 
 /**
- * The Models key Search is embedding on (D81): the line naming it, and "Use
- * a different key", which opens the provider's own key field. A key saved
- * there takes precedence; until then nothing changes.
+ * The three readouts: the share of passages searchable by meaning, the
+ * chunks waiting for a vector, and where sensitive records go.
+ */
+function searchReadouts(view: BackfillView): Array<RecordReadout> {
+  if (view.pin === null)
+    return [
+      { label: 'Passages searchable by meaning', value: '—' },
+      { label: 'Waiting', value: '—' },
+      { label: 'Sensitive records', value: '—' },
+    ]
+  const waiting = view.estimate.chunks + (view.sensitive?.estimate.chunks ?? 0)
+  const local =
+    EMBEDDING_PROVIDER_INFO[view.pin.provider].local || view.sensitive !== null
+  return [
+    {
+      label: 'Passages searchable by meaning',
+      value:
+        view.total === 0
+          ? '—'
+          : `${Math.floor((view.embedded / view.total) * 100)}%`,
+    },
+    {
+      label: 'Waiting',
+      value: formatNumber(waiting, 0),
+      tone: waiting === 0 ? 'muted' : undefined,
+    },
+    {
+      label: 'Sensitive records',
+      value: local ? 'Local' : 'Left out',
+      tone: local ? undefined : 'muted',
+    },
+  ]
+}
+
+const LINK =
+  'focus-ring self-start rounded-md text-label text-graphite hover:text-foreground'
+
+/**
+ * The Models key Search embeds on (D81), as a tick: "Use the OpenAI key
+ * from Models", with "Use a different key" under it. Unticked, the
+ * provider's own key field opens; a key saved there takes precedence.
  */
 function ReusedModelsKey({
   provider,
@@ -337,18 +379,39 @@ function ReusedModelsKey({
   keyRow: EmbeddingKeyRow
 }) {
   const [different, setDifferent] = useState(false)
-  if (different)
-    return <EmbeddingKeyField provider={provider} keyRow={undefined} />
+  const id = `embed-${provider}-reuse`
   return (
-    <SettingsRow label={`${EMBEDDING_PROVIDER_INFO[provider].label} key`}>
-      <span className="mono text-label">{keyRow.display ?? '••••'}</span>
-      <span className="mono text-micro text-graphite">
-        {reusedKeyLine(provider)}
-      </span>
-      <Button size="sm" variant="outline" onClick={() => setDifferent(true)}>
-        Use a different key
-      </Button>
-    </SettingsRow>
+    <>
+      <SettingsRow label="Key">
+        <span className="flex flex-col gap-1.5">
+          <span className="flex items-center gap-2.5">
+            <Checkbox
+              id={id}
+              checked={!different}
+              onCheckedChange={(on) => setDifferent(!on)}
+            />
+            <label htmlFor={id} className="text-ui text-foreground">
+              {reusedKeyLine(provider)}
+            </label>
+            <span className="mono text-micro text-graphite">
+              {keyRow.display ?? '••••'}
+            </span>
+          </span>
+          {different ? null : (
+            <button
+              type="button"
+              onClick={() => setDifferent(true)}
+              className={LINK}
+            >
+              Use a different key
+            </button>
+          )}
+        </span>
+      </SettingsRow>
+      {different ? (
+        <EmbeddingKeyField provider={provider} keyRow={undefined} />
+      ) : null}
+    </>
   )
 }
 
@@ -505,11 +568,15 @@ function Backfill({
   return (
     <>
       <SettingsGroupHead
-        title="Backfill"
-        count={<span className="tabular">{runLine(view)}</span>}
+        title="Catch up"
+        action={<span className="tabular">{runLine(view)}</span>}
       />
       <SettingsRow
-        label="Embed what is stored"
+        label={
+          pendingChunks === 0
+            ? 'Every passage is embedded'
+            : `${formatNumber(pendingChunks, 0)} not embedded yet`
+        }
         hint={
           pendingChunks === 0
             ? undefined
@@ -538,7 +605,9 @@ function Backfill({
           onClick={() => void start()}
           disabled={starting || busy || pendingChunks === 0}
         >
-          Backfill
+          {pendingChunks === 0
+            ? 'Embed'
+            : `Embed ${formatNumber(pendingChunks, 0)}`}
         </Button>
       </SettingsRow>
       {error || run.state === 'failed' ? (
@@ -619,25 +688,32 @@ function SensitiveSlot({
   return (
     <>
       <SettingsGroupHead
-        title="Sensitive slot"
-        count={
-          pinLocal
-            ? LOCAL_PIN_HEADLINE
-            : slot
-              ? slotHeadline(slot)
-              : NO_SLOT_HEADLINE
-        }
+        title="Sensitive records"
+        action={pinLocal ? 'the pin is local' : slot ? 'local' : 'left out'}
       />
-      {pinLocal ? null : candidate === null ? (
+      {pinLocal ? (
         <SettingsRow
-          label="Local model"
+          label="Embed them with"
+          hint="Sensitive text stays on your box."
+        >
+          <span className="mono text-label">
+            {EMBEDDING_PROVIDER_INFO[pin.provider].label} · {pin.model}
+          </span>
+        </SettingsRow>
+      ) : candidate === null ? (
+        <SettingsRow
+          label="Embed them with"
           hint="Offered once a local model tests green above. Until then sensitive records stay unembedded; nothing is sent to the cloud pin."
         />
       ) : (
         <SettingsRow
-          label={`${EMBEDDING_PROVIDER_INFO[candidate.provider].label} ${candidate.model}`}
+          label="Embed them with"
           hint={slotSearchNote(pin, candidate)}
         >
+          <span className="mono text-label">
+            {EMBEDDING_PROVIDER_INFO[candidate.provider].label} ·{' '}
+            {candidate.model}
+          </span>
           <span className="tabular mono text-micro text-graphite">
             {slot ? `slot · ${PIN_DIMS}` : `tested · ${PIN_DIMS}`}
           </span>
@@ -668,7 +744,7 @@ function SensitiveSlot({
   )
 }
 
-/** A model that can emit the pin's width: a radio row, wash + check when chosen. */
+/** A model that can emit the pin's width: a radio row, washed when chosen. */
 function ModelRow({
   model,
   on,
@@ -693,13 +769,8 @@ function ModelRow({
         )}
       >
         <span aria-hidden className="flex w-5 shrink-0 justify-center">
-          <span
-            className={cn(
-              'flex size-3.5 items-center justify-center border border-hairline',
-              on ? 'bg-primary text-paper' : 'bg-paper',
-            )}
-          >
-            {on ? <Check className="size-2.5" strokeWidth={2.5} /> : null}
+          <span className={radioClasses({ checked: on })}>
+            {on ? <span className="size-1.5 bg-primary" /> : null}
           </span>
         </span>
         <span className="w-56 shrink-0 truncate mono text-label text-foreground">

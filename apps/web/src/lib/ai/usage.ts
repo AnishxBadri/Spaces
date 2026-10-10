@@ -1,5 +1,15 @@
-import { Effect, Schema } from 'effect'
-import { asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { Clock, Effect, Schema } from 'effect'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   aiRun,
@@ -16,6 +26,7 @@ import type {
   suggestionKind,
   suggestionStatus,
 } from '@spaces/db/schema'
+import { utcDayStart } from '@spaces/core/ai/caps'
 import { resolveRefsProgram } from '@spaces/core/writes/context/names'
 import type { ResolvedRef } from '@spaces/core/writes/context/names'
 import { effectFn } from '#/lib/server/effect'
@@ -92,6 +103,8 @@ export type LoneCall = {
 export type UsageView = {
   runs: Array<RunListItem>
   loneCalls: Array<LoneCall>
+  /** Runs started since 00:00 UTC, and what runs proposed still open in Review. */
+  today: { runs: number; waiting: number }
 }
 
 export type RunStepView = {
@@ -261,7 +274,27 @@ export const usageViewProgram = Effect.fn('usageView')(
     const who = yield* whoNames(
       lone.map((u) => ({ type: u.callerType, id: u.callerId })),
     )
+    const dayStart = utcDayStart(new Date(yield* Clock.currentTimeMillis))
+    const runsToday = yield* query(async () =>
+      (
+        await db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(aiRun)
+          .where(gte(aiRun.startedAt, dayStart))
+      ).at(0),
+    )
+    const waiting = yield* query(async () =>
+      (
+        await db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(suggestion)
+          .where(
+            and(eq(suggestion.status, 'open'), isNotNull(suggestion.runId)),
+          )
+      ).at(0),
+    )
     return {
+      today: { runs: runsToday?.n ?? 0, waiting: waiting?.n ?? 0 },
       runs,
       loneCalls: lone.map((u) => ({
         id: u.id,

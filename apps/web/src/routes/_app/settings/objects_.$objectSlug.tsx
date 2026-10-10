@@ -5,7 +5,10 @@ import { toast } from 'sonner'
 import { AttributeDialog } from '#/components/attributes/attribute-dialog'
 import { AiConfigSection } from '#/components/attributes/ai-config-section'
 import { ObjectDialog } from '#/components/objects/object-dialog'
-import { RegistryList } from '#/components/attributes/registry-list'
+import {
+  RegistryList,
+  TYPE_LABELS,
+} from '#/components/attributes/registry-list'
 import { KeyHint } from '#/components/page-header'
 import {
   SettingsGroupHead,
@@ -18,7 +21,12 @@ import {
   IDENTITY_KEYS,
   IDENTITY_KEY_ATTRIBUTES,
 } from '@spaces/core/attributes/registry'
-import { getObject, listRegistry, updateObject } from '#/lib/server-fns'
+import {
+  getEnrichmentPage,
+  getObject,
+  listRegistry,
+  updateObject,
+} from '#/lib/server-fns'
 import { useHotkey } from '#/lib/use-hotkey'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
 
@@ -35,17 +43,46 @@ const shell = getRouteApi('/_app/settings')
 export const Route = createFileRoute('/_app/settings/objects_/$objectSlug')({
   loader: async ({ params }) => {
     const object = await getObject({ data: { slug: params.objectSlug } })
-    const registry = await listRegistry({
-      data: { objectId: object.id, includeArchived: true },
-    })
-    return { object, registry }
+    const [registry, filledBy] = await Promise.all([
+      listRegistry({ data: { objectId: object.id, includeArchived: true } }),
+      filledByOf(object),
+    ])
+    return { object, registry, filledBy }
   },
   component: ObjectAttributesPage,
 })
 
+/**
+ * Attribute id → the enrichment source that fills it, from the Enrichment
+ * page's grid. Only Companies and People fill from enrichment (D76); a
+ * failed read leaves the Rules lane without it rather than failing the page.
+ */
+async function filledByOf(object: {
+  slug: string
+  isSystem: boolean
+}): Promise<Record<string, string>> {
+  const kind = !object.isSystem
+    ? null
+    : object.slug === 'companies'
+      ? 'company'
+      : object.slug === 'people'
+        ? 'person'
+        : null
+  if (kind === null) return {}
+  try {
+    const { grids } = await getEnrichmentPage()
+    const rows = grids.find((g) => g.kind === kind)?.rows ?? []
+    return Object.fromEntries(
+      rows.flatMap((r) => (r.filledBy === null ? [] : [[r.id, r.filledBy]])),
+    )
+  } catch {
+    return {}
+  }
+}
+
 function ObjectAttributesPage() {
-  const { object, registry } = Route.useLoaderData()
-  const { isAdmin } = shell.useLoaderData()
+  const { object, registry, filledBy } = Route.useLoaderData()
+  const { isAdmin, objects } = shell.useLoaderData()
   const router = useRouter()
   const live = registry.filter((a) => !a.archived).length
   const [creating, setCreating] = useState(false)
@@ -174,18 +211,14 @@ function ObjectAttributesPage() {
         </p>
       ) : null}
 
-      <div className="mt-6">
-        <RegistryList
-          object={object}
-          registry={registry}
-          canReshape={isAdmin}
-        />
-      </div>
+      <RegistryList
+        object={object}
+        registry={registry}
+        canReshape={isAdmin}
+        objectNames={new Map(objects.map((o) => [o.id, o.plural]))}
+        filledBy={new Map(Object.entries(filledBy))}
+      />
 
-      {/* AI attributes (SPA-72): config on the existing types — the
-            spec's `attribute.config.ai`, stored as `options.ai`. Offered
-            only on types that can hold a mode; core and custom objects
-            alike. */}
       <AiConfigSection
         objectPlural={object.plural}
         registry={registry}
@@ -218,7 +251,7 @@ function ObjectAttributesPage() {
                       />
                       <span className="min-w-0 flex-1">{backing.name}</span>
                       <span className="mono text-micro text-graphite">
-                        {backing.slug} · {backing.type}
+                        {TYPE_LABELS[backing.type] ?? backing.type}
                       </span>
                     </label>
                   </li>
@@ -236,7 +269,7 @@ function ObjectAttributesPage() {
                   >
                     <span className="min-w-0 flex-1">{backing.name}</span>
                     <span className="mono text-micro text-graphite">
-                      {backing.slug} · {backing.type}
+                      {TYPE_LABELS[backing.type] ?? backing.type}
                     </span>
                   </li>
                 )
