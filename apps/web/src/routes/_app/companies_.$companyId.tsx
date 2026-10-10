@@ -43,6 +43,8 @@ import { EnrichAction, PluginActions } from '#/components/record/plugin-actions'
 import { CreateDealDialog } from '#/routes/_app/deals'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { jsonStrings } from '@spaces/core/json'
+import { fileInSpaceAction } from '#/lib/file-in-space'
+import { runBinding, usePageActions } from '#/lib/page-actions'
 import {
   countOpenSuggestions,
   createNote,
@@ -156,6 +158,20 @@ function CompanyRecordPage() {
       toast.error(err instanceof Error ? err.message : 'Could not create note')
     }
   }
+
+  usePageActions([
+    { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+    {
+      id: 'note',
+      label: 'Note about this',
+      run: () => void newNoteAboutThis(),
+    },
+    fileInSpaceAction({
+      id: company.id,
+      name: company.name,
+      filedIds: company.spaces.map((s) => s.id),
+    }),
+  ])
 
   return (
     <div className="flex min-h-full flex-col">

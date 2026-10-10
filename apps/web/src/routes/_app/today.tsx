@@ -33,6 +33,7 @@ import {
   todayStamp,
 } from '#/lib/today/needs-you'
 import { localToday } from '@spaces/core/tasks/parse-due'
+import { GLOBAL_ACTIONS, runBinding, usePageActions } from '#/lib/page-actions'
 
 const DAY_MS = 86_400_000
 
@@ -118,6 +119,10 @@ function TodayLedger({
   today: string
 }) {
   const router = useRouter()
+  usePageActions([
+    { id: 'task', label: 'Add a task', key: 'T', run: runBinding('T') },
+    ...GLOBAL_ACTIONS,
+  ])
   const {
     tasks,
     holdings,

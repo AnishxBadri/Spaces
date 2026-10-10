@@ -42,6 +42,7 @@ import { Button } from '#/components/ui/button'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { readoutDay, readoutDayUntil } from '#/lib/records/readout-format'
 import { useHotkey } from '#/lib/use-hotkey'
+import { runBinding, usePageActions } from '#/lib/page-actions'
 import {
   countOpenSuggestions,
   createNote,
@@ -172,6 +173,26 @@ function DealRecordPage() {
       toast.error(err instanceof Error ? err.message : 'Could not create note')
     }
   }
+
+  usePageActions([
+    ...(liveStages.length > 0
+      ? [
+          {
+            id: 'move-stage',
+            label: 'Move stage',
+            key: 'M',
+            run: () => setMoveOpen(true),
+          },
+        ]
+      : []),
+    { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+    { id: 'task', label: 'Add a task', key: 'T', run: runBinding('T') },
+    {
+      id: 'note',
+      label: 'Note about this',
+      run: () => void newNoteAboutThis(),
+    },
+  ])
 
   return (
     <div className="flex min-h-full flex-col">

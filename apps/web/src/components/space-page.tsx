@@ -52,6 +52,7 @@ import {
 } from '#/lib/chassis-prefs'
 import type { SpaceTab } from '#/lib/spaces/page'
 import { useHotkey } from '#/lib/use-hotkey'
+import { runBinding, usePageActions } from '#/lib/page-actions'
 
 /**
  * A space reads like a record (D73, D74): the head with its stamp, crumb
@@ -116,6 +117,10 @@ export function SpacePageView({
     }
   }
   useHotkey('n', () => void newNote())
+  usePageActions([
+    { id: 'note', label: 'Note here', key: 'N', run: runBinding('N') },
+    { id: 'task', label: 'Add a task', key: 'T', run: runBinding('T') },
+  ])
 
   return (
     <div className="flex min-h-full flex-col">

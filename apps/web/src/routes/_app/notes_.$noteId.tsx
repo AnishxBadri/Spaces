@@ -42,6 +42,8 @@ import { Input } from '#/components/ui/input'
 import { Segmented } from '#/components/ui/segmented'
 import { Select } from '#/components/ui/select'
 import { recordPath } from '#/lib/record-path'
+import { fileInSpaceAction } from '#/lib/file-in-space'
+import { usePageActions } from '#/lib/page-actions'
 import {
   deleteNote,
   fileNoteAgainst,
@@ -136,6 +138,14 @@ function NotePage() {
       if (timer.current) clearTimeout(timer.current)
     }
   }, [])
+
+  usePageActions([
+    fileInSpaceAction({
+      id: initial.id,
+      name: title || 'Untitled',
+      filedIds: initial.spaces.map((s) => s.id),
+    }),
+  ])
 
   return (
     <div className="flex min-h-full flex-col">

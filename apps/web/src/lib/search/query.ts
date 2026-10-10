@@ -157,9 +157,16 @@ export type SearchHit =
  *
  * The snippet is the nearest chunk's text, whitespace-collapsed, cut to 160
  * characters, with any « » removed: nothing matched a word, so nothing is
- * marked, and `Highlighted` renders it as plain text.
+ * marked, and `Highlighted` renders it as plain text. `page` is that chunk's
+ * page, when extraction knew it.
+ *
+ * Cmd-K's Passages run these CTEs alone (`passagesStatement`); the fused
+ * statement takes them as its fifth lane for MCP's `search_records`.
  */
-function semanticLane(userId: string, { vector, model }: QueryVector): SQL {
+export function semanticCtes(
+  userId: string,
+  { vector, model }: QueryVector,
+): SQL {
   const literal = `[${vector.join(',')}]`
   return sql`
       qv as (
@@ -171,9 +178,10 @@ function semanticLane(userId: string, { vector, model }: QueryVector): SQL {
                row_number() over (order by min(c.distance), c.entity_id) as rnk,
                left(btrim(regexp_replace(translate(
                  (array_agg(c.text order by c.distance))[1], '«»', ''),
-                 '[[:space:]]+', ' ', 'g')), 160) as snippet
+                 '[[:space:]]+', ' ', 'g')), 160) as snippet,
+               (array_agg(c.page order by c.distance))[1] as page
         from (
-          select ch.entity_id, ch.embedding_model, ch.text,
+          select ch.entity_id, ch.embedding_model, ch.text, ch.page,
                  ch.embedding <=> (select v from qv) as distance
           from chunk ch
           order by ch.embedding <=> (select v from qv)
@@ -185,7 +193,12 @@ function semanticLane(userId: string, { vector, model }: QueryVector): SQL {
         group by c.entity_id
         order by rnk
         limit 40
-      ),
+      )`
+}
+
+/** The fifth lane as the fused statement takes it: the CTEs and a comma. */
+function semanticLane(userId: string, vector: QueryVector): SQL {
+  return sql`${semanticCtes(userId, vector)},
 `
 }
 

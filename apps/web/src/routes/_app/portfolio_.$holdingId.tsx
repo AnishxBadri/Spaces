@@ -35,6 +35,7 @@ import {
   voidLedgerEvent,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
+import { usePageActions } from '#/lib/page-actions'
 import {
   fmtMoney,
   fmtMultiple,
@@ -52,6 +53,18 @@ type Holding = Awaited<ReturnType<typeof getHolding>>
 function HoldingPage() {
   const h = Route.useLoaderData()
   const m = h.metrics.ok ? h.metrics.metrics : null
+  const router = useRouter()
+  usePageActions([
+    {
+      id: 'company',
+      label: 'Open the company record',
+      run: () =>
+        void router.navigate({
+          to: '/companies/$companyId',
+          params: { companyId: h.companyId },
+        }),
+    },
+  ])
 
   const missing =
     h.metrics.ok === false

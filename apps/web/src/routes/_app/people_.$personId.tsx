@@ -37,6 +37,8 @@ import { PluginActions } from '#/components/record/plugin-actions'
 import { recordPath } from '#/lib/record-path'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { jsonStrings } from '@spaces/core/json'
+import { fileInSpaceAction } from '#/lib/file-in-space'
+import { runBinding, usePageActions } from '#/lib/page-actions'
 import {
   countOpenSuggestions,
   createNote,
@@ -130,6 +132,20 @@ function PersonRecordPage() {
       toast.error(err instanceof Error ? err.message : 'Could not create note')
     }
   }
+
+  usePageActions([
+    { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+    {
+      id: 'note',
+      label: 'Note about this',
+      run: () => void newNoteAboutThis(),
+    },
+    fileInSpaceAction({
+      id: person.id,
+      name: person.name,
+      filedIds: person.spaces.map((s) => s.id),
+    }),
+  ])
 
   return (
     <div className="flex min-h-full flex-col">

@@ -129,6 +129,14 @@ export const listPinnedViews = createServerFn()
     return effectFn(pinnedViewsProgram)({ id: u.id }, data.ids)
   })
 
+/** Cmd-K's Jump to: every saved view the caller may open, with its list. */
+export const listJumpViews = createServerFn().handler(async () => {
+  const u = await requireUser()
+  const { jumpViewsProgram } = await import('../views/jump')
+  const { effectFn } = await import('./effect')
+  return effectFn(jumpViewsProgram)({ id: u.id })
+})
+
 /**
  * The view chips' counts (SPA-162): one call per page for every chip on the
  * bar. `live` carries the conditions the page is showing for its active view

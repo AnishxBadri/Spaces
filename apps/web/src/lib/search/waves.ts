@@ -1,25 +1,20 @@
 /**
- * When Cmd-K asks, and which answer it may show (SPA-129). Pure — timers and
- * two callbacks, no React, no Effect — so the palette holds one and a test
+ * When Cmd-K asks, and which answers it may show. Pure — timers and
+ * callbacks, no React, no Effect — so the palette holds one and a test
  * drives it with fake timers.
  *
- * Two waves per query:
+ * Two waves per query, each with its own group:
  *
- * - **lexical**, 180ms after the last keystroke, as the palette always has:
- *   names, notes, documents, tasks. It embeds nothing, so typing a word
- *   bills no provider call per letter.
- * - **semantic**, 600ms after the last keystroke: the same fused query plus
- *   the vector lane. Its answer replaces the list.
+ * - **lexical**, 180ms after the last keystroke: Records. It embeds
+ *   nothing, so typing a word bills no provider call per letter.
+ * - **semantic**, 600ms after the last keystroke: Passages, the vector lane
+ *   alone. Its answer fills its own group below Records and never replaces
+ *   or reorders a row above it. (D70)
  *
- * The second wave is **suppressed once the user has taken the list** —
- * moved the selection (arrow keys, or the pointer over a row) or pressed
- * Enter — both before it fires and after, while it is in flight: no row
- * ever moves under the cursor. A new keystroke is a new query, and the
- * list is the user's to lose again.
- *
- * Nothing about the second wave is drawn: no spinner, no "searching by
- * meaning" row (DESIGN.md §Motion: no load choreography — pages appear
- * settled). The list simply updates, or does not.
+ * - An answer lands only while its query is still the one typed: a slow
+ *   answer to a query typed past is dropped.
+ * - `start` says a wave's request went out, so the palette can mark its
+ *   group head as running while it is pending.
  */
 
 export const LEXICAL_DELAY_MS = 180
@@ -27,31 +22,32 @@ export const SEMANTIC_DELAY_MS = 600
 
 export type Wave = 'lexical' | 'semantic'
 
-export type SearchWavesOptions<T> = {
-  /** Ask the server; `wave` says whether to add the vector lane. */
-  fetch: (q: string, wave: Wave) => Promise<T>
-  /** An answer the palette may show — the current query's, still wanted. */
-  show: (rows: T, wave: Wave) => void
-  /**
-   * The lexical wave failed. A failed second wave calls nothing: the
-   * lexical list is already a whole answer, so it stays.
-   */
+/** One wave's request and where its answer goes. */
+export type WaveLane<T> = {
+  fetch: (q: string) => Promise<T>
+  show: (rows: T) => void
+  /** The request failed; the group shows nothing. */
   fail: () => void
+}
+
+export type SearchWavesOptions<TLexical, TSemantic> = {
+  lexical: WaveLane<TLexical>
+  semantic: WaveLane<TSemantic>
+  /** A wave's request went out for the current query. */
+  start?: (wave: Wave) => void
 }
 
 export type SearchWaves = {
   /** The query changed. */
   type: (q: string) => void
-  /** The user moved the selection or pressed Enter: the list is theirs. */
-  engage: () => void
   /** The palette closed: nothing pending may land. */
   stop: () => void
 }
 
-export function searchWaves<T>(opts: SearchWavesOptions<T>): SearchWaves {
+export function searchWaves<TLexical, TSemantic>(
+  opts: SearchWavesOptions<TLexical, TSemantic>,
+): SearchWaves {
   let generation = 0
-  let engaged = false
-  let semanticShown = false
   let timers: Array<ReturnType<typeof setTimeout>> = []
 
   const clear = () => {
@@ -59,24 +55,14 @@ export function searchWaves<T>(opts: SearchWavesOptions<T>): SearchWaves {
     timers = []
   }
 
-  const launch = (q: string, wave: Wave, gen: number) => {
-    opts.fetch(q, wave).then(
+  function launch<T>(lane: WaveLane<T>, wave: Wave, q: string, gen: number) {
+    opts.start?.(wave)
+    lane.fetch(q).then(
       (rows) => {
-        // Out-of-order answers would otherwise show results for a query
-        // the user has already typed past.
-        if (gen !== generation) return
-        if (wave === 'semantic') {
-          if (engaged) return
-          semanticShown = true
-        } else if (semanticShown) {
-          // A slow lexical answer must not undo the fuller one.
-          return
-        }
-        opts.show(rows, wave)
+        if (gen === generation) lane.show(rows)
       },
       () => {
-        if (gen === generation && wave === 'lexical' && !semanticShown)
-          opts.fail()
+        if (gen === generation) lane.fail()
       },
     )
   }
@@ -85,47 +71,23 @@ export function searchWaves<T>(opts: SearchWavesOptions<T>): SearchWaves {
     type(raw) {
       clear()
       generation += 1
-      engaged = false
-      semanticShown = false
       const q = raw.trim()
       if (q.length < 2) return
       const gen = generation
       timers.push(
-        setTimeout(() => launch(q, 'lexical', gen), LEXICAL_DELAY_MS),
-        setTimeout(() => {
-          if (!engaged) launch(q, 'semantic', gen)
-        }, SEMANTIC_DELAY_MS),
+        setTimeout(
+          () => launch(opts.lexical, 'lexical', q, gen),
+          LEXICAL_DELAY_MS,
+        ),
+        setTimeout(
+          () => launch(opts.semantic, 'semantic', q, gen),
+          SEMANTIC_DELAY_MS,
+        ),
       )
-    },
-    engage() {
-      engaged = true
     },
     stop() {
       clear()
       generation += 1
     },
-  }
-}
-
-/**
- * The keys that move cmdk's selection or act on it — what `engage` means
- * from the keyboard. cmdk also binds Ctrl+N/P and, with `vimBindings`
- * (its default), Ctrl+J/K.
- */
-export function takesTheList(e: { key: string; ctrlKey: boolean }): boolean {
-  switch (e.key) {
-    case 'ArrowDown':
-    case 'ArrowUp':
-    case 'Home':
-    case 'End':
-    case 'Enter':
-      return true
-    case 'n':
-    case 'p':
-    case 'j':
-    case 'k':
-      return e.ctrlKey
-    default:
-      return false
   }
 }

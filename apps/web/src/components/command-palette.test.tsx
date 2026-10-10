@@ -2,11 +2,13 @@ import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
+import type { Passage } from '#/lib/search/passages'
 import type { SearchHit } from '#/lib/search/query'
-import { HitLine, hitMeta, hrefFor } from './command-palette'
+import { nameFirst } from '#/lib/search/records'
+import { HitLine, hrefFor, passageHref, passageMeta } from './command-palette'
 
 /**
- * The palette's task branch (SPA-55). Asserted over the row's content and
+ * The palette's record and passage rows. Asserted over the row's content and
  * its destination rather than the dialog: `CommandPalette` wants a router
  * and a Radix portal, and the suite runs on `environment: 'node'` with no
  * DOM. `renderToStaticMarkup` is the server render the app ships through
@@ -89,60 +91,69 @@ describe('the palette task row', () => {
   })
 })
 
-/**
- * A row the second wave found by meaning alone (SPA-129): `matchedIn:
- * 'semantic'`, a plain 160-character cut of the nearest chunk, and a meta
- * lane that says why it is here.
- */
-const meaningSnippet =
-  'Our direct-to-chip liquid loop moves thermal load off the server floor. Cold plates sit on each accelerator and the warm water leaves the building through a'
+describe('the Records order', () => {
+  it('puts a typed name first, then other names, then text-only rows, each in fused order', () => {
+    const hit = (name: string, matchedIn: string): SearchHit => ({
+      ...companyHit,
+      id: name,
+      name,
+      matchedIn,
+    })
+    const fused = [
+      hit('Grid storage memo.pdf', 'document'),
+      hit('Old Halcyon notes', 'name'),
+      hit('Halcyon Grid Seed', 'name'),
+      hit('Halcyon', 'name'),
+    ]
+    expect(nameFirst(fused, ' halcyon ').map((h) => h.name)).toEqual([
+      'Halcyon',
+      'Halcyon Grid Seed',
+      'Old Halcyon notes',
+      'Grid storage memo.pdf',
+    ])
+  })
+})
 
-const deckByMeaning: SearchHit = {
-  rowKind: 'entity',
+/**
+ * A passage: the semantic lane's own row, never a Records row. Its path
+ * lane names the file and page; it goes to the record the file is filed on.
+ */
+const deckPassage: Passage = {
   id: '5f0c1a52-3e0b-4a8e-9b61-000000000002',
   kind: 'document',
   name: 'Coldplate Series A.pdf',
   objectSlug: null,
-  snippet: meaningSnippet,
-  matchedIn: 'semantic',
+  snippet: 'Our direct-to-chip liquid loop moves thermal load off the floor.',
+  page: 5,
   parent: {
     id: '5f0c1a52-3e0b-4a8e-9b61-000000000003',
     kind: 'company',
     name: 'Coldplate Systems',
     objectSlug: null,
   },
-  task: null,
 }
 
-describe('the palette row for a hit found by meaning', () => {
-  it('reads · meaning in the mono lane, beside the record it is filed on', () => {
-    expect(hitMeta(deckByMeaning)).toBe('in Coldplate Systems · meaning')
+describe('the palette passage row', () => {
+  it('names the file and its page, and goes to the record the file is filed on', () => {
+    expect(passageMeta(deckPassage)).toBe('Coldplate Series A.pdf · p.5')
+    expect(passageMeta({ ...deckPassage, page: null })).toBe(
+      'Coldplate Series A.pdf',
+    )
+    expect(passageHref(deckPassage)).toBe(
+      '/companies/5f0c1a52-3e0b-4a8e-9b61-000000000003',
+    )
+    expect(passageHref({ ...deckPassage, parent: null })).toBeNull()
     expect(
-      hitMeta({
-        ...companyHit,
+      passageMeta({
+        ...deckPassage,
         kind: 'note',
-        matchedIn: 'semantic',
+        name: 'IC call',
+        page: null,
       }),
-    ).toBe('note · meaning')
-    // The lexical lanes read as they did.
-    expect(hitMeta({ ...companyHit, kind: 'note', matchedIn: 'note' })).toBe(
-      'note · text',
-    )
-    expect(hitMeta({ ...deckByMeaning, matchedIn: 'document' })).toBe(
-      'in Coldplate Systems',
-    )
+    ).toBe('note · IC call')
   })
 
-  it('renders the plain snippet as text: one span, nothing set as a match', () => {
-    const html = renderToStaticMarkup(<HitLine hit={deckByMeaning} />)
-    expect(html).toMatch(
-      /class="[^"]*mono[^"]*">in Coldplate Systems · meaning</,
-    )
-    expect(html).toContain(`<span>${meaningSnippet}</span>`)
-    expect(html).not.toContain('font-medium text-foreground')
-  })
-
-  it("keeps cmdk's own filter off, so the second wave's rows are shown as ranked", () => {
+  it("keeps cmdk's own filter off, so the server's order is the order shown", () => {
     const source = readFileSync(
       new URL('./command-palette.tsx', import.meta.url),
       'utf8',

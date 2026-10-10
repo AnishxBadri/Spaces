@@ -66,18 +66,27 @@ function CommandDialog({
 
 function CommandInput({
   className,
+  mode,
+  aside,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentProps<typeof CommandPrimitive.Input> & {
+  /** The mode at the head of the input; a pine `›` when omitted. */
+  mode?: React.ReactNode
+  /** The input's right lane. */
+  aside?: React.ReactNode
+}) {
   return (
-    // The prompt: a pine › then the query, keys on the right. 48px, hairline
-    // under (the palette's head).
+    // The prompt: the mode, then the query, the right lane after. 48px,
+    // hairline under (the palette's head).
     <div
       data-slot="command-input-wrapper"
       className="flex h-12 items-center gap-3 border-b border-hairline px-4"
     >
-      <span aria-hidden className="mono text-ui text-primary">
-        ›
-      </span>
+      {mode ?? (
+        <span aria-hidden className="mono text-ui text-primary">
+          ›
+        </span>
+      )}
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
@@ -86,9 +95,11 @@ function CommandInput({
         )}
         {...props}
       />
-      <span className="hidden shrink-0 mono text-micro text-graphite sm:inline">
-        ↑↓ move · ↵ open
-      </span>
+      {aside ? (
+        <span className="hidden shrink-0 mono text-micro text-graphite sm:inline">
+          {aside}
+        </span>
+      ) : null}
     </div>
   )
 }

@@ -36,6 +36,8 @@ import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { recordPath } from '#/lib/record-path'
 import { DASH, readoutDayAgo } from '#/lib/records/readout-format'
+import { fileInSpaceAction } from '#/lib/file-in-space'
+import { usePageActions } from '#/lib/page-actions'
 import {
   countOpenSuggestions,
   createNote,
@@ -133,6 +135,19 @@ function ObjectRecordPage() {
       toast.error(err instanceof Error ? err.message : 'Could not create note')
     }
   }
+
+  usePageActions([
+    {
+      id: 'note',
+      label: 'Note about this',
+      run: () => void newNoteAboutThis(),
+    },
+    fileInSpaceAction({
+      id: record.id,
+      name: record.name,
+      filedIds: record.spaces.map((s) => s.id),
+    }),
+  ])
 
   return (
     <div className="flex min-h-full flex-col">

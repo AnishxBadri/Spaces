@@ -140,7 +140,11 @@ function AppShell() {
         <Outlet />
       </main>
 
-      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+      <CommandPalette
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        objects={objects}
+      />
       {/* Mounted once, for all three of §3.1 entry point 3's doors (SPA-108).
           Here rather than in each surface because an upload has to outlive
           the sheet it was started from: this component never unmounts, so

@@ -21,21 +21,29 @@ export const searchEntities = createServerFn()
   })
 
 /**
- * Unified search — Cmd-K's one box. The fused query and every invariant it
- * keeps live in `lib/search/query.ts` (SPA-148), outside `lib/server/` so a
- * test can call it without a request; this is the request half only.
- * `semantic` is the palette's second wave (SPA-129): the same query plus
- * the vector lane, which embeds the query text as the searching user.
+ * Cmd-K's Records — the lexical fused statement only, never the vector lane,
+ * ordered so a typed name puts its record first (`nameFirst`). (D70) The
+ * query and its invariants live in `lib/search/query.ts`; this is the
+ * request half.
  */
 export const searchAll = createServerFn()
-  .validator(
-    z.object({ q: z.string().max(200), semantic: z.boolean().optional() }),
-  )
+  .validator(z.object({ q: z.string().max(200) }))
   .handler(async ({ data }) => {
-    // The body lives outside `lib/server/` so a test can call it (SPA-28:
-    // the MCP `search_records` tool is pinned to answer exactly this).
     const { searchAllHandler } = await import('#/lib/search/search-all-handler')
+    const { nameFirst } = await import('#/lib/search/records')
     // A record's picture draws in place of its kind icon; MCP has no use for it.
     const { withPictures } = await import('#/lib/records/pictures')
-    return withPictures(await searchAllHandler(data))
+    return withPictures(nameFirst(await searchAllHandler(data), data.q))
+  })
+
+/**
+ * Cmd-K's Passages — the semantic lane alone, asked for once typing pauses.
+ * Embeds the query as the searching user; no pin answers nothing.
+ */
+export const searchPassages = createServerFn()
+  .validator(z.object({ q: z.string().max(200) }))
+  .handler(async ({ data }) => {
+    const { searchPassagesHandler } =
+      await import('#/lib/search/passages-handler')
+    return searchPassagesHandler(data)
   })
