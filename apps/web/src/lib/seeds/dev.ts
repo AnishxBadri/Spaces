@@ -43,6 +43,7 @@ import {
 import { objectIdForKindAsync } from '@spaces/core/writes/attributes/objects'
 import { getRegistry, setValues } from '@spaces/core/writes/attributes/values'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { recomputeInteractionStats } from '@spaces/core/writes/interactions/stats'
 import { enqueueSourceEmbed } from '#/lib/ai/enqueue-embed'
 import { storage } from '@spaces/core/writes/storage'
 import type { ObjectKind } from '@spaces/core/attributes/registry'
@@ -3152,6 +3153,7 @@ async function seedInteractions(
   if (already) return 0
 
   let created = 0
+  const touched = new Set<string>()
   for (const [i, c] of COMPANIES.entries()) {
     const companyId = companies.get(c.name)
     if (!companyId) continue
@@ -3181,6 +3183,7 @@ async function seedInteractions(
         .returning({ id: interaction.id })
       for (const id of [companyId, personId, dealId]) {
         if (!id) continue
+        touched.add(id)
         await db
           .insert(interactionEntity)
           .values({ interactionId: row.id, entityId: id })
@@ -3198,6 +3201,8 @@ async function seedInteractions(
       created++
     }
   }
+  // Straight inserts, so the stats the writer would keep are rebuilt here.
+  await db.transaction((tx) => recomputeInteractionStats(tx, [...touched]))
   return created
 }
 

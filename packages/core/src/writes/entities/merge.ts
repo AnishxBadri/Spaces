@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns, or, sql } from 'drizzle-orm'
+import { and, eq, getTableColumns, inArray, or, sql } from 'drizzle-orm'
 import { getTableConfig } from 'drizzle-orm/pg-core'
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core'
 import { db } from '@spaces/db'
@@ -11,6 +11,7 @@ import {
   duplicateCandidate,
   entity,
   entityAlias,
+  interactionStat,
   link,
   mergeEvent,
 } from '@spaces/db/schema'
@@ -21,6 +22,7 @@ import type {
 import type { Json } from '@spaces/db/json'
 import { activity } from '@spaces/db/schema/activity'
 import { identityNorm } from '../../attributes/registry'
+import { recomputeInteractionStats } from '../interactions/stats'
 import type { CoreIdentityKey } from '../../attributes/registry'
 import {
   distribution,
@@ -123,6 +125,7 @@ const CUSTOM_HANDLERS = new Set([
   'holdings',
   'candidates',
   'chunks',
+  'interaction_stats',
 ])
 for (const ref of ENTITY_REFS) {
   if (ref.merge.kind === 'custom' && !CUSTOM_HANDLERS.has(ref.merge.handler))
@@ -333,6 +336,47 @@ export async function mergeEntities(opts: {
 
     // --- every generic edge column: one loop over the registry ------------
     await repointRegistryInTx(tx, loserId, winnerId, snapshot)
+
+    // --- interaction stats: the loser's rows go; the winner's rebuild ----
+    // Derived rows, so nothing moves: once the interaction edges above have
+    // repointed, the winner's first/last/next are recomputed from both
+    // histories. The snapshot keeps every row as it was before.
+    {
+      const before = await tx
+        .select()
+        .from(interactionStat)
+        .where(inArray(interactionStat.entityId, [loserId, winnerId]))
+      for (const r of before.filter((s) => s.entityId === loserId))
+        snapshot.push({
+          table: 'interaction_stat',
+          action: 'dropped',
+          pk: { entityId: loserId, kind: r.kind },
+          old: r,
+        })
+      await tx
+        .delete(interactionStat)
+        .where(eq(interactionStat.entityId, loserId))
+      await recomputeInteractionStats(tx, [winnerId])
+      const after = await tx
+        .select({ kind: interactionStat.kind })
+        .from(interactionStat)
+        .where(eq(interactionStat.entityId, winnerId))
+      const kinds = new Set([
+        ...before.filter((r) => r.entityId === winnerId).map((r) => r.kind),
+        ...after.map((r) => r.kind),
+      ])
+      for (const kind of kinds) {
+        const was = before.find(
+          (r) => r.entityId === winnerId && r.kind === kind,
+        )
+        snapshot.push({
+          table: 'interaction_stat',
+          action: 'recomputed',
+          pk: { entityId: winnerId, kind },
+          old: was ?? {},
+        })
+      }
+    }
 
     // --- chunks: follow the record; the winner's source wins -------------
     // Per source (source_kind, source_key), the values rule below said

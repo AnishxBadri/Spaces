@@ -16,14 +16,14 @@ import {
   entity,
   entityAlias,
   entitySpace,
-  interaction,
-  interactionEntity,
+  interactionStat,
   link,
 } from '@spaces/db/schema'
 import { objectIdForKind } from '@spaces/core/writes/attributes/objects'
 import { compileConditions } from './sql'
 import { entityValuesResolver } from './resolve'
 import { listScope } from './scope'
+import type { RowStats } from './stat-fields'
 import {
   afterCursor,
   clampLimit,
@@ -47,8 +47,7 @@ import type { Condition } from '@spaces/core/views/filter'
  * `./paging` helpers `/o/$objectSlug` uses. Nothing here is a second pager.
  *
  * What is different is what a row carries beyond its values — a company's
- * domains, a person's emails, and when either was last touched
- * by an interaction. Those were whole-table side queries: three `select`s
+ * domains, a person's emails, and their interaction stats. Those were whole-table side queries: three `select`s
  * with no `where` that built a map of every alias in the database so fifty
  * rows could read fifty entries out of it. **They run over the page's ids
  * now**, which is the only shape that survives twenty thousand companies.
@@ -125,26 +124,47 @@ async function aliasesFor(
   return by
 }
 
+const NO_STATS: RowStats = {
+  lastContact: null,
+  lastEmail: null,
+  nextMeeting: null,
+}
+
 /**
- * Last interaction per record, for the page's rows only. It was a `group by`
- * over every interaction edge in the database (`lastTouchedMap`, SPA-96
- * removed it); scoping it to the page turns a whole-table aggregate into an
- * index range.
+ * Last contact, last email and next meeting for the page's rows, read from
+ * `interaction_stat` — one primary-key range over the page's ids.
  */
-async function lastTouchedFor(
-  ids: Array<string>,
-): Promise<Map<string, string>> {
+async function statsFor(ids: Array<string>): Promise<Map<string, RowStats>> {
   if (ids.length === 0) return new Map()
   const rows = await db
     .select({
-      entityId: interactionEntity.entityId,
-      last: sql<string>`max(${interaction.occurredAt})`,
+      entityId: interactionStat.entityId,
+      kind: interactionStat.kind,
+      lastAt: interactionStat.lastAt,
+      nextAt: interactionStat.nextAt,
     })
-    .from(interactionEntity)
-    .innerJoin(interaction, eq(interaction.id, interactionEntity.interactionId))
-    .where(inArray(interactionEntity.entityId, ids))
-    .groupBy(interactionEntity.entityId)
-  return new Map(rows.map((r) => [r.entityId, new Date(r.last).toISOString()]))
+    .from(interactionStat)
+    .where(
+      and(
+        inArray(interactionStat.entityId, ids),
+        inArray(interactionStat.kind, ['any', 'email']),
+      ),
+    )
+  const by = new Map<string, RowStats>()
+  for (const r of rows) {
+    const cur = by.get(r.entityId) ?? NO_STATS
+    by.set(
+      r.entityId,
+      r.kind === 'any'
+        ? {
+            ...cur,
+            lastContact: r.lastAt?.toISOString() ?? null,
+            nextMeeting: r.nextAt?.toISOString() ?? null,
+          }
+        : { ...cur, lastEmail: r.lastAt?.toISOString() ?? null },
+    )
+  }
+  return by
 }
 
 /** Spaces each of the page's rows is tagged into. */
@@ -256,11 +276,11 @@ export const listCompaniesPageProgram = Effect.fn('listCompaniesPageProgram')(
       conditions,
       options,
     )
-    const [domains, spaces, touched] = yield* query(() =>
+    const [domains, spaces, stats] = yield* query(() =>
       Promise.all([
         aliasesFor('domain', page.ids),
         spacesFor(page.ids),
-        lastTouchedFor(page.ids),
+        statsFor(page.ids),
       ]),
     )
     return {
@@ -270,7 +290,7 @@ export const listCompaniesPageProgram = Effect.fn('listCompaniesPageProgram')(
         values: r.values,
         domains: domains.get(r.id) ?? [],
         spaces: spaces.get(r.id) ?? [],
-        lastTouched: touched.get(r.id) ?? null,
+        stats: stats.get(r.id) ?? NO_STATS,
         createdAt: r.createdAt.toISOString(),
       })),
       nextCursor: page.nextCursor,
@@ -311,11 +331,11 @@ export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
       conditions,
       options,
     )
-    const [emails, refNames, touched] = yield* query(() =>
+    const [emails, refNames, stats] = yield* query(() =>
       Promise.all([
         aliasesFor('email', page.ids),
         referenceNamesFor(page.ids),
-        lastTouchedFor(page.ids),
+        statsFor(page.ids),
       ]),
     )
     return {
@@ -324,7 +344,7 @@ export const listPeoplePageProgram = Effect.fn('listPeoplePageProgram')(
         name: r.name,
         values: r.values,
         emails: emails.get(r.id) ?? [],
-        lastTouched: touched.get(r.id) ?? null,
+        stats: stats.get(r.id) ?? NO_STATS,
         createdAt: r.createdAt.toISOString(),
       })),
       nextCursor: page.nextCursor,

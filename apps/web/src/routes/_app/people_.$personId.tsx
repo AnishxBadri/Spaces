@@ -1,4 +1,4 @@
-import { DASH, readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
+import { readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
 import {
   createFileRoute,
   Link,
@@ -201,8 +201,13 @@ function PersonRecordPage() {
             label: 'Last email',
             value: readoutDay(person.readouts.lastEmail, person.readouts.today),
           },
-          // A dash until calendar sync.
-          { label: 'Next meeting', value: DASH },
+          {
+            label: 'Next meeting',
+            value: readoutDay(
+              person.readouts.nextMeeting,
+              person.readouts.today,
+            ),
+          },
           {
             label: 'First contact',
             value: readoutDay(

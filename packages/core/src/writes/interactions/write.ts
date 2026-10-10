@@ -4,6 +4,7 @@ import type { NoteBody } from '@spaces/db/schema/kinds'
 import type { InteractionMeta } from '@spaces/db/schema/interactions'
 import { readInteractionMeta } from '../../json'
 import type { Tx } from '../entities/resolve'
+import { interactionParticipants, recomputeInteractionStats } from './stats'
 
 /**
  * The integration interaction lane (SPA-200, sdk-7b): one interaction, its
@@ -36,6 +37,11 @@ import type { Tx } from '../entities/resolve'
  * timeline. Its visibility is the caller's to decide (D30, D49) — a
  * forwarded body is `shared`, a synced or plugin-written one `private` —
  * and never the writer's.
+ *
+ * **The stats follow in the same transaction.** Every entity edged is handed
+ * to `recomputeInteractionStats` before the writer returns, and
+ * `updateInteraction` does the same for a change in place — a cancellation
+ * included — so `interaction_stat` cannot disagree with a committed row.
  */
 
 /** A long body is kept whole in `body_md` up to here, not truncated at 1 MB by accident. */
@@ -180,5 +186,54 @@ export async function writeIntegrationInteraction(
       .values({ interactionId: row.id, entityId })
       .onConflictDoNothing()
   }
+  await recomputeInteractionStats(tx, edges)
   return { kind: 'written', interactionId: row.id, noteId, edges }
+}
+
+/** What a sync may change on an interaction it wrote earlier. */
+export type InteractionChange = {
+  subject?: string | null
+  occurredAt?: Date
+  /** Replaces the whole `meta`; its `kind` must be the row's. */
+  meta?: InteractionMeta
+}
+
+/**
+ * An interaction changed in place — a meeting moved, renamed or cancelled
+ * (D68: a cancelled meeting is marked, never deleted). Its participants'
+ * stats are rebuilt in the same transaction. Returns false when no such row.
+ */
+export async function updateInteraction(
+  tx: Tx,
+  interactionId: string,
+  change: InteractionChange,
+): Promise<boolean> {
+  const current = (
+    await tx
+      .select({ kind: interaction.kind })
+      .from(interaction)
+      .where(eq(interaction.id, interactionId))
+  ).at(0)
+  if (!current) return false
+  let meta: InteractionMeta | null | undefined
+  if (change.meta !== undefined) {
+    const read = readInteractionMeta(current.kind, change.meta)
+    if (!read.ok) throw new Error(`interaction meta refused — ${read.reason}`)
+    meta = read.meta
+  }
+  await tx
+    .update(interaction)
+    .set({
+      ...(change.subject === undefined ? {} : { subject: change.subject }),
+      ...(change.occurredAt === undefined
+        ? {}
+        : { occurredAt: change.occurredAt }),
+      ...(meta === undefined ? {} : { meta }),
+    })
+    .where(eq(interaction.id, interactionId))
+  await recomputeInteractionStats(
+    tx,
+    await interactionParticipants(tx, interactionId),
+  )
+  return true
 }

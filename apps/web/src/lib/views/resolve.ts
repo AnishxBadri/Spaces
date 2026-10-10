@@ -1,6 +1,9 @@
 import { sql } from 'drizzle-orm'
-import { entity } from '@spaces/db/schema'
+import { entity, interactionStat } from '@spaces/db/schema'
+import { interactionStatField } from './stat-fields'
+import type { SQL } from 'drizzle-orm'
 import type { FieldResolver } from './sql'
+import type { InteractionStatField } from './stat-fields'
 
 /**
  * The entity-backed half of the compiler's seam (SPA-40). Every
@@ -30,11 +33,38 @@ import type { FieldResolver } from './sql'
  */
 const slugLiteral = (slug: string) => `'${slug.replaceAll("'", "''")}'::text`
 
+/**
+ * A stat's timestamp for the listed row: a correlated lookup on
+ * `interaction_stat`'s primary key `(entity_id, kind)`, the kind a literal.
+ * SQL NULL when the record has no such interaction. (D67)
+ */
+export function interactionStatAt(f: InteractionStatField): SQL {
+  const col =
+    f.at === 'first'
+      ? interactionStat.firstAt
+      : f.at === 'last'
+        ? interactionStat.lastAt
+        : interactionStat.nextAt
+  return sql`(select ${col} from ${interactionStat} where ${interactionStat.entityId} = ${entity.id} and ${interactionStat.kind} = ${sql.raw(`'${f.kind}'`)})`
+}
+
+/**
+ * The resolver also answers the `stat:` slugs every entity list has: the UTC
+ * day of the stat as a jsonb string, typed `date`, so `is`/`gt`/`lt` compare
+ * days the way they do for a date attribute. Read-only — no write path takes
+ * these slugs.
+ */
 export function entityValuesResolver(
   registry: Array<{ slug: string; type: string }>,
 ): FieldResolver {
   const typeOf = new Map(registry.map((d) => [d.slug, d.type]))
   return (slug) => {
+    const stat = interactionStatField(slug)
+    if (stat)
+      return {
+        expr: sql`to_jsonb(to_char(${interactionStatAt(stat)} at time zone 'UTC', 'YYYY-MM-DD'))`,
+        type: 'date',
+      }
     const type = typeOf.get(slug)
     if (type === undefined) return null
     return {

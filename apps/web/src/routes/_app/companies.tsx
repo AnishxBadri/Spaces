@@ -39,6 +39,8 @@ import {
 import { PageHeader } from '#/components/page-header'
 import { ImportAction } from '#/components/import/import-action'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
+import { statColumns } from '#/components/table/stat-columns'
+import { INTERACTION_STAT_FILTERS } from '#/lib/views/stat-fields'
 import { RECORD_PAGE_SIZE } from '#/lib/views/page-size'
 import {
   countOpenInbox,
@@ -231,6 +233,12 @@ function CompaniesPage() {
     }
   }
 
+  // The view bar filters on the stat columns too; a record's editors never see them.
+  const filterRegistry = useMemo(
+    () => [...registry, ...INTERACTION_STAT_FILTERS],
+    [registry],
+  )
+
   const columns = useMemo(() => {
     const defs: Array<ColumnDef<Row, unknown>> = [
       col.accessor('name', {
@@ -291,13 +299,8 @@ function CompaniesPage() {
           </span>
         ),
       }),
-      col.accessor((r) => r.lastTouched ?? '', {
-        id: 'lastTouched',
-        header: 'Last touched',
-        size: 120,
-        enableSorting: false,
-        cell: (info) => <DateCell value={info.row.original.lastTouched} />,
-      }),
+      // Read-only, from the interaction stats; sorted on the server. (D67)
+      ...statColumns<Row>(),
       col.accessor('createdAt', {
         id: 'createdAt',
         header: 'Added',
@@ -380,7 +383,7 @@ function CompaniesPage() {
             >
               <ViewBar
                 objectId={objectId}
-                registry={registry}
+                registry={filterRegistry}
                 views={views}
                 counts={counts}
                 activeId={activeId ?? null}

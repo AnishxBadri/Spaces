@@ -35,7 +35,7 @@ import { Select } from '#/components/ui/select'
 import { collisionToast } from '#/lib/attributes/collision-toast'
 import { objectIcon } from '#/lib/object-icons'
 import { recordPath } from '#/lib/record-path'
-import { DASH, readoutDayAgo } from '#/lib/records/readout-format'
+import { readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { usePageActions } from '#/lib/page-actions'
 import {
@@ -200,8 +200,13 @@ function ObjectRecordPage() {
               record.readouts.today,
             ),
           },
-          // A dash until calendar sync.
-          { label: 'Next meeting', value: DASH },
+          {
+            label: 'Next meeting',
+            value: readoutDay(
+              record.readouts.nextMeeting,
+              record.readouts.today,
+            ),
+          },
           {
             label: 'Moving, 30 days',
             value: `${record.readouts.moving30}`,

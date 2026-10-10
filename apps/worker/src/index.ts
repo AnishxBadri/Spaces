@@ -26,6 +26,7 @@ import {
 import { dedupeSweep } from './jobs/dedupe-sweep'
 import { sweepOrphanBlobs } from './jobs/sweep-orphan-blobs'
 import { pruneIngress } from './jobs/prune-ingress'
+import { rollInteractionStats } from './jobs/roll-interaction-stats'
 import { readDeck } from './jobs/read-deck'
 import { summarize } from './jobs/summarize'
 import { embedDocument } from './jobs/embed-document'
@@ -500,8 +501,14 @@ async function main() {
     { includeMetadata: true },
     runJob(pruneIngress, { host, layer: Layer.empty }),
   )
+  // A next meeting that has started becomes last contact: one recompute.
+  await boss.work(
+    QUEUES.rollInteractionStats,
+    { includeMetadata: true },
+    runJob(rollInteractionStats, { host, layer: Layer.empty }),
+  )
 
-  // The nightly scans (`CORE_SCHEDULES`): dedupe, orphan blobs, ingress prune.
+  // The clock's jobs (`CORE_SCHEDULES`): dedupe, orphan blobs, ingress prune, stats roll.
   for (const { queue, cron } of CORE_SCHEDULES)
     await boss.schedule(queue, cron, undefined, { tz: 'Etc/UTC' })
 

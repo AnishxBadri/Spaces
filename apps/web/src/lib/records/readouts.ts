@@ -1,12 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import {
-  entity,
-  interaction,
-  interactionEntity,
-  signal,
-} from '@spaces/db/schema'
+import { entity, interactionStat, signal } from '@spaces/db/schema'
 import { holding, investment, round } from '@spaces/db/schema/portfolio'
 import { jsonString } from '@spaces/core/json'
 import { ownership } from '@spaces/core/portfolio/ownership'
@@ -18,8 +13,8 @@ import { localDay } from './readout-format'
 /**
  * The record head's readout strip: numbers and dates, never a word, never a
  * section's count.
- * - Interaction dates are one aggregate per record over
- *   `interaction`/`interaction_entity`, the People list's Last touched shape.
+ * - Interaction dates come from `interaction_stat` (D67), the rows the People
+ *   and Companies lists sort on; one aggregate over the record's ids.
  * - Days are the server's local calendar days, with `today` beside them, so
  *   the server and the browser print the same string.
  *
@@ -33,12 +28,14 @@ export type PersonReadouts = {
   today: string
   lastContact: ReadoutDay
   lastEmail: ReadoutDay
+  nextMeeting: ReadoutDay
   firstContact: ReadoutDay
 }
 
 export type CompanyReadouts = {
   today: string
   lastContact: ReadoutDay
+  nextMeeting: ReadoutDay
   moving30: number
   /** Fully diluted (`actual`) or locked by a post-money SAFE (`implied`). */
   ownership: { kind: 'actual' | 'implied'; pct: number } | null
@@ -55,6 +52,7 @@ export type DealReadouts = {
 export type RecordReadouts = {
   today: string
   lastContact: ReadoutDay
+  nextMeeting: ReadoutDay
   moving30: number
 }
 
@@ -75,31 +73,39 @@ const query = <TResult>(run: () => Promise<TResult>) =>
 const dayOf = (raw: string | null): ReadoutDay =>
   raw === null ? null : localDay(new Date(raw))
 
-/** Latest, latest email and earliest interaction over any of `entityIds`. */
+/**
+ * Last contact, last email, next meeting and first contact over any of
+ * `entityIds`, from their `interaction_stat` rows.
+ */
 const interactionDays = Effect.fn('interactionDays')(function* (
   entityIds: Array<string>,
 ) {
+  const any = sql`${interactionStat.kind} = 'any'`
   const row = yield* query(async () =>
     (
       await db
         .select({
-          last: sql<string | null>`max(${interaction.occurredAt})`,
+          last: sql<
+            string | null
+          >`max(${interactionStat.lastAt}) filter (where ${any})`,
           lastEmail: sql<
             string | null
-          >`max(${interaction.occurredAt}) filter (where ${interaction.kind} = 'email')`,
-          first: sql<string | null>`min(${interaction.occurredAt})`,
+          >`max(${interactionStat.lastAt}) filter (where ${interactionStat.kind} = 'email')`,
+          next: sql<
+            string | null
+          >`min(${interactionStat.nextAt}) filter (where ${any})`,
+          first: sql<
+            string | null
+          >`min(${interactionStat.firstAt}) filter (where ${any})`,
         })
-        .from(interactionEntity)
-        .innerJoin(
-          interaction,
-          eq(interaction.id, interactionEntity.interactionId),
-        )
-        .where(inArray(interactionEntity.entityId, entityIds))
+        .from(interactionStat)
+        .where(inArray(interactionStat.entityId, entityIds))
     ).at(0),
   )
   return {
     last: dayOf(row?.last ?? null),
     lastEmail: dayOf(row?.lastEmail ?? null),
+    next: dayOf(row?.next ?? null),
     first: dayOf(row?.first ?? null),
   }
 })
@@ -179,13 +185,14 @@ export const personReadoutsProgram = Effect.fn('personReadoutsProgram')(
       today: localDay(now),
       lastContact: days.last,
       lastEmail: days.lastEmail,
+      nextMeeting: days.next,
       firstContact: days.first,
     }
     return out
   },
 )
 
-/** Last contact runs over the company and its Team (people whose `companies` holds it). */
+/** Last contact and next meeting run over the company and its Team (people whose `companies` holds it). */
 export const companyReadoutsProgram = Effect.fn('companyReadoutsProgram')(
   function* (companyId: string, now: Date) {
     const team = yield* companyPeopleProgram(companyId)
@@ -193,6 +200,7 @@ export const companyReadoutsProgram = Effect.fn('companyReadoutsProgram')(
     const out: CompanyReadouts = {
       today: localDay(now),
       lastContact: days.last,
+      nextMeeting: days.next,
       moving30: yield* movingCount(companyId, now),
       ownership: yield* companyOwnership(companyId),
     }
@@ -253,6 +261,7 @@ export const recordReadoutsProgram = Effect.fn('recordReadoutsProgram')(
     const out: RecordReadouts = {
       today: localDay(now),
       lastContact: days.last,
+      nextMeeting: days.next,
       moving30: yield* movingCount(recordId, now),
     }
     return out

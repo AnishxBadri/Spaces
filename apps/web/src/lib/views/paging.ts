@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm'
 import { entity } from '@spaces/db/schema'
 import { compileSortKey } from './sql'
+import { interactionStatAt } from './resolve'
+import { interactionStatField } from './stat-fields'
 import { RECORD_PAGE_MAX, RECORD_PAGE_SIZE } from './page-size'
 import type { SQL } from 'drizzle-orm'
 import type { FieldResolver, SortCast } from './sql'
@@ -63,9 +65,10 @@ export type PageCursor = { k: string | null; id: string }
  * `name` and `createdAt` are columns; `attr:<slug>` goes through the same
  * `resolve` seam the conditions use, so an archived attribute drops its sort
  * exactly as it drops its condition — the list stays ordered, by the default
- * key. Anything this surface has no key for (`spaces`, `domains`,
- * `lastTouched`) falls back the same way; those columns disable their sort
- * menu rather than promising an order nobody can serve.
+ * key. A `stat:` id sorts on its interaction timestamp. Anything this
+ * surface has no key for (`spaces`, `domains`) falls back the same way;
+ * those columns disable their sort menu rather than promising an order
+ * nobody can serve.
  */
 export function planSort(
   sort: RecordSort | null | undefined,
@@ -79,6 +82,10 @@ export function planSort(
   }
   if (s.id === 'name')
     return { expr: sql`${entity.canonicalName}`, cast: 'text', desc: s.desc }
+  // The stat columns sort on the timestamp itself, not on its filter day.
+  const stat = interactionStatField(s.id)
+  if (stat)
+    return { expr: interactionStatAt(stat), cast: 'timestamptz', desc: s.desc }
   if (s.id.startsWith('attr:')) {
     const field = resolve(s.id.slice('attr:'.length))
     if (!field) return { ...created, desc: NEWEST_FIRST.desc }

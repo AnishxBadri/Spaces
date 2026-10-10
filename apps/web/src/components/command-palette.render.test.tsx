@@ -461,6 +461,7 @@ describe('the preview pane', () => {
       readouts: {
         today: '2026-10-10',
         lastContact: '2026-10-04',
+        nextMeeting: null,
         moving30: 3,
         ownership: null,
       },

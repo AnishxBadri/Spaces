@@ -149,6 +149,49 @@ export const interactionEntity = pgTable(
   ],
 )
 
+/** The kinds `interaction_stat` keeps a row for: every interaction kind plus `any`. */
+export const INTERACTION_STAT_KINDS = [
+  ...interactionKind.enumValues,
+  'any',
+] as const
+
+export type InteractionStatKind = (typeof INTERACTION_STAT_KINDS)[number]
+
+/**
+ * First, last and next interaction per entity and kind, derived (D67).
+ * - Written only by `recomputeInteractionStats`, in the transaction of the
+ *   interaction write that changed it; never edited, never in `entity.values`.
+ * - `first`/`last` are uncancelled interactions that have happened; `next` is
+ *   the earliest uncancelled meeting still ahead.
+ * - `kind` is text, not `interaction_kind`, because `any` is not a kind.
+ */
+export const interactionStat = pgTable(
+  'interaction_stat',
+  {
+    entityId: uuid('entity_id')
+      .notNull()
+      .references(() => entity.id),
+    kind: text('kind').$type<InteractionStatKind>().notNull(),
+    firstId: uuid('first_id').references(() => interaction.id),
+    firstAt: timestamp('first_at', { withTimezone: true }),
+    lastId: uuid('last_id').references(() => interaction.id),
+    lastAt: timestamp('last_at', { withTimezone: true }),
+    nextId: uuid('next_id').references(() => interaction.id),
+    nextAt: timestamp('next_at', { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.entityId, t.kind] }),
+    // The roll's lookup: rows whose next meeting has started.
+    index('interaction_stat_next_idx')
+      .on(t.nextAt)
+      .where(sql`${t.nextAt} is not null`),
+    check(
+      'interaction_stat_kind_check',
+      sql`${t.kind} in (${sql.raw(INTERACTION_STAT_KINDS.map((k) => `'${k}'`).join(', '))})`,
+    ),
+  ],
+)
+
 /** What a document is to the interaction it hangs off (D68). */
 export const interactionDocumentRole = pgEnum('interaction_document_role', [
   'attachment',

@@ -31,7 +31,7 @@ import {
 import { RecordPicture } from '#/components/record/record-picture'
 import { OptionChip } from '#/components/attributes/value-editor'
 import { fmtPct } from '@spaces/core/portfolio/format'
-import { DASH, readoutDayAgo } from '#/lib/records/readout-format'
+import { DASH, readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { RecordNotes } from '#/components/record/record-notes'
 import { RecordFiles } from '#/components/record-files'
@@ -239,8 +239,13 @@ function CompanyRecordPage() {
               company.readouts.today,
             ),
           },
-          // A dash until calendar sync.
-          { label: 'Next meeting', value: DASH },
+          {
+            label: 'Next meeting',
+            value: readoutDay(
+              company.readouts.nextMeeting,
+              company.readouts.today,
+            ),
+          },
           {
             label: 'Moving, 30 days',
             value: `${company.readouts.moving30}`,

@@ -13,6 +13,8 @@ import {
 } from '@spaces/db/schema'
 import { holding, investment, round } from '@spaces/db/schema/portfolio'
 import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { recomputeInteractionStats } from '@spaces/core/writes/interactions/stats'
+import { updateInteraction } from '@spaces/core/writes/interactions/write'
 import type { Actor } from '@spaces/core/writes/attributes/values'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { birthDealInTx } from '#/lib/deals/birth'
@@ -61,16 +63,22 @@ async function interact(
   at: Date,
   entityIds: Array<string>,
 ) {
-  const row = (
-    await db
-      .insert(interaction)
-      .values({ kind, occurredAt: at })
-      .returning({ id: interaction.id })
-  ).at(0)
-  if (!row) throw new Error('no interaction')
-  await db
-    .insert(interactionEntity)
-    .values(entityIds.map((entityId) => ({ interactionId: row.id, entityId })))
+  await db.transaction(async (tx) => {
+    const row = (
+      await tx
+        .insert(interaction)
+        .values({ kind, occurredAt: at })
+        .returning({ id: interaction.id })
+    ).at(0)
+    if (!row) throw new Error('no interaction')
+    await tx
+      .insert(interactionEntity)
+      .values(
+        entityIds.map((entityId) => ({ interactionId: row.id, entityId })),
+      )
+    // The stats the readouts read, kept as every writer keeps them.
+    await recomputeInteractionStats(tx, entityIds)
+  })
 }
 
 async function aDeal(
@@ -116,6 +124,7 @@ describe('person readouts', () => {
       today: '2026-10-05',
       lastContact: localDay(daysAgo(1)),
       lastEmail: localDay(daysAgo(10)),
+      nextMeeting: null,
       firstContact: localDay(daysAgo(400)),
     })
   })
@@ -139,6 +148,43 @@ describe('person readouts', () => {
     expect(r.lastEmail).toBeNull()
   })
 
+  it('reads the next meeting from the stats, skipping a cancelled one', async () => {
+    const p = await aPerson('Meets Soon')
+    // Ahead of the database clock, which is what `next` is measured against.
+    const ahead = (days: number) => new Date(Date.now() + days * DAY)
+    await interact('meeting', ahead(5), [p])
+    await interact('meeting', ahead(2), [p])
+    const cancelled = (
+      await db
+        .select({ id: interaction.id })
+        .from(interaction)
+        .innerJoin(
+          interactionEntity,
+          eq(interactionEntity.interactionId, interaction.id),
+        )
+        .where(eq(interactionEntity.entityId, p))
+        .orderBy(interaction.occurredAt)
+    ).at(0)
+    if (!cancelled) throw new Error('no meeting')
+    await db.transaction((tx) =>
+      updateInteraction(tx, cancelled.id, {
+        meta: {
+          kind: 'meeting',
+          ends_at: ahead(2).toISOString(),
+          status: 'cancelled',
+          conference_url: null,
+          organizer: null,
+          recurring_instance_id: null,
+          rsvp: {},
+        },
+      }),
+    )
+
+    const r = await Effect.runPromise(personReadoutsProgram(p, NOW))
+    expect(r.nextMeeting).toBe(localDay(ahead(5)))
+    expect(r.lastContact).toBeNull()
+  })
+
   it('reads null, not zero, for a person with no interactions', async () => {
     const p = await aPerson('Never Met')
     const r = await Effect.runPromise(personReadoutsProgram(p, NOW))
@@ -146,6 +192,7 @@ describe('person readouts', () => {
       today: '2026-10-05',
       lastContact: null,
       lastEmail: null,
+      nextMeeting: null,
       firstContact: null,
     })
   })
@@ -227,6 +274,7 @@ describe('company readouts', () => {
     expect(r).toEqual({
       today: '2026-10-05',
       lastContact: null,
+      nextMeeting: null,
       moving30: 0,
       ownership: null,
     })
@@ -308,6 +356,7 @@ describe('custom record readouts', () => {
     expect(r).toEqual({
       today: '2026-10-05',
       lastContact: localDay(daysAgo(13)),
+      nextMeeting: null,
       moving30: 1,
     })
   })

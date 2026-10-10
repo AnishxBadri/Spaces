@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, interaction, interactionEntity, link } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
+import { recomputeInteractionStats } from '@spaces/core/writes/interactions/stats'
 import { NoteCreateFailed, createNoteProgram } from '#/lib/notes/create'
 
 /**
@@ -190,6 +191,9 @@ export const logInteractionProgram = Effect.fn('logInteractionProgram')(
               .onConflictDoNothing()
           }
         }
+
+        // The attendees' first/last/next, in this transaction. (D67)
+        await recomputeInteractionStats(tx, attendeeIds)
 
         await tx.insert(activity).values({
           actorId,

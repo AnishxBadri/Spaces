@@ -169,6 +169,11 @@ export const QUEUES = {
    * delete by cutoff is a no-op.
    */
   pruneIngress: 'ingress.prune',
+  /**
+   * Rebuilds the `interaction_stat` rows whose next meeting has started, so
+   * it becomes their last. Retried, since a recompute is idempotent.
+   */
+  rollInteractionStats: 'interaction-stats.roll',
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]

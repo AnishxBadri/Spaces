@@ -14,6 +14,7 @@ import {
   interaction,
   interactionDocument,
   interactionEntity,
+  interactionStat,
   investment,
   jobRun,
   link,
@@ -296,6 +297,16 @@ export const ENTITY_REFS: ReadonlyArray<EntityRef> = [
     del: { kind: 'cascade' }, // the interaction outlives its artifact
     // The document reached through the interaction's participants.
     context: { role: 'item', kind: 'doc_chunk', hop: 1 },
+  },
+  {
+    key: 'interaction_stat.entity',
+    table: interactionStat,
+    column: interactionStat.entityId,
+    // Derived: the loser's rows go and the winner's are recomputed from both
+    // histories once the interaction edges have moved.
+    merge: { kind: 'custom', handler: 'interaction_stats' },
+    del: { kind: 'cascade' }, // a derived row about a deleted record
+    context: null, // the interactions themselves are what the walk sees
   },
   {
     key: 'task_entity.entity',

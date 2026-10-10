@@ -41,6 +41,7 @@ export type MergeSnapshotEntry = {
     | 'field_conflict'
     | 'field_unioned'
     | 'inserted'
+    | 'recomputed'
   pk: Record<string, unknown>
   old: Record<string, unknown>
 }

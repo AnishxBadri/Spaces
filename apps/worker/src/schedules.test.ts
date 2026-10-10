@@ -14,11 +14,12 @@ const ENRICHMENT_QUEUES: ReadonlyArray<string> = [
 ]
 
 describe('the worker’s schedule list', () => {
-  it('schedules the three nightly scans and no enrichment queue', () => {
+  it('schedules the three nightly scans, the stats roll and no enrichment queue', () => {
     expect(CORE_SCHEDULES.map((s) => s.queue)).toEqual([
       QUEUES.dedupeSweep,
       QUEUES.sweepOrphanBlobs,
       QUEUES.pruneIngress,
+      QUEUES.rollInteractionStats,
     ])
     for (const { queue } of CORE_SCHEDULES)
       expect(ENRICHMENT_QUEUES).not.toContain(queue)

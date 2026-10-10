@@ -526,6 +526,13 @@
       "when": 1791585671483,
       "tag": "0074_job_run_watch",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1791626215936,
+      "tag": "0075_interaction_stat",
+      "breakpoints": true
     }
   ]
 }
