@@ -19,6 +19,7 @@ import {
   JOURNAL_TABLE,
   PLUGIN_RUNTIME_ROLE,
   PluginDbLive,
+  SECRET_TABLES,
   dropPluginSchema,
   pluginSchemaName,
 } from './plugin-db'
@@ -406,6 +407,75 @@ describe('containment of plugin_runtime', () => {
       [PLUGIN_RUNTIME_ROLE],
     )
     expect(select).toEqual([{ can: true }])
+    const secrets = await rowsOf<{ name: string }>(
+      `select c.relname::text as name
+         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relname = any($2::text[])
+          and has_any_column_privilege($1, c.oid, 'SELECT')`,
+      [PLUGIN_RUNTIME_ROLE, `{${SECRET_TABLES.join(',')}}`],
+    )
+    expect(secrets).toEqual([])
+  })
+
+  it('reads no secret table, and no schema but public and its own', async () => {
+    const root = newPluginsRoot()
+    install(root, 'tabled')
+    await row('tabled')
+    await run(root)
+    // pg-boss creates its schema on first start; the worker always has it.
+    await db.$client.query('create schema if not exists pgboss')
+
+    const refusal = async (text: string) => {
+      const result = await pluginQuery('tabled', text)
+      expect(result._tag).toBe('Failure')
+      return result._tag === 'Failure' ? result.failure.reason : null
+    }
+    expect(await refusal('select * from public.session')).toBe(
+      'PluginDb: permission denied for table session',
+    )
+    expect(await refusal('select token from public.session')).toBe(
+      'PluginDb: permission denied for table session',
+    )
+    for (const table of SECRET_TABLES) {
+      expect(await refusal(`select 1 from public."${table}" limit 1`)).toBe(
+        `PluginDb: permission denied for table ${table}`,
+      )
+    }
+    expect(await refusal('select * from drizzle.__drizzle_migrations')).toBe(
+      'PluginDb: permission denied for schema drizzle',
+    )
+    expect(await refusal('select * from pgboss.job')).toBe(
+      'PluginDb: permission denied for schema pgboss',
+    )
+    // A graph table next to them still reads.
+    const read = await pluginQuery(
+      'tabled',
+      'select count(*)::int as n from public.entity',
+    )
+    expect(read._tag).toBe('Success')
+  })
+
+  it('a secret table readable through PUBLIC degrades the plugin, naming the table', async () => {
+    const root = newPluginsRoot()
+    install(root, 'tabled')
+    install(root, 'echo')
+    await row('tabled')
+    await row('echo')
+    await db.$client.query('grant select on public.session to public')
+    try {
+      const { verdicts } = await run(root)
+      expect(verdicts.map((v) => [v.id, v.status, v.reason])).toEqual([
+        ['echo', 'enabled', null],
+        [
+          'tabled',
+          'degraded',
+          `role ${PLUGIN_RUNTIME_ROLE} can read public.session, which holds secrets; revoke SELECT on it from the role and from PUBLIC`,
+        ],
+      ])
+    } finally {
+      await db.$client.query('revoke select on public.session from public')
+    }
+    expect(await schemaExists(TABLED)).toBe(false)
   })
 
   it('a plugin schema may point at public.entity, and nothing in public points into a plugin schema', async () => {

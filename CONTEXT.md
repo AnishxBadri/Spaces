@@ -409,7 +409,13 @@ unsafe-entry · manifest-missing · manifest-mismatch`, checking the
   race-safe; the role is cluster-wide, its grants per database), grants it
   USAGE on `public`, SELECT on its tables (re-applied every load) and
   REFERENCES on `entity(id)` — nothing that writes — and refuses to go on if
-  it can create in `public` or write any table there by any grant. The
+  it can create in `public` or write any table there by any grant. Right
+  after that grant it revokes SELECT on the tables that hold secrets —
+  `SECRET_TABLES`: `credential`, `account_connection`, `session`,
+  `verification`, `api_token`, `user` — and refuses likewise, naming the
+  table, if the role can still read one (a deny-list; an allow-list of
+  joinable graph tables is the stronger posture). The `drizzle` and `pgboss`
+  schemas grant it no USAGE (tested). The
   plugin's schema is `plugin_<id>` (hyphens → underscores) **owned by that
   role**, and both the migrations and every `PluginDb` query run after
   `set local role plugin_runtime` with `search_path = plugin_<id>, public`

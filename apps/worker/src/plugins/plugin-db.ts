@@ -17,9 +17,10 @@ import { splitStatements } from './sql-split'
  *
  * - Containment is the `plugin_runtime` role: created by the owning user
  *   (DATABASE_URL's), `nologin`, granted USAGE on `public`, SELECT on its
- *   tables and REFERENCES on `entity(id)` — nothing that writes. Every
- *   plugin statement runs after `set local role plugin_runtime` on a pooled
- *   connection, inside a transaction, so the role never leaks to the pool.
+ *   tables but `SECRET_TABLES` and REFERENCES on `entity(id)` — nothing
+ *   that writes. Every plugin statement runs after `set local role
+ *   plugin_runtime` on a pooled connection, inside a transaction, so the
+ *   role never leaks to the pool.
  * - `plugin_<id>` (hyphens become underscores) is owned by the role, so
  *   migrations run as the role too: DDL in `public` is refused by Postgres.
  * - A refused CREATE ROLE, a role that can write `public`, or a failing
@@ -29,6 +30,20 @@ import { splitStatements } from './sql-split'
  */
 
 export const PLUGIN_RUNTIME_ROLE = 'plugin_runtime'
+
+/**
+ * Tables in `public` the role must never read: sessions, OAuth bundles, keys,
+ * one-time codes, MCP tokens and every user's email and role.
+ * - A new table holding a secret or a token is added here.
+ */
+export const SECRET_TABLES = [
+  'credential',
+  'account_connection',
+  'session',
+  'verification',
+  'api_token',
+  'user',
+] as const
 
 /** The journal table in each plugin schema: one row per applied file. */
 export const JOURNAL_TABLE = 'spaces_migrations'
@@ -163,8 +178,9 @@ const ensureRole = (client: PoolClient, role: string) =>
 
 /**
  * The role's grants on `public`, re-applied on every load so a table a core
- * migration added since is readable, then the containment check: the role
- * may neither create in `public` nor write any table there, by any grant.
+ * migration added since is readable, then the containment check.
+ * - The role may neither create in `public` nor write any table there.
+ * - The role may read no `SECRET_TABLES` entry, by any grant.
  */
 const containRole = (client: PoolClient, role: string) =>
   Effect.gen(function* () {
@@ -181,6 +197,7 @@ const containRole = (client: PoolClient, role: string) =>
     for (const grant of [
       `grant usage on schema public to ${ident(role)}`,
       `grant select on all tables in schema public to ${ident(role)}`,
+      `revoke select on table ${SECRET_TABLES.map((name) => `public.${ident(name)}`).join(', ')} from ${ident(role)}`,
       `grant references (id) on table public.entity to ${ident(role)}`,
     ]) {
       yield* query(client, grant).pipe(
@@ -210,6 +227,22 @@ const containRole = (client: PoolClient, role: string) =>
     if (table !== undefined) {
       return yield* new PluginDbRefused({
         reason: `role ${role} can write public.${table}; revoke INSERT, UPDATE, DELETE, TRUNCATE on it`,
+      })
+    }
+    // Any column counts: a column grant on session.token is a read of it.
+    const readable = yield* query<{ name: string }>(
+      client,
+      `select c.relname::text as name
+         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relname = any($2::text[])
+          and has_any_column_privilege($1, c.oid, 'SELECT')
+        order by 1 limit 1`,
+      [role, [...SECRET_TABLES]],
+    ).pipe(Effect.mapError(refuse('could not check containment')))
+    const secret = readable.rows.at(0)?.name
+    if (secret !== undefined) {
+      return yield* new PluginDbRefused({
+        reason: `role ${role} can read public.${secret}, which holds secrets; revoke SELECT on it from the role and from PUBLIC`,
       })
     }
   })
