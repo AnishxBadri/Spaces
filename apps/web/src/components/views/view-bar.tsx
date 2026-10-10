@@ -572,9 +572,14 @@ function ConditionValueEditor({
         className="h-8 text-ui"
       />
     )
-  // Multi-select: a condition compares one option, so use the single picker.
+  // A condition compares one value: a multi-select takes the single picker,
+  // a multi phone the single number box.
   const single: RegistryEntry =
-    def.type === 'multi_select' ? { ...def, type: 'select' } : def
+    def.type === 'multi_select'
+      ? { ...def, type: 'select' }
+      : def.type === 'phone' && def.options?.multi
+        ? { ...def, options: { ...def.options, multi: false } }
+        : def
   return (
     <ValueEditor
       def={single}

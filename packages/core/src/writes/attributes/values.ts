@@ -11,6 +11,7 @@ import { objectIdForKindAsync } from './objects'
 import {
   claimIdentityAlias,
   normalizeIdentityValue,
+  recordNameAlias,
   releaseIdentityAlias,
 } from '../entities/resolve'
 import type { IdentityOutcome, ResolveSource } from '../entities/resolve'
@@ -31,6 +32,13 @@ import type {
   CoreIdentityKey,
   ObjectKind,
 } from '../../attributes/registry'
+import {
+  FIRST_NAME_SLUG,
+  LAST_NAME_SLUG,
+  isNamePart,
+  joinName,
+  splitName,
+} from '../../attributes/person-name'
 
 /**
  * The one write path for attribute values. Validates against the registry,
@@ -385,6 +393,12 @@ export type SetValuesInput = {
    * birth passes the source it was resolved from.
    */
   identitySource?: ResolveSource
+  /**
+   * A whole name for the record. On a person it splits into `first_name`
+   * and `last_name` (`splitName`), overriding the patch's parts, unless it
+   * is already their join; elsewhere it sets `canonical_name` as given.
+   */
+  name?: string
 }
 
 /** One element of a multi-valued identity slug, and what its claim did. */
@@ -551,7 +565,6 @@ export async function setValuesInTx(
 ): Promise<SetValuesResult> {
   const {
     entityId,
-    patch,
     actor,
     source = 'direct',
     suggestionId,
@@ -560,6 +573,7 @@ export async function setValuesInTx(
     fillDefaults,
     fillBlanks,
     identitySource,
+    name,
   } = opts
   const claimSource = identitySource ?? aliasSource(actor, source)
   const actorId = actor.type === 'user' ? actor.id : null
@@ -579,6 +593,7 @@ export async function setValuesInTx(
         kind: entity.kind,
         objectId: entity.objectId,
         values: entity.values,
+        canonicalName: entity.canonicalName,
       })
       .from(entity)
       .where(eq(entity.id, entityId))
@@ -600,6 +615,15 @@ export async function setValuesInTx(
   }
   const registry = await getRegistryByObjectId(objectId)
   const current = ent.values
+  const nameParts =
+    ent.kind === 'person' && registry.some((d) => isNamePart(d.slug))
+  const patch = withNameParts(opts.patch, {
+    nameParts,
+    current,
+    canonicalName: ent.canonicalName,
+    name,
+    birth: fillDefaults !== undefined,
+  })
 
   // Planning is synchronous and pure; a typed failure surfaces as a
   // throw here and is passed through untouched by the catch below.
@@ -745,6 +769,26 @@ export async function setValuesInTx(
     await tx.update(entity).set({ values: next }).where(eq(entity.id, entityId))
   }
 
+  // The name follows its parts on a person; elsewhere a given name is set.
+  const renamed = nameParts
+    ? changes.some((c) => isNamePart(c.slug))
+      ? joinName(next[FIRST_NAME_SLUG], next[LAST_NAME_SLUG])
+      : null
+    : name !== undefined
+      ? name.trim()
+      : null
+  if (renamed === '')
+    throw invalid(FIRST_NAME_SLUG, 'A person needs a first or last name')
+  if (renamed !== null && renamed !== ent.canonicalName) {
+    await tx
+      .update(entity)
+      .set({ canonicalName: renamed })
+      .where(eq(entity.id, entityId))
+    // Names are history: the one left behind stays findable.
+    await recordNameAlias(entityId, ent.canonicalName, claimSource, tx)
+    await recordNameAlias(entityId, renamed, claimSource, tx)
+  }
+
   // The declaration made flesh (spec §9): an attribute carrying
   // `options.identityKey` mirrors its value into `entity_alias` as an
   // identity alias, in this transaction, beside the `attribute_event`
@@ -858,6 +902,46 @@ export const setValuesEffect = Effect.fn('setValues')(function* (
   // loop was here; it moved out with the enqueue, which core cannot hold.
   return result
 })
+
+/**
+ * The patch with a person's name parts settled: a given `name` split into
+ * them unless it is already their join, and a birth that names neither part
+ * filling both from the name the record was born with.
+ */
+function withNameParts(
+  patch: Record<string, unknown>,
+  ctx: {
+    nameParts: boolean
+    current: EntityValues
+    canonicalName: string
+    name: string | undefined
+    birth: boolean
+  },
+): Record<string, unknown> {
+  if (!ctx.nameParts) return patch
+  const held = joinName(
+    ctx.current[FIRST_NAME_SLUG],
+    ctx.current[LAST_NAME_SLUG],
+  )
+  let whole: string | null = null
+  if (ctx.name !== undefined) {
+    if (joinName(ctx.name, null) !== held) whole = ctx.name
+  } else if (
+    ctx.birth &&
+    held === '' &&
+    !(FIRST_NAME_SLUG in patch) &&
+    !(LAST_NAME_SLUG in patch)
+  ) {
+    whole = ctx.canonicalName
+  }
+  if (whole === null) return patch
+  const parts = splitName(whole)
+  return {
+    ...patch,
+    [FIRST_NAME_SLUG]: parts.first,
+    [LAST_NAME_SLUG]: parts.last,
+  }
+}
 
 /** Promise seam for server-fns and tests; new Effect code composes `setValuesEffect`. */
 export const setValues = (opts: SetValuesInput): Promise<SetValuesResult> =>

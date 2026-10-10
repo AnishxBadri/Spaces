@@ -100,3 +100,44 @@ describe('ValueEditor — a person’s emails', () => {
     expect(render(plain, ['info@acme.example'])).not.toContain('shared inbox')
   })
 })
+
+const phone = (multi: boolean): RegistryEntry => ({
+  slug: 'phone',
+  name: 'Phone',
+  type: 'phone',
+  isSystem: true,
+  options: multi ? { multi: true } : {},
+})
+
+describe('ValueEditor — phone (D67)', () => {
+  it('reads a stored E.164 number grouped', () => {
+    expect(inputValue(phone(false), '+14155550100', 'field').value).toBe(
+      '+1 415 555 0100',
+    )
+  })
+
+  it('a multi phone shows every number in a field, the first and +N in a cell', () => {
+    const numbers = ['+919845012345', '+14155550100']
+    const field = renderToStaticMarkup(
+      <ValueEditor
+        def={phone(true)}
+        value={numbers}
+        variant="field"
+        onSave={() => {}}
+      />,
+    )
+    expect(field).toContain('+91 98450 12345')
+    expect(field).toContain('+1 415 555 0100')
+    const cell = renderToStaticMarkup(
+      <ValueEditor
+        def={phone(true)}
+        value={numbers}
+        variant="cell"
+        onSave={() => {}}
+      />,
+    )
+    expect(cell).toContain('+91 98450 12345')
+    expect(cell).not.toContain('+1 415 555 0100')
+    expect(cell).toContain('+1</span>')
+  })
+})

@@ -4,6 +4,7 @@ import type { Json } from '@spaces/db/json'
 import { valueValidator } from '../attributes/registry'
 import type { AttributeDef } from '../attributes/registry'
 import { normalizeDomain } from '../entities/normalize'
+import { toE164 } from '../attributes/phone'
 
 /**
  * The enrichment rules, pure (D76): which linked keys a source is still
@@ -143,6 +144,11 @@ export type Decision = {
  */
 export const toAttributeValue = (def: AttributeDef, value: Json): Json => {
   if (Array.isArray(value) && def.type === 'text') return value.join(', ')
+  // A phone answer is one number; a multi phone holds it as a list of one.
+  if (def.type === 'phone' && typeof value === 'string') {
+    const e164 = toE164(value) ?? value
+    return def.options.multi ? [e164] : e164
+  }
   if (def.type === 'select' && typeof value === 'string') {
     const label = value.trim()
     const option = (def.options.options ?? []).find(

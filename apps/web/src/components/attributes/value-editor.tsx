@@ -18,6 +18,11 @@ import {
 } from '#/components/ui/tooltip'
 import { liveOptions, optionState } from '@spaces/core/attributes/options'
 import { isNonIdentityValue } from '@spaces/core/attributes/registry'
+import {
+  phoneProblem,
+  formatPhone,
+  toE164,
+} from '@spaces/core/attributes/phone'
 import { formatDate, formatNumber } from '@spaces/core/format'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
@@ -198,7 +203,8 @@ export function ValueEditor({
       )
     case 'email':
     case 'domain':
-      // A person's emails, a company's domains: a list, one claim each.
+    case 'phone':
+      // A person's emails, a company's domains, a list of phones.
       if (def.options?.multi)
         return (
           <MultiTextPicker
@@ -363,9 +369,12 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
   const precision = def.type === 'number' ? def.options?.precision : undefined
   const currency =
     def.type === 'currency' ? (def.options?.code ?? 'USD') : undefined
+  // A phone is stored in E.164 and reads grouped until it is edited.
+  const phone = def.type === 'phone'
   const formatted =
-    (precision !== undefined || currency !== undefined) && !focused
+    (precision !== undefined || currency !== undefined || phone) && !focused
   const atRest = (raw: string): string => {
+    if (phone) return formatPhone(raw)
     if (currency === undefined) return formatNumber(raw, precision)
     const n = Number(raw)
     return raw.trim() === '' || !Number.isFinite(n)
@@ -380,6 +389,15 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
     if (def.type === 'number' || def.type === 'currency') {
       const n = Number(draft)
       return onSave(Number.isFinite(n) ? n : null)
+    }
+    // Formatted on blur; a non-number goes to the write path, which names the shape.
+    if (phone) {
+      const e164 = toE164(draft)
+      if (e164 !== null) {
+        setDraft(e164)
+        committed.current = e164
+      }
+      return onSave(e164 ?? draft.trim())
     }
     onSave(draft.trim())
   }
@@ -396,7 +414,7 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
   return (
     <input
       type={inputType}
-      inputMode={def.type === 'number' ? 'decimal' : undefined}
+      inputMode={def.type === 'number' ? 'decimal' : phone ? 'tel' : undefined}
       value={formatted ? atRest(draft) : draft}
       autoFocus={autoFocus}
       aria-label={def.name}
@@ -546,18 +564,31 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
 }
 
 /**
- * A multi-valued `email` / `domain`: the values as chips, a box to add one
- * (↵), and each value a menu item that removes it. The write path cleans,
- * de-duplicates and — on an identity attribute — claims every element.
+ * A multi-valued `email` / `domain` / `phone`: the values as chips, a box to
+ * add one (↵), and each value a menu item that removes it. The write path
+ * cleans, de-duplicates and — on an identity attribute — claims every
+ * element. A phone is added in E.164 and shown grouped; a cell shows the
+ * first phone and a mono +N.
  */
 function MultiTextPicker({ def, value, onSave, variant }: Props) {
   const selected: Array<string> = Array.isArray(value) ? value.map(String) : []
   const [draft, setDraft] = useState('')
+  const [problem, setProblem] = useState<string | null>(null)
+  const phone = def.type === 'phone'
+  const shown = (v: string) => (phone ? formatPhone(v) : v)
+  const chips = phone && variant === 'cell' ? selected.slice(0, 1) : selected
+  const more = selected.length - chips.length
 
   function add() {
-    const next = draft.trim()
-    if (next === '') return
+    const raw = draft.trim()
+    if (raw === '') return
+    const next = phone ? toE164(raw) : raw
+    if (next === null) {
+      setProblem(phoneProblem(raw))
+      return
+    }
     setDraft('')
+    setProblem(null)
     if (!selected.includes(next)) onSave([...selected, next])
   }
 
@@ -576,10 +607,10 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
           {selected.length === 0 ? (
             <span className="text-ui text-graphite">—</span>
           ) : (
-            selected.map((v) => (
+            chips.map((v) => (
               <span key={v} className="flex min-w-0 items-center gap-1">
                 <span className="flex h-5 items-center truncate border border-rule bg-paper px-1.5 mono text-label">
-                  {v}
+                  {shown(v)}
                 </span>
                 {def.options?.identityKey !== undefined &&
                 isNonIdentityValue(def.options.identityKey, v) ? (
@@ -588,6 +619,9 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
               </span>
             ))
           )}
+          {more > 0 ? (
+            <span className="mono text-micro text-graphite">+{more}</span>
+          ) : null}
         </span>
         <ChevronDown className="size-3 shrink-0 text-graphite opacity-0 transition-opacity group-hover/pick:opacity-100 group-focus-visible/pick:opacity-100 group-data-[state=open]/pick:opacity-100" />
       </DropdownMenuTrigger>
@@ -596,12 +630,20 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
           <Input
             value={draft}
             autoFocus
-            type={def.type === 'email' ? 'email' : 'text'}
+            type={def.type === 'email' ? 'email' : phone ? 'tel' : 'text'}
             aria-label={`Add to ${def.name}`}
+            aria-invalid={problem !== null}
             placeholder={
-              def.type === 'email' ? 'name@company.com ↵' : 'company.com ↵'
+              def.type === 'email'
+                ? 'name@company.com ↵'
+                : phone
+                  ? '+14155550100 ↵'
+                  : 'company.com ↵'
             }
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value)
+              setProblem(null)
+            }}
             onKeyDown={(e) => {
               e.stopPropagation()
               if (e.key === 'Enter') {
@@ -611,6 +653,11 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
             }}
             className="h-7 mono text-label"
           />
+          {problem ? (
+            <p role="alert" className="pt-1 text-label text-destructive">
+              {problem}
+            </p>
+          ) : null}
         </div>
         {selected.map((v) => (
           <DropdownMenuItem
@@ -622,7 +669,7 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
             }}
           >
             <X className="size-3 text-graphite" strokeWidth={2} />
-            <span className="truncate mono text-label">{v}</span>
+            <span className="truncate mono text-label">{shown(v)}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

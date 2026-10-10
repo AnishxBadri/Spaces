@@ -16,6 +16,7 @@ import {
   normalizeLinkedin,
 } from '../entities/normalize'
 import type { BadgeColor } from './colors'
+import { phoneProblem, toE164 } from './phone'
 
 /**
  * The attribute type menu — fixed in code; users define attributes, never
@@ -358,8 +359,27 @@ export function valueValidator(
       const one = identityKey ? identityValue(base, identityKey) : base
       return def.options.multi ? multiText(one, identityKey, 'domain') : one
     }
-    case 'phone':
-      return z.string().max(40)
+    case 'phone': {
+      // A number the record already holds is kept as written, so a value
+      // stored before E.164 does not block the write that adds a second.
+      const one = z
+        .string()
+        .trim()
+        .max(40)
+        .transform((raw, ctx) => {
+          if (heldIds.has(raw)) return raw
+          const e164 = toE164(raw)
+          if (e164 !== null) return e164
+          ctx.addIssue({ code: 'custom', message: phoneProblem(raw) })
+          return z.NEVER
+        })
+      return def.options.multi
+        ? z
+            .array(one)
+            .max(MAX_MULTI_TEXT)
+            .transform((items) => [...new Set(items)])
+        : one
+    }
     case 'email': {
       const base = z.string().email().max(255)
       const one = identityKey ? identityValue(base, identityKey) : base
@@ -603,7 +623,7 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       options: { enrichmentKey: 'person.twitter' },
     },
     // Unlinked by default: a phone costs extra credits and is opt-in. (D76)
-    { slug: 'phone', name: 'Phone', type: 'phone' },
+    { slug: 'phone', name: 'Phone', type: 'phone', options: { multi: true } },
     {
       // The companies this person is at (D60): angels, advisors and
       // co-investors sit at several, hence multi. Written through the one
@@ -626,6 +646,10 @@ export const SYSTEM_ATTRIBUTES: Record<ObjectKind, Array<SeedDef>> = {
       type: 'email',
       options: { multi: true, identityKey: 'email' },
     },
+    // The name in two parts (D67); `setValues` keeps `canonical_name` their
+    // join. Appended, never slotted — the record page draws them as one cell.
+    { slug: 'first_name', name: 'First name', type: 'text' },
+    { slug: 'last_name', name: 'Last name', type: 'text' },
   ],
   deal: [
     {

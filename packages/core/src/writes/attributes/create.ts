@@ -160,6 +160,13 @@ const buildOptions = Effect.fn('buildOptions')(function* (
     if (cfg.targetKind) out.targetKind = cfg.targetKind
     else if (cfg.targetObjectId) out.targetObjectId = cfg.targetObjectId
     out.multi = cfg.multi ?? false
+  } else if (input.type === 'phone') {
+    // A phone may hold several numbers (D67); the shape is fixed at creation.
+    if (cfg.targetKind !== undefined || cfg.targetObjectId !== undefined)
+      return yield* reject(
+        'Relationship settings are not settings of this type',
+      )
+    if (cfg.multi) out.multi = true
   } else if (
     cfg.targetKind !== undefined ||
     cfg.targetObjectId !== undefined ||

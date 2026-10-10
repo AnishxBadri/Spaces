@@ -501,6 +501,7 @@ function AttributeForm({
               ...(type === 'currency' ? { code } : {}),
               ...(type === 'rating' ? { max } : {}),
               ...(type === 'number' ? { precision } : {}),
+              ...(type === 'phone' ? { multi } : {}),
               ...(type === 'record_reference' && targetKind
                 ? { targetKind, multi }
                 : type === 'record_reference' && targetObjectId
@@ -620,6 +621,21 @@ function AttributeForm({
             />
           </div>
         )
+      case 'phone':
+        return mode === 'edit' ? (
+          <p className="text-ui text-graphite sm:col-span-2">
+            {stored.multi ? 'Several numbers' : 'One number'}, stored as + then
+            the digits. Fixed since creation.
+          </p>
+        ) : (
+          <CheckRow
+            id="attr-multi"
+            checked={multi}
+            onChange={setMulti}
+            label="Multiple values"
+            hint="Several numbers at once, like work and mobile"
+          />
+        )
       case 'record_reference':
         return mode === 'edit' ? (
           <p className="text-ui text-graphite sm:col-span-2">
@@ -672,7 +688,9 @@ function AttributeForm({
           Pick what it points at first.
         </p>
       )
-    if (TEXT_LIKE.has(type) || NUMBER_LIKE.has(type))
+    // A multi phone's default is a list, drawn by the record's own editor.
+    const listDefault = type === 'phone' && multi
+    if ((TEXT_LIKE.has(type) && !listDefault) || NUMBER_LIKE.has(type))
       return (
         <Input
           id="attr-default"

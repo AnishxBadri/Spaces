@@ -9,6 +9,7 @@ import type {
   CoreIdentityKey,
 } from '../attributes/registry'
 import { coerce, summarizeColumn } from './coerce'
+import { isNamePart } from '../attributes/person-name'
 import type { CoerceOptions, ColumnSummary, Coercion } from './coerce'
 import type {
   ColumnTarget,
@@ -209,6 +210,11 @@ const ALIASES: Record<string, ReadonlyArray<string>> = {
   deal_name: ['name'],
   person_name: ['name'],
   full_name: ['name'],
+  first: ['first_name'],
+  given_name: ['first_name'],
+  last: ['last_name'],
+  surname: ['last_name'],
+  family_name: ['last_name'],
   round: ['stage'],
   email_address: ['email'],
   linkedin_url: ['linkedin'],
@@ -508,7 +514,15 @@ export function validateMapping(
       })
   })
   const names = byClaim.get('name') ?? []
-  if (names.length === 0)
+  // A person's First and Last name columns make the name. (D67)
+  const parts = mapping.some(
+    (t) =>
+      t.target === 'attribute' &&
+      registry.attributes.some(
+        (a) => a.id === t.attributeId && isNamePart(a.slug),
+      ),
+  )
+  if (names.length === 0 && !parts)
     problems.unshift({ column: null, reason: 'Map one column to the name' })
   for (const [claim, columns] of byClaim) {
     if (columns.length < 2) continue

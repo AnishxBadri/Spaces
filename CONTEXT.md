@@ -1282,7 +1282,13 @@ enum branch in any registry read. `description` landed 2026-09 (migration
   domains (domain, multi, identity) · linkedin (url, plain) (D75). No registration
   number: Spaces is country-agnostic, and a user who tracks one adds their own attribute.
 - **Person:** job_title (text) · description · location · twitter (url) ·
-  phone (phone) · emails (email, multi, identity) · linkedin (url, plain) (D75).
+  phone (phone, multi, E.164) · emails (email, multi, identity) · linkedin (url, plain)
+  (D75) · first_name, last_name (text) (D67).
+- **A person's name is two parts (D67).** `canonical_name` stays a column, never an
+  attribute, and `setValues` keeps it the join of `first_name` and `last_name`: a write to
+  either part rewrites it; a whole name (a rename, a birth, an import's Name column)
+  splits on its last space, one without a space being a first name only. Migration 0076
+  split existing names the same way. A phone is stored as `+` then 2–15 digits.
 - **LinkedIn is a plain attribute (D75).** SPA-300 (migration 0063) briefly made it a
   `linkedin` identity alias; D75 reverses that, as Attio models it: optional, not
   unique, not matched on.

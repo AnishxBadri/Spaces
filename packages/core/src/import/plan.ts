@@ -7,6 +7,11 @@ import {
   specFor,
 } from './mapping'
 import { resolveReferenceCells } from './references'
+import {
+  FIRST_NAME_SLUG,
+  LAST_NAME_SLUG,
+  joinName,
+} from '../attributes/person-name'
 import type { CoreIdentityKey, ObjectKind } from '../attributes/registry'
 import type { MappingRegistry } from './mapping'
 import type {
@@ -181,7 +186,26 @@ export function readRow(
         return
     }
   })
+  // No name column: a person's First and Last name columns make it. (D67)
+  if (out.name === null) {
+    const joined = joinName(
+      namePart(out.patch, registry, FIRST_NAME_SLUG),
+      namePart(out.patch, registry, LAST_NAME_SLUG),
+    )
+    if (joined !== '') out.name = joined
+  }
   return out
+}
+
+/** A name part the row read, by the part's slug. */
+function namePart(
+  patch: ReadRow['patch'],
+  registry: MappingRegistry,
+  slug: string,
+): string | null {
+  const attr = registry.attributes.find((a) => a.slug === slug && !a.archived)
+  const value = attr ? patch[attr.id] : undefined
+  return typeof value === 'string' ? value : null
 }
 
 /**

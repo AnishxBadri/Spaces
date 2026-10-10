@@ -688,7 +688,7 @@ const PEOPLE: Array<PersonSpec> = [
     values: {
       job_title: 'Founder & CEO',
       location: 'Bengaluru',
-      phone: '+91 98450 11223',
+      phone: ['+919845011223'],
     },
   },
   {

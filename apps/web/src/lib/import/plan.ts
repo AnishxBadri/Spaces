@@ -4,6 +4,7 @@ import { db } from '@spaces/db'
 import { entity, importBatch, importRow } from '@spaces/db/schema'
 import { CORE_IDENTITY_KEYS } from '@spaces/core/attributes/registry'
 import { fitMapping } from '@spaces/core/import/mapping'
+import { isNamePart } from '@spaces/core/attributes/person-name'
 import {
   NEEDS_NAME,
   applyDecision,
@@ -220,7 +221,18 @@ export const planImportProgram = Effect.fn('planImportProgram')(function* (
       resolved: yield* resolveRow(object.kind, read),
     })
   }
-  const nameColumn = mapping.findIndex((t) => t.target === 'name')
+  // The name's column, or the first name part's when the parts make it.
+  const named = mapping.findIndex((t) => t.target === 'name')
+  const nameColumn =
+    named !== -1
+      ? named
+      : mapping.findIndex(
+          (t) =>
+            t.target === 'attribute' &&
+            object.registry.attributes.some(
+              (a) => a.id === t.attributeId && isNamePart(a.slug),
+            ),
+        )
   const planned = planRows(inputs, creatorFor(object.kind), nameColumn)
 
   const stored = yield* query(() =>

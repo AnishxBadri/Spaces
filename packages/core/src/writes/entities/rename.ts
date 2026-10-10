@@ -4,6 +4,8 @@ import { db } from '@spaces/db'
 import { entity } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
 import { recordNameAlias } from './resolve'
+import { setValuesEffect } from '../attributes/values'
+import type { AttributeValidationError } from '../attributes/values'
 
 /**
  * Renaming a record, for every object-model kind `updateRecord` serves
@@ -27,6 +29,9 @@ import { recordNameAlias } from './resolve'
  * Names are history: an earlier alias is never replaced or deleted.
  * `searchEntities` matches `entity_alias` name rows already, so the record
  * stays findable by what it used to be called without any sweep running.
+ *
+ * A person's name is the join of `first_name` and `last_name` (D67), so a
+ * person's rename goes through `setValues`, which splits it into the parts.
  */
 
 export class RenameQueryFailed extends Schema.TaggedError<RenameQueryFailed>()(
@@ -49,21 +54,40 @@ export type RenameRecordInput = {
 export const renameRecordProgram = Effect.fn('renameRecordProgram')(function* (
   actorId: string,
   input: RenameRecordInput,
-): Effect.fn.Return<{ ok: true }, RenameQueryFailed> {
+): Effect.fn.Return<
+  { ok: true },
+  RenameQueryFailed | AttributeValidationError
+> {
   // Read the outgoing name before the update overwrites it.
   const before = yield* query(() =>
     db
-      .select({ name: entity.canonicalName })
+      .select({ name: entity.canonicalName, kind: entity.kind })
       .from(entity)
       .where(eq(entity.id, input.id))
       .then((rows) => rows.at(0)),
   )
-  yield* query(() =>
-    db
-      .update(entity)
-      .set({ canonicalName: input.name })
-      .where(eq(entity.id, input.id)),
-  )
+  if (before?.kind === 'person') {
+    yield* setValuesEffect({
+      entityId: input.id,
+      patch: {},
+      actor: { type: 'user', id: actorId },
+      name: input.name,
+    }).pipe(
+      Effect.catchTags({
+        EntityNotFound: (cause) =>
+          Effect.fail(new RenameQueryFailed({ cause })),
+        ValuesWriteFailed: (cause) =>
+          Effect.fail(new RenameQueryFailed({ cause })),
+      }),
+    )
+  } else {
+    yield* query(() =>
+      db
+        .update(entity)
+        .set({ canonicalName: input.name })
+        .where(eq(entity.id, input.id)),
+    )
+  }
   yield* query(() =>
     db.insert(activity).values({
       actorId,

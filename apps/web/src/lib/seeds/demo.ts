@@ -210,7 +210,10 @@ export async function seedDemoData(
     .onConflictDoNothing()
   await db
     .update(entity)
-    .set({ values: { job_title: 'Co-founder & CTO' } })
+    // Merged, so the name parts and emails the birth wrote stay.
+    .set({
+      values: sql`${entity.values} || ${JSON.stringify({ job_title: 'Co-founder & CTO' })}::jsonb`,
+    })
     .where(eq(entity.id, personResult.entityId))
   const submerId = companyIds.get('Submer')
   if (submerId) {

@@ -1,5 +1,6 @@
 import { splitImportList } from '@spaces/sdk/import-grid'
 import { valueValidator } from '../attributes/registry'
+import { PHONE_SHAPE, toE164 } from '../attributes/phone'
 import type {
   AttributeOptions,
   AttributeType,
@@ -301,10 +302,24 @@ function coerceShape(
         return refuse(`${quote(raw)} is not a LinkedIn profile or company page`)
       return accept(url)
     }
-    case 'phone':
-      return normalizePhone(s)
-        ? accept(s)
-        : refuse(`${quote(raw)} is not a phone number`)
+    case 'phone': {
+      // Stored in E.164; a multi phone reads a list cell, one number each.
+      const items = options.multi ? (splitImportList(s) ?? [s]) : [s]
+      const numbers: Array<string> = []
+      for (const item of items) {
+        if (item.trim() === '') continue
+        const e164 = toE164(item)
+        if (e164 === null)
+          return refuse(
+            normalizePhone(item)
+              ? `${quote(item)} has no country code — expected ${PHONE_SHAPE}`
+              : `${quote(item)} is not a phone number`,
+          )
+        numbers.push(e164)
+      }
+      if (numbers.length === 0) return accept(null)
+      return accept(options.multi ? numbers : numbers[0])
+    }
     case 'record_reference':
       return refuse(
         'record references are matched to records in the next step, not read from the cell',

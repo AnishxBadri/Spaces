@@ -6,12 +6,14 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { SpaceRailRow } from '#/components/record/space-rail-row'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
+import { NameField } from '#/components/attributes/name-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import { KeyHint } from '#/components/page-header'
 import {
@@ -36,7 +38,8 @@ import { SuggestSpacesAction } from '#/components/record/suggest-spaces'
 import { PluginActions } from '#/components/record/plugin-actions'
 import { recordPath } from '#/lib/record-path'
 import { collisionToast } from '#/lib/attributes/collision-toast'
-import { jsonStrings } from '@spaces/core/json'
+import { jsonString, jsonStrings } from '@spaces/core/json'
+import { isNamePart } from '@spaces/core/attributes/person-name'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { runBinding, usePageActions } from '#/lib/page-actions'
 import {
@@ -120,6 +123,8 @@ function PersonRecordPage() {
   } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
+  // The name as the Name cell's First and Last are typed; the head shows it.
+  const [nameDraft, setNameDraft] = useState<string | null>(null)
 
   // Identity is an attribute (D75): the first email names the record.
   const firstEmail = jsonStrings(person.values.emails).at(0)
@@ -199,7 +204,12 @@ function PersonRecordPage() {
             fallback={<InitialsMark name={person.name} size="lg" />}
           />
         }
-        name={person.name}
+        name={nameDraft ?? person.name}
+        badges={
+          nameDraft === null ? null : (
+            <span className="mono text-micro text-graphite">editing</span>
+          )
+        }
         readouts={[
           {
             label: 'Last contact',
@@ -280,32 +290,46 @@ function PersonRecordPage() {
       >
         <AiCellsProvider entityIds={[person.id]} registry={registry}>
           <PropertyGrid>
-            {registry.map((def) => (
-              <RailField
-                key={def.slug}
-                entityId={person.id}
-                def={def}
-                attr={def}
-                objectLabel={'person'}
-                fillFrom="person"
-                whereFrom={enrichment.whereFrom[def.slug]}
-                onAttributeSaved={() => router.invalidate()}
-                value={person.values[def.slug] ?? null}
-                refNames={person.refNames}
-                onSave={async (v) => {
-                  const result = await updateRecord({
-                    data: { id: person.id, patch: { [def.slug]: v } },
-                  })
-                  // An email another person holds was refused; say so.
-                  const collision = collisionToast(result, 'person')
-                  if (collision)
-                    toast(collision.title, {
-                      description: collision.description,
-                    })
-                  void router.invalidate()
+            {/* The name's two parts are one cell; the head is their join. (D67) */}
+            {registry.some((def) => isNamePart(def.slug)) ? (
+              <NameField
+                first={jsonString(person.values.first_name)}
+                last={jsonString(person.values.last_name)}
+                onDraft={setNameDraft}
+                onSave={async (parts) => {
+                  await updateRecord({ data: { id: person.id, patch: parts } })
+                  await router.invalidate()
                 }}
               />
-            ))}
+            ) : null}
+            {registry
+              .filter((def) => !isNamePart(def.slug))
+              .map((def) => (
+                <RailField
+                  key={def.slug}
+                  entityId={person.id}
+                  def={def}
+                  attr={def}
+                  objectLabel={'person'}
+                  fillFrom="person"
+                  whereFrom={enrichment.whereFrom[def.slug]}
+                  onAttributeSaved={() => router.invalidate()}
+                  value={person.values[def.slug] ?? null}
+                  refNames={person.refNames}
+                  onSave={async (v) => {
+                    const result = await updateRecord({
+                      data: { id: person.id, patch: { [def.slug]: v } },
+                    })
+                    // An email another person holds was refused; say so.
+                    const collision = collisionToast(result, 'person')
+                    if (collision)
+                      toast(collision.title, {
+                        description: collision.description,
+                      })
+                    void router.invalidate()
+                  }}
+                />
+              ))}
             <PropertyCell label="">
               <AttributeCreateDialog
                 objectKind="person"

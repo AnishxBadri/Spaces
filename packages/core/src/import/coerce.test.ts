@@ -335,14 +335,21 @@ describe('url', () => {
 })
 
 describe('phone', () => {
-  it('accepts a plausible number, stored as written', () => {
+  it('accepts a number with its country code, stored in E.164', () => {
     accepts('phone', {}, [
-      ['+91 98450 11223', '+91 98450 11223'],
-      ['(415) 555-0134', '(415) 555-0134'],
+      ['+91 98450 11223', '+919845011223'],
+      ['+1 (415) 555-0134', '+14155550134'],
     ])
   })
-  it('refuses words and implausible lengths', () => {
+  it('refuses words, and a number without its country code naming the shape', () => {
     refuses('phone', {}, ['call me', '12345', 'TBD'])
+    const out = coerce('phone', {}, '(415) 555-0134')
+    expect(out.ok ? null : out.reason).toMatch(/\+ then 2–15 digits/)
+  })
+  it('reads a list cell into a multi phone', () => {
+    accepts('phone', { multi: true }, [
+      ['+91 98450 11223; +1 415 555 0134', ['+919845011223', '+14155550134']],
+    ])
   })
 })
 
