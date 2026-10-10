@@ -3,12 +3,25 @@ import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { db } from '@spaces/db'
-import { entity, integration, space, spaceWatch } from '@spaces/db/schema'
+import {
+  entity,
+  entitySpace,
+  integration,
+  signal,
+  space,
+  spaceWatch,
+  suggestion,
+} from '@spaces/db/schema'
 import { defineManifest, toManifestJson } from '@spaces/sdk'
 import { jsonRecord, jsonValue } from '../../json'
 import { Enqueue } from '../../queue/enqueue'
 import type { EnqueueOptions } from '../../queue/sender'
-import { dueWatchesProgram, runWatchNowProgram } from './run'
+import {
+  dueWatchesProgram,
+  runWatchNowProgram,
+  watchRunSummary,
+  watchRunTallyProgram,
+} from './run'
 
 /**
  * The two senders of a watch run: the tick's due read, and "Run now". The
@@ -249,5 +262,70 @@ describe('runWatchNowProgram', () => {
       refusedWith(await runNow('00000000-0000-4000-8000-000000000000', layer)),
     ).toMatchObject({ message: 'That watch is gone' })
     expect(sent).toEqual([])
+  })
+})
+
+describe('watchRunTallyProgram', () => {
+  const aCompany = async (name: string, spaceId: string | null) => {
+    const ent = (
+      await db
+        .insert(entity)
+        .values({ kind: 'company', canonicalName: name })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!ent) throw new Error('no company')
+    if (spaceId !== null)
+      await db.insert(entitySpace).values({ entityId: ent.id, spaceId })
+    return ent.id
+  }
+
+  it('counts the cards born citing the watch and its signals on members, since the run began', async () => {
+    const root = await aSpace()
+    const sub = await aSpace(root)
+    const integrationId = await anIntegration()
+    const watchId = await aWatch(integrationId, root.id, null)
+    const other = await aWatch(integrationId, root.id, null)
+    const since = new Date(Date.now() - 60_000)
+    const before = new Date(since.getTime() - 60_000)
+    const card = (domain: string, watchIds: Array<string>, at: Date) => ({
+      kind: 'add_record' as const,
+      entityId: null,
+      payload: { spaceId: root.id, domain, name: domain, watchIds },
+      proposedByType: 'integration' as const,
+      proposedById: integrationId,
+      createdAt: at,
+    })
+    await db
+      .insert(suggestion)
+      .values([
+        card('a.example', [watchId], new Date()),
+        card('b.example', [other, watchId], new Date()),
+        card('c.example', [other], new Date()),
+        card('d.example', [watchId], before),
+      ])
+    const member = await aCompany('Varda', sub.id)
+    const outsider = await aCompany('Elsewhere', null)
+    const emitted = (entityId: string, at: Date) => ({
+      entityId,
+      source: 'watcher',
+      payload: { kind: 'web' },
+      sourceClass: 'integration' as const,
+      sourceRef: integrationId,
+      observedAt: at,
+    })
+    await db
+      .insert(signal)
+      .values([
+        emitted(member, new Date()),
+        emitted(outsider, new Date()),
+        emitted(member, before),
+      ])
+
+    const tally = await Effect.runPromise(
+      watchRunTallyProgram({ watchId, integrationId, spaceId: root.id }, since),
+    )
+    expect(tally).toEqual({ cards: 2, signals: 1 })
+    expect(watchRunSummary(tally)).toBe('3 found · 2 cards')
+    expect(watchRunSummary({ cards: 1, signals: 0 })).toBe('1 found · 1 card')
   })
 })

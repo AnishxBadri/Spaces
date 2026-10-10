@@ -18,6 +18,7 @@ import type { Space } from './space-tabs'
 import type * as PrefModule from '#/lib/record-tab-pref'
 import type * as RouterModule from '@tanstack/react-router'
 import type { SpaceTab } from '#/lib/spaces/page'
+import type { SpaceWatching } from '#/lib/server-fns'
 
 /**
  * The space page as the owner approved it (D73, D74), mounted under a memory
@@ -41,6 +42,7 @@ const fns = vi.hoisted(() => {
 
 vi.mock('#/lib/server-fns', () => {
   const names = [
+    'addSpaceWatch',
     'archiveSpace',
     'clipUrl',
     'createNote',
@@ -57,6 +59,7 @@ vi.mock('#/lib/server-fns', () => {
     'prepareDocumentUpload',
     'renameSpace',
     'restoreSpace',
+    'runWatchNow',
     'saveSpaceAsTemplate',
     'searchEntities',
     'setEntitySensitive',
@@ -95,6 +98,32 @@ let tabs: typeof TabsModule
 let pref: typeof PrefModule
 let router: typeof RouterModule
 
+/** The space's status stream, fed by hand: what `/api/job-status` would send. */
+class FakeEventSource {
+  static readonly CLOSED = 2
+  static opened: Array<FakeEventSource> = []
+  readonly url: string
+  readyState = 1
+  private readonly listeners = new Map<
+    string,
+    Array<(message: { data: string }) => void>
+  >()
+  constructor(url: string) {
+    this.url = url
+    FakeEventSource.opened.push(this)
+  }
+  addEventListener(type: string, fn: (message: { data: string }) => void) {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn])
+  }
+  close() {
+    this.readyState = FakeEventSource.CLOSED
+  }
+  emit(type: string, data: unknown) {
+    for (const fn of this.listeners.get(type) ?? [])
+      fn({ data: JSON.stringify(data) })
+  }
+}
+
 class StubObserver {
   observe() {}
   disconnect() {}
@@ -113,6 +142,15 @@ beforeAll(async () => {
   vi.stubGlobal('KeyboardEvent', win.KeyboardEvent)
   vi.stubGlobal('IntersectionObserver', StubObserver)
   vi.stubGlobal('scrollTo', () => {})
+  vi.stubGlobal('EventSource', FakeEventSource)
+  // The Add watch window is a Radix dialog: its focus scope and portal
+  // reach for the rest of the DOM's classes.
+  vi.stubGlobal('Event', win.Event)
+  vi.stubGlobal('CustomEvent', win.CustomEvent)
+  for (const name of Object.getOwnPropertyNames(win))
+    if (/^[A-Z]/.test(name) && !(name in globalThis))
+      vi.stubGlobal(name, Reflect.get(win, name))
+  vi.stubGlobal('getComputedStyle', win.getComputedStyle.bind(win))
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   ;({ createRoot } = await import('react-dom/client'))
   page = await import('./space-page')
@@ -131,6 +169,7 @@ let root: Root
 beforeEach(() => {
   localStorage.clear()
   toasts.shown.length = 0
+  FakeEventSource.opened = []
   for (const fn of fns.made.values()) fn.mockClear()
   const host = document.createElement('div')
   document.body.append(host)
@@ -243,21 +282,52 @@ const terms = [
   },
 ]
 
-async function mount(tab: SpaceTab, onTabChange = (_: SpaceTab) => {}) {
+/** What the server holds now; a stubbed write may change it. */
+const served: { current: SpaceWatching } = {
+  current: { watches: [], engines: [], installed: [], moving: [] },
+}
+
+/** No watch, no engine: the lanes' resting state. */
+const noWatches: SpaceWatching = {
+  watches: [],
+  engines: [],
+  installed: [],
+  moving: [],
+}
+
+/**
+ * The page under a root route whose loads re-read `served`, so a
+ * `router.invalidate()` after a save draws what the server now holds.
+ */
+async function mount(
+  tab: SpaceTab,
+  onTabChange = (_: SpaceTab) => {},
+  watching: SpaceWatching = noWatches,
+) {
   const { SpacePageView } = page
-  const { RouterProvider, createMemoryHistory, createRootRoute, createRouter } =
-    router
-  const rootRoute = createRootRoute({
-    component: () => (
+  const {
+    RouterProvider,
+    createMemoryHistory,
+    createRootRoute,
+    createRouter,
+    useRouterState,
+  } = router
+  served.current = watching
+  function Root() {
+    // Each load (an invalidate included) re-renders and re-reads `served`.
+    useRouterState({ select: (s) => s.matches.at(0)?.updatedAt })
+    return (
       <SpacePageView
         spc={spc}
         terms={terms}
         sensitivity={{ sensitivity: 'normal', own: false }}
+        watching={served.current}
         tab={tab}
         onTabChange={onTabChange}
       />
-    ),
-  })
+    )
+  }
+  const rootRoute = createRootRoute({ loader: () => null, component: Root })
   const r = createRouter({
     routeTree: rootRoute,
     history: createMemoryHistory({ initialEntries: ['/'] }),
@@ -299,14 +369,14 @@ describe('the space head', () => {
     expect(text(head.querySelector('h1'))).toBe('Property ops')
   })
 
-  it('has Note here as its only button beside the toggle and the menu', async () => {
+  it('has Note here and Add watch beside the toggle and the menu', async () => {
     await mount('notes')
     const buttons = Array.from(header().querySelectorAll('button')).filter(
       (b) =>
         b.getAttribute('role') !== 'switch' &&
         !(b.getAttribute('aria-label') ?? '').startsWith('More for'),
     )
-    expect(buttons.map((b) => text(b))).toEqual(['Note hereN'])
+    expect(buttons.map((b) => text(b))).toEqual(['Note hereN', 'Add watch'])
   })
 
   it('reads three readouts, none of them a tab count', async () => {
@@ -341,13 +411,27 @@ describe('the space head', () => {
 })
 
 describe('the details column', () => {
-  it('holds Map, Glossary and Tasks in that order', async () => {
+  it("holds Criteria, Watching and What's moving above Map, Glossary and Tasks", async () => {
     await mount('notes')
     const column = document.querySelector('aside[aria-label="Details"]')
     const heads = Array.from(column?.querySelectorAll('h2') ?? []).map((h) =>
       text(h),
     )
-    expect(heads).toEqual(['Map', 'Glossary', 'Tasks'])
+    expect(heads).toEqual([
+      'Watching',
+      "What's moving",
+      'Map',
+      'Glossary',
+      'Tasks',
+    ])
+    const sections = Array.from(
+      column?.querySelectorAll('section[aria-label]') ?? [],
+    ).map((s) => s.getAttribute('aria-label'))
+    expect(sections.slice(0, 3)).toEqual([
+      'Criteria',
+      'Watching',
+      "What's moving",
+    ])
     expect(column?.className).toContain('bg-bone')
     expect(column?.className).toContain('xl:w-80')
   })
@@ -486,5 +570,301 @@ describe('the readouts helper', () => {
     const empty: Space = { ...spc, companies: [], lastFiled: null }
     const cells = tabs.spaceReadouts(empty)
     expect(cells.map((c) => c.value)).toEqual(['0 of 0', '—', '—'])
+  })
+})
+
+const exa: SpaceWatching['engines'][number] = {
+  integrationId: '00000000-0000-4000-8000-0000000000e1',
+  name: 'Exa',
+  form: {
+    ok: true,
+    fields: [
+      {
+        kind: 'string',
+        key: 'criteria',
+        label: 'Criteria',
+        hint: null,
+        required: false,
+        default: null,
+        minLength: null,
+        maxLength: null,
+        pattern: null,
+        format: null,
+      },
+      {
+        kind: 'number',
+        key: 'cap',
+        label: 'Cap',
+        hint: null,
+        required: false,
+        default: 10,
+        integer: true,
+        minimum: 1,
+        maximum: 100,
+        exclusiveMinimum: null,
+        exclusiveMaximum: null,
+      },
+    ],
+  },
+}
+
+const watch = (
+  id: string,
+  label: string,
+  over: Partial<SpaceWatching['watches'][number]> = {},
+): SpaceWatching['watches'][number] => ({
+  id,
+  integrationId: exa.integrationId,
+  engine: 'Exa',
+  label,
+  cadenceMinutes: null,
+  lastRunAt: null,
+  run: null,
+  stopped: null,
+  ...over,
+})
+
+const lane = (name: string) => {
+  const el = document.querySelector(`section[aria-label="${name}"]`)
+  if (!el) throw new Error(`no ${name} lane`)
+  return el
+}
+
+const row = (watchId: string) => {
+  const el = document.querySelector(`[data-watch="${watchId}"]`)
+  if (!el) throw new Error(`no row ${watchId}`)
+  return el
+}
+
+const runEvent = (
+  watchId: string,
+  jobRunId: string,
+  status: 'running' | 'succeeded',
+  summary: string | null,
+) => ({
+  jobRunId,
+  queue: 'plugin.exa.watch',
+  integrationId: exa.integrationId,
+  entityId: spc.id,
+  watchId,
+  status,
+  startedAt: '2026-10-10T10:00:00.000Z',
+  summary,
+  error: null,
+})
+
+describe('the Watching lane', () => {
+  it('names the installed engines that can watch, and says nothing else, when there is no watch', async () => {
+    await mount('notes', undefined, {
+      ...noWatches,
+      installed: ['Exa', 'Watcher'],
+    })
+    const watching = lane('Watching')
+    expect(
+      Array.from(watching.querySelectorAll('li')).map((li) => text(li)),
+    ).toEqual(['EExa', 'WWatcher'])
+    expect(watching.querySelectorAll('p, button')).toHaveLength(0)
+  })
+
+  it('draws 32px rows with Run now on manual and scheduled watches, and none on a degraded engine, which says why', async () => {
+    await mount('notes', undefined, {
+      ...noWatches,
+      engines: [exa],
+      installed: ['Exa'],
+      watches: [
+        watch('w1', 'Orbital fabs'),
+        watch('w2', 'Space tugs', {
+          cadenceMinutes: 1440,
+          lastRunAt: '2026-10-09T08:00:00.000Z',
+        }),
+        watch('w3', 'Launch brokers', { stopped: 'Exa key removed' }),
+      ],
+    })
+    expect(row('w1').className).toContain('h-8')
+    expect(text(row('w1'))).toContain('manual · —')
+    expect(text(row('w2'))).toContain('daily · 10-09')
+    expect(row('w1').querySelector('button[aria-label^="Run now"]')).not.toBe(
+      null,
+    )
+    expect(row('w2').querySelector('button[aria-label^="Run now"]')).not.toBe(
+      null,
+    )
+    expect(row('w3').querySelector('button')).toBe(null)
+    expect(text(row('w3').querySelector('[data-stopped]'))).toBe(
+      'Exa key removed',
+    )
+    expect(row('w3').querySelector('.opacity-40')).not.toBe(null)
+    const head = lane('Watching').querySelector('h2')?.parentElement
+    expect(head?.parentElement?.className).toContain('h-11')
+    expect(head?.parentElement?.className).toContain('bg-bone')
+  })
+
+  it('settles from job_run on open and streams a run: running, then its tally', async () => {
+    await mount('notes', undefined, {
+      ...noWatches,
+      engines: [exa],
+      watches: [
+        watch('w1', 'Orbital fabs'),
+        watch('w2', 'Space tugs', {
+          run: {
+            jobRunId: 'r0',
+            queue: 'plugin.exa.watch',
+            status: 'succeeded',
+            startedAt: '2026-10-09T08:00:00.000Z',
+            summary: '3 found · 2 cards',
+            error: null,
+          },
+        }),
+      ],
+    })
+    // The loader's latest run, before the stream says anything.
+    expect(text(row('w2').querySelector('[data-cell]'))).toBe(
+      '3 found · 2 cards',
+    )
+    expect(row('w1').querySelector('[data-cell]')).toBe(null)
+    const stream = FakeEventSource.opened.at(0)
+    expect(stream?.url).toBe(`/api/job-status/${spc.id}`)
+    await act(async () => {
+      stream?.emit('init', { rows: [] })
+      stream?.emit('status', runEvent('w1', 'r1', 'running', null))
+    })
+    expect(text(row('w1').querySelector('[data-cell]'))).toBe('running')
+    expect(text(row('w2').querySelector('[data-cell]'))).toBe(
+      '3 found · 2 cards',
+    )
+    await act(async () => {
+      stream?.emit(
+        'status',
+        runEvent('w1', 'r1', 'succeeded', '7 found · 6 cards'),
+      )
+    })
+    expect(text(row('w1').querySelector('[data-cell]'))).toBe(
+      '7 found · 6 cards',
+    )
+    expect(text(row('w1'))).toContain('manual · 10-10')
+  })
+
+  it('sends Run now and reads queued until the run arrives', async () => {
+    await mount('notes', undefined, {
+      ...noWatches,
+      engines: [exa],
+      watches: [watch('w1', 'Orbital fabs')],
+    })
+    const run = fns.get('runWatchNow')
+    run.mockResolvedValueOnce({
+      status: 'queued',
+      queue: 'plugin.exa.watch',
+      jobId: 'j1',
+    })
+    await act(async () => buttonNamed(/^Run now: Orbital fabs/).click())
+    expect(run).toHaveBeenCalledWith({ data: { watchId: 'w1' } })
+    expect(text(row('w1').querySelector('[data-cell]'))).toBe('queued')
+    await act(async () => {
+      FakeEventSource.opened
+        .at(0)
+        ?.emit('status', runEvent('w1', 'r1', 'running', null))
+    })
+    expect(text(row('w1').querySelector('[data-cell]'))).toBe('running')
+  })
+})
+
+describe('Add watch', () => {
+  it('opens on the engine with How often on Manual, and saves a manual watch the lane shows at once', async () => {
+    await mount('notes', undefined, {
+      ...noWatches,
+      engines: [exa],
+      installed: ['Exa'],
+    })
+    const add = fns.get('addSpaceWatch')
+    add.mockResolvedValueOnce({ id: 'w-new' })
+    await act(async () => buttonNamed(/^Add watch$/).click())
+    const dialog = document.querySelector('[role="dialog"]')
+    expect(text(dialog?.querySelector('h2') ?? null)).toBe('Add watch')
+    const labels = Array.from(dialog?.querySelectorAll('label') ?? []).map(
+      (l) => text(l),
+    )
+    expect(labels).toEqual(['Engine', 'Look for', 'How often', 'At most'])
+    expect(text(dialog?.querySelector('[aria-label="Engine"]') ?? null)).toBe(
+      'Exa',
+    )
+    expect(
+      text(dialog?.querySelector('[aria-label="How often"]') ?? null),
+    ).toBe('Manual')
+    expect(text(dialog)).toContain('per run')
+    // What the server holds once the row is written; drawn only on reload.
+    served.current = { ...served.current, watches: [watch('w-new', 'Exa')] }
+    expect(document.querySelector('[data-watch="w-new"]')).toBe(null)
+    await act(async () => buttonNamed(/^Save watch/).click())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(add).toHaveBeenCalledWith({
+      data: {
+        spaceId: spc.id,
+        integrationId: exa.integrationId,
+        values: { criteria: '', cap: '10' },
+        cadenceMinutes: null,
+      },
+    })
+    expect(text(row('w-new'))).toContain('manual')
+  })
+
+  it('is off while no engine is enabled', async () => {
+    await mount('notes')
+    expect(buttonNamed(/^Add watch$/).disabled).toBe(true)
+  })
+})
+
+describe("What's moving", () => {
+  const signal = (
+    id: string,
+    recordName: string,
+    observedAt: string,
+    via: { id: string; name: string } | null,
+  ): SpaceWatching['moving'][number] => ({
+    id,
+    recordId: `rec-${id}`,
+    recordName,
+    recordKind: 'company',
+    via,
+    source: 'Exa',
+    title: `${recordName} raised`,
+    kind: 'funding',
+    url: 'https://www.example.com/news',
+    refs: [],
+    observedAt,
+  })
+
+  it('lists signals on members with record, via subspace and source, folding at three', async () => {
+    const leasing = { id: spc.children[0].id, name: 'Leasing' }
+    await mount('notes', undefined, {
+      ...noWatches,
+      moving: [
+        signal('s1', 'Varda', '2026-10-10T09:00:00.000Z', leasing),
+        signal('s2', 'Varda', '2026-10-09T09:00:00.000Z', null),
+        signal('s3', 'Tenantry', '2026-10-08T09:00:00.000Z', null),
+        signal('s4', 'Arbor', '2026-10-07T09:00:00.000Z', null),
+        signal('s5', 'Corbel', '2026-10-06T09:00:00.000Z', null),
+      ],
+    })
+    const moving = lane("What's moving")
+    const items = () => Array.from(moving.querySelectorAll('[data-signal]'))
+    expect(items()).toHaveLength(3)
+    const first = items().at(0) ?? null
+    expect(text(first)).toContain('Varda')
+    expect(text(first)).toContain('via Leasing')
+    expect(text(first)).toContain('Exa')
+    expect(text(first?.querySelector('[data-ref]') ?? null)).toBe(
+      'example.com ↗',
+    )
+    expect(text(items().at(1) ?? null)).not.toContain('via')
+    await act(async () => buttonNamed(/^\+2 more$/).click())
+    expect(items().map((li) => li.getAttribute('data-signal'))).toEqual([
+      's1',
+      's2',
+      's3',
+      's4',
+      's5',
+    ])
   })
 })

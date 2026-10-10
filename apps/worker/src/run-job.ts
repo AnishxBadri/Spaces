@@ -447,6 +447,7 @@ const postgresLedger: JobRunLedger = {
         queue: row.queue,
         integrationId: row.integrationId,
         entityId: row.entityId,
+        ...(row.watchId === null ? {} : { watchId: row.watchId }),
         status: 'running',
         startedAt: row.startedAt.toISOString(),
         summary: null,
@@ -461,6 +462,7 @@ const postgresLedger: JobRunLedger = {
           queue: jobRun.queue,
           integrationId: jobRun.integrationId,
           entityId: jobRun.entityId,
+          watchId: jobRun.watchId,
           startedAt: jobRun.startedAt,
         })
       ).at(0)
@@ -475,6 +477,7 @@ const postgresLedger: JobRunLedger = {
           queue: closed.queue,
           integrationId: closed.integrationId,
           entityId: closed.entityId,
+          ...(closed.watchId === null ? {} : { watchId: closed.watchId }),
           status: row.status,
           startedAt: closed.startedAt.toISOString(),
           summary: row.summary,

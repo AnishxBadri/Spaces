@@ -248,6 +248,8 @@ describe('Run now', () => {
       entityId: launch.id,
       watchId,
       status: 'succeeded',
+      // The Watching lane's tally: the fixture hands nothing back.
+      summary: '0 found · 0 cards',
     })
     const logged = lines.find((l) => l.startsWith('[plugin:watcher] brief '))
     expect(logged).toBeDefined()

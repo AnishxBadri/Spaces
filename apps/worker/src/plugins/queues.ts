@@ -17,7 +17,12 @@ import {
 } from '@spaces/core/queue/watch'
 import type { WatchRunData } from '@spaces/core/queue/watch'
 import { ImportRun } from '@spaces/core/writes/ports/import'
-import { dueWatchesProgram, liveSpaceOf } from '@spaces/core/writes/watches/run'
+import {
+  dueWatchesProgram,
+  liveSpaceOf,
+  watchRunSummary,
+  watchRunTallyProgram,
+} from '@spaces/core/writes/watches/run'
 import { storage } from '@spaces/core/writes/storage'
 import {
   ACTION_TARGETS,
@@ -430,9 +435,10 @@ export const runWatchJob = (
       return yield* new JobSkipped({
         reason: `watch ${data.watchId} is paused: its space is archived`,
       })
+    const startedAt = new Date()
     yield* markWatch(
       data.watchId,
-      { lastRunAt: new Date(), lastStatus: 'running', lastError: null },
+      { lastRunAt: startedAt, lastStatus: 'running', lastError: null },
       `stamp watch ${data.watchId}`,
     )
     const out = yield* invoke(integrationId, plan.job, {
@@ -455,8 +461,14 @@ export const runWatchJob = (
         reason: `${plan.queue} returned no { state } object or null`,
       })
     const state = parsed.data.state
+    // The lane's status cell reads this line; a tally that cannot be read
+    // never fails the run.
+    const tally = yield* watchRunTallyProgram(
+      { watchId: data.watchId, integrationId, spaceId: row.spaceId },
+      startedAt,
+    ).pipe(Effect.orElseSucceed(() => null))
     const result: JobClose = {
-      summary: `watch ${data.watchId} · state ${state === null ? 'cleared' : 'kept'}`,
+      summary: tally === null ? 'done' : watchRunSummary(tally),
       close: async (tx) => {
         await tx
           .update(spaceWatch)

@@ -112,6 +112,15 @@ describe('reviewGroupsProgram', () => {
         proposedByType: 'system' as const,
         proposedById: null,
       },
+      // The same engine's value on a filed record: its own row, so the
+      // space's discovery row counts add and file cards only.
+      {
+        kind: 'attribute_patch' as const,
+        entityId: filed,
+        payload: {},
+        proposedByType: 'integration' as const,
+        proposedById: exa,
+      },
       // A model's value on a record filed nowhere.
       {
         kind: 'attribute_patch' as const,
@@ -153,6 +162,14 @@ describe('reviewGroupsProgram', () => {
         file: 1,
         review: 0,
         total: 4,
+      },
+      {
+        space: 'Tday Proptech / Property ops',
+        source: 'Exa',
+        add: 0,
+        file: 0,
+        review: 1,
+        total: 1,
       },
       {
         space: null,

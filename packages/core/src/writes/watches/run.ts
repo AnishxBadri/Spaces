@@ -3,7 +3,14 @@ import { and, asc, eq, isNotNull, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { db } from '@spaces/db'
-import { integration, spaceWatch } from '@spaces/db/schema'
+import {
+  entitySpace,
+  integration,
+  signal,
+  space,
+  spaceWatch,
+  suggestion,
+} from '@spaces/db/schema'
 import { Enqueue } from '../../queue/enqueue'
 import { watchJobOf } from '../../queue/watch'
 import type { WatchRunData } from '../../queue/watch'
@@ -133,3 +140,69 @@ export const runWatchNowProgram = Effect.fn('runWatchNowProgram')(function* (
     ? { status: 'not-sent', queue: target.queue }
     : { status: 'queued', queue: target.queue, jobId }
 })
+
+/** What one watch run handed back: new cards citing it, signals on members. */
+export type WatchRunTally = { readonly cards: number; readonly signals: number }
+
+/**
+ * A watch run's tally since `since`, for the Watching lane's status cell:
+ * discovery cards born citing this watch, and this integration's signals on
+ * records filed in the space or below it.
+ * - A candidate merged into an older open card is not a new card.
+ */
+export const watchRunTallyProgram = Effect.fn('watchRunTallyProgram')(
+  function* (
+    watch: {
+      readonly watchId: string
+      readonly integrationId: string
+      readonly spaceId: string
+    },
+    since: Date,
+  ) {
+    const at = since.toISOString()
+    const [cards, signals] = yield* Effect.all(
+      [
+        query(() =>
+          db
+            .select({ n: sql<number>`count(*)::int` })
+            .from(suggestion)
+            .where(
+              and(
+                sql`${suggestion.kind} in ('add_record', 'file_record')`,
+                sql`${suggestion.payload} -> 'watchIds' ? ${watch.watchId}`,
+                sql`${suggestion.createdAt} >= ${at}::timestamptz`,
+              ),
+            ),
+        ),
+        query(() =>
+          db
+            .select({ n: sql<number>`count(*)::int` })
+            .from(signal)
+            .where(
+              and(
+                eq(signal.sourceRef, watch.integrationId),
+                sql`${signal.observedAt} >= ${at}::timestamptz`,
+                sql`exists (
+                  select 1 from ${entitySpace}
+                  join ${space} filed on filed.entity_id = ${entitySpace.spaceId}
+                  join ${space} watched on watched.entity_id = ${watch.spaceId}
+                  where ${entitySpace.entityId} = ${signal.entityId}
+                    and watched.path @> filed.path
+                )`,
+              ),
+            ),
+        ),
+      ],
+      { concurrency: 'unbounded' },
+    )
+    const tally: WatchRunTally = {
+      cards: cards.at(0)?.n ?? 0,
+      signals: signals.at(0)?.n ?? 0,
+    }
+    return tally
+  },
+)
+
+/** A run's summary line, `7 found · 6 cards`: found is cards plus signals. */
+export const watchRunSummary = (tally: WatchRunTally): string =>
+  `${tally.cards + tally.signals} found · ${tally.cards} card${tally.cards === 1 ? '' : 's'}`

@@ -153,3 +153,45 @@ export const runWatchNow = createServerFn({ method: 'POST' })
       )
     }
   })
+
+export type {
+  SpaceSignal,
+  SpaceWatching,
+  WatchEngine,
+  WatchRow,
+} from '../spaces/watching'
+
+/** The space page's Watching and What's moving lanes, and the engines to add with. */
+export const getSpaceWatching = createServerFn()
+  .validator(z.object({ spaceId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { spaceWatchingProgram } = await import('../spaces/watching')
+    const { effectFn } = await import('./effect')
+    return effectFn(spaceWatchingProgram)(data.spaceId)
+  })
+
+/**
+ * Add watch: one `space_watch` row; no cadence is Manual, which runs only
+ * on Run now. The same lens twice is refused as "Already watching this".
+ */
+export const addSpaceWatch = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      spaceId: z.string().uuid(),
+      integrationId: z.string().uuid(),
+      values: z.record(z.string(), z.union([z.string(), z.boolean()])),
+      cadenceMinutes: z.int().positive().nullable(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { addSpaceWatchProgram, addWatchMessage } =
+      await import('../spaces/watching')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(addSpaceWatchProgram)(u.id, data)
+    } catch (failure) {
+      throw new Error(addWatchMessage(failure))
+    }
+  })

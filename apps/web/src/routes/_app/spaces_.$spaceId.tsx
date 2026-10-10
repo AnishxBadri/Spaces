@@ -1,6 +1,11 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { SpacePageView } from '#/components/space-page'
-import { getEntitySensitivity, getSpace, listTerms } from '#/lib/server-fns'
+import {
+  getEntitySensitivity,
+  getSpace,
+  getSpaceWatching,
+  listTerms,
+} from '#/lib/server-fns'
 import { rememberRecordTab, useLastRecordTab } from '#/lib/record-tab-pref'
 import { openSpaceTab, spaceSearch } from '#/lib/spaces/page'
 import type { SpaceTab } from '#/lib/spaces/page'
@@ -12,12 +17,13 @@ import type { SpaceTab } from '#/lib/spaces/page'
 export const Route = createFileRoute('/_app/spaces_/$spaceId')({
   validateSearch: spaceSearch,
   loader: async ({ params }) => {
-    const [spc, terms, sensitivity] = await Promise.all([
+    const [spc, terms, sensitivity, watching] = await Promise.all([
       getSpace({ data: { id: params.spaceId } }),
       listTerms({ data: { spaceId: params.spaceId } }),
       getEntitySensitivity({ data: { entityId: params.spaceId } }),
+      getSpaceWatching({ data: { spaceId: params.spaceId } }),
     ])
-    return { spc, terms, sensitivity }
+    return { spc, terms, sensitivity, watching }
   },
   component: SpacePage,
 })
@@ -26,7 +32,7 @@ export const Route = createFileRoute('/_app/spaces_/$spaceId')({
 const TAB_PREF = 'space'
 
 function SpacePage() {
-  const { spc, terms, sensitivity } = Route.useLoaderData()
+  const { spc, terms, sensitivity, watching } = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = useNavigate()
   const tab = openSpaceTab(search.tab, useLastRecordTab(TAB_PREF))
@@ -47,6 +53,7 @@ function SpacePage() {
       spc={spc}
       terms={terms}
       sensitivity={sensitivity}
+      watching={watching}
       tab={tab}
       onTabChange={changeTab}
     />

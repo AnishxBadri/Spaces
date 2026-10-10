@@ -80,6 +80,8 @@ const spaceLabels = Effect.fn('spaceLabels')(function* () {
  * Open suggestions, one group per (source, space).
  * - A discovery card's space is its payload's; any other card's is the
  *   record's earliest live filing, or none.
+ * - Discovery cards never share a group with other cards: a space's
+ *   discovery row counts `add_record` and `file_record` only.
  * - Groups come back largest first.
  */
 export const reviewGroupsProgram = Effect.fn('reviewGroupsProgram')(
@@ -175,7 +177,9 @@ export const reviewGroupsProgram = Effect.fn('reviewGroupsProgram')(
         s.proposedByType === 'integration' && s.proposedById !== null
           ? (sourceName.get(s.proposedById) ?? 'Integration')
           : JUDGMENT
-      const key = `${source}|${spaceId ?? ''}`
+      // A space's discovery cards are their own row, so it counts only add
+      // and file cards and can open Review on that space alone.
+      const key = `${source}|${spaceId ?? ''}${isDiscoveryKind(s.kind) ? '|discovery' : ''}`
       const at = s.createdAt.toISOString()
       const g = groups.get(key) ?? {
         key,

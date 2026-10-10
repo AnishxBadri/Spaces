@@ -22,6 +22,7 @@ import { SpaceCriteria } from './space-criteria'
 import { SpaceGlossary } from './space-glossary'
 import { SpaceMoveDialog } from './space-move-dialog'
 import { SpaceTabs, spaceReadouts } from './space-tabs'
+import { AddWatchDialog, WatchingLane, WhatsMovingLane } from './space-watching'
 import type { Space } from './space-tabs'
 import { TasksRail } from './tasks-rail'
 import { SaveAsTemplateAction } from './templates'
@@ -44,7 +45,11 @@ import {
   restoreSpace,
   saveSpaceAsTemplate,
 } from '#/lib/server-fns'
-import type { getEntitySensitivity, listTerms } from '#/lib/server-fns'
+import type {
+  SpaceWatching,
+  getEntitySensitivity,
+  listTerms,
+} from '#/lib/server-fns'
 import {
   syncStarredSpaceName,
   toggleStarredSpace,
@@ -56,8 +61,9 @@ import { runBinding, usePageActions } from '#/lib/page-actions'
 
 /**
  * A space reads like a record (D73, D74): the head with its stamp, crumb
- * and three readouts; the details column left (criteria, Map, Glossary,
- * Tasks); the tabbed view right. The route owns which tab is open.
+ * and three readouts; the details column left (Criteria, Watching, What's
+ * moving, Map, Glossary, Tasks); the tabbed view right. The route owns which
+ * tab is open.
  */
 
 type Term = Awaited<ReturnType<typeof listTerms>>[number]
@@ -67,12 +73,14 @@ export function SpacePageView({
   spc,
   terms,
   sensitivity,
+  watching,
   tab,
   onTabChange,
 }: {
   spc: Space
   terms: Array<Term>
   sensitivity: Sensitivity
+  watching: SpaceWatching
   tab: SpaceTab
   onTabChange: (tab: SpaceTab) => void
 }) {
@@ -82,6 +90,7 @@ export function SpacePageView({
   const [moving, setMoving] = useState(false)
   const [composing, setComposing] = useState(false)
   const [templating, setTemplating] = useState(false)
+  const [addingWatch, setAddingWatch] = useState(false)
   const archived = spc.archive !== null || spc.archivedUnder !== null
 
   /** Archive asks nothing: Restore, on the notice it leaves, undoes it. */
@@ -177,6 +186,13 @@ export function SpacePageView({
               Note here
               <KeyHint>N</KeyHint>
             </Button>
+            <Button
+              variant="outline"
+              disabled={watching.engines.length === 0}
+              onClick={() => setAddingWatch(true)}
+            >
+              Add watch
+            </Button>
             <SpaceMenu
               id={spc.id}
               name={spc.name}
@@ -232,6 +248,14 @@ export function SpacePageView({
         }}
       />
 
+      <AddWatchDialog
+        open={addingWatch}
+        onOpenChange={setAddingWatch}
+        spaceId={spc.id}
+        spaceName={spc.name}
+        engines={watching.engines}
+      />
+
       <RecordBody
         details={
           <>
@@ -239,6 +263,9 @@ export function SpacePageView({
             <div className="border-b border-hairline px-3">
               <SpaceCriteria spaceId={spc.id} criteria={spc.criteria} />
             </div>
+
+            <WatchingLane spaceId={spc.id} watching={watching} />
+            <WhatsMovingLane signals={watching.moving} />
 
             <RailSection label="Map" meta={`${spc.children.length} sub`}>
               {spc.parent ? (

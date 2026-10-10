@@ -20,6 +20,7 @@ const eventSchema = z.object({
   queue: z.string(),
   integrationId: z.string().nullable(),
   entityId: z.string().nullable(),
+  watchId: z.string().nullable().exactOptional(),
   status: z.enum(['running', 'succeeded', 'failed', 'skipped']),
   startedAt: z.string(),
   summary: z.string().nullable(),

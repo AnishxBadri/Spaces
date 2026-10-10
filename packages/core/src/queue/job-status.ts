@@ -17,6 +17,8 @@ export type JobStatusEvent = {
   readonly queue: string
   readonly integrationId: string | null
   readonly entityId: string | null
+  /** The `space_watch` row a watch run is for; absent on every other run. */
+  readonly watchId?: string | null
   readonly status: JobRunStatus
   /** ISO instant the attempt began; orders two attempts of one queue. */
   readonly startedAt: string
@@ -29,6 +31,7 @@ export const JobStatusEventSchema = Schema.Struct({
   queue: Schema.String,
   integrationId: Schema.NullOr(Schema.String),
   entityId: Schema.NullOr(Schema.String),
+  watchId: Schema.optionalKey(Schema.NullOr(Schema.String)),
   status: Schema.Literals(['running', 'succeeded', 'failed', 'skipped']),
   startedAt: Schema.String,
   summary: Schema.NullOr(Schema.String),

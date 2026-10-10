@@ -42,18 +42,22 @@ const query = <T>(run: () => Promise<T>) =>
  */
 const workerLost = sql<boolean>`(${jobRun.status} = 'running' and (${workerHeartbeat.beatAt} is null or ${workerHeartbeat.beatAt} < now() - make_interval(secs => ${STALE_AFTER}) or ${workerHeartbeat.bootedAt} > ${jobRun.startedAt}))`
 
-/** The latest attempt on each plugin queue for one record. */
+/**
+ * The latest attempt on each plugin queue for one record — per watch on a
+ * space, whose watches may share one engine's queue.
+ */
 export const jobStatusSnapshotProgram = Effect.fn('jobStatusSnapshotProgram')(
   function* (
     entityId: string,
   ): Effect.fn.Return<Array<JobStatusRow>, JobStatusFailed> {
     const rows = yield* query(() =>
       db
-        .selectDistinctOn([jobRun.queue], {
+        .selectDistinctOn([jobRun.queue, jobRun.watchId], {
           jobRunId: jobRun.id,
           queue: jobRun.queue,
           integrationId: jobRun.integrationId,
           entityId: jobRun.entityId,
+          watchId: jobRun.watchId,
           status: jobRun.status,
           startedAt: jobRun.startedAt,
           summary: jobRun.summary,
@@ -73,10 +77,11 @@ export const jobStatusSnapshotProgram = Effect.fn('jobStatusSnapshotProgram')(
             sql`starts_with(${jobRun.queue}, 'plugin.')`,
           ),
         )
-        .orderBy(jobRun.queue, desc(jobRun.startedAt)),
+        .orderBy(jobRun.queue, jobRun.watchId, desc(jobRun.startedAt)),
     )
-    return rows.map(({ lost, startedAt, ...row }): JobStatusRow => ({
+    return rows.map(({ lost, startedAt, watchId, ...row }): JobStatusRow => ({
       ...row,
+      ...(watchId === null ? {} : { watchId }),
       startedAt: startedAt.toISOString(),
       status: lost ? 'failed' : row.status,
       error: lost ? WORKER_LOST : row.error,
@@ -84,12 +89,13 @@ export const jobStatusSnapshotProgram = Effect.fn('jobStatusSnapshotProgram')(
   },
 )
 
-const RECORD_KINDS: ReadonlySet<string> = new Set(ACTION_TARGETS)
+/** A space streams its watch runs, which carry its id. (D72) */
+const RECORD_KINDS: ReadonlySet<string> = new Set([...ACTION_TARGETS, 'space'])
 
 /**
  * Whether `user` may watch this record's jobs: the record page would render
- * it for them — it exists, is a company, person or deal, is not merged away,
- * and `canRead` passes as that user, never as an integration.
+ * it for them — it exists, is a company, person, deal or space, is not
+ * merged away, and `canRead` passes as that user, never as an integration.
  */
 export const recordReadableProgram = Effect.fn('recordReadableProgram')(
   function* (

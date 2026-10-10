@@ -68,9 +68,10 @@ function FieldRow({
   )
 }
 
-const inputId = (key: string) => `setting-${key}`
+export const settingInputId = (key: string) => `setting-${key}`
 
-function Control({
+/** One setting's control, by kind; the Add watch window draws these too. */
+export function SettingControl({
   field,
   value,
   invalid,
@@ -87,7 +88,7 @@ function Control({
     case 'boolean':
       return (
         <Switch
-          id={inputId(field.key)}
+          id={settingInputId(field.key)}
           checked={value === true}
           disabled={disabled}
           onCheckedChange={onChange}
@@ -96,7 +97,7 @@ function Control({
     case 'enum':
       return (
         <Select
-          id={inputId(field.key)}
+          id={settingInputId(field.key)}
           aria-label={field.label}
           width="content"
           value={typeof value === 'string' ? value : ''}
@@ -109,7 +110,7 @@ function Control({
     case 'number':
       return (
         <Input
-          id={inputId(field.key)}
+          id={settingInputId(field.key)}
           inputMode="decimal"
           aria-invalid={invalid || undefined}
           value={typeof value === 'string' ? value : ''}
@@ -122,7 +123,7 @@ function Control({
     case 'string':
       return (
         <Input
-          id={inputId(field.key)}
+          id={settingInputId(field.key)}
           aria-invalid={invalid || undefined}
           value={typeof value === 'string' ? value : ''}
           placeholder={field.required ? 'required' : ''}
@@ -181,12 +182,12 @@ export function SettingsFields({
         return (
           <FieldRow
             key={field.key}
-            htmlFor={inputId(field.key)}
+            htmlFor={settingInputId(field.key)}
             label={field.label}
             hint={field.hint}
             error={error}
           >
-            <Control
+            <SettingControl
               field={field}
               value={
                 Object.hasOwn(values, field.key) ? values[field.key] : undefined

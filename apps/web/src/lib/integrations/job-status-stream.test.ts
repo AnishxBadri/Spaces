@@ -269,4 +269,34 @@ describe('the /api/job-status request', () => {
     await until(read.isDone)
     expect(read.isDone()).toBe(true)
   })
+
+  it('streams a space, whose watch runs carry its id', async () => {
+    const { db } = await import('@spaces/db')
+    const { entity, space } = await import('@spaces/db/schema')
+    const spaceId = (
+      await db
+        .insert(entity)
+        .values({ kind: 'space', canonicalName: 'Watched' })
+        .returning({ id: entity.id })
+    ).at(0)?.id
+    if (spaceId === undefined) throw new Error('no space')
+    const slug = `watched_${randomUUID().slice(0, 6)}`
+    await db.insert(space).values({ entityId: spaceId, slug, path: slug })
+
+    session.current = { id: randomUUID(), role: 'member' }
+    const abort = new AbortController()
+    const response = await handleJobStatusRequest(
+      new Request(`http://localhost/api/job-status/${spaceId}`, {
+        signal: abort.signal,
+      }),
+      spaceId,
+    )
+    expect(response.status).toBe(200)
+    if (response.body === null) throw new Error('no body')
+    const read = reader(response.body)
+    await until(() => read.frames.length >= 2)
+    expect(dataOf(read.frames.at(1))).toEqual({ rows: [] })
+    abort.abort()
+    await until(read.isDone)
+  })
 })
