@@ -1,0 +1,34 @@
+{
+  "//": "Exa's answers to the tests' searches, matched on method and URL in order, with no network. Files are relative to fixtures/. The key travels in the x-api-key header and is never recorded.",
+  "keyHeader": "x-api-key",
+  "interactions": [
+    {
+      "name": "five pages",
+      "method": "POST",
+      "url": "https://api.exa.ai/search",
+      "status": 200,
+      "file": "search.json"
+    },
+    {
+      "name": "nothing found",
+      "method": "POST",
+      "url": "https://api.exa.ai/search",
+      "status": 200,
+      "file": "search-empty.json"
+    },
+    {
+      "name": "revoked key",
+      "method": "POST",
+      "url": "https://api.exa.ai/search",
+      "status": 401,
+      "file": "error-401.json"
+    },
+    {
+      "name": "out of credits",
+      "method": "POST",
+      "url": "https://api.exa.ai/search",
+      "status": 402,
+      "file": "error-402.json"
+    }
+  ]
+}

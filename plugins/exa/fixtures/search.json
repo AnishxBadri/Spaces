@@ -1,0 +1,57 @@
+{
+  "requestId": "b6f1c2e0a9d84e57a3f2c4d1e8b7a6c5",
+  "resolvedSearchType": "neural",
+  "results": [
+    {
+      "id": "https://news.example/2026/09/northwind-robotics-series-a",
+      "url": "https://news.example/2026/09/northwind-robotics-series-a",
+      "title": "Northwind Robotics raises $6.5M to teach warehouse robots new SKUs",
+      "publishedDate": "2026-09-28T07:30:00.000Z",
+      "author": "A. Reporter",
+      "highlights": [
+        "Pune-based Northwind Robotics has raised a $6.5M Series A led by Harbour Ventures."
+      ],
+      "highlightScores": [0.62]
+    },
+    {
+      "id": "https://blog.example/warehouse-picking-2026",
+      "url": "https://blog.example/warehouse-picking-2026",
+      "title": "Who is winning warehouse picking in 2026?",
+      "publishedDate": "2026-09-15T00:00:00.000Z",
+      "author": null,
+      "highlights": [
+        "Northwind's arms learn a new SKU from a single demonstration, which cuts onboarding from weeks to hours."
+      ],
+      "highlightScores": [0.48]
+    },
+    {
+      "id": "https://jobs.example/northwind-robotics/ml-engineer",
+      "url": "https://jobs.example/northwind-robotics/ml-engineer",
+      "title": "Machine Learning Engineer, Manipulation — Northwind Robotics",
+      "publishedDate": "2026-09-02T00:00:00.000Z",
+      "highlights": [
+        "Northwind Robotics is hiring its first manipulation team in Bengaluru."
+      ],
+      "highlightScores": [0.41]
+    },
+    {
+      "id": "https://trade.example/logistics/northwind-pilot",
+      "url": "https://trade.example/logistics/northwind-pilot",
+      "title": "Third-party logistics firm pilots Northwind pickers in two sites",
+      "publishedDate": "2026-08-21T00:00:00.000Z",
+      "author": "Trade Desk",
+      "highlights": []
+    },
+    {
+      "id": "https://podcast.example/episodes/142",
+      "url": "https://podcast.example/episodes/142",
+      "title": "Episode 142: one-shot learning on the warehouse floor"
+    }
+  ],
+  "costDollars": {
+    "total": 0.01,
+    "search": { "neural": 0.005 },
+    "contents": { "highlights": 0.005 }
+  },
+  "searchTime": 412.6
+}

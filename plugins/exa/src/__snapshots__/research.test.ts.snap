@@ -1,0 +1,213 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`research, against the cassette > emits one web signal per hit and proposes exactly one note citing them 1`] = `
+[
+  {
+    "call": "Config.get",
+    "input": {},
+    "output": {},
+  },
+  {
+    "call": "Read.entity",
+    "input": {
+      "id": "entity-0",
+    },
+    "output": {
+      "id": "entity-0",
+      "keys": {
+        "domain": [
+          "northwind-robotics.example",
+        ],
+        "email": [],
+        "linkedin": [],
+      },
+      "kind": "company",
+      "name": "Northwind Robotics",
+      "values": {},
+    },
+  },
+  {
+    "call": "Secrets.get",
+    "input": {},
+    "output": "<redacted>",
+  },
+  {
+    "call": "Http.request",
+    "input": {
+      "body": {
+        "contents": {
+          "highlights": true,
+        },
+        "numResults": 5,
+        "query": "Northwind Robotics (northwind-robotics.example)",
+        "startPublishedDate": "2026-07-12T00:00:00.000Z",
+        "type": "auto",
+      },
+      "headers": {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "x-api-key": "test-exa-key",
+      },
+      "method": "POST",
+      "url": "https://api.exa.ai/search",
+    },
+  },
+  {
+    "call": "Ai.complete",
+    "input": {
+      "items": [
+        {
+          "ref": "attr:entity-0:name",
+          "text": "Northwind Robotics",
+        },
+        {
+          "ref": "event:hit-1",
+          "text": "Northwind Robotics raises $6.5M to teach warehouse robots new SKUs — 2026-09-28 — https://news.example/2026/09/northwind-robotics-series-a
+Pune-based Northwind Robotics has raised a $6.5M Series A led by Harbour Ventures.",
+        },
+        {
+          "ref": "event:hit-2",
+          "text": "Who is winning warehouse picking in 2026? — 2026-09-15 — https://blog.example/warehouse-picking-2026
+Northwind's arms learn a new SKU from a single demonstration, which cuts onboarding from weeks to hours.",
+        },
+        {
+          "ref": "event:hit-3",
+          "text": "Machine Learning Engineer, Manipulation — Northwind Robotics — 2026-09-02 — https://jobs.example/northwind-robotics/ml-engineer
+Northwind Robotics is hiring its first manipulation team in Bengaluru.",
+        },
+        {
+          "ref": "event:hit-4",
+          "text": "Third-party logistics firm pilots Northwind pickers in two sites — 2026-08-21 — https://trade.example/logistics/northwind-pilot",
+        },
+        {
+          "ref": "event:hit-5",
+          "text": "Episode 142: one-shot learning on the warehouse floor — https://podcast.example/episodes/142",
+        },
+      ],
+      "lane": "synthesize",
+    },
+    "output": "Northwind Robotics raised a $6.5M Series A [event:hit-1] and is hiring a manipulation team [event:hit-3].",
+  },
+  {
+    "call": "Content.emitSignal",
+    "input": {
+      "_tag": "signal",
+      "entityId": "entity-0",
+      "key": "web:https://news.example/2026/09/northwind-robotics-series-a",
+      "kind": "web",
+      "payload": {
+        "author": "A. Reporter",
+        "exaId": "https://news.example/2026/09/northwind-robotics-series-a",
+        "highlights": [
+          "Pune-based Northwind Robotics has raised a $6.5M Series A led by Harbour Ventures.",
+        ],
+      },
+      "publishedAt": "2026-09-28T07:30:00.000Z",
+      "title": "Northwind Robotics raises $6.5M to teach warehouse robots new SKUs",
+      "url": "https://news.example/2026/09/northwind-robotics-series-a",
+    },
+    "output": {
+      "signalId": "signal-1",
+    },
+  },
+  {
+    "call": "Content.emitSignal",
+    "input": {
+      "_tag": "signal",
+      "entityId": "entity-0",
+      "key": "web:https://blog.example/warehouse-picking-2026",
+      "kind": "web",
+      "payload": {
+        "exaId": "https://blog.example/warehouse-picking-2026",
+        "highlights": [
+          "Northwind's arms learn a new SKU from a single demonstration, which cuts onboarding from weeks to hours.",
+        ],
+      },
+      "publishedAt": "2026-09-15T00:00:00.000Z",
+      "title": "Who is winning warehouse picking in 2026?",
+      "url": "https://blog.example/warehouse-picking-2026",
+    },
+    "output": {
+      "signalId": "signal-2",
+    },
+  },
+  {
+    "call": "Content.emitSignal",
+    "input": {
+      "_tag": "signal",
+      "entityId": "entity-0",
+      "key": "web:https://jobs.example/northwind-robotics/ml-engineer",
+      "kind": "web",
+      "payload": {
+        "exaId": "https://jobs.example/northwind-robotics/ml-engineer",
+        "highlights": [
+          "Northwind Robotics is hiring its first manipulation team in Bengaluru.",
+        ],
+      },
+      "publishedAt": "2026-09-02T00:00:00.000Z",
+      "title": "Machine Learning Engineer, Manipulation — Northwind Robotics",
+      "url": "https://jobs.example/northwind-robotics/ml-engineer",
+    },
+    "output": {
+      "signalId": "signal-3",
+    },
+  },
+  {
+    "call": "Content.emitSignal",
+    "input": {
+      "_tag": "signal",
+      "entityId": "entity-0",
+      "key": "web:https://trade.example/logistics/northwind-pilot",
+      "kind": "web",
+      "payload": {
+        "author": "Trade Desk",
+        "exaId": "https://trade.example/logistics/northwind-pilot",
+      },
+      "publishedAt": "2026-08-21T00:00:00.000Z",
+      "title": "Third-party logistics firm pilots Northwind pickers in two sites",
+      "url": "https://trade.example/logistics/northwind-pilot",
+    },
+    "output": {
+      "signalId": "signal-4",
+    },
+  },
+  {
+    "call": "Content.emitSignal",
+    "input": {
+      "_tag": "signal",
+      "entityId": "entity-0",
+      "key": "web:https://podcast.example/episodes/142",
+      "kind": "web",
+      "payload": {
+        "exaId": "https://podcast.example/episodes/142",
+      },
+      "title": "Episode 142: one-shot learning on the warehouse floor",
+      "url": "https://podcast.example/episodes/142",
+    },
+    "output": {
+      "signalId": "signal-5",
+    },
+  },
+  {
+    "call": "Judgment.suggest",
+    "input": {
+      "entityId": "entity-0",
+      "proposal": {
+        "body": "Northwind Robotics raised a $6.5M Series A [event:signal-1] and is hiring a manipulation team [event:signal-3].",
+        "kind": "note",
+      },
+      "rationale": "Exa web research: 5 pages",
+      "refs": [
+        "event:signal-1",
+        "event:signal-2",
+        "event:signal-3",
+        "event:signal-4",
+        "event:signal-5",
+      ],
+    },
+    "output": {
+      "suggestionId": "suggestion-1",
+    },
+  },
+]
+`;
