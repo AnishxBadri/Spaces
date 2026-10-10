@@ -17,6 +17,7 @@ import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import {
   Ai,
+  Discover,
   JobPermanent,
   JobRateLimited,
   JobRetryable,
@@ -37,6 +38,8 @@ import type {
 } from '@spaces/sdk'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { AiBinder } from '@spaces/core/writes/ports/ai'
+import { DiscoverBinder } from '@spaces/core/writes/ports/discover'
+import type { DiscoverBinding } from '@spaces/core/writes/ports/discover'
 import type { ModelCall } from '@spaces/core/writes/ports/ai'
 import type { FetchLike } from '@spaces/core/writes/ports/http'
 import type { LogSink } from '@spaces/core/writes/ports/log'
@@ -71,6 +74,8 @@ import type { PluginQueue, PluginQueuesOptions } from './queues'
  * - `Ai` is built once per (integration, job) and bound per invocation to
  *   the entity the job runs on (`AiBinder`): sensitivity is resolved from
  *   that entity, never from anything the plugin passes.
+ * - `Discover` is bound the same way to a watch run's watch and space
+ *   (`DiscoverBinder`); outside a watch run it refuses.
  * - One `Enqueue` serves every job, built in the host's own scope: closing a
  *   job's scope closes its ports and never the shared sender.
  * - A tripped breaker releases its plugin from a detached fiber, never from
@@ -167,6 +172,8 @@ type WiredJob = {
   readonly context: Context.Context<never>
   /** Binds `Ai` to one invocation's subject; null when the job has no Ai. */
   readonly bindAi: AiBinder['Service']['bind'] | null
+  /** Binds `Discover` to one watch run; null when the job has no Discover. */
+  readonly bindDiscover: DiscoverBinder['Service']['bind'] | null
 }
 
 type Wired = {
@@ -255,6 +262,16 @@ const subjectOf = (trigger: Trigger, input: JobInput): string | null => {
       : ''
   return null
 }
+
+/** The watch run an invocation is, or null for any other trigger. */
+const watchOf = (trigger: Trigger, input: JobInput): DiscoverBinding | null =>
+  trigger === 'watch' &&
+  Predicate.hasProperty(input, 'watchId') &&
+  Predicate.isString(input.watchId) &&
+  Predicate.hasProperty(input, 'spaceId') &&
+  Predicate.isString(input.spaceId)
+    ? { watchId: input.watchId, spaceId: input.spaceId }
+    : null
 
 /** Run a lifecycle hook with no ports; the failure's message, or null. */
 const runHook = (hook: LoadedHook): Effect.Effect<string | null> =>
@@ -375,6 +392,13 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
           onNone: () => null,
           onSome: (binder) => binder.bind,
         }),
+        bindDiscover: Option.match(
+          Context.getOption(built.value, DiscoverBinder),
+          {
+            onNone: () => null,
+            onSome: (binder) => binder.bind,
+          },
+        ),
       })
     }
     const plans =
@@ -625,14 +649,23 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
         )
       }
       const label = `${plugin.id}.${jobName}`
-      // Ai is bound here, per invocation, to the entity the job runs on.
-      const context =
+      // Ai is bound here, per invocation, to the entity the job runs on;
+      // Discover to the watch run.
+      const withAi =
         job.bindAi === null
           ? job.context
           : Context.add(
               job.context,
               Ai,
               job.bindAi(subjectOf(job.trigger, input)),
+            )
+      const context =
+        job.bindDiscover === null
+          ? withAi
+          : Context.add(
+              withAi,
+              Discover,
+              job.bindDiscover(watchOf(job.trigger, input)),
             )
       return Effect.suspend(() => {
         const out = job.run(input)

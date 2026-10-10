@@ -7,10 +7,16 @@ import { z } from 'zod'
  *   and a dismissal of the pair refuses every later card for it.
  * - `domain` is stored normalized (`normalizeDomain`): the propose path
  *   rewrites it before the row is written.
+ * - `watchIds` are the watches that found it: a later find merges its
+ *   evidence and its watch into the open card ("found by 2 watches"). (D77)
  *
  * One decoder, three readers: the propose path holds a new row to it, the
  * accept path reads it back, and the Review card draws it.
  */
+
+/** What one card holds at most; a merge keeps the first ones. */
+export const MAX_EVIDENCE = 50
+export const MAX_WATCHES = 50
 
 const evidenceSchema = z
   .object({
@@ -23,7 +29,8 @@ const common = {
   spaceId: z.string().uuid(),
   domain: z.string().trim().min(1).max(253),
   name: z.string().trim().min(1).max(300),
-  evidence: z.array(evidenceSchema).max(50),
+  evidence: z.array(evidenceSchema).max(MAX_EVIDENCE),
+  watchIds: z.array(z.string().uuid()).max(MAX_WATCHES).default([]),
 }
 
 export const addRecordPayloadSchema = z
@@ -51,6 +58,7 @@ export type AddRecordPayload = {
   domain: string
   name: string
   evidence: Array<DiscoveryEvidence>
+  watchIds: Array<string>
   aliases: Array<string>
   subspaceHint: string | null
 }
@@ -60,6 +68,7 @@ export type FileRecordPayload = {
   domain: string
   name: string
   evidence: Array<DiscoveryEvidence>
+  watchIds: Array<string>
   entityId: string
 }
 

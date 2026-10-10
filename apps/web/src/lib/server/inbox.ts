@@ -24,6 +24,8 @@ export type {
   CapturedPage,
   ColumnRunRow,
   ColumnRunSummary,
+  DiscoveryRow,
+  DiscoverySpace,
   DuplicateCandidateRow,
   InboxCounts,
   InboxKind,

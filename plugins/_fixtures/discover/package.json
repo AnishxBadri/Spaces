@@ -1,0 +1,28 @@
+{
+  "//": "A loader fixture, not a product: one `watch` job granted Spaces, Discover, Content and Log. Each run reads its space's brief, emits a signal on every member through Content, and hands back the candidates its watch settings list through Discover; a watch whose settings say `reachForFacts` reaches for Facts, which it was never granted. apps/worker's discover test runs it through the loader.",
+  "name": "@spaces/plugin-discover",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@spaces/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@spaces/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "effect": "4.0.0-rc.112",
+    "eslint": "^9.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5",
+    "zod": "^4.3.6"
+  }
+}

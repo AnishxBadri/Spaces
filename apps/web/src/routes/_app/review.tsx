@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { EmptyState } from '#/components/empty-state'
 import { SuggestionCard } from '#/components/inbox/suggestion-card'
 import { ColumnRunGroup } from '#/components/inbox/column-run-group'
+import { DiscoveryGroup } from '#/components/inbox/discovery-group'
 import { PageHeader } from '#/components/page-header'
 import { PluginStatusSection } from '#/components/plugin-status-section'
 import { Button } from '#/components/ui/button'
@@ -18,6 +19,7 @@ import {
 } from '#/lib/server-fns'
 import type {
   ColumnRunRow,
+  DiscoveryRow,
   DuplicateCandidateRow,
   InboxKind,
   InboxLane,
@@ -84,6 +86,16 @@ function isColumnRunRow(row: QueueRow): row is ColumnRunRow {
   )
 }
 
+function isDiscoveryRow(row: QueueRow): row is DiscoveryRow {
+  return (
+    row.kind === 'discovery' &&
+    'space' in row &&
+    'via' in row &&
+    'suggestions' in row &&
+    Array.isArray(row.suggestions)
+  )
+}
+
 function isSuggestionRow(row: QueueRow): row is SuggestionRow {
   return (
     row.kind === 'suggestion' &&
@@ -117,6 +129,12 @@ const RENDERERS: Record<InboxKind, InboxRenderer> = {
   column_run: ({ row }) =>
     isColumnRunRow(row) ? (
       <ColumnRunGroup group={row} />
+    ) : (
+      <PayloadFallback row={row} />
+    ),
+  discovery: ({ row }) =>
+    isDiscoveryRow(row) ? (
+      <DiscoveryGroup group={row} />
     ) : (
       <PayloadFallback row={row} />
     ),
@@ -193,7 +211,7 @@ function InboxPage() {
       : rows.filter((r) => laneOf(r.kind) === key).length
   const suggestionCount = rows.reduce(
     (n, r) =>
-      r.kind === 'suggestion'
+      r.kind === 'suggestion' || r.kind === 'discovery'
         ? n + r.suggestions.length
         : r.kind === 'column_run'
           ? n + r.cards.reduce((m, c) => m + c.suggestions.length, 0)

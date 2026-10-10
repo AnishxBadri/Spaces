@@ -9,6 +9,7 @@ import { AmbientPortsLive } from '@spaces/core/writes/ports/ambient'
 import type { BoundIntegration } from '@spaces/core/writes/ports/binding'
 import type { ConfigInvalid } from '@spaces/core/writes/ports/config'
 import { ContentLive } from '@spaces/core/writes/ports/content'
+import { DiscoverLive } from '@spaces/core/writes/ports/discover'
 import { FactsLive } from '@spaces/core/writes/ports/facts'
 import type { FetchLike } from '@spaces/core/writes/ports/http'
 import { IdentityLive } from '@spaces/core/writes/ports/identity'
@@ -156,9 +157,9 @@ export const grantLayer = (
       case 'Spaces':
         standalone.push(SpacesLive(row))
         break
-      // The host provides no Discover: declared, it builds nothing, and a job
-      // that reaches for it fails "service not found".
+      // Bound per invocation to the watch run (`DiscoverBinder`), as Ai is.
       case 'Discover':
+        standalone.push(DiscoverLive(row))
         break
       case 'Ai':
         standalone.push(

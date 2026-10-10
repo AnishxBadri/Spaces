@@ -1,5 +1,6 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   entity,
@@ -18,6 +19,8 @@ import { spaceTagPayloadSchema } from '../../ai/space-tag'
 import { taskPayloadSchema } from '../../ai/task'
 import type { TaskPayload } from '../../ai/task'
 import {
+  MAX_EVIDENCE,
+  MAX_WATCHES,
   addRecordPayloadSchema,
   evidenceOf,
   fileRecordPayloadSchema,
@@ -418,35 +421,14 @@ export type DiscoveryProposeInput = {
 /**
  * What a discovery proposal came to.
  * - `proposed`: a new open card.
- * - `held`: an open card for this (space, domain) already stood; it is
- *   handed back untouched.
+ * - `merged`: an open card for this (space, domain) already stood; this
+ *   find's evidence, refs and watch were appended to it.
  * - `dismissed`: the domain is dismissed from the space; nothing was written.
  */
 export type DiscoveryProposed =
   | { outcome: 'proposed'; suggestion: Suggestion }
-  | { outcome: 'held'; suggestion: Suggestion }
+  | { outcome: 'merged'; suggestion: Suggestion }
   | { outcome: 'dismissed' }
-
-/** The open discovery card for (space, domain), by the index's own terms. */
-async function heldDiscovery(
-  reader: Reader,
-  spaceId: string,
-  domain: string,
-): Promise<Suggestion | undefined> {
-  return (
-    await reader
-      .select()
-      .from(suggestion)
-      .where(
-        and(
-          eq(suggestion.status, 'open'),
-          inArray(suggestion.kind, [...DISCOVERY_KINDS]),
-          sql`${suggestion.payload} ->> 'spaceId' = ${spaceId}`,
-          sql`${suggestion.payload} ->> 'domain' = ${domain}`,
-        ),
-      )
-  ).at(0)
-}
 
 /** The payload decoded, its domain normalized, and the record it sits on. */
 function discoveryRow(input: DiscoveryProposeInput): {
@@ -472,11 +454,100 @@ function discoveryRow(input: DiscoveryProposeInput): {
 }
 
 /**
- * Propose an `add_record` or `file_record` card for a space. (D72)
- * - The dismissal read and the insert share one transaction: a domain
+ * The first `cap` distinct elements of two jsonb arrays, old first, keyed by
+ * `key` (an element's text when null): a merge never reorders what a card
+ * already shows.
+ */
+const unionJsonb = (
+  held: SQL,
+  found: SQL,
+  key: 'url' | null,
+  cap: number,
+): SQL => {
+  const by = key === null ? sql.raw(`t.e #>> '{}'`) : sql.raw(`t.e ->> 'url'`)
+  return sql`(select coalesce(jsonb_agg(k.e order by k.ord), '[]'::jsonb) from (
+    select d.e, d.ord from (
+      select distinct on (${by}) t.e, t.ord
+      from jsonb_array_elements(coalesce(${held}, '[]'::jsonb) || coalesce(${found}, '[]'::jsonb)) with ordinality as t(e, ord)
+      order by ${by}, t.ord
+    ) d order by d.ord limit ${sql.raw(String(cap))}
+  ) k)`
+}
+
+/**
+ * Insert a discovery card, or merge into the open one for its (space,
+ * domain) in the same statement: `ON CONFLICT` on
+ * `suggestion_open_discovery_unique` appends the evidence (by URL), the
+ * refs and the finding watches. The card's kind, name and record stay as
+ * first proposed. (D77)
+ */
+async function upsertDiscovery(
+  tx: Tx,
+  input: DiscoveryProposeInput,
+  row: { entityId: string | null; payload: Json },
+): Promise<{ id: string; inserted: boolean }> {
+  const proposedById =
+    input.proposedBy.type === 'system' ? null : input.proposedBy.id
+  const result = await tx.execute<{ id: string; inserted: boolean }>(sql`
+    insert into suggestion as s
+      (entity_id, kind, payload, rationale, refs, run_id, proposed_by_type, proposed_by_id)
+    values (
+      ${row.entityId}::uuid,
+      ${input.kind}::suggestion_kind,
+      ${JSON.stringify(row.payload)}::jsonb,
+      ${input.rationale ?? null},
+      array(select jsonb_array_elements_text(${JSON.stringify(input.refs ?? [])}::jsonb)),
+      ${input.runId ?? null}::uuid,
+      ${input.proposedBy.type}::actor_type,
+      ${proposedById}
+    )
+    on conflict ((payload ->> 'spaceId'), (payload ->> 'domain'))
+      where status = 'open' and suggestion_is_discovery(kind)
+    do update set
+      payload = s.payload || jsonb_build_object(
+        'evidence', ${unionJsonb(sql.raw(`s.payload -> 'evidence'`), sql.raw(`excluded.payload -> 'evidence'`), 'url', MAX_EVIDENCE)},
+        'watchIds', ${unionJsonb(sql.raw(`s.payload -> 'watchIds'`), sql.raw(`excluded.payload -> 'watchIds'`), null, MAX_WATCHES)}
+      ),
+      refs = array(
+        select d.r from (
+          select distinct on (u.r) u.r, u.ord
+          from unnest(s.refs || excluded.refs) with ordinality as u(r, ord)
+          order by u.r, u.ord
+        ) d order by d.ord
+      )
+    returning s.id, (s.xmax = 0) as inserted
+  `)
+  const out = result.rows.at(0)
+  if (!out) throw new Error('a discovery upsert returned no row')
+  return out
+}
+
+/** Whether `domain` (normalized) is dismissed from the space's cards. */
+export async function isDismissed(
+  reader: Reader,
+  spaceId: string,
+  domain: string,
+): Promise<boolean> {
+  const hit = (
+    await reader
+      .select({ domain: spaceWatchDismissal.domain })
+      .from(spaceWatchDismissal)
+      .where(
+        and(
+          eq(spaceWatchDismissal.spaceId, spaceId),
+          eq(spaceWatchDismissal.domain, domain),
+        ),
+      )
+  ).at(0)
+  return hit !== undefined
+}
+
+/**
+ * Propose an `add_record` or `file_record` card for a space. (D72, D77)
+ * - The dismissal read and the upsert share one transaction: a domain
  *   dismissed from the space writes nothing, ever.
- * - `suggestion_open_discovery_unique` keeps one open card per (space,
- *   domain); a refused insert hands back the card already held.
+ * - One open card per (space, domain): a later find merges into it
+ *   (`upsertDiscovery`) rather than proposing again.
  * - `add_record` has no record, so its `entity_id` is null; a `file_record`
  *   row sits on the record it would file.
  */
@@ -507,40 +578,16 @@ export async function proposeDiscoveryWith(
       if (!record)
         throw new EntityNotFound({ entityId, message: 'Record not found' })
     }
-    const dismissed = (
-      await tx
-        .select({ domain: spaceWatchDismissal.domain })
-        .from(spaceWatchDismissal)
-        .where(
-          and(
-            eq(spaceWatchDismissal.spaceId, spaceId),
-            eq(spaceWatchDismissal.domain, domain),
-          ),
-        )
-    ).at(0)
-    if (dismissed) return { outcome: 'dismissed' }
+    if (await isDismissed(tx, spaceId, domain)) return { outcome: 'dismissed' }
+    const { id, inserted } = await upsertDiscovery(tx, input, {
+      entityId,
+      payload,
+    })
     const row = (
-      await tx
-        .insert(suggestion)
-        .values({
-          entityId,
-          kind: input.kind,
-          payload,
-          rationale: input.rationale ?? null,
-          refs: input.refs ?? [],
-          runId: input.runId ?? null,
-          proposedByType: input.proposedBy.type,
-          proposedById:
-            input.proposedBy.type === 'system' ? null : input.proposedBy.id,
-        })
-        .onConflictDoNothing()
-        .returning()
+      await tx.select().from(suggestion).where(eq(suggestion.id, id))
     ).at(0)
-    if (row) return { outcome: 'proposed', suggestion: row }
-    const open = await heldDiscovery(tx, spaceId, domain)
-    // Decided between the refused insert and this read: the next try inserts.
-    if (!open) throw new Error('an open discovery card closed mid-insert')
-    return { outcome: 'held', suggestion: open }
+    if (!row) throw new Error('a discovery card vanished mid-transaction')
+    return { outcome: inserted ? 'proposed' : 'merged', suggestion: row }
   })
 }
 

@@ -38,12 +38,21 @@ export const acceptSuggestion = createServerFn({ method: 'POST' })
     const u = await requireUser()
     const { acceptProgram, suggestionMessage } = await import('../ai/propose')
     const { effectFn } = await import('./effect')
-    try {
-      await effectFn(acceptProgram)(data.id, { type: 'user', id: u.id })
-    } catch (err) {
+    const accepted = await effectFn(acceptProgram)(data.id, {
+      type: 'user',
+      id: u.id,
+    }).catch((err: unknown) => {
       throw new Error(suggestionMessage(err))
-    }
-    return { ok: true }
+    })
+    // An "add X?" card's company: the card shows its enrich state after.
+    const added =
+      accepted.kind === 'add_record'
+        ? {
+            entityId: accepted.resolved.entityId,
+            created: accepted.resolved.action === 'created',
+          }
+        : null
+    return { ok: true, added }
   })
 
 export type { BatchOutcome } from '../ai/propose'

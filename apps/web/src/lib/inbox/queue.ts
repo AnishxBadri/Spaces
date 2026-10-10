@@ -7,6 +7,7 @@ import {
   document,
   duplicateCandidate,
   entity,
+  integration,
   objectDef,
   suggestion,
   suggestionKind,
@@ -26,7 +27,7 @@ import { isColumnRunTask } from '#/lib/ai/column-run'
 import { captureReadSlug } from '@spaces/core/writes/ai/capture-read'
 import { resolveRefsProgram } from '@spaces/core/writes/context/names'
 import type { ResolvedRef } from '@spaces/core/writes/context/names'
-import { jsonRecord } from '@spaces/core/json'
+import { jsonRecord, jsonString } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { entityContext } from './context'
 import type { InboxSide } from './context'
@@ -197,12 +198,38 @@ export type ColumnRunRow = {
   latestAt: string
 }
 
+/** The space a discovery group is about, labelled by its path of names. */
+export type DiscoverySpace = {
+  id: string
+  name: string
+  /** `Proptech / Rental software`. */
+  path: string
+}
+
+/**
+ * A space's open discovery cards (`add_record`, `file_record`) under one
+ * head: the space's path, the plugins that found them, the count. Each card
+ * is decided on its own; there is no bulk accept. (D72)
+ */
+export type DiscoveryRow = {
+  kind: 'discovery'
+  /** The space's id — one group per space. */
+  id: string
+  space: DiscoverySpace
+  /** The integrations that proposed the cards, by name, first seen first. */
+  via: Array<string>
+  /** Newest first. */
+  suggestions: Array<SuggestionItem>
+  latestAt: string
+}
+
 /**
  * Every row the inbox can hold. Add a lane by adding a member here and a
  * renderer in `routes/_app/inbox.tsx` — the queue, the count and the page
  * follow. Nothing else in the app switches on this union.
  */
-export type InboxRow = DuplicateCandidateRow | SuggestionRow | ColumnRunRow
+export type InboxRow =
+  DuplicateCandidateRow | SuggestionRow | ColumnRunRow | DiscoveryRow
 
 export type InboxKind = InboxRow['kind']
 
@@ -298,7 +325,10 @@ function patchFields(
 
 const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   scope: InboxScope,
-): Effect.fn.Return<Array<SuggestionRow | ColumnRunRow>, InboxQueryFailed> {
+): Effect.fn.Return<
+  Array<SuggestionRow | ColumnRunRow | DiscoveryRow>,
+  InboxQueryFailed
+> {
   const isOpen = eq(suggestion.status, 'open')
   const open = yield* query(() =>
     db
@@ -421,6 +451,63 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
             .where(inArray(apiToken.id, tokenIds)),
         )).map((t) => [t.id, t.name]),
   )
+  // A discovery group's head names the plugins that found its cards.
+  const integrationIds = [
+    ...new Set(
+      open.flatMap((s) =>
+        isDiscoveryKind(s.kind) &&
+        s.proposedByType === 'integration' &&
+        s.proposedById !== null &&
+        UUID.test(s.proposedById)
+          ? [s.proposedById]
+          : [],
+      ),
+    ),
+  ]
+  const integrationName = new Map(
+    integrationIds.length === 0
+      ? []
+      : (yield* query(() =>
+          db
+            .select({
+              id: integration.id,
+              capabilityId: integration.capabilityId,
+              manifest: integration.manifest,
+            })
+            .from(integration)
+            .where(inArray(integration.id, integrationIds)),
+        )).map((i) => [
+          i.id,
+          jsonString(jsonRecord(i.manifest).name) ?? i.capabilityId,
+        ]),
+  )
+  const discoverySpaceIds = [
+    ...new Set(
+      open.flatMap((s) => {
+        const id = isDiscoveryKind(s.kind) ? discoverySpaceOf(s.payload) : null
+        return id === null ? [] : [id]
+      }),
+    ),
+  ]
+  const spacePath = new Map(
+    discoverySpaceIds.length === 0
+      ? []
+      : (yield* query(() =>
+          db.execute<{ id: string; path: string }>(sql`
+            select s.entity_id as id,
+              string_agg(e.canonical_name, ' / ' order by nlevel(a.path)) as path
+            from space s
+            join space a on a.path @> s.path
+            join entity e on e.id = a.entity_id
+            where s.entity_id in (${sql.join(
+              discoverySpaceIds.map((id) => sql`${id}::uuid`),
+              sql`, `,
+            )})
+            group by s.entity_id
+          `),
+        )).rows.map((r) => [r.id, r.path]),
+  )
+
   const originOf = (s: (typeof open)[number]): SuggestionOrigin => {
     if (s.proposedByType !== 'integration') return { via: 'app' }
     const token =
@@ -482,10 +569,46 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
   // `open` is newest first, so the first member seen for a record is its
   // newest and Map insertion order is already the queue's order.
   const cards = new Map<string, SuggestionRow>()
+  const discoveries = new Map<string, DiscoveryRow>()
   for (const s of open) {
     const anchor = anchorOf(s)
     const head = anchor === null ? undefined : headOf.get(anchor)
     if (!head) continue
+    if (isDiscoveryKind(s.kind)) {
+      const item: SuggestionItem = {
+        id: s.id,
+        kind: s.kind,
+        payload: s.payload,
+        rationale: s.rationale,
+        citations: citationsOf.get(s.id) ?? [],
+        fields: null,
+        origin: originOf(s),
+        createdAt: s.createdAt.toISOString(),
+        runId: s.runId,
+      }
+      const via =
+        s.proposedById === null
+          ? undefined
+          : integrationName.get(s.proposedById)
+      const group = discoveries.get(head.id)
+      if (group) {
+        group.suggestions.push(item)
+        if (via !== undefined && !group.via.includes(via)) group.via.push(via)
+      } else
+        discoveries.set(head.id, {
+          kind: 'discovery',
+          id: head.id,
+          space: {
+            id: head.id,
+            name: head.name,
+            path: spacePath.get(head.id) ?? head.name,
+          },
+          via: via === undefined ? [] : [via],
+          suggestions: [item],
+          latestAt: item.createdAt,
+        })
+      continue
+    }
     const pageObjectId = head.kind === 'document' ? pageObjectOf(s) : null
     const registry = yield* registryOf(head, pageObjectId)
     const item: SuggestionItem = {
@@ -553,7 +676,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
       },
     ]
   })
-  return [...cards.values(), ...runRows]
+  return [...cards.values(), ...runRows, ...discoveries.values()]
 })
 
 /**

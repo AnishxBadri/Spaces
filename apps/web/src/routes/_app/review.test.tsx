@@ -390,3 +390,125 @@ describe('bulk accept on the suggestion card', () => {
     )
   })
 })
+
+/**
+ * A space's discovery cards (D72, D77): one group under a bone space head —
+ * path, `via` the plugin's mark, the count — each card with its name,
+ * domain, evidence chips opening their URLs, and its two verbs.
+ */
+describe('the discovery group', () => {
+  const spaceId = 'a1f0b6f2-7c1e-4f0a-9d2a-000000000001'
+  const card = (
+    kind: 'add_record' | 'file_record',
+    extra: object = {},
+  ): SuggestionItem => ({
+    id: `d-${kind}`,
+    kind,
+    payload: {
+      spaceId,
+      domain: kind === 'add_record' ? 'orbit.example' : 'redwire.example',
+      name: kind === 'add_record' ? 'Orbit' : 'Redwire',
+      evidence: [
+        { url: 'https://news.example/orbit', title: 'Orbit raises' },
+        { url: 'https://www.blog.example/post' },
+      ],
+      watchIds: ['b1f0b6f2-7c1e-4f0a-9d2a-000000000001'],
+      ...(kind === 'add_record'
+        ? { aliases: [], subspaceHint: null }
+        : { entityId: 'c1f0b6f2-7c1e-4f0a-9d2a-000000000001' }),
+      ...extra,
+    },
+    rationale: null,
+    citations: [],
+    fields: null,
+    origin: { via: 'integration' },
+    createdAt: '2026-10-10T00:00:00.000Z',
+    runId: null,
+  })
+
+  it('routes the discovery kind to its own renderer', () => {
+    expect(rendererFor('discovery')).not.toBe(PayloadFallback)
+  })
+
+  it('heads the group with the space path, via the plugin mark, and the count', async () => {
+    const { DiscoveryHead } = await import('#/components/inbox/discovery-group')
+    const html = renderToStaticMarkup(
+      <DiscoveryHead
+        group={{
+          kind: 'discovery',
+          id: spaceId,
+          space: { id: spaceId, name: 'Launch', path: 'Space tech / Launch' },
+          via: ['Exa'],
+          suggestions: [card('add_record'), card('file_record')],
+          latestAt: '2026-10-10T00:00:00.000Z',
+        }}
+      />,
+    )
+    expect(html).toContain('Space tech / Launch')
+    expect(html).toContain(`href="/spaces/${spaceId}"`)
+    expect(html).toContain('bg-bone')
+    expect(html).toMatch(/via.*>E<\/span>.*Exa/)
+    expect(html).toMatch(/mono[^"]*">2<\/span>/)
+  })
+
+  it('draws a card with its refs opening the evidence URLs and its two verbs', async () => {
+    const { DiscoveryEntry } =
+      await import('#/components/inbox/discovery-group')
+    const draw = (item: SuggestionItem) =>
+      renderToStaticMarkup(
+        <ul>
+          <DiscoveryEntry
+            item={item}
+            pending={false}
+            after={null}
+            onAccept={() => {}}
+            onDismiss={() => {}}
+          />
+        </ul>,
+      )
+    const add = draw(card('add_record'))
+    expect(add).toContain('Orbit')
+    expect(add).toContain('orbit.example')
+    expect(add).toContain('href="https://news.example/orbit"')
+    expect(add).toContain('Orbit raises')
+    // No title: the chip reads as the page's host.
+    expect(add).toContain('href="https://www.blog.example/post"')
+    expect(add).toContain('>blog.example</a>')
+    expect(add).toContain('Add and file here')
+    expect(add).toContain('Dismiss')
+    expect(add).toContain('never suggested in this space again')
+    // One watch found it: the head's `via` says so; no "found by" line.
+    expect(add).not.toContain('found by')
+
+    const file = draw(
+      card('file_record', {
+        watchIds: [
+          'b1f0b6f2-7c1e-4f0a-9d2a-000000000001',
+          'b1f0b6f2-7c1e-4f0a-9d2a-000000000002',
+        ],
+      }),
+    )
+    expect(file).toContain('File here')
+    expect(file).not.toContain('Add and file here')
+    expect(file).toContain('found by 2 watches')
+  })
+
+  it('shows the after-state once accepted, in place of the verbs', async () => {
+    const { DiscoveryEntry } =
+      await import('#/components/inbox/discovery-group')
+    const html = renderToStaticMarkup(
+      <ul>
+        <DiscoveryEntry
+          item={card('add_record')}
+          pending
+          after="enriching"
+          onAccept={() => {}}
+          onDismiss={() => {}}
+        />
+      </ul>,
+    )
+    expect(html).toContain('Added · enriching')
+    expect(html).not.toContain('Add and file here')
+    expect(html).not.toContain('Dismiss')
+  })
+})

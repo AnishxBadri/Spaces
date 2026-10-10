@@ -12,7 +12,13 @@ import {
   suggestion,
 } from '@spaces/db/schema'
 import type { DomainEvent } from '@spaces/sdk'
-import { resolveEntity } from '@spaces/core/writes/entities/resolve'
+import { readAddRecordPayload } from '@spaces/core/ai/discovery'
+import {
+  previewResolve,
+  resolveEntity,
+} from '@spaces/core/writes/entities/resolve'
+import type { PreviewResolveInput } from '@spaces/core/writes/entities/resolve'
+import { discoverWith } from '@spaces/core/writes/ports/discover'
 import { createSpaceRow } from '#/lib/server/shared'
 import { listInboxProgram } from '#/lib/inbox/queue'
 import {
@@ -69,6 +75,25 @@ const addCard = (spaceId: string, domain: string, extra: object = {}) => ({
 const propose = (input: Parameters<typeof proposeDiscoveryProgram>[0]) =>
   Effect.runPromise(proposeDiscoveryProgram(input))
 
+/** A watch on the space, from a throwaway integration. */
+const aWatch = async (spaceId: string) => {
+  const plugin = (
+    await db
+      .insert(integration)
+      .values({ capabilityId: `watch-${tag()}`, version: '0.1.0' })
+      .returning({ id: integration.id })
+  ).at(0)
+  if (!plugin) throw new Error('no integration')
+  const watch = (
+    await db
+      .insert(spaceWatch)
+      .values({ spaceId, integrationId: plugin.id, settings: {} })
+      .returning({ id: spaceWatch.id })
+  ).at(0)
+  if (!watch) throw new Error('no watch')
+  return watch.id
+}
+
 const openCards = (spaceId: string, domain: string) =>
   db
     .select({ id: suggestion.id, status: suggestion.status })
@@ -90,11 +115,24 @@ describe('discovery cards', () => {
     // Normalized before it is written: the index compares the bare domain.
     expect(first.suggestion.payload).toMatchObject({ domain })
 
-    const again = await propose(addCard(spaceId, domain))
+    const again = await propose(
+      addCard(spaceId, domain, {
+        evidence: [{ url: `https://blog.example/${domain}` }],
+      }),
+    )
     expect(again).toMatchObject({
-      outcome: 'held',
+      outcome: 'merged',
       suggestion: { id: first.suggestion.id },
     })
+    // The later find's evidence is appended to the open card.
+    if (again.outcome !== 'merged') throw new Error('expected a merge')
+    expect(readAddRecordPayload(again.suggestion.payload)?.evidence).toEqual([
+      {
+        url: `https://news.example/https://www.${domain}/`,
+        title: 'A write-up',
+      },
+      { url: `https://blog.example/${domain}` },
+    ])
 
     const raw = await db
       .insert(suggestion)
@@ -262,23 +300,84 @@ describe('discovery cards', () => {
     })
   })
 
-  it('Review groups a space’s cards under the space', async () => {
-    const spaceId = await createSpaceRow(`Grouped ${tag()}`, null, me)
-    await propose(addCard(spaceId, `one${tag()}.com`))
-    await propose(addCard(spaceId, `two${tag()}.com`))
+  it('Review groups a space’s cards under the space head: its path, the plugin that found them', async () => {
+    const parent = `Space tech ${tag()}`
+    const parentId = await createSpaceRow(parent, null, me)
+    const leaf = `Grouped ${tag()}`
+    const spaceId = await createSpaceRow(leaf, parentId, me)
+    const plugin = (
+      await db
+        .insert(integration)
+        .values({
+          capabilityId: `exa-${tag()}`,
+          version: '0.1.0',
+          manifest: { name: 'Exa' },
+        })
+        .returning({ id: integration.id })
+    ).at(0)
+    if (!plugin) throw new Error('no integration')
+    const byPlugin = { type: 'integration', id: plugin.id } as const
+    await propose({
+      ...addCard(spaceId, `one${tag()}.com`),
+      proposedBy: byPlugin,
+    })
+    await propose({
+      ...addCard(spaceId, `two${tag()}.com`),
+      proposedBy: byPlugin,
+    })
     const rows = await Effect.runPromise(listInboxProgram({ record: spaceId }))
     expect(rows).toHaveLength(1)
     expect(rows.at(0)).toMatchObject({
-      kind: 'suggestion',
+      kind: 'discovery',
       id: spaceId,
-      record: { id: spaceId, kind: 'space' },
+      space: { id: spaceId, name: leaf, path: `${parent} / ${leaf}` },
+      via: ['Exa'],
     })
-    const card = rows.at(0)
-    if (card?.kind !== 'suggestion') throw new Error('expected a card')
-    expect(card.suggestions.map((s) => s.kind)).toEqual([
+    const group = rows.at(0)
+    if (group?.kind !== 'discovery') throw new Error('expected a group')
+    expect(group.suggestions.map((s) => s.kind)).toEqual([
       'add_record',
       'add_record',
     ])
+  })
+
+  it('after a card is accepted the member check answers, after it is dismissed the dismissal does', async () => {
+    const spaceId = await createSpaceRow(`Checked ${tag()}`, null, me)
+    const watchId = await aWatch(spaceId)
+    const preview = vi.fn((input: PreviewResolveInput) => previewResolve(input))
+    const find = (domain: string) =>
+      discoverWith(
+        {
+          claim: {
+            spaceId,
+            name: `Found ${domain}`,
+            domain,
+            evidence: [{ url: `https://news.example/${domain}` }],
+          },
+          proposedBy: { type: 'system' },
+          watchId,
+        },
+        { preview },
+      )
+    const kept = `kept${tag()}.com`
+    const card = await find(kept)
+    if (card.outcome !== 'proposed') throw new Error('expected a card')
+    const accepted = await Effect.runPromise(
+      acceptProgram(card.suggestion.id, decider),
+    )
+    if (accepted.kind !== 'add_record') throw new Error('expected add_record')
+    expect(await find(kept)).toEqual({
+      outcome: 'member',
+      entityId: accepted.resolved.entityId,
+    })
+
+    const dropped = `dropped${tag()}.com`
+    const second = await find(dropped)
+    if (second.outcome !== 'proposed') throw new Error('expected a card')
+    await Effect.runPromise(rejectProgram(second.suggestion.id, decider))
+    preview.mockClear()
+    expect(await find(dropped)).toEqual({ outcome: 'dismissed' })
+    expect(preview).not.toHaveBeenCalled()
   })
 })
 
