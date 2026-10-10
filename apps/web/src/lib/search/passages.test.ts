@@ -11,14 +11,13 @@ import { PIN_DIMS } from '#/lib/ai/providers/embed/ids'
 import { searchPassagesProgram } from './passages'
 import { searchAllProgram } from './query'
 import { clearQueryEmbeddingCache } from './query-embedding'
-import { nameFirst } from './records'
 
 /**
  * Cmd-K's Records and Passages are two lanes, never one list. (D70) The
- * fixture is built so the semantic lane would outrank the record by name:
+ * fixture is built so the semantic lane would outrank the record by score:
  * a deck that mentions "halcyon" in its text and whose chunk sits nearest
- * the query. Fused with the vector lane it wins; in the palette it is a
- * passage, and the record typed by name leads Records.
+ * the query. The statement's name tier still puts the record typed by name
+ * first; in the palette the deck is a passage.
  */
 
 const QUERY = 'halcyon'
@@ -111,26 +110,24 @@ beforeEach(async () => {
 })
 
 describe('Records and Passages', () => {
-  it('puts the record typed by name first in Records, where fused with the vector lane the deck would win', async () => {
+  it('puts the record typed by name first, even where the vector lane fuses the deck above it by score', async () => {
     await pin()
     const { company, deck } = await fixture()
     const { model } = countingModel()
 
-    // The fixture is real: the vector lane fused in ranks the deck first.
+    // The vector lane fused in: the deck scores two lanes, the record one,
+    // and the name tier still leads with the record.
     const fused = await Effect.runPromise(
       searchAllProgram(
         { userId: FIXTURE_ACTOR.id, q: QUERY, semantic: true },
         { model },
       ),
     )
-    expect(fused.at(0)?.id).toBe(deck)
+    expect(fused.map((h) => h.id)).toEqual([company, deck])
 
     // The palette's Records: lexical only, a typed name first.
-    const records = nameFirst(
-      await Effect.runPromise(
-        searchAllProgram({ userId: FIXTURE_ACTOR.id, q: QUERY }, { model }),
-      ),
-      QUERY,
+    const records = await Effect.runPromise(
+      searchAllProgram({ userId: FIXTURE_ACTOR.id, q: QUERY }, { model }),
     )
     expect(records.at(0)).toMatchObject({ id: company, matchedIn: 'name' })
     expect(records.every((h) => h.matchedIn !== 'semantic')).toBe(true)

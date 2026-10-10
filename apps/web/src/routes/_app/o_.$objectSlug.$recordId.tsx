@@ -142,20 +142,18 @@ function ObjectRecordPage() {
     }
   }
 
-  usePageActions([
-    { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
-    { id: 'task', label: 'Add a task', key: 'T', run: runBinding('T') },
-    {
-      id: 'note',
-      label: 'Note about this',
-      run: () => void newNoteAboutThis(),
-    },
-    fileInSpaceAction({
-      id: record.id,
-      name: record.name,
-      filedIds: record.spaces.map((s) => s.id),
-    }),
-  ])
+  usePageActions(
+    [
+      { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+      { id: 'task', label: 'Add task', key: 'T', run: runBinding('T') },
+      fileInSpaceAction({
+        id: record.id,
+        name: record.name,
+        filedIds: record.spaces.map((s) => s.id),
+      }),
+    ],
+    record.name,
+  )
 
   return (
     <div className="flex min-h-full flex-col">

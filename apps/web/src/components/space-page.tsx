@@ -145,10 +145,14 @@ export function SpacePageView({
   }
 
   useHotkey('n', () => void newNote())
-  usePageActions([
-    { id: 'note', label: 'Note here', key: 'N', run: runBinding('N') },
-    { id: 'task', label: 'Add a task', key: 'T', run: runBinding('T') },
-  ])
+  // A space reads like a record, so its verbs are scoped to it.
+  usePageActions(
+    [
+      { id: 'note', label: 'Note here', key: 'N', run: runBinding('N') },
+      { id: 'task', label: 'Add a task', key: 'T', run: runBinding('T') },
+    ],
+    spc.name,
+  )
 
   return (
     <div className="flex min-h-full flex-col">

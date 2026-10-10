@@ -6,6 +6,7 @@ import { Button } from './ui/button'
 import { PictureMark, PreviewHead, ReadoutStrip } from './record/record-parts'
 import type { RecordReadout } from './record/record-parts'
 import { DASH, readoutDay, readoutDayAgo } from '#/lib/records/readout-format'
+import type { KindLane } from '#/lib/search/kind-lanes'
 import type { Passage } from '#/lib/search/passages'
 import type {
   ObjectPreview,
@@ -25,8 +26,11 @@ import type { SearchHit } from '#/lib/search/query'
  *   ← returns to the list.
  */
 
-/** A search hit, with its record's picture URL when `searchAll` found one. */
-export type PreviewHit = SearchHit & { readonly picture?: string | null }
+/** A search hit, with its picture URL and kind lane when `searchAll` has them. */
+export type PreviewHit = SearchHit & {
+  readonly picture?: string | null
+  readonly lane?: KindLane | null
+}
 
 /** What the highlighted row asks the pane to show, keyed by the row's value. */
 export type PreviewTarget =
@@ -250,7 +254,9 @@ function RecordPane({
         mark={hit.picture ? <PictureMark src={hit.picture} size={22} /> : null}
         name={data?.name ?? hit.name}
       >
-        {readouts.length > 0 ? <ReadoutStrip readouts={readouts} /> : null}
+        {readouts.length > 0 ? (
+          <ReadoutStrip readouts={readouts} size="pane" />
+        ) : null}
       </PreviewHead>
       {data && data.fields.length > 0 ? (
         <dl className="flex flex-col px-5 pt-1">
@@ -340,7 +346,12 @@ function PassagePane({
   const parts =
     data && data.parts.length > 0
       ? data.parts
-      : [{ text: passage.snippet || passage.name, matched: true }]
+      : [
+          {
+            text: passage.snippet.replace(/[«»]/g, '') || passage.name,
+            matched: true,
+          },
+        ]
   const pageOf =
     passage.page === null
       ? null

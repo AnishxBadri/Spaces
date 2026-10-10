@@ -233,7 +233,18 @@ ${semantic ?? sql``}
       group by f.row_kind, f.id,
                e.kind, e.canonical_name, o.slug,
                t.id, t.content, t.due_date, t.done_at
-      order by score desc, name
+      -- Name first: a record named exactly as typed, then one whose name
+      -- starts with it, outranks every note or file titled with it, and any
+      -- name match outranks a text-only row. The fused score orders within
+      -- a tier. (D70)
+      order by case
+                 when not bool_or(f.source = 'name') then 3
+                 when e.kind in ('note', 'document') then 2
+                 when lower(e.canonical_name) = lower(btrim((select raw from q))) then 0
+                 when starts_with(lower(e.canonical_name), lower(btrim((select raw from q)))) then 1
+                 else 2
+               end,
+               score desc, name
       limit 20
     `
 }

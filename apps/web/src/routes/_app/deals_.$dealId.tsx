@@ -223,25 +223,23 @@ function DealRecordPage() {
     }
   }
 
-  usePageActions([
-    ...(liveStages.length > 0
-      ? [
-          {
-            id: 'move-stage',
-            label: 'Move stage',
-            key: 'M',
-            run: () => setMoveOpen(true),
-          },
-        ]
-      : []),
-    { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
-    { id: 'task', label: 'Add a task', key: 'T', run: runBinding('T') },
-    {
-      id: 'note',
-      label: 'Note about this',
-      run: () => void newNoteAboutThis(),
-    },
-  ])
+  usePageActions(
+    [
+      ...(liveStages.length > 0
+        ? [
+            {
+              id: 'move-stage',
+              label: 'Move stage',
+              key: 'M',
+              run: () => setMoveOpen(true),
+            },
+          ]
+        : []),
+      { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+      { id: 'task', label: 'Add task', key: 'T', run: runBinding('T') },
+    ],
+    deal.name,
+  )
 
   return (
     <div className="flex min-h-full flex-col">

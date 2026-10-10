@@ -186,19 +186,18 @@ function CompanyRecordPage() {
     }
   }
 
-  usePageActions([
-    { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
-    {
-      id: 'note',
-      label: 'Note about this',
-      run: () => void newNoteAboutThis(),
-    },
-    fileInSpaceAction({
-      id: company.id,
-      name: company.name,
-      filedIds: company.spaces.map((s) => s.id),
-    }),
-  ])
+  usePageActions(
+    [
+      { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+      { id: 'task', label: 'Add task', key: 'T', run: runBinding('T') },
+      fileInSpaceAction({
+        id: company.id,
+        name: company.name,
+        filedIds: company.spaces.map((s) => s.id),
+      }),
+    ],
+    company.name,
+  )
 
   return (
     <div className="flex min-h-full flex-col">

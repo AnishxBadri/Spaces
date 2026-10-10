@@ -3,6 +3,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { objectDef } from '@spaces/db/schema'
 import { canReadNoteSql } from '@spaces/core/writes/read/search'
+import { renderWikiLinks } from '@spaces/core/context/wiki-link'
 import { listViewsProgram } from '@spaces/core/writes/views/store'
 import { getRecordProgram } from '#/lib/mcp/tools'
 import {
@@ -187,9 +188,9 @@ export type PassagePreview = {
 
 type ChunkRow = { idx: number; text: string; page: number | null }
 
-/** A chunk's text as the semantic lane's snippet was cut from it. */
+/** A chunk's text as a snippet was cut from it: marks gone, links as names. */
 const flatten = (text: string) =>
-  text.replace(/[«»]/g, '').replace(/\s+/g, ' ').trim()
+  renderWikiLinks(text).replace(/[«»]/g, '').replace(/\s+/g, ' ').trim()
 
 /**
  * The page a passage sits on, its chunks in order, the one whose text the
@@ -219,7 +220,7 @@ export const passagePreviewProgram = Effect.fn('passagePreviewProgram')(
         : rows.find(
             (r) =>
               (passage.page === null || r.page === passage.page) &&
-              flatten(r.text).startsWith(snippet),
+              flatten(r.text).includes(snippet),
           )
     const onPage =
       passage.page === null
@@ -233,7 +234,10 @@ export const passagePreviewProgram = Effect.fn('passagePreviewProgram')(
     const out: PassagePreview = {
       page: passage.page,
       pages: numbered.length === 0 ? null : Math.max(...numbered),
-      parts: onPage.map((r) => ({ text: r.text, matched: r === matched })),
+      parts: onPage.map((r) => ({
+        text: renderWikiLinks(r.text),
+        matched: r === matched,
+      })),
     }
     return out
   },

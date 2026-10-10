@@ -4,8 +4,15 @@ import { describe, expect, it } from 'vitest'
 
 import type { Passage } from '#/lib/search/passages'
 import type { SearchHit } from '#/lib/search/query'
-import { nameFirst } from '#/lib/search/records'
-import { HitLine, hrefFor, passageHref, passageMeta } from './command-palette'
+import {
+  HitLine,
+  hitMeta,
+  hrefFor,
+  mergePassages,
+  passageHref,
+  passageMeta,
+  splitHits,
+} from './command-palette'
 
 /**
  * The palette's record and passage rows. Asserted over the row's content and
@@ -91,25 +98,69 @@ describe('the palette task row', () => {
   })
 })
 
-describe('the Records order', () => {
-  it('puts a typed name first, then other names, then text-only rows, each in fused order', () => {
-    const hit = (name: string, matchedIn: string): SearchHit => ({
-      ...companyHit,
-      id: name,
-      name,
-      matchedIn,
-    })
-    const fused = [
-      hit('Grid storage memo.pdf', 'document'),
-      hit('Old Halcyon notes', 'name'),
-      hit('Halcyon Grid Seed', 'name'),
-      hit('Halcyon', 'name'),
+describe('the kind lane', () => {
+  it('prints the kind, the stage word and the first filed space, not the plural slug', () => {
+    expect(
+      hitMeta({
+        ...companyHit,
+        objectSlug: 'companies',
+        lane: {
+          singular: 'Company',
+          stage: 'Seed',
+          space: 'Proptech › Property ops',
+        },
+      }),
+    ).toBe('company · seed · Proptech › Property ops')
+    expect(
+      hitMeta({
+        ...companyHit,
+        kind: 'deal',
+        objectSlug: 'deals',
+        lane: { singular: 'Deal', stage: 'Diligence', space: null },
+      }),
+    ).toBe('deal · diligence')
+    // No lane read: the kind alone, never the slug.
+    expect(hitMeta({ ...companyHit, objectSlug: 'companies' })).toBe('company')
+  })
+})
+
+describe('Records and Passages', () => {
+  const hit = (
+    id: string,
+    kind: string,
+    snippet: string | null,
+  ): SearchHit => ({
+    ...companyHit,
+    id,
+    kind,
+    name: id,
+    snippet,
+  })
+
+  it('sends a note or a file to Passages with its snippet, and keeps records and tasks in Records', () => {
+    const task = taskHit(false, null)
+    const { records, passages } = splitHits([
+      hit('Vayu Orbital', 'company', null),
+      hit('Vayu — first call', 'note', 'the «Vayu» thesis'),
+      hit('Vayu deck.pdf', 'document', null),
+      task,
+    ])
+    expect(records.map((h) => h.id)).toEqual(['Vayu Orbital', task.id])
+    expect(passages.map((p) => [p.id, p.kind, p.snippet, p.page])).toEqual([
+      ['Vayu — first call', 'note', 'the «Vayu» thesis', null],
+      ['Vayu deck.pdf', 'document', '', null],
+    ])
+  })
+
+  it('lists the lexical passages first, then the semantic lane’s new ones', () => {
+    const { passages } = splitHits([hit('n1', 'note', 'a «word»')])
+    const semantic = [
+      { ...deckPassage, id: 'n1' },
+      { ...deckPassage, id: 'd2' },
     ]
-    expect(nameFirst(fused, ' halcyon ').map((h) => h.name)).toEqual([
-      'Halcyon',
-      'Halcyon Grid Seed',
-      'Old Halcyon notes',
-      'Grid storage memo.pdf',
+    expect(mergePassages(passages, semantic).map((p) => p.id)).toEqual([
+      'n1',
+      'd2',
     ])
   })
 })

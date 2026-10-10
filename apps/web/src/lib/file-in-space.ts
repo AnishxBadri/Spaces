@@ -49,6 +49,7 @@ export function spaceChoices(
 /**
  * Cmd-K's "File in a space…": asks for the space in the palette, files the
  * record there with `tagIntoSpace`, and stays open for another. (D70)
+ * The row's lane says how many spaces hold it now: `in 2 now`.
  * The list is the space picker's own `listSpaces`.
  */
 export function fileInSpaceAction(record: {
@@ -62,6 +63,7 @@ export function fileInSpaceAction(record: {
     label: 'File in a space…',
     icon: FolderInput,
     words: 'tag space file',
+    ...(filed.size > 0 ? { meta: `in ${String(filed.size)} now` } : {}),
     step: {
       mode: 'File in',
       subject: record.name,

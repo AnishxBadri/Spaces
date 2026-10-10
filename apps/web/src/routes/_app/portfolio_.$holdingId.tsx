@@ -58,17 +58,20 @@ function HoldingPage() {
   const h = Route.useLoaderData()
   const m = h.metrics.ok ? h.metrics.metrics : null
   const router = useRouter()
-  usePageActions([
-    {
-      id: 'company',
-      label: 'Open the company record',
-      run: () =>
-        void router.navigate({
-          to: '/companies/$companyId',
-          params: { companyId: h.companyId },
-        }),
-    },
-  ])
+  usePageActions(
+    [
+      {
+        id: 'company',
+        label: 'Open the company record',
+        run: () =>
+          void router.navigate({
+            to: '/companies/$companyId',
+            params: { companyId: h.companyId },
+          }),
+      },
+    ],
+    h.companyName,
+  )
 
   const missing =
     h.metrics.ok === false

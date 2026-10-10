@@ -114,12 +114,16 @@ export function RecordHeader({
  * value in mono over a sentence-case label. The record head draws it, so do
  * Cmd-K's preview of a record and Today's head.
  * - A cell with `to` is a link to the list it counted; hover inks the label.
+ * - `pane` sets the values a size down, so three fit the preview pane's
+ *   width without clipping a day and its age.
  */
 export function ReadoutStrip({
   readouts,
+  size = 'page',
   className,
 }: {
   readouts: ReadonlyArray<RecordReadout>
+  size?: 'page' | 'pane' | undefined
   className?: string | undefined
 }) {
   return (
@@ -132,7 +136,8 @@ export function ReadoutStrip({
     >
       {readouts.map((r, i) => {
         const cls = cn(
-          'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule px-4 first:pl-0 last:border-r-0',
+          'flex min-w-28 basis-0 flex-col justify-center gap-0.5 border-r border-rule first:pl-0 last:border-r-0',
+          size === 'pane' ? 'px-3' : 'px-4',
           r.figure ? 'max-w-110 flex-2' : 'max-w-55 flex-1',
         )
         const inner = (
@@ -142,7 +147,8 @@ export function ReadoutStrip({
             ) : (
               <span
                 className={cn(
-                  'truncate mono text-page leading-6.5',
+                  'truncate mono leading-6.5',
+                  size === 'pane' ? 'text-title' : 'text-page',
                   r.tone === 'bad'
                     ? 'text-destructive'
                     : r.tone === 'warn'

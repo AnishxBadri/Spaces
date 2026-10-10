@@ -7,6 +7,10 @@ import { openUploadDialog } from './upload-dialog-store'
  * The verbs a page publishes to Cmd-K's Actions group. (D70)
  * - A route calls `usePageActions` once with its own verbs, record verbs
  *   first; the registration goes when the route unmounts.
+ * - A page with a subject (a record, a space) names it as the `scope`:
+ *   nothing typed, the palette lists only a scoped page's verbs, under
+ *   `Actions · on <name>`. An unscoped page's verbs (Today, lists, notes,
+ *   settings) wait for a typed word, like the global ones.
  * - `key` is the page's own binding, printed on the row, so it must be one
  *   the page really binds. `runBinding` runs a verb through that binding,
  *   which keeps the row and the key one thing.
@@ -50,6 +54,8 @@ type ActionFields = {
   readonly icon?: LucideIcon
   /** Words a typed query may match besides the label; never drawn. */
   readonly words?: string
+  /** Graphite lane before the key: `in 2 now`. */
+  readonly meta?: string
 }
 
 export type PageAction =
@@ -81,15 +87,34 @@ export function runBinding(binding: string): () => void {
   }
 }
 
-type Registration = { readonly current: ReadonlyArray<PageAction> }
+type Registration = {
+  readonly current: {
+    readonly actions: ReadonlyArray<PageAction>
+    readonly scope: string | null
+  }
+}
+
+/** What the palette reads: the mounted pages' verbs and the record they are on. */
+export type PageActionsState = {
+  readonly actions: ReadonlyArray<PageAction>
+  /** The deepest mounted record's name; null on a page with no record. */
+  readonly scope: string | null
+}
+
+const EMPTY: PageActionsState = { actions: [], scope: null }
 
 /** Mounted registrations, newest first: the deepest route leads. */
 let registrations: Array<Registration> = []
-let snapshot: ReadonlyArray<PageAction> = []
+let snapshot: PageActionsState = EMPTY
 const listeners = new Set<() => void>()
 
 function publish() {
-  snapshot = registrations.flatMap((r) => r.current)
+  snapshot = {
+    actions: registrations.flatMap((r) => r.current.actions),
+    scope:
+      registrations.find((r) => r.current.scope !== null)?.current.scope ??
+      null,
+  }
   for (const l of listeners) l()
 }
 
@@ -100,10 +125,8 @@ function subscribe(cb: () => void) {
   }
 }
 
-const EMPTY: ReadonlyArray<PageAction> = []
-
-/** What the palette reads: the mounted pages' verbs, in order. */
-export function usePageActionsList(): ReadonlyArray<PageAction> {
+/** What the palette reads: the mounted pages' verbs, in order, and their scope. */
+export function usePageActionsList(): PageActionsState {
   return useSyncExternalStore(
     subscribe,
     () => snapshot,
@@ -117,20 +140,29 @@ export function usePageActionsList(): ReadonlyArray<PageAction> {
  */
 export function latestPageAction(id: string): PageAction | undefined {
   for (const r of registrations) {
-    const found = r.current.find((a) => a.id === id)
+    const found = r.current.actions.find((a) => a.id === id)
     if (found) return found
   }
   return undefined
 }
 
-/** Publish this page's verbs to Cmd-K while the page is mounted. */
-export function usePageActions(actions: ReadonlyArray<PageAction>) {
-  const latest = useRef<ReadonlyArray<PageAction>>(actions)
-  latest.current = actions
+/**
+ * Publish this page's verbs to Cmd-K while the page is mounted; `scope` is
+ * the name of the record the page is on.
+ */
+export function usePageActions(
+  actions: ReadonlyArray<PageAction>,
+  scope: string | null = null,
+) {
+  const latest = useRef({ actions, scope })
+  latest.current = { actions, scope }
   // Re-publish when what is drawn changes; handlers are read live.
-  const signature = actions
-    .map((a) => `${a.id}\u0000${a.label}\u0000${a.key ?? ''}`)
-    .join('\u0001')
+  const signature = [
+    scope ?? '',
+    ...actions.map(
+      (a) => `${a.id}\u0000${a.label}\u0000${a.key ?? ''}\u0000${a.meta ?? ''}`,
+    ),
+  ].join('\u0001')
 
   useEffect(() => {
     const reg: Registration = latest

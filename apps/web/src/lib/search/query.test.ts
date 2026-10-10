@@ -392,6 +392,43 @@ describe('searchAllProgram', () => {
     expect(order.indexOf(note)).toBeGreaterThanOrEqual(0)
   })
 
+  it('puts a record whose name starts with the query above a note and a deck titled with it', async () => {
+    const { me, newEntity, newNote, newDeck, search } = await deps()
+    // The note and the deck each score two lanes (name and text); the
+    // company scores one. Fused alone they would lead.
+    const note = await newNote({
+      title: 'Vayuthrone — first call',
+      body: 'Vayuthrone pitched a reusable upper stage.',
+      authorId: me,
+      visibility: 'shared',
+    })
+    const deck = await newDeck(
+      'Vayuthrone deck.pdf',
+      'Vayuthrone builds reusable upper stages.',
+    )
+    const company = await newEntity('company', 'Vayuthrone Orbital')
+
+    const order = (await search('Vayuthrone')).map((h) => h.id)
+    expect(order.at(0)).toBe(company)
+    expect(order.slice(1).sort()).toEqual([deck, note].sort())
+  })
+
+  it('renders a mention in a note body as its name in the snippet, never as [[Name|entity:id]]', async () => {
+    const { me, newEntity, newNote, search } = await deps()
+    const vayu = await newEntity('company', 'Vayu Orbital')
+    const note = await newNote({
+      title: 'Partner meeting',
+      body: `The quorvent leak moves under everyone.\n\nMentions: [[Vayu Orbital|entity:${vayu}]]`,
+      authorId: me,
+      visibility: 'shared',
+    })
+
+    const hit = (await search('quorvent')).find((h) => h.id === note)
+    expect(hit?.snippet).toContain('Vayu Orbital')
+    expect(hit?.snippet).not.toContain('[[')
+    expect(hit?.snippet).not.toContain('entity:')
+  })
+
   it('answers at most 20 hits', async () => {
     const { newEntity, search } = await deps()
     for (let i = 1; i <= 25; i++)

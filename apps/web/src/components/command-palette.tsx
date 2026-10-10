@@ -69,16 +69,19 @@ import { cn } from '#/lib/utils'
  * Cmd-K finds and goes; Ask answers. (D70)
  * - Four groups in order: Jump to, Actions, Records, Passages. A group with
  *   nothing in it is absent.
- * - Nothing typed shows only the page's own verbs (`usePageActions`), and a
- *   page with none shows only the input. Never recent items.
- * - Records is the lexical statement only, a typed name first; Passages is
- *   the semantic lane alone, a second wave once typing pauses
- *   (`searchWaves`), in its own group below.
+ * - Nothing typed on a record or a space shows only its verbs, under
+ *   `Actions · on <name>`, the subject named in the input. Anywhere else
+ *   nothing typed shows only the input. Never recent items.
+ * - Records is the lexical statement's records and tasks, in its name-first
+ *   order. Passages is its notes and files, then the semantic lane's second
+ *   wave once typing pauses (`searchWaves`): a note or a deck never sits in
+ *   Records.
  * - A verb with a `step` asks its answer in the same palette under its mode
  *   label; ⌫ on the empty input returns to Find with the query restored.
  * - Highlighting a record, an object or a passage opens `PreviewPane` and
  *   widens the window; anything else runs the list full width.
- * - Only our own bindings are printed: never esc, ↵ or ⌘K.
+ * - Only our own bindings are printed, and ↵ in the foot alone: never esc
+ *   or ⌘K.
  * - cmdk's filtering is off: the server ranked these.
  */
 
@@ -143,12 +146,59 @@ export function Highlighted({ text }: { text: string }) {
   )
 }
 
-/** A record row's path lane: where the match came from, or a task's due date. */
+/**
+ * A record row's kind lane — `company · seed · Proptech › Property ops`: the
+ * kind, its stage word, the first space it is filed in. A task's is its due
+ * date.
+ */
 export function hitMeta(hit: Hit): string {
   if (hit.rowKind === 'task') return hit.task.dueDate ?? 'no date'
-  if (hit.kind === 'document' && hit.parent) return `in ${hit.parent.name}`
-  if (hit.matchedIn === 'name') return hit.objectSlug ?? hit.kind
-  return `${hit.objectSlug ?? hit.kind} · text`
+  const lane = hit.lane ?? null
+  return [
+    (lane?.singular ?? hit.kind).toLowerCase(),
+    lane?.stage?.toLowerCase() ?? null,
+    lane?.space ?? null,
+  ]
+    .filter((part) => part !== null && part !== '')
+    .join(' · ')
+}
+
+/** The kinds the fused statement returns that are passages, not records. */
+const PASSAGE_KINDS = new Set(['note', 'document'])
+
+/**
+ * The fused hits as the palette groups them: records and tasks under
+ * Records, notes and files under Passages with their marked snippet.
+ */
+export function splitHits(hits: ReadonlyArray<Hit>): {
+  records: Array<Hit>
+  passages: Array<Passage>
+} {
+  const records: Array<Hit> = []
+  const passages: Array<Passage> = []
+  for (const hit of hits) {
+    if (hit.rowKind === 'entity' && PASSAGE_KINDS.has(hit.kind))
+      passages.push({
+        id: hit.id,
+        kind: hit.kind,
+        name: hit.name,
+        objectSlug: hit.objectSlug,
+        snippet: hit.snippet ?? '',
+        page: null,
+        parent: hit.parent,
+      })
+    else records.push(hit)
+  }
+  return { records, passages }
+}
+
+/** The lexical passages, then the semantic lane's that are not already in. */
+export function mergePassages(
+  lexical: ReadonlyArray<Passage>,
+  semantic: ReadonlyArray<Passage>,
+): Array<Passage> {
+  const seen = new Set(lexical.map((p) => p.id))
+  return [...lexical, ...semantic.filter((p) => !seen.has(p.id))]
 }
 
 /** A passage's path lane: the file and its page, or the record it is on. */
@@ -173,7 +223,13 @@ function Glyph({ icon: Icon }: { icon: LucideIcon }) {
 }
 
 /** The row's right lanes: the path in graphite, then the printed key. */
-function Lanes({ meta, keys }: { meta?: string; keys?: string }) {
+function Lanes({
+  meta,
+  keys,
+}: {
+  meta?: string | undefined
+  keys?: string | undefined
+}) {
   return (
     <>
       {meta ? (
@@ -364,6 +420,8 @@ type Mode =
 export type PaletteBodyProps = {
   /** The mounted page's own verbs, record verbs first. */
   pageActions: ReadonlyArray<PageAction>
+  /** The record or space the page is on, by name; null on a page with none. */
+  scope: string | null
   /** Verbs offered on every page, once something is typed. */
   extraActions: ReadonlyArray<PageAction>
   jump: ReadonlyArray<JumpTarget>
@@ -386,6 +444,7 @@ export type PaletteBodyProps = {
  */
 export function PaletteBody({
   pageActions,
+  scope,
   extraActions,
   jump,
   searchRecords,
@@ -498,10 +557,12 @@ export function PaletteBody({
     else onRun(action)
   }
 
-  // Find: nothing typed is the page's own verbs and nothing else.
+  // Find: nothing typed is the subject's own verbs, and nothing on any other page.
   const pageIds = new Set(pageActions.map((a) => a.id))
   const actions = !typed
-    ? pageActions
+    ? scope === null
+      ? []
+      : pageActions
     : [
         ...pageActions,
         ...extraActions.filter((a) => !pageIds.has(a.id)),
@@ -509,8 +570,12 @@ export function PaletteBody({
   const jumps = typed
     ? jump.filter((j) => matchesQuery(typed, `${j.label} ${j.meta}`))
     : []
-  const shownRecords = typed.length >= 2 ? records : []
-  const shownPassages = typed.length >= 2 ? passages : []
+  const fused = splitHits(typed.length >= 2 ? records : [])
+  const shownRecords = fused.records
+  const shownPassages = mergePassages(
+    fused.passages,
+    typed.length >= 2 ? passages : [],
+  )
   // Nothing found waits for both waves, so a late passage never follows it.
   const settled =
     typed.length < 2 || (recordsFor === typed && passagesFor === typed)
@@ -624,7 +689,13 @@ export function PaletteBody({
             </span>
           )
         }
-        aside={finding ? undefined : mode.step.subject}
+        aside={
+          finding
+            ? scope === null
+              ? undefined
+              : `on ${scope}`
+            : mode.step.subject
+        }
         placeholder={
           finding ? 'Find a record, a page, an action' : mode.step.placeholder
         }
@@ -702,7 +773,11 @@ export function PaletteBody({
               {actions.length > 0 ? (
                 <PaletteGroup
                   id="actions"
-                  heading="Actions"
+                  heading={
+                    !typed && scope !== null
+                      ? `Actions · on ${scope}`
+                      : 'Actions'
+                  }
                   count={actions.length}
                 >
                   {actions.map((a) => (
@@ -714,7 +789,7 @@ export function PaletteBody({
                     >
                       <Glyph icon={a.icon ?? ChevronRight} />
                       <span className="min-w-0 flex-1 truncate">{a.label}</span>
-                      <Lanes {...(a.key ? { keys: a.key } : {})} />
+                      <Lanes meta={a.meta} keys={a.key} />
                     </CommandItem>
                   ))}
                 </PaletteGroup>
@@ -771,7 +846,13 @@ export function PaletteBody({
                       >
                         <Glyph icon={p.kind === 'note' ? Pilcrow : File} />
                         <span className="min-w-0 flex-1 truncate">
-                          “{p.snippet || p.name}”
+                          “
+                          {p.snippet ? (
+                            <Highlighted text={p.snippet} />
+                          ) : (
+                            p.name
+                          )}
+                          ”
                         </span>
                         <Lanes meta={passageMeta(p)} />
                       </CommandItem>
@@ -798,7 +879,7 @@ export function PaletteBody({
         className="flex h-8 items-center justify-between gap-3 border-t border-rule bg-bone px-4 mono text-micro text-graphite"
       >
         <span>
-          {finding ? '↑↓ move' : '↑↓ move · ⌫ back to find'}
+          {finding ? '↑↓ move · ↵ open' : '↑↓ move · ⌫ back to find'}
           {target ? (
             <>
               {' · '}
@@ -887,7 +968,7 @@ export function CommandPalette({
 }) {
   const navigate = useNavigate()
   const router = useRouter()
-  const pageActions = usePageActionsList()
+  const { actions: pageActions, scope } = usePageActionsList()
   const { data: views } = useQuery({
     queryKey: ['palette-jump-views'],
     queryFn: () => listJumpViews(),
@@ -987,6 +1068,7 @@ export function CommandPalette({
       >
         <PaletteBody
           pageActions={pageActions}
+          scope={scope}
           extraActions={extraActions}
           jump={jump}
           searchRecords={(q) => searchAll({ data: { q } })}

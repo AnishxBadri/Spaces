@@ -21,19 +21,16 @@ export const searchEntities = createServerFn()
   })
 
 /**
- * Cmd-K's Records — the lexical fused statement only, never the vector lane,
- * ordered so a typed name puts its record first (`nameFirst`). (D70) The
- * query and its invariants live in `lib/search/query.ts`; this is the
- * request half.
+ * Cmd-K's Records and its lexical passages — the fused statement only, never
+ * the vector lane, in its name-first order. (D70) The query and its
+ * invariants live in `lib/search/query.ts`; this is the request half.
  */
 export const searchAll = createServerFn()
   .validator(z.object({ q: z.string().max(200) }))
   .handler(async ({ data }) => {
-    const { searchAllHandler } = await import('#/lib/search/search-all-handler')
-    const { nameFirst } = await import('#/lib/search/records')
-    // A record's picture draws in place of its kind icon; MCP has no use for it.
-    const { withPictures } = await import('#/lib/records/pictures')
-    return withPictures(nameFirst(await searchAllHandler(data), data.q))
+    const { paletteRecordsHandler } =
+      await import('#/lib/search/palette-records')
+    return paletteRecordsHandler(data)
   })
 
 /**

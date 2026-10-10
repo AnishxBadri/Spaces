@@ -132,6 +132,7 @@ const dealVerbs = (onMove: () => void): Array<PageAction> => [
 
 type Mount = {
   pageActions?: ReadonlyArray<PageAction>
+  scope?: string | null
   records?: (q: string) => Promise<ReadonlyArray<SearchHit>>
   passages?: (q: string) => Promise<ReadonlyArray<Passage>>
   onRun?: (a: PageAction) => void
@@ -149,6 +150,7 @@ const NO_LOADERS: PreviewLoaders = {
 
 function mount({
   pageActions: verbs = [],
+  scope = null,
   records = async () => [],
   passages = async () => [],
   onRun = () => {},
@@ -164,6 +166,7 @@ function mount({
       <Command shouldFilter={false}>
         <PaletteBody
           pageActions={verbs}
+          scope={scope}
           extraActions={pageActions.GLOBAL_ACTIONS}
           jump={jumpTargets(
             [],
@@ -251,16 +254,77 @@ describe('the palette, nothing typed', () => {
     expect(input().placeholder).toBe('Find a record, a page, an action')
   })
 
-  it("on a record lists that record's verbs only, with their printed keys", () => {
-    mount({ pageActions: dealVerbs(() => {}) })
+  it("on a record lists that record's verbs only under ACTIONS · ON <name>, the first in bone", () => {
+    mount({ pageActions: dealVerbs(() => {}), scope: 'Flent' })
     expect(groups()).toEqual(['actions'])
+    expect(
+      host.querySelector('[data-group="actions"] [cmdk-group-heading]')
+        ?.textContent,
+    ).toBe('Actions · on Flent3')
+    expect(
+      host.querySelector('[data-slot="command-input-wrapper"]')?.textContent,
+    ).toContain('on Flent')
     expect(rowsIn('actions')).toEqual([
       'Move stageM',
       'Log interactionL',
       'Hallmark this deal',
     ])
+    const first = host.querySelector('[data-group="actions"] [cmdk-item]')
+    expect(first?.getAttribute('data-selected')).toBe('true')
     // The global verbs wait for a typed word.
     expect(host.textContent).not.toContain('Upload a file')
+  })
+
+  it('on a space lists its verbs under ACTIONS · ON <space>, the first in bone', () => {
+    mount({
+      scope: 'Proptech',
+      pageActions: [
+        { id: 'note', label: 'Note here', key: 'N', run: () => {} },
+        { id: 'task', label: 'Add a task', key: 'T', run: () => {} },
+      ],
+    })
+    expect(groups()).toEqual(['actions'])
+    expect(
+      host.querySelector('[data-group="actions"] [cmdk-group-heading]')
+        ?.textContent,
+    ).toBe('Actions · on Proptech2')
+    expect(
+      host.querySelector('[data-slot="command-input-wrapper"]')?.textContent,
+    ).toContain('on Proptech')
+    expect(rowsIn('actions')).toEqual(['Note hereN', 'Add a taskT'])
+    const first = host.querySelector('[data-group="actions"] [cmdk-item]')
+    expect(first?.getAttribute('data-selected')).toBe('true')
+  })
+
+  it('prints a verb’s lane before its key: File in a space… in 2 now', () => {
+    mount({
+      scope: 'Flent',
+      pageActions: [
+        { id: 'task', label: 'Add task', key: 'T', run: () => {} },
+        {
+          id: 'file',
+          label: 'File in a space…',
+          meta: 'in 2 now',
+          run: () => {},
+        },
+      ],
+    })
+    expect(rowsIn('actions')).toEqual(['Add taskT', 'File in a space…in 2 now'])
+  })
+
+  it('on a page with verbs but no record shows only the input until something is typed', () => {
+    mount({
+      pageActions: [
+        { id: 'task', label: 'Add a task', key: 'T', run: () => {} },
+      ],
+    })
+    expect(groups()).toEqual([])
+    expect(
+      host.querySelector('[data-slot="command-input-wrapper"]')?.textContent,
+    ).not.toContain('on ')
+    type('add')
+    expect(groups()).toEqual(['actions'])
+    expect(rowsIn('actions')).toEqual(['Add a taskT'])
   })
 })
 
@@ -312,6 +376,43 @@ describe('the palette, typed', () => {
     ])
   })
 
+  it('lists a note or a deck the statement found under Passages, never Records, ahead of the semantic wave', async () => {
+    const lane = deferred<ReadonlyArray<Passage>>()
+    const vayu = company('c-vayu', 'Vayu Orbital')
+    const note: SearchHit = {
+      ...company('n-vayu', 'Vayu — first call'),
+      kind: 'note',
+      objectSlug: null,
+      snippet: 'the «Vayu» thesis, mentions Vayu Orbital',
+    }
+    const deck: SearchHit = {
+      ...company('d-vayu', 'Vayu deck.pdf'),
+      kind: 'document',
+      objectSlug: null,
+    }
+    mount({
+      records: async () => [vayu, note, deck],
+      passages: () => lane.promise,
+    })
+    type('vayu')
+    await wait(180)
+    expect(groups()).toEqual(['records', 'passages'])
+    expect(rowsIn('records')).toEqual(['Vayu Orbitalcompany'])
+    expect(rowsIn('passages')).toEqual([
+      '“the Vayu thesis, mentions Vayu Orbital”note · Vayu — first call',
+      '“Vayu deck.pdf”Vayu deck.pdf',
+    ])
+    expect(host.textContent).not.toContain('[[')
+
+    await wait(420)
+    await act(async () => {
+      lane.resolve([{ ...DECK, id: 'd-vayu' }, DECK])
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    // The semantic lane adds only what the statement had not found.
+    expect(rowsIn('passages')).toHaveLength(3)
+  })
+
   it('leaves a group with nothing in it absent, and says Nothing found once every lane has answered', async () => {
     mount({ pageActions: dealVerbs(() => {}) })
     type('zzqx')
@@ -337,16 +438,22 @@ describe('the palette, typed', () => {
 })
 
 describe('the palette grammar', () => {
-  it('prints no esc, no ↵ and no ⌘K anywhere, and only our keys in the foot', async () => {
+  it('prints no esc and no ⌘K anywhere, and only our keys in the foot', async () => {
     mount({ pageActions: dealVerbs(() => {}), records: async () => [HALCYON] })
     const forbidden = (text: string | null) => {
-      expect(text).not.toMatch(/esc|↵|⌘K/i)
+      expect(text).not.toMatch(/esc|⌘K/i)
     }
     forbidden(host.textContent)
+    expect(host.querySelector('[data-foot]')?.textContent).toBe(
+      '↑↓ move · ↵ open',
+    )
     type('hal')
     await wait(700)
     forbidden(host.textContent)
-    expect(host.querySelector('[data-foot]')?.textContent).toBe('↑↓ move')
+    // A highlighted record or object adds `→ actions`; nothing else changes.
+    expect(host.querySelector('[data-foot]')?.textContent).toMatch(
+      /^↑↓ move · ↵ open( · → actions)?$/,
+    )
   })
 
   it('draws 36px rows under 44px bone heads', async () => {
@@ -502,7 +609,7 @@ describe('the preview pane', () => {
     await wait(180)
     // The saved view under Jump to is highlighted first: nothing to preview.
     expect(pane()).toBeNull()
-    expect(foot()).toBe('↑↓ move')
+    expect(foot()).toBe('↑↓ move · ↵ open')
 
     press('ArrowDown')
     await wait(0)
@@ -532,7 +639,7 @@ describe('the preview pane', () => {
       'LinkedInlinkedin.com/halcyon',
       'FoundersAda Lind',
     ])
-    expect(foot()).toBe('↑↓ move · → actions')
+    expect(foot()).toBe('↑↓ move · ↵ open · → actions')
     // The pane prints no universal key either.
     expect(pane()?.textContent).not.toMatch(/\besc\b|↵|⌘K/i)
   })
@@ -599,7 +706,7 @@ describe('the preview pane', () => {
     press('ArrowDown')
     await wait(0)
     expect(pane()).toBeNull()
-    expect(foot()).toBe('↑↓ move')
+    expect(foot()).toBe('↑↓ move · ↵ open')
     press('ArrowUp')
     await wait(0)
     expect(pane()?.getAttribute('data-preview')).toBe('object')
@@ -720,23 +827,27 @@ describe('usePageActions', () => {
     const moved = vi.fn()
     const charted = vi.fn()
     let seen: ReadonlyArray<PageAction> = []
+    let scope: string | null = null
     function Page() {
       hotkey.useHotkeys([
         ['m', moved],
         ['g t', charted],
       ])
-      pageActions.usePageActions([
-        {
-          id: 'move',
-          label: 'Move stage',
-          key: 'M',
-          run: pageActions.runBinding('M'),
-        },
-      ])
+      pageActions.usePageActions(
+        [
+          {
+            id: 'move',
+            label: 'Move stage',
+            key: 'M',
+            run: pageActions.runBinding('M'),
+          },
+        ],
+        'Flent — Series A',
+      )
       return null
     }
     function Reader() {
-      seen = pageActions.usePageActionsList()
+      ;({ actions: seen, scope } = pageActions.usePageActionsList())
       return null
     }
     act(() =>
@@ -748,6 +859,7 @@ describe('usePageActions', () => {
       ),
     )
     expect(seen.map((a) => a.id)).toEqual(['move'])
+    expect(scope).toBe('Flent — Series A')
     const verb = pageActions.latestPageAction('move')
     if (!verb || !('run' in verb)) throw new Error('no runnable verb')
     act(() => verb.run())
@@ -757,5 +869,6 @@ describe('usePageActions', () => {
 
     act(() => root.render(<Reader />))
     expect(seen).toEqual([])
+    expect(scope).toBeNull()
   })
 })

@@ -203,19 +203,18 @@ function PersonRecordPage() {
     }
   }
 
-  usePageActions([
-    { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
-    {
-      id: 'note',
-      label: 'Note about this',
-      run: () => void newNoteAboutThis(),
-    },
-    fileInSpaceAction({
-      id: person.id,
-      name: person.name,
-      filedIds: person.spaces.map((s) => s.id),
-    }),
-  ])
+  usePageActions(
+    [
+      { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+      { id: 'task', label: 'Add task', key: 'T', run: runBinding('T') },
+      fileInSpaceAction({
+        id: person.id,
+        name: person.name,
+        filedIds: person.spaces.map((s) => s.id),
+      }),
+    ],
+    person.name,
+  )
 
   return (
     <div className="flex min-h-full flex-col">
