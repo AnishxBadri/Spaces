@@ -50,6 +50,36 @@ export function SectionHead({
 }
 
 /**
+ * A mono caps label on a hairline — the head of a ledger that is the page's
+ * one list (the market map), where a bone band would be a second head under
+ * the page's own. 28px; lane heads ride right as `children`.
+ */
+export function LabelHead({
+  label,
+  children,
+  className,
+}: {
+  label: ReactNode
+  /** Lowercase mono lane heads, aligned with the rows' fixed lanes. */
+  children?: ReactNode
+  className?: string | undefined
+}) {
+  return (
+    <div
+      className={cn(
+        'flex h-7 shrink-0 items-center gap-2.5 border-b border-hairline px-3',
+        className,
+      )}
+    >
+      <h2 className="min-w-0 flex-1 truncate label-caps text-graphite">
+        {label}
+      </h2>
+      {children}
+    </div>
+  )
+}
+
+/**
  * P2 — Ledger section. The bone head band (title + mono count left, one
  * mono link right), then 40px rows on rules; the last row may be a
  * composer. The section is a list, so the rows are `<li>`s and the caller

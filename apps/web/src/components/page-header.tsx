@@ -22,6 +22,7 @@ import { cn } from '#/lib/utils'
 export function PageHeader({
   eyebrow,
   title,
+  count,
   description,
   action,
   tabs,
@@ -30,6 +31,8 @@ export function PageHeader({
   /** Mono caps line above the title — "Today · Wednesday · 2026-09-10". */
   eyebrow?: ReactNode
   title: ReactNode
+  /** Mono readout beside the title, on its baseline — "26 spaces · 18 nested". */
+  count?: ReactNode
   /** Mono readout under the title — counts, last touch. Never prose. */
   description?: ReactNode
   action?: ReactNode
@@ -53,9 +56,20 @@ export function PageHeader({
               {eyebrow}
             </div>
           ) : null}
-          <h1 ref={titleRef} className="title-serif">
-            {title}
-          </h1>
+          {count ? (
+            <div className="flex min-w-0 items-baseline gap-3">
+              <h1 ref={titleRef} className="title-serif">
+                {title}
+              </h1>
+              <span className="shrink-0 mono text-label text-graphite">
+                {count}
+              </span>
+            </div>
+          ) : (
+            <h1 ref={titleRef} className="title-serif">
+              {title}
+            </h1>
+          )}
           {description ? (
             <div className="flex flex-wrap items-baseline gap-x-5 mono text-label text-graphite">
               {description}

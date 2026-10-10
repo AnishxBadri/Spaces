@@ -11,6 +11,7 @@ import {
   or,
   sql,
 } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@spaces/db'
 import {
   attribute,
@@ -30,6 +31,7 @@ import {
 import { jsonString } from '@spaces/core/json'
 import { archiveCountsProgram } from '@spaces/core/writes/entities/space'
 import { filedNotesProgram } from '#/lib/notes/filed'
+import { localDay } from '#/lib/records/readout-format'
 import { liveSpaceSql } from '#/lib/spaces/live'
 import {
   spaceContactsProgram,
@@ -145,6 +147,96 @@ export const listSpacesProgram = Effect.fn('listSpacesProgram')(function* (
     memos: memos.get(r.id) ?? 0,
     terms: terms.get(r.id) ?? 0,
   }))
+})
+
+/**
+ * The newest filing into each live space or any live space under it — the
+ * index's `last filed` lane. One grouped query over the ltree containment.
+ */
+const lastFiledBySpace = Effect.fn('lastFiledBySpace')(function* () {
+  const below = alias(space, 'below')
+  const rows = yield* query(() =>
+    db
+      .select({ spaceId: space.entityId, at: max(entitySpace.createdAt) })
+      .from(space)
+      .innerJoin(below, sql`${below.path} <@ ${space.path}`)
+      .innerJoin(entitySpace, eq(entitySpace.spaceId, below.entityId))
+      .where(isNull(below.archivedAt))
+      .groupBy(space.entityId),
+  )
+  return new Map(rows.map((r) => [r.spaceId, r.at]))
+})
+
+/**
+ * The archive heads: archived spaces with no archived ancestor, newest first.
+ * Restore on a head brings back every space archived with it. (D73)
+ */
+const archivedHeads = Effect.fn('archivedHeads')(function* () {
+  const rows = yield* query(() =>
+    db
+      .select({
+        id: space.entityId,
+        name: entity.canonicalName,
+        archivedAt: space.archivedAt,
+        within: sql<string | null>`(
+          select string_agg(up_entity.canonical_name, ' / ' order by nlevel(up.path))
+          from space up join entity up_entity on up_entity.id = up.entity_id
+          where up.path @> ${space.path} and up.path <> ${space.path}
+        )`,
+        spaces: sql<number>`(
+          select count(*)::int from space held
+          where held.path <@ ${space.path} and held.archived_at = ${space.archivedAt}
+        )`,
+      })
+      .from(space)
+      .innerJoin(entity, eq(entity.id, space.entityId))
+      .where(
+        and(
+          isNotNull(space.archivedAt),
+          sql`not exists (
+            select 1 from space arch
+            where arch.path @> ${space.path} and arch.path <> ${space.path}
+              and arch.archived_at is not null
+          )`,
+        ),
+      )
+      .orderBy(desc(space.archivedAt)),
+  )
+  return rows.flatMap((r) =>
+    r.archivedAt === null
+      ? []
+      : [
+          {
+            id: r.id,
+            name: r.name,
+            within: r.within,
+            spaces: r.spaces,
+            archivedOn: localDay(r.archivedAt),
+          },
+        ],
+  )
+})
+
+/**
+ * The spaces index: the live tree with each row's last filed day, the
+ * archive heads for the fold, and the server's `today` the days print from.
+ */
+export const spacesIndexProgram = Effect.fn('spacesIndexProgram')(function* (
+  userId: string,
+) {
+  const [rows, lastFiled, archived] = yield* Effect.all(
+    [listSpacesProgram(userId), lastFiledBySpace(), archivedHeads()],
+    { concurrency: 'unbounded' },
+  )
+  const now = yield* Clock.currentTimeMillis
+  return {
+    today: localDay(new Date(now)),
+    spaces: rows.map((r) => {
+      const at = lastFiled.get(r.id) ?? null
+      return { ...r, lastFiled: at === null ? null : localDay(at) }
+    }),
+    archived,
+  }
 })
 
 /**

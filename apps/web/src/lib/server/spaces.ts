@@ -3,7 +3,11 @@ import { Effect } from 'effect'
 import { z } from 'zod'
 import { db } from '@spaces/db'
 import { activity } from '@spaces/db/schema/activity'
-import { getSpaceProgram, listSpacesProgram } from '#/lib/spaces/read'
+import {
+  getSpaceProgram,
+  listSpacesProgram,
+  spacesIndexProgram,
+} from '#/lib/spaces/read'
 import { createSpaceRow, requireUser } from './shared'
 
 // Spaces — first real write path through the entity core. The reads are
@@ -14,6 +18,12 @@ import { createSpaceRow, requireUser } from './shared'
 export const listSpaces = createServerFn().handler(async () => {
   const u = await requireUser()
   return Effect.runPromise(listSpacesProgram(u.id))
+})
+
+/** The spaces index: the live tree with last filed, and the archive heads. */
+export const getSpacesIndex = createServerFn().handler(async () => {
+  const u = await requireUser()
+  return Effect.runPromise(spacesIndexProgram(u.id))
 })
 
 export const getSpace = createServerFn()

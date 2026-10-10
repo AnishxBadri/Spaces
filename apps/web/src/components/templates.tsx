@@ -1,5 +1,6 @@
 import { ChevronDown, LayoutTemplate } from 'lucide-react'
 import { useState } from 'react'
+import type { ReactElement } from 'react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import {
@@ -34,6 +35,8 @@ export function TemplatePicker({
   objectKind,
   context,
   label = 'From template',
+  trigger,
+  align = 'end',
   onPick,
 }: {
   kind: 'note' | 'space' | 'record'
@@ -41,6 +44,10 @@ export function TemplatePicker({
   /** Entity kind of the surface this picker sits on — the suggest_on hint. */
   context?: string
   label?: string
+  /** Drawn instead of the outline button — a row that opens the picker. It
+   *  must be an element that spreads its props (a native `button`). */
+  trigger?: ReactElement
+  align?: 'start' | 'end'
   onPick: (template: TemplateRow) => void
 }) {
   const [items, setItems] = useState<Array<TemplateRow> | null>(null)
@@ -65,13 +72,15 @@ export function TemplatePicker({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild onPointerDown={load} onFocus={load}>
-        <Button size="sm" variant="outline">
-          <LayoutTemplate className="size-3.5" strokeWidth={1.75} />
-          {label}
-          <ChevronDown className="size-3" strokeWidth={2} />
-        </Button>
+        {trigger ?? (
+          <Button size="sm" variant="outline">
+            <LayoutTemplate className="size-3.5" strokeWidth={1.75} />
+            {label}
+            <ChevronDown className="size-3" strokeWidth={2} />
+          </Button>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align={align} className="w-56">
         {items === null ? (
           <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
         ) : items.length === 0 ? (
