@@ -6,7 +6,6 @@ import { LedgerRow, LedgerSection } from '#/components/ledger-section'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   DitherMark,
-  RailEmpty,
   RailRow,
   RailSection,
   RecordBody,
@@ -24,6 +23,11 @@ import {
   DialogTrigger,
 } from '#/components/ui/dialog'
 import { Input } from '#/components/ui/input'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '#/components/ui/tooltip'
 import { Label } from '#/components/ui/label'
 import { Select } from '#/components/ui/select'
 import {
@@ -197,7 +201,7 @@ function HoldingPage() {
         />
         <EventSection
           title="Marks"
-          empty="Never marked — value shows at cost, staleness on purpose."
+          empty="No mark yet."
           add={<AddMarkDialog holdingId={h.id} />}
           table="mark"
           rows={h.marks.map((r) => ({
@@ -239,20 +243,45 @@ function HoldingPage() {
   )
 }
 
+/** A rail figure whose explanation is its tooltip, not a line under it. */
+function ExplainedFigure({ figure, why }: { figure: string; why: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0} className="focus-ring cursor-default">
+          {figure}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">{why}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 function OwnershipBlock({ ownership }: { ownership: Holding['ownership'] }) {
   if (ownership.kind === 'cost_basis_only') {
     return (
-      <RailEmpty>
-        Cost basis only — unconverted instrument, a percentage would be a guess.
-      </RailEmpty>
+      <RailRow
+        label="Cost basis only"
+        value={
+          <ExplainedFigure
+            figure="—"
+            why="An unconverted instrument has no percentage yet; one would be a guess."
+          />
+        }
+      />
     )
   }
   if (ownership.kind === 'implied') {
     return (
-      <>
-        <RailRow label="Implied" value={`~${fmtPct(ownership.pct)}`} />
-        <RailEmpty>Post-money SAFE, locked at signing.</RailEmpty>
-      </>
+      <RailRow
+        label="Implied"
+        value={
+          <ExplainedFigure
+            figure={`~${fmtPct(ownership.pct)}`}
+            why="Post-money SAFE, locked at signing."
+          />
+        }
+      />
     )
   }
   return (

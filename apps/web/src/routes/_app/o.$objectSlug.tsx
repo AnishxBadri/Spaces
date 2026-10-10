@@ -453,6 +453,7 @@ function ObjectListPage() {
                     mode="create"
                     objectId={object.id}
                     objectLabel={object.singular}
+                    objectPlural={object.plural}
                     onSaved={refresh}
                     trigger={<AddColumnButton />}
                   />

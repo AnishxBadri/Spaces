@@ -230,7 +230,7 @@ type Props = {
   /** singular noun for copy ("every company"); defaults from objectKind */
   objectLabel?: string | undefined
   /** plural noun for the head's mono context ("on Companies") */
-  objectPlural?: string | undefined
+  objectPlural: string
   /** live attribute count — the head reads `19 → 20` on create */
   attributeCount?: number | undefined
   /**
@@ -308,7 +308,7 @@ function AttributeForm({
   objectKind?: ObjectKind | undefined
   objectId?: string | undefined
   objectLabel: string
-  objectPlural?: string | undefined
+  objectPlural: string
   attributeCount?: number | undefined
   fillFrom?: 'company' | 'person' | undefined
   mode: 'create' | 'edit'
@@ -771,11 +771,10 @@ function AttributeForm({
     )
   })()
 
-  const plural = objectPlural ?? `${objectLabel}s`
   const context =
     mode === 'create' && attributeCount !== undefined
-      ? `on ${plural} · ${attributeCount} → ${attributeCount + 1}`
-      : `on ${plural}`
+      ? `on ${objectPlural} · ${attributeCount} → ${attributeCount + 1}`
+      : `on ${objectPlural}`
   const slug = mode === 'edit' ? (attr?.slug ?? '') : slugPreview(name)
 
   return (
@@ -879,7 +878,7 @@ function AttributeForm({
                 checked={dflt === true}
                 onChange={(on) => setDflt(on ? true : null)}
                 label="Starts checked"
-                hint={`New ${plural.toLowerCase()} begin ticked`}
+                hint={`New ${objectPlural.toLowerCase()} begin ticked`}
               />
             ) : (
               <CheckRow

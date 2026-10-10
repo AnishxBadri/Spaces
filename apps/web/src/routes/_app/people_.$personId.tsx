@@ -6,12 +6,11 @@ import {
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { AttributeCreateDialog } from '#/components/attributes/attribute-create-dialog'
 import { RailField } from '#/components/attributes/rail-field'
-import { NameField } from '#/components/attributes/name-field'
 import { AiCellsProvider } from '#/components/attributes/ai-cell'
 import { KeyHint } from '#/components/page-header'
 import {
@@ -26,6 +25,7 @@ import {
   RecordHeader,
 } from '#/components/record/record-parts'
 import { DetailsPickRow } from '#/components/record/details-add'
+import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordPicture } from '#/components/record/record-picture'
@@ -136,9 +136,6 @@ function PersonRecordPage() {
   } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
-  // The name as the Name cell's First and Last are typed; the head shows it.
-  const [nameDraft, setNameDraft] = useState<string | null>(null)
-
   const go = Route.useNavigate()
   const [tab, changeTab] = useRecordTab(
     'person',
@@ -151,6 +148,15 @@ function PersonRecordPage() {
   const firstEmail = jsonStrings(person.values.emails).at(0)
   const role = jsonString(person.values.job_title)
   const companies = person.companies
+  // Beside the name: `role · company`, then the first email.
+  const nameMeta = [role, companies.at(0)?.name, firstEmail]
+    .filter((part) => part !== null && part !== undefined && part !== '')
+    .join(' · ')
+  // The name's parts lead the grid; the head is their join. (D67)
+  const fields = [
+    ...registry.filter((def) => isNamePart(def.slug)),
+    ...registry.filter((def) => !isNamePart(def.slug)),
+  ]
   const searchCompanies = useCallback(
     async (q: string) => {
       const on = new Set(companies.map((c) => c.id))
@@ -214,7 +220,7 @@ function PersonRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={{ kind: 'Person', fact: person.id.slice(0, 8) }}
+        stamp={{ kind: 'Person' }}
         crumb={
           <>
             <Link to="/people" className="focus-ring hover:text-foreground">
@@ -222,7 +228,8 @@ function PersonRecordPage() {
             </Link>
             {' / '}
             {person.id.slice(0, 8)}
-            {firstEmail ? ` / ${firstEmail}` : ''}
+            {' / added '}
+            {person.createdAt.slice(0, 10)}
           </>
         }
         actions={
@@ -256,10 +263,12 @@ function PersonRecordPage() {
             fallback={<InitialsMark name={person.name} size="lg" />}
           />
         }
-        name={nameDraft ?? person.name}
+        name={person.name}
         badges={
-          nameDraft === null ? null : (
-            <span className="mono text-micro text-graphite">editing</span>
+          nameMeta === '' ? null : (
+            <span className="min-w-0 truncate mono text-micro text-graphite">
+              {nameMeta}
+            </span>
           )
         }
         readouts={[
@@ -296,29 +305,17 @@ function PersonRecordPage() {
           <>
             <AiCellsProvider entityIds={[person.id]} registry={registry}>
               <PropertyGrid>
-                {/* The name's two parts are one cell; the head is their join. (D67) */}
-                {registry.some((def) => isNamePart(def.slug)) ? (
-                  <NameField
-                    first={jsonString(person.values.first_name)}
-                    last={jsonString(person.values.last_name)}
-                    onDraft={setNameDraft}
-                    onSave={async (parts) => {
-                      await updateRecord({
-                        data: { id: person.id, patch: parts },
-                      })
-                      await router.invalidate()
-                    }}
-                  />
-                ) : null}
-                {registry
-                  .filter((def) => !isNamePart(def.slug))
-                  .map((def) => (
+                <PropertyFold
+                  defs={fields}
+                  valueOf={(def) => person.values[def.slug]}
+                  render={(def) => (
                     <RailField
                       key={def.slug}
                       entityId={person.id}
                       def={def}
                       attr={def}
                       objectLabel={'person'}
+                      objectPlural="People"
                       fillFrom="person"
                       whereFrom={enrichment.whereFrom[def.slug]}
                       onAttributeSaved={() => router.invalidate()}
@@ -337,7 +334,8 @@ function PersonRecordPage() {
                         void router.invalidate()
                       }}
                     />
-                  ))}
+                  )}
+                />
                 <PropertyCell label="">
                   <AttributeCreateDialog
                     objectKind="person"

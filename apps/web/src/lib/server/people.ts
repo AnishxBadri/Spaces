@@ -205,6 +205,7 @@ export const getPerson = createServerFn()
       id: head.id,
       name: head.name,
       mergedIntoId: head.mergedIntoId,
+      createdAt: head.createdAt.toISOString(),
       values: head.values,
       picture: await pictureUrl(head.pictureSha),
       readouts,

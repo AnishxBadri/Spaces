@@ -4,6 +4,7 @@ import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { cellsFor } from './dither'
+import { FilterCount, FilterRow, FilterTab } from './filter-row'
 import { LedgerFigure, LedgerRow } from './ledger-section'
 import { KeyHint } from './page-header'
 import { DitherMark, InitialsMark } from './record/record-parts'
@@ -151,54 +152,6 @@ export function SpaceTabs({
   )
 }
 
-// ---------- the filter row ----------
-
-/** A filter in the underline grammar: pine 2px under the chosen one. */
-function FilterTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        'focus-ring-inset flex h-9 items-center gap-1.5 border-b-2 px-3 label-caps transition-colors duration-150 ease-out-quart',
-        active
-          ? 'border-primary text-foreground'
-          : 'border-transparent text-graphite hover:text-foreground',
-      )}
-    >
-      {children}
-    </button>
-  )
-}
-
-function FilterRow({
-  label,
-  children,
-  end,
-}: {
-  label: string
-  children: ReactNode
-  end?: ReactNode
-}) {
-  return (
-    <div className="flex h-11 items-end justify-between gap-3 border-b border-rule px-3">
-      <div role="group" aria-label={label} className="-ml-3 flex items-end">
-        {children}
-      </div>
-      {end ? <div className="flex h-full items-center">{end}</div> : null}
-    </div>
-  )
-}
-
 /**
  * Move here's selection bar, in place of the filter row: the subspace to
  * move into, and Move here as the one pine verb.
@@ -236,10 +189,6 @@ function MoveBar({
       </Button>
     </SelectionBar>
   )
-}
-
-function Count({ n }: { n: number }) {
-  return <span className="tabular mono text-micro font-normal">{n}</span>
 }
 
 /** One quiet row for a tab with nothing in it. */
@@ -388,19 +337,19 @@ function CompaniesTab({ spc, into }: { spc: Space; into: string | null }) {
           }
         >
           <FilterTab active={filter === 'all'} onClick={() => setFilter('all')}>
-            All <Count n={spc.companies.length} />
+            All <FilterCount n={spc.companies.length} />
           </FilterTab>
           <FilterTab
             active={filter === 'pipeline'}
             onClick={() => setFilter('pipeline')}
           >
-            In pipeline <Count n={inPipeline} />
+            In pipeline <FilterCount n={inPipeline} />
           </FilterTab>
           <FilterTab
             active={filter === 'watching'}
             onClick={() => setFilter('watching')}
           >
-            Watching <Count n={watching} />
+            Watching <FilterCount n={watching} />
           </FilterTab>
         </FilterRow>
       )}
@@ -505,13 +454,13 @@ function NotesTab({
           active={filter === 'filed'}
           onClick={() => setFilter('filed')}
         >
-          Filed <Count n={spc.filed.length} />
+          Filed <FilterCount n={spc.filed.length} />
         </FilterTab>
         <FilterTab
           active={filter === 'mentions'}
           onClick={() => setFilter('mentions')}
         >
-          Mentions <Count n={spc.notes.length} />
+          Mentions <FilterCount n={spc.notes.length} />
         </FilterTab>
       </FilterRow>
       {filter === 'filed' ? (

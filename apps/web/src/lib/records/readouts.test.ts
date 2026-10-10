@@ -298,6 +298,38 @@ describe('deal readouts', () => {
     expect(b.lastContact).toBe(localDay(daysAgo(3)))
   })
 
+  it('reads the company’s latest round, and none without one', async () => {
+    const c = await aCompany('Rounded')
+    const d = await aDeal(c)
+    expect(
+      (await Effect.runPromise(dealReadoutsProgram(d, NOW))).round,
+    ).toBeNull()
+    await db.insert(round).values([
+      {
+        companyId: c,
+        date: '2024-03-01',
+        kind: 'pre_seed',
+        raised: '1000000',
+        currency: 'USD',
+        postMoney: '6000000',
+      },
+      {
+        companyId: c,
+        date: '2026-06-01',
+        kind: 'seed',
+        raised: '4200000',
+        currency: 'USD',
+        postMoney: '18000000',
+      },
+    ])
+    const r = await Effect.runPromise(dealReadoutsProgram(d, NOW))
+    expect(r.round).toEqual({
+      raised: 4_200_000,
+      postMoney: 18_000_000,
+      currency: 'USD',
+    })
+  })
+
   it('reads null last contact when nothing touched the deal', async () => {
     const c = await aCompany('Silent')
     const d = await aDeal(c)

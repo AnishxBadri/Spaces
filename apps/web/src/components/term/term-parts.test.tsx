@@ -4,8 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { Highlighted } from '#/components/command-palette'
 import {
   CoMentioned,
-  TERM_EMPTY_BODY,
-  TERM_EMPTY_TITLE,
+  TERM_EMPTY,
   TermMentions,
   mentionHref,
 } from './term-parts'
@@ -34,16 +33,20 @@ describe('the term page', () => {
     expect(renderToStaticMarkup(<CoMentioned rows={[]} />)).toBe('')
   })
 
-  it('says the litmus when nothing mentions the term, and offers nothing to do', () => {
-    const html = renderToStaticMarkup(<TermMentions rows={[]} total={0} />)
-    expect(TERM_EMPTY_TITLE).toBe('Nothing mentions this term yet.')
-    expect(TERM_EMPTY_BODY).toBe(
-      'A term gathers what mentions it and holds nothing itself — file notes and decks into a space.',
+  it('says one line when nothing mentions the term, and holds the primary it is given', () => {
+    const bare = renderToStaticMarkup(<TermMentions rows={[]} total={0} />)
+    expect(TERM_EMPTY).toBe('Nothing mentions this term yet.')
+    expect(bare).toContain(TERM_EMPTY)
+    expect(bare.match(/<p/g)).toHaveLength(1)
+    expect(bare).not.toMatch(/<button|<a |<form|<input/)
+    const offered = renderToStaticMarkup(
+      <TermMentions
+        rows={[]}
+        total={0}
+        action={<button type="button">Write a note</button>}
+      />,
     )
-    expect(html).toContain(TERM_EMPTY_TITLE)
-    expect(html).toContain(TERM_EMPTY_BODY)
-    // No action: a term is not something to file, tag or attach into.
-    expect(html).not.toMatch(/<button|<a |<form|<input/)
+    expect(offered).toContain('Write a note')
   })
 
   it('draws a snippet with the palette’s own renderer — «» as text, never markup', () => {

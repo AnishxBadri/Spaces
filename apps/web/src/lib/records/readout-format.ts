@@ -1,3 +1,5 @@
+import { fmtMoney } from '@spaces/core/portfolio/format'
+
 /**
  * How a record readout prints a day: `MM-DD` in the current year, the full
  * `YYYY-MM-DD` otherwise, and `—` for none. Pure, so the server and the
@@ -36,4 +38,18 @@ export function readoutDayUntil(day: string | null, today: string): string {
   if (day === null) return DASH
   const n = daysBetween(today, day)
   return `${readoutDay(day, today)} · ${n < 0 ? '−' : ''}${Math.abs(n)}d`
+}
+
+/** `$4.2M @ $18M` — a round's size at its post-money; `—` for none. */
+export function readoutRound(
+  r: {
+    raised: number | null
+    postMoney: number | null
+    currency: string
+  } | null,
+): string {
+  if (r === null || (r.raised === null && r.postMoney === null)) return DASH
+  const money = (n: number) => fmtMoney(n, r.currency, { compact: true })
+  if (r.postMoney === null) return money(r.raised ?? 0)
+  return `${r.raised === null ? DASH : money(r.raised)} @ ${money(r.postMoney)}`
 }

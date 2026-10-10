@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, like, sql } from 'drizzle-orm'
 import { condenseBursts } from '@spaces/core/timeline/bursts'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
@@ -8,11 +8,14 @@ import {
   entity,
   integration,
   interaction,
+  interactionDocument,
   interactionEntity,
   link,
 } from '@spaces/db/schema'
+import type { InteractionMeta } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
-import { jsonRecord, jsonString } from '@spaces/core/json'
+import { investment } from '@spaces/db/schema/portfolio'
+import { jsonRecord, jsonString, jsonStrings } from '@spaces/core/json'
 import { sinceRemoved } from '@spaces/core/plugins/registry'
 import type { Json } from '@spaces/core/json'
 import { resolveRefsProgram } from '@spaces/core/writes/context/names'
@@ -131,12 +134,13 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
     // reaches a deal by derivation, never by an edge written at arrival, so
     // a company carrying two deals shows every thread on both. The deal's
     // own edges still count — the one explicit pin D49 keeps.
-    const kind = (yield* query(() =>
+    const self = (yield* query(() =>
       db
-        .select({ kind: entity.kind })
+        .select({ kind: entity.kind, values: entity.values })
         .from(entity)
         .where(eq(entity.id, entityId)),
-    )).at(0)?.kind
+    )).at(0)
+    const kind = self?.kind
     const derived =
       kind === 'deal'
         ? (yield* query(() =>
@@ -166,6 +170,8 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           // case — a meeting logged in twenty seconds has no body — and the
           // row renders exactly as it did before.
           noteId: interaction.noteId,
+          sourceRef: interaction.sourceRef,
+          meta: interaction.meta,
         })
         .from(interactionEntity)
         .innerJoin(
@@ -192,6 +198,101 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
               .where(inArray(interactionEntity.interactionId, interactionIds)),
           )
         : []
+    // The row's end lane: who logged it or which integration wrote it, and
+    // how many attachments hang off it.
+    const loggers =
+      interactionIds.length > 0
+        ? yield* query(() =>
+            db
+              .select({
+                interactionId: sql<string>`${activity.meta} ->> 'interactionId'`,
+                actorId: activity.actorId,
+              })
+              .from(activity)
+              .where(
+                and(
+                  like(activity.verb, 'interaction.%'),
+                  isNotNull(activity.actorId),
+                  inArray(
+                    sql<string>`${activity.meta} ->> 'interactionId'`,
+                    interactionIds,
+                  ),
+                ),
+              ),
+          )
+        : []
+    const loggedBy = new Map(
+      loggers.flatMap((l) => {
+        const name = l.actorId ? userNames.get(l.actorId) : undefined
+        return name === undefined ? [] : [[l.interactionId, name] as const]
+      }),
+    )
+    const attachmentRows =
+      interactionIds.length > 0
+        ? yield* query(() =>
+            db
+              .select({
+                interactionId: interactionDocument.interactionId,
+                n: sql<number>`count(*)::int`,
+              })
+              .from(interactionDocument)
+              .where(
+                and(
+                  inArray(interactionDocument.interactionId, interactionIds),
+                  eq(interactionDocument.role, 'attachment'),
+                ),
+              )
+              .groupBy(interactionDocument.interactionId),
+          )
+        : []
+    const attachmentsBy = new Map(
+      attachmentRows.map((r) => [r.interactionId, r.n]),
+    )
+    // A person's own emails, so a meeting row can say how they answered.
+    const ownEmails =
+      kind === 'person' && self ? jsonStrings(self.values.emails) : []
+
+    // A deal's checks, read off the ledger by `deal_id`: each original with
+    // the instant it was voided, so History can strike it. (D12)
+    const checks =
+      kind === 'deal'
+        ? yield* query(() =>
+            db
+              .select({
+                id: investment.id,
+                reversesId: investment.reversesId,
+                amount: investment.amount,
+                currency: investment.currency,
+                instrument: investment.instrument,
+                date: investment.date,
+                createdBy: investment.createdBy,
+                createdAt: investment.createdAt,
+              })
+              .from(investment)
+              .where(eq(investment.dealId, entityId)),
+          )
+        : []
+    const checkIds = checks.map((c) => c.id)
+    const reversals =
+      checkIds.length > 0
+        ? yield* query(() =>
+            db
+              .select({
+                reversesId: investment.reversesId,
+                createdAt: investment.createdAt,
+              })
+              .from(investment)
+              .where(inArray(investment.reversesId, checkIds)),
+          )
+        : []
+    const voidedAt = new Map(
+      reversals.flatMap((r) =>
+        r.reversesId === null
+          ? []
+          : [[r.reversesId, r.createdAt.toISOString()] as const],
+      ),
+    )
+
     const attendeesBy = new Map<
       string,
       Array<{ id: string; name: string; kind: string }>
@@ -251,9 +352,45 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
         noteId: i.noteId,
         at: i.occurredAt.toISOString(),
         attendees: attendeesBy.get(i.id) ?? [],
+        via: i.sourceRef
+          ? (integrationNames.get(i.sourceRef) ?? null)
+          : (loggedBy.get(i.id) ?? null),
+        attachments: attachmentsBy.get(i.id) ?? 0,
+        answer: meetingAnswer(i.meta, ownEmails),
       })),
+      ...checks
+        .filter((c) => c.reversesId === null)
+        .map((c) => ({
+          type: 'ledger' as const,
+          id: c.id,
+          verb: 'investment.added',
+          actorName: c.createdBy ? (userNames.get(c.createdBy) ?? null) : null,
+          amount: Number(c.amount),
+          currency: c.currency,
+          instrument: c.instrument,
+          date: c.date,
+          voidedAt: voidedAt.get(c.id) ?? null,
+          at: c.createdAt.toISOString(),
+        })),
     ].sort((a, b) => (a.at < b.at ? 1 : -1))
 
     return items.slice(0, 60)
   },
 )
+
+/**
+ * The word a meeting row ends on: `cancelled`, else how this person
+ * answered the invite. Null for an email or a call, and for no answer yet.
+ */
+export function meetingAnswer(
+  meta: InteractionMeta | null,
+  ownEmails: ReadonlyArray<string>,
+): string | null {
+  if (meta?.kind !== 'meeting') return null
+  if (meta.status === 'cancelled') return 'cancelled'
+  const own = new Set(ownEmails.map((e) => e.toLowerCase()))
+  for (const [email, answer] of Object.entries(meta.rsvp)) {
+    if (own.has(email.toLowerCase()) && answer !== 'needs_action') return answer
+  }
+  return null
+}

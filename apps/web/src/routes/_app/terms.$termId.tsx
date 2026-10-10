@@ -1,4 +1,11 @@
-import { Link, createFileRoute, notFound } from '@tanstack/react-router'
+import {
+  Link,
+  createFileRoute,
+  notFound,
+  useNavigate,
+} from '@tanstack/react-router'
+import { toast } from 'sonner'
+import { Button } from '#/components/ui/button'
 import {
   DitherMark,
   RecordBody,
@@ -9,7 +16,7 @@ import {
   CompaniesReached,
   TermMentions,
 } from '#/components/term/term-parts'
-import { getTermPage } from '#/lib/server-fns'
+import { createNote, getTermPage } from '#/lib/server-fns'
 
 /**
  * A term's page — the concept node (SPA-75; CONTEXT.md → Glossary). The
@@ -30,6 +37,19 @@ export const Route = createFileRoute('/_app/terms/$termId')({
 
 function TermPage() {
   const { term, mentions, companies, coMentioned } = Route.useLoaderData()
+  const navigate = useNavigate()
+
+  /** A note that mentions the term: the first thing it gathers. */
+  async function writeNote() {
+    try {
+      const { id } = await createNote({
+        data: { about: { entityId: term.id, label: term.name, kind: 'term' } },
+      })
+      void navigate({ to: '/notes/$noteId', params: { noteId: id } })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not create note')
+    }
+  }
 
   return (
     <div className="flex min-h-full flex-col">
@@ -78,7 +98,13 @@ function TermPage() {
             <span className="text-graphite">No definition yet.</span>
           )}
         </p>
-        <TermMentions rows={mentions.rows} total={mentions.total} />
+        <TermMentions
+          rows={mentions.rows}
+          total={mentions.total}
+          action={
+            <Button onClick={() => void writeNote()}>Write a note</Button>
+          }
+        />
       </RecordBody>
     </div>
   )

@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { optionLabel, refName } from './attributes/value-editor'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
-import { RecordSection } from './record/record-parts'
+import { FilterCount, FilterRow, FilterTab } from './filter-row'
+import { fmtMoney } from '@spaces/core/portfolio/format'
 import { writeUpInteraction } from '#/lib/server-fns'
 import { stamp } from '#/lib/timeline/stamp'
 import { cn } from '#/lib/utils'
@@ -127,25 +128,115 @@ export const VERB_TYPES: Record<string, string> = {
 /** How much history a record shows before the fold. */
 export const HISTORY_FOLD = 6
 
+/** How many interactions a record shows before the fold. */
+export const INTERACTIONS_FOLD = 20
+
+type Item = Items[number]
+type InteractionItem = Extract<Item, { type: 'interaction' }>
+type LedgerItem = Extract<Item, { type: 'ledger' }>
+
 /**
  * A record's ledger split into its two tabs: the conversations, and the
  * bookkeeping (stage moves, attribute bursts, filings, the portfolio's
  * verbs). One flat list gave a call the weight of `tagged into a space`.
  */
 export function splitLedger(items: Items): {
-  interactions: Items
+  interactions: Array<InteractionItem>
   history: Items
 } {
   return {
-    interactions: items.filter((i) => i.type === 'interaction'),
+    interactions: items.filter(
+      (i): i is InteractionItem => i.type === 'interaction',
+    ),
     history: items.filter((i) => i.type !== 'interaction'),
   }
 }
 
+/** The Interactions tab's filters: every kind, or one. */
+export const INTERACTION_FILTERS = ['all', 'email', 'meeting', 'call'] as const
+export type InteractionFilter = (typeof INTERACTION_FILTERS)[number]
+
+const INTERACTION_FILTER_LABELS: Record<InteractionFilter, string> = {
+  all: 'All',
+  email: 'Email',
+  meeting: 'Meeting',
+  call: 'Call',
+}
+
+/** How many rows each interaction filter lists. */
+export function interactionCounts(
+  interactions: ReadonlyArray<{ kind: string }>,
+): Record<InteractionFilter, number> {
+  const of = (k: string) => interactions.filter((i) => i.kind === k).length
+  return {
+    all: interactions.length,
+    email: of('email'),
+    meeting: of('meeting'),
+    call: of('call'),
+  }
+}
+
+/** The History tab's filters on a deal. */
+export const HISTORY_FILTERS = ['all', 'stage', 'attributes', 'ledger'] as const
+export type HistoryFilter = (typeof HISTORY_FILTERS)[number]
+
+const HISTORY_FILTER_LABELS: Record<HistoryFilter, string> = {
+  all: 'All',
+  stage: 'Stage',
+  attributes: 'Attributes',
+  ledger: 'Ledger',
+}
+
+/** The portfolio's verbs: a check, a mark, a distribution, a round, a holding. */
+const LEDGER_VERB = /^(investment|mark|distribution|round|holding)\./
+
+/** Which History filter an entry belongs to besides All; null for none. */
+export function historyKind(item: Item): Exclude<HistoryFilter, 'all'> | null {
+  if (item.type === 'ledger') return 'ledger'
+  if (item.type === 'attrs')
+    return item.changes.some((c) => c.slug === 'stage') ? 'stage' : 'attributes'
+  if (item.type === 'macro' && LEDGER_VERB.test(item.verb)) return 'ledger'
+  return null
+}
+
+/** How many entries each History filter lists. */
+export function historyCounts(history: Items): Record<HistoryFilter, number> {
+  const of = (k: HistoryFilter) =>
+    history.filter((i) => historyKind(i) === k).length
+  return {
+    all: history.length,
+    stage: of('stage'),
+    attributes: of('attributes'),
+    ledger: of('ledger'),
+  }
+}
+
+/** `20 of 34 · more ›` — the foot of a list folded at its cap. */
+function FoldFoot({
+  shown,
+  total,
+  onMore,
+}: {
+  shown: number
+  total: number
+  onMore: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onMore}
+      className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-3 text-left mono text-micro text-graphite hover:text-foreground"
+    >
+      {shown} of {total} · more ›
+    </button>
+  )
+}
+
 /**
- * The Interactions tab: calls, emails, meetings, each with its way in to a
- * write-up, under the composer row (DESIGN.md P7, the Composer Row: a stream
- * is added to from a row, not a corner button).
+ * The Interactions tab: the kind filters, the composer row (DESIGN.md P7,
+ * the Composer Row), then calls, emails and meetings, folded past
+ * `INTERACTIONS_FOLD`. The filter is the view's own state, as the space
+ * page's Notes filter is.
  */
 export function RecordInteractions({
   items,
@@ -160,58 +251,99 @@ export function RecordInteractions({
   composer?: React.ReactNode
 }) {
   const { interactions } = splitLedger(items)
+  const [filter, setFilter] = useState<InteractionFilter>('all')
+  const [unfolded, setUnfolded] = useState(false)
+  const counts = interactionCounts(interactions)
+  const listed =
+    filter === 'all'
+      ? interactions
+      : interactions.filter((i) => i.kind === filter)
+  const shown = unfolded ? listed : listed.slice(0, INTERACTIONS_FOLD)
   return (
-    <RecordSection label="Interactions" meta={`${interactions.length}`}>
+    <div className="flex flex-col">
+      <FilterRow label="Show interactions">
+        {INTERACTION_FILTERS.map((f) => (
+          <FilterTab key={f} active={filter === f} onClick={() => setFilter(f)}>
+            {INTERACTION_FILTER_LABELS[f]} <FilterCount n={counts[f]} />
+          </FilterTab>
+        ))}
+      </FilterRow>
       {composer}
       <RecordTimeline
-        items={interactions}
+        items={shown}
         registry={registry}
         refNames={refNames}
         empty={composer ? null : 'None logged.'}
+        last={shown.length === listed.length}
       />
-    </RecordSection>
+      {shown.length < listed.length ? (
+        <FoldFoot
+          shown={shown.length}
+          total={listed.length}
+          onMore={() => setUnfolded(true)}
+        />
+      ) : null}
+    </div>
   )
 }
 
 /**
- * The History tab, folded past `HISTORY_FOLD` behind a `+ N more` row, the
- * way the contract's question 17 asks a surface to bound itself.
+ * The History tab, folded past `HISTORY_FOLD`, the way the contract's
+ * question 17 asks a surface to bound itself. `filters` draws All · Stage ·
+ * Attributes · Ledger over it (a deal's).
  */
 export function RecordHistory({
   items,
   registry,
   refNames,
+  filters = false,
 }: {
   items: Items
   registry: Array<RegistryEntry>
   refNames?: RefNames | undefined
+  filters?: boolean
 }) {
   const { history } = splitLedger(items)
+  const [filter, setFilter] = useState<HistoryFilter>('all')
   const [unfolded, setUnfolded] = useState(false)
-  const shown =
-    unfolded || history.length <= HISTORY_FOLD
+  const listed =
+    filter === 'all'
       ? history
-      : history.slice(0, HISTORY_FOLD)
-  const hidden = history.length - shown.length
+      : history.filter((i) => historyKind(i) === filter)
+  const shown =
+    unfolded || listed.length <= HISTORY_FOLD
+      ? listed
+      : listed.slice(0, HISTORY_FOLD)
+  const counts = historyCounts(history)
   return (
-    <RecordSection label="History" meta={`${history.length}`}>
+    <div className="flex flex-col">
+      {filters ? (
+        <FilterRow label="Show history">
+          {HISTORY_FILTERS.map((f) => (
+            <FilterTab
+              key={f}
+              active={filter === f}
+              onClick={() => setFilter(f)}
+            >
+              {HISTORY_FILTER_LABELS[f]} <FilterCount n={counts[f]} />
+            </FilterTab>
+          ))}
+        </FilterRow>
+      ) : null}
       <RecordTimeline
         items={shown}
         registry={registry}
         refNames={refNames}
-        last={hidden === 0}
+        last={shown.length === listed.length}
       />
-      {hidden > 0 ? (
-        <button
-          type="button"
-          onClick={() => setUnfolded(true)}
-          className="focus-ring-inset flex h-ledger-row w-full items-center gap-3 px-3 text-left mono text-micro text-graphite hover:text-foreground"
-        >
-          <span className="text-primary">+</span>
-          {hidden} more
-        </button>
+      {shown.length < listed.length ? (
+        <FoldFoot
+          shown={shown.length}
+          total={listed.length}
+          onMore={() => setUnfolded(true)}
+        />
       ) : null}
-    </RecordSection>
+    </div>
   )
 }
 
@@ -219,17 +351,20 @@ function Row({
   at,
   type,
   children,
+  end,
   last,
 }: {
   at: string
   type: string
   children: React.ReactNode
+  /** The fixed mono lane the row ends on. */
+  end?: React.ReactNode
   last: boolean
 }) {
   return (
     <li
       className={cn(
-        'flex items-start gap-4 px-3 py-2',
+        'group/row flex items-start gap-4 px-3 py-2',
         !last && 'border-b border-rule',
       )}
     >
@@ -240,6 +375,14 @@ function Row({
         {type}
       </span>
       <div className="min-w-0 flex-1 text-ui leading-4.5">{children}</div>
+      {end === undefined ? null : (
+        <span
+          data-end-lane
+          className="flex w-48 shrink-0 items-center justify-end gap-2 mono text-micro text-graphite"
+        >
+          {end}
+        </span>
+      )}
     </li>
   )
 }
@@ -284,6 +427,9 @@ export function RecordTimeline({
         if (item.type === 'interaction') {
           return <InteractionRow key={item.id} item={item} last={last} />
         }
+        if (item.type === 'ledger') {
+          return <LedgerEntry key={item.id} item={item} last={last} />
+        }
         return (
           <AttrBurst
             key={item.id}
@@ -298,23 +444,31 @@ export function RecordTimeline({
   )
 }
 
+/** The end lane of an interaction: `via Anish · ⧉ 2 · accepted`. */
+export function interactionLane(item: {
+  via: string | null
+  attachments: number
+  answer: string | null
+}): string {
+  return [
+    item.via === null ? null : `via ${item.via}`,
+    item.attachments > 0 ? `⧉ ${item.attachments}` : null,
+    item.answer,
+  ]
+    .filter((part) => part !== null)
+    .join(' · ')
+}
+
 /**
- * One interaction on the ledger, and its way in to a body.
- *
- * Two affordances, one treatment (SPA-128). A row that was written up opens
- * its note; a row that was not — every row logged before SPA-123, every row
- * a calendar or a mailbox will sync — writes one now and lands in the
- * editor. The classes are the ones SPA-123 introduced here and
- * `record-notes.tsx` uses: pine, underline on hover, the reticle for focus.
- * No new visual vocabulary, and the pair is symmetric on purpose — the
- * subject stays prose, and the one thing you can click is the one thing
- * that goes to the note.
+ * One interaction on the ledger. A written-up row opens its note from the
+ * subject; one that is not offers `Write up` as a row action, shown on
+ * hover and focus, which writes one now and lands in the editor.
  */
 function InteractionRow({
   item,
   last,
 }: {
-  item: Extract<Items[number], { type: 'interaction' }>
+  item: InteractionItem
   last: boolean
 }) {
   const router = useRouter()
@@ -335,32 +489,83 @@ function InteractionRow({
   }
 
   return (
-    <Row at={item.at} type={item.kind} last={last}>
-      {/* Synced rows carry no subject at all; the affordance stands alone. */}
-      {item.subject ? <span>{item.subject}</span> : null}{' '}
+    <Row
+      at={item.at}
+      type={item.kind}
+      last={last}
+      end={
+        <>
+          {item.noteId ? null : (
+            <button
+              type="button"
+              onClick={() => void writeUp()}
+              disabled={pending}
+              className={cn(
+                'focus-ring shrink-0 font-sans text-label text-foreground hover:underline',
+                !pending &&
+                  'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100',
+              )}
+            >
+              {pending ? 'Writing up…' : 'Write up'}
+            </button>
+          )}
+          <span className="min-w-0 truncate">{interactionLane(item)}</span>
+        </>
+      }
+    >
       {item.noteId ? (
         <Link
           to="/notes/$noteId"
           params={{ noteId: item.noteId }}
-          className="focus-ring text-primary hover:underline"
+          className="focus-ring hover:underline"
         >
-          Open note
+          {item.subject || 'Untitled'}
         </Link>
+      ) : item.subject ? (
+        <span>{item.subject}</span>
       ) : (
-        <button
-          type="button"
-          onClick={() => void writeUp()}
-          disabled={pending}
-          className="focus-ring text-primary hover:underline"
-        >
-          {pending ? 'Writing up…' : 'Write up'}
-        </button>
+        <span className="text-graphite">Untitled</span>
       )}
       {item.attendees.length > 0 ? (
         <span className="block mono text-micro text-graphite">
           {item.attendees.map((a) => a.name).join(' · ')}
         </span>
       ) : null}
+    </Row>
+  )
+}
+
+const INSTRUMENT_LABELS: Record<string, string> = {
+  priced: 'priced',
+  safe_post_money: 'SAFE post',
+  safe_pre_money: 'SAFE pre',
+  ccd: 'CCD',
+}
+
+/** A check on the deal's ledger; a voided one struck, with the void's day. */
+function LedgerEntry({ item, last }: { item: LedgerItem; last: boolean }) {
+  return (
+    <Row
+      at={item.at}
+      type={VERB_TYPES[item.verb] ?? 'invest'}
+      last={last}
+      end={
+        item.voidedAt === null
+          ? undefined
+          : `voided ${item.voidedAt.slice(5, 10)}`
+      }
+    >
+      <span
+        data-voided={item.voidedAt === null ? undefined : ''}
+        className={cn(item.voidedAt !== null && 'text-graphite line-through')}
+      >
+        <span className="font-medium">{item.actorName ?? 'System'}</span>{' '}
+        {VERB_LABELS[item.verb] ?? item.verb} ·{' '}
+        <span className="mono text-micro">
+          {fmtMoney(item.amount, item.currency, { compact: true })}{' '}
+          {INSTRUMENT_LABELS[item.instrument] ?? item.instrument}
+        </span>
+      </span>
     </Row>
   )
 }

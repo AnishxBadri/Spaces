@@ -19,6 +19,7 @@ import {
   RecordBody,
   RecordHeader,
 } from '#/components/record/record-parts'
+import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordNotes } from '#/components/record/record-notes'
@@ -159,7 +160,7 @@ function ObjectRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={{ kind: record.object.singular, fact: record.id.slice(0, 8) }}
+        stamp={{ kind: record.object.singular }}
         crumb={
           <>
             <Link
@@ -242,40 +243,46 @@ function ObjectRecordPage() {
           <>
             <AiCellsProvider entityIds={[record.id]} registry={registry}>
               <PropertyGrid>
-                {registry.map((def) => (
-                  <RailField
-                    key={def.slug}
-                    entityId={record.id}
-                    def={def}
-                    attr={def}
-                    objectLabel={record.object.singular}
-                    onAttributeSaved={() => router.invalidate()}
-                    value={record.values[def.slug] ?? null}
-                    refNames={record.refNames}
-                    onSave={async (v) => {
-                      const result = await updateRecord({
-                        data: { id: record.id, patch: { [def.slug]: v } },
-                      })
-                      // The save succeeded either way — the value is the
-                      // operator's field and always lands. What a collision
-                      // withholds is the *claim*, and this is where it is said.
-                      const collision = collisionToast(
-                        result,
-                        record.object.singular,
-                      )
-                      if (collision)
-                        toast(collision.title, {
-                          description: collision.description,
+                <PropertyFold
+                  defs={registry}
+                  valueOf={(def) => record.values[def.slug]}
+                  render={(def) => (
+                    <RailField
+                      key={def.slug}
+                      entityId={record.id}
+                      def={def}
+                      attr={def}
+                      objectLabel={record.object.singular}
+                      objectPlural={record.object.plural}
+                      onAttributeSaved={() => router.invalidate()}
+                      value={record.values[def.slug] ?? null}
+                      refNames={record.refNames}
+                      onSave={async (v) => {
+                        const result = await updateRecord({
+                          data: { id: record.id, patch: { [def.slug]: v } },
                         })
-                      void router.invalidate()
-                    }}
-                  />
-                ))}
+                        // The save succeeded either way — the value is the
+                        // operator's field and always lands. What a collision
+                        // withholds is the *claim*, and this is where it is said.
+                        const collision = collisionToast(
+                          result,
+                          record.object.singular,
+                        )
+                        if (collision)
+                          toast(collision.title, {
+                            description: collision.description,
+                          })
+                        void router.invalidate()
+                      }}
+                    />
+                  )}
+                />
                 <PropertyCell label="">
                   <AttributeDialog
                     mode="create"
                     objectId={record.object.id}
                     objectLabel={record.object.singular}
+                    objectPlural={record.object.plural}
                     onSaved={() => router.invalidate()}
                     trigger={
                       <button className="focus-ring mono text-micro text-graphite hover:text-foreground">

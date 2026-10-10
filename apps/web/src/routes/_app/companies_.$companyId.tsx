@@ -29,6 +29,7 @@ import {
   RecordHeader,
 } from '#/components/record/record-parts'
 import { DetailsPickRow } from '#/components/record/details-add'
+import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordPicture } from '#/components/record/record-picture'
@@ -202,7 +203,7 @@ function CompanyRecordPage() {
   return (
     <div className="flex min-h-full flex-col">
       <RecordHeader
-        stamp={{ kind: 'Company', fact: company.id.slice(0, 8) }}
+        stamp={{ kind: 'Company' }}
         crumb={
           <>
             <Link to="/companies" className="focus-ring hover:text-foreground">
@@ -210,7 +211,8 @@ function CompanyRecordPage() {
             </Link>
             {' / '}
             {company.id.slice(0, 8)}
-            {firstDomain ? ` / ${firstDomain}` : ''}
+            {' / added '}
+            {company.createdAt.slice(0, 10)}
           </>
         }
         actions={
@@ -254,9 +256,16 @@ function CompanyRecordPage() {
         }
         name={company.name}
         badges={
-          nameAliases.length > 0 ? (
+          firstDomain || nameAliases.length > 0 ? (
             <span className="min-w-0 truncate mono text-micro text-graphite">
-              also {nameAliases.map((a) => a.value).join(' · ')}
+              {[
+                firstDomain,
+                nameAliases.length > 0
+                  ? `also ${nameAliases.map((a) => a.value).join(' · ')}`
+                  : undefined,
+              ]
+                .filter((part) => part !== undefined)
+                .join(' · ')}
             </span>
           ) : null
         }
@@ -296,31 +305,36 @@ function CompanyRecordPage() {
           <>
             <AiCellsProvider entityIds={[company.id]} registry={registry}>
               <PropertyGrid>
-                {registry.map((def) => (
-                  <RailField
-                    key={def.slug}
-                    entityId={company.id}
-                    def={def}
-                    attr={def}
-                    objectLabel={'company'}
-                    fillFrom="company"
-                    whereFrom={enrichment.whereFrom[def.slug]}
-                    onAttributeSaved={() => router.invalidate()}
-                    value={company.values[def.slug] ?? null}
-                    onSave={async (v) => {
-                      const result = await updateRecord({
-                        data: { id: company.id, patch: { [def.slug]: v } },
-                      })
-                      // A domain another company holds was refused; say so.
-                      const collision = collisionToast(result, 'company')
-                      if (collision)
-                        toast(collision.title, {
-                          description: collision.description,
+                <PropertyFold
+                  defs={registry}
+                  valueOf={(def) => company.values[def.slug]}
+                  render={(def) => (
+                    <RailField
+                      key={def.slug}
+                      entityId={company.id}
+                      def={def}
+                      attr={def}
+                      objectLabel={'company'}
+                      objectPlural="Companies"
+                      fillFrom="company"
+                      whereFrom={enrichment.whereFrom[def.slug]}
+                      onAttributeSaved={() => router.invalidate()}
+                      value={company.values[def.slug] ?? null}
+                      onSave={async (v) => {
+                        const result = await updateRecord({
+                          data: { id: company.id, patch: { [def.slug]: v } },
                         })
-                      void router.invalidate()
-                    }}
-                  />
-                ))}
+                        // A domain another company holds was refused; say so.
+                        const collision = collisionToast(result, 'company')
+                        if (collision)
+                          toast(collision.title, {
+                            description: collision.description,
+                          })
+                        void router.invalidate()
+                      }}
+                    />
+                  )}
+                />
                 <PropertyCell label="">
                   <AttributeCreateDialog
                     objectKind="company"

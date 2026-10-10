@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { entity, interactionStat, signal } from '@spaces/db/schema'
 import { holding, investment, round } from '@spaces/db/schema/portfolio'
@@ -47,6 +47,14 @@ export type DealReadouts = {
   daysInStage: number
   medianDaysInStage: number | null
   pastTwiceMedian: boolean
+  /** The company's latest round: its size and post-money; null with none. */
+  round: DealRound | null
+}
+
+export type DealRound = {
+  raised: number | null
+  postMoney: number | null
+  currency: string
 }
 
 export type RecordReadouts = {
@@ -250,6 +258,35 @@ export const dealReadoutsProgram = Effect.fn('dealReadoutsProgram')(function* (
     daysInStage: Math.max(0, Math.floor(inStage)),
     medianDaysInStage: median,
     pastTwiceMedian: median !== null && median > 0 && inStage > 2 * median,
+    round: companyId ? yield* latestRound(companyId) : null,
+  }
+  return out
+})
+
+/**
+ * A company's latest round: a dated event, written by the ledger or by
+ * enrichment (D76). One with neither a size nor a post-money reads as none.
+ */
+const latestRound = Effect.fn('latestRound')(function* (companyId: string) {
+  const row = yield* query(async () =>
+    (
+      await db
+        .select({
+          raised: round.raised,
+          postMoney: round.postMoney,
+          currency: round.currency,
+        })
+        .from(round)
+        .where(eq(round.companyId, companyId))
+        .orderBy(desc(round.date), desc(round.createdAt))
+        .limit(1)
+    ).at(0),
+  )
+  if (!row || (row.raised === null && row.postMoney === null)) return null
+  const out: DealRound = {
+    raised: num(row.raised),
+    postMoney: num(row.postMoney),
+    currency: row.currency ?? 'USD',
   }
   return out
 })

@@ -23,7 +23,7 @@ import {
   formatPhone,
   toE164,
 } from '@spaces/core/attributes/phone'
-import { formatDate, formatNumber } from '@spaces/core/format'
+import { formatNumber } from '@spaces/core/format'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { listUsers, searchEntities } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -277,7 +277,7 @@ export function ValueEditor({
       )
     }
     case 'date':
-      return variant === 'cell' ? (
+      return variant !== 'form' ? (
         <DateCellEditor
           def={def}
           value={value}
@@ -307,19 +307,31 @@ export function ValueEditor({
 }
 
 /**
- * A date cell reads as a date until you edit it. `<input type="date">` renders
- * its own `mm/dd/yyyy` skeleton and picker glyph in every empty row, which puts
- * a US-format placeholder and a stray icon in a column where every other empty
- * cell is an em dash — two conventions broken at once. In a form field the
- * native control is exactly right, so this only applies to cells.
+ * A date in a table cell or a property row reads as ISO text until clicked,
+ * then hands over to the native control with its picker open.
+ * - `<input type="date">` at rest prints a `mm/dd/yyyy` skeleton and a picker
+ *   glyph in every empty row, where every other empty value is an em dash.
+ * - In a form the native control is right as it is.
  */
-function DateCellEditor({ def, value, onSave }: Props) {
+function DateCellEditor({ def, value, onSave, variant }: Props) {
   const [editing, setEditing] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
   const stored = value == null ? '' : String(value)
+
+  useEffect(() => {
+    if (!editing) return
+    // The click that opened the editor is the activation `showPicker` needs.
+    try {
+      input.current?.showPicker()
+    } catch {
+      // No picker to show (an older engine, or no activation): typing works.
+    }
+  }, [editing])
 
   if (editing) {
     return (
       <input
+        ref={input}
         type="date"
         defaultValue={stored}
         autoFocus
@@ -333,7 +345,12 @@ function DateCellEditor({ def, value, onSave }: Props) {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           if (e.key === 'Escape') setEditing(false)
         }}
-        className="focus-ring-inset h-full w-full min-w-0 rounded-md bg-transparent px-1 text-ui"
+        className={cn(
+          'w-full min-w-0 bg-transparent text-ui',
+          variant === 'cell'
+            ? 'focus-ring-inset h-full rounded-md px-1'
+            : cn(boxChrome(variant), 'focus:border-rule'),
+        )}
       />
     )
   }
@@ -344,11 +361,14 @@ function DateCellEditor({ def, value, onSave }: Props) {
       aria-label={def.name}
       onClick={() => setEditing(true)}
       className={cn(
-        'focus-ring-inset h-full w-full rounded-md px-1 text-ui',
-        stored ? 'numeric' : 'text-left text-graphite',
+        'w-full text-left text-ui',
+        variant === 'cell'
+          ? 'focus-ring-inset h-full rounded-md px-1'
+          : boxChrome(variant),
+        !stored ? 'text-graphite' : variant === 'cell' ? 'numeric' : 'tabular',
       )}
     >
-      {stored ? formatDate(stored) : '—'}
+      {stored ? stored.slice(0, 10) : '—'}
     </button>
   )
 }
@@ -436,7 +456,10 @@ function TextLikeEditor({ def, value, onSave, variant, autoFocus }: Props) {
       }}
       className={cn(
         'w-full min-w-0 bg-transparent text-ui',
-        (def.type === 'number' || def.type === 'currency') && 'numeric',
+        // A column of figures right-aligns; a property row's value lane is
+        // left-aligned like every other value.
+        (def.type === 'number' || def.type === 'currency') &&
+          (variant === 'cell' ? 'numeric' : 'tabular'),
         variant !== 'cell'
           ? // ↵ commits, esc reverts; the reticle on focus.
             cn(boxChrome(variant), 'focus:border-rule')
@@ -567,8 +590,7 @@ function RecordRefPicker({ def, value, onSave, variant, refNames }: Props) {
  * A multi-valued `email` / `domain` / `phone`: the values as chips, a box to
  * add one (↵), and each value a menu item that removes it. The write path
  * cleans, de-duplicates and — on an identity attribute — claims every
- * element. A phone is added in E.164 and shown grouped; a cell shows the
- * first phone and a mono +N.
+ * element. A phone is added in E.164 and shown grouped.
  */
 function MultiTextPicker({ def, value, onSave, variant }: Props) {
   const selected: Array<string> = Array.isArray(value) ? value.map(String) : []
@@ -576,7 +598,13 @@ function MultiTextPicker({ def, value, onSave, variant }: Props) {
   const [problem, setProblem] = useState<string | null>(null)
   const phone = def.type === 'phone'
   const shown = (v: string) => (phone ? formatPhone(v) : v)
-  const chips = phone && variant === 'cell' ? selected.slice(0, 1) : selected
+  // A cell shows a list's first phone, a property row a person's first
+  // email; a mono +N counts the rest.
+  const chips =
+    (phone && variant === 'cell') ||
+    (def.type === 'email' && variant === 'field')
+      ? selected.slice(0, 1)
+      : selected
   const more = selected.length - chips.length
 
   function add() {

@@ -164,7 +164,7 @@ function openGooglePicker(
   return builder.build().setVisible(true)
 }
 
-type Readiness = Awaited<ReturnType<typeof pickerReadiness>>
+export type Readiness = Awaited<ReturnType<typeof pickerReadiness>>
 
 type Session =
   | { readonly kind: 'google'; readonly session: GoogleSession }
@@ -172,16 +172,15 @@ type Session =
 
 const LABEL = 'Attach from Drive'
 
-/** The Files tab's "Attach from Drive", in whatever state the user's Drive is in. */
-export function StoragePicker({
-  onPicked,
-}: {
-  onPicked: (files: ReadonlyArray<PickedFile>) => void
-}) {
+/**
+ * The user's Drive picker state, asked once on mount. Held by the Files
+ * tab so a picker that is not set up reads in its head's meta.
+ */
+export function usePickerReadiness(): [
+  Readiness | null,
+  (next: Readiness) => void,
+] {
   const [readiness, setReadiness] = useState<Readiness | null>(null)
-  const [opening, setOpening] = useState(false)
-  const [session, setSession] = useState<Session | null>(null)
-
   useEffect(() => {
     let stale = false
     pickerReadiness({
@@ -196,6 +195,21 @@ export function StoragePicker({
       stale = true
     }
   }, [])
+  return [readiness, setReadiness]
+}
+
+/** The Files tab's "Attach from Drive", in whatever state the user's Drive is in. */
+export function StoragePicker({
+  readiness,
+  setReadiness,
+  onPicked,
+}: {
+  readiness: Readiness | null
+  setReadiness: (next: Readiness) => void
+  onPicked: (files: ReadonlyArray<PickedFile>) => void
+}) {
+  const [opening, setOpening] = useState(false)
+  const [session, setSession] = useState<Session | null>(null)
 
   /** The picker closed: the session and its token go, and a pick is attached. */
   const settle = (result: PickResult) => {
@@ -279,7 +293,36 @@ export function StoragePicker({
 
 const BUTTON = 'shrink-0'
 
-/** The button itself: open, Connect, re-consent, not set up, or refused in a tooltip. */
+/**
+ * `picker not set up`, in mono, for the Files head's meta: the reason in a
+ * tooltip, and for an admin a link to the integration's page. Nothing in
+ * any other state.
+ */
+export function PickerState({ readiness }: { readiness: Readiness | null }) {
+  if (readiness?._tag !== 'unconfigured') return null
+  const label = 'picker not set up'
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {readiness.settingsHref === null ? (
+          <span tabIndex={0} className="focus-ring cursor-default">
+            {label}
+          </span>
+        ) : (
+          <a
+            href={readiness.settingsHref}
+            className="focus-ring hover:text-foreground"
+          >
+            {label} ›
+          </a>
+        )}
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">{readiness.reason}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** The button itself: open, Connect, re-consent, or refused in a tooltip. */
 export function PickerButton({
   readiness,
   opening,
@@ -324,11 +367,8 @@ export function PickerButton({
         readiness.href,
       )
     case 'unconfigured':
-      return explained(
-        'Picker not set up',
-        readiness.reason,
-        readiness.settingsHref,
-      )
+      // A state, not a control: `PickerState` says it in the head's meta.
+      return null
     case 'refused':
       return explained(LABEL, readiness.reason, null)
     case 'ready':

@@ -238,3 +238,105 @@ describe('the record page, for a document a plugin filed', () => {
     if (doc?.blobSha) await storage().delete(doc.blobSha)
   })
 })
+
+/**
+ * A deal's History reads its checks off the ledger, a voided one struck;
+ * an interaction row ends on who logged it.
+ */
+describe('the record timeline, for a deal', () => {
+  it('lists the deal’s checks with the void instant, and who logged a call', async () => {
+    const { db } = await import('@spaces/db')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
+    const { FIXTURE_ACTOR } = await import('../../../vitest.seed')
+    const { birthDealInTx } = await import('#/lib/deals/birth')
+    const { addInvestmentProgram } = await import('#/lib/portfolio/write')
+    const { voidLedgerEventProgram } = await import('#/lib/portfolio/reverse')
+    const { logInteractionProgram } = await import('#/lib/interactions/log')
+    const { recordTimelineProgram } = await import('./record')
+
+    const { entityId: companyId } = await resolveEntity({
+      kind: 'company',
+      name: 'Ledgered Co',
+      keys: { domain: 'ledgered.example' },
+      source: { class: 'manual' },
+    })
+    const deal = await db.transaction((tx) =>
+      birthDealInTx(tx, {
+        name: 'Ledgered seed',
+        companyId,
+        stage: 'diligence',
+        values: {},
+        actorId: FIXTURE_ACTOR.id,
+        source: 'manual',
+      }),
+    )
+    const check = (amount: number) =>
+      Effect.runPromise(
+        addInvestmentProgram({
+          companyId,
+          dealId: deal.id,
+          date: '2026-09-01',
+          amount,
+          currency: 'USD',
+          instrument: 'safe_post_money',
+          actorId: FIXTURE_ACTOR.id,
+        }),
+      )
+    const kept = await check(50_000)
+    const voided = await check(25_000)
+    await Effect.runPromise(
+      voidLedgerEventProgram(FIXTURE_ACTOR.id, {
+        table: 'investment',
+        id: voided.id,
+      }),
+    )
+    await Effect.runPromise(
+      logInteractionProgram(FIXTURE_ACTOR.id, {
+        kind: 'call',
+        subject: 'Ledger call',
+        occurredAt: new Date('2026-09-18T11:00:00Z'),
+        attendeeIds: [deal.id],
+        writeUp: false,
+      }),
+    )
+
+    const items = await Effect.runPromise(recordTimelineProgram(deal.id))
+    const ledger = items.filter((i) => i.type === 'ledger')
+    expect(ledger).toHaveLength(2)
+    expect(ledger.find((l) => l.id === kept.id)).toMatchObject({
+      amount: 50_000,
+      voidedAt: null,
+      actorName: FIXTURE_ACTOR.name,
+    })
+    expect(ledger.find((l) => l.id === voided.id)?.voidedAt).toEqual(
+      expect.any(String),
+    )
+    const call = items.find((i) => i.type === 'interaction')
+    expect(call).toMatchObject({ via: FIXTURE_ACTOR.name, attachments: 0 })
+  })
+})
+
+describe('a meeting row’s answer', () => {
+  it('reads cancelled, else this person’s RSVP, and nothing for no answer', async () => {
+    const { meetingAnswer } = await import('./record')
+    const meeting = {
+      kind: 'meeting' as const,
+      ends_at: '2026-10-01T11:00:00Z',
+      status: 'scheduled' as const,
+      conference_url: null,
+      organizer: null,
+      recurring_instance_id: null,
+      rsvp: {
+        'ishaan@vayu.example': 'accepted' as const,
+        'meera@vayu.example': 'needs_action' as const,
+      },
+    }
+    expect(meetingAnswer(meeting, ['Ishaan@vayu.example'])).toBe('accepted')
+    expect(meetingAnswer(meeting, ['meera@vayu.example'])).toBeNull()
+    expect(
+      meetingAnswer({ ...meeting, status: 'cancelled' }, ['x@y.example']),
+    ).toBe('cancelled')
+    expect(meetingAnswer(null, [])).toBeNull()
+  })
+})

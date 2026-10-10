@@ -32,6 +32,7 @@ import {
   StageStepper,
 } from '#/components/record/record-parts'
 import { DetailsPickRow } from '#/components/record/details-add'
+import { PropertyFold } from '#/components/record/property-fold'
 import { RecordSpacesSection } from '#/components/record/spaces-section'
 import { RecordTabs, useRecordTab } from '#/components/record/record-tabs'
 import { RecordNotes } from '#/components/record/record-notes'
@@ -44,7 +45,11 @@ import { PluginActions } from '#/components/record/plugin-actions'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { fmtMoney } from '@spaces/core/portfolio/format'
-import { readoutDay, readoutDayUntil } from '#/lib/records/readout-format'
+import {
+  readoutDay,
+  readoutDayUntil,
+  readoutRound,
+} from '#/lib/records/readout-format'
 import { useHotkey } from '#/lib/use-hotkey'
 import { runBinding, usePageActions } from '#/lib/page-actions'
 import { recordSearch, recordTabCounts } from '#/lib/records/record-tabs'
@@ -152,8 +157,9 @@ function DealRecordPage() {
   // Move-stage never offers a retired stage; the header chip still shows one.
   const liveStages = stageOptions.filter((o) => !o.archived)
 
-  // The readouts: our check, the close, days in stage against the stage's
-  // median, and the last contact through the company and people (D49).
+  // The readouts: our check, the company's round, the close, days in stage
+  // against the stage's median, and the last contact through the company
+  // and people (D49).
   const { readouts } = deal
   const valueCode =
     registry.find((d) => d.slug === 'value')?.options.code ?? 'USD'
@@ -259,7 +265,7 @@ function DealRecordPage() {
       ) : null}
 
       <RecordHeader
-        stamp={{ kind: 'Deal', fact: deal.id.slice(0, 8) }}
+        stamp={{ kind: 'Deal' }}
         crumb={
           <>
             <Link to="/deals" className="focus-ring hover:text-foreground">
@@ -267,7 +273,7 @@ function DealRecordPage() {
             </Link>
             {' / '}
             {deal.id.slice(0, 8)}
-            {' / opened '}
+            {' / added '}
             {deal.createdAt.slice(0, 10)}
           </>
         }
@@ -292,7 +298,7 @@ function DealRecordPage() {
               <KeyHint>T</KeyHint>
             </Button>
             {liveStages.length > 0 ? (
-              <Button onClick={() => setMoveOpen(true)}>
+              <Button variant="outline" onClick={() => setMoveOpen(true)}>
                 Move stage
                 <KeyHint>M</KeyHint>
               </Button>
@@ -344,6 +350,10 @@ function DealRecordPage() {
             tone: ourCheck === null ? 'muted' : undefined,
           },
           {
+            label: 'Round',
+            value: readoutRound(readouts.round),
+          },
+          {
             label: 'Close',
             value: readoutDayUntil(closeDate, readouts.today),
             tone:
@@ -371,24 +381,29 @@ function DealRecordPage() {
           <>
             <AiCellsProvider entityIds={[deal.id]} registry={registry}>
               <PropertyGrid>
-                {registry.map((def) => (
-                  <RailField
-                    key={def.slug}
-                    entityId={deal.id}
-                    def={def}
-                    attr={def}
-                    objectLabel={'deal'}
-                    onAttributeSaved={() => router.invalidate()}
-                    value={deal.values[def.slug] ?? null}
-                    refNames={refNames}
-                    onSave={async (v) => {
-                      await updateRecord({
-                        data: { id: deal.id, patch: { [def.slug]: v } },
-                      })
-                      void router.invalidate()
-                    }}
-                  />
-                ))}
+                <PropertyFold
+                  defs={registry}
+                  valueOf={(def) => deal.values[def.slug]}
+                  render={(def) => (
+                    <RailField
+                      key={def.slug}
+                      entityId={deal.id}
+                      def={def}
+                      attr={def}
+                      objectLabel={'deal'}
+                      objectPlural="Deals"
+                      onAttributeSaved={() => router.invalidate()}
+                      value={deal.values[def.slug] ?? null}
+                      refNames={refNames}
+                      onSave={async (v) => {
+                        await updateRecord({
+                          data: { id: deal.id, patch: { [def.slug]: v } },
+                        })
+                        void router.invalidate()
+                      }}
+                    />
+                  )}
+                />
                 <PropertyCell label="">
                   <AttributeCreateDialog
                     objectKind="deal"
@@ -516,6 +531,7 @@ function DealRecordPage() {
                 items={timeline}
                 registry={registry}
                 refNames={refNames}
+                filters
               />
             ),
           }}

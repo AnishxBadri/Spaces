@@ -25,8 +25,11 @@ import {
 } from './document-source'
 import { DocumentTile } from './document-tile'
 import { LinkFetchRow, LinkPasteRow, useLinkFetches } from './record-files-link'
-import { RecordSection } from './record/record-parts'
-import { StoragePicker } from './storage-picker'
+import {
+  PickerState,
+  StoragePicker,
+  usePickerReadiness,
+} from './storage-picker'
 import { KIND_ICONS } from './editor/mention'
 import { SummarizeRowButton, useSummarizer } from './summarize'
 import type { Summarizer } from './summarize'
@@ -117,6 +120,7 @@ export function RecordFiles({
   const [pending, setPending] = useState<Array<Pending>>([])
   const [previewing, setPreviewing] = useState<Documents[number] | null>(null)
   const links = useLinkFetches(entityId)
+  const [readiness, setReadiness] = usePickerReadiness()
 
   useExtractionPolling(documents, router)
   const deckReaderFor = useDeckReader(entityId, documents)
@@ -206,24 +210,36 @@ export function RecordFiles({
       }}
       className="flex flex-col"
     >
-      <RecordSection
-        label="Files"
-        meta={
-          documents.length === 0
-            ? '0 files'
-            : `${documents.length} file${documents.length === 1 ? '' : 's'} · ${formatBytes(documents.reduce((n, d) => n + (d.sizeBytes ?? 0), 0))}`
-        }
-        action={
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="focus-ring flex items-center gap-1 text-primary hover:underline"
-          >
-            <Upload className="size-3" strokeWidth={2} />
-            upload
-          </button>
-        }
-      >
+      {/* The tab head is the section head: the view opens on paper, with
+          the count and size, the picker's state, Attach from Drive and
+          Upload. */}
+      <section className="flex flex-col">
+        <div className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-rule px-3">
+          <span className="flex min-w-0 items-baseline gap-3 mono text-micro text-graphite">
+            <span className="shrink-0">
+              {documents.length === 0
+                ? '0'
+                : `${documents.length} · ${formatBytes(documents.reduce((n, d) => n + (d.sizeBytes ?? 0), 0))}`}
+            </span>
+            <PickerState readiness={readiness} />
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            <StoragePicker
+              readiness={readiness}
+              setReadiness={setReadiness}
+              onPicked={(files) => void links.attachPicked(files)}
+            />
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              onClick={() => inputRef.current?.click()}
+            >
+              <Upload className="size-3" strokeWidth={2} />
+              Upload
+            </Button>
+          </span>
+        </div>
         <input
           ref={inputRef}
           type="file"
@@ -322,15 +338,8 @@ export function RecordFiles({
             Release to attach
           </div>
         ) : null}
-        <LinkPasteRow
-          onLink={(url) => void handleLink(url)}
-          action={
-            <StoragePicker
-              onPicked={(files) => void links.attachPicked(files)}
-            />
-          }
-        />
-      </RecordSection>
+        <LinkPasteRow onLink={(url) => void handleLink(url)} />
+      </section>
 
       <DocumentPreview
         doc={previewing}

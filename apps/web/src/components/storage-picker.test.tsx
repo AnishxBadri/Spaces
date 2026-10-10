@@ -4,7 +4,13 @@ import type { Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LinkFetchRow, useLinkFetches } from './record-files-link'
-import { PickerButton, StoragePicker, readGooglePick } from './storage-picker'
+import {
+  PickerButton,
+  PickerState,
+  StoragePicker,
+  readGooglePick,
+  usePickerReadiness,
+} from './storage-picker'
 
 /**
  * The picker host under the fake providers: three files picked are one
@@ -75,9 +81,14 @@ vi.mock('@tanstack/react-router', () => ({
 
 function Harness() {
   const links = useLinkFetches(RECORD)
+  const [readiness, setReadiness] = usePickerReadiness()
   return (
     <div>
-      <StoragePicker onPicked={(files) => void links.attachPicked(files)} />
+      <StoragePicker
+        readiness={readiness}
+        setReadiness={setReadiness}
+        onPicked={(files) => void links.attachPicked(files)}
+      />
       <ul>
         {links.fetches.map((f) => (
           <LinkFetchRow
@@ -218,18 +229,27 @@ describe('PickerButton', () => {
     expect(consent).toContain('Attach from Drive…')
   })
 
-  it('reads Picker not set up, a link for an admin and none for a member', () => {
+  it('draws no button for a picker not set up; the head’s meta says it, a link for an admin and none for a member', () => {
     const unconfigured = {
       _tag: 'unconfigured' as const,
       reason: 'needs Picker API key and Picker app id',
       integrationId: 'row',
     }
-    expect(
-      render({ ...unconfigured, settingsHref: '/settings/plugins/row' }),
-    ).toContain('href="/settings/plugins/row"')
-    const member = render({ ...unconfigured, settingsHref: null })
-    expect(member).toContain('Picker not set up')
+    expect(render({ ...unconfigured, settingsHref: null })).toBe('')
+    const state = (settingsHref: `/settings/plugins/${string}` | null) =>
+      renderToStaticMarkup(
+        <PickerState readiness={{ ...unconfigured, settingsHref }} />,
+      )
+    expect(state('/settings/plugins/row')).toContain(
+      'href="/settings/plugins/row"',
+    )
+    const member = state(null)
+    expect(member).toContain('picker not set up')
     expect(member).not.toContain('href=')
+    expect(member).not.toMatch(/<button/)
+    expect(
+      renderToStaticMarkup(<PickerState readiness={{ _tag: 'ready' }} />),
+    ).toBe('')
   })
 })
 

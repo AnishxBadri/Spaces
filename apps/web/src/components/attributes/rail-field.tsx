@@ -35,6 +35,7 @@ export function RailField({
   onSave,
   attr,
   objectLabel,
+  objectPlural,
   onAttributeSaved,
   entityId,
   fillFrom,
@@ -47,6 +48,8 @@ export function RailField({
   /** the attribute row, when the rail may open the edit dialog (spec §7) */
   attr?: EditableAttribute | undefined
   objectLabel?: string | undefined
+  /** The object's plural, for the edit window's head (`on Companies`). */
+  objectPlural: string
   onAttributeSaved?: (() => void) | undefined
   /**
    * The record the field belongs to: given, an AI attribute (SPA-72) grows
@@ -114,6 +117,7 @@ export function RailField({
           mode="edit"
           attr={attr}
           objectLabel={objectLabel}
+          objectPlural={objectPlural}
           fillFrom={fillFrom}
           open={editing}
           onOpenChange={setEditing}

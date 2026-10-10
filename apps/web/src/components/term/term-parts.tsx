@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { EmptyState } from '#/components/empty-state'
+import type { ReactNode } from 'react'
 import { Highlighted } from '#/components/command-palette'
 import {
   InitialsMark,
@@ -17,8 +17,8 @@ import type { getTermPage } from '#/lib/server-fns'
  *
  * What is missing is the design: no "file into", no "tag", no "attach", no
  * "track companies". A concept never holds things (CONTEXT.md → Glossary);
- * every list here is something the graph learned by matching the term, and
- * the empty state says so in the litmus' own words.
+ * every list here is something the graph learned by matching the term. The
+ * empty state's one primary writes a note that mentions it.
  */
 
 type Page = NonNullable<Awaited<ReturnType<typeof getTermPage>>>
@@ -26,9 +26,7 @@ export type MentionRow = Page['mentions']['rows'][number]
 export type CompanyRow = Page['companies']['rows'][number]
 export type CoMentionRow = Page['coMentioned'][number]
 
-export const TERM_EMPTY_TITLE = 'Nothing mentions this term yet.'
-export const TERM_EMPTY_BODY =
-  'A term gathers what mentions it and holds nothing itself — file notes and decks into a space.'
+export const TERM_EMPTY = 'Nothing mentions this term yet.'
 
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`
@@ -60,12 +58,20 @@ function mentionMeta(row: MentionRow): string {
 export function TermMentions({
   rows,
   total,
+  action,
 }: {
   rows: Array<MentionRow>
   total: number
+  /** The empty state's one primary. */
+  action?: ReactNode
 }) {
   if (total === 0) {
-    return <EmptyState title={TERM_EMPTY_TITLE} body={TERM_EMPTY_BODY} />
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <p className="text-ui text-graphite">{TERM_EMPTY}</p>
+        {action}
+      </div>
+    )
   }
   return (
     <RecordSection
@@ -140,9 +146,7 @@ export function CompaniesReached({
       meta={rows.length < total ? `${rows.length} of ${total}` : `${total}`}
     >
       {rows.length === 0 ? (
-        <RailEmpty>
-          No company yet — none of the mentions is filed on or names one.
-        </RailEmpty>
+        <RailEmpty>No company yet.</RailEmpty>
       ) : (
         rows.map((c) => (
           <RailItem key={c.id}>

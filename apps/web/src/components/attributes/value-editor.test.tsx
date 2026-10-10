@@ -85,9 +85,16 @@ describe('ValueEditor — a person’s emails', () => {
     )
 
   it('marks a role address as a shared inbox, and only that one', () => {
-    const html = render(emails, ['jane@acme.example', 'info@acme.example'])
+    const html = render(emails, ['info@acme.example', 'jane@acme.example'])
     expect(html).toContain('info@acme.example')
     expect(html.match(/shared inbox/g)).toHaveLength(1)
+  })
+
+  it('shows the first email in a property row and +N for the rest', () => {
+    const html = render(emails, ['jane@acme.example', 'info@acme.example'])
+    expect(html).toContain('jane@acme.example')
+    expect(html).not.toContain('info@acme.example')
+    expect(html).toContain('+1</span>')
   })
 
   it('leaves the mark off an email attribute that is not identity', () => {
